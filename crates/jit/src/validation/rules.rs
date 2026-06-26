@@ -20,7 +20,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::JitConfig;
@@ -146,7 +146,7 @@ pub enum RuleConfigError {
 /// assert_eq!(Severity::default(), Severity::Warn);
 /// assert_ne!(Severity::Off, Severity::Error);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
     /// Rule is disabled.
@@ -203,12 +203,32 @@ impl Severity {
 /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
 /// assert_eq!(set.rules[0].scope, Scope::Local);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Scope {
     /// Per-issue, runs on write.
     Local,
     /// Aggregate/graph, runs only on demand.
     Graph,
+}
+
+impl Scope {
+    /// Stable snake_case token for this scope, matching the TOML grammar.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::rules::Scope;
+    ///
+    /// assert_eq!(Scope::Local.token(), "local");
+    /// assert_eq!(Scope::Graph.token(), "graph");
+    /// ```
+    pub fn token(self) -> &'static str {
+        match self {
+            Scope::Local => "local",
+            Scope::Graph => "graph",
+        }
+    }
 }
 
 /// Selector matching the issue dimensions a rule applies to.

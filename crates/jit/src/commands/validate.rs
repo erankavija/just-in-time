@@ -1273,16 +1273,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .rules
             .iter()
             .map(|rule| {
-                let scope = match rule.scope {
-                    Scope::Local => "local",
-                    Scope::Graph => "graph",
-                };
                 match rule.when.match_failure(&issue) {
                     // Selector excluded the issue: report it as skipped.
                     Some(skip_reason) => RuleOutcome {
                         rule: rule.name.clone(),
-                        scope: scope.to_string(),
-                        severity: rule.severity.token().to_string(),
+                        scope: rule.scope,
+                        severity: rule.severity,
                         selector: render_selector(&rule.when),
                         matched: false,
                         skip_reason: Some(skip_reason),
@@ -1301,8 +1297,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         };
                         RuleOutcome {
                             rule: rule.name.clone(),
-                            scope: scope.to_string(),
-                            severity: rule.severity.token().to_string(),
+                            scope: rule.scope,
+                            severity: rule.severity,
                             selector: render_selector(&rule.when),
                             matched: true,
                             skip_reason: None,
