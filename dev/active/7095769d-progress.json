@@ -72,7 +72,7 @@
           "title": "Typed error variants and downcast for error classification",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (worktree agent-b9a28509, base 3f4458cd, Opus worker t3-error-class)"
+          "status": "in_progress (worktree agent-b9a28509, base 3f4458cd, Opus worker t3-error-class). Worker raised a scope ambiguity in criterion 2 (error_to_exit_code also string-matches invalid/already-exists/io, untargeted by report fix #4). User chose FULL PURGE: error_to_exit_code must be 100%% string-free (type all ~20 'Invalid ...' parse origins -> shared InvalidArgumentError, GateAlreadyExists, io via std::io::Error+ErrorKind). Criterion 2 then holds literally; NO criterion edit. Kept as one atomic worktree change (partial conversion would break exit-code tests); Sonnet-workflow fan-out held in reserve if origin breadth balloons."
         }
       ]
     },
