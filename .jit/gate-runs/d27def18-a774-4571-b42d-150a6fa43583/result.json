@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d27def18-a774-4571-b42d-150a6fa43583",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
+  "commit": "e36f12a32dd3a2956d7fe513bceefea4a0e2b097",
+  "branch": "worktree-agent-70ca9e3a",
+  "status": "passed",
+  "started_at": "2026-06-25T23:19:30.183483698Z",
+  "completed_at": "2026-06-25T23:21:14.677407164Z",
+  "duration_ms": 104493,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nNo blocking findings. `WorktreeConfig.mode` and `enforce_leases` are now typed as `Option<WorktreeMode>` / `Option<EnforcementMode>` with shared `FromStr` + serde deserialization in [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:867). Env-var parsing now also goes through the same `FromStr` path in [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:1406).\n\n`ItemKindConfig.scope` is typed as `Option<KindScopeConfig>` and invalid tokens fail during TOML deserialization in [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:319). The domain conversion now handles only typed variants in [domain/item.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/domain/item.rs:482).\n\n**Architecture**\nNo new I/O or storage access was introduced outside storage. The change is limited to config parsing, command diagnostics, and domain conversion of already-loaded config values. The existing domain-to-config coupling in `ItemKind::from_config` remains, but this change does not materially expand the architectural boundary beyond the requested typed config handoff.\n\n**Functional Paradigm**\nThe changed code uses expression-oriented parsing and direct typed matches. The required dispatch-table collapse is implemented through `FromStr` rather than duplicated string matches.\n\n**Correctness And Invariants**\nNo file-write, event-log, gate-transition, assignee/label, or PID code paths were changed. Gate semantics and PID safety are unaffected by this diff.\n\n**Safety**\nNo unsafe code was introduced. The workspace-level `#![deny(unsafe_code)]` requirement is not weakened.\n\n**Testing**\nThe issue context reports `cargo-ci` passed with exit code `0` at `2026-06-25T23:16:29Z`; per instruction I did not rerun cargo tests. New unit tests cover invalid scope parse-time failure and worktree/enforcement case handling in [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:2248).\n\n**Error Handling**\nNew parser errors use `thiserror` and include the invalid token, e.g. [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:834) and [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:857). Fallible env parsing still returns `Result` with context in [config.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/config.rs:1408).\n\n**CLI Contract**\nNo command surface or `--json` handling was removed. CLI config validation now uses the same typed parsers in [main.rs](/home/vkaskivuo/Projects/just-in-time/.claude/worktrees/agent-70ca9e3a/crates/jit/src/main.rs:3960).\n\n**Documentation**\nThe new public enums and parser error types have doc comments and examples, including `KindScopeConfig`, `WorktreeMode`, and `EnforcementMode`.\n\n**Jit Issue Management**\n`issue.dependencies` is empty, so there is no prerequisite work to verify. I ran `./scripts/jit-validate.sh`; it passed with `✓ Repository validation passed`. Prior review history is empty, so there are no unresolved prior-review items.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

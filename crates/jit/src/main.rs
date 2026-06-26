@@ -3970,65 +3970,36 @@ fn run() -> Result<()> {
 
                 let mut result = ValidationResult::default();
 
-                // Check repo config
+                // Check repo config — invalid worktree/enforcement tokens are now
+                // caught at TOML parse time, so a successful load implies valid values.
                 let repo_config_path = jit_dir.join("config.toml");
                 if repo_config_path.exists() {
-                    match JitConfig::load(&jit_dir) {
-                        Ok(cfg) => {
-                            // Check for invalid values
-                            if let Some(ref wt) = cfg.worktree {
-                                if let Err(e) = wt.worktree_mode() {
-                                    result.errors.push(format!("repo config: {}", e));
-                                }
-                                if let Err(e) = wt.enforcement_mode() {
-                                    result.errors.push(format!("repo config: {}", e));
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            result.errors.push(format!("repo config: {}", e));
-                        }
+                    if let Err(e) = JitConfig::load(&jit_dir) {
+                        result.errors.push(format!("repo config: {}", e));
                     }
                 }
 
-                // Check user config
+                // Check user config.
                 if let Some(home) = dirs::home_dir() {
                     let user_config_path = home.join(".config/jit/config.toml");
                     if user_config_path.exists() {
                         let user_dir = home.join(".config/jit");
-                        match JitConfig::load(&user_dir) {
-                            Ok(cfg) => {
-                                if let Some(ref wt) = cfg.worktree {
-                                    if let Err(e) = wt.worktree_mode() {
-                                        result.errors.push(format!("user config: {}", e));
-                                    }
-                                    if let Err(e) = wt.enforcement_mode() {
-                                        result.errors.push(format!("user config: {}", e));
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                result.errors.push(format!("user config: {}", e));
-                            }
+                        if let Err(e) = JitConfig::load(&user_dir) {
+                            result.errors.push(format!("user config: {}", e));
                         }
                     }
                 }
 
-                // Check env vars
+                // Check env vars — use the same FromStr as TOML parsing so
+                // case-handling is identical across both sources.
                 if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-                    if !["auto", "on", "off"].contains(&val.to_lowercase().as_str()) {
-                        result.errors.push(format!(
-                            "JIT_WORKTREE_MODE='{}' is invalid. Use: auto, on, off",
-                            val
-                        ));
+                    if let Err(e) = val.parse::<jit::config::WorktreeMode>() {
+                        result.errors.push(format!("JIT_WORKTREE_MODE: {e}"));
                     }
                 }
                 if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
-                    if !["strict", "warn", "off"].contains(&val.to_lowercase().as_str()) {
-                        result.errors.push(format!(
-                            "JIT_ENFORCE_LEASES='{}' is invalid. Use: strict, warn, off",
-                            val
-                        ));
+                    if let Err(e) = val.parse::<jit::config::EnforcementMode>() {
+                        result.errors.push(format!("JIT_ENFORCE_LEASES: {e}"));
                     }
                 }
 
