@@ -1,0 +1,19 @@
+{
+  "id": "f16cfe8c-970e-450b-9ac5-050243c6741d",
+  "title": "Revisit archival mechanism: epic-level atomic archive + reference integrity sweep",
+  "description": "Follow-up to the archival doc-reference integrity fix. Revisit the archival mechanism and UX holistically rather than only patching per-document archive.\n\nMotivation: epic 25064508's archival left dangling references because archival is per-document and not reference-aware/transactional at the epic level. A retiring epic has many artifacts (plan, completion report, showcase, dogfood evidence) and many cross-issue references; doing this one file at a time is error-prone.\n\n## Possible scope (to be refined)\n\n- An epic-level `jit archive <container>` that atomically relocates ALL of a container's artifacts and re-links every reference across the graph in one transaction, aborting if any artifact is missing.\n- A `jit doc verify` / integrity sweep surfacing dangling references before they reach `jit validate`.\n- Clear UX for what \"archive\" means for a bracket (plan, breakdown, completion report) and how the planning node's plan reference is carried.\n\n## Success Criteria\n\n- [ ] A design note evaluating epic-level atomic archival vs the per-document model, with a recommendation.\n- [ ] (If approved) an implementation that makes archiving a completed epic a single safe operation that never leaves dangling references.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:code-smell-cleanup"
+  ],
+  "created_at": "2026-06-26T08:06:02.045165430+00:00",
+  "updated_at": "2026-06-26T08:06:02.046624370+00:00"
+}

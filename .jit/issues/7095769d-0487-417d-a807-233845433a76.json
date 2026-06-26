@@ -6,17 +6,19 @@
   "priority": "high",
   "assignee": "agent:project-lead",
   "dependencies": [
-    "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
-    "2355c5ea-cdaf-4874-b123-b7964fa33436",
-    "b9a28509-ec8e-4d1a-93cc-10ef055f16a1",
-    "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
-    "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
-    "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
-    "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
     "b22c041e-8281-45ea-8cab-88edf1c23fb8",
     "e3e6d47d-4262-4451-a343-9b6c07a3a3c0",
+    "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
+    "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
+    "f067678a-ff9c-454a-89d0-a410ec129f0b",
+    "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
     "44450437-d807-4e33-bf10-3a3eb9af29ad",
-    "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c"
+    "b9a28509-ec8e-4d1a-93cc-10ef055f16a1",
+    "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
+    "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
+    "2355c5ea-cdaf-4874-b123-b7964fa33436",
+    "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
+    "f16cfe8c-970e-450b-9ac5-050243c6741d"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -36,5 +38,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-25T21:39:11.551989374+00:00",
-  "updated_at": "2026-06-25T22:00:16.440124362+00:00"
+  "updated_at": "2026-06-26T08:06:02.072707808+00:00"
 }
