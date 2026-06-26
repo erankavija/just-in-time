@@ -60,6 +60,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use gate::{
     GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, PassAllOutcome,
 };
+pub use graph::GraphExportFormat;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use item::{ItemListResult, ItemShowResult};
 pub use template::TemplateApplyResult;

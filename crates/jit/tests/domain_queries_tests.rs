@@ -179,9 +179,18 @@ fn test_query_blocked_finds_issues_with_incomplete_deps() {
     let issues = vec![dep1, dep2, blocked, ready];
     let blocked_result = jit::domain::queries::query_blocked(&issues);
 
+    use jit::domain::queries::BlockingReason;
     assert_eq!(blocked_result.len(), 1);
     assert_eq!(blocked_result[0].0.id, "blocked1");
-    assert!(blocked_result[0].1.iter().any(|r| r.contains("dep1")));
+    assert!(blocked_result[0].1.iter().any(|r| matches!(
+        r,
+        BlockingReason::Dependency { id, .. } if id == "dep1"
+    )));
+    // Display round-trips to the canonical reason string.
+    assert!(blocked_result[0]
+        .1
+        .iter()
+        .any(|r| r.to_string().contains("dependency:dep1")));
 }
 
 #[test]
