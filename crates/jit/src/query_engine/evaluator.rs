@@ -3,10 +3,9 @@
 //! This layer contains all domain knowledge and reuses existing Issue methods.
 
 use super::parser::{QueryCondition, QueryExpr};
-use crate::domain::{Issue, Priority, State};
+use crate::domain::Issue;
 use crate::labels;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 /// Context needed for evaluating queries
 ///
@@ -43,24 +42,16 @@ impl QueryEvaluator {
 
     fn eval_condition(cond: &QueryCondition, issue: &Issue, ctx: &QueryContext) -> bool {
         match cond {
-            QueryCondition::State(s) => {
-                // Use FromStr trait for parsing
-                State::from_str(s)
-                    .map(|state| issue.state == state)
-                    .unwrap_or(false)
-            }
+            // Conditions carry typed values parsed at parse time, so matching is
+            // a direct comparison (no fail-open FromStr round-trip here).
+            QueryCondition::State(state) => issue.state == *state,
 
             QueryCondition::Label(pattern) => {
                 // Use centralized label matching from labels module
                 labels::matches_pattern(&issue.labels, pattern)
             }
 
-            QueryCondition::Priority(p) => {
-                // Use FromStr trait for parsing
-                Priority::from_str(p)
-                    .map(|priority| issue.priority == priority)
-                    .unwrap_or(false)
-            }
+            QueryCondition::Priority(priority) => issue.priority == *priority,
 
             QueryCondition::Assignee(assignee) => issue
                 .assignee
@@ -115,10 +106,10 @@ mod tests {
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
-        let cond = QueryCondition::State("ready".to_string());
+        let cond = QueryCondition::State(State::Ready);
         assert!(QueryEvaluator::eval_condition(&cond, &issue, &context));
 
-        let cond = QueryCondition::State("done".to_string());
+        let cond = QueryCondition::State(State::Done);
         assert!(!QueryEvaluator::eval_condition(&cond, &issue, &context));
     }
 
@@ -128,10 +119,10 @@ mod tests {
         let issues = [issue.clone()];
         let context = QueryContext::from_issues(&issues);
 
-        let cond = QueryCondition::Priority("high".to_string());
+        let cond = QueryCondition::Priority(Priority::High);
         assert!(QueryEvaluator::eval_condition(&cond, &issue, &context));
 
-        let cond = QueryCondition::Priority("low".to_string());
+        let cond = QueryCondition::Priority(Priority::Low);
         assert!(!QueryEvaluator::eval_condition(&cond, &issue, &context));
     }
 
@@ -257,11 +248,9 @@ mod tests {
         let context = QueryContext::from_issues(&issues);
 
         let expr = QueryExpr::And(
-            Box::new(QueryExpr::Condition(QueryCondition::State(
-                "ready".to_string(),
-            ))),
+            Box::new(QueryExpr::Condition(QueryCondition::State(State::Ready))),
             Box::new(QueryExpr::Condition(QueryCondition::Priority(
-                "high".to_string(),
+                Priority::High,
             ))),
         );
 
@@ -275,12 +264,8 @@ mod tests {
         let context = QueryContext::from_issues(&issues);
 
         let expr = QueryExpr::Or(
-            Box::new(QueryExpr::Condition(QueryCondition::State(
-                "ready".to_string(),
-            ))),
-            Box::new(QueryExpr::Condition(QueryCondition::State(
-                "done".to_string(),
-            ))),
+            Box::new(QueryExpr::Condition(QueryCondition::State(State::Ready))),
+            Box::new(QueryExpr::Condition(QueryCondition::State(State::Done))),
         );
 
         assert!(QueryEvaluator::matches(&expr, &issue, &context));
@@ -309,15 +294,11 @@ mod tests {
         // (state:ready OR state:done) AND priority:high
         let expr = QueryExpr::And(
             Box::new(QueryExpr::Or(
-                Box::new(QueryExpr::Condition(QueryCondition::State(
-                    "ready".to_string(),
-                ))),
-                Box::new(QueryExpr::Condition(QueryCondition::State(
-                    "done".to_string(),
-                ))),
+                Box::new(QueryExpr::Condition(QueryCondition::State(State::Ready))),
+                Box::new(QueryExpr::Condition(QueryCondition::State(State::Done))),
             )),
             Box::new(QueryExpr::Condition(QueryCondition::Priority(
-                "high".to_string(),
+                Priority::High,
             ))),
         );
 

@@ -2,8 +2,12 @@
 //!
 //! Builds an abstract syntax tree (AST) from tokens.
 
-use super::lexer::Token;
-use anyhow::{anyhow, Result};
+use super::error::{QueryParseError, PRIORITY_VALUES, STATE_VALUES};
+use super::lexer::{FilterField, Token};
+use crate::domain::{Priority, State};
+use std::str::FromStr;
+
+type Result<T> = std::result::Result<T, QueryParseError>;
 
 /// Abstract syntax tree node for query expressions
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,13 +25,17 @@ pub enum QueryExpr {
 /// Individual query conditions
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QueryCondition {
-    /// Filter by state (value unparsed, e.g., "ready")
-    State(String),
-    /// Filter by label (supports wildcards, e.g., "epic:*")
+    /// Filter by lifecycle state, parsed into a typed [`State`] at parse time so
+    /// an invalid value (e.g. `state:notastate`) is a parse error rather than a
+    /// silent no-match.
+    State(State),
+    /// Filter by label (open value, supports wildcards, e.g., "epic:*")
     Label(String),
-    /// Filter by priority (value unparsed, e.g., "high")
-    Priority(String),
-    /// Filter by assignee
+    /// Filter by priority, parsed into a typed [`Priority`] at parse time so an
+    /// invalid value (e.g. `priority:nope`) is a parse error rather than a
+    /// silent no-match.
+    Priority(Priority),
+    /// Filter by assignee (open value)
     Assignee(String),
     /// Issues with no assignee
     Unassigned,
@@ -107,7 +115,7 @@ impl Parser {
             let expr = self.parse_expr()?;
 
             if !self.match_token(&Token::RParen) {
-                return Err(anyhow!("Expected closing parenthesis"));
+                return Err(QueryParseError::UnclosedParen);
             }
             self.advance();
             return Ok(expr);
@@ -119,7 +127,7 @@ impl Parser {
     /// Parse a single condition (atom)
     fn parse_condition(&mut self) -> Result<QueryExpr> {
         if self.is_at_end() {
-            return Err(anyhow!("Unexpected end of query"));
+            return Err(QueryParseError::UnexpectedEnd);
         }
 
         let token = self.current_token().clone();
@@ -127,18 +135,17 @@ impl Parser {
 
         match token {
             Token::Filter { field, value } => {
-                let condition = match field.as_str() {
-                    "state" => QueryCondition::State(value),
-                    "label" => QueryCondition::Label(value),
-                    "priority" => QueryCondition::Priority(value),
-                    "assignee" => QueryCondition::Assignee(value),
-                    _ => return Err(anyhow!("Unknown filter field: '{}'", field)),
+                let condition = match field {
+                    FilterField::State => QueryCondition::State(parse_state(&value)?),
+                    FilterField::Label => QueryCondition::Label(value),
+                    FilterField::Priority => QueryCondition::Priority(parse_priority(&value)?),
+                    FilterField::Assignee => QueryCondition::Assignee(value),
                 };
                 Ok(QueryExpr::Condition(condition))
             }
             Token::Unassigned => Ok(QueryExpr::Condition(QueryCondition::Unassigned)),
             Token::Blocked => Ok(QueryExpr::Condition(QueryCondition::Blocked)),
-            _ => Err(anyhow!("Expected condition, found {:?}", token)),
+            other => Err(QueryParseError::ExpectedCondition(format!("{other:?}"))),
         }
     }
 
@@ -174,6 +181,25 @@ impl Parser {
     }
 }
 
+/// Parse a `state:` filter value into a typed [`State`], mapping any failure to a
+/// typed [`QueryParseError::InvalidState`] so an invalid value fails loudly
+/// instead of silently matching nothing.
+fn parse_state(value: &str) -> Result<State> {
+    State::from_str(value).map_err(|_| QueryParseError::InvalidState {
+        value: value.to_string(),
+        valid: STATE_VALUES.to_string(),
+    })
+}
+
+/// Parse a `priority:` filter value into a typed [`Priority`], mapping any
+/// failure to a typed [`QueryParseError::InvalidPriority`].
+fn parse_priority(value: &str) -> Result<Priority> {
+    Priority::from_str(value).map_err(|_| QueryParseError::InvalidPriority {
+        value: value.to_string(),
+        valid: PRIORITY_VALUES.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,7 +212,7 @@ mod tests {
 
         assert_eq!(
             expr,
-            QueryExpr::Condition(QueryCondition::State("ready".to_string()))
+            QueryExpr::Condition(QueryCondition::State(State::Ready))
         );
     }
 
@@ -199,11 +225,11 @@ mod tests {
             QueryExpr::And(left, right) => {
                 assert_eq!(
                     *left,
-                    QueryExpr::Condition(QueryCondition::State("ready".to_string()))
+                    QueryExpr::Condition(QueryCondition::State(State::Ready))
                 );
                 assert_eq!(
                     *right,
-                    QueryExpr::Condition(QueryCondition::Priority("high".to_string()))
+                    QueryExpr::Condition(QueryCondition::Priority(Priority::High))
                 );
             }
             _ => panic!("Expected And expression"),
@@ -219,15 +245,45 @@ mod tests {
             QueryExpr::Or(left, right) => {
                 assert_eq!(
                     *left,
-                    QueryExpr::Condition(QueryCondition::State("ready".to_string()))
+                    QueryExpr::Condition(QueryCondition::State(State::Ready))
                 );
                 assert_eq!(
                     *right,
-                    QueryExpr::Condition(QueryCondition::State("done".to_string()))
+                    QueryExpr::Condition(QueryCondition::State(State::Done))
                 );
             }
             _ => panic!("Expected Or expression"),
         }
+    }
+
+    #[test]
+    fn test_parse_error_invalid_state_value() {
+        // Regression: an invalid state value must be a PARSE ERROR, not a silent
+        // no-match (the `state:notastate` fail-open bug).
+        let tokens = Lexer::tokenize("state:notastate").unwrap();
+        let result = Parser::parse(tokens);
+
+        assert_eq!(
+            result.unwrap_err(),
+            QueryParseError::InvalidState {
+                value: "notastate".to_string(),
+                valid: STATE_VALUES.to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_error_invalid_priority_value() {
+        let tokens = Lexer::tokenize("priority:nope").unwrap();
+        let result = Parser::parse(tokens);
+
+        assert_eq!(
+            result.unwrap_err(),
+            QueryParseError::InvalidPriority {
+                value: "nope".to_string(),
+                valid: PRIORITY_VALUES.to_string(),
+            }
+        );
     }
 
     #[test]
@@ -263,11 +319,11 @@ mod tests {
             QueryExpr::And(left, right) => {
                 assert_eq!(
                     *left,
-                    QueryExpr::Condition(QueryCondition::State("ready".to_string()))
+                    QueryExpr::Condition(QueryCondition::State(State::Ready))
                 );
                 assert_eq!(
                     *right,
-                    QueryExpr::Condition(QueryCondition::Priority("high".to_string()))
+                    QueryExpr::Condition(QueryCondition::Priority(Priority::High))
                 );
             }
             _ => panic!("Expected And expression for implicit AND"),
@@ -313,21 +369,6 @@ mod tests {
         let expr = Parser::parse(tokens).unwrap();
 
         assert_eq!(expr, QueryExpr::Condition(QueryCondition::Blocked));
-    }
-
-    #[test]
-    fn test_parse_error_unknown_field() {
-        let tokens = vec![Token::Filter {
-            field: "unknown".to_string(),
-            value: "value".to_string(),
-        }];
-        let result = Parser::parse(tokens);
-
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Unknown filter field"));
     }
 
     #[test]

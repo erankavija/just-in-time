@@ -697,7 +697,7 @@ fn evaluate_label_coverage(
     // in `child-state`. `container_short_id` is the criteria-owning container's
     // short id, threaded in so the qualified form's scope can be checked.
     let state_matcher = child_state.map(|s| Selector {
-        state: Some(StatePredicate::Single(s.to_string())),
+        state: Some(StatePredicate::single(s)),
         ..Selector::default()
     });
     let satisfied_id = |child: &Issue, id: &str, container_short_id: &str| -> bool {
