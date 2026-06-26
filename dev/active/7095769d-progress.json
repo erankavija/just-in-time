@@ -108,7 +108,7 @@
           "title": "Shared type: label-namespace helper",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched 5a (worktree agent-e3e6d47d base b673231e; sonnet t5-label-helper)"
+          "status": "rework R2 (AT CAP 2/2; same-finding occurrence 2/3). cargo-ci green throughout. R1 fixed template.rs duplicate; re-gate FAIL found 3 MORE type:-encoding sites my idiom-keyed audit missed (bare \"type\" literal forms): type_hierarchy.rs:249 extract_type parts[0]!=\"type\", domain/projection.rs:144 duplicate const TYPE_NAMESPACE, validation/graph.rs:889 values_in_namespace(_,\"type\"). R2 = make labels::TYPE_NAMESPACE the single owner; route all via the const; EXHAUSTIVE bare-literal audit; scope-guard OUT group_labels split refactor (separate finding). Next distinct round -> ESCALATE."
         },
         {
           "id": "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
@@ -149,7 +149,8 @@
     "d0edc072": 2,
     "bf0034e1": 1,
     "f067678a": 2,
-    "b9a28509": 2
+    "b9a28509": 2,
+    "e3e6d47d": 2
   },
   "b9a28509_rework_r2": "AT CAP (2/2). R1 fixes verified (ripgrep typed, message-text audit, +3 latent regressions closed). Re-gate on 9b440259: cargo-ci green, code-review FAIL 1 new finding \u2014 gate.rs:869 create_gate_preset uses GENERIC NotFoundError (chosen in R1 to preserve the 'Gate not found in registry: {key}' text, which differs from GateNotFoundError::single's wording), violating criterion 1 (gate-not-found must be the DEDICATED typed variant). Flip side of the R1 message fix. R2: add a GateNotFoundError variant (InRegistry) whose Display is byte-identical to that text; use it; audit ALL generic-NotFoundError sites to use dedicated types where one exists. Next distinct finding -> ESCALATE (cap reached). NOTE: t3 amended a commit mid-gate once (d9a29d8e->9b440259, inert +5-line comment); told it to use new commits, not amend, during gates.",
   "b9a28509_rework_r1": "cargo-ci green; code-review FAIL (2 legit findings): (1) a 6th string-classification site at main.rs:4354 (search Err handler picks RIPGREP_NOT_FOUND vs SEARCH_FAILED via e.to_string().contains('not installed')) -> type at the rg-spawn origin via io::ErrorKind::NotFound; (2) message-text regression: GateNotFoundError::single Display 'Gate '{0}' not found in registry' != original 'Gate not found in registry: {gate_key}'. Sent rework demanding COMPLETE per-origin message-preservation audit (byte-identical Display to pre-refactor text at every typed origin) + full main.rs string-control-flow grep, to avoid round-by-round churn.",
