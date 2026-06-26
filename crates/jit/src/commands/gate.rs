@@ -227,10 +227,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Atomic: fail entirely if any gate doesn't exist
         if !not_found.is_empty() {
-            return Err(anyhow!(
-                "Gates not found in registry: {}",
-                not_found.join(", ")
-            ));
+            return Err(crate::storage::GateNotFoundError::new(not_found).into());
         }
 
         // Second pass: add gates (now safe since all are validated)
@@ -611,7 +608,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
-            return Err(anyhow!("Gate '{}' already exists", key));
+            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
         }
 
         registry.gates.insert(
@@ -657,7 +654,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if registry.gates.contains_key(&key) {
-            return Err(anyhow!("Gate '{}' already exists", key));
+            return Err(crate::storage::GateAlreadyExistsError::new(key.as_str()).into());
         }
 
         // Validate: auto gates must have checker
@@ -702,7 +699,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if !registry.gates.contains_key(key) {
-            return Err(anyhow!("Gate '{}' not found", key));
+            return Err(crate::storage::GateNotFoundError::by_key(key).into());
         }
 
         registry.gates.remove(key);
@@ -716,7 +713,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .gates
             .get(key)
             .cloned()
-            .ok_or_else(|| anyhow!("Gate '{}' not found", key))
+            .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key).into())
     }
 
     // Preset management methods
@@ -865,10 +862,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut gates = Vec::new();
 
         for gate_key in &issue.gates_required {
+            // Dedicated GateNotFoundError (exit 3) so a gate-not-found is always
+            // this type by downcast; the InRegistry variant reproduces this site's
+            // original "Gate not found in registry: <key>" phrasing verbatim. The
+            // other ::single origins (gate_check.rs, bulk_update.rs) used a
+            // different wording carried by the Single variant.
             let gate = registry
                 .gates
                 .get(gate_key)
-                .ok_or_else(|| anyhow!("Gate not found in registry: {}", gate_key))?;
+                .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
 
             gates.push(GateTemplate {
                 key: gate.key.clone(),

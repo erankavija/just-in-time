@@ -9,6 +9,13 @@ pub struct DependenciesAddResult {
     pub already_exist: Vec<String>,
     pub skipped: Vec<(String, String)>, // (id, reason)
     pub errors: Vec<(String, String)>,  // (id, error message)
+    /// The same per-dependency failures as their original typed errors, in the
+    /// same order as [`errors`](Self::errors). Preserved (not serialized) so the
+    /// CLI can classify a failure (cycle vs not-found) by downcasting the typed
+    /// error instead of scanning its message text. The human-readable string in
+    /// `errors` remains the serialized / displayed form.
+    #[serde(skip)]
+    pub typed_errors: Vec<(String, anyhow::Error)>,
 }
 
 /// Result of removing multiple dependencies
@@ -162,6 +169,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             already_exist: Vec::new(),
             skipped: Vec::new(),
             errors: Vec::new(),
+            typed_errors: Vec::new(),
         };
 
         // Try to add each dependency individually
@@ -177,7 +185,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     result.skipped.push((dep_id.clone(), reason));
                 }
                 Err(e) => {
+                    // Keep both representations in lockstep: the message for
+                    // serialization / display, and the typed error for the CLI
+                    // to classify by downcast.
                     result.errors.push((dep_id.clone(), e.to_string()));
+                    result.typed_errors.push((dep_id.clone(), e));
                 }
             }
         }

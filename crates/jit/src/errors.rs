@@ -95,6 +95,239 @@ impl fmt::Display for ActionableError {
 
 impl std::error::Error for ActionableError {}
 
+/// A user-supplied argument or configuration value that failed to parse or
+/// validate.
+///
+/// This is the shared typed carrier for "invalid argument" conditions that were
+/// previously raised as bare `anyhow!("Invalid ...")` strings. It carries the
+/// original human-readable message so `Display` is byte-for-byte unchanged from
+/// the old form; the CLI downcasts to this type to classify the failure as an
+/// invalid-argument condition (exit code `2`) without scanning the message text.
+///
+/// Use [`InvalidArgumentError::new`] at every origin whose error message the CLI
+/// maps to exit code `2` (enum `FromStr` parse failures, config parse failures,
+/// malformed CLI values), so the classification is driven by type rather than by
+/// substring matching.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::InvalidArgumentError;
+///
+/// let err = InvalidArgumentError::new("Invalid priority: urgent");
+/// assert_eq!(err.to_string(), "Invalid priority: urgent");
+/// assert_eq!(err.message(), "Invalid priority: urgent");
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<InvalidArgumentError>().is_some());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct InvalidArgumentError {
+    message: String,
+}
+
+impl InvalidArgumentError {
+    /// Build an [`InvalidArgumentError`] carrying the user-facing message.
+    ///
+    /// The message is reproduced verbatim by `Display`, so passing the exact
+    /// string that the previous `anyhow!` origin produced keeps user-facing
+    /// output unchanged.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// The user-facing message describing what was invalid.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+/// A generic "resource not found" failure carrying its user-facing message.
+///
+/// This is the shared typed carrier for the long tail of lookup failures that do
+/// not warrant a bespoke type (document references, gate keys, plan documents,
+/// git paths, the `jit-server` binary, …). The structured storage resources keep
+/// their dedicated errors (e.g. [`crate::storage::IssueNotFoundError`]); this
+/// covers the rest. It carries the original message so `Display` is unchanged,
+/// and the CLI downcasts to it to classify the failure as a not-found condition
+/// (exit code `3`) without scanning the message text.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::NotFoundError;
+///
+/// let err = NotFoundError::new("Document reference docs/x.md not found in issue ab12");
+/// assert!(err.to_string().contains("not found"));
+///
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<NotFoundError>().is_some());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct NotFoundError {
+    message: String,
+}
+
+impl NotFoundError {
+    /// Build a [`NotFoundError`] carrying the user-facing message verbatim.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// The user-facing not-found message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+/// A generic "resource already exists" failure carrying its user-facing message.
+///
+/// Shared typed carrier for already-exists conditions outside the gate registry
+/// (which uses [`crate::storage::GateAlreadyExistsError`]), e.g. a snapshot output
+/// path that is already occupied. Carries the message verbatim; the CLI downcasts
+/// to it to classify the failure as an already-exists condition (exit code `6`).
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::AlreadyExistsError;
+///
+/// let err = AlreadyExistsError::new("Output path already exists: /tmp/snap");
+/// assert!(err.to_string().contains("already exists"));
+///
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<AlreadyExistsError>().is_some());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct AlreadyExistsError {
+    message: String,
+}
+
+impl AlreadyExistsError {
+    /// Build an [`AlreadyExistsError`] carrying the user-facing message verbatim.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// The user-facing already-exists message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+/// A validation failure that rejects an operation: a repository-integrity
+/// violation found by `jit validate`'s silent pass (broken dependency, undefined
+/// required gate, dangling document reference, cyclic/isolated DAG, …) or a
+/// write-time rule rejection (an `enforce` rule blocking a create/update).
+///
+/// These are validation failures by design (exit code `4`): this typed wrapper
+/// carries the underlying message verbatim so `Display` is unchanged, while the
+/// CLI downcasts to it to classify the failure without scanning the message text.
+/// Structured validation failures keep their dedicated types (e.g.
+/// [`TransitionBlockedError`], [`crate::GraphError`]); this covers the
+/// message-only cases.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::ValidationFailedError;
+///
+/// let err = ValidationFailedError::new(
+///     "Invalid dependency: issue 'a' depends on 'b' which does not exist",
+/// );
+/// assert!(err.to_string().contains("Invalid dependency"));
+///
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<ValidationFailedError>().is_some());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct ValidationFailedError {
+    message: String,
+}
+
+impl ValidationFailedError {
+    /// Build a [`ValidationFailedError`] carrying the violation message verbatim.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// The user-facing validation-failure message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+/// A lease-not-found failure.
+///
+/// Most lease lookups previously stringified an [`ActionableError`] into an
+/// `anyhow!("{}", ...)` (causes + remediation); one path used a plain
+/// `anyhow!("Lease {} not found", id)`. The CLI could only classify either by
+/// scanning for "not found". This dedicated type makes a lease-not-found
+/// downcastable (exit code `3`) instead, while each constructor reproduces its
+/// origin's message verbatim through `Display`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::{no_active_lease, LeaseNotFoundError};
+///
+/// let err = LeaseNotFoundError::new(&no_active_lease("abc12345"));
+/// // The rich remediation text is preserved verbatim.
+/// assert!(err.to_string().contains("abc12345"));
+/// assert!(err.to_string().contains("not found"));
+///
+/// // The plain "Lease <id> not found" form for the bare lookup path.
+/// assert_eq!(
+///     LeaseNotFoundError::by_id("abc12345").to_string(),
+///     "Lease abc12345 not found"
+/// );
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
+/// ```
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct LeaseNotFoundError {
+    message: String,
+}
+
+impl LeaseNotFoundError {
+    /// Build a [`LeaseNotFoundError`] capturing the full rendered message of an
+    /// [`ActionableError`] (e.g. from [`no_active_lease`] or [`lease_not_found`]).
+    pub fn new(error: &ActionableError) -> Self {
+        Self {
+            message: error.to_string(),
+        }
+    }
+
+    /// Build a [`LeaseNotFoundError`] for a bare lookup miss, using the plain
+    /// "Lease <id> not found" phrasing (no remediation block).
+    pub fn by_id(lease_id: impl std::fmt::Display) -> Self {
+        Self {
+            message: format!("Lease {} not found", lease_id),
+        }
+    }
+
+    /// The fully-rendered, user-facing lease-not-found message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A state-transition failure with structured blocker details.
 ///
 /// Command logic uses this error to report why an issue cannot move to the
@@ -688,5 +921,85 @@ mod tests {
         assert!(msg.contains("Not in a git repository"));
         assert!(msg.contains("git init"));
         assert!(msg.contains("git --version"));
+    }
+
+    // The generic message-carrier errors exist so the top-level exit-code
+    // classifier can downcast (rather than scan the message text) while leaving
+    // the user-facing `Display` byte-identical to the original `anyhow!`/`bail!`
+    // string. These tests pin both halves of that contract: `Display` equals the
+    // message verbatim, and the type survives an `anyhow::Error` round trip.
+
+    #[test]
+    fn test_invalid_argument_error_display_is_message_verbatim() {
+        let msg = "invalid field: unknown field 'nope'";
+        let err = InvalidArgumentError::new(msg);
+        assert_eq!(err.to_string(), msg);
+        assert_eq!(err.message(), msg);
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<InvalidArgumentError>().is_some());
+    }
+
+    #[test]
+    fn test_not_found_error_display_is_message_verbatim() {
+        let msg = "Gate 'ci' not found";
+        let err = NotFoundError::new(msg);
+        assert_eq!(err.to_string(), msg);
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<NotFoundError>().is_some());
+    }
+
+    #[test]
+    fn test_already_exists_error_display_is_message_verbatim() {
+        let msg = "Output path already exists: ./snapshot.json";
+        let err = AlreadyExistsError::new(msg);
+        assert_eq!(err.to_string(), msg);
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<AlreadyExistsError>().is_some());
+    }
+
+    #[test]
+    fn test_validation_failed_error_display_is_message_verbatim() {
+        let msg = "Invalid dependency: issue 'a' depends on 'b' which does not exist";
+        let err = ValidationFailedError::new(msg);
+        assert_eq!(err.to_string(), msg);
+        assert_eq!(err.message(), msg);
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), msg);
+        assert!(any.downcast_ref::<ValidationFailedError>().is_some());
+    }
+
+    #[test]
+    fn test_lease_not_found_error_renders_actionable_message_verbatim() {
+        // LeaseNotFoundError captures the full rendered ActionableError text so
+        // the rich remediation block is preserved while remaining downcastable.
+        let actionable = no_active_lease("abc12345");
+        let expected = actionable.to_string();
+        let err = LeaseNotFoundError::new(&actionable);
+        assert_eq!(err.to_string(), expected);
+        assert_eq!(err.message(), expected);
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), expected);
+        assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
+    }
+
+    #[test]
+    fn test_lease_not_found_error_by_id_is_plain_message() {
+        // The bare lookup path keeps its plain "Lease <id> not found" phrasing
+        // (no remediation block) while still being the dedicated, downcastable type.
+        let err = LeaseNotFoundError::by_id("xyz789");
+        assert_eq!(err.to_string(), "Lease xyz789 not found");
+        assert_eq!(err.message(), "Lease xyz789 not found");
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), "Lease xyz789 not found");
+        assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
     }
 }

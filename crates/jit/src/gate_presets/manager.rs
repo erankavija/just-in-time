@@ -1,7 +1,7 @@
 //! Preset manager for loading and managing gate presets
 
 use super::{BuiltinPresets, GatePresetDefinition, PresetInfo};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -73,10 +73,15 @@ impl PresetManager {
             let preset: GatePresetDefinition = serde_json::from_str(&content)
                 .with_context(|| format!("Failed to parse preset file: {:?}", path))?;
 
-            // Validate preset
-            preset
-                .validate()
-                .with_context(|| format!("Invalid preset in file: {:?}", path))?;
+            // Validate preset. A validation failure is an argument error (exit 2):
+            // type it so the top-level handler classifies by downcast, preserving
+            // the historical exit code and the top-level message verbatim.
+            preset.validate().map_err(|_| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "Invalid preset in file: {:?}",
+                    path
+                ))
+            })?;
 
             presets.insert(preset.name.clone(), preset);
         }
@@ -100,7 +105,7 @@ impl PresetManager {
     pub fn get_preset(&self, name: &str) -> Result<&GatePresetDefinition> {
         self.presets
             .get(name)
-            .ok_or_else(|| anyhow!("Preset not found: {}", name))
+            .ok_or_else(|| crate::storage::PresetNotFoundError::new(name).into())
     }
 
     /// List all available presets.

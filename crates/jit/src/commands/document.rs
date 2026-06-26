@@ -15,7 +15,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<(DocumentAddResult, Vec<String>)> {
         use crate::document::{AdapterRegistry, AssetScanner};
         use crate::domain::DocumentReference;
-        use anyhow::anyhow;
         use std::path::Path;
 
         let mut warnings = Vec::new();
@@ -28,7 +27,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Detect format and scan assets unless --skip-scan
         let (format, assets) = if skip_scan {
@@ -110,11 +109,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
-            return Err(anyhow!(
+            // Generic NotFoundError: a document-reference not-found has no dedicated
+            // domain type (unlike issue/gate/preset/gate-run/repository/lease). Still
+            // downcastable -> exit 3; message preserved verbatim.
+            return Err(crate::errors::NotFoundError::new(format!(
                 "Document reference {} not found in issue {}",
-                path,
-                full_id
-            ));
+                path, full_id
+            ))
+            .into());
         }
 
         self.storage.save_issue(issue)?;
@@ -140,7 +142,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         // Determine which commit to view
         let reference = if let Some(at) = at_commit {
@@ -202,7 +209,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -231,7 +243,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documents
             .iter()
             .find(|d| d.path == path)
-            .ok_or_else(|| anyhow!("Document reference {} not found in issue {}", path, full_id))?;
+            .ok_or_else(|| {
+                crate::errors::NotFoundError::new(format!(
+                    "Document reference {} not found in issue {}",
+                    path, full_id
+                ))
+            })?;
 
         let repo = Repository::open(".").map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
@@ -423,11 +440,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             })?;
 
         // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.storage.root().parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
 
         // Try to get history from git, return empty list if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -474,11 +491,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             })?;
 
         // Get repository root (parent of .jit directory)
-        let repo_root = self
-            .storage
-            .root()
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.storage.root().parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
 
         // Try to get diff from git, return error message if not available
         if let Ok(repo) = Repository::open(repo_root) {
@@ -663,7 +680,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Rescan if requested
         let assets = if rescan {
@@ -752,7 +769,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Check document links and assets for validity
     pub fn check_document_links(&self, scope: &str) -> Result<crate::commands::LinkCheckResult> {
         use crate::document::{AssetType, LinkValidationResult, LinkValidator};
-        use anyhow::anyhow;
         use std::path::PathBuf;
 
         // Get repository root
@@ -760,7 +776,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Parse scope and get documents to check
         let issues = if scope == "all" {
@@ -770,10 +786,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             let issue = self.storage.load_issue(&full_id)?;
             vec![issue]
         } else {
-            return Err(anyhow!(
+            return Err(crate::errors::InvalidArgumentError::new(format!(
                 "Invalid scope '{}'. Use 'all' or 'issue:ID'",
                 scope
-            ));
+            ))
+            .into());
         };
 
         // Collect all documents to check
@@ -1094,7 +1111,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let doc_path = Path::new(path);
 

@@ -3,7 +3,8 @@
 //! Snapshots capture complete issue state with all linked documents and assets at a specific point
 //! in time. They are critical for handoffs, audits, compliance, and reproducibility.
 
-use anyhow::{anyhow, Result};
+use crate::errors::InvalidArgumentError;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -175,20 +176,20 @@ impl SnapshotScope {
             // Parse "namespace:value" from label:namespace:value
             let parts: Vec<&str> = label_part.splitn(2, ':').collect();
             if parts.len() != 2 {
-                return Err(anyhow!(
-                    "Invalid label scope format: '{}'. Expected 'label:namespace:value'",
-                    s
-                ));
+                return Err(InvalidArgumentError::new(format!(
+                    "Invalid label scope format: '{s}'. Expected 'label:namespace:value'"
+                ))
+                .into());
             }
             Ok(SnapshotScope::Label {
                 namespace: parts[0].to_string(),
                 value: parts[1].to_string(),
             })
         } else {
-            Err(anyhow!(
-                "Invalid scope format: '{}'. Expected 'all', 'issue:ID', or 'label:namespace:value'",
-                s
+            Err(InvalidArgumentError::new(format!(
+                "Invalid scope format: '{s}'. Expected 'all', 'issue:ID', or 'label:namespace:value'"
             ))
+            .into())
         }
     }
 }
@@ -218,7 +219,10 @@ impl SnapshotFormat {
         match s {
             "dir" => Ok(SnapshotFormat::Directory),
             "tar" => Ok(SnapshotFormat::Tar),
-            _ => Err(anyhow!("Invalid format: '{}'. Expected 'dir' or 'tar'", s)),
+            _ => Err(InvalidArgumentError::new(format!(
+                "Invalid format: '{s}'. Expected 'dir' or 'tar'"
+            ))
+            .into()),
         }
     }
 }

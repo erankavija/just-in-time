@@ -368,10 +368,9 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let info = released
-        .into_iter()
-        .next_back()
-        .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))?;
+    let info = released.into_iter().next_back().ok_or_else(|| {
+        crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id))
+    })?;
     Ok((info, warnings))
 }
 
@@ -919,10 +918,9 @@ mod tests {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        released
-            .into_iter()
-            .next_back()
-            .ok_or_else(|| anyhow::anyhow!("{}", crate::errors::no_active_lease(&full_id)))
+        released.into_iter().next_back().ok_or_else(|| {
+            crate::errors::LeaseNotFoundError::new(&crate::errors::no_active_lease(&full_id)).into()
+        })
     }
 
     /// Assert a string satisfies the agent-identity invariant: has a `:`,

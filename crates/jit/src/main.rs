@@ -51,6 +51,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
         .is_some()
+        || error
+            .downcast_ref::<jit::errors::ValidationFailedError>()
+            .is_some()
     {
         return ExitCode::ValidationFailed;
     }
@@ -71,8 +74,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
-    let error_msg = error.to_string().to_lowercase();
-
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {
@@ -82,26 +83,121 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
-    // Check error message patterns
-    if error_msg.contains("not found") || error_msg.contains("no such file") {
-        ExitCode::NotFound
-    } else if error_msg.contains("gate validation failed") || error_msg.contains("blocked by") {
-        // Gate blocking should return validation failed
-        ExitCode::ValidationFailed
-    } else if error_msg.contains("cycle") || error_msg.contains("invalid dependency") {
-        ExitCode::ValidationFailed
-    } else if error_msg.contains("already exists") {
-        ExitCode::AlreadyExists
-    } else if error_msg.contains("invalid") && !error_msg.contains("invalid dependency") {
-        ExitCode::InvalidArgument
-    } else if error_msg.contains("data")
-        && (error_msg.contains("failed to read") || error_msg.contains("io error"))
-    {
-        // File system errors related to data directory
-        ExitCode::ExternalError
-    } else {
-        ExitCode::GenericError
+    // Graph errors are typed: a cycle is a validation failure, a missing node is
+    // a not-found condition. Classified by downcast, not by message text.
+    if let Some(graph_error) = error.downcast_ref::<jit::GraphError>() {
+        return match graph_error {
+            jit::GraphError::CycleDetected => ExitCode::ValidationFailed,
+            jit::GraphError::NodeNotFound { .. } => ExitCode::NotFound,
+        };
     }
+
+    // A missing storage-backed resource is a typed not-found condition (exit 3):
+    // an issue or gate key (either backend), a gate-run record, a gate preset, the
+    // repository itself, or a lease. Classified by downcast, not message text.
+    if error
+        .downcast_ref::<jit::storage::IssueNotFoundError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::storage::GateNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::GateRunNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::PresetNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::storage::RepositoryNotFoundError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::errors::LeaseNotFoundError>()
+            .is_some()
+        || error.downcast_ref::<jit::errors::NotFoundError>().is_some()
+    {
+        return ExitCode::NotFound;
+    }
+
+    // An already-exists condition is typed: the gate-registry case plus the shared
+    // AlreadyExistsError carrier (e.g. an occupied snapshot output path).
+    if error
+        .downcast_ref::<jit::storage::GateAlreadyExistsError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::errors::AlreadyExistsError>()
+            .is_some()
+    {
+        return ExitCode::AlreadyExists;
+    }
+
+    // Invalid-argument conditions are typed: the shared InvalidArgumentError, the
+    // enum parse errors (gate stage/mode), and a UTF-8 decode failure of
+    // subprocess/git output (`String::from_utf8` / `str::from_utf8`, possibly
+    // behind a `.context(...)` describing which output) all map to exit code 2 by
+    // downcast against their concrete types.
+    if error
+        .downcast_ref::<jit::errors::InvalidArgumentError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::domain::GateStageParseError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::domain::GateModeParseError>()
+            .is_some()
+        || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
+        || error.downcast_ref::<std::str::Utf8Error>().is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
+
+    // Path-based storage errors are typed via PathReadError; classify by variant.
+    // A wrapped (`Other`) cause is re-classified by recursing on its inner error,
+    // so an io::Error or an InvalidArgumentError nested in PathReadError still
+    // reaches the right code.
+    if let Some(path_error) = error.downcast_ref::<jit::storage::PathReadError>() {
+        return match path_error {
+            jit::storage::PathReadError::NotFound(_)
+            | jit::storage::PathReadError::CommitNotFound(_) => ExitCode::NotFound,
+            jit::storage::PathReadError::InvalidPath(_) => ExitCode::InvalidArgument,
+            jit::storage::PathReadError::OutsideRepoRoot(_) => ExitCode::GenericError,
+            jit::storage::PathReadError::Other(inner) => error_to_exit_code(inner),
+        };
+    }
+
+    // Archive command errors are typed: a missing source document is a not-found
+    // condition (3); an occupied destination is already-exists (6).
+    if let Some(archive_error) = error.downcast_ref::<jit::commands::ArchiveError>() {
+        return match archive_error {
+            jit::commands::ArchiveError::SourceMissing { .. } => ExitCode::NotFound,
+            jit::commands::ArchiveError::DestinationOccupied { .. } => ExitCode::AlreadyExists,
+        };
+    }
+
+    // A missing/unreadable plan document is a not-found condition (3); a missing
+    // content-parser cargo feature is a generic failure.
+    if let Some(plan_error) = error.downcast_ref::<jit::commands::plan_doc::PlanDocError>() {
+        return match plan_error {
+            jit::commands::plan_doc::PlanDocError::Read { .. } => ExitCode::NotFound,
+            jit::commands::plan_doc::PlanDocError::ContentParser(_) => ExitCode::GenericError,
+        };
+    }
+
+    // A template whose internal depends_on edges form a cycle is a validation
+    // failure (4); other template-config errors are generic.
+    if let Some(template_error) = error.downcast_ref::<jit::templates::TemplateConfigError>() {
+        return match template_error {
+            jit::templates::TemplateConfigError::CyclicDependsOn { .. } => {
+                ExitCode::ValidationFailed
+            }
+            _ => ExitCode::GenericError,
+        };
+    }
+
+    // No typed classifier matched: a genuinely-unknown error keeps the historical
+    // default exit code. Every condition the CLI deliberately distinguishes is
+    // classified by a typed downcast above; classification is never driven by
+    // matching against a human-readable error string.
+    ExitCode::GenericError
 }
 
 /// Render a failed `gate pass` / `gate pass-all` outcome and terminate appropriately.
@@ -170,7 +266,10 @@ fn render_gate_pass_error(
                 "Add the gate first: jit gate add {} {}",
                 not_required.issue_id, not_required.gate_key
             ))
-    } else if e.to_string().to_lowercase().contains("not found") {
+    } else if e
+        .downcast_ref::<jit::storage::IssueNotFoundError>()
+        .is_some()
+    {
         // Pre-verdict lookup error: issue id did not resolve.
         JsonError::issue_not_found(id, command)
     } else {
@@ -985,17 +1084,21 @@ fn run() -> Result<()> {
                         || priority.is_some()
                         || !labels.is_empty();
                     if query.is_none() && !has_filter {
-                        return Err(anyhow!(
-                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)"
-                        ));
+                        return Err(jit::errors::InvalidArgumentError::new(
+                            "invalid arguments: provide a search query or at least one filter (--label/--state/--assignee/--priority)",
+                        )
+                        .into());
                     }
 
                     // Reject malformed label filters up front with a clear,
                     // argument-classified error rather than silently matching
                     // nothing.
                     for label in &labels {
-                        jit::labels::validate_label(label)
-                            .with_context(|| format!("invalid --label filter '{label}'"))?;
+                        jit::labels::validate_label(label).map_err(|_| {
+                            jit::errors::InvalidArgumentError::new(format!(
+                                "invalid --label filter '{label}'"
+                            ))
+                        })?;
                     }
 
                     let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
@@ -1059,10 +1162,11 @@ fn run() -> Result<()> {
                     // Projection targets a single issue: `--field`/`--fields`
                     // with multiple ids is ambiguous, so reject it.
                     if projecting && ids.len() > 1 {
-                        return Err(anyhow!(
+                        return Err(jit::errors::InvalidArgumentError::new(format!(
                             "invalid arguments: --field/--fields require exactly one issue id (got {})",
                             ids.len()
-                        ));
+                        ))
+                        .into());
                     }
 
                     // Multi-id: return a JSON array of full issue objects in
@@ -1138,19 +1242,19 @@ fn run() -> Result<()> {
                                 if let Some(name) = field {
                                     let rendered = jit::output::project_field(&value, &name)
                                         .ok_or_else(|| {
-                                            anyhow!(
+                                            jit::errors::InvalidArgumentError::new(format!(
                                                 "invalid field: unknown field '{}' for issue show",
                                                 name
-                                            )
+                                            ))
                                         })?;
                                     println!("{}", rendered);
                                 } else {
                                     let rendered = jit::output::project_fields(&value, &fields)
                                         .map_err(|unknown| {
-                                            anyhow!(
+                                            jit::errors::InvalidArgumentError::new(format!(
                                                 "invalid field: unknown field '{}' for issue show",
                                                 unknown.0
-                                            )
+                                            ))
                                         })?;
                                     println!("{}", rendered);
                                 }
@@ -1323,6 +1427,11 @@ fn run() -> Result<()> {
                                 }
                             }
                             Err(e) => {
+                                // `error_msg` is display-payload only: the branch
+                                // selection below is driven entirely by `downcast_ref`
+                                // (typed TransitionBlockedError / IssueNotFoundError),
+                                // and the string is used solely as the GENERIC_ERROR
+                                // message body. No control flow branches on it.
                                 let error_msg = e.to_string();
                                 let json_error = if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
@@ -1331,7 +1440,10 @@ fn run() -> Result<()> {
                                         blocked,
                                         "issue update",
                                     )
-                                } else if error_msg.contains("not found") {
+                                } else if e
+                                    .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                    .is_some()
+                                {
                                     jit::output::JsonError::issue_not_found(
                                         &full_id,
                                         "issue update",
@@ -1792,24 +1904,43 @@ fn run() -> Result<()> {
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_dependencies(&from_id, &to_ids) {
-                    Ok(result) => {
+                    Ok(mut result) => {
                         // If all dependencies failed, return error
                         if result.added.is_empty() && !result.errors.is_empty() {
+                            // Classify the first failure by its TYPED error, not by
+                            // scanning the message. `typed_errors` mirrors `errors`
+                            // 1:1, so it is guaranteed non-empty here.
+                            let (dep_id, typed) = result
+                                .typed_errors
+                                .drain(..)
+                                .next()
+                                .expect("typed_errors mirrors the non-empty errors list");
                             if json {
                                 use jit::output::JsonError;
-                                // Get first error for backward compatibility
-                                let (dep_id, error_msg) = &result.errors[0];
-                                let json_error = if error_msg.contains("cycle") {
-                                    JsonError::cycle_detected(&from_id, dep_id, "dep add")
-                                } else if error_msg.contains("not found") {
-                                    JsonError::issue_not_found(dep_id, "dep add")
+                                use jit::GraphError;
+                                let json_error = if let Some(GraphError::CycleDetected) =
+                                    typed.downcast_ref::<GraphError>()
+                                {
+                                    JsonError::cycle_detected(&from_id, &dep_id, "dep add")
+                                } else if typed
+                                    .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                    .is_some()
+                                    || matches!(
+                                        typed.downcast_ref::<GraphError>(),
+                                        Some(GraphError::NodeNotFound { .. })
+                                    )
+                                {
+                                    JsonError::issue_not_found(&dep_id, "dep add")
                                 } else {
-                                    JsonError::new("DEPENDENCY_ERROR", error_msg.clone(), "dep add")
+                                    JsonError::new("DEPENDENCY_ERROR", typed.to_string(), "dep add")
                                 };
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
-                                return Err(anyhow!("{}", result.errors[0].1));
+                                // Propagate the typed error so `error_to_exit_code`
+                                // can classify it by downcast (preserving the
+                                // cycle -> exit 4 / not-found -> exit 3 mapping).
+                                return Err(typed);
                             }
                         }
 
@@ -2269,14 +2400,19 @@ fn run() -> Result<()> {
                         if json {
                             use jit::output::JsonError;
                             let error_str = e.to_string();
-                            let json_error =
-                                if error_str.contains("Issue") && error_str.contains("not found") {
-                                    JsonError::issue_not_found(&id, "gate add")
-                                } else if error_str.contains("not found in registry") {
-                                    JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
-                                } else {
-                                    JsonError::new("GATE_ERROR", error_str, "gate add")
-                                };
+                            let json_error = if e
+                                .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                .is_some()
+                            {
+                                JsonError::issue_not_found(&id, "gate add")
+                            } else if e
+                                .downcast_ref::<jit::storage::GateNotFoundError>()
+                                .is_some()
+                            {
+                                JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
+                            } else {
+                                JsonError::new("GATE_ERROR", error_str, "gate add")
+                            };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -3075,11 +3211,9 @@ fn run() -> Result<()> {
                         println!("{}", output.to_json_string()?);
                     } else {
                         // Get repository root to check if assets exist
-                        let repo_root = executor
-                            .storage()
-                            .root()
-                            .parent()
-                            .ok_or_else(|| anyhow::anyhow!("Invalid storage path"))?;
+                        let repo_root = executor.storage().root().parent().ok_or_else(|| {
+                            jit::errors::InvalidArgumentError::new("Invalid storage path")
+                        })?;
 
                         output_ctx.print_data(format!(
                             "Assets for document {} (issue {}):",
@@ -4222,7 +4356,14 @@ fn run() -> Result<()> {
                     if json {
                         use jit::output::JsonError;
 
-                        let error_code = if e.to_string().contains("not installed") {
+                        // Classify by downcast against the typed SearchError, not by
+                        // scanning the message text. RipgrepNotInstalled -> the
+                        // not-found code; every other failure (rg ran and failed, an
+                        // io/spawn error, a parse error) -> the generic search code.
+                        let error_code = if matches!(
+                            e.downcast_ref::<jit::search::SearchError>(),
+                            Some(jit::search::SearchError::RipgrepNotInstalled)
+                        ) {
                             "RIPGREP_NOT_FOUND"
                         } else {
                             "SEARCH_FAILED"
@@ -4588,7 +4729,12 @@ fn run() -> Result<()> {
                 // the generic error path would lose the structured rule report
                 // (which includes graph-rule findings). The exit status is decided
                 // AFTER rendering, below.
-                let integrity_error = executor.validate_integrity_silent().err();
+                // Wrap any integrity violation in the typed ValidationFailedError
+                // (message preserved verbatim) so the top-level handler classifies
+                // it as a validation failure by downcast rather than by message text.
+                let integrity_error = executor.validate_integrity_silent().err().map(|e| {
+                    anyhow::Error::new(jit::errors::ValidationFailedError::new(e.to_string()))
+                });
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // Run the declarative rules for every issue AND the cross-issue

@@ -1406,9 +1406,10 @@ impl EffectiveConfig {
     pub fn worktree_mode(&self) -> Result<WorktreeMode> {
         // Check env var first (highest priority). Uses the same FromStr as TOML.
         if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-            return val
-                .parse::<WorktreeMode>()
-                .map_err(|e| anyhow::anyhow!("invalid JIT_WORKTREE_MODE: {e}"));
+            return val.parse::<WorktreeMode>().map_err(|e| {
+                crate::errors::InvalidArgumentError::new(format!("invalid JIT_WORKTREE_MODE: {e}"))
+                    .into()
+            });
         }
 
         // Check repo first, then user, then system
@@ -1446,9 +1447,10 @@ impl EffectiveConfig {
     pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
         // Check env var first (highest priority). Uses the same FromStr as TOML.
         if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
-            return val
-                .parse::<EnforcementMode>()
-                .map_err(|e| anyhow::anyhow!("invalid JIT_ENFORCE_LEASES: {e}"));
+            return val.parse::<EnforcementMode>().map_err(|e| {
+                crate::errors::InvalidArgumentError::new(format!("invalid JIT_ENFORCE_LEASES: {e}"))
+                    .into()
+            });
         }
 
         if let Some(ref cfg) = self.repo_config {

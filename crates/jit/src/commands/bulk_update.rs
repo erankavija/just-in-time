@@ -526,7 +526,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let registry = self.storage.load_gate_registry()?;
             for gate_key in &operations.add_gates {
                 if !registry.gates.contains_key(gate_key) {
-                    return Err(anyhow::anyhow!("Gate '{}' not found in registry", gate_key));
+                    return Err(crate::storage::GateNotFoundError::single(gate_key).into());
                 }
             }
         }

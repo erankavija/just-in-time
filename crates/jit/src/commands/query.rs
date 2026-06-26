@@ -34,18 +34,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
         // Validate pattern format
         if !pattern.contains(':') {
-            return Err(anyhow!(
+            return Err(crate::errors::InvalidArgumentError::new(format!(
                 "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
                 pattern
-            ));
+            ))
+            .into());
         }
 
         let parts: Vec<&str> = pattern.splitn(2, ':').collect();
         if parts.len() != 2 {
-            return Err(anyhow!(
+            return Err(crate::errors::InvalidArgumentError::new(format!(
                 "Invalid label pattern '{}': must contain exactly one colon",
                 pattern
-            ));
+            ))
+            .into());
         }
 
         let namespace = parts[0];
@@ -55,10 +57,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         {
-            return Err(anyhow!(
+            return Err(crate::errors::InvalidArgumentError::new(format!(
                 "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
                 pattern
-            ));
+            ))
+            .into());
         }
 
         let issues = self.storage.list_issues()?;

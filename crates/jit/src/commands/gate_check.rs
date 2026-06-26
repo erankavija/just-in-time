@@ -49,7 +49,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let gate = registry
             .gates
             .get(gate_key)
-            .ok_or_else(|| anyhow!("Gate '{}' not found in registry", gate_key))?;
+            .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
 
         // Check if gate is automated
         if gate.mode != GateMode::Auto {

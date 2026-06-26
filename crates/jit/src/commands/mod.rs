@@ -447,7 +447,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.config
             .get_or_init(|| self.config_manager.load().map_err(|err| err.to_string()))
             .as_ref()
-            .map_err(|err| anyhow!("invalid .jit/config.toml: {err}"))
+            .map_err(|err| {
+                crate::errors::InvalidArgumentError::new(format!("invalid .jit/config.toml: {err}"))
+                    .into()
+            })
     }
 
     /// Return the cached label namespace registry, building it on first access.
@@ -466,7 +469,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             })
             .as_ref()
-            .map_err(|err| anyhow!("invalid namespace configuration: {err}"))
+            .map_err(|err| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "invalid namespace configuration: {err}"
+                ))
+                .into()
+            })
     }
 
     /// Resolve the repo-level default content format from `[validation]
@@ -515,13 +523,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let blocking = evaluation.blocking_rules();
         if !blocking.is_empty() && !force {
-            // Ordinary rejection: NOT logged (only --force bypasses are).
-            return Err(anyhow!(
-                "{}",
+            // Ordinary rejection: NOT logged (only --force bypasses are). Typed as a
+            // validation failure (exit 4) carrying the message verbatim, so the
+            // top-level handler classifies it by downcast rather than message text.
+            return Err(crate::errors::ValidationFailedError::new(
                 evaluation
                     .rejection_message()
-                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string())
-            ));
+                    .unwrap_or_else(|| "blocked by validation rule(s)".to_string()),
+            )
+            .into());
         }
 
         let mut warnings = Vec::new();

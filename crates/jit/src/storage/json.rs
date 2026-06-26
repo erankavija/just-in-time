@@ -4,7 +4,10 @@
 //! The directory location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::domain::{Event, Issue};
-use crate::storage::{FileLocker, GateRegistry, IssueStore};
+use crate::storage::{
+    FileLocker, GateRegistry, GateRunNotFoundError, IssueNotFoundError, IssueStore,
+    RepositoryNotFoundError,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
@@ -76,12 +79,7 @@ impl JsonFileStorage {
     /// Returns an error with a helpful message if not.
     pub fn validate(&self) -> Result<()> {
         if !self.root.exists() {
-            anyhow::bail!(
-                "JIT repository not found at '{}'\n\n\
-                 Initialize a repository with: jit init\n\
-                 Or set JIT_DATA_DIR environment variable to point to an existing repository.",
-                self.root.display()
-            );
+            return Err(RepositoryNotFoundError::new(self.root.display().to_string()).into());
         }
 
         let index_path = self.root.join(INDEX_FILE);
@@ -184,7 +182,7 @@ impl JsonFileStorage {
         let repo_root = self
             .root
             .parent()
-            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
 
         let output = Command::new("git")
             .arg("show")
@@ -205,7 +203,7 @@ impl JsonFileStorage {
         let repo_root = self
             .root
             .parent()
-            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
 
         let output = Command::new("git")
             .args(["rev-parse", "--git-common-dir"])
@@ -264,7 +262,7 @@ impl JsonFileStorage {
         let repo_root = self
             .root
             .parent()
-            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
 
         let git_path = format!("HEAD:.jit/issues/{}.json", id);
         let output = Command::new("git")
@@ -299,7 +297,7 @@ impl JsonFileStorage {
         let repo_root = self
             .root
             .parent()
-            .ok_or_else(|| anyhow!("Invalid .jit path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid .jit path"))?;
 
         // We need to detect worktree context from git commands
         // First check if we're in a git repo at all
@@ -459,10 +457,7 @@ impl IssueStore for JsonFileStorage {
         }
 
         // Issue not found in any source
-        Err(anyhow!(
-            "Issue {} not found in local storage, git, or main worktree",
-            id
-        ))
+        Err(IssueNotFoundError::across_sources(id).into())
     }
 
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
@@ -515,7 +510,7 @@ impl IssueStore for JsonFileStorage {
             return self
                 .load_issue(partial_id)
                 .map(|issue| issue.id)
-                .map_err(|_| anyhow!("Issue not found: {}", partial_id));
+                .map_err(|_| IssueNotFoundError::new(partial_id).into());
         }
 
         // Minimum length check
@@ -533,7 +528,7 @@ impl IssueStore for JsonFileStorage {
             .collect();
 
         match matches.len() {
-            0 => Err(anyhow!("Issue not found: {}", partial_id)),
+            0 => Err(IssueNotFoundError::new(partial_id).into()),
             1 => Ok(matches[0].clone()),
             _ => {
                 // Load issue titles for better error message
@@ -684,7 +679,7 @@ impl IssueStore for JsonFileStorage {
         let result_path = self.root.join("gate-runs").join(run_id).join("result.json");
 
         if !result_path.exists() {
-            anyhow::bail!("Gate run '{}' not found", run_id);
+            return Err(GateRunNotFoundError::new(run_id).into());
         }
 
         let contents =
@@ -769,10 +764,11 @@ impl IssueStore for JsonFileStorage {
         // path. Shape validation alone is not enough: a symlinked directory
         // segment could still resolve OUTSIDE the repo, so mirror the read path's
         // canonicalize+containment check below before creating dirs or writing.
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.root.parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
         let target = repo_root.join(rel_path);
         let parent = target
             .parent()
@@ -854,10 +850,11 @@ impl IssueStore for JsonFileStorage {
         validate_repo_relative_input(path)?;
 
         // Resolve repo root: parent of the .jit directory.
-        let repo_root = self
-            .root
-            .parent()
-            .ok_or_else(|| PathReadError::Other(anyhow!("Invalid storage path")))?;
+        let repo_root = self.root.parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
 
         if let Some(commit_ref) = at_commit {
             use git2::Repository;

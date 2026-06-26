@@ -144,9 +144,14 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .with_context(|| format!("Reference '{}' is not a commit", reference))?;
         let tree = commit.tree()?;
 
-        let entry = tree
-            .get_path(Path::new(path))
-            .with_context(|| format!("Path '{}' not found in commit {}", path, reference))?;
+        let entry = tree.get_path(Path::new(path)).map_err(|_| {
+            // Generic NotFoundError: a path-in-commit not-found has no dedicated
+            // domain type. Still downcastable -> exit 3; message preserved verbatim.
+            crate::errors::NotFoundError::new(format!(
+                "Path '{}' not found in commit {}",
+                path, reference
+            ))
+        })?;
         let blob = repo.find_blob(entry.id())?;
 
         let content = blob.content().to_vec();
@@ -168,7 +173,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let full_path = repo_root.join(path);
         let content =
@@ -210,7 +215,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         // Create new adapter registry for scanning
         let registry = AdapterRegistry::with_builtins();
@@ -329,7 +334,7 @@ impl<S: IssueStore> SnapshotExporter<S> {
             .storage
             .root()
             .parent()
-            .ok_or_else(|| anyhow!("Invalid storage path"))?;
+            .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid storage path"))?;
 
         let path = repo_root
             .canonicalize()
@@ -616,10 +621,11 @@ This is a read-only export. Future versions may support:
     ) -> Result<()> {
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!(
+            return Err(crate::errors::AlreadyExistsError::new(format!(
                 "Output path already exists: {}",
                 out_path.display()
-            ));
+            ))
+            .into());
         }
 
         // Atomic rename from temp to final destination
@@ -640,10 +646,11 @@ This is a read-only export. Future versions may support:
 
         // Check if output path already exists
         if out_path.exists() {
-            return Err(anyhow!(
+            return Err(crate::errors::AlreadyExistsError::new(format!(
                 "Output path already exists: {}",
                 out_path.display()
-            ));
+            ))
+            .into());
         }
 
         let tar_file = File::create(out_path)?;
@@ -661,7 +668,7 @@ This is a read-only export. Future versions may support:
             let path = entry.path();
             let name = path
                 .file_name()
-                .ok_or_else(|| anyhow!("Invalid file name"))?;
+                .ok_or_else(|| crate::errors::InvalidArgumentError::new("Invalid file name"))?;
 
             let archive_path = format!("{}/{}", base_name, name.to_string_lossy());
 
