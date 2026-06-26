@@ -86,7 +86,7 @@
           "title": "Typed scope/format/blocked-reason enums",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatching (Wave 4; main.rs + domain/queries.rs + commands/document.rs + commands/graph.rs; commands/* may collide with external epic 52ad3b1f -> merge carefully)"
+          "status": "dispatched (Wave 4; worktree agent-6e7f54a7 base 64403d7d; Opus worker t9-typed-enums; BlockingReason enum in domain/queries.rs + DocumentScope FromStr mirroring SnapshotScope + GraphExportFormat ValueEnum; commands/* may collide with external epic 52ad3b1f -> merge carefully)"
         }
       ]
     },
