@@ -3881,3 +3881,4 @@
 {"type":"issue_updated","id":"01d23521-ca5b-4005-9f02-ec6db8bf8554","issue_id":"10ce6962-8973-4357-b836-da8c0b3a6789","timestamp":"2026-06-26T20:06:57.427856440Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"c3ef6d69-6e2f-4077-a20a-a94b8e40bb0d","issue_id":"90a2dbfd-be54-46f2-b84a-b19382c6b0f2","timestamp":"2026-06-26T20:06:57.438466093Z","from":"ready","to":"backlog"}
 {"type":"issue_updated","id":"e5ed78a6-1bc5-4d42-92c2-23c5f08e9944","issue_id":"90a2dbfd-be54-46f2-b84a-b19382c6b0f2","timestamp":"2026-06-26T20:06:57.438487743Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"435e8ed8-19e8-41fc-a57e-7bc1c59cd422","issue_id":"90a2dbfd-be54-46f2-b84a-b19382c6b0f2","timestamp":"2026-06-26T20:26:47.185771573Z","updated_by":"issue-update","fields":["description"]}
