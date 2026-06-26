@@ -116,7 +116,7 @@
           "title": "Type validation finding kinds and severities",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched 5a (worktree agent-99908d7b base b673231e; sonnet t10-finding-types)"
+          "status": "DONE (both gates green first try; merged to main clean, no conflicts; validate exit 0; leak clean). Overlaps noted: shares validation/rules.rs w/ t8, commands/validate.rs w/ t5 -> rebuild-test main after those merges."
         },
         {
           "id": "2355c5ea-cdaf-4874-b123-b7964fa33436",
