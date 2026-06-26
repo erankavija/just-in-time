@@ -75,7 +75,7 @@ fn test_harness_issue_lifecycle() {
         .claim_issue(&id, "agent:worker-1".to_string())
         .unwrap();
     let issue = h.get_issue(&id);
-    assert_eq!(issue.assignee, Some("agent:worker-1".to_string()));
+    assert_eq!(issue.assignee, Some("agent:worker-1".parse().unwrap()));
 
     // Release
     h.executor.release_issue(&id, "timeout").unwrap();

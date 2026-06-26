@@ -32,7 +32,7 @@
 //! kinds, whose source path comes from config). A list entry without a matching
 //! self-id is plain prose and incurs no addressing requirement (REQ-06).
 
-use crate::config::{ItemKindConfig, SourceOfTruth};
+use crate::config::{ItemKindConfig, KindScopeConfig, SourceOfTruth};
 use crate::document::ContentParser;
 use crate::domain::{project, Issue};
 use serde::Serialize;
@@ -479,7 +479,12 @@ impl ItemKind {
             .link_namespaces
             .clone()
             .unwrap_or_else(|| vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]);
-        let kind_scope = KindScope::parse_for(name, config.scope.as_deref())?;
+        // Scope is now a typed field — invalid tokens are rejected at TOML parse
+        // time, so this conversion is infallible.
+        let kind_scope = match config.scope {
+            None | Some(KindScopeConfig::Issue) => KindScope::Issue,
+            Some(KindScopeConfig::Project) => KindScope::Project,
+        };
         let source_of_truth = config.source_of_truth();
         // The `invariant` kind name is RESERVED as a project-scoped, registry-first
         // kind: its items come only from the invariant registry, never a markdown
@@ -690,7 +695,7 @@ impl ItemKind {
                 id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec![INVARIANT_KIND_LINK_NAMESPACE.to_string()]),
-                scope: Some(KindScope::PROJECT_TOKEN.to_string()),
+                scope: Some(KindScopeConfig::Project),
                 source: None,
                 source_of_truth: Some(SourceOfTruth::RegistryFirst),
             },
@@ -1555,7 +1560,7 @@ mod tests {
             id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(KindScope::PROJECT_TOKEN.to_string()),
+            scope: Some(KindScopeConfig::Project),
             source: None,
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
         };
@@ -1570,21 +1575,23 @@ mod tests {
         // it must NEVER be sourced from markdown nor parsed from issue descriptions,
         // so any declaration that is not BOTH project + registry-first is rejected
         // (REQ-02). Helper builds a config with the given scope/source-of-truth.
-        let cfg = |scope: &str, sot: Option<SourceOfTruth>, source: Option<&str>| ItemKindConfig {
-            section: Some(DEFAULT_ITEM_SECTION.to_string()),
-            id_pattern: Some("INV-[0-9]+".to_string()),
-            markers: Some(vec![]),
-            link_namespaces: Some(vec!["enforces".to_string()]),
-            scope: Some(scope.to_string()),
-            source: source.map(str::to_string),
-            source_of_truth: sot,
+        let cfg = |scope: KindScopeConfig, sot: Option<SourceOfTruth>, source: Option<&str>| {
+            ItemKindConfig {
+                section: Some(DEFAULT_ITEM_SECTION.to_string()),
+                id_pattern: Some("INV-[0-9]+".to_string()),
+                markers: Some(vec![]),
+                link_namespaces: Some(vec!["enforces".to_string()]),
+                scope: Some(scope),
+                source: source.map(str::to_string),
+                source_of_truth: sot,
+            }
         };
 
         // 1. project + markdown-first → rejected.
         let err = ItemKind::from_config(
             INVARIANT_KIND_NAME,
             &cfg(
-                KindScope::PROJECT_TOKEN,
+                KindScopeConfig::Project,
                 Some(SourceOfTruth::MarkdownFirst),
                 Some("project-items.md"),
             ),
@@ -1602,7 +1609,7 @@ mod tests {
         assert!(matches!(
             ItemKind::from_config(
                 INVARIANT_KIND_NAME,
-                &cfg(KindScope::PROJECT_TOKEN, None, Some("project-items.md")),
+                &cfg(KindScopeConfig::Project, None, Some("project-items.md")),
             )
             .unwrap_err(),
             ItemError::InvariantMustBeProjectRegistryFirst
@@ -1614,7 +1621,7 @@ mod tests {
             ItemKind::from_config(
                 INVARIANT_KIND_NAME,
                 &cfg(
-                    KindScope::ISSUE_TOKEN,
+                    KindScopeConfig::Issue,
                     Some(SourceOfTruth::RegistryFirst),
                     None
                 ),
@@ -1628,7 +1635,7 @@ mod tests {
             ItemKind::from_config(
                 INVARIANT_KIND_NAME,
                 &cfg(
-                    KindScope::ISSUE_TOKEN,
+                    KindScopeConfig::Issue,
                     Some(SourceOfTruth::MarkdownFirst),
                     None
                 ),
@@ -1641,7 +1648,7 @@ mod tests {
         let ok = ItemKind::from_config(
             INVARIANT_KIND_NAME,
             &cfg(
-                KindScope::PROJECT_TOKEN,
+                KindScopeConfig::Project,
                 Some(SourceOfTruth::RegistryFirst),
                 None,
             ),
@@ -1659,7 +1666,7 @@ mod tests {
             id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
-            scope: Some(KindScope::PROJECT_TOKEN.to_string()),
+            scope: Some(KindScopeConfig::Project),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
         };

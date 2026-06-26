@@ -152,7 +152,7 @@ impl ConfigManager {
         config: &JitConfig,
     ) -> Result<crate::config::EnforcementMode> {
         match config.worktree.as_ref() {
-            Some(worktree_config) => worktree_config.enforcement_mode(),
+            Some(worktree_config) => Ok(worktree_config.enforcement_mode()),
             // No worktree section - default to Off for single-agent development.
             None => Ok(crate::config::EnforcementMode::Off),
         }
@@ -467,10 +467,15 @@ enforce_leases = "invalid"
         let config_mgr = ConfigManager::new(&jit_dir);
         let result = config_mgr.get_enforcement_mode();
 
+        // Invalid tokens are now rejected at TOML parse time (via the typed
+        // EnforcementMode field), so the error propagates through load().
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid enforce_leases mode"));
+        // Use the full error chain (anyhow's `{:#}`) to see through the
+        // "Failed to parse config.toml" context wrapper.
+        let msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            msg.contains("invalid"),
+            "error chain must mention invalidity: {msg}"
+        );
     }
 }

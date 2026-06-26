@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::errors::{TransitionBlockedError, TransitionBlocker};
+use crate::storage::StorageWarning;
 
 impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)]
@@ -108,7 +109,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }
                 if let Some(ref assignee) = assignee_filter {
-                    if issue.assignee.as_ref() != Some(assignee) {
+                    if !issue
+                        .assignee
+                        .as_ref()
+                        .is_some_and(|a| a == assignee.as_str())
+                    {
                         return false;
                     }
                 }
@@ -560,9 +565,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             warnings.push(warning);
         }
 
+        // Validate through the one `Assignee` path so `assign` cannot persist a
+        // raw, malformed assignee (this command previously skipped validation).
+        let assignee: crate::domain::Assignee = assignee.parse()?;
         let mut issue = self.storage.load_issue(&full_id)?;
         // No-op if already assigned to the same assignee: don't bump updated_at.
-        if issue.assignee.as_deref() == Some(assignee.as_str()) {
+        if issue.assignee.as_ref() == Some(&assignee) {
             return Ok(warnings);
         }
         issue.assignee = Some(assignee);
@@ -570,7 +578,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
+    /// Claim an issue for `assignee`.
+    ///
+    /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
+    /// observed while checking leases) so the calling command can surface them
+    /// at its own output boundary; this method never writes to stderr.
+    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>> {
         use super::claim::check_issue_lease;
 
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -580,11 +593,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Issue is already assigned"));
         }
 
-        // Check for existing lease held by another agent
-        // Use both short and full ID since leases may store either
+        // Check for existing lease held by another agent.
+        // Use both short and full ID since leases may store either. Collect the
+        // relocation warning from the identity load (the first call fixes the
+        // recorded path, so the second observes none).
         let short_id = issue.short_id();
-        let conflicting_lease = check_issue_lease(&short_id, Some(&assignee))?
-            .or(check_issue_lease(&full_id, Some(&assignee))?);
+        let (lease_short, mut warnings) = check_issue_lease(&short_id, Some(&assignee))?;
+        let (lease_full, warnings_full) = check_issue_lease(&full_id, Some(&assignee))?;
+        warnings.extend(warnings_full);
+        let conflicting_lease = lease_short.or(lease_full);
 
         if let Some(lease) = conflicting_lease {
             let expires_str = lease
@@ -622,18 +639,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // If we get here, prechecks passed (or issue wasn't Ready)
-        // Now assign the issue
+        // Now assign the issue, validating through the one `Assignee` path. The
+        // parsed actor is reused for the event so it cannot diverge from the
+        // stored assignee.
+        let actor: crate::domain::Assignee = assignee.parse()?;
         let mut issue = self.storage.load_issue(&full_id)?;
-        issue.assignee = Some(assignee.clone());
+        issue.assignee = Some(actor.clone());
 
         let issue_id = issue.id.clone();
         self.storage.save_issue(issue)?;
 
         // Log assignment event
-        let event = Event::new_issue_claimed(issue_id, assignee);
+        let event = Event::new_issue_claimed(issue_id, actor);
         self.storage.append_event(&event)?;
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Unassign an issue.
@@ -680,17 +700,21 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Log release event (after any state-change event the chokepoint emitted).
-        let event = Event::new_issue_released(
-            full_id.clone(),
-            old_assignee.unwrap_or_default(),
-            reason.to_string(),
-        );
-        self.storage.append_event(&event)?;
+        // Only a real prior assignee is a release actor; releasing an unassigned
+        // issue records no actor (and an empty assignee is not a valid `Assignee`).
+        if let Some(assignee) = old_assignee {
+            let event = Event::new_issue_released(full_id.clone(), assignee, reason.to_string());
+            self.storage.append_event(&event)?;
+        }
 
         Ok(())
     }
 
-    pub fn claim_next(&self, assignee: String, _filter: Option<String>) -> Result<String> {
+    pub fn claim_next(
+        &self,
+        assignee: String,
+        _filter: Option<String>,
+    ) -> Result<(String, Vec<StorageWarning>)> {
         let issues = self.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -709,8 +733,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if let Some(issue) = candidates.first() {
             let id = issue.id.clone();
-            self.claim_issue(&id, assignee)?;
-            Ok(id)
+            let warnings = self.claim_issue(&id, assignee)?;
+            Ok((id, warnings))
         } else {
             Err(anyhow!("No ready issues available"))
         }
@@ -1013,7 +1037,7 @@ enforce_leases = "off"
         // Verify issue transitioned to InProgress and is assigned
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
-        assert_eq!(issue.assignee, Some("agent:test".to_string()));
+        assert_eq!(issue.assignee, Some("agent:test".parse().unwrap()));
     }
 
     #[test]

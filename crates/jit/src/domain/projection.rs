@@ -145,16 +145,14 @@ const TYPE_NAMESPACE: &str = "type";
 
 /// Group labels by namespace, preserving per-namespace order.
 ///
-/// A label is `namespace:value`; the first `:` splits the two. Labels with no
-/// `:` are skipped (they are not part of the namespaced contract).
+/// Each label is parsed with [`parse_label`](crate::labels::parse_label) into
+/// `namespace:value`. Labels that are not valid namespaced labels (no `:`, or a
+/// malformed namespace/value) are skipped, as they are not part of the
+/// namespaced contract.
 fn group_labels(labels: &[String]) -> BTreeMap<String, Vec<String>> {
     labels.iter().fold(BTreeMap::new(), |mut acc, label| {
-        if let Some((ns, value)) = label.split_once(':') {
-            if !ns.is_empty() {
-                acc.entry(ns.to_string())
-                    .or_default()
-                    .push(value.to_string());
-            }
+        if let Ok((ns, value)) = crate::labels::parse_label(label) {
+            acc.entry(ns).or_default().push(value);
         }
         acc
     })

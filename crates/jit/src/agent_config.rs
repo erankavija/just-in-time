@@ -194,32 +194,28 @@ where
 ///
 /// Returns an error if the format is invalid.
 fn validate_agent_id(id: &str) -> Result<()> {
-    if !id.contains(':') {
-        bail!(
+    use crate::domain::{Assignee, AssigneeParseError};
+
+    // Reuse the single `{type}:{identifier}` parse path, mapping its errors onto
+    // the agent-identity wording. Agent IDs are stricter than a bare assignee:
+    // whitespace is rejected on top of the shared structural validation.
+    let assignee = id.parse::<Assignee>().map_err(|e| match e {
+        AssigneeParseError::EmptyKind(_) => anyhow!("Agent ID type cannot be empty: '{}'", id),
+        AssigneeParseError::EmptyIdentifier(_) => {
+            anyhow!("Agent ID identifier cannot be empty: '{}'", id)
+        }
+        AssigneeParseError::Empty | AssigneeParseError::MissingSeparator(_) => anyhow!(
             "Invalid agent ID format: '{}'\n\
              Expected format: {{type}}:{{identifier}}\n\
              Examples: agent:copilot-1, human:alice, ci:github-actions",
             id
-        );
-    }
-
-    let parts: Vec<&str> = id.splitn(2, ':').collect();
-    if parts.len() != 2 {
-        bail!("Invalid agent ID format: '{}'", id);
-    }
-
-    let (type_part, identifier_part) = (parts[0], parts[1]);
-
-    if type_part.is_empty() {
-        bail!("Agent ID type cannot be empty: '{}'", id);
-    }
-
-    if identifier_part.is_empty() {
-        bail!("Agent ID identifier cannot be empty: '{}'", id);
-    }
+        ),
+    })?;
 
     // Type and identifier should not contain whitespace
-    if type_part.contains(char::is_whitespace) || identifier_part.contains(char::is_whitespace) {
+    if assignee.kind().contains(char::is_whitespace)
+        || assignee.identifier().contains(char::is_whitespace)
+    {
         bail!("Agent ID cannot contain whitespace: '{}'", id);
     }
 

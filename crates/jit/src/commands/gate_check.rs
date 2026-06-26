@@ -91,6 +91,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save run result
         self.storage.save_gate_run_result(&result)?;
 
+        // Parse the runner's actor once through the one `Assignee` path; reused
+        // for both the gate state and the logged event.
+        let by: Option<crate::domain::Assignee> = result
+            .by
+            .as_deref()
+            .map(str::parse::<crate::domain::Assignee>)
+            .transpose()?;
+
         // Update issue gate status
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.gates_status.insert(
@@ -101,7 +109,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     GateRunStatus::Failed | GateRunStatus::Error => GateStatus::Failed,
                     _ => GateStatus::Pending,
                 },
-                updated_by: result.by.clone(),
+                updated_by: by.clone(),
                 updated_at: result.started_at,
             },
         );
@@ -110,9 +118,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Log event
         let event = match result.status {
             GateRunStatus::Passed => {
-                Event::new_gate_passed(full_id.clone(), gate_key.to_string(), result.by.clone())
+                Event::new_gate_passed(full_id.clone(), gate_key.to_string(), by)
             }
-            _ => Event::new_gate_failed(full_id.clone(), gate_key.to_string(), result.by.clone()),
+            _ => Event::new_gate_failed(full_id.clone(), gate_key.to_string(), by),
         };
         self.storage.append_event(&event)?;
 

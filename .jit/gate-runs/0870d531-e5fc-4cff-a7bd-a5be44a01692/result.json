@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0870d531-e5fc-4cff-a7bd-a5be44a01692",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
+  "commit": "352ccca188d4a1bdc5ddbb840e5d5a24f2cd9590",
+  "branch": "worktree-agent-bf0034e1",
+  "status": "passed",
+  "started_at": "2026-06-26T00:21:10.368759089Z",
+  "completed_at": "2026-06-26T00:22:52.594441066Z",
+  "duration_ms": 102225,
+  "exit_code": 0,
+  "stdout": "**Architecture**\nNo blocking issues. `Assignee` lives in domain (`crates/jit/src/domain/types.rs:195`), storage still updates timestamps behind `IssueStore` (`crates/jit/src/storage/json.rs:411`, `crates/jit/src/storage/memory.rs:107`), and commands parse CLI-facing strings before storing typed domain values (`crates/jit/src/commands/issue.rs:569`, `crates/jit/src/commands/gate.rs:365`).\n\n**Functional Style**\nNo blocking issues. `group_labels` now uses iterator `fold` and shared label parsing instead of inline colon splitting (`crates/jit/src/domain/projection.rs:152`).\n\n**Correctness And Invariants**\nNo blocking issues found. `Issue.created_at` and `Issue.updated_at` are `DateTime<Utc>` (`crates/jit/src/domain/types.rs:403`, `crates/jit/src/domain/types.rs:405`). `Issue.assignee` and `GateState.updated_by` are typed as `Option<Assignee>` (`crates/jit/src/domain/types.rs:382`, `crates/jit/src/domain/types.rs:362`).\n\nThe prior failed review item is addressed: `IssueClaimed.assignee`, `GatePassed.updated_by`, `GateFailed.updated_by`, and `IssueReleased.assignee` now use `Assignee` (`crates/jit/src/domain/types.rs:917`, `crates/jit/src/domain/types.rs:943`, `crates/jit/src/domain/types.rs:956`, `crates/jit/src/domain/types.rs:1007`), and their constructors require typed values (`crates/jit/src/domain/types.rs:1142`, `crates/jit/src/domain/types.rs:1176`, `crates/jit/src/domain/types.rs:1204`, `crates/jit/src/domain/types.rs:1262`).\n\n**Safety**\nNo unsafe code introduced in the reviewed changes.\n\n**Testing**\nPer instruction, I did not run cargo tests because the issue context records `cargo-ci` as passed at `2026-06-26T00:19:37.847937949+00:00`. Focused tests exist for `Assignee` parsing/serde, timestamp serialization, legacy timestamp deserialization, and typed event actors (`crates/jit/src/domain/types.rs:2091`, `crates/jit/src/domain/types.rs:2187`, `crates/jit/src/domain/types.rs:2203`, `crates/jit/src/domain/types.rs:2223`).\n\n**Error Handling**\nNo blocking issues. `AssigneeParseError` is a typed `thiserror` error with contextual messages (`crates/jit/src/domain/types.rs:252`). Command call sites propagate parse errors through `Result` instead of accepting raw malformed strings.\n\n**CLI Contract**\nNo new command surface was added, so no new `--json` requirement gap was introduced.\n\n**Documentation**\nNo blocking issues found for the new public domain surface. `Assignee`, `AssigneeParseError`, accessors, and constructor-facing event APIs include doc comments and examples (`crates/jit/src/domain/types.rs:160`, `crates/jit/src/domain/types.rs:226`, `crates/jit/src/domain/types.rs:1128`).\n\n**Jit Management**\n`./scripts/jit-validate.sh` passed. `issue.dependencies` is empty, so there are no prerequisites to verify.\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

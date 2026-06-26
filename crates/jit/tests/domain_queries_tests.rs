@@ -21,8 +21,8 @@ fn make_issue(id: &str, title: &str, state: State) -> Issue {
         documents: Vec::new(),
         labels: Vec::new(),
         content_format: None,
-        created_at: "2024-01-01T00:00:00Z".to_string(),
-        updated_at: "2024-01-01T00:00:00Z".to_string(),
+        created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+        updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
     }
 }
 
@@ -41,8 +41,8 @@ fn make_issue_with_deps(id: &str, title: &str, state: State, deps: Vec<String>) 
         documents: Vec::new(),
         labels: Vec::new(),
         content_format: None,
-        created_at: "2024-01-01T00:00:00Z".to_string(),
-        updated_at: "2024-01-01T00:00:00Z".to_string(),
+        created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+        updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
     }
 }
 
@@ -64,7 +64,7 @@ fn test_query_ready_finds_unassigned_ready_unblocked_issues() {
 #[test]
 fn test_query_ready_excludes_assigned_issues() {
     let mut issue1 = make_issue("id1", "Ready but assigned", State::Ready);
-    issue1.assignee = Some("agent:worker-1".to_string());
+    issue1.assignee = Some("agent:worker-1".parse().unwrap());
 
     let issue2 = make_issue("id2", "Ready unassigned", State::Ready);
 
@@ -130,10 +130,10 @@ fn test_query_by_priority_filters_correctly() {
 #[test]
 fn test_query_by_assignee_filters_correctly() {
     let mut issue1 = make_issue("id1", "Assigned to alice", State::InProgress);
-    issue1.assignee = Some("agent:alice".to_string());
+    issue1.assignee = Some("agent:alice".parse().unwrap());
 
     let mut issue2 = make_issue("id2", "Assigned to bob", State::InProgress);
-    issue2.assignee = Some("agent:bob".to_string());
+    issue2.assignee = Some("agent:bob".parse().unwrap());
 
     let issue3 = make_issue("id3", "Unassigned", State::Ready);
 

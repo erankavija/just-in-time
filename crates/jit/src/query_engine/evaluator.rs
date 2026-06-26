@@ -62,9 +62,10 @@ impl QueryEvaluator {
                     .unwrap_or(false)
             }
 
-            QueryCondition::Assignee(assignee) => {
-                issue.assignee.as_deref() == Some(assignee.as_str())
-            }
+            QueryCondition::Assignee(assignee) => issue
+                .assignee
+                .as_ref()
+                .is_some_and(|a| a == assignee.as_str()),
 
             QueryCondition::Unassigned => issue.assignee.is_none(),
 
@@ -95,7 +96,7 @@ mod tests {
             description: String::new(),
             state,
             priority,
-            assignee: assignee.map(|s| s.to_string()),
+            assignee: assignee.map(|s| s.parse().unwrap()),
             dependencies: dependencies.iter().map(|s| s.to_string()).collect(),
             gates_required: vec![],
             gates_status: Default::default(),
@@ -103,8 +104,8 @@ mod tests {
             documents: vec![],
             labels: labels.iter().map(|s| s.to_string()).collect(),
             content_format: None,
-            created_at: "2024-01-01T00:00:00Z".to_string(),
-            updated_at: "2024-01-01T00:00:00Z".to_string(),
+            created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+            updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
         }
     }
 

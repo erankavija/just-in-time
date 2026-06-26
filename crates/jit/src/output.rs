@@ -724,12 +724,29 @@ pub struct GraphDepsTreeResponse {
 }
 
 /// Summary statistics for dependencies
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::DependencySummary;
+/// use jit::domain::State;
+/// use std::collections::HashMap;
+///
+/// let mut by_state = HashMap::new();
+/// by_state.insert(State::Done, 2usize);
+/// by_state.insert(State::Ready, 1usize);
+/// let summary = DependencySummary { total: 3, by_state };
+///
+/// // Keys serialize as snake_case JSON strings.
+/// let json = serde_json::to_string(&summary).unwrap();
+/// assert!(json.contains("\"done\":2") || json.contains("\"done\": 2"));
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencySummary {
     /// Total number of unique dependencies
     pub total: usize,
-    /// Count by state
-    pub by_state: std::collections::HashMap<String, usize>,
+    /// Count by state (keys are canonical snake_case state names)
+    pub by_state: std::collections::HashMap<State, usize>,
 }
 
 /// Response for `graph roots` command
@@ -868,15 +885,18 @@ impl IssueShowResponse {
             description: issue.description,
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee,
+            assignee: issue
+                .assignee
+                .as_ref()
+                .map(crate::domain::Assignee::to_string),
             dependencies: enriched_deps,
             gates,
             context: issue.context,
             documents: issue.documents,
             labels: issue.labels,
             content_format: issue.content_format,
-            created_at: issue.created_at,
-            updated_at: issue.updated_at,
+            created_at: issue.created_at.to_rfc3339(),
+            updated_at: issue.updated_at.to_rfc3339(),
         }
     }
 }
@@ -1016,7 +1036,7 @@ impl From<&Issue> for IssueUpdateResponse {
             id: issue.id.clone(),
             short_id: issue.short_id(),
             state: issue.state,
-            updated_at: issue.updated_at.clone(),
+            updated_at: issue.updated_at.to_rfc3339(),
         }
     }
 }
@@ -1061,7 +1081,10 @@ impl From<&Issue> for IssueShowSummaryResponse {
             title: issue.title.clone(),
             state: issue.state,
             priority: issue.priority,
-            assignee: issue.assignee.clone(),
+            assignee: issue
+                .assignee
+                .as_ref()
+                .map(crate::domain::Assignee::to_string),
             labels: issue.labels.clone(),
             gates_required: issue.gates_required.clone(),
             gates_status: issue.gates_status.clone(),
@@ -1361,7 +1384,7 @@ mod tests {
             "tests".to_string(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: Some("ci:test".to_string()),
+                updated_by: Some("ci:test".parse().unwrap()),
                 updated_at: run_at,
             },
         );

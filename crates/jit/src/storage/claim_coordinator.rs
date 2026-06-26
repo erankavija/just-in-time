@@ -12,6 +12,7 @@
 //!
 //! See design doc: `dev/design/worktree-parallel-work.md` - "Claim Acquisition Algorithm"
 
+use crate::storage::StorageWarning;
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -170,6 +171,37 @@ pub struct ClaimsIndex {
 }
 
 impl ClaimsIndex {
+    /// Non-fatal warnings derived from the index's diagnostic state.
+    ///
+    /// Currently this surfaces any sequence gaps detected while rebuilding the
+    /// index from the claims log as [`StorageWarning::SequenceGap`] values. The
+    /// storage layer collects these instead of printing them; the output layer
+    /// decides whether and how to render them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::{ClaimCoordinator, StorageWarning};
+    /// # use jit::storage::claim_coordinator::ClaimsIndex;
+    /// let index = ClaimsIndex {
+    ///     sequence_gaps: vec![2, 5],
+    ///     ..Default::default()
+    /// };
+    /// assert_eq!(
+    ///     index.warnings(),
+    ///     vec![
+    ///         StorageWarning::SequenceGap { missing: 2 },
+    ///         StorageWarning::SequenceGap { missing: 5 },
+    ///     ]
+    /// );
+    /// ```
+    pub fn warnings(&self) -> Vec<StorageWarning> {
+        self.sequence_gaps
+            .iter()
+            .map(|&missing| StorageWarning::SequenceGap { missing })
+            .collect()
+    }
+
     /// Find active lease for an issue
     pub fn find_lease(&self, issue_id: &str) -> Option<&Lease> {
         self.leases.iter().find(|l| l.issue_id == issue_id)
@@ -958,14 +990,10 @@ impl ClaimCoordinator {
 
                 // Check for sequence gaps
                 if entry.seq != expected_seq {
-                    // Detect missing sequences
-                    for missing in expected_seq..entry.seq {
-                        eprintln!(
-                            "Warning: Sequence gap detected - missing sequence {}",
-                            missing
-                        );
-                        sequence_gaps.push(missing);
-                    }
+                    // Detect missing sequences. These are surfaced as
+                    // `StorageWarning::SequenceGap` via `ClaimsIndex::warnings()`;
+                    // storage must not render diagnostics itself.
+                    sequence_gaps.extend(expected_seq..entry.seq);
                 }
                 expected_seq = entry.seq + 1;
                 max_seq = max_seq.max(entry.seq);
@@ -1042,15 +1070,45 @@ impl ClaimCoordinator {
     /// 3. Evict expired leases
     ///
     /// This is safe to call repeatedly and has minimal overhead when no recovery needed.
-    pub fn startup_recovery(&self) -> Result<()> {
+    ///
+    /// # Returns
+    ///
+    /// The non-fatal [`StorageWarning`]s observed during recovery. The caller's
+    /// output layer decides whether and how to render them; this routine never
+    /// writes to stderr itself.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a required recovery step (lock cleanup, index
+    /// rebuild, or eviction) fails irrecoverably. Best-effort temp-file cleanup
+    /// failures are surfaced as [`StorageWarning::TempCleanupFailed`] rather
+    /// than errors.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::ClaimCoordinator;
+    /// # fn run(coordinator: &ClaimCoordinator) -> anyhow::Result<()> {
+    /// for warning in coordinator.startup_recovery()? {
+    ///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn startup_recovery(&self) -> Result<Vec<StorageWarning>> {
+        let mut warnings = Vec::new();
+
         // 1. Clean up stale locks
         let lock_dir = self.paths.shared_jit.join("locks");
-        lock_cleanup::cleanup_stale_locks(&lock_dir)?;
+        warnings.extend(lock_cleanup::cleanup_stale_locks(&lock_dir)?);
 
         // 2. Rebuild index if corrupted
-        if !self.verify_index_consistency()? {
-            eprintln!("Warning: Claims index inconsistent, rebuilding from log...");
+        let (consistent, verify_warnings) = self.verify_index_consistency()?;
+        warnings.extend(verify_warnings);
+        if !consistent {
+            warnings.push(StorageWarning::IndexRebuilt);
             let index = self.rebuild_index_from_log()?;
+            warnings.extend(index.warnings());
             self.write_index_atomic(&index)?;
         }
 
@@ -1062,26 +1120,44 @@ impl ClaimCoordinator {
         // 4. Clean up orphaned temp files (1 hour threshold)
         let jit_data_dir = &self.paths.local_jit;
         if let Err(e) = temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
-            // Log but don't fail - temp file cleanup is best-effort
-            eprintln!("Warning: Failed to cleanup orphaned temp files: {}", e);
+            // Surface but don't fail - temp file cleanup is best-effort.
+            warnings.push(StorageWarning::TempCleanupFailed {
+                reason: e.to_string(),
+            });
         }
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Verify index consistency
     ///
-    /// Returns true if index is valid, false if it needs rebuilding.
+    /// Returns `(true, _)` if the index is valid and `(false, _)` if it needs
+    /// rebuilding, paired with any non-fatal [`StorageWarning`]s describing the
+    /// inconsistency (e.g. a [`StorageWarning::DuplicateLease`]). The caller's
+    /// output layer decides whether and how to render the warnings.
     ///
     /// Note: Does NOT check for expired leases - those are handled by evict_expired().
     /// Expired leases are normal state, not corruption. Treating them as corruption
     /// would trigger unnecessary full index rebuilds.
-    pub fn verify_index_consistency(&self) -> Result<bool> {
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::storage::ClaimCoordinator;
+    /// # fn run(coordinator: &ClaimCoordinator) -> anyhow::Result<()> {
+    /// let (consistent, warnings) = coordinator.verify_index_consistency()?;
+    /// if !consistent {
+    ///     // rebuild the index; `warnings` explains why
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn verify_index_consistency(&self) -> Result<(bool, Vec<StorageWarning>)> {
         use std::collections::HashSet;
 
         let index_path = self.paths.shared_jit.join("claims.index.json");
         if !index_path.exists() {
-            return Ok(false);
+            return Ok((false, Vec::new()));
         }
 
         // Try to parse index
@@ -1090,23 +1166,24 @@ impl ClaimCoordinator {
             .and_then(|s| serde_json::from_str(&s).ok())
         {
             Some(idx) => idx,
-            None => return Ok(false), // Corrupted JSON
+            None => return Ok((false, Vec::new())), // Corrupted JSON
         };
 
         // Check for duplicates (actual corruption)
         let mut seen_issues = HashSet::new();
         for lease in &index.leases {
             if !seen_issues.insert(&lease.issue_id) {
-                eprintln!(
-                    "Error: Duplicate active lease for issue: {}",
-                    lease.issue_id
-                );
-                return Ok(false);
+                return Ok((
+                    false,
+                    vec![StorageWarning::DuplicateLease {
+                        issue_id: lease.issue_id.clone(),
+                    }],
+                ));
             }
         }
 
         // All checks passed
-        Ok(true)
+        Ok((true, Vec::new()))
     }
 }
 
@@ -1752,6 +1829,56 @@ mod tests {
             rebuilt.sequence_gaps.contains(&3),
             "Should detect missing sequence 3"
         );
+        // The gap must also surface as a typed warning for the output layer.
+        assert!(
+            rebuilt
+                .warnings()
+                .contains(&StorageWarning::SequenceGap { missing: 3 }),
+            "Sequence gap must surface as a SequenceGap warning, got {:?}",
+            rebuilt.warnings()
+        );
+    }
+
+    #[test]
+    fn test_verify_index_consistency_reports_duplicate_lease() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Write an index with two active leases for the same issue (corruption).
+        let make_lease = |lease_id: &str| Lease {
+            lease_id: lease_id.to_string(),
+            issue_id: "issue-dup".to_string(),
+            agent_id: "agent:test".to_string(),
+            worktree_id: "wt:main".to_string(),
+            branch: None,
+            ttl_secs: 600,
+            acquired_at: Utc::now(),
+            expires_at: Some(Utc::now() + Duration::seconds(600)),
+            last_beat: Utc::now(),
+            stale: false,
+        };
+        let index = ClaimsIndex {
+            schema_version: 1,
+            generated_at: Utc::now(),
+            last_seq: 2,
+            stale_threshold_secs: 3600,
+            leases: vec![make_lease("lease-a"), make_lease("lease-b")],
+            sequence_gaps: Vec::new(),
+        };
+        coordinator.write_index_atomic(&index).unwrap();
+
+        let (consistent, warnings) = coordinator.verify_index_consistency().unwrap();
+        assert!(
+            !consistent,
+            "Duplicate lease must mark the index inconsistent"
+        );
+        assert_eq!(
+            warnings,
+            vec![StorageWarning::DuplicateLease {
+                issue_id: "issue-dup".to_string()
+            }],
+            "Duplicate lease must surface a DuplicateLease warning"
+        );
     }
 
     #[test]
@@ -1831,8 +1958,12 @@ mod tests {
         // Corrupt the index by writing invalid JSON
         fs::write(&index_path, "invalid json{{{").unwrap();
 
-        // Recovery should rebuild from log
-        coordinator.startup_recovery().unwrap();
+        // Recovery should rebuild from log and surface the rebuild as a warning
+        let warnings = coordinator.startup_recovery().unwrap();
+        assert!(
+            warnings.contains(&StorageWarning::IndexRebuilt),
+            "Rebuilding a corrupted index must surface an IndexRebuilt warning, got {warnings:?}"
+        );
 
         // Index should be valid and contain the lease
         let index = coordinator.load_claims_index().unwrap();
@@ -1890,6 +2021,45 @@ mod tests {
 
         assert!(!lock_path.exists(), "Stale lock should be removed");
         assert!(!meta_path.exists(), "Stale lock metadata should be removed");
+    }
+
+    /// The orphaned-temp-file cleanup step scans `local_jit`; when that scan
+    /// fails, recovery must surface it as `StorageWarning::TempCleanupFailed`
+    /// rather than aborting. Deterministic: an unreadable directory makes the
+    /// scan fail without depending on timing. Earlier recovery steps operate on
+    /// `shared_jit`, so they are unaffected.
+    #[test]
+    #[cfg(unix)]
+    fn test_startup_recovery_surfaces_temp_cleanup_failure() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Make the local .jit directory unreadable so the temp-file scan errors.
+        let local_jit = temp_dir.path().join(".jit");
+        fs::create_dir_all(&local_jit).unwrap();
+        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o000)).unwrap();
+
+        // Confirm the failure actually reproduces here (a root sandbox bypasses
+        // 0o000); if it cannot be reproduced, restore and skip rather than flake.
+        let reproduces = temp_cleanup::cleanup_orphaned_temp_files(&local_jit, 3600).is_err();
+        let result = coordinator.startup_recovery();
+
+        // Restore permissions so TempDir cleanup can remove the directory.
+        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o755)).unwrap();
+
+        if !reproduces {
+            return; // environment cannot deny directory reads; nothing to assert
+        }
+
+        let warnings = result.unwrap();
+        assert!(
+            warnings
+                .iter()
+                .any(|w| matches!(w, StorageWarning::TempCleanupFailed { .. })),
+            "startup_recovery must surface TempCleanupFailed when temp cleanup fails, got {warnings:?}"
+        );
     }
 
     #[test]
