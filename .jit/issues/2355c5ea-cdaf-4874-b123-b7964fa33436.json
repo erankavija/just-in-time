@@ -2,9 +2,9 @@
   "id": "2355c5ea-cdaf-4874-b123-b7964fa33436",
   "title": "Route storage-internal paths and IO through the storage layer",
   "description": "Route storage-internal paths and file IO back through the storage layer (report boundary leaks). The command, output, and validation layers must not construct `.jit/` paths or read/write storage files directly.\n\n## Sites\n- `commands/mod.rs:964-974` (`check_active_lease`) — stop hardcoding `claims.index.json` + manual read/deserialize; delegate to `ClaimCoordinator::load_claims_index()` as `claim.rs:600` already does (consider a read-only `IssueStore`/coordinator method).\n- `commands/validate.rs:1653-1664` (`check_worktree_exists`) — remove the hardcoded `.jit/worktree.json` path + `\"worktree_id\"` field; add a read-only `read_worktree_id(worktree_root) -> Result<Option<String>>` in `storage::worktree_identity` deserializing into `WorktreeIdentity`.\n- `main.rs:323-326` (`print_gate_run_details`) — the `.jit/gate-runs/{run_id}/result.json` literal duplicates `storage/json.rs:662-684`; expose a `result_path()` from `JsonFileStorage` and use it. Do NOT put a path on the pure `GateRunResult` domain type.\n- `validation/serialize.rs:122-222` (`scaffold_default_rules`, `regenerate_type_hierarchy_schema`) — raw `std::fs` writes + hardcoded `.jit/` paths; route persistence through a storage write method (jit-root-relative variant) while validation produces only content.\n\n## Success Criteria\n- [ ] No `.jit/` path literal or storage filename (`claims.index.json`, `worktree.json`, `gate-runs/.../result.json`) is constructed in `commands/`, `main.rs`, or `validation/`; each goes through a storage-layer method.\n- [ ] Lease and worktree-id reads go through dedicated storage/coordinator methods returning typed values, not inline `std::fs::read_to_string` + `serde_json::from_str`.\n- [ ] `validation/serialize.rs` produces content only; persistence is performed by a storage write method, preserving the atomic temp-file+rename guarantee.\n- [ ] The pure `GateRunResult` domain type gains no path/IO field.\n- [ ] `cargo-ci` and `code-review` pass; behavior (files read/written, contents) is unchanged.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",

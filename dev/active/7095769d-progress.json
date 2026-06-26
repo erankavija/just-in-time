@@ -130,6 +130,7 @@
     }
   ],
   "created_during_execution": [],
+  "f16cfe8c_scope_decision": "f16cfe8c (type:enhancement — deferred full-atomicity archival redesign, born from the f067678a escalation) was wired as a blocking child of epic 7095769d, so the code-smell epic could not close without doing the deferred future redesign. ESCALATED to user (scope-defining edge per invariant 4). USER CHOSE: 'Detach from epic, keep on 1.0'. Executed: removed epic 7095769d -> f16cfe8c dep edge + epic:code-smell-cleanup label. DISCOVERY: the 1.0 milestone (9db27a3a) reached f16cfe8c only TRANSITIVELY through the epic (no direct edge), so removing the epic edge isolated it. Re-wired with a DIRECT milestone 9db27a3a -> f16cfe8c edge + milestone:v1.0 membership label. Result: epic has 12 children (11 done + t6); f16cfe8c stays a tracked 1.0 follow-up. jit validate exit 0, 0 warnings.",
   "escalations": [
     {
       "issue": "f067678a",

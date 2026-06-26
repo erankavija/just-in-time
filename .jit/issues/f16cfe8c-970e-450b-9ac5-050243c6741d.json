@@ -12,8 +12,8 @@
   "documents": [],
   "labels": [
     "type:enhancement",
-    "epic:code-smell-cleanup"
+    "milestone:v1.0"
   ],
-  "created_at": "2026-06-26T08:06:02.045165430+00:00",
-  "updated_at": "2026-06-26T08:06:02.046624370+00:00"
+  "created_at": "2026-06-26T08:06:02.045165430Z",
+  "updated_at": "2026-06-26T17:43:22.753832293Z"
 }
