@@ -2023,6 +2023,45 @@ mod tests {
         assert!(!meta_path.exists(), "Stale lock metadata should be removed");
     }
 
+    /// The orphaned-temp-file cleanup step scans `local_jit`; when that scan
+    /// fails, recovery must surface it as `StorageWarning::TempCleanupFailed`
+    /// rather than aborting. Deterministic: an unreadable directory makes the
+    /// scan fail without depending on timing. Earlier recovery steps operate on
+    /// `shared_jit`, so they are unaffected.
+    #[test]
+    #[cfg(unix)]
+    fn test_startup_recovery_surfaces_temp_cleanup_failure() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        // Make the local .jit directory unreadable so the temp-file scan errors.
+        let local_jit = temp_dir.path().join(".jit");
+        fs::create_dir_all(&local_jit).unwrap();
+        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o000)).unwrap();
+
+        // Confirm the failure actually reproduces here (a root sandbox bypasses
+        // 0o000); if it cannot be reproduced, restore and skip rather than flake.
+        let reproduces = temp_cleanup::cleanup_orphaned_temp_files(&local_jit, 3600).is_err();
+        let result = coordinator.startup_recovery();
+
+        // Restore permissions so TempDir cleanup can remove the directory.
+        fs::set_permissions(&local_jit, fs::Permissions::from_mode(0o755)).unwrap();
+
+        if !reproduces {
+            return; // environment cannot deny directory reads; nothing to assert
+        }
+
+        let warnings = result.unwrap();
+        assert!(
+            warnings
+                .iter()
+                .any(|w| matches!(w, StorageWarning::TempCleanupFailed { .. })),
+            "startup_recovery must surface TempCleanupFailed when temp cleanup fails, got {warnings:?}"
+        );
+    }
+
     #[test]
     fn test_indefinite_lease_per_agent_limit() {
         let temp_dir = TempDir::new().unwrap();
