@@ -391,9 +391,11 @@ pub enum ItemCommands {
 /// Project-invariant subcommands.
 ///
 /// `render` projects the loaded `.jit/invariants.toml` registry into the
-/// `[invariant_projection]` target. `check` runs the bidirectional
-/// enforcement-drift check between the registry and the declared rules/gates.
-/// The target path/mode/delimiters come only from config.
+/// `[invariant_projection]` target. `check` runs the enforcement-drift check
+/// between the registry and the declared rules/gates, reporting the sole
+/// declared-but-unenforced direction (an invariant whose `enforced-by` resolves
+/// to no loadable rule/gate). The target path/mode/delimiters come only from
+/// config.
 #[derive(Subcommand)]
 pub enum InvariantCommands {
     /// Render the invariant registry into its configured documentation target

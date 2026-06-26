@@ -17,8 +17,9 @@
 //! - [`graph`] — cross-issue graph-rule evaluation (validate / gate checkers);
 //! - [`invariants`] — the project-invariant registry and `.jit/invariants.toml`
 //!   loader (registry-first, project-scoped);
-//! - [`drift`] — the bidirectional enforcement-drift check (declaration
-//!   consistency between invariants and loadable rules/gates);
+//! - [`drift`] — the enforcement-drift check (declaration consistency between
+//!   invariants and loadable rules/gates), reporting the sole
+//!   declared-but-unenforced direction;
 //! - [`report`] — structured rule reports for `jit validate [--explain]`;
 //! - [`serialize`] — render a [`rules::RuleSet`] to `rules.toml` + schema file
 //!   CONTENT (no I/O); the storage layer

@@ -597,8 +597,9 @@ fn run_item_inner<S: IssueStore>(
 ///
 /// A thin delegation over the [`CommandExecutor`] invariant methods: `render`
 /// projects the registry into its configured documentation target and reports the
-/// written target; `check` runs the bidirectional enforcement-drift check and
-/// exits non-zero (via [`run_invariant_inner`]) when any drift is present. On
+/// written target; `check` runs the enforcement-drift check (the sole
+/// declared-but-unenforced direction) and exits non-zero (via
+/// [`run_invariant_inner`]) when any drift is present. On
 /// `--json` a failure is rendered as a JSON error object (honoring the
 /// machine-readable contract) rather than the top-level plain `Error: ...`.
 fn run_invariant<S: IssueStore>(
