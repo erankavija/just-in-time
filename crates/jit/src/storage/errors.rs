@@ -80,10 +80,12 @@ impl IssueNotFoundError {
 /// Error raised when one or more gate keys are absent from the gate registry.
 ///
 /// Returned by the gate-registry membership checks (`jit gate add`, gate-check,
-/// template expansion). The CLI downcasts to this type to classify the failure as
-/// a not-found condition (exit code `3`) and to render a `GATE_NOT_FOUND` JSON
-/// error, rather than scanning the message text. The two variants preserve the
-/// two distinct phrasings the callers already produced.
+/// template expansion, `gate show`/`remove`, `gate preset create`). The CLI
+/// downcasts to this type to classify the failure as a not-found condition (exit
+/// code `3`) and to render a `GATE_NOT_FOUND` JSON error, rather than scanning the
+/// message text. Each variant preserves one of the distinct phrasings the callers
+/// already produced, so a gate-not-found is always this dedicated type (never a
+/// generic `NotFoundError`) while keeping the user-facing text byte-for-byte.
 ///
 /// # Examples
 ///
@@ -95,6 +97,12 @@ impl IssueNotFoundError {
 ///
 /// let single = GateNotFoundError::single("lint");
 /// assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
+///
+/// let by_key = GateNotFoundError::by_key("lint");
+/// assert_eq!(by_key.to_string(), "Gate 'lint' not found");
+///
+/// let in_registry = GateNotFoundError::in_registry("lint");
+/// assert_eq!(in_registry.to_string(), "Gate not found in registry: lint");
 /// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum GateNotFoundError {
@@ -104,6 +112,14 @@ pub enum GateNotFoundError {
     /// A single gate-key lookup missed (gate-check / template expansion).
     #[error("Gate '{0}' not found in registry")]
     Single(String),
+    /// A single gate-key lookup missed, phrased without the "in registry" suffix
+    /// (`gate show` / `gate remove`).
+    #[error("Gate '{0}' not found")]
+    ByKey(String),
+    /// A single gate-key lookup missed during preset creation, phrased
+    /// "Gate not found in registry: <key>" (`gate preset create`).
+    #[error("Gate not found in registry: {0}")]
+    InRegistry(String),
 }
 
 impl GateNotFoundError {
@@ -112,9 +128,22 @@ impl GateNotFoundError {
         Self::Batch(keys.into_iter().map(Into::into).collect())
     }
 
-    /// Build a [`GateNotFoundError::Single`] for one missing gate key.
+    /// Build a [`GateNotFoundError::Single`] for one missing gate key
+    /// ("Gate '<key>' not found in registry").
     pub fn single(key: impl Into<String>) -> Self {
         Self::Single(key.into())
+    }
+
+    /// Build a [`GateNotFoundError::ByKey`] for one missing gate key, using the
+    /// `gate show`/`gate remove` phrasing ("Gate '<key>' not found").
+    pub fn by_key(key: impl Into<String>) -> Self {
+        Self::ByKey(key.into())
+    }
+
+    /// Build a [`GateNotFoundError::InRegistry`] for one missing gate key, using
+    /// the `gate preset create` phrasing ("Gate not found in registry: <key>").
+    pub fn in_registry(key: impl Into<String>) -> Self {
+        Self::InRegistry(key.into())
     }
 }
 
@@ -278,6 +307,24 @@ mod tests {
         );
         let single = GateNotFoundError::single("lint");
         assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
+    }
+
+    #[test]
+    fn test_gate_not_found_by_key_and_in_registry_messages() {
+        // Per-origin Display lock: each variant reproduces the exact original text
+        // of the call site it replaced (gate show/remove vs gate preset create),
+        // so a gate-not-found is the dedicated type without changing user output.
+        let by_key = GateNotFoundError::by_key("lint");
+        assert_eq!(by_key.to_string(), "Gate 'lint' not found");
+
+        let in_registry = GateNotFoundError::in_registry("lint");
+        assert_eq!(in_registry.to_string(), "Gate not found in registry: lint");
+
+        // Both still downcast to the dedicated type for exit-code classification.
+        let any: anyhow::Error = by_key.into();
+        assert!(any.downcast_ref::<GateNotFoundError>().is_some());
+        let any: anyhow::Error = in_registry.into();
+        assert!(any.downcast_ref::<GateNotFoundError>().is_some());
     }
 
     #[test]

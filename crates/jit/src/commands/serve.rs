@@ -285,6 +285,8 @@ pub fn find_server_binary() -> Result<PathBuf> {
 
     // 2. PATH
     which::which("jit-server").map_err(|_| {
+        // Generic NotFoundError: a missing executable has no dedicated domain type.
+        // Still downcastable -> exit 3; message preserved verbatim.
         crate::errors::NotFoundError::new(
             "jit-server binary not found. \
              Ensure it is installed and on PATH, or built alongside jit.",

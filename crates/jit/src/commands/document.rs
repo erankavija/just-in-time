@@ -109,6 +109,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.retain(|doc| doc.path != path);
 
         if issue.documents.len() == original_len {
+            // Generic NotFoundError: a document-reference not-found has no dedicated
+            // domain type (unlike issue/gate/preset/gate-run/repository/lease). Still
+            // downcastable -> exit 3; message preserved verbatim.
             return Err(crate::errors::NotFoundError::new(format!(
                 "Document reference {} not found in issue {}",
                 path, full_id

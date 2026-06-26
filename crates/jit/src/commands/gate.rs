@@ -699,9 +699,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut registry = self.storage.load_gate_registry()?;
 
         if !registry.gates.contains_key(key) {
-            return Err(
-                crate::errors::NotFoundError::new(format!("Gate '{}' not found", key)).into(),
-            );
+            return Err(crate::storage::GateNotFoundError::by_key(key).into());
         }
 
         registry.gates.remove(key);
@@ -711,9 +709,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn show_gate_definition(&self, key: &str) -> Result<Gate> {
         let registry = self.storage.load_gate_registry()?;
-        registry.gates.get(key).cloned().ok_or_else(|| {
-            crate::errors::NotFoundError::new(format!("Gate '{}' not found", key)).into()
-        })
+        registry
+            .gates
+            .get(key)
+            .cloned()
+            .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key).into())
     }
 
     // Preset management methods
@@ -862,16 +862,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut gates = Vec::new();
 
         for gate_key in &issue.gates_required {
-            // Message-carrying NotFoundError (exit 3) so the Display reproduces this
-            // site's original phrasing verbatim; the other two ::single origins
-            // (gate_check.rs, bulk_update.rs) used a different wording that the
-            // GateNotFoundError::single Display matches, so they keep using it.
-            let gate = registry.gates.get(gate_key).ok_or_else(|| {
-                crate::errors::NotFoundError::new(format!(
-                    "Gate not found in registry: {}",
-                    gate_key
-                ))
-            })?;
+            // Dedicated GateNotFoundError (exit 3) so a gate-not-found is always
+            // this type by downcast; the InRegistry variant reproduces this site's
+            // original "Gate not found in registry: <key>" phrasing verbatim. The
+            // other ::single origins (gate_check.rs, bulk_update.rs) used a
+            // different wording carried by the Single variant.
+            let gate = registry
+                .gates
+                .get(gate_key)
+                .ok_or_else(|| crate::storage::GateNotFoundError::in_registry(gate_key))?;
 
             gates.push(GateTemplate {
                 key: gate.key.clone(),

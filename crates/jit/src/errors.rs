@@ -270,14 +270,14 @@ impl ValidationFailedError {
     }
 }
 
-/// A lease-not-found failure, carrying the fully-rendered [`ActionableError`]
-/// message (causes + remediation) as plain text.
+/// A lease-not-found failure.
 ///
-/// The lease lookups previously stringified an [`ActionableError`] into an
-/// `anyhow!("{}", ...)`, which the CLI could only classify by scanning for
-/// "not found". This typed wrapper preserves that rich message verbatim through
-/// `Display` while letting the CLI downcast to classify the failure as a
-/// not-found condition (exit code `3`).
+/// Most lease lookups previously stringified an [`ActionableError`] into an
+/// `anyhow!("{}", ...)` (causes + remediation); one path used a plain
+/// `anyhow!("Lease {} not found", id)`. The CLI could only classify either by
+/// scanning for "not found". This dedicated type makes a lease-not-found
+/// downcastable (exit code `3`) instead, while each constructor reproduces its
+/// origin's message verbatim through `Display`.
 ///
 /// # Examples
 ///
@@ -288,6 +288,12 @@ impl ValidationFailedError {
 /// // The rich remediation text is preserved verbatim.
 /// assert!(err.to_string().contains("abc12345"));
 /// assert!(err.to_string().contains("not found"));
+///
+/// // The plain "Lease <id> not found" form for the bare lookup path.
+/// assert_eq!(
+///     LeaseNotFoundError::by_id("abc12345").to_string(),
+///     "Lease abc12345 not found"
+/// );
 ///
 /// // Downcastable through anyhow for exit-code classification.
 /// let any: anyhow::Error = err.into();
@@ -305,6 +311,14 @@ impl LeaseNotFoundError {
     pub fn new(error: &ActionableError) -> Self {
         Self {
             message: error.to_string(),
+        }
+    }
+
+    /// Build a [`LeaseNotFoundError`] for a bare lookup miss, using the plain
+    /// "Lease <id> not found" phrasing (no remediation block).
+    pub fn by_id(lease_id: impl std::fmt::Display) -> Self {
+        Self {
+            message: format!("Lease {} not found", lease_id),
         }
     }
 
@@ -973,6 +987,19 @@ mod tests {
 
         let any: anyhow::Error = err.into();
         assert_eq!(any.to_string(), expected);
+        assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
+    }
+
+    #[test]
+    fn test_lease_not_found_error_by_id_is_plain_message() {
+        // The bare lookup path keeps its plain "Lease <id> not found" phrasing
+        // (no remediation block) while still being the dedicated, downcastable type.
+        let err = LeaseNotFoundError::by_id("xyz789");
+        assert_eq!(err.to_string(), "Lease xyz789 not found");
+        assert_eq!(err.message(), "Lease xyz789 not found");
+
+        let any: anyhow::Error = err.into();
+        assert_eq!(any.to_string(), "Lease xyz789 not found");
         assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
     }
 }

@@ -551,9 +551,7 @@ impl ClaimCoordinator {
         // 3. Find the lease
         let lease = index
             .find_lease_by_id(lease_id)
-            .ok_or_else(|| {
-                crate::errors::NotFoundError::new(format!("Lease {} not found", lease_id))
-            })?
+            .ok_or_else(|| crate::errors::LeaseNotFoundError::by_id(lease_id))?
             .clone();
 
         // 4. Verify ownership

@@ -145,6 +145,8 @@ impl<S: IssueStore> SnapshotExporter<S> {
         let tree = commit.tree()?;
 
         let entry = tree.get_path(Path::new(path)).map_err(|_| {
+            // Generic NotFoundError: a path-in-commit not-found has no dedicated
+            // domain type. Still downcastable -> exit 3; message preserved verbatim.
             crate::errors::NotFoundError::new(format!(
                 "Path '{}' not found in commit {}",
                 path, reference
