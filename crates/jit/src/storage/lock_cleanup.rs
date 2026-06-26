@@ -3,6 +3,7 @@
 //! Detects and removes locks from dead processes using PID-based detection.
 //! Only activates when worktree/claim features are in use - zero overhead for single developers.
 
+use crate::storage::StorageWarning;
 use anyhow::Result;
 use std::path::Path;
 
@@ -54,17 +55,38 @@ pub fn process_exists(_pid: u32) -> bool {
 ///
 /// * `lock_dir` - Directory containing lock files
 ///
+/// # Returns
+///
+/// The non-fatal [`StorageWarning`]s observed during cleanup (locks removed,
+/// long-lived locks left in place). The caller's output layer decides whether
+/// and how to render them; this function never writes to stderr itself.
+///
 /// # Errors
 ///
 /// Returns error if lock directory cannot be read
-pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::storage::lock_cleanup::cleanup_stale_locks;
+/// use std::path::Path;
+///
+/// let warnings = cleanup_stale_locks(Path::new(".jit/locks"))?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<StorageWarning>> {
     use crate::storage::lock::LockMetadata;
     use chrono::Utc;
     use fs4::fs_std::FileExt;
     use std::fs::{self, OpenOptions};
 
+    let mut warnings = Vec::new();
+
     if !lock_dir.exists() {
-        return Ok(());
+        return Ok(warnings);
     }
 
     // Iterate through lock files
@@ -89,7 +111,7 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
             match file.try_lock_exclusive() {
                 Ok(true) => {
                     // Lock acquired => it was stale
-                    eprintln!("Warning: Removed stale lock: {}", path.display());
+                    warnings.push(StorageWarning::StaleLockRemoved { path: path.clone() });
                     // Lock automatically released when file dropped
                     drop(file);
                     let _ = fs::remove_file(&path);
@@ -101,11 +123,10 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
                         if let Ok(meta) = serde_json::from_str::<LockMetadata>(&meta_json) {
                             // Check if process still exists
                             if !process_exists(meta.pid) {
-                                eprintln!(
-                                    "Warning: Removing lock from dead process {}: {}",
-                                    meta.pid,
-                                    path.display()
-                                );
+                                warnings.push(StorageWarning::LockFromDeadProcess {
+                                    pid: meta.pid,
+                                    path: path.clone(),
+                                });
                                 // Force remove (process dead, lock should be stale)
                                 let _ = fs::remove_file(&path);
                                 let _ = fs::remove_file(&metadata_path);
@@ -115,13 +136,12 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
                             // Check age (1 hour TTL for locks)
                             let age = Utc::now().signed_duration_since(meta.created_at);
                             if age.num_seconds() > 3600 {
-                                eprintln!(
-                                    "Error: Lock very old: {} ({}s, pid={}, agent={})",
-                                    path.display(),
-                                    age.num_seconds(),
-                                    meta.pid,
-                                    meta.agent_id
-                                );
+                                warnings.push(StorageWarning::LockVeryOld {
+                                    path: path.clone(),
+                                    age_secs: age.num_seconds(),
+                                    pid: meta.pid,
+                                    agent_id: meta.agent_id.clone(),
+                                });
                                 // Don't auto-remove if process exists, require manual intervention
                             }
                         }
@@ -131,7 +151,7 @@ pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(warnings)
 }
 
 #[cfg(test)]
@@ -174,8 +194,9 @@ mod tests {
         let lock_dir = temp_dir.path().join("locks");
         std::fs::create_dir(&lock_dir).unwrap();
 
-        cleanup_stale_locks(&lock_dir).unwrap();
-        // Should succeed with no errors
+        let warnings = cleanup_stale_locks(&lock_dir).unwrap();
+        // Should succeed with no warnings
+        assert!(warnings.is_empty(), "Empty directory yields no warnings");
     }
 
     #[test]
@@ -197,11 +218,18 @@ mod tests {
         };
         std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        cleanup_stale_locks(&lock_dir).unwrap();
+        let warnings = cleanup_stale_locks(&lock_dir).unwrap();
 
         // Lock should be removed because it's not actually held
         assert!(!lock_path.exists(), "Lock file should be removed");
         assert!(!meta_path.exists(), "Metadata file should be removed");
+        assert_eq!(
+            warnings,
+            vec![StorageWarning::StaleLockRemoved {
+                path: lock_path.clone()
+            }],
+            "Removing an unheld lock must surface a StaleLockRemoved warning"
+        );
     }
 
     #[test]
@@ -232,12 +260,20 @@ mod tests {
         };
         std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        cleanup_stale_locks(&lock_dir).unwrap();
+        let warnings = cleanup_stale_locks(&lock_dir).unwrap();
 
         // Lock should be removed despite being held (dead process)
         drop(lock_file);
         assert!(!lock_path.exists(), "Lock file should be removed");
         assert!(!meta_path.exists(), "Metadata file should be removed");
+        assert_eq!(
+            warnings,
+            vec![StorageWarning::LockFromDeadProcess {
+                pid: u32::MAX - 1,
+                path: lock_path.clone()
+            }],
+            "Removing a dead-process lock must surface a LockFromDeadProcess warning"
+        );
     }
 
     #[test]
@@ -268,11 +304,15 @@ mod tests {
         };
         std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        cleanup_stale_locks(&lock_dir).unwrap();
+        let warnings = cleanup_stale_locks(&lock_dir).unwrap();
 
         // Lock should be preserved (held by live process)
         assert!(lock_path.exists(), "Lock file should still exist");
         assert!(meta_path.exists(), "Metadata file should still exist");
+        assert!(
+            warnings.is_empty(),
+            "A fresh, live-process lock must produce no warnings"
+        );
 
         drop(lock_file);
     }
@@ -307,12 +347,19 @@ mod tests {
         };
         std::fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap()).unwrap();
 
-        // Should not panic, just log error (can't verify logging in test)
-        cleanup_stale_locks(&lock_dir).unwrap();
+        // Should not panic, and must surface the long-lived lock as a warning.
+        let warnings = cleanup_stale_locks(&lock_dir).unwrap();
 
         // Lock should still exist (live process, even if old)
         assert!(lock_path.exists(), "Lock file should still exist");
         assert!(meta_path.exists(), "Metadata file should still exist");
+        assert!(
+            matches!(
+                warnings.as_slice(),
+                [StorageWarning::LockVeryOld { pid, .. }] if *pid == std::process::id()
+            ),
+            "An old, live-process lock must surface a LockVeryOld warning, got {warnings:?}"
+        );
 
         drop(lock_file);
     }

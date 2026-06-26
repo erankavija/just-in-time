@@ -21,6 +21,7 @@ pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
 pub mod temp_cleanup;
+pub mod warnings;
 pub mod worktree_identity;
 pub mod worktree_paths;
 
@@ -29,6 +30,7 @@ pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use warnings::StorageWarning;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;

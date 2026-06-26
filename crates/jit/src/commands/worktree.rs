@@ -3,8 +3,9 @@
 //! Provides CLI interface for worktree information and operations.
 
 use crate::storage::claim_coordinator::ClaimsIndex;
-use crate::storage::worktree_identity::load_or_create_worktree_identity;
+use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
+use crate::storage::StorageWarning;
 use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -143,7 +144,31 @@ fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
 ///
 /// Displays current worktree context including ID, branch, paths, and whether
 /// this is the main worktree or a secondary one.
-pub fn execute_worktree_info() -> Result<WorktreeInfo> {
+///
+/// # Returns
+///
+/// The worktree info paired with any non-fatal [`StorageWarning`]s observed
+/// while loading the worktree identity (e.g. a relocation), for the caller's
+/// output layer to render. This function never writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected (e.g. not in a git
+/// repository) or the identity cannot be loaded or created.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::worktree::execute_worktree_info;
+///
+/// let (info, warnings) = execute_worktree_info()?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("worktree {} on {}", info.worktree_id, info.branch);
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
@@ -151,27 +176,57 @@ pub fn execute_worktree_info() -> Result<WorktreeInfo> {
     // Get current branch
     let branch = get_current_branch()?;
 
-    // Load or generate worktree identity
-    let identity =
-        load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+    // Load or generate worktree identity, surfacing relocation as a warning
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
+        &paths.local_jit,
+        &paths.worktree_root,
+        &branch,
+    )?;
 
     // Determine if this is the main worktree
     let is_main = !paths.is_worktree();
 
-    Ok(WorktreeInfo {
-        worktree_id: identity.worktree_id,
-        branch: identity.branch,
-        root_path: paths.worktree_root.to_string_lossy().to_string(),
-        is_main_worktree: is_main,
-        common_dir: paths.common_dir.to_string_lossy().to_string(),
-    })
+    Ok((
+        WorktreeInfo {
+            worktree_id: identity.worktree_id,
+            branch: identity.branch,
+            root_path: paths.worktree_root.to_string_lossy().to_string(),
+            is_main_worktree: is_main,
+            common_dir: paths.common_dir.to_string_lossy().to_string(),
+        },
+        warnings,
+    ))
 }
 
 /// Execute `jit worktree list` command.
 ///
 /// Lists all git worktrees with their JIT status including worktree ID, branch,
 /// path, and count of active claims.
-pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
+///
+/// # Returns
+///
+/// The worktree entries paired with any non-fatal [`StorageWarning`]s observed
+/// while loading each worktree's identity (e.g. a relocation), for the caller's
+/// output layer to render. This function never writes to stderr itself.
+///
+/// # Errors
+///
+/// Returns an error if worktree context cannot be detected, `git worktree list`
+/// fails, or a present `.jit` identity cannot be read.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::commands::worktree::execute_worktree_list;
+///
+/// let (entries, warnings) = execute_worktree_list()?;
+/// for warning in &warnings {
+///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
+/// }
+/// println!("{} worktree(s)", entries.len());
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
     use crate::storage::claim_coordinator::ClaimsIndex;
     use std::path::PathBuf;
 
@@ -216,7 +271,9 @@ pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
         }
     };
 
-    // Enrich git entries with JIT data
+    // Enrich git entries with JIT data, collecting any relocation warnings
+    // observed while loading each worktree's identity.
+    let mut warnings = Vec::new();
     let entries = git_entries
         .into_iter()
         .map(|git_entry| -> Result<WorktreeListEntry> {
@@ -225,14 +282,18 @@ pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
 
             // Load worktree identity - error if .jit exists but can't be read
             let worktree_id = if local_jit.exists() {
-                let identity =
-                    load_or_create_worktree_identity(&local_jit, &worktree_path, &git_entry.branch)
-                        .with_context(|| {
-                            format!(
-                                "Failed to load worktree identity from {}",
-                                local_jit.display()
-                            )
-                        })?;
+                let (identity, entry_warnings) = load_or_create_worktree_identity_with_warnings(
+                    &local_jit,
+                    &worktree_path,
+                    &git_entry.branch,
+                )
+                .with_context(|| {
+                    format!(
+                        "Failed to load worktree identity from {}",
+                        local_jit.display()
+                    )
+                })?;
+                warnings.extend(entry_warnings);
                 identity.worktree_id
             } else {
                 // No .jit directory yet - use branch-based temporary ID
@@ -255,7 +316,7 @@ pub fn execute_worktree_list() -> Result<Vec<WorktreeListEntry>> {
         })
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(entries)
+    Ok((entries, warnings))
 }
 
 /// Check if current branch has diverged from origin/main.

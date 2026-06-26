@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::errors::{TransitionBlockedError, TransitionBlocker};
+use crate::storage::StorageWarning;
 
 impl<S: IssueStore> CommandExecutor<S> {
     #[allow(clippy::too_many_arguments)]
@@ -570,7 +571,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(warnings)
     }
 
-    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<()> {
+    /// Claim an issue for `assignee`.
+    ///
+    /// Returns any non-fatal [`StorageWarning`]s (e.g. a worktree relocation
+    /// observed while checking leases) so the calling command can surface them
+    /// at its own output boundary; this method never writes to stderr.
+    pub fn claim_issue(&self, id: &str, assignee: String) -> Result<Vec<StorageWarning>> {
         use super::claim::check_issue_lease;
 
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -580,11 +586,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(anyhow!("Issue is already assigned"));
         }
 
-        // Check for existing lease held by another agent
-        // Use both short and full ID since leases may store either
+        // Check for existing lease held by another agent.
+        // Use both short and full ID since leases may store either. Collect the
+        // relocation warning from the identity load (the first call fixes the
+        // recorded path, so the second observes none).
         let short_id = issue.short_id();
-        let conflicting_lease = check_issue_lease(&short_id, Some(&assignee))?
-            .or(check_issue_lease(&full_id, Some(&assignee))?);
+        let (lease_short, mut warnings) = check_issue_lease(&short_id, Some(&assignee))?;
+        let (lease_full, warnings_full) = check_issue_lease(&full_id, Some(&assignee))?;
+        warnings.extend(warnings_full);
+        let conflicting_lease = lease_short.or(lease_full);
 
         if let Some(lease) = conflicting_lease {
             let expires_str = lease
@@ -633,7 +643,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let event = Event::new_issue_claimed(issue_id, assignee);
         self.storage.append_event(&event)?;
 
-        Ok(())
+        Ok(warnings)
     }
 
     /// Unassign an issue.
@@ -690,7 +700,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    pub fn claim_next(&self, assignee: String, _filter: Option<String>) -> Result<String> {
+    pub fn claim_next(
+        &self,
+        assignee: String,
+        _filter: Option<String>,
+    ) -> Result<(String, Vec<StorageWarning>)> {
         let issues = self.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -709,8 +723,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if let Some(issue) = candidates.first() {
             let id = issue.id.clone();
-            self.claim_issue(&id, assignee)?;
-            Ok(id)
+            let warnings = self.claim_issue(&id, assignee)?;
+            Ok((id, warnings))
         } else {
             Err(anyhow!("No ready issues available"))
         }
