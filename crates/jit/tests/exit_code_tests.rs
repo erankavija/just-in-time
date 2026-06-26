@@ -109,6 +109,41 @@ fn test_exit_code_validation_failed_cycle() {
 }
 
 #[test]
+fn test_exit_code_gate_not_found_in_registry() {
+    let temp_dir = setup_test_env();
+
+    // Create an issue to attach the gate to.
+    let issue = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Gated work", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    // Adding an undefined gate is a not-found condition (exit code 3), now
+    // classified by downcasting the typed `GateNotFoundError`.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["gate", "add", &issue, "undefined-gate"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(3));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not found in registry"));
+
+    // The same condition under --json carries the GATE_NOT_FOUND code.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["gate", "add", &issue, "undefined-gate", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "GATE_NOT_FOUND");
+}
+
+#[test]
 fn test_exit_code_invalid_argument() {
     let temp_dir = setup_test_env();
 

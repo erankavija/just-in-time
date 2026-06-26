@@ -12,6 +12,7 @@ use std::collections::HashMap;
 pub mod claim_coordinator;
 pub mod claims_log;
 pub mod control_plane;
+pub mod errors;
 pub mod gate_runs;
 pub mod heartbeat;
 pub mod json;
@@ -27,6 +28,7 @@ pub mod worktree_paths;
 
 // Re-export for convenience
 pub use claim_coordinator::{ClaimCoordinator, Lease};
+pub use errors::{GateNotFoundError, IssueNotFoundError};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};

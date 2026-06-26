@@ -71,8 +71,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
-    let error_msg = error.to_string().to_lowercase();
-
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {
@@ -82,7 +80,34 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
-    // Check error message patterns
+    // Graph errors are typed: a cycle is a validation failure, a missing node is
+    // a not-found condition. Classified by downcast, not by message text.
+    if let Some(graph_error) = error.downcast_ref::<jit::GraphError>() {
+        return match graph_error {
+            jit::GraphError::CycleDetected => ExitCode::ValidationFailed,
+            jit::GraphError::NodeNotFound { .. } => ExitCode::NotFound,
+        };
+    }
+
+    // A missing issue (from either storage backend) is a typed not-found
+    // condition; likewise a gate key absent from the registry.
+    if error
+        .downcast_ref::<jit::storage::IssueNotFoundError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::storage::GateNotFoundError>()
+            .is_some()
+    {
+        return ExitCode::NotFound;
+    }
+
+    let error_msg = error.to_string().to_lowercase();
+
+    // Residual message-based fallback for conditions that are not represented by
+    // a typed error. The three TYPED conditions (issue/gate-not-found, cycle) are
+    // classified above by downcast and never reach this block; the remaining
+    // string checks are a best-effort net for still-untyped producers
+    // (e.g. preset/gate-run not-found, invalid-argument, already-exists).
     if error_msg.contains("not found") || error_msg.contains("no such file") {
         ExitCode::NotFound
     } else if error_msg.contains("gate validation failed") || error_msg.contains("blocked by") {
@@ -170,7 +195,10 @@ fn render_gate_pass_error(
                 "Add the gate first: jit gate add {} {}",
                 not_required.issue_id, not_required.gate_key
             ))
-    } else if e.to_string().to_lowercase().contains("not found") {
+    } else if e
+        .downcast_ref::<jit::storage::IssueNotFoundError>()
+        .is_some()
+    {
         // Pre-verdict lookup error: issue id did not resolve.
         JsonError::issue_not_found(id, command)
     } else {
@@ -1331,7 +1359,10 @@ fn run() -> Result<()> {
                                         blocked,
                                         "issue update",
                                     )
-                                } else if error_msg.contains("not found") {
+                                } else if e
+                                    .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                    .is_some()
+                                {
                                     jit::output::JsonError::issue_not_found(
                                         &full_id,
                                         "issue update",
@@ -1792,24 +1823,43 @@ fn run() -> Result<()> {
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_dependencies(&from_id, &to_ids) {
-                    Ok(result) => {
+                    Ok(mut result) => {
                         // If all dependencies failed, return error
                         if result.added.is_empty() && !result.errors.is_empty() {
+                            // Classify the first failure by its TYPED error, not by
+                            // scanning the message. `typed_errors` mirrors `errors`
+                            // 1:1, so it is guaranteed non-empty here.
+                            let (dep_id, typed) = result
+                                .typed_errors
+                                .drain(..)
+                                .next()
+                                .expect("typed_errors mirrors the non-empty errors list");
                             if json {
                                 use jit::output::JsonError;
-                                // Get first error for backward compatibility
-                                let (dep_id, error_msg) = &result.errors[0];
-                                let json_error = if error_msg.contains("cycle") {
-                                    JsonError::cycle_detected(&from_id, dep_id, "dep add")
-                                } else if error_msg.contains("not found") {
-                                    JsonError::issue_not_found(dep_id, "dep add")
+                                use jit::GraphError;
+                                let json_error = if let Some(GraphError::CycleDetected) =
+                                    typed.downcast_ref::<GraphError>()
+                                {
+                                    JsonError::cycle_detected(&from_id, &dep_id, "dep add")
+                                } else if typed
+                                    .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                    .is_some()
+                                    || matches!(
+                                        typed.downcast_ref::<GraphError>(),
+                                        Some(GraphError::NodeNotFound { .. })
+                                    )
+                                {
+                                    JsonError::issue_not_found(&dep_id, "dep add")
                                 } else {
-                                    JsonError::new("DEPENDENCY_ERROR", error_msg.clone(), "dep add")
+                                    JsonError::new("DEPENDENCY_ERROR", typed.to_string(), "dep add")
                                 };
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
-                                return Err(anyhow!("{}", result.errors[0].1));
+                                // Propagate the typed error so `error_to_exit_code`
+                                // can classify it by downcast (preserving the
+                                // cycle -> exit 4 / not-found -> exit 3 mapping).
+                                return Err(typed);
                             }
                         }
 
@@ -2269,14 +2319,19 @@ fn run() -> Result<()> {
                         if json {
                             use jit::output::JsonError;
                             let error_str = e.to_string();
-                            let json_error =
-                                if error_str.contains("Issue") && error_str.contains("not found") {
-                                    JsonError::issue_not_found(&id, "gate add")
-                                } else if error_str.contains("not found in registry") {
-                                    JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
-                                } else {
-                                    JsonError::new("GATE_ERROR", error_str, "gate add")
-                                };
+                            let json_error = if e
+                                .downcast_ref::<jit::storage::IssueNotFoundError>()
+                                .is_some()
+                            {
+                                JsonError::issue_not_found(&id, "gate add")
+                            } else if e
+                                .downcast_ref::<jit::storage::GateNotFoundError>()
+                                .is_some()
+                            {
+                                JsonError::new("GATE_NOT_FOUND", error_str, "gate add")
+                            } else {
+                                JsonError::new("GATE_ERROR", error_str, "gate add")
+                            };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {

@@ -4,7 +4,7 @@
 //! The directory location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::domain::{Event, Issue};
-use crate::storage::{FileLocker, GateRegistry, IssueStore};
+use crate::storage::{FileLocker, GateRegistry, IssueNotFoundError, IssueStore};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
@@ -459,10 +459,7 @@ impl IssueStore for JsonFileStorage {
         }
 
         // Issue not found in any source
-        Err(anyhow!(
-            "Issue {} not found in local storage, git, or main worktree",
-            id
-        ))
+        Err(IssueNotFoundError::across_sources(id).into())
     }
 
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
@@ -515,7 +512,7 @@ impl IssueStore for JsonFileStorage {
             return self
                 .load_issue(partial_id)
                 .map(|issue| issue.id)
-                .map_err(|_| anyhow!("Issue not found: {}", partial_id));
+                .map_err(|_| IssueNotFoundError::new(partial_id).into());
         }
 
         // Minimum length check
@@ -533,7 +530,7 @@ impl IssueStore for JsonFileStorage {
             .collect();
 
         match matches.len() {
-            0 => Err(anyhow!("Issue not found: {}", partial_id)),
+            0 => Err(IssueNotFoundError::new(partial_id).into()),
             1 => Ok(matches[0].clone()),
             _ => {
                 // Load issue titles for better error message

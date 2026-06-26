@@ -227,10 +227,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Atomic: fail entirely if any gate doesn't exist
         if !not_found.is_empty() {
-            return Err(anyhow!(
-                "Gates not found in registry: {}",
-                not_found.join(", ")
-            ));
+            return Err(crate::storage::GateNotFoundError::new(not_found).into());
         }
 
         // Second pass: add gates (now safe since all are validated)

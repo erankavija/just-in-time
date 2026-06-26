@@ -4,7 +4,7 @@
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use crate::domain::{Event, Issue};
-use crate::storage::{GateRegistry, IssueStore};
+use crate::storage::{GateRegistry, IssueNotFoundError, IssueStore};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -116,7 +116,7 @@ impl IssueStore for InMemoryStorage {
             .unwrap()
             .get(id)
             .cloned()
-            .ok_or_else(|| anyhow!("Issue not found: {}", id))
+            .ok_or_else(|| IssueNotFoundError::new(id).into())
     }
 
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, crate::storage::PathReadError> {
@@ -140,7 +140,7 @@ impl IssueStore for InMemoryStorage {
             return self
                 .load_issue(partial_id)
                 .map(|issue| issue.id)
-                .map_err(|_| anyhow!("Issue not found: {}", partial_id));
+                .map_err(|_| IssueNotFoundError::new(partial_id).into());
         }
 
         // Minimum length check
@@ -157,7 +157,7 @@ impl IssueStore for InMemoryStorage {
             .collect();
 
         match matches.len() {
-            0 => Err(anyhow!("Issue not found: {}", partial_id)),
+            0 => Err(IssueNotFoundError::new(partial_id).into()),
             1 => Ok(matches[0].clone()),
             _ => {
                 // Get titles for better error message
@@ -183,7 +183,7 @@ impl IssueStore for InMemoryStorage {
             .lock()
             .unwrap()
             .remove(id)
-            .ok_or_else(|| anyhow!("Issue not found: {}", id))?;
+            .ok_or_else(|| IssueNotFoundError::new(id))?;
         Ok(())
     }
 
