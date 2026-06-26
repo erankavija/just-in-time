@@ -878,12 +878,12 @@ pub enum GateCommands {
         description: String,
 
         /// Gate stage: precheck or postcheck
-        #[arg(short, long, default_value = "postcheck")]
-        stage: String,
+        #[arg(short, long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
+        stage: crate::domain::GateStage,
 
         /// Gate mode: manual or auto
-        #[arg(short, long, default_value = "manual")]
-        mode: String,
+        #[arg(short, long, value_enum, default_value_t = crate::domain::GateMode::Manual)]
+        mode: crate::domain::GateMode,
 
         /// Command to execute for automated gates
         #[arg(long)]
@@ -1408,8 +1408,8 @@ pub enum RegistryCommands {
         example: Option<String>,
 
         /// Gate execution stage (precheck or postcheck)
-        #[arg(short, long, default_value = "postcheck")]
-        stage: String,
+        #[arg(short, long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
+        stage: crate::domain::GateStage,
     },
 
     /// Remove a gate definition

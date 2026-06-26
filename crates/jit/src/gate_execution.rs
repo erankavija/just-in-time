@@ -49,14 +49,10 @@ pub fn execute_gate_checker_with_context(
     let git_context = get_git_context(working_dir);
 
     // Build base env vars that are always set
-    let stage_str = match stage {
-        GateStage::Precheck => "precheck",
-        GateStage::Postcheck => "postcheck",
-    };
     let mut base_env = std::collections::HashMap::new();
     base_env.insert("JIT_ISSUE_ID".to_string(), issue_id.to_string());
     base_env.insert("JIT_GATE_KEY".to_string(), gate_key.to_string());
-    base_env.insert("JIT_STAGE".to_string(), stage_str.to_string());
+    base_env.insert("JIT_STAGE".to_string(), stage.as_str().to_string());
 
     // Write context file if context is provided; otherwise explicitly clear
     // JIT_CONTEXT_FILE so it is never inherited from the parent environment

@@ -768,8 +768,46 @@ fn default_gate_priority() -> u32 {
     100
 }
 
+/// Error returned when a string cannot be parsed as a [`GateStage`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{GateStage, GateStageParseError};
+/// use std::str::FromStr;
+///
+/// assert_eq!(
+///     GateStage::from_str("unknown"),
+///     Err(GateStageParseError::UnknownStage("unknown".to_string()))
+/// );
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum GateStageParseError {
+    /// The input did not match any known gate stage.
+    #[error("Invalid gate stage: '{0}' (expected 'precheck' or 'postcheck')")]
+    UnknownStage(String),
+}
+
 /// Gate execution stage
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+///
+/// Serialized as `snake_case` (`"precheck"`, `"postcheck"`); the same names are
+/// used as CLI argument values and as the `JIT_STAGE` environment variable passed
+/// to gate checker processes.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::GateStage;
+/// use std::str::FromStr;
+///
+/// assert_eq!(GateStage::from_str("precheck").unwrap(), GateStage::Precheck);
+/// assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
+/// assert_eq!(GateStage::Precheck.as_str(), "precheck");
+/// assert!(GateStage::from_str("invalid").is_err());
+/// ```
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum GateStage {
     /// Runs before work starts (ready → in_progress)
@@ -778,14 +816,177 @@ pub enum GateStage {
     Postcheck,
 }
 
+impl GateStage {
+    /// The canonical snake_case string for this stage.
+    ///
+    /// Identical to [`Display`](std::fmt::Display) output and the JSON
+    /// serialization; use this when a `&'static str` is needed (e.g. to set an
+    /// environment variable) without a heap allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateStage;
+    ///
+    /// assert_eq!(GateStage::Precheck.as_str(), "precheck");
+    /// assert_eq!(GateStage::Postcheck.as_str(), "postcheck");
+    /// ```
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GateStage::Precheck => "precheck",
+            GateStage::Postcheck => "postcheck",
+        }
+    }
+}
+
+impl FromStr for GateStage {
+    type Err = GateStageParseError;
+
+    /// Parse a snake_case stage name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateStage;
+    /// use std::str::FromStr;
+    ///
+    /// assert_eq!(GateStage::from_str("precheck").unwrap(), GateStage::Precheck);
+    /// assert_eq!(GateStage::from_str("postcheck").unwrap(), GateStage::Postcheck);
+    /// assert!(GateStage::from_str("invalid").is_err());
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "precheck" => Ok(GateStage::Precheck),
+            "postcheck" => Ok(GateStage::Postcheck),
+            _ => Err(GateStageParseError::UnknownStage(s.to_string())),
+        }
+    }
+}
+
+impl std::fmt::Display for GateStage {
+    /// Format as the canonical snake_case string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateStage;
+    ///
+    /// assert_eq!(GateStage::Precheck.to_string(), "precheck");
+    /// assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
+    /// ```
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Error returned when a string cannot be parsed as a [`GateMode`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{GateMode, GateModeParseError};
+/// use std::str::FromStr;
+///
+/// assert_eq!(
+///     GateMode::from_str("unknown"),
+///     Err(GateModeParseError::UnknownMode("unknown".to_string()))
+/// );
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum GateModeParseError {
+    /// The input did not match any known gate mode.
+    #[error("Invalid gate mode: '{0}' (expected 'manual' or 'auto')")]
+    UnknownMode(String),
+}
+
 /// Gate execution mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Serialized as `snake_case` (`"manual"`, `"auto"`); the same names are used as
+/// CLI argument values.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::GateMode;
+/// use std::str::FromStr;
+///
+/// assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
+/// assert_eq!(GateMode::Auto.to_string(), "auto");
+/// assert_eq!(GateMode::Manual.as_str(), "manual");
+/// assert!(GateMode::from_str("invalid").is_err());
+/// ```
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum GateMode {
     /// Requires manual pass/fail
     Manual,
     /// Can be automatically checked
     Auto,
+}
+
+impl GateMode {
+    /// The canonical snake_case string for this mode.
+    ///
+    /// Identical to [`Display`](std::fmt::Display) output and the JSON
+    /// serialization; use this when a `&'static str` is needed without a heap
+    /// allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateMode;
+    ///
+    /// assert_eq!(GateMode::Manual.as_str(), "manual");
+    /// assert_eq!(GateMode::Auto.as_str(), "auto");
+    /// ```
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GateMode::Manual => "manual",
+            GateMode::Auto => "auto",
+        }
+    }
+}
+
+impl FromStr for GateMode {
+    type Err = GateModeParseError;
+
+    /// Parse a snake_case mode name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateMode;
+    /// use std::str::FromStr;
+    ///
+    /// assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
+    /// assert_eq!(GateMode::from_str("auto").unwrap(), GateMode::Auto);
+    /// assert!(GateMode::from_str("invalid").is_err());
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "manual" => Ok(GateMode::Manual),
+            "auto" => Ok(GateMode::Auto),
+            _ => Err(GateModeParseError::UnknownMode(s.to_string())),
+        }
+    }
+}
+
+impl std::fmt::Display for GateMode {
+    /// Format as the canonical snake_case string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateMode;
+    ///
+    /// assert_eq!(GateMode::Manual.to_string(), "manual");
+    /// assert_eq!(GateMode::Auto.to_string(), "auto");
+    /// ```
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// Gate checker configuration
@@ -2083,6 +2284,76 @@ mod tests {
             // Test using str::parse() method
             let priority: Priority = "high".parse().unwrap();
             assert_eq!(priority, Priority::High);
+        }
+
+        // GateStage FromStr/Display/as_str
+
+        #[test]
+        fn test_gate_stage_from_str_accepts_valid() {
+            assert_eq!(
+                GateStage::from_str("precheck").unwrap(),
+                GateStage::Precheck
+            );
+            assert_eq!(
+                GateStage::from_str("postcheck").unwrap(),
+                GateStage::Postcheck
+            );
+        }
+
+        #[test]
+        fn test_gate_stage_from_str_rejects_invalid() {
+            assert!(GateStage::from_str("invalid").is_err());
+            assert!(GateStage::from_str("").is_err());
+            assert!(GateStage::from_str("PRECHECK").is_err());
+        }
+
+        #[test]
+        fn test_gate_stage_display_and_as_str_round_trip() {
+            assert_eq!(GateStage::Precheck.to_string(), "precheck");
+            assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
+            assert_eq!(GateStage::Precheck.as_str(), "precheck");
+            assert_eq!(GateStage::Postcheck.as_str(), "postcheck");
+        }
+
+        #[test]
+        fn test_gate_stage_display_equals_serde() {
+            // Display/as_str must match what serde produces (snake_case).
+            let json_pre = serde_json::to_string(&GateStage::Precheck).unwrap();
+            let json_post = serde_json::to_string(&GateStage::Postcheck).unwrap();
+            assert_eq!(json_pre, format!("\"{}\"", GateStage::Precheck));
+            assert_eq!(json_post, format!("\"{}\"", GateStage::Postcheck));
+        }
+
+        // GateMode FromStr/Display/as_str
+
+        #[test]
+        fn test_gate_mode_from_str_accepts_valid() {
+            assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
+            assert_eq!(GateMode::from_str("auto").unwrap(), GateMode::Auto);
+        }
+
+        #[test]
+        fn test_gate_mode_from_str_rejects_invalid() {
+            assert!(GateMode::from_str("invalid").is_err());
+            assert!(GateMode::from_str("").is_err());
+            assert!(GateMode::from_str("MANUAL").is_err());
+        }
+
+        #[test]
+        fn test_gate_mode_display_and_as_str_round_trip() {
+            assert_eq!(GateMode::Manual.to_string(), "manual");
+            assert_eq!(GateMode::Auto.to_string(), "auto");
+            assert_eq!(GateMode::Manual.as_str(), "manual");
+            assert_eq!(GateMode::Auto.as_str(), "auto");
+        }
+
+        #[test]
+        fn test_gate_mode_display_equals_serde() {
+            // Display/as_str must match what serde produces (snake_case).
+            let json_manual = serde_json::to_string(&GateMode::Manual).unwrap();
+            let json_auto = serde_json::to_string(&GateMode::Auto).unwrap();
+            assert_eq!(json_manual, format!("\"{}\"", GateMode::Manual));
+            assert_eq!(json_auto, format!("\"{}\"", GateMode::Auto));
         }
     }
 

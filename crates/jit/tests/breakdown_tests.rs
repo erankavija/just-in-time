@@ -226,7 +226,7 @@ fn test_breakdown_with_inherit_gates() {
             "All tests must pass".to_string(),
             false,
             None,
-            "postcheck".to_string(),
+            jit::domain::GateStage::Postcheck,
         )
         .unwrap();
 
@@ -238,7 +238,7 @@ fn test_breakdown_with_inherit_gates() {
             "Clippy must pass".to_string(),
             false,
             None,
-            "postcheck".to_string(),
+            jit::domain::GateStage::Postcheck,
         )
         .unwrap();
 

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b2817d4a-ac04-4f64-be8a-8be110286ace",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "b22c041e-8281-45ea-8cab-88edf1c23fb8",
+  "commit": "5641850b42f46c68bb0e748b2532e3dac3ec59b2",
+  "branch": "worktree-agent-b22c041e",
+  "status": "failed",
+  "started_at": "2026-06-26T01:08:48.931455611Z",
+  "completed_at": "2026-06-26T01:10:17.665692048Z",
+  "duration_ms": 88734,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest storage::claims_log::tests::test_concurrent_append_safety ... FAILED\ntest result: FAILED. 1218 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.42s\n---- storage::claims_log::tests::test_concurrent_append_safety stdout ----\n\nthread '<unnamed>' (3238324) panicked at crates/jit/src/storage/claims_log.rs:412:39:\ncalled `Result::unwrap()` on an `Err` value: Failed to acquire claims lock\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

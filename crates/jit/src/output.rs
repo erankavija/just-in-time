@@ -12,8 +12,8 @@ use std::io::{self, Write};
 use thiserror::Error;
 
 use crate::domain::{
-    GateRunResult, GateRunStatus, GateStage, GateState, Issue, MinimalBlockedIssue, MinimalIssue,
-    Priority, State,
+    GateMode, GateRunResult, GateRunStatus, GateStage, GateState, Issue, MinimalBlockedIssue,
+    MinimalIssue, Priority, State,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -1242,6 +1242,30 @@ pub struct GateListResponse {
 }
 
 /// Gate definition structure (for registry responses)
+///
+/// Serialized as snake_case JSON; `stage` and `mode` are typed enums so the
+/// serialized form is always well-formed and identical to the registry storage
+/// format (`"precheck"` / `"postcheck"` / `"manual"` / `"auto"`).
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::GateDefinition;
+/// use jit::domain::{GateMode, GateStage};
+///
+/// let def = GateDefinition {
+///     key: "tests".to_string(),
+///     title: "Tests".to_string(),
+///     description: "Run test suite".to_string(),
+///     auto: true,
+///     example_integration: None,
+///     stage: GateStage::Postcheck,
+///     mode: GateMode::Auto,
+/// };
+/// let json = serde_json::to_value(&def).unwrap();
+/// assert_eq!(json["stage"], "postcheck");
+/// assert_eq!(json["mode"], "auto");
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
     pub key: String,
@@ -1249,8 +1273,10 @@ pub struct GateDefinition {
     pub description: String,
     pub auto: bool,
     pub example_integration: Option<String>,
-    pub stage: String,
-    pub mode: String,
+    /// Execution stage; serializes as `"precheck"` or `"postcheck"`.
+    pub stage: GateStage,
+    /// Execution mode; serializes as `"manual"` or `"auto"`.
+    pub mode: GateMode,
 }
 
 impl From<crate::domain::Gate> for GateDefinition {
@@ -1261,8 +1287,8 @@ impl From<crate::domain::Gate> for GateDefinition {
             description: gate.description,
             auto: gate.auto,
             example_integration: gate.example_integration,
-            stage: format!("{:?}", gate.stage).to_lowercase(),
-            mode: format!("{:?}", gate.mode).to_lowercase(),
+            stage: gate.stage,
+            mode: gate.mode,
         }
     }
 }
@@ -1663,5 +1689,60 @@ mod tests {
 
         assert_eq!(dep_json["type"], "dependency");
         assert_eq!(gate_json["type"], "gate");
+    }
+
+    #[test]
+    fn test_gate_definition_serializes_stage_and_mode_as_snake_case() {
+        use crate::domain::{GateMode, GateStage};
+        // --json gate output must remain snake_case regardless of enum Debug repr.
+        let def = GateDefinition {
+            key: "ci".to_string(),
+            title: "CI".to_string(),
+            description: "Continuous integration".to_string(),
+            auto: true,
+            example_integration: None,
+            stage: GateStage::Postcheck,
+            mode: GateMode::Auto,
+        };
+        let v = serde_json::to_value(&def).unwrap();
+        assert_eq!(v["stage"], "postcheck", "stage must be snake_case");
+        assert_eq!(v["mode"], "auto", "mode must be snake_case");
+
+        let def_pre = GateDefinition {
+            key: "lint".to_string(),
+            title: "Lint".to_string(),
+            description: "Linting".to_string(),
+            auto: false,
+            example_integration: None,
+            stage: GateStage::Precheck,
+            mode: GateMode::Manual,
+        };
+        let v2 = serde_json::to_value(&def_pre).unwrap();
+        assert_eq!(v2["stage"], "precheck");
+        assert_eq!(v2["mode"], "manual");
+    }
+
+    #[test]
+    fn test_gate_definition_from_gate_round_trips_stage_mode() {
+        use crate::domain::{Gate, GateMode, GateStage};
+        let gate = Gate {
+            version: 1,
+            key: "tests".to_string(),
+            title: "Tests".to_string(),
+            description: "Run tests".to_string(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Auto,
+            checker: None,
+            priority: 100,
+            reserved: std::collections::HashMap::new(),
+            auto: true,
+            example_integration: None,
+        };
+        let def = GateDefinition::from(gate);
+        assert_eq!(def.stage, GateStage::Postcheck);
+        assert_eq!(def.mode, GateMode::Auto);
+        let v = serde_json::to_value(&def).unwrap();
+        assert_eq!(v["stage"], "postcheck");
+        assert_eq!(v["mode"], "auto");
     }
 }
