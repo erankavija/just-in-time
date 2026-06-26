@@ -2,6 +2,7 @@
   "epic_id": "7095769d-0487-417d-a807-233845433a76",
   "epic_short_id": "7095769d",
   "current_wave": 5,
+  "EPIC_COMPLETE": "2026-06-26: Epic 7095769d DONE. All 12 children done + both gates green; epic transitioned ready->in_progress->done. All 7 epic success criteria verified met (findings resolved, children gated, stringly-typed dispatch eliminated, storage-boundary leaks routed, query_engine fail-open fixed, clippy/fmt clean, JSON field-compatible). Two scope decisions, both user-approved & recorded: f067678a criterion amended to referential consistency; f16cfe8c (full-atomicity archival redesign) detached from epic and re-homed as a direct 1.0-milestone deliverable. The code-smell epic was 1 of the 1.0 milestone's deps; milestone still has other independent blockers (docs tooling a4e3cfb0/94f873c8, observability d7bfd4a4-rejected, PL-skill f2532a2d, f16cfe8c) — OUT OF SCOPE per single-epic invariant. jit validate exit 0. Single-epic scope complete; stopping per invariant 6.",
   "model_policy": "Sonnet for mechanical/well-specified tasks, Opus for architectural/cross-cutting judgment",
   "external_parallel_work": "Another worker actively churns the validation/ + commands/{mod,validate} hot zone on main. Waves are ordered so my code touches files disjoint from that hot zone first; t5/t6/t8/t10 (which collide) are deferred to Wave 5 and re-checked then. main is dirty intermittently; integrate only during clean windows; never run destructive git ops on main while external work is uncommitted.",
   "operational_notes": [
@@ -124,7 +125,7 @@
           "title": "Route storage-internal paths and IO through the storage layer",
           "classification": "implementation",
           "model": "opus",
-          "status": "deferred to 5b (solo, after 5a merges; touches commands/{mod,validate}.rs overlapping t5+t10)"
+          "status": "DONE (both gates green FIRST TRY at e4e860df; merged to main dbe27412; leak clean; binary reinstalled). Opus worker t6-storage-boundary. Exhaustive-first-pass-audit strategy WORKED — no criterion expansion. Added storage primitives: atomic_write.rs (shared temp+rename helper), ruleset_store.rs (validation persistence, content-only producer), worktree_identity::read_worktree_id, ClaimsIndex::load, JsonFileStorage::result_path. validation/serialize.rs slimmed ~248 lines (content-only). GateRunResult domain type untouched (crit 4). Lead independently verified all 5 criteria + build/clippy/fmt before gating. Trivial .jit merge conflict (updated_at timestamp only) resolved."
         }
       ]
     }
