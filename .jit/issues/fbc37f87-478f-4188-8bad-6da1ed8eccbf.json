@@ -28,9 +28,9 @@
   ],
   "labels": [
     "milestone:v1.0",
-    "story:item-sources",
-    "type:planning"
+    "type:planning",
+    "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:06:57.412389396Z",
-  "updated_at": "2026-06-26T20:31:00.903669662Z"
+  "updated_at": "2026-06-26T21:21:00.692933518Z"
 }

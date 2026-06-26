@@ -9,7 +9,7 @@
 [[template]]
 name        = "plan"
 description = "Plan-before-fan-out bracket: planning node P and breakdown node B."
-applies_to  = ["epic", "story"]  # container types this template may be applied to
+applies_to  = ["epic"]           # container types this template may be applied to
 
   [[template.anchors]]
   name = "container"             # bound at apply time to the target issue
