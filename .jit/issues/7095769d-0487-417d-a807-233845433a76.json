@@ -17,8 +17,7 @@
     "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
     "397d98df-342e-48a0-9b2b-c7d0d1bf6ae0",
     "2355c5ea-cdaf-4874-b123-b7964fa33436",
-    "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c",
-    "f16cfe8c-970e-450b-9ac5-050243c6741d"
+    "70ca9e3a-2856-47e4-b5e0-7d94e7373a2c"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -37,6 +36,6 @@
     "epic:code-smell-cleanup",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-25T21:39:11.551989374+00:00",
-  "updated_at": "2026-06-26T08:06:02.072707808+00:00"
+  "created_at": "2026-06-25T21:39:11.551989374Z",
+  "updated_at": "2026-06-26T17:42:14.526889833Z"
 }
