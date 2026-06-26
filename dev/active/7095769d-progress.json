@@ -72,7 +72,7 @@
           "title": "Typed error variants and downcast for error classification",
           "classification": "implementation",
           "model": "opus",
-          "status": "DONE (both gates green at 256c759e after 2 reworks; full string-classification purge; merged to main clean; leak check clean; binary reinstalled). Was FULL PURGE (worktree agent-b9a28509, Opus worker t3-error-class). Bounded core shipped (8fd5a11c: typed IssueNotFoundError/GateNotFoundError both backends, 5 sites downcast, codes 3/3/4). Full-purge groundwork (52ab99aa): InvalidArgumentError(2)+GateAlreadyExistsError(6), State/Priority/ContentFormat/Snapshot FromStr converted, leading typed arms added above retained string fallback. Worker enumerated remainder + an architectural fork; LEAD DECISIONS: (1) Bucket-B internal path guards PRESERVE exit 2 (criterion #3 binding), routed honestly via PathReadError::InvalidPath not shoehorned into InvalidArgumentError. (2) SOLO end-to-end (B overlaps document.rs/json.rs/main.rs with C/D work; fan-out would conflict in the monolith). (C) APPROVED PathReadError classification arm (by variant: NotFound/CommitNotFound->3, InvalidPath->2, OutsideRepoRoot->1, Other->recurse). (D) APPROVED typing not-found family (preset/gate-run/gate-check-registry/lease) preserving exit 3 + route stringified io via PathReadError. Finale: delete string block LAST, prove all codes numerically identical. Criterion 2 then holds literally; NO criterion edit. FINAL DECISIONS: lease not-found -> typed LeaseNotFoundError rendering the full ActionableError text at claim.rs:374,925 (preserve exit 3 + remediation); Bucket-B path guards -> InvalidArgumentError carrying VERBATIM message (preserve exit 2 AND exact text, NOT PathReadError::InvalidPath which would change Display). Governing rule: representation-only refactor, preserve BOTH exit code and message text everywhere. OWNERSHIP (corrected): t3-error-class owns and is finishing solo. LEAD MISJUDGMENT: its idle heartbeats + no new branch commits read as a stall, so I dispatched a duplicate worker t3b-error-purge on the same worktree — but t3 actually had UNCOMMITTED in-progress work (typed not-found family in storage/errors.rs) and flagged the collision before either committed. Stood t3b down (SendMessage halt; TaskStop does not track background agents); t3 reconciles the working tree (baseline = committed 52ab99aa) then finishes per the final spec. LESSON: a branch-commit check misses uncommitted work; query the worker's live status before concluding a stall. COMPLETE: t3 finished solo (HEAD c2fad03d, commits 8fd5a11c/52ab99aa/558563a4/c2fad03d). error_to_exit_code is 100%% downcast-based (zero .contains — independently verified); string block deleted. ValidationFailedError replaces RepositoryIntegrityError (rename swept clean, no residual refs) and also covers the blocked-by-rule write rejection (caught+prevented a 4->1 regression). FromUtf8Error/Utf8Error -> single InvalidArgument downcast arm (preserves exit 2 for ~12 git-output decode sites, zero hot-zone producer churn). Local verify: cargo-ci 2667 passed/0 failed, doctests 387, jit validate exit 0, full before/after exit-code table all-identical. Lead pre-gate review PASS (criteria 1-4 met, scope disciplined, stale-narrative clean). Gate run dispatched (bwxec4jpt, flaky-tolerant)."
+          "status": "DONE (both gates green at 256c759e after 2 reworks; full string-classification purge; merged to main clean; leak check clean; binary reinstalled). Was FULL PURGE (worktree agent-b9a28509, Opus worker t3-error-class). Bounded core shipped (8fd5a11c: typed IssueNotFoundError/GateNotFoundError both backends, 5 sites downcast, codes 3/3/4). Full-purge groundwork (52ab99aa): InvalidArgumentError(2)+GateAlreadyExistsError(6), State/Priority/ContentFormat/Snapshot FromStr converted, leading typed arms added above retained string fallback. Worker enumerated remainder + an architectural fork; LEAD DECISIONS: (1) Bucket-B internal path guards PRESERVE exit 2 (criterion #3 binding), routed honestly via PathReadError::InvalidPath not shoehorned into InvalidArgumentError. (2) SOLO end-to-end (B overlaps document.rs/json.rs/main.rs with C/D work; fan-out would conflict in the monolith). (C) APPROVED PathReadError classification arm (by variant: NotFound/CommitNotFound->3, InvalidPath->2, OutsideRepoRoot->1, Other->recurse). (D) APPROVED typing not-found family (preset/gate-run/gate-check-registry/lease) preserving exit 3 + route stringified io via PathReadError. Finale: delete string block LAST, prove all codes numerically identical. Criterion 2 then holds literally; NO criterion edit. FINAL DECISIONS: lease not-found -> typed LeaseNotFoundError rendering the full ActionableError text at claim.rs:374,925 (preserve exit 3 + remediation); Bucket-B path guards -> InvalidArgumentError carrying VERBATIM message (preserve exit 2 AND exact text, NOT PathReadError::InvalidPath which would change Display). Governing rule: representation-only refactor, preserve BOTH exit code and message text everywhere. OWNERSHIP (corrected): t3-error-class owns and is finishing solo. LEAD MISJUDGMENT: its idle heartbeats + no new branch commits read as a stall, so I dispatched a duplicate worker t3b-error-purge on the same worktree \u2014 but t3 actually had UNCOMMITTED in-progress work (typed not-found family in storage/errors.rs) and flagged the collision before either committed. Stood t3b down (SendMessage halt; TaskStop does not track background agents); t3 reconciles the working tree (baseline = committed 52ab99aa) then finishes per the final spec. LESSON: a branch-commit check misses uncommitted work; query the worker's live status before concluding a stall. COMPLETE: t3 finished solo (HEAD c2fad03d, commits 8fd5a11c/52ab99aa/558563a4/c2fad03d). error_to_exit_code is 100%% downcast-based (zero .contains \u2014 independently verified); string block deleted. ValidationFailedError replaces RepositoryIntegrityError (rename swept clean, no residual refs) and also covers the blocked-by-rule write rejection (caught+prevented a 4->1 regression). FromUtf8Error/Utf8Error -> single InvalidArgument downcast arm (preserves exit 2 for ~12 git-output decode sites, zero hot-zone producer churn). Local verify: cargo-ci 2667 passed/0 failed, doctests 387, jit validate exit 0, full before/after exit-code table all-identical. Lead pre-gate review PASS (criteria 1-4 met, scope disciplined, stale-narrative clean). Gate run dispatched (bwxec4jpt, flaky-tolerant)."
         }
       ]
     },
@@ -100,7 +100,7 @@
           "title": "Type query-engine conditions, filter fields, and state predicate",
           "classification": "implementation",
           "model": "opus",
-          "status": "deferred-external-conflict"
+          "status": "dispatched 5a (worktree agent-44450437 base b673231e; opus t8-query-engine)"
         },
         {
           "id": "e3e6d47d-4262-4451-a343-9b6c07a3a3c0",
@@ -108,7 +108,7 @@
           "title": "Shared type: label-namespace helper",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "deferred-external-conflict"
+          "status": "dispatched 5a (worktree agent-e3e6d47d base b673231e; sonnet t5-label-helper)"
         },
         {
           "id": "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
@@ -116,7 +116,7 @@
           "title": "Type validation finding kinds and severities",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "deferred-external-conflict"
+          "status": "DONE (both gates green first try; merged to main clean, no conflicts; validate exit 0; leak clean). Overlaps noted: shares validation/rules.rs w/ t8, commands/validate.rs w/ t5 -> rebuild-test main after those merges."
         },
         {
           "id": "2355c5ea-cdaf-4874-b123-b7964fa33436",
@@ -124,7 +124,7 @@
           "title": "Route storage-internal paths and IO through the storage layer",
           "classification": "implementation",
           "model": "opus",
-          "status": "deferred-external-conflict"
+          "status": "deferred to 5b (solo, after 5a merges; touches commands/{mod,validate}.rs overlapping t5+t10)"
         }
       ]
     }
@@ -133,7 +133,11 @@
   "escalations": [
     {
       "issue": "f067678a",
-      "triggers": ["5 (rework cap=2, 3rd code-review fail)", "5a (transactionality finding repeated 3x)", "3/4 (success-criteria change)"],
+      "triggers": [
+        "5 (rework cap=2, 3rd code-review fail)",
+        "5a (transactionality finding repeated 3x)",
+        "3/4 (success-criteria change)"
+      ],
       "question": "Archive 'atomic transaction' criterion is infeasible across doc file + N issue JSONs + append-only event log without a WAL; worker delivered referential consistency and documented it honestly; reviewer FAILs on literal wording.",
       "decision": "User chose: amend criterion to referential consistency (no dangling ref, no data loss, no-clobber). Full journaled atomicity stays tracked in f16cfe8c.",
       "resolution": "Amended f067678a success criterion (user-approved). Fixed finding 1 (data-loss clobber) with typed ArchiveError::DestinationOccupied + fail-fast pre-existence check + test. Commits b4168372 (code) + b8230dc8 (.jit) in worktree agent-f067678a.",
@@ -147,7 +151,7 @@
     "f067678a": 2,
     "b9a28509": 2
   },
-  "b9a28509_rework_r2": "AT CAP (2/2). R1 fixes verified (ripgrep typed, message-text audit, +3 latent regressions closed). Re-gate on 9b440259: cargo-ci green, code-review FAIL 1 new finding — gate.rs:869 create_gate_preset uses GENERIC NotFoundError (chosen in R1 to preserve the 'Gate not found in registry: {key}' text, which differs from GateNotFoundError::single's wording), violating criterion 1 (gate-not-found must be the DEDICATED typed variant). Flip side of the R1 message fix. R2: add a GateNotFoundError variant (InRegistry) whose Display is byte-identical to that text; use it; audit ALL generic-NotFoundError sites to use dedicated types where one exists. Next distinct finding -> ESCALATE (cap reached). NOTE: t3 amended a commit mid-gate once (d9a29d8e->9b440259, inert +5-line comment); told it to use new commits, not amend, during gates.",
+  "b9a28509_rework_r2": "AT CAP (2/2). R1 fixes verified (ripgrep typed, message-text audit, +3 latent regressions closed). Re-gate on 9b440259: cargo-ci green, code-review FAIL 1 new finding \u2014 gate.rs:869 create_gate_preset uses GENERIC NotFoundError (chosen in R1 to preserve the 'Gate not found in registry: {key}' text, which differs from GateNotFoundError::single's wording), violating criterion 1 (gate-not-found must be the DEDICATED typed variant). Flip side of the R1 message fix. R2: add a GateNotFoundError variant (InRegistry) whose Display is byte-identical to that text; use it; audit ALL generic-NotFoundError sites to use dedicated types where one exists. Next distinct finding -> ESCALATE (cap reached). NOTE: t3 amended a commit mid-gate once (d9a29d8e->9b440259, inert +5-line comment); told it to use new commits, not amend, during gates.",
   "b9a28509_rework_r1": "cargo-ci green; code-review FAIL (2 legit findings): (1) a 6th string-classification site at main.rs:4354 (search Err handler picks RIPGREP_NOT_FOUND vs SEARCH_FAILED via e.to_string().contains('not installed')) -> type at the rg-spawn origin via io::ErrorKind::NotFound; (2) message-text regression: GateNotFoundError::single Display 'Gate '{0}' not found in registry' != original 'Gate not found in registry: {gate_key}'. Sent rework demanding COMPLETE per-origin message-preservation audit (byte-identical Display to pre-refactor text at every typed origin) + full main.rs string-control-flow grep, to avoid round-by-round churn.",
   "started_at": "2026-06-25T22:01:45Z",
   "wave1_completed": "All 4 issues DONE, both gates green, merged to main (commit de139bc7). t7 took 2 rework rounds (relocation propagation, then TempCleanupFailed test coverage).",
