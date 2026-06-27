@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T00:49:01.347369871Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T00:46:20.282705310Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:51:42.192150907Z",
-  "updated_at": "2026-06-26T23:37:50.160344945Z"
+  "updated_at": "2026-06-27T00:51:43.147570483Z"
 }
