@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "8b09a91c-784d-4788-bead-a05bbade0a4f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "22826a75-ca56-4a96-b33d-b43a01112df2",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:27:49.704705355Z",
+  "completed_at": "2026-06-27T23:29:17.603772263Z",
+  "duration_ms": 87899,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-11 is met. Both parser copies now scan for the last matching `VERDICT: PASS|FAIL` line instead of the last non-blank line: `scripts/ai-review.sh:137-142` and `contrib/gates/ai-review.sh:107-112`. The regression tests cover trailing prose after `VERDICT: PASS` for both copies in `crates/jit/tests/ai_review_verdict_tests.rs:70` and `crates/jit/tests/ai_review_verdict_tests.rs:98`.\n\n**Architecture And Separation**\n\nNo domain/storage/commands/CLI boundary violation found. The change is limited to shell gate scripts plus integration-style regression tests.\n\n**Functional Paradigm**\n\nNo blocking issue. The changed shell pipeline is concise and scoped to the I/O boundary.\n\n**Correctness And Invariants**\n\nNo state mutation paths were touched, so atomic writes, event logging, gate transition semantics, assignee/label formatting, and PID safety are unaffected. The “last verdict line wins” behavior is explicitly documented next to both parser copies.\n\n**Safety**\n\nNo unsafe Rust code was introduced.\n\n**Testing**\n\nThe issue has a passed `cargo-ci` gate in the provided context, so I did not rerun cargo tests. I did run `./scripts/jit-validate.sh`; it passed with `Repository validation passed`.\n\n**Error Handling**\n\nNo production Rust error-handling changes. Test-only `unwrap()` usage is allowed under the review rules.\n\n**CLI Contract**\n\nNo CLI command surface was added or changed; `--json` support is unaffected.\n\n**Documentation**\n\nNo public Rust API was added, so no new API documentation requirement applies. Inline parser comments explain the changed behavior in both scripts.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there is no prior review feedback to verify.\n\n**Jit Issue Management**\n\nThe listed dependency `7f709152` is done in the provided issue context. Required validation passed as noted above.\n\n1. No findings.\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

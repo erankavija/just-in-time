@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "86fb6a36-442f-4cc2-9aa3-3cbf96ae5f61",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4b063bdf-9b24-432e-b3b8-08db52849b2b",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-27T23:27:49.703752904Z",
+  "completed_at": "2026-06-27T23:29:05.588159865Z",
+  "duration_ms": 75884,
+  "exit_code": 1,
+  "stdout": "**Architecture And Separation Of Concerns**\n\nThe issue change is limited to skill prose in `.claude/skills/jit-manage/SKILL.md` and `.claude/skills/jit-parallel/references/worktree-mode.md`. No Rust domain, storage, command, CLI, or output boundaries are affected.\n\n**Functional Paradigm**\n\nNo implementation code was changed.\n\n**Correctness And Invariants**\n\nREQ-18 is satisfied by the prose:\n- `.claude/skills/jit-manage/SKILL.md:164` distinguishes assignment from advisory leases.\n- `.claude/skills/jit-manage/SKILL.md:171` prescribes `--assign-only` for dependency-blocked containers.\n- `.claude/skills/jit-parallel/references/worktree-mode.md:28` states that `active_claims` counts leases, not assignments.\n\nNo file-write, event-log, gate-transition, PID, assignee-format, or label-format logic was changed.\n\n**Safety**\n\nNo unsafe Rust code was introduced; this is docs-only.\n\n**Testing**\n\nBlocking. The provided run history for this issue contains a failed review gate with failed workspace tests, and I found no newer successful cargo-ci or replacement gate evidence for issue `4b063bdf`. Per the review instructions, existing failed test evidence fails the review.\n\nI did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo fallible Rust code was changed.\n\n**CLI Contract**\n\nNo CLI implementation was changed.\n\n**Documentation**\n\nThe documentation/prose change satisfies the issue’s success criterion. No public Rust APIs were added or changed.\n\n**Prior Review Feedback**\n\nThe most recent prior review feedback has not been resolved in the issue evidence: the same issue still has only the failed code-review gate recorded in `.jit/issues/4b063bdf-9b24-432e-b3b8-08db52849b2b.json`, with `code-review` status `failed`.\n\n**Jit Issue Management**\n\nThe prerequisite issue `7f709152-973d-49c9-8848-3845c6782e38` is `done`. `./scripts/jit-validate.sh` passed.\n\n1. `.jit/gate-runs/0de889c0-aeea-49f0-be3f-1e213295d06e/result.json:9` records the issue’s `code-review` gate as failed, and `.jit/gate-runs/0de889c0-aeea-49f0-be3f-1e213295d06e/result.json:14` records failed `./scripts/cargo-ci.sh` test evidence: `1276 passed; 5 failed`, specifically `commands::issue::tests::test_claim_issue_enforces_prechecks`, `commands::issue::tests::test_claim_issue_succeeds_when_prechecks_pass`, `commands::serve::tests::test_find_available_port_returns_free_port`, `commands::serve::tests::test_find_available_port_skips_bound_port`, and `commands::serve::tests::test_start_server_errors_when_child_exits_immediately`. This violates the “No test or lint failures” acceptance rule.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2170 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0b69-337c-7342-948f-4764775bf460\n--------\nuser\n--- 2157 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

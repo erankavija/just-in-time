@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "66b127d9-ed90-4625-abf0-809d15a5b65a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "2614ecf2-a54d-4491-a241-27035b245398",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:27:49.702778274Z",
+  "completed_at": "2026-06-27T23:30:04.682508522Z",
+  "duration_ms": 134979,
+  "exit_code": 0,
+  "stdout": "**Architecture**\nDomain/storage/commands/CLI boundaries are preserved. The change stays in template model/loading and command orchestration: [templates.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/templates.rs:229), [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:195).\n\n**Acceptance Criteria**\nREQ-13 is met. `AnchorSlot` accepts `#[serde(default)] gates: Vec<String>` at [templates.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/templates.rs:243). Anchor presets are prevalidated with the same `get_gate_preset` path as node presets at [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:279), and attached through the shared `attach_gate_presets` helper using `apply_gate_preset` at [template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:863).\n\n**Functional Paradigm**\nNo blocking style regressions found. The code follows existing command-layer patterns; loops are localized orchestration over fallible storage operations.\n\n**Correctness And Invariants**\nAtomic writes remain behind storage. Anchor gate attachment uses existing command/storage paths and logs `gate_added` events via `add_gates`. No PID or unsafe-code changes.\n\n**Testing**\nProvided issue evidence shows `cargo-ci` passed on 2026-06-27T23:24:48Z; I did not rerun cargo tests. New coverage includes parsing/default behavior and apply success/failure paths in [template_apply_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/template_apply_tests.rs:456). I ran `./scripts/jit-validate.sh`; it passed.\n\n**CLI Contract**\nNo CLI output contract changes were introduced. Existing apply JSON behavior is not affected.\n\n**Documentation**\nThe new public `AnchorSlot::gates` field has documentation, and the apply-flow docs were updated.\n\n**Prior Review Feedback**\n`run_history` is empty, so there were no prior findings to verify.\n\n**Jit Issue Management**\nThe listed prerequisite issue `7f709152` is `done`. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

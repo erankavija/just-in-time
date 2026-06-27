@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c3425dcb-5fcd-44ee-a354-b0e31a54bd56",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b920ea57-1f80-45b9-9f9d-b4372daceb07",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:27:49.704429205Z",
+  "completed_at": "2026-06-27T23:29:13.198028812Z",
+  "duration_ms": 83493,
+  "exit_code": 0,
+  "stdout": "**Architecture and Separation of Concerns**\nReviewed [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1008): `issue create --json` now loads the created issue, enriches dependencies, and serializes through `IssueShowResponse`. This stays in the CLI/output orchestration layer and does not add domain I/O or storage bypasses.\n\n**Functional Paradigm**\nThe changed code is small orchestration code. No problematic imperative domain logic or avoidable shared mutation was introduced.\n\n**Correctness and Invariants**\nREQ-14 is met at [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1016): create output uses `IssueShowResponse::from_issue`, which includes `short_id`, `gates`, enriched `dependencies`, and `labels`, and omits legacy `gates_required`/`gates_status` per [crates/jit/src/output.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:814). No file-write, event-log, assignee, label, PID, or gate-transition invariant changes were introduced.\n\n**Safety**\nNo unsafe code was added. The reviewed change is serialization/orchestration only.\n\n**Testing**\nThe issue context reports `cargo-ci` passed at `2026-06-27T23:23:06.139598466+00:00`; per instruction, I did not rerun the cargo test suite. New integration coverage exists in [crates/jit/tests/issue_create_json_contract_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/issue_create_json_contract_test.rs:51), covering `short_id`, per-gate pending shape, absence of legacy gate fields, dependency array shape, and labels array.\n\n**Error Handling**\nThe new fallible gate-run load includes contextual error text at [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1013). No new library `unwrap()`/`expect()` usage was added outside tests.\n\n**CLI Contract**\n`issue create --json` now matches the `issue show --json` response contract by using the same response type. No new command lacking `--json` support was introduced.\n\n**Documentation**\nNo new public API was introduced. Existing public `IssueShowResponse::from_issue` documentation remains present with examples at [crates/jit/src/output.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:838).\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The prerequisite issue in `issue.dependencies` is marked `done` in the provided context. `run_history` is empty, so there was no prior review feedback to re-check.\n\n**Findings**\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

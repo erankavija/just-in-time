@@ -2,7 +2,7 @@
   "id": "22826a75-ca56-4a96-b33d-b43a01112df2",
   "title": "Robust AI-review verdict parsing",
   "description": "Parse the review verdict so trailing prose after the verdict line no longer records a pass as a failure.\n\n## Background\n\nBoth verdict parsers extract the verdict only from the last non-blank line (scripts/ai-review.sh:135-137; contrib/gates/ai-review.sh:105-107), so any reviewer prose after the verdict line flips a pass to a fail. The two copies have drifted and both need the same fix.\n\n## Success Criteria\n\n- [hard] REQ-11: a review output whose verdict line is followed by additional prose is recorded as a pass in both parser copies, asserted by a regression test.\n\n## Notes\n\nTouch scripts/ai-review.sh and contrib/gates/ai-review.sh, and add a regression test. Self-contained.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T23:27:49.704705355Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T23:26:31.268402164Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "satisfies:REQ-11"
   ],
   "created_at": "2026-06-27T21:43:33.836994557Z",
-  "updated_at": "2026-06-27T22:18:50.234281063Z"
+  "updated_at": "2026-06-27T23:40:30.475608913Z"
 }

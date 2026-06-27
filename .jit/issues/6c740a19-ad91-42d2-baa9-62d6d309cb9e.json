@@ -2,7 +2,7 @@
   "id": "6c740a19-ad91-42d2-baa9-62d6d309cb9e",
   "title": "Breakdown and review skill prose",
   "description": "Direct workers to consume the full review report and direct breakdown to ship complete, standards-meeting items.\n\n## Background\n\nSkill prose today does not tell workers to account for every numbered finding before re-requesting review, and breakdown can emit gateless, terse, or untyped items. This is a skill-prose change only; there is no engine require-gates rule.\n\n## Success Criteria\n\n- [hard] REQ-10: review-skill prose directs the worker to read the full report and address every numbered finding before re-requesting the gate, and breakdown-skill prose requires output items to carry gates, descriptive titles, and derived types per the content standards.\n\n## Notes\n\nEdit the jit-breakdown skill docs and the review/project-lead skill docs; self-contained.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:03:13.574988581Z"
+      "updated_at": "2026-06-27T23:27:49.703752244Z"
     }
   },
   "context": {},
@@ -27,5 +27,5 @@
     "satisfies:REQ-10"
   ],
   "created_at": "2026-06-27T21:43:33.749542792Z",
-  "updated_at": "2026-06-27T23:05:20.055191577Z"
+  "updated_at": "2026-06-27T23:40:30.705699509Z"
 }

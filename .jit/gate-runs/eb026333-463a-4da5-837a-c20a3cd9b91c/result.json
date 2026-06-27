@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "eb026333-463a-4da5-837a-c20a3cd9b91c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:27:49.704561475Z",
+  "completed_at": "2026-06-27T23:29:01.384792923Z",
+  "duration_ms": 71680,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-15 is met. `graph_deps` now maps to `GraphDepsTreeResponse` in `crates/jit/src/schema.rs:421`, matching the actual JSON handler emission at `crates/jit/src/main.rs:2847`. The orphaned `GraphDepsResponse` type has been removed from `crates/jit/src/output.rs`; remaining mentions are only in test assertion text and planning docs.\n\n**Architecture And Separation**\nNo boundary violation found. The change is limited to output schema metadata and response type cleanup in `crates/jit/src/schema.rs` and `crates/jit/src/output.rs`.\n\n**Functional Paradigm**\nNo concern found. The added test is straightforward and scoped.\n\n**Correctness And Invariants**\nNo invariant regression found. This change does not touch persistence, state transitions, gates, labels, assignees, or PID-sensitive code.\n\n**Safety**\nNo unsafe code introduced.\n\n**Testing**\nA focused unit test was added at `crates/jit/src/schema.rs:649` verifying the schema points to `GraphDepsTreeResponse`, includes `tree` and `summary`, and excludes the removed flat `dependencies` field. I did not rerun cargo tests because the issue context shows `cargo-ci` passed on `2026-06-27T23:23:57Z`. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\nNo fallible runtime path changed, and no new production `unwrap()` / `expect()` issue found in the reviewed change.\n\n**CLI Contract**\nNo CLI surface changed. The existing `graph deps --json` handler emits `GraphDepsTreeResponse` at `crates/jit/src/main.rs:2847`.\n\n**Documentation**\nNo new public API was introduced. The existing public `GraphDepsTreeResponse` remains documented at `crates/jit/src/output.rs:701`.\n\n**Prior Review Feedback**\n`run_history` is empty, so there are no previous review findings to verify.\n\n**Jit Issue Management**\nThe listed prerequisite issue `7f709152` is marked `done`. `./scripts/jit-validate.sh` passed. The provided `cargo-ci` gate evidence is passed.\n\n**Findings**\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

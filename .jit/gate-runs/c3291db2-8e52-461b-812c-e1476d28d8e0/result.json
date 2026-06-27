@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c3291db2-8e52-461b-812c-e1476d28d8e0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6c740a19-ad91-42d2-baa9-62d6d309cb9e",
+  "commit": "48a2cbd44dc7150247eff4e0862c539062ff2a64",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:27:49.703752244Z",
+  "completed_at": "2026-06-27T23:28:53.775988736Z",
+  "duration_ms": 64072,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPASS. REQ-10 is satisfied.\n\nThe review/management prose tells workers to read the complete gate report and resolve every numbered finding before re-requesting review: `.claude/skills/jit-manage/SKILL.md:434`.\n\nThe project-lead rework protocol gives the same instruction for rework dispatches: `.claude/skills/project-lead/references/lead-review-protocol.md:117`.\n\nThe breakdown prose now requires descriptive titles, derived types, and non-empty gate tiers before approval: `.claude/skills/jit-breakdown/SKILL.md:272`, `.claude/skills/jit-breakdown/SKILL.md:404-409`. The prior blocking issue is fixed: the final analysis prompt schema now includes `gate_tier` at `.claude/skills/jit-breakdown/references/analysis-prompt.md:206`, consistent with `.claude/skills/jit-breakdown/references/plan-schema.md:19`.\n\n**Architecture And Separation Of Concerns**\n\nNo Rust architecture boundary was changed for this issue. The relevant changes are skill/prose documentation only.\n\n**Functional Paradigm**\n\nN/A for this prose-only change.\n\n**Correctness And Invariants**\n\nNo code paths touching atomic writes, event logging, gate transitions, assignee/label validation, PID handling, or graph invariants were changed.\n\n**Safety**\n\nNo unsafe Rust was introduced by this issue.\n\n**Testing**\n\n`./scripts/jit-validate.sh` passes. The supplied run history contains a failed `code-review` run, not a test/lint failure; its single finding has been addressed by adding `gate_tier` to the final breakdown analysis schema.\n\n**Error Handling**\n\nN/A for this prose-only change.\n\n**CLI Contract**\n\nNo CLI surface changed.\n\n**Documentation**\n\nThe documentation/prose change is internally consistent after the fix. The analysis prompt’s final output schema now requires `gate_tier`, matching the surrounding gate-tier instructions and the standalone plan schema.\n\n**Prior Review Feedback**\n\nResolved. The prior review failed because `.claude/skills/jit-breakdown/references/analysis-prompt.md:198-210` omitted `gate_tier`; current line `.claude/skills/jit-breakdown/references/analysis-prompt.md:206` includes it.\n\n**Jit Issue Management**\n\n`./scripts/jit-validate.sh` passes. The prerequisite issue `7f709152-973d-49c9-8848-3845c6782e38` is marked `done` in the provided issue context, so the dependency is complete.\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
