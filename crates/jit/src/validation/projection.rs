@@ -8,7 +8,12 @@
 //! - **region**: only a delimited region within an existing file is rewritten,
 //!   byte-preserving everything OUTSIDE the delimiters.
 //!
-//! The target path, mode, and region delimiters come ONLY from
+//! The render is style-selectable (REQ-08): the config's [`ProjectionStyle`]
+//! chooses between the `full` render (a `## Project invariants` header plus
+//! `- **id** [kind] (enforced-by): statement` bullets, the default) and the
+//! heading-less `id-anchor` render (`- **{id}** — {statement}` bullets).
+//!
+//! The target path, mode, render style, and region delimiters come ONLY from
 //! [`InvariantProjectionConfig`]; this module hardcodes NO documentation filename
 //! (REQ-04). Writes go through the shared atomic writer
 //! [`write_file_atomic`](crate::validation::serialize::write_file_atomic) (REQ-02,
@@ -19,7 +24,7 @@
 //! ([`splice_region`]) are PURE and unit-testable; the orchestrator
 //! [`project_invariants`] is the only function that performs I/O.
 
-use crate::config::{InvariantProjectionConfig, ProjectionMode};
+use crate::config::{InvariantProjectionConfig, ProjectionMode, ProjectionStyle};
 use crate::storage::{IssueStore, PathReadError};
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
 use thiserror::Error;
@@ -94,16 +99,29 @@ pub enum ProjectionError {
     },
 }
 
-/// Render `registry` into a deterministic, readable markdown block.
+/// Render `registry` into a deterministic, readable markdown block in `style`.
 ///
-/// Pure: performs no I/O and reads no configuration. Each invariant is listed in
-/// authored order with its id, statement, kind, and (when bound) the rule/gate
-/// that enforces it. An empty registry renders a header plus an explicit "no
-/// invariants declared" line so the projected region is never blank.
+/// Pure: performs no I/O and reads no configuration beyond the `style` argument.
+/// Each invariant is listed in authored order. The two styles
+/// ([`ProjectionStyle`], REQ-08) differ only in framing:
+///
+/// - [`ProjectionStyle::Full`] (the default) renders a `## Project invariants`
+///   header followed by one `- **{id}** [{kind}]{enforced_by}: {statement}` bullet
+///   per invariant, where `enforced_by` is `` (enforced-by: `<rule>`)`` when bound.
+///   This output is byte-identical to the original single-style render.
+/// - [`ProjectionStyle::IdAnchor`] renders a HEADING-LESS bullet list: one
+///   `- **{id}** — {statement}` line per invariant (bold id, space, em-dash, space,
+///   statement) with NO kind tag and NO enforced-by, for embedding beneath a
+///   hand-authored heading.
+///
+/// An empty registry renders an explicit "no invariants declared" line so the
+/// projected region is never blank (in `Full` style this follows the header; in
+/// `IdAnchor` style it is the sole line).
 ///
 /// # Examples
 ///
 /// ```
+/// use jit::config::ProjectionStyle;
 /// use jit::validation::invariants::InvariantRegistry;
 /// use jit::validation::projection::render_invariants_markdown;
 ///
@@ -111,13 +129,29 @@ pub enum ProjectionError {
 ///     "[[invariants]]\nid = \"INV-01\"\nstatement = \"Acyclic.\"\nkind = \"enforced\"\nenforced-by = \"dag-no-cycles\"\n",
 /// )
 /// .unwrap();
-/// let md = render_invariants_markdown(&reg);
-/// assert!(md.contains("INV-01"));
-/// assert!(md.contains("Acyclic."));
-/// assert!(md.contains("enforced"));
-/// assert!(md.contains("dag-no-cycles"));
+///
+/// // Full style keeps the header, kind tag, and enforced-by.
+/// let full = render_invariants_markdown(&reg, ProjectionStyle::Full);
+/// assert!(full.contains("## Project invariants"));
+/// assert!(full.contains("- **INV-01** [enforced] (enforced-by: `dag-no-cycles`): Acyclic."));
+///
+/// // Id-anchor style is heading-less with no kind/enforced-by.
+/// let anchored = render_invariants_markdown(&reg, ProjectionStyle::IdAnchor);
+/// assert!(!anchored.contains("## Project invariants"));
+/// assert_eq!(anchored, "- **INV-01** — Acyclic.\n");
 /// ```
-pub fn render_invariants_markdown(registry: &InvariantRegistry) -> String {
+pub fn render_invariants_markdown(registry: &InvariantRegistry, style: ProjectionStyle) -> String {
+    match style {
+        ProjectionStyle::Full => render_full(registry),
+        ProjectionStyle::IdAnchor => render_id_anchor(registry),
+    }
+}
+
+/// Render the `full` style: header + `- **{id}** [{kind}]{enforced_by}: {statement}`.
+///
+/// Byte-identical to the original single-style render (REQ-08 keeps `full` the
+/// default so existing targets and tests are unchanged).
+fn render_full(registry: &InvariantRegistry) -> String {
     let mut out = String::from("## Project invariants\n\n");
     if registry.invariants.is_empty() {
         out.push_str("_No invariants declared._\n");
@@ -140,6 +174,28 @@ pub fn render_invariants_markdown(registry: &InvariantRegistry) -> String {
         ));
     }
     out
+}
+
+/// Render the `id-anchor` style: a heading-less `- **{id}** — {statement}` list.
+///
+/// No `## Project invariants` header, no `[kind]` tag, no enforced-by. The
+/// separator is a literal em-dash (`—`). An empty registry still emits the
+/// explicit "no invariants declared" line so the projected region is never blank.
+fn render_id_anchor(registry: &InvariantRegistry) -> String {
+    if registry.invariants.is_empty() {
+        return String::from("_No invariants declared._\n");
+    }
+    registry
+        .invariants
+        .iter()
+        .map(|inv| {
+            format!(
+                "- **{id}** — {statement}\n",
+                id = inv.id,
+                statement = inv.statement
+            )
+        })
+        .collect()
 }
 
 /// Replace the text between `begin` and `end` in `existing` with `rendered`,
@@ -209,8 +265,10 @@ pub fn splice_region(
 /// Project `registry` into the documentation target described by `config`.
 ///
 /// The orchestrator (the only function here that performs I/O) reads the target
-/// path, mode, and delimiters ONLY from `config` — this module contains no
-/// documentation-filename literal (REQ-04). ALL persistence goes through the
+/// path, mode, render style, and delimiters ONLY from `config` — this module
+/// contains no documentation-filename literal (REQ-04). The chosen
+/// [`ProjectionStyle`](crate::config::ProjectionStyle) is threaded into
+/// [`render_invariants_markdown`]. ALL persistence goes through the
 /// storage boundary: region mode reads the existing target via
 /// [`read_repo_file`] and both modes write via [`write_repo_file`], which
 /// path-validates the config-driven target (rejecting absolute/`..`-escaping
@@ -250,7 +308,7 @@ pub fn project_invariants<S: IssueStore>(
     registry: &InvariantRegistry,
 ) -> Result<String, ProjectionError> {
     let target = config.target();
-    let rendered = render_invariants_markdown(registry);
+    let rendered = render_invariants_markdown(registry, config.style());
 
     let content = match config.mode() {
         ProjectionMode::SeparateFile => rendered,
@@ -288,7 +346,7 @@ pub fn project_invariants<S: IssueStore>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ProjectionMode;
+    use crate::config::{ProjectionMode, ProjectionStyle};
     use crate::storage::JsonFileStorage;
 
     fn registry_with_two() -> InvariantRegistry {
@@ -311,7 +369,7 @@ kind = "advisory"
 
     #[test]
     fn test_render_lists_each_invariant_deterministically() {
-        let md = render_invariants_markdown(&registry_with_two());
+        let md = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
         // Authored order is preserved: INV-01 before INV-02.
         let p1 = md.find("INV-01").unwrap();
         let p2 = md.find("INV-02").unwrap();
@@ -321,13 +379,54 @@ kind = "advisory"
         assert!(md.contains("enforced-by: `dag-no-cycles`"));
         assert!(md.contains("Issues prefer functional style."));
         // Deterministic: same input renders identical output.
-        assert_eq!(md, render_invariants_markdown(&registry_with_two()));
+        assert_eq!(
+            md,
+            render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full)
+        );
     }
 
     #[test]
     fn test_render_empty_registry_has_explicit_line() {
-        let md = render_invariants_markdown(&InvariantRegistry::empty());
+        let md = render_invariants_markdown(&InvariantRegistry::empty(), ProjectionStyle::Full);
         assert!(md.contains("No invariants declared"));
+    }
+
+    #[test]
+    fn test_render_default_style_is_full() {
+        // REQ-08: an absent `style` field resolves to Full, so the default render
+        // is byte-identical to the explicit full render.
+        let reg = registry_with_two();
+        let via_default =
+            render_invariants_markdown(&reg, InvariantProjectionConfig::default().style());
+        let explicit_full = render_invariants_markdown(&reg, ProjectionStyle::Full);
+        assert_eq!(via_default, explicit_full);
+        assert!(via_default.starts_with("## Project invariants\n\n"));
+    }
+
+    #[test]
+    fn test_render_id_anchor_is_heading_less_with_no_kind_or_enforced_by() {
+        // REQ-08: id-anchor renders `- **{id}** — {statement}` bullets with no
+        // header, no [kind] tag, and no enforced-by, in authored order.
+        let md = render_invariants_markdown(&registry_with_two(), ProjectionStyle::IdAnchor);
+        assert_eq!(
+            md,
+            "- **INV-01** — Every dependency edge stays acyclic.\n\
+             - **INV-02** — Issues prefer functional style.\n"
+        );
+        // No header, no kind tag, no enforced-by leaks into the id-anchor render.
+        assert!(!md.contains("## Project invariants"));
+        assert!(!md.contains("[enforced]"));
+        assert!(!md.contains("[advisory]"));
+        assert!(!md.contains("enforced-by"));
+        // The separator is a literal em-dash with surrounding spaces.
+        assert!(md.contains("** — "));
+    }
+
+    #[test]
+    fn test_render_id_anchor_empty_registry_has_explicit_line() {
+        let md = render_invariants_markdown(&InvariantRegistry::empty(), ProjectionStyle::IdAnchor);
+        assert_eq!(md, "_No invariants declared._\n");
+        assert!(!md.contains("## Project invariants"));
     }
 
     #[test]
@@ -430,6 +529,7 @@ kind = "advisory"
             target: Some("GUIDE.md".to_string()),
             region_begin: Some(begin.to_string()),
             region_end: Some(end.to_string()),
+            ..Default::default()
         };
         project_invariants(&store, &cfg, &registry_with_two()).unwrap();
 
@@ -522,6 +622,7 @@ kind = "advisory"
             target: Some("CLAUDE.md".to_string()),
             region_begin: Some(begin.to_string()),
             region_end: Some(end.to_string()),
+            ..Default::default()
         };
         let written = project_invariants(&store, &cfg, &registry_with_two()).unwrap();
         assert_eq!(written, "CLAUDE.md");
@@ -557,6 +658,7 @@ kind = "advisory"
             target: Some("CLAUDE.md".to_string()),
             region_begin: Some("<!-- jit:invariants:begin -->".to_string()),
             region_end: Some("<!-- jit:invariants:end -->".to_string()),
+            ..Default::default()
         };
 
         // Missing begin marker is a typed error.

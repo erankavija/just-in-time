@@ -120,16 +120,16 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **CLI commands must support `--json`** for machine-readable output.
 - **git is optional** — jit must work without git unless a feature strictly requires it.
 
-<!-- jit:invariants:begin -->
-## Project invariants
+### Domain Invariants
 
-- **INV-LABEL-FORMAT** [enforced] (enforced-by: `default:label-format`): Every label is namespace:value (namespace lowercase-kebab, value non-empty).
-- **INV-NAMESPACE-REGISTRY** [enforced] (enforced-by: `default:namespace-registry`): Every label namespace is declared in the namespace registry.
-- **INV-DAG-ACYCLIC** [enforced] (enforced-by: `cargo-ci`): Cycle detection runs before every dependency operation; the graph stays acyclic.
-- **INV-GATE-SEMANTICS** [enforced] (enforced-by: `cargo-ci`): An issue cannot reach Ready or Done with pending or failed gates.
-- **INV-EVENT-LOG** [advisory]: Every state change appends an event to events.jsonl.
-- **INV-ATOMIC-WRITES** [advisory]: All file writes use the temp-file + atomic-rename pattern.
-- **INV-ASSIGNEE-FORMAT** [advisory]: Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
+<!-- jit:invariants:begin -->
+- **INV-LABEL-FORMAT** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
+- **INV-NAMESPACE-REGISTRY** — Every label namespace is declared in the namespace registry.
+- **INV-DAG-ACYCLIC** — Cycle detection runs before every dependency operation; the graph stays acyclic.
+- **INV-GATE-SEMANTICS** — An issue cannot reach Ready or Done with pending or failed gates.
+- **INV-EVENT-LOG** — Every state change appends an event to events.jsonl.
+- **INV-ATOMIC-WRITES** — All file writes use the temp-file + atomic-rename pattern.
+- **INV-ASSIGNEE-FORMAT** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
 <!-- jit:invariants:end -->
 
 ## Commit Conventions

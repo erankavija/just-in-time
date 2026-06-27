@@ -797,6 +797,8 @@ pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
 /// targeting [`DEFAULT_INVARIANT_PROJECTION_TARGET`] — so the default never
 /// touches existing docs (decision D3). The `target` path and region delimiters
 /// are config-driven; the projection engine hardcodes no documentation filename.
+/// The `style` field selects how each invariant is rendered ([`ProjectionStyle`],
+/// defaulting to the original full render).
 ///
 /// # Examples
 ///
@@ -847,6 +849,11 @@ pub struct InvariantProjectionConfig {
     /// [`DEFAULT_INVARIANT_REGION_END`] when unset.
     #[serde(default, rename = "region-end")]
     pub region_end: Option<String>,
+    /// Render style for the projected markdown block. Defaults to
+    /// [`ProjectionStyle::Full`] when unset, so an absent `style` field keeps the
+    /// existing `## Project invariants` header + `[kind]`/enforced-by bullets.
+    #[serde(default)]
+    pub style: Option<ProjectionStyle>,
 }
 
 impl InvariantProjectionConfig {
@@ -919,6 +926,28 @@ impl InvariantProjectionConfig {
             .as_deref()
             .unwrap_or(DEFAULT_INVARIANT_REGION_END)
     }
+
+    /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{InvariantProjectionConfig, ProjectionStyle};
+    ///
+    /// // An absent `style` field resolves to the existing full render.
+    /// assert_eq!(
+    ///     InvariantProjectionConfig::default().style(),
+    ///     ProjectionStyle::Full
+    /// );
+    ///
+    /// // The id-anchor style is opt-in via the `[invariant_projection]` table.
+    /// let cfg: InvariantProjectionConfig =
+    ///     toml::from_str("style = \"id-anchor\"").unwrap();
+    /// assert_eq!(cfg.style(), ProjectionStyle::IdAnchor);
+    /// ```
+    pub fn style(&self) -> ProjectionStyle {
+        self.style.unwrap_or_default()
+    }
 }
 
 /// How the invariant registry is projected into its documentation target.
@@ -954,6 +983,48 @@ pub enum ProjectionMode {
     /// everything outside the delimiters.
     #[serde(rename = "region")]
     Region,
+}
+
+/// How each invariant is rendered into the projected markdown block.
+///
+/// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
+/// rename; an unrecognized value is a descriptive parse error rather than a
+/// silent default. The shipped default (no `style` field) is
+/// [`ProjectionStyle::Full`], which reproduces the original
+/// `## Project invariants` header plus `- **id** [kind] (enforced-by): statement`
+/// bullets. [`ProjectionStyle::IdAnchor`] renders a heading-less bullet list of
+/// `- **{id}** — {statement}` lines (no kind tag, no enforced-by), suited to a
+/// region beneath a hand-authored heading.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{InvariantProjectionConfig, ProjectionStyle};
+///
+/// // The default style is full (the original render).
+/// assert_eq!(ProjectionStyle::default(), ProjectionStyle::Full);
+///
+/// // Parsed from its kebab-case token inside the projection table.
+/// let cfg: InvariantProjectionConfig =
+///     toml::from_str("style = \"id-anchor\"").unwrap();
+/// assert_eq!(cfg.style, Some(ProjectionStyle::IdAnchor));
+///
+/// // An invalid token is a descriptive error, not a silent default.
+/// let err = toml::from_str::<InvariantProjectionConfig>("style = \"prose\"").unwrap_err();
+/// assert!(err.to_string().contains("full"));
+/// ```
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+pub enum ProjectionStyle {
+    /// Reproduce the original render: a `## Project invariants` header followed by
+    /// `- **{id}** [{kind}]{enforced_by}: {statement}` bullets (the default).
+    #[default]
+    #[serde(rename = "full")]
+    Full,
+    /// Render a heading-less bullet list of `- **{id}** — {statement}` lines, with
+    /// no kind tag and no enforced-by, for embedding beneath a hand-authored
+    /// heading.
+    #[serde(rename = "id-anchor")]
+    IdAnchor,
 }
 
 /// An error validating an explicitly-declared `[item_kinds.X]` table.

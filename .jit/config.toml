@@ -148,7 +148,10 @@ source-of-truth = "markdown-first"
 [invariant_projection]
 # Region mode: replace only the delimited region inside CLAUDE.md (REQ-06).
 # The markers <!-- jit:invariants:begin --> and <!-- jit:invariants:end --> wrap
-# the "## Project invariants" section; `jit invariant render` keeps everything
-# outside those markers byte-exact and writes atomically through storage.
+# the id-anchor bullet list; `jit invariant render` keeps everything outside
+# those markers byte-exact and writes atomically through storage.
+# id-anchor style (REQ-08): heading-less `- **{id}** — {statement}` bullets, so
+# the hand-authored "### Domain Invariants" heading above the markers stays put.
 mode = "region"
 target = "CLAUDE.md"
+style = "id-anchor"
