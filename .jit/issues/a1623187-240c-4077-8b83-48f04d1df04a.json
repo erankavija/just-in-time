@@ -2,7 +2,7 @@
   "id": "a1623187-240c-4077-8b83-48f04d1df04a",
   "title": "First-guess command residuals",
   "description": "Remove the remaining commands and flags that fail on the natural first guess.\n\n## Background\n\nSeveral first guesses fail today: `gate define` exposes the mode only as `-m/--mode` with no `--auto` convenience (cli.rs:885-887); `doc add` has `--label`/`--doc-type` but no `--title`, while the canonical human-label flag is `--label` (cli.rs:1175,1179); gate inspection misparses when the gate key and issue id are transposed; and the top-level command set has no reverse-deps or issue-listing entry (cli.rs:39-145).\n\n## Success Criteria\n\n- [hard] REQ-05: gate define --auto sets mode to auto; doc add --title is accepted as an alias for the human label; a gate-inspection call with the gate key and issue id transposed yields an actionable suggestion rather than a misparse; and a top-level reverse-dependency or issue-listing first guess resolves to the canonical command or an actionable error.\n\n## Notes\n\nTouch cli.rs (gate define, doc add, the gate Check variant, top-level Commands) and the affected handlers. `--auto` sets mode=auto; `--title` on `doc add` aliases the `--label` human label; transposed gate-inspection args yield a did-you-mean; the reverse-deps / issue-listing guess resolves to the canonical command or an actionable error.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-06-27T21:43:33.231677634Z",
-  "updated_at": "2026-06-27T22:18:50.038730447Z"
+  "updated_at": "2026-06-27T23:43:53.143983137Z"
 }

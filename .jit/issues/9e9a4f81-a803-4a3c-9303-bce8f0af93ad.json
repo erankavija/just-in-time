@@ -2,7 +2,7 @@
   "id": "9e9a4f81-a803-4a3c-9303-bce8f0af93ad",
   "title": "Per-issue validation scoping",
   "description": "Scope the per-issue validation gate to the issue under review.\n\n## Background\n\nThe jit-validate gate checker is a bare `jit validate` (.jit/gates.json:193), which runs whole-repo validation (`run_rules(None)`) and so fails the issue on unrelated repo-wide findings. The single-issue path `run_rules(Some(id))` already exists (commands/validate.rs:944-982) and `JIT_ISSUE_ID` is already injected into gate execution (gate_execution.rs:53).\n\n## Success Criteria\n\n- [hard] REQ-12: the per-issue validation gate evaluates only the issue under review and does not fail on unrelated repository-wide findings.\n\n## Notes\n\nPoint the gate checker at the single issue (`jit validate $JIT_ISSUE_ID`, the `run_rules(Some(id))` path), not the container-subtree `--scope`. Touch the jit-validate gate checker command (.jit/gates.json) and any preset that defines it; self-contained.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:27:49.702777384Z"
+      "updated_at": "2026-06-27T23:43:08.961213896Z"
     },
     "cargo-ci": {
       "status": "passed",
@@ -33,5 +33,5 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-06-27T21:43:33.923593312Z",
-  "updated_at": "2026-06-27T23:41:47.441682393Z"
+  "updated_at": "2026-06-27T23:44:43.889949435Z"
 }

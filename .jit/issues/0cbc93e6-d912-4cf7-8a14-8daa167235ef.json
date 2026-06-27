@@ -2,7 +2,7 @@
   "id": "0cbc93e6-d912-4cf7-8a14-8daa167235ef",
   "title": "Bounded reverse-dependency depth",
   "description": "Stop the reverse-dependency view from defaulting to unbounded output.\n\n## Background\n\n`graph deps --depth` defaults to 1, but `graph rdeps --depth` defaults to 0, meaning unbounded traversal, and `depth` is an unguarded `u32` (cli.rs:1333-1366). The transitive-dependency request on the graph commands needs an explicit bounded decision applied consistently across the two.\n\n## Success Criteria\n\n- [hard] REQ-19: graph rdeps defaults to a bounded depth and unbounded traversal is opt-in, consistent with graph deps.\n\n## Notes\n\nTouch cli.rs and the graph handlers; bound rdeps depth consistently with deps and make unbounded traversal opt-in. Update doc-comments.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "satisfies:REQ-19"
   ],
   "created_at": "2026-06-27T21:43:33.318893519Z",
-  "updated_at": "2026-06-27T22:18:50.066527825Z"
+  "updated_at": "2026-06-27T23:43:53.018489711Z"
 }

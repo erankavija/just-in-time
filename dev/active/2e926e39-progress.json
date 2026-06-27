@@ -1,7 +1,7 @@
 {
   "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
   "epic_short_id": "2e926e39",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -11,70 +11,70 @@
           "title": "CLI command-grammar standard",
           "satisfies": "REQ-06",
           "classification": "documentation",
-          "status": "integrated-pending-gates"
+          "status": "done"
         },
         {
           "short_id": "6c740a19",
           "title": "Breakdown and review skill prose",
           "satisfies": "REQ-10",
           "classification": "documentation",
-          "status": "integrated-pending-gates"
+          "status": "done"
         },
         {
           "short_id": "4b063bdf",
           "title": "Claim and lease skill prose",
           "satisfies": "REQ-18",
           "classification": "documentation",
-          "status": "integrated-pending-gates"
+          "status": "done"
         },
         {
           "short_id": "9e9a4f81",
           "title": "Per-issue validation scoping",
           "satisfies": "REQ-12",
           "classification": "implementation",
-          "status": "integrated-pending-gates"
+          "status": "done"
         },
         {
           "short_id": "f5054f15",
           "title": "Reviewer numbered-findings enumeration",
           "satisfies": "REQ-09",
           "classification": "implementation",
-          "status": "integrated-pending-gates"
+          "status": "done"
         },
         {
           "short_id": "22826a75",
           "title": "Robust AI-review verdict parsing",
           "satisfies": "REQ-11",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "2614ecf2",
           "title": "Anchor-level template gates",
           "satisfies": "REQ-13",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "b920ea57",
           "title": "Align issue create json with the show contract",
           "satisfies": "REQ-14",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "c4b56370",
           "title": "Claim git-requirement error and documentation",
           "satisfies": "REQ-17",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "short_id": "d287bd4c",
           "title": "Dependency-graph schema fidelity",
           "satisfies": "REQ-15",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -188,7 +188,11 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "c4b56370": 1,
+    "9e9a4f81": 1,
+    "6c740a19": 1
+  },
   "wave1_dispatch": {
     "base_sha": "3b493636f406d758c5141f26a6281a63ce641d14",
     "agents": {
@@ -207,5 +211,5 @@
     }
   },
   "started_at": "2026-06-28T00:00:00Z",
-  "notes": "Bracket (P=8efc0d75, B=7f709152) complete: plan-review + coverage-preview + breakdown-review passed. Critical spine: 527bf0a6->a1623187->1c94f4f1->073f9d13->252c947b->e3259063->07657508. Serialize f5054f15(REQ-09) and 22826a75(REQ-11): both edit scripts/ai-review.sh + contrib/gates/ai-review.sh. Integration model: workers author in worktrees, lead integrates to main serially, runs gates on main, then completes."
+  "notes": "Bracket (P=8efc0d75, B=7f709152) complete: plan-review + coverage-preview + breakdown-review passed. Critical spine: 527bf0a6->a1623187->1c94f4f1->073f9d13->252c947b->e3259063->07657508. Serialize f5054f15(REQ-09) and 22826a75(REQ-11): both edit scripts/ai-review.sh + contrib/gates/ai-review.sh. Integration model: workers author in worktrees, lead integrates to main serially, runs gates on main, then completes. | Wave1: 9/10 done. c4b56370 in rework-1 (real findings: --json exit-10 consistency + missing # Examples). Lead-direct fixes closed real findings on 9e9a4f81 (stale jit-validate ref) and 6c740a19 (gate_tier schema). Per user directive, added cargo-ci gate to content issues 9e9a4f81/4b063bdf so AI review trusts green build (sandbox-only test failures were false-blocking)."
 }

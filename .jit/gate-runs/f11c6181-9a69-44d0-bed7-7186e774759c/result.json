@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f11c6181-9a69-44d0-bed7-7186e774759c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9e9a4f81-a803-4a3c-9303-bce8f0af93ad",
+  "commit": "fc867ac8e72d4c2aeda6f60ecb9e6b32996c2b6b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:43:08.961213896Z",
+  "completed_at": "2026-06-27T23:44:23.382218238Z",
+  "duration_ms": 74421,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. `.jit/gates.json:193` now runs `jit validate \"$JIT_ISSUE_ID\"`, which invokes the existing per-issue path. `crates/jit/src/gate_execution.rs:53` sets `JIT_ISSUE_ID`, `crates/jit/src/main.rs:4603-4608` dispatches `jit validate <id>` to `executor.run_rules(id.as_deref())`, and `crates/jit/src/commands/validate.rs:944-982` filters findings to the target issue.\n\nNo stale `jit-validate` preset defining bare `jit validate` was found. The remaining `--scope` references are for the separate coverage-preview flow.\n\n## Architecture And Separation\n\nPass. The implementation is a gate registry/configuration change in `.jit/gates.json`; it reuses existing CLI and command paths. No domain/storage/commands/CLI boundary violation was introduced.\n\n## Functional Paradigm\n\nPass. No Rust implementation logic was added for this issue.\n\n## Correctness And Invariants\n\nPass. The per-issue validation gate no longer runs whole-repo validation and does not use container-subtree `--scope`. No atomic-write, event-log, gate-transition, assignee/label-format, or PID-safety regression was introduced by the scoped config change.\n\n## Safety\n\nPass. `#![deny(unsafe_code)]` remains present in the Rust crate entry points, and no unsafe code was introduced.\n\n## Testing\n\nPass. I did not rerun cargo tests because the issue context includes a succeeded `cargo-ci` gate at `2026-06-27T23:40:54.916329616Z`. The previously failed code-review test evidence is superseded by that newer succeeded cargo-ci gate.\n\nI did run the required `./scripts/jit-validate.sh`; it passed with `Repository validation passed`.\n\n## Error Handling\n\nPass. No new fallible Rust operations were added.\n\n## CLI Contract\n\nPass. No new command was added. The existing `jit validate <id>` path supports `--json` at `crates/jit/src/main.rs:4609-4618`.\n\n## Documentation\n\nPass. Prior stale operational prompt text is fixed at `scripts/breakdown-review-prompt.md:36`, which now correctly distinguishes repository-wide validation from the per-issue `jit-validate` gate.\n\n## Prior Review Feedback\n\nPass. The most recent review’s remaining blocker was stale failed test evidence; the supplied issue context now has a newer passed `cargo-ci` gate. The earlier stale prompt finding is addressed at `scripts/breakdown-review-prompt.md:36`.\n\n## Jit Issue Management\n\nPass. Dependency `7f709152-973d-49c9-8848-3845c6782e38` is `done` in `.jit/issues/7f709152-973d-49c9-8848-3845c6782e38.json:5`. The issue now requires `cargo-ci` and records it passed in `.jit/issues/9e9a4f81-a803-4a3c-9303-bce8f0af93ad.json:11-25`.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

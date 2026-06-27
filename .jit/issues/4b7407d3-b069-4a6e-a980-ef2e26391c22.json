@@ -2,7 +2,7 @@
   "id": "4b7407d3-b069-4a6e-a980-ef2e26391c22",
   "title": "Positional issue title and type flag",
   "description": "Make the natural first guess for creating and typing an issue work: a positional title and a long-only type flag.\n\n## Background\n\n`issue create` currently accepts only `--title` (cli.rs:436-438), so `jit issue create \"Title\"` with the title positional fails. There is no `--type` flag, and `-t` is already bound to `--title`, so a type flag must be long-only. Type validity already flows through the config `[type_hierarchy]` (config.toml:24) and the baked schema (validation/defaults.rs:192), so no type list belongs in the CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: jit issue create \"Title\" succeeds with the title taken positionally, and the --title flag form remains accepted.\n- [hard] REQ-02: issue create and issue update accept --type <kind>, write a type:<kind> label, and reject a kind not declared in config through the existing validation layer.\n\n## Notes\n\nTouch cli.rs and the create/update handlers; `--type` writes a `type:<kind>` label validated through the existing validation layer (config.toml:24, validation/defaults.rs:192). Update doc-comments in the same change.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "satisfies:REQ-02"
   ],
   "created_at": "2026-06-27T21:43:32.972916570Z",
-  "updated_at": "2026-06-27T22:18:49.959397404Z"
+  "updated_at": "2026-06-27T23:43:53.087249131Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "137de3d7-8337-4662-bfa7-7900e6cc154b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
+  "commit": "02a32af1f240bcd6e3307b648f9120ba51a72ee8",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:52:59.860319544Z",
+  "completed_at": "2026-06-27T23:54:10.684811037Z",
+  "duration_ms": 70824,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-17 is functionally met for the reviewed paths. Claim commands outside git now produce an actionable git-requirement error, and JSON claim failures map `ClaimRequiresGitError` to `CLAIM_REQUIRES_GIT` with exit 10.\n\n**Architecture / Separation**\n\nNo domain/storage/command/CLI boundary violation found in the reviewed changes.\n\n**Functional Style**\n\nNo blocking functional-style issue found.\n\n**Correctness / Invariants**\n\nNo new atomic-write, event-log, gate, assignee, label, PID, or unsafe-code issue found.\n\n**Testing**\n\nProvided issue evidence has `cargo-ci` passed, so I did not rerun tests. I ran `./scripts/jit-validate.sh`; it passed. New JSON integration coverage exists for `claim acquire --json` and `claim list --json` outside git.\n\n**Error Handling**\n\nThe prior JSON exit-code issue is addressed via `claim_json_error` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:222), and all claim JSON error paths now use it.\n\n**CLI Contract**\n\nAffected commands still support `--json`; the git-requirement JSON path now exits 10.\n\n**Documentation**\n\nThe prior missing examples on `ClaimRequiresGitError::new` and `ClaimRequiresGitError::message` are addressed in [errors.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:359).\n\n**Prior Review / Dependencies**\n\nThe latest prior review had two findings; both are addressed. Dependency `7f709152` is marked done.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
