@@ -1,7 +1,7 @@
 {
   "id": "e3259063-2ac4-40a6-86a7-40dbc9716b2f",
   "title": "Canonical command renames and consumer sweep",
-  "description": "Rename every deviating command to its canonical grammar form and update all consumers in the same change.\n\n## Success Criteria\n\n- [hard] REQ-06: Deviating commands, including the separation of gate configuration from gate execution and inspection, are renamed to their canonical forms and a tree-wide search over the crates, docs, skills, contrib, scripts, the MCP server, and the sibling consumer repo finds no reference to any retired command name.",
+  "description": "Rename every deviating command to its canonical grammar form and update all consumers in the same change, verified by a repo-wide search.\n\n## Background\n\nSeveral commands deviate from the canonical grammar, chiefly the gate command enum that mixes gate configuration, attachment, execution, and inspection in one flat list (cli.rs:866-1082). The project takes clean renames with no compatibility shims; the consumer set is entirely ours (the MCP server regenerates tools from the CLI schema, the sibling repo and skills are local), so renames are absorbed by updating every consumer in the same change.\n\n## Success Criteria\n\n- [hard] REQ-06: Deviating commands, including the separation of gate configuration from gate execution and inspection, are renamed to their canonical forms and a tree-wide search over the crates, docs, skills, contrib, scripts, the MCP server, and the sibling consumer repo finds no reference to any retired command name.\n\n## Notes\n\nTouch cli.rs and the gate command enum. Consumers to update in the same change: skills jit-manage/SKILL.md, project-lead/SKILL.md and lead-review-protocol.md, jit-breakdown/SKILL.md and bracket-spine.md, jit-plan/SKILL.md; scripts/cargo-ci.sh, scripts/ai-review.sh, contrib/gates/ai-review.sh, contrib/README.md; docs/reference/cli-commands.md, docs/how-to/custom-gates.md, docs/how-to/software-development.md, docs/concepts/core-model.md; the regenerated MCP server tools; and the ../gf2 handoff prose. A tree-wide grep over crates, docs, skills, contrib, scripts, the MCP server, and ../gf2 must find no retired command name.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -26,5 +26,5 @@
     "story:cli-grammar-rename"
   ],
   "created_at": "2026-06-27T21:43:33.405578434Z",
-  "updated_at": "2026-06-27T21:45:39.715149261Z"
+  "updated_at": "2026-06-27T22:18:50.096769834Z"
 }

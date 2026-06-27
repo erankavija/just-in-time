@@ -1,7 +1,7 @@
 {
   "id": "252c947b-0a59-4c51-b63e-bd0ea6d60750",
   "title": "Editable gate definition",
-  "description": "Allow editing an existing gate definition through the CLI without hand-editing the registry file.\n\n## Success Criteria\n\n- [hard] REQ-16: a gate-update command edits an existing gate's mutable fields with an atomic write and leaves per-issue gate status unchanged, requiring no registry hand-editing.",
+  "description": "Allow editing an existing gate definition through the CLI without hand-editing the registry file.\n\n## Background\n\nThere is no `gate update` variant (cli.rs:866-1082) and `define_gate` rejects existing keys (commands/gate.rs:656), so the only way to change a gate's fields today is to hand-edit the registry file. Per-issue gate status lives separately on `Issue.gates_status` (types.rs:395), distinct from the registry.\n\n## Success Criteria\n\n- [hard] REQ-16: a gate-update command edits an existing gate's mutable fields with an atomic write and leaves per-issue gate status unchanged, requiring no registry hand-editing.\n\n## Notes\n\nAdd a `gate update` command that edits an existing gate's mutable fields via the atomic `write_file_atomic` primitive (storage/atomic_write.rs:34) through `save_gate_registry` (storage/json.rs:633), leaving per-issue `gates_status` (types.rs:395) untouched. Document the command.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-16"
   ],
   "created_at": "2026-06-27T21:43:34.357835696Z",
-  "updated_at": "2026-06-27T21:43:35.141802010Z"
+  "updated_at": "2026-06-27T22:18:50.407685513Z"
 }

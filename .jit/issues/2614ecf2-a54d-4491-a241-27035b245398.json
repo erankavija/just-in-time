@@ -1,7 +1,7 @@
 {
   "id": "2614ecf2-a54d-4491-a241-27035b245398",
   "title": "Anchor-level template gates",
-  "description": "Let a template anchor declare gate presets that are attached to the bound anchor issue at apply time.\n\n## Success Criteria\n\n- [hard] REQ-13: a template anchor accepts a declarative gates field, the loader validates it like node gates, and applying a template attaches the anchor's gate presets to the bound anchor issue through the shared preset path.",
+  "description": "Let a template anchor declare gate presets that the apply engine attaches to the bound anchor issue at apply time.\n\n## Background\n\nTemplate anchors carry only a `name` today (`AnchorSlot`, templates.rs:243-246) and cannot declare gates, while node gates already flow from `TemplateNode.gates` (templates.rs:286) through `attach_node_gates`->`apply_gate_preset` (commands/template.rs:832, called at :603). Attaching a completion gate to a bound container anchor needs `AnchorSlot` to carry gates and the apply engine to attach them through that same path.\n\n## Success Criteria\n\n- [hard] REQ-13: a template anchor accepts a declarative gates field, the loader validates it like node gates, and applying a template attaches the anchor's gate presets to the bound anchor issue through the shared preset path.\n\n## Notes\n\nExtend `AnchorSlot` (templates.rs:243-246) with a `#[serde(default)] gates: Vec<String>` field, validate it in the template loader like node gates, and attach the anchor's presets to the bound anchor via a shared attach-gates-by-name helper factored out of `attach_node_gates` (commands/template.rs:832,603). Engine work; anchor gates stay declarative strings in templates.toml.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -23,5 +23,5 @@
     "story:anchor-gates"
   ],
   "created_at": "2026-06-27T21:43:34.012354847Z",
-  "updated_at": "2026-06-27T21:53:35.586748569Z"
+  "updated_at": "2026-06-27T22:18:50.288662729Z"
 }

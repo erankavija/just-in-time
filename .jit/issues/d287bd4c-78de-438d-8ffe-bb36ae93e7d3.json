@@ -1,7 +1,7 @@
 {
   "id": "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
   "title": "Dependency-graph schema fidelity",
-  "description": "Make the exported schema for the dependency-graph command match what the command emits.\n\n## Success Criteria\n\n- [hard] REQ-15: the exported schema for graph deps matches the response shape the command emits, with no dead-code warning left from an orphaned response type.",
+  "description": "Make the exported schema for the dependency-graph command match the shape the command actually emits.\n\n## Success Criteria\n\n- [hard] REQ-15: the exported schema for graph deps matches the response shape the command emits, with no dead-code warning left from an orphaned response type.\n\n## Notes\n\nThe schema maps `graph_deps` to `GraphDepsResponse` (schema.rs:421-423) but the handler emits `GraphDepsTreeResponse` (main.rs:2822-2834). Repoint the schema and, in the same change, remove or repurpose the now-orphaned `GraphDepsResponse` (output.rs:657) so it does not become dead code that fails the clippy gate.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-15"
   ],
   "created_at": "2026-06-27T21:43:34.269145971Z",
-  "updated_at": "2026-06-27T21:53:36.064073626Z"
+  "updated_at": "2026-06-27T22:18:50.378793544Z"
 }

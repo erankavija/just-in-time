@@ -1,7 +1,7 @@
 {
   "id": "eb37a05a-884f-4bd2-91d1-b231575cd52c",
   "title": "Full gate report text",
-  "description": "Show the complete checker report on gate inspection rather than a truncated fragment.\n\n## Success Criteria\n\n- [hard] REQ-07: gate inspection output contains the complete checker report with no line truncation and no substitution of a file path for the report body.",
+  "description": "Show the complete checker report on gate inspection rather than a truncated fragment.\n\n## Background\n\n`print_gate_run_details` truncates the report at `.take(20)` lines (main.rs:418,422) and then prints a file path (main.rs:425) instead of the body, so agents glob the raw run files to read the full report. The full stdout/stderr is already stored, so the truncation is the only obstacle.\n\n## Success Criteria\n\n- [hard] REQ-07: gate inspection output contains the complete checker report with no line truncation and no substitution of a file path for the report body.\n\n## Notes\n\nTouch main.rs:388-426; self-contained. Emit the full stored checker report with no truncation and no file-path substitution.",
   "state": "backlog",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-07"
   ],
   "created_at": "2026-06-27T21:43:33.491360518Z",
-  "updated_at": "2026-06-27T21:43:34.964755350Z"
+  "updated_at": "2026-06-27T22:18:50.125055402Z"
 }

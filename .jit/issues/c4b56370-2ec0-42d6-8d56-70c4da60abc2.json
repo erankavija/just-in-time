@@ -1,7 +1,7 @@
 {
   "id": "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
   "title": "Claim git-requirement error and documentation",
-  "description": "Make claim and lease commands fail clearly outside a git repo and document the requirement.\n\n## Success Criteria\n\n- [hard] REQ-17: a claim or lease command run outside a git repository emits an actionable error naming the git requirement, and the project guidance documents that leases require git.",
+  "description": "Make claim and lease commands fail clearly outside a git repo and document the requirement.\n\n## Background\n\nClaim and lease commands depend on `get_current_branch`, which already errors outside a git repo but with a generic message (commands/claim.rs:14-29). The project's CLAUDE.md states \"git is optional\", which does not flag the lease exception.\n\n## Success Criteria\n\n- [hard] REQ-17: a claim or lease command run outside a git repository emits an actionable error naming the git requirement, and the project guidance documents that leases require git.\n\n## Notes\n\nTouch commands/claim.rs for an actionable error that names the git requirement, and amend the \"git is optional\" guidance in CLAUDE.md with the lease exception. Self-contained.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -22,5 +22,5 @@
     "satisfies:REQ-17"
   ],
   "created_at": "2026-06-27T21:43:34.445918121Z",
-  "updated_at": "2026-06-27T21:53:36.029716836Z"
+  "updated_at": "2026-06-27T22:18:50.436319921Z"
 }
