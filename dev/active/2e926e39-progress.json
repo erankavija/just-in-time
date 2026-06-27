@@ -1,0 +1,68 @@
+{
+  "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
+  "epic_short_id": "2e926e39",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"short_id": "527bf0a6", "title": "CLI command-grammar standard", "satisfies": "REQ-06", "classification": "documentation", "status": "pending"},
+        {"short_id": "6c740a19", "title": "Breakdown and review skill prose", "satisfies": "REQ-10", "classification": "documentation", "status": "pending"},
+        {"short_id": "4b063bdf", "title": "Claim and lease skill prose", "satisfies": "REQ-18", "classification": "documentation", "status": "pending"},
+        {"short_id": "9e9a4f81", "title": "Per-issue validation scoping", "satisfies": "REQ-12", "classification": "implementation", "status": "pending"},
+        {"short_id": "f5054f15", "title": "Reviewer numbered-findings enumeration", "satisfies": "REQ-09", "classification": "implementation", "status": "pending"},
+        {"short_id": "22826a75", "title": "Robust AI-review verdict parsing", "satisfies": "REQ-11", "classification": "implementation", "status": "pending"},
+        {"short_id": "2614ecf2", "title": "Anchor-level template gates", "satisfies": "REQ-13", "classification": "implementation", "status": "pending"},
+        {"short_id": "b920ea57", "title": "Align issue create json with the show contract", "satisfies": "REQ-14", "classification": "implementation", "status": "pending"},
+        {"short_id": "c4b56370", "title": "Claim git-requirement error and documentation", "satisfies": "REQ-17", "classification": "implementation", "status": "pending"},
+        {"short_id": "d287bd4c", "title": "Dependency-graph schema fidelity", "satisfies": "REQ-15", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"short_id": "4b7407d3", "title": "Positional issue title and type flag", "satisfies": "REQ-01,REQ-02", "classification": "implementation", "status": "pending"},
+        {"short_id": "3758ee60", "title": "Query default routing and ready alias", "satisfies": "REQ-04", "classification": "implementation", "status": "pending"},
+        {"short_id": "a1623187", "title": "First-guess command residuals", "satisfies": "REQ-05", "classification": "implementation", "status": "pending"},
+        {"short_id": "0cbc93e6", "title": "Bounded reverse-dependency depth", "satisfies": "REQ-19", "classification": "implementation", "status": "pending"},
+        {"short_id": "eb37a05a", "title": "Full gate report text", "satisfies": "REQ-07", "classification": "implementation", "status": "pending"},
+        {"short_id": "552ff75c", "title": "Repo-wide integrity gate on the container", "satisfies": "REQ-13", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"short_id": "1c94f4f1", "title": "Gate key as flag on pass and check", "satisfies": "REQ-03", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"short_id": "073f9d13", "title": "Gate check history and flat output", "satisfies": "REQ-08", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"short_id": "252c947b", "title": "Editable gate definition", "satisfies": "REQ-16", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"short_id": "e3259063", "title": "Canonical command renames and consumer sweep", "satisfies": "REQ-06", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"short_id": "07657508", "title": "Retire the obsolete issue breakdown command", "satisfies": "REQ-06", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-06-28T00:00:00Z",
+  "notes": "Bracket (P=8efc0d75, B=7f709152) complete: plan-review + coverage-preview + breakdown-review passed. Critical spine: 527bf0a6->a1623187->1c94f4f1->073f9d13->252c947b->e3259063->07657508. Serialize f5054f15(REQ-09) and 22826a75(REQ-11): both edit scripts/ai-review.sh + contrib/gates/ai-review.sh. Integration model: workers author in worktrees, lead integrates to main serially, runs gates on main, then completes."
+}
