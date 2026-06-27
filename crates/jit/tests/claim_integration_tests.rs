@@ -790,3 +790,52 @@ fn test_claim_ttl0_workflow_acquire_heartbeat_release() {
     let final_leases = final_json["leases"].as_array().unwrap();
     assert_eq!(final_leases.len(), 0, "Lease should be released");
 }
+
+/// Setup a jit repository WITHOUT git (to test git-requirement errors on claim/lease commands).
+fn setup_non_git_jit_repo() -> TempDir {
+    let temp = TempDir::new().unwrap();
+
+    // Initialize jit only — no git init.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success();
+
+    temp
+}
+
+#[test]
+fn test_claim_acquire_outside_git_repo_emits_git_requirement_error() {
+    let temp = setup_non_git_jit_repo();
+    let issue_id = create_issue(temp.path(), "Test Issue Outside Git");
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("git repository"))
+        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
+}
+
+#[test]
+fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
+    let temp = setup_non_git_jit_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "list"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("git repository"))
+        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
+}

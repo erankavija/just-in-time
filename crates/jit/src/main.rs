@@ -74,6 +74,15 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
+    // Claim/lease commands require git; running them outside a git repository is
+    // an external-dependency failure (exit 10).
+    if error
+        .downcast_ref::<jit::errors::ClaimRequiresGitError>()
+        .is_some()
+    {
+        return ExitCode::ExternalError;
+    }
+
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {

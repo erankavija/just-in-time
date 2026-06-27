@@ -328,6 +328,56 @@ impl LeaseNotFoundError {
     }
 }
 
+/// Error returned when a claim or lease command is run outside a git repository.
+///
+/// Claims and leases require git for worktree identity and branch tracking.
+/// This typed wrapper is downcastable in `error_to_exit_code` (→
+/// `ExitCode::ExternalError`) so the CLI reports exit code 10 rather than the
+/// generic error exit code.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::ClaimRequiresGitError;
+///
+/// let err = ClaimRequiresGitError::new();
+/// let msg = err.to_string();
+/// assert!(msg.contains("git repository"));
+/// assert!(msg.contains("claim"));
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<ClaimRequiresGitError>().is_some());
+/// ```
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct ClaimRequiresGitError {
+    message: String,
+}
+
+impl ClaimRequiresGitError {
+    /// Build a [`ClaimRequiresGitError`] with the standard remediation message.
+    pub fn new() -> Self {
+        let msg = ActionableError::new("Claims and leases require a git repository")
+            .with_cause("Claim tracking records the git worktree identity and current branch")
+            .with_remedy("Initialize a git repository: git init")
+            .with_remedy("Change to a directory that is inside a git repository")
+            .to_error_message();
+        Self { message: msg }
+    }
+
+    /// The fully-rendered, user-facing message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+impl Default for ClaimRequiresGitError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A state-transition failure with structured blocker details.
 ///
 /// Command logic uses this error to report why an issue cannot move to the

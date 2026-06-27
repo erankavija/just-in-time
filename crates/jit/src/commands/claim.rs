@@ -11,19 +11,21 @@ use std::process::Command;
 use std::time::Duration;
 
 /// Get current git branch name.
+///
+/// # Errors
+///
+/// Returns [`crate::errors::ClaimRequiresGitError`] when the current directory
+/// is not inside a git repository, or when git is not available. This typed
+/// error allows callers to classify the failure as an external dependency
+/// failure (exit code 10) rather than a generic error.
 fn get_current_branch() -> Result<String> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
-        .context("Failed to get current git branch")?;
+        .context("Failed to execute git command for branch detection")?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        anyhow::bail!(
-            "Failed to get current git branch. Are you in a git repository?\n\
-             Git error: {}",
-            stderr.trim()
-        );
+        return Err(crate::errors::ClaimRequiresGitError::new().into());
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())

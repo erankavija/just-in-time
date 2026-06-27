@@ -118,7 +118,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
 - **CLI commands must support `--json`** for machine-readable output.
-- **git is optional** — jit must work without git unless a feature strictly requires it.
+- **git is optional** — jit must work without git unless a feature strictly requires it. Exception: claim and lease commands (`jit claim acquire/release/renew/heartbeat/status/list`) require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
 ### Domain Invariants
 
