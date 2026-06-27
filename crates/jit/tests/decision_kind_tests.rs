@@ -26,7 +26,7 @@
 //! - REQ-02: [`test_default_repo_per_label_resolves_decision`] proves a
 //!   `per:<issue>/D-01` label resolves to the addressed decision through the
 //!   existing generic `resolve_link_label` (the `per` namespace is recognized
-//!   because the built-in `decision` kind ships it).
+//!   because the `decision` kind declares the `per` link-namespace).
 //! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_decisions`] proves
 //!   the markdown description is the only source — editing it changes the index and
 //!   no parallel structured store is written under `.jit/`.

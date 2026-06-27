@@ -28,7 +28,7 @@
 //!   [`test_default_repo_resolves_label_resolves_risk`] prove that BOTH a
 //!   `mitigates:<issue>/RISK-01` and a `resolves:<issue>/RISK-01` label resolve to
 //!   the addressed risk through the existing generic `resolve_link_label` (both
-//!   namespaces are recognized because the built-in `risk` kind ships them).
+//!   namespaces are recognized because the `risk` kind declares both link-namespaces).
 //! - REQ-03: [`test_default_repo_markdown_is_sole_source_for_risks`] proves the
 //!   markdown description is the only source — editing it changes the index and no
 //!   parallel structured store is written under `.jit/`.
@@ -153,7 +153,7 @@ fn test_default_repo_mitigates_label_resolves_risk() {
     // REQ-02 (mitigates): a `mitigates:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`, with
     // NO custom config — the `mitigates` namespace is recognized because the
-    // BUILT-IN `risk` kind ships it.
+    // `risk` kind that `jit init` emits declares it.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) = default_executor_with(
         temp.path(),

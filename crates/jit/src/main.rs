@@ -921,8 +921,12 @@ fn run() -> Result<()> {
                 .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
 
             // Write config.toml only when it did not already exist (idempotent).
+            // Atomic temp-file + rename per the project's file-write invariant.
             if !config_already_existed {
-                std::fs::write(&config_path, chosen.generate_config_toml())?;
+                jit::storage::atomic_write::write_file_atomic(
+                    &config_path,
+                    &chosen.generate_config_toml(),
+                )?;
             }
 
             // Scaffold .jit/rules.toml (the operative single source of truth) with
