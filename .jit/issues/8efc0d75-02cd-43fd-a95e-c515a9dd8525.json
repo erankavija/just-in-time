@@ -17,12 +17,20 @@
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "milestone:v1.0",
     "epic:agent-seamlessness",
     "type:planning"
   ],
   "created_at": "2026-06-27T20:49:54.394862468Z",
-  "updated_at": "2026-06-27T20:49:54.398428089Z"
+  "updated_at": "2026-06-27T21:27:54.854045072Z"
 }
