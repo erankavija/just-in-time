@@ -14,15 +14,15 @@
 //! [`ItemError::DuplicateSelfId`].
 //!
 //! An **item kind** ([`ItemKind`]) is the config-declared projection
-//! `(section, id-pattern, marker(s), link-namespace(s))` that says which entries
-//! are addressable and how. `requirement` is just one kind; the model is generic
-//! and no kind NAME is interpreted by this module — only the four-tuple is
-//! (REQ-01). The built-in defaults ([`builtin_default_kinds`]) ship `requirement`,
-//! `decision`, and `risk` markdown-first, plus `invariant` project-scoped and
-//! registry-first (projected from the invariant registry, not a markdown section);
-//! [`ItemKind::requirement_default`] reproduces the
-//! exact triple the `label-coverage` rule already consumes, so the existing
-//! coverage machinery is demonstrably compatible with the model (REQ-05).
+//! `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)`
+//! that says which entries are addressable and how. The model is generic: no kind
+//! NAME is interpreted by this module, only the tuple (REQ-01). Kinds are authored
+//! entirely in the `[item_kinds]` config table (scaffolded by `jit init`); this
+//! module bakes in no domain defaults. With no `[item_kinds]` table the kind set
+//! is empty (single-consumer design, no backward-compat layer — see
+//! [`resolve_item_kinds`]). A kind's tuple is chosen to align with the
+//! `label-coverage` rule's own defaults, so the coverage machinery is compatible
+//! with the model without rewriting any rule (REQ-05).
 //!
 //! Indexing is pure and substrate-specific but shares one derivation core
 //! ([`derive_scope_items`], which enforces per-scope uniqueness and mints
@@ -55,92 +55,6 @@ pub const DEFAULT_ITEM_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 /// Default link-label namespace referencing items of a kind when none is
 /// declared, matching the `label-coverage` rule's `satisfies-namespace` default.
 pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
-
-/// The conventional NAME of the built-in requirement kind.
-///
-/// Used only to LABEL the default kind for display and `--kind` filtering; it is
-/// never branched on in indexing logic (the kind is fully described by its
-/// four-tuple), keeping the engine domain-agnostic (REQ-01).
-pub const REQUIREMENT_KIND_NAME: &str = "requirement";
-
-/// The conventional NAME of the built-in `decision` kind.
-///
-/// Like [`REQUIREMENT_KIND_NAME`], this only LABELS the default kind for display
-/// and `--kind` filtering; indexing never branches on it (the kind is fully
-/// described by its tuple), keeping the engine domain-agnostic (REQ-01).
-pub const DECISION_KIND_NAME: &str = "decision";
-
-/// Default section slug the built-in `decision` kind authors its items under
-/// (`## Decisions`). Decisions live in issue descriptions, markdown-first.
-pub const DECISION_KIND_SECTION: &str = "decisions";
-
-/// Default self-id pattern for the built-in `decision` kind (`D-1`, `D-02`, ...).
-///
-/// Narrower than [`DEFAULT_ITEM_ID_PATTERN`] so an unmarked decisions list does
-/// not accidentally claim arbitrary `XXX-NN` ids; decision self-ids are the `D-NN`
-/// shape.
-pub const DECISION_KIND_ID_PATTERN: &str = "D-[0-9]+";
-
-/// Default link-label namespace referencing the built-in `decision` kind: a
-/// `per:<issue>/D-01` label on a node points at the addressed decision.
-pub const DECISION_KIND_LINK_NAMESPACE: &str = "per";
-
-/// The conventional NAME of the built-in `risk` kind.
-///
-/// Like [`REQUIREMENT_KIND_NAME`], this only LABELS the default kind for display
-/// and `--kind` filtering; indexing never branches on it (the kind is fully
-/// described by its tuple), keeping the engine domain-agnostic (REQ-01).
-pub const RISK_KIND_NAME: &str = "risk";
-
-/// Default section slug the built-in `risk` kind authors its items under
-/// (`## Risks`). Risks live in issue descriptions, markdown-first.
-pub const RISK_KIND_SECTION: &str = "risks";
-
-/// Default self-id pattern for the built-in `risk` kind (`RISK-1`, `RISK-02`, ...).
-///
-/// Uses the `RISK-` prefix so the unmarked risks section does not accidentally
-/// claim generic `XX-NN` ids from other sections; risk self-ids are the
-/// `RISK-NN` shape.
-pub const RISK_KIND_ID_PATTERN: &str = "RISK-[0-9]+";
-
-/// Link-label namespaces that reference the built-in `risk` kind.
-///
-/// Both `mitigates:<issue>/RISK-01` (partial mitigation) and
-/// `resolves:<issue>/RISK-01` (full resolution) point at the addressed risk item.
-pub const RISK_KIND_LINK_NAMESPACES: [&str; 2] = ["mitigates", "resolves"];
-
-/// The conventional NAME of the built-in `invariant` kind.
-///
-/// Like [`REQUIREMENT_KIND_NAME`], this only LABELS the default kind for display
-/// and `--kind` filtering; indexing never branches on it (the kind is fully
-/// described by its tuple), keeping the engine domain-agnostic (REQ-01). The
-/// invariant kind is *registry-first* (see [`ItemKind::invariant_default`]), so
-/// its items are projected from the loaded invariant registry, not parsed from a
-/// markdown section.
-pub const INVARIANT_KIND_NAME: &str = "invariant";
-
-/// Link-label namespace that references the built-in `invariant` kind: an
-/// `enforces:@/INV-01` label on a node points at the addressed invariant.
-pub const INVARIANT_KIND_LINK_NAMESPACE: &str = "enforces";
-
-/// Repository-local path of the toml registry backing the built-in `invariant`
-/// kind, read through the storage boundary by the generic registry-first path.
-///
-/// One of the four descriptor fields [`ItemKind::invariant_default`] maps the
-/// invariant registry through; they describe a baked default kind (REQ-04 will
-/// delete the bakery), NOT a routing branch — projection never compares against
-/// them.
-const INVARIANT_REGISTRY_PATH: &str = ".jit/invariants.toml";
-
-/// The array-of-tables key projected from [`INVARIANT_REGISTRY_PATH`] (each
-/// `[[invariants]]` entry becomes one `@/<id>` item).
-const INVARIANT_REGISTRY_TABLE: &str = "invariants";
-
-/// The invariant-entry field supplying each item's self-id.
-const INVARIANT_REGISTRY_ID_FIELD: &str = "id";
-
-/// The invariant-entry field supplying each item's display text.
-const INVARIANT_REGISTRY_TEXT_FIELD: &str = "statement";
 
 /// The scope sentinel that addresses project-level items not tied to any single
 /// issue. The first segment of a qualified id equal to this string denotes
@@ -296,8 +210,8 @@ impl KindScope {
     /// ```
     /// use jit::domain::item::KindScope;
     ///
-    /// let err = KindScope::parse_for("invariant", Some("global")).unwrap_err();
-    /// assert!(err.to_string().contains("invariant"));
+    /// let err = KindScope::parse_for("example", Some("global")).unwrap_err();
+    /// assert!(err.to_string().contains("example"));
     /// ```
     pub fn parse_for(kind: &str, scope: Option<&str>) -> Result<Self, ItemError> {
         match scope {
@@ -443,19 +357,29 @@ pub enum ItemError {
 /// A resolved item-kind projection: the `(section, id-pattern, markers,
 /// link-namespaces)` four-tuple with all defaults already applied.
 ///
-/// Resolved from an [`ItemKindConfig`] via [`ItemKind::from_config`] (or built
-/// directly for the requirement default). The `id_pattern` is pre-compiled so
-/// indexing is regex-error-free.
+/// Resolved from an [`ItemKindConfig`] via [`ItemKind::from_config`]. The
+/// `id_pattern` is pre-compiled so indexing is regex-error-free.
 ///
 /// # Examples
 ///
 /// ```
+/// use jit::config::ItemKindConfig;
 /// use jit::domain::item::ItemKind;
 ///
-/// let req = ItemKind::requirement_default().unwrap();
-/// assert_eq!(req.name(), "requirement");
+/// let kind = ItemKind::from_config(
+///     "example",
+///     &ItemKindConfig {
+///         section: Some("success_criteria".into()),
+///         id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".into()),
+///         markers: Some(vec!["[hard]".into()]),
+///         link_namespaces: Some(vec!["satisfies".into()]),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
+/// assert_eq!(kind.name(), "example");
 /// // The kind exposes the same triple the label-coverage rule consumes.
-/// let (section, marker, pattern) = req.as_triple();
+/// let (section, marker, pattern) = kind.as_triple();
 /// assert_eq!(section, "success_criteria");
 /// assert_eq!(marker, Some("[hard]"));
 /// assert_eq!(pattern, "[A-Z][A-Z0-9]*-[0-9]+");
@@ -489,15 +413,15 @@ impl ItemKind {
     /// use jit::domain::item::ItemKind;
     ///
     /// let cfg = ItemKindConfig {
-    ///     section: Some("decisions".to_string()),
-    ///     id_pattern: Some("D-\\d+".to_string()),
+    ///     section: Some("glossary".to_string()),
+    ///     id_pattern: Some("G-\\d+".to_string()),
     ///     markers: None,
-    ///     link_namespaces: Some(vec!["per".to_string()]),
+    ///     link_namespaces: Some(vec!["defines".to_string()]),
     ///     ..Default::default()
     /// };
-    /// let kind = ItemKind::from_config("decision", &cfg).unwrap();
-    /// assert_eq!(kind.section(), "decisions");
-    /// assert_eq!(kind.link_namespaces(), &["per".to_string()]);
+    /// let kind = ItemKind::from_config("example", &cfg).unwrap();
+    /// assert_eq!(kind.section(), "glossary");
+    /// assert_eq!(kind.link_namespaces(), &["defines".to_string()]);
     /// ```
     pub fn from_config(name: &str, config: &ItemKindConfig) -> Result<Self, ItemError> {
         let section = config
@@ -565,205 +489,6 @@ impl ItemKind {
         })
     }
 
-    /// Build the built-in `requirement` kind.
-    ///
-    /// Its four-tuple is `(success_criteria, [hard], REQ/repo id-pattern,
-    /// satisfies)` — exactly the triple the `label-coverage` rule reads with its
-    /// own defaults, so the requirement model and the coverage rule are
-    /// compatible by construction (REQ-05).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let req = ItemKind::requirement_default().unwrap();
-    /// assert_eq!(req.markers(), &["[hard]".to_string()]);
-    /// assert_eq!(req.link_namespaces(), &["satisfies".to_string()]);
-    /// ```
-    pub fn requirement_default() -> Result<Self, ItemError> {
-        Self::from_config(
-            REQUIREMENT_KIND_NAME,
-            &ItemKindConfig {
-                section: Some(DEFAULT_ITEM_SECTION.to_string()),
-                id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
-                markers: Some(vec!["[hard]".to_string()]),
-                link_namespaces: Some(vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]),
-                ..Default::default()
-            },
-        )
-    }
-
-    /// Build the built-in `decision` kind.
-    ///
-    /// A markdown-first, issue-scoped kind: decisions are authored as list entries
-    /// under a `## Decisions` section of an issue description and indexed through
-    /// the SAME generic parse path as `requirement`, with NO marker (every matching
-    /// line qualifies). Its tuple is `(decisions, D-[0-9]+, <no marker>, per)`. A
-    /// `per:<issue>/D-01` label references a decision by its qualified id. Shipped
-    /// as a built-in default (alongside `requirement`) via
-    /// [`builtin_default_kinds`], so `jit item list --kind decision` works in a
-    /// default-initialized repo with no `[item_kinds]` config.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let decision = ItemKind::decision_default().unwrap();
-    /// assert_eq!(decision.name(), "decision");
-    /// assert_eq!(decision.section(), "decisions");
-    /// // No marker: every D-NN line in the section qualifies.
-    /// assert!(decision.markers().is_empty());
-    /// assert_eq!(decision.link_namespaces(), &["per".to_string()]);
-    /// ```
-    pub fn decision_default() -> Result<Self, ItemError> {
-        Self::from_config(
-            DECISION_KIND_NAME,
-            &ItemKindConfig {
-                section: Some(DECISION_KIND_SECTION.to_string()),
-                id_pattern: Some(DECISION_KIND_ID_PATTERN.to_string()),
-                // No marker: a decisions list needs no `[hard]`-style gate.
-                markers: Some(vec![]),
-                link_namespaces: Some(vec![DECISION_KIND_LINK_NAMESPACE.to_string()]),
-                ..Default::default()
-            },
-        )
-    }
-
-    /// Build the built-in `risk` kind.
-    ///
-    /// A markdown-first, issue-scoped kind: risks are authored as list entries
-    /// under a `## Risks` section of an issue description and indexed through the
-    /// SAME generic parse path as `requirement` and `decision`, with NO marker
-    /// (every matching line qualifies). Its tuple is
-    /// `(risks, RISK-[0-9]+, <no marker>, [mitigates, resolves])`.
-    ///
-    /// Two link namespaces are declared:
-    /// - `mitigates:<issue>/RISK-01` — the labelled item partially mitigates the risk.
-    /// - `resolves:<issue>/RISK-01` — the labelled item fully resolves the risk.
-    ///
-    /// Shipped as a built-in default (alongside `requirement` and `decision`) via
-    /// [`builtin_default_kinds`], so `jit item list --kind risk` works in a
-    /// default-initialized repo with no `[item_kinds]` config.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let risk = ItemKind::risk_default().unwrap();
-    /// assert_eq!(risk.name(), "risk");
-    /// assert_eq!(risk.section(), "risks");
-    /// // No marker: every RISK-NN line in the section qualifies.
-    /// assert!(risk.markers().is_empty());
-    /// // Both `mitigates:` and `resolves:` namespaces reference risks.
-    /// assert_eq!(
-    ///     risk.link_namespaces(),
-    ///     &["mitigates".to_string(), "resolves".to_string()]
-    /// );
-    /// ```
-    pub fn risk_default() -> Result<Self, ItemError> {
-        Self::from_config(
-            RISK_KIND_NAME,
-            &ItemKindConfig {
-                section: Some(RISK_KIND_SECTION.to_string()),
-                id_pattern: Some(RISK_KIND_ID_PATTERN.to_string()),
-                // No marker: a risks list needs no `[hard]`-style gate.
-                markers: Some(vec![]),
-                link_namespaces: Some(
-                    RISK_KIND_LINK_NAMESPACES
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
-                ),
-                ..Default::default()
-            },
-        )
-    }
-
-    /// Build the built-in `invariant` kind.
-    ///
-    /// A *registry-first*, project-scoped kind: unlike `requirement`, `decision`,
-    /// and `risk` (markdown-first), an invariant is NOT parsed from a markdown
-    /// section. Its items are projected from a toml `source` descriptor naming the
-    /// invariant registry (`.jit/invariants.toml`), read through the storage
-    /// boundary by the GENERIC registry-first path. Each `[[invariants]]` entry's
-    /// `id` is its self-id, so its qualified id is `@/<id>` (REQ-01); the registry
-    /// is authoritative and no markdown index is produced for invariants (REQ-02).
-    ///
-    /// Because a registry-first kind does not use the triple parse path, the
-    /// `section` / `id-pattern` / `marker` fields are NOT consulted for projecting
-    /// items; they are set to sensible inert defaults purely to satisfy the shared
-    /// tuple shape. The caller (`commands/item.rs::project_items`) routes on
-    /// [`source_of_truth`](Self::source_of_truth) and projects invariant items from
-    /// the kind's toml `source` descriptor, bypassing the markdown scanner entirely.
-    /// Consequently the invariant kind declares NO markdown `source` file, only the
-    /// toml descriptor exposed by [`toml_source`](Self::toml_source).
-    ///
-    /// Its link namespace is `enforces`: an `enforces:@/INV-01` label on a node
-    /// points at the addressed invariant.
-    ///
-    /// Shipped as a built-in default (alongside `requirement`, `decision`, and
-    /// `risk`) via [`builtin_default_kinds`], so `jit item list --kind invariant`
-    /// works in a default-initialized repo that carries a `.jit/invariants.toml`,
-    /// with no `[item_kinds]` config.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::SourceOfTruth;
-    /// use jit::domain::item::{ItemKind, KindScope};
-    ///
-    /// let inv = ItemKind::invariant_default().unwrap();
-    /// assert_eq!(inv.name(), "invariant");
-    /// // Project-scoped and registry-first: items come from the toml registry, not
-    /// // a markdown source file.
-    /// assert_eq!(inv.kind_scope(), KindScope::Project);
-    /// assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
-    /// // No markdown `source` path; the registry is named by a toml descriptor.
-    /// assert_eq!(inv.source(), None);
-    /// let descriptor = inv.toml_source().unwrap();
-    /// assert_eq!(descriptor.toml, ".jit/invariants.toml");
-    /// assert_eq!(descriptor.table, "invariants");
-    /// assert_eq!(descriptor.id_field, "id");
-    /// assert_eq!(descriptor.text_field, "statement");
-    /// // No link-fields: an invariant's `enforced-by` is not an item link.
-    /// assert!(descriptor.link_fields.is_empty());
-    /// assert_eq!(inv.link_namespaces(), &["enforces".to_string()]);
-    /// ```
-    pub fn invariant_default() -> Result<Self, ItemError> {
-        Self::from_config(
-            INVARIANT_KIND_NAME,
-            &ItemKindConfig {
-                // Registry-first: the section / id-pattern / markers below are inert
-                // (the toml registry, not a markdown section, is the source), kept
-                // only to fill the shared tuple shape. They are never used to parse
-                // invariant items.
-                section: Some(DEFAULT_ITEM_SECTION.to_string()),
-                id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
-                markers: Some(vec![]),
-                link_namespaces: Some(vec![INVARIANT_KIND_LINK_NAMESPACE.to_string()]),
-                scope: Some(KindScopeConfig::Project),
-                // The toml `source` descriptor routes the invariant kind through the
-                // GENERIC registry-first path (no reserved-name branch): each
-                // `[[invariants]]` entry of `.jit/invariants.toml` projects to an
-                // item whose self-id is its `id` and text its `statement`. No
-                // link-fields are mapped, so each item's links stay empty: an
-                // invariant's `enforced-by` is consumed by drift analysis, not
-                // surfaced as an addressable-item link.
-                source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
-                    toml: INVARIANT_REGISTRY_PATH.to_string(),
-                    table: INVARIANT_REGISTRY_TABLE.to_string(),
-                    id_field: INVARIANT_REGISTRY_ID_FIELD.to_string(),
-                    text_field: INVARIANT_REGISTRY_TEXT_FIELD.to_string(),
-                    link_fields: std::collections::BTreeMap::new(),
-                })),
-                source_of_truth: Some(SourceOfTruth::RegistryFirst),
-            },
-        )
-    }
-
     /// The kind's display name.
     pub fn name(&self) -> &str {
         &self.name
@@ -789,10 +514,11 @@ impl ItemKind {
     /// # Examples
     ///
     /// ```
+    /// use jit::config::ItemKindConfig;
     /// use jit::domain::item::{ItemKind, KindScope};
     ///
-    /// let req = ItemKind::requirement_default().unwrap();
-    /// assert_eq!(req.kind_scope(), KindScope::Issue);
+    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
+    /// assert_eq!(kind.kind_scope(), KindScope::Issue);
     /// ```
     pub fn kind_scope(&self) -> KindScope {
         self.kind_scope
@@ -806,20 +532,22 @@ impl ItemKind {
     /// # Examples
     ///
     /// ```
+    /// use jit::config::ItemKindConfig;
     /// use jit::domain::item::ItemKind;
     ///
-    /// // The built-in requirement kind is issue-scoped and has no source file.
-    /// assert_eq!(ItemKind::requirement_default().unwrap().source(), None);
+    /// // An issue-scoped kind has no project source file.
+    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
+    /// assert_eq!(kind.source(), None);
     /// ```
     pub fn source(&self) -> Option<&str> {
         self.source_path.as_deref()
     }
 
     /// The structured TOML source descriptor a registry-first project kind reads
-    /// its items from, or `None` for an issue-scope or markdown-first kind. The
-    /// built-in `invariant` kind is an ordinary registry-first kind, so it returns
-    /// `Some(descriptor)` (its descriptor names `.jit/invariants.toml`) like any
-    /// other toml-source kind.
+    /// its items from, or `None` for an issue-scope or markdown-first kind. A
+    /// registry-first project kind returns `Some(descriptor)` naming the `.toml`
+    /// registry its items are projected from (its `source` is a
+    /// `{ toml = "...", table = "...", ... }` descriptor).
     ///
     /// When present, [`commands`](crate::commands) reads the descriptor's `toml`
     /// file through the storage boundary and projects each table entry into an
@@ -828,10 +556,12 @@ impl ItemKind {
     /// # Examples
     ///
     /// ```
+    /// use jit::config::ItemKindConfig;
     /// use jit::domain::item::ItemKind;
     ///
-    /// // The built-in requirement kind has no toml source descriptor.
-    /// assert!(ItemKind::requirement_default().unwrap().toml_source().is_none());
+    /// // A markdown-first kind has no toml source descriptor.
+    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
+    /// assert!(kind.toml_source().is_none());
     /// ```
     pub fn toml_source(&self) -> Option<&crate::config::TomlSourceDescriptor> {
         self.toml_source.as_ref()
@@ -840,26 +570,19 @@ impl ItemKind {
     /// The kind's authoring DIRECTION (which substrate is canonical).
     ///
     /// `markdown-first` kinds are parsed from a markdown substrate (issue
-    /// descriptions, or a project-scope `source` file); `registry-first` kinds
-    /// (e.g. `invariant`) are projected from a structured registry. Callers route
-    /// the sourcing path on this value.
+    /// descriptions, or a project-scope `source` file); `registry-first` kinds are
+    /// projected from a structured registry. Callers route the sourcing path on
+    /// this value.
     ///
     /// # Examples
     ///
     /// ```
-    /// use jit::config::SourceOfTruth;
+    /// use jit::config::{ItemKindConfig, SourceOfTruth};
     /// use jit::domain::item::ItemKind;
     ///
-    /// // The built-in requirement kind is markdown-first.
-    /// assert_eq!(
-    ///     ItemKind::requirement_default().unwrap().source_of_truth(),
-    ///     SourceOfTruth::MarkdownFirst
-    /// );
-    /// // The built-in invariant kind is registry-first.
-    /// assert_eq!(
-    ///     ItemKind::invariant_default().unwrap().source_of_truth(),
-    ///     SourceOfTruth::RegistryFirst
-    /// );
+    /// // A kind defaults to markdown-first.
+    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
+    /// assert_eq!(kind.source_of_truth(), SourceOfTruth::MarkdownFirst);
     /// ```
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth
@@ -875,9 +598,19 @@ impl ItemKind {
     /// # Examples
     ///
     /// ```
+    /// use jit::config::ItemKindConfig;
     /// use jit::domain::item::ItemKind;
     ///
-    /// let kind = ItemKind::requirement_default().unwrap();
+    /// let kind = ItemKind::from_config(
+    ///     "example",
+    ///     &ItemKindConfig {
+    ///         section: Some("success_criteria".into()),
+    ///         id_pattern: Some("REQ-[0-9]+".into()),
+    ///         markers: Some(vec!["[hard]".into()]),
+    ///         ..Default::default()
+    ///     },
+    /// )
+    /// .unwrap();
     /// let (section, marker, pattern) = kind.as_triple();
     /// assert_eq!((section, marker), ("success_criteria", Some("[hard]")));
     /// assert!(!pattern.is_empty());
@@ -985,7 +718,7 @@ pub struct AddressableItem {
 /// use jit::domain::item::RawScopeItem;
 ///
 /// let raw = RawScopeItem {
-///     kind: "invariant".to_string(),
+///     kind: "policy".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "all writes are atomic".to_string(),
 ///     links: Vec::new(),
@@ -1022,7 +755,7 @@ pub struct RawScopeItem {
 /// use jit::domain::item::{derive_scope_items, RawScopeItem, Scope};
 ///
 /// let raw = vec![RawScopeItem {
-///     kind: "invariant".to_string(),
+///     kind: "policy".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "atomic writes".to_string(),
 ///     links: Vec::new(),
@@ -1077,6 +810,7 @@ pub fn derive_scope_items(
 /// # Examples
 ///
 /// ```
+/// use jit::config::ItemKindConfig;
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_items, ItemKind};
 /// use jit::domain::Issue;
@@ -1085,8 +819,17 @@ pub fn derive_scope_items(
 ///     "T".to_string(),
 ///     "## Success Criteria\n\n- [hard] REQ-01: a\n- prose line\n".to_string(),
 /// );
-/// let kinds = vec![ItemKind::requirement_default().unwrap()];
-/// let items = index_items(&issue, &kinds, &MarkdownContentParser).unwrap();
+/// let kind = ItemKind::from_config(
+///     "example",
+///     &ItemKindConfig {
+///         section: Some("success_criteria".into()),
+///         id_pattern: Some("REQ-[0-9]+".into()),
+///         markers: Some(vec!["[hard]".into()]),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
+/// let items = index_items(&issue, &[kind], &MarkdownContentParser).unwrap();
 /// assert_eq!(items.len(), 1);
 /// assert_eq!(items[0].self_id, "REQ-01");
 /// assert!(items[0].qualified_id.ends_with("/REQ-01"));
@@ -1153,13 +896,23 @@ fn extract_raw_items(
 /// # Examples
 ///
 /// ```
+/// use jit::config::ItemKindConfig;
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_markdown_items, ItemKind, Scope};
 ///
-/// let kinds = vec![ItemKind::requirement_default().unwrap()];
+/// let kind = ItemKind::from_config(
+///     "example",
+///     &ItemKindConfig {
+///         section: Some("success_criteria".into()),
+///         id_pattern: Some("[A-Z]+-[0-9]+".into()),
+///         markers: Some(vec!["[hard]".into()]),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
 /// let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n";
 /// let items =
-///     index_markdown_items(md, &Scope::Project, &kinds, &MarkdownContentParser).unwrap();
+///     index_markdown_items(md, &Scope::Project, &[kind], &MarkdownContentParser).unwrap();
 /// assert_eq!(items[0].qualified_id, "@/INV-01");
 /// ```
 pub fn index_markdown_items(
@@ -1199,13 +952,15 @@ fn sections_from_markdown(
 /// # Examples
 ///
 /// ```
+/// use jit::config::ItemKindConfig;
 /// use jit::domain::item::{ItemKind, ProjectSource};
 ///
+/// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
 /// let src = ProjectSource {
-///     kind: ItemKind::requirement_default().unwrap(),
+///     kind,
 ///     markdown: "## Success Criteria\n\n- [hard] INV-01: x\n".to_string(),
 /// };
-/// assert_eq!(src.kind.name(), "requirement");
+/// assert_eq!(src.kind.name(), "example");
 /// ```
 #[derive(Debug, Clone)]
 pub struct ProjectSource {
@@ -1223,8 +978,8 @@ pub struct ProjectSource {
 ///
 /// 1. **Markdown-first** kinds (each a [`ProjectSource`]) are parsed and scanned
 ///    via the same [`extract_raw_items`] path as issue descriptions.
-/// 2. **Registry-first** kinds (e.g. `invariant`) supply their candidates directly
-///    as `registry_items` — already projected from a structured registry, NOT a
+/// 2. **Registry-first** kinds supply their candidates directly as
+///    `registry_items` — already projected from a structured registry, NOT a
 ///    markdown section, since the registry is their authoritative source (REQ-02).
 ///
 /// Pooling all candidates before deriving means a self-id repeated across any two
@@ -1235,16 +990,27 @@ pub struct ProjectSource {
 /// # Examples
 ///
 /// ```
+/// use jit::config::ItemKindConfig;
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource, RawScopeItem};
 ///
+/// let kind = ItemKind::from_config(
+///     "example",
+///     &ItemKindConfig {
+///         section: Some("success_criteria".into()),
+///         id_pattern: Some("REQ-[0-9]+".into()),
+///         markers: Some(vec!["[hard]".into()]),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
 /// let sources = vec![ProjectSource {
-///     kind: ItemKind::requirement_default().unwrap(),
+///     kind,
 ///     markdown: "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
 /// }];
-/// // A registry-first candidate (an invariant) is supplied directly.
+/// // A registry-first candidate is supplied directly.
 /// let registry = vec![RawScopeItem {
-///     kind: "invariant".to_string(),
+///     kind: "policy".to_string(),
 ///     self_id: "INV-01".to_string(),
 ///     text: "every dependency edge stays acyclic".to_string(),
 ///     links: Vec::new(),
@@ -1431,51 +1197,14 @@ fn toml_link_labels(
         .collect())
 }
 
-/// The built-in item kinds a repo has when it declares no `[item_kinds]` table.
-///
-/// These are the kinds JIT ships out of the box. Three are authored markdown-first
-/// in issue descriptions: `requirement` (`## Success Criteria`), `decision`
-/// (`## Decisions`), and `risk` (`## Risks`); `invariant` is project-scoped and
-/// *registry-first*, projected from `.jit/invariants.toml` rather than any markdown
-/// section. Returned in name order for deterministic output. A project's explicit
-/// `[item_kinds]` table REPLACES this set (see [`resolve_item_kinds`]).
-///
-/// This is the single extension point for shipping further built-in kinds:
-/// appending a `*_default()` constructor here makes the new kind available in
-/// every default-initialized repo with no further wiring.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::builtin_default_kinds;
-///
-/// let kinds = builtin_default_kinds().unwrap();
-/// let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
-/// // Shipped built-ins, in name order.
-/// assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
-/// ```
-pub fn builtin_default_kinds() -> Result<Vec<ItemKind>, ItemError> {
-    // Keep in name order so the default set matches the registry path's ordering.
-    let mut kinds = vec![
-        ItemKind::requirement_default()?,
-        ItemKind::decision_default()?,
-        ItemKind::risk_default()?,
-        ItemKind::invariant_default()?,
-    ];
-    kinds.sort_by(|a, b| a.name().cmp(b.name()));
-    Ok(kinds)
-}
-
 /// Resolve the effective set of item kinds from an optional config registry.
 ///
-/// When the registry is `None` (no `[item_kinds]` table), the built-in default
-/// kinds ([`builtin_default_kinds`]: `requirement`, `decision`, `risk`, and
-/// `invariant`) are returned, so a repo that declares nothing still ships those
-/// models. When the
-/// registry is present it is used verbatim (each entry resolved through
-/// [`ItemKind::from_config`]); the caller opts in to every kind it wants,
-/// including re-declaring `requirement` with non-default fields. An explicit table
-/// REPLACES the defaults.
+/// The engine bakes in no domain defaults: when the registry is `None` (no
+/// `[item_kinds]` table) the kind set is EMPTY (per design D4, single consumer,
+/// no backward-compat layer). Kinds are authored entirely in the `[item_kinds]`
+/// config table, which `jit init` scaffolds with a complete, editable set. When
+/// the registry is present it is used verbatim (each entry resolved through
+/// [`ItemKind::from_config`]); the caller opts in to every kind it wants.
 ///
 /// Kinds are returned in name order for deterministic output.
 ///
@@ -1484,16 +1213,14 @@ pub fn builtin_default_kinds() -> Result<Vec<ItemKind>, ItemError> {
 /// ```
 /// use jit::domain::item::resolve_item_kinds;
 ///
-/// // No registry -> the built-in default kinds, in name order.
-/// let kinds = resolve_item_kinds(None).unwrap();
-/// let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
-/// assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
+/// // No `[item_kinds]` table -> no kinds (no baked built-ins).
+/// assert!(resolve_item_kinds(None).unwrap().is_empty());
 /// ```
 pub fn resolve_item_kinds(
     registry: Option<&HashMap<String, ItemKindConfig>>,
 ) -> Result<Vec<ItemKind>, ItemError> {
     match registry {
-        None => builtin_default_kinds(),
+        None => Ok(Vec::new()),
         Some(map) => {
             let mut names: Vec<&String> = map.keys().collect();
             names.sort();
@@ -1556,7 +1283,7 @@ pub struct KindTriple {
 ///
 /// let mut registry = HashMap::new();
 /// registry.insert(
-///     "requirement".to_string(),
+///     "example".to_string(),
 ///     ItemKindConfig {
 ///         section: Some("success_criteria".to_string()),
 ///         markers: Some(vec!["[hard]".to_string()]),
@@ -1564,7 +1291,7 @@ pub struct KindTriple {
 ///         ..Default::default()
 ///     },
 /// );
-/// let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
+/// let triple = expand_kind_triple(Some(&registry), "example").unwrap();
 /// assert_eq!(triple.section, "success_criteria");
 /// assert_eq!(triple.marker.as_deref(), Some("[hard]"));
 ///
@@ -1596,8 +1323,84 @@ mod tests {
     use crate::document::MarkdownContentParser;
     use crate::domain::Issue;
 
+    // The canonical kinds `jit init` authors into the `[item_kinds]` table, rebuilt
+    // here from their exact field shape so the domain layer can pin that those
+    // fields project as expected. They are no longer baked into the engine (a repo
+    // with no `[item_kinds]` table has no kinds); these helpers stand in for the
+    // config-authored table.
+    fn req_cfg() -> ItemKindConfig {
+        ItemKindConfig {
+            section: Some("success_criteria".to_string()),
+            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            markers: Some(vec!["[hard]".to_string()]),
+            link_namespaces: Some(vec!["satisfies".to_string()]),
+            scope: Some(KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+        }
+    }
+
+    fn decision_cfg() -> ItemKindConfig {
+        ItemKindConfig {
+            section: Some("decisions".to_string()),
+            id_pattern: Some("D-[0-9]+".to_string()),
+            markers: Some(vec![]),
+            link_namespaces: Some(vec!["per".to_string()]),
+            scope: Some(KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+        }
+    }
+
+    fn risk_cfg() -> ItemKindConfig {
+        ItemKindConfig {
+            section: Some("risks".to_string()),
+            id_pattern: Some("RISK-[0-9]+".to_string()),
+            markers: Some(vec![]),
+            link_namespaces: Some(vec!["mitigates".to_string(), "resolves".to_string()]),
+            scope: Some(KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+        }
+    }
+
+    fn invariant_cfg() -> ItemKindConfig {
+        ItemKindConfig {
+            section: Some("success_criteria".to_string()),
+            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            markers: Some(vec![]),
+            link_namespaces: Some(vec!["enforces".to_string()]),
+            scope: Some(KindScopeConfig::Project),
+            source: Some(ItemKindSource::Toml(TomlSourceDescriptor {
+                toml: ".jit/invariants.toml".to_string(),
+                table: "invariants".to_string(),
+                id_field: "id".to_string(),
+                text_field: "statement".to_string(),
+                link_fields: std::collections::BTreeMap::new(),
+            })),
+            source_of_truth: Some(SourceOfTruth::RegistryFirst),
+        }
+    }
+
     fn req_kind() -> ItemKind {
-        ItemKind::requirement_default().unwrap()
+        ItemKind::from_config("requirement", &req_cfg()).unwrap()
+    }
+
+    fn decision_kind() -> ItemKind {
+        ItemKind::from_config("decision", &decision_cfg()).unwrap()
+    }
+
+    fn risk_kind() -> ItemKind {
+        ItemKind::from_config("risk", &risk_cfg()).unwrap()
+    }
+
+    fn invariant_kind() -> ItemKind {
+        ItemKind::from_config("invariant", &invariant_cfg()).unwrap()
+    }
+
+    /// The four canonical kinds, in name order (the set `jit init` authors).
+    fn canonical_kinds() -> Vec<ItemKind> {
+        vec![decision_kind(), invariant_kind(), req_kind(), risk_kind()]
     }
 
     #[test]
@@ -1758,19 +1561,36 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_item_kinds_default_when_absent() {
-        // With no registry, the built-in default set ships requirement, decision,
-        // risk, and invariant, in name order.
-        let kinds = resolve_item_kinds(None).unwrap();
+    fn test_resolve_item_kinds_empty_when_absent() {
+        // No `[item_kinds]` table -> no kinds. The engine bakes in no domain
+        // defaults (D4: single consumer, no backward-compat layer); kinds are
+        // authored entirely in config (scaffolded by `jit init`).
+        assert!(resolve_item_kinds(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_resolve_item_kinds_canonical_table_resolves_all_four() {
+        // The complete table `jit init` authors resolves to the four canonical
+        // kinds, in name order — each through the generic `from_config` path.
+        let map: HashMap<String, ItemKindConfig> = [
+            ("requirement", req_cfg()),
+            ("decision", decision_cfg()),
+            ("risk", risk_cfg()),
+            ("invariant", invariant_cfg()),
+        ]
+        .into_iter()
+        .map(|(name, cfg)| (name.to_string(), cfg))
+        .collect();
+        let kinds = resolve_item_kinds(Some(&map)).unwrap();
         let names: Vec<&str> = kinds.iter().map(ItemKind::name).collect();
         assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
     }
 
     #[test]
-    fn test_decision_default_tuple() {
-        // The built-in decision kind: section `decisions`, D-NN ids, no marker,
+    fn test_decision_kind_tuple() {
+        // The canonical decision kind: section `decisions`, D-NN ids, no marker,
         // `per` link namespace, issue-scoped, markdown-first.
-        let decision = ItemKind::decision_default().unwrap();
+        let decision = decision_kind();
         assert_eq!(decision.name(), "decision");
         assert_eq!(decision.section(), "decisions");
         assert!(decision.markers().is_empty());
@@ -1783,35 +1603,16 @@ mod tests {
     }
 
     #[test]
-    fn test_builtin_default_kinds_includes_decision() {
-        let names: Vec<String> = builtin_default_kinds()
-            .unwrap()
-            .iter()
-            .map(|k| k.name().to_string())
-            .collect();
-        assert!(names.contains(&"requirement".to_string()));
-        assert!(names.contains(&"decision".to_string()));
-    }
-
-    #[test]
-    fn test_invariant_default_is_project_scope_registry_first() {
-        // The built-in invariant kind: project-scoped, registry-first, `enforces`
-        // link namespace, and NO `source` file (items come from the registry).
-        let inv = ItemKind::invariant_default().unwrap();
+    fn test_invariant_kind_is_project_scope_registry_first() {
+        // The canonical invariant kind: project-scoped, registry-first, `enforces`
+        // link namespace, and NO markdown `source` file (items come from the toml
+        // registry named by its descriptor).
+        let inv = invariant_kind();
         assert_eq!(inv.name(), "invariant");
         assert_eq!(inv.kind_scope(), KindScope::Project);
         assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
         assert_eq!(inv.source(), None);
         assert_eq!(inv.link_namespaces(), &["enforces".to_string()]);
-    }
-
-    #[test]
-    fn test_builtin_default_kinds_includes_invariant() {
-        // The no-`[item_kinds]` default set ships invariant alongside the
-        // markdown-first kinds, in name order.
-        let kinds = builtin_default_kinds().unwrap();
-        let names: Vec<&str> = kinds.iter().map(ItemKind::name).collect();
-        assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
     }
 
     #[test]
@@ -1852,13 +1653,13 @@ mod tests {
     }
 
     #[test]
-    fn test_invariant_default_routes_through_toml_descriptor() {
-        // REQ-03: the built-in `invariant` kind carries a toml `source` descriptor
+    fn test_invariant_kind_routes_through_toml_descriptor() {
+        // REQ-03: the canonical `invariant` kind carries a toml `source` descriptor
         // naming `.jit/invariants.toml`, so it routes through the GENERIC
         // registry-first path with no reserved-name branch. The descriptor maps
         // `id`/`statement` and NO link-fields (so each item's links stay empty,
         // matching the prior typed projection byte-for-byte).
-        let inv = ItemKind::invariant_default().unwrap();
+        let inv = invariant_kind();
         assert_eq!(inv.name(), "invariant");
         assert_eq!(inv.kind_scope(), KindScope::Project);
         assert_eq!(inv.source_of_truth(), SourceOfTruth::RegistryFirst);
@@ -1894,7 +1695,7 @@ mod tests {
         // Markdown-first project `invariant` with a source: once a reserved-name
         // rejection, now an ordinary markdown-first project kind.
         let md = ItemKind::from_config(
-            INVARIANT_KIND_NAME,
+            "invariant",
             &cfg(
                 KindScopeConfig::Project,
                 SourceOfTruth::MarkdownFirst,
@@ -1909,7 +1710,7 @@ mod tests {
         // out of the issue-description parser, now an ordinary issue-scope kind (the
         // project-source requirement does not apply to issue scope).
         let issue = ItemKind::from_config(
-            INVARIANT_KIND_NAME,
+            "invariant",
             &cfg(KindScopeConfig::Issue, SourceOfTruth::RegistryFirst, None),
         )
         .unwrap();
@@ -2060,14 +1861,14 @@ enforced-by = \"tests\"
     }
 
     #[test]
-    fn test_index_items_projects_decisions_by_default() {
-        // The default kind set indexes a `## Decisions` section's D-NN lines with
-        // no extra config (the shipped product behavior).
+    fn test_index_items_projects_decisions_with_canonical_kinds() {
+        // The canonical kind set (as `jit init` authors it) indexes a `## Decisions`
+        // section's D-NN lines through the same generic parse path as requirements.
         let issue = Issue::new(
             "T".to_string(),
             "## Decisions\n\n- D-01: use json\n- D-02: atomic writes\n".to_string(),
         );
-        let kinds = builtin_default_kinds().unwrap();
+        let kinds = canonical_kinds();
         let items = index_items(&issue, &kinds, &MarkdownContentParser).unwrap();
         let decisions: Vec<&AddressableItem> =
             items.iter().filter(|i| i.kind == "decision").collect();

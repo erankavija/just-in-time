@@ -267,7 +267,7 @@ fn test_harness_scales_with_many_issues() {
 
 #[test]
 fn test_harness_item_list_and_resolve() {
-    let h = TestHarness::new();
+    let h = TestHarness::new().with_item_kinds();
     let id = h.create_issue_with_desc(
         "Foundational",
         "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n",
@@ -288,11 +288,21 @@ fn test_harness_item_list_and_resolve() {
 fn test_harness_item_kind_compatible_with_label_coverage() {
     use jit::domain::item::ItemKind;
 
-    // REQ-05: the built-in requirement kind expands to exactly the
-    // (section, marker, id-pattern) triple the label-coverage rule consumes by
-    // default, so the coverage machinery is compatible with the item model
-    // without rewriting any rule.
-    let kind = ItemKind::requirement_default().unwrap();
+    // REQ-05: the canonical requirement kind (as `jit init` authors it) expands to
+    // exactly the (section, marker, id-pattern) triple the label-coverage rule
+    // consumes by default, so the coverage machinery is compatible with the item
+    // model without rewriting any rule.
+    let kind = ItemKind::from_config(
+        "requirement",
+        &jit::config::ItemKindConfig {
+            section: Some("success_criteria".to_string()),
+            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+            markers: Some(vec!["[hard]".to_string()]),
+            link_namespaces: Some(vec!["satisfies".to_string()]),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let (section, marker, pattern) = kind.as_triple();
     assert_eq!(section, "success_criteria");
     assert_eq!(marker, Some("[hard]"));
@@ -301,7 +311,7 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
     // REQ-05: a generic link label `<ns>:<issue>/<self-id>` (here the
     // requirement kind's `satisfies` namespace) resolves to the addressed item
     // via its qualified id — not merely the legacy unqualified `satisfies:REQ-01`.
-    let h = TestHarness::new();
+    let h = TestHarness::new().with_item_kinds();
     let container = h.create_issue_with_desc(
         "Container",
         "## Success Criteria\n\n- [hard] REQ-01: covered\n",

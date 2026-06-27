@@ -25,6 +25,55 @@ impl TestHarness {
         Self { executor, storage }
     }
 
+    /// Declare the canonical `[item_kinds]` table (the set `jit init` authors) in
+    /// this harness's repo, so item indexing and link resolution recognize the
+    /// shipped kinds. The engine bakes in no kinds, so tests that exercise
+    /// addressable items must opt in. Call before creating issues.
+    #[allow(dead_code)]
+    pub fn with_item_kinds(self) -> Self {
+        const CANONICAL_ITEM_KINDS: &str = "\
+[item_kinds.requirement]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = [\"[hard]\"]
+link-namespaces = [\"satisfies\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.decision]
+section = \"decisions\"
+id-pattern = \"D-[0-9]+\"
+markers = []
+link-namespaces = [\"per\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.risk]
+section = \"risks\"
+id-pattern = \"RISK-[0-9]+\"
+markers = []
+link-namespaces = [\"mitigates\", \"resolves\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+";
+        std::fs::create_dir_all(self.storage.root()).unwrap();
+        std::fs::write(
+            self.storage.root().join("config.toml"),
+            CANONICAL_ITEM_KINDS,
+        )
+        .unwrap();
+        self
+    }
+
     // === Fluent API for common operations ===
 
     /// Create an issue with minimal parameters

@@ -1,15 +1,14 @@
-//! Integration tests for the SHIPPED, built-in markdown-first `decision` item
-//! kind (issue `b629686b`).
+//! Integration tests for the markdown-first `decision` item kind (issue
+//! `b629686b`).
 //!
-//! JIT ships `decision` as a built-in default item kind (alongside
-//! `requirement`), so a default-initialized repo — with NO custom `[item_kinds]`
-//! config — indexes decisions authored as list entries under a `## Decisions`
-//! section of an issue description. Decisions become addressable, queryable items
-//! through the SAME generic triple-driven parse path `requirement` uses; no engine
-//! code special-cases the kind (its tuple lives in the domain layer's
-//! `builtin_default_kinds`).
+//! `jit init` scaffolds a `[item_kinds]` table that declares `decision` alongside
+//! `requirement`, so a freshly initialized repo indexes decisions authored as list
+//! entries under a `## Decisions` section of an issue description. Decisions become
+//! addressable, queryable items through the SAME generic triple-driven parse path
+//! `requirement` uses; no engine code special-cases the kind (the engine bakes in
+//! no kinds — the tuple is authored entirely in the emitted config table).
 //!
-//! The built-in `decision` tuple is:
+//! The `decision` tuple `jit init` emits is:
 //!
 //! ```text
 //! section          = "decisions"          # authored under a `## Decisions` heading
@@ -143,13 +142,14 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
         .contains("json storage"));
 }
 
-/// Build a [`JsonFileStorage`]-backed executor over a DEFAULT `.jit` repo (no
-/// custom `[item_kinds]` config), seed `issues`, and return it paired with the
-/// seeded issues' short ids in insertion order.
+/// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
+/// `config.toml` declares the `decision` kind (the engine bakes in no kinds), seed
+/// `issues`, and return it paired with the seeded issues' short ids in insertion
+/// order.
 ///
-/// With no config, the executor resolves the BUILT-IN default kind set, which
-/// ships `decision` (and therefore the `per` link namespace) — so this proves the
-/// shipped behavior, not a test-only override.
+/// The declared `decision` kind brings the `per` link namespace; this declaration
+/// mirrors the one `jit init` emits, so the test exercises the shipped kind shape,
+/// not an arbitrary override.
 fn default_executor_with(
     repo: &Path,
     issues: Vec<(&str, &str)>,
@@ -158,6 +158,17 @@ fn default_executor_with(
     std::fs::create_dir_all(&jit_dir).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
+    std::fs::write(
+        jit_dir.join("config.toml"),
+        "[item_kinds.decision]\n\
+         section = \"decisions\"\n\
+         id-pattern = \"D-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"per\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n",
+    )
+    .unwrap();
     let mut shorts = Vec::new();
     for (title, body) in issues {
         let issue = Issue::new(title.to_string(), body.to_string());

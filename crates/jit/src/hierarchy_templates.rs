@@ -160,6 +160,58 @@ unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate"]
 
 # =============================================================================
+# ITEM KINDS
+# =============================================================================
+# Addressable structured items projected from issue descriptions (or, for a
+# project-scope kind, a source file). Each `[item_kinds.<name>]` declares HOW a
+# kind's entries are found and addressed; the engine interprets no kind NAME, only
+# these fields, so you may rename, edit, remove, or add kinds freely. With NO
+# `[item_kinds]` table at all, no kinds are indexed.
+#
+# Required fields per kind:
+#   section          — heading slug whose list items are scanned
+#   id-pattern       — regex extracting each item's self-id from its text
+#   markers          — prefixes an item must start with ([] = every item qualifies)
+#   link-namespaces  — label namespaces that reference items of this kind
+#   scope            — "issue" (items live in issue descriptions) | "project"
+#   source-of-truth  — "markdown-first" | "registry-first"
+# A project-scope kind also needs `source`: a markdown file path, or a toml
+# descriptor {{ toml, table, id-field, text-field }} for a registry-first kind.
+
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.decision]
+section = "decisions"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.risk]
+section = "risks"
+id-pattern = "RISK-[0-9]+"
+markers = []
+link-namespaces = ["mitigates", "resolves"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = {{ toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }}
+source-of-truth = "registry-first"
+
+# =============================================================================
 # ADVANCED (uncomment to enable)
 # =============================================================================
 
@@ -377,9 +429,13 @@ mod tests {
         assert!(toml.contains("default_type = \"task\""));
         assert!(!toml.contains("reject_malformed_labels"));
         assert!(!toml.contains("enforce_namespace_registry"));
-        // No per-namespace constraint fields anywhere.
+        // No per-namespace constraint fields anywhere. (`id-pattern` is an
+        // item-kind field, not a namespace `pattern =` constraint, so match a
+        // line that STARTS with the constraint key.)
         assert!(!toml.contains("values ="));
-        assert!(!toml.contains("pattern ="));
+        assert!(!toml
+            .lines()
+            .any(|l| l.trim_start().starts_with("pattern =")));
         assert!(!toml.contains("required ="));
     }
 
@@ -406,5 +462,69 @@ mod tests {
             "Issue type (hierarchical). Exactly one per issue."
         );
         assert!(type_ns.unique);
+    }
+
+    #[test]
+    fn test_generated_config_emits_item_kinds_table_golden() {
+        // REQ-04: `jit init` emits an editable `[item_kinds]` table carrying the
+        // complete kind set. Golden: pin the exact emitted block so an accidental
+        // field change (which would silently alter indexing) is caught.
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        let expected_block = "\
+[item_kinds.requirement]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = [\"[hard]\"]
+link-namespaces = [\"satisfies\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.decision]
+section = \"decisions\"
+id-pattern = \"D-[0-9]+\"
+markers = []
+link-namespaces = [\"per\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.risk]
+section = \"risks\"
+id-pattern = \"RISK-[0-9]+\"
+markers = []
+link-namespaces = [\"mitigates\", \"resolves\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+";
+        assert!(
+            toml.contains(expected_block),
+            "emitted config must contain the golden [item_kinds] block; got:\n{toml}"
+        );
+    }
+
+    #[test]
+    fn test_generated_config_item_kinds_resolve_with_no_built_ins() {
+        // REQ-04: a repo whose ONLY config is the emitted one indexes kinds purely
+        // from the table (the engine bakes in no defaults). Resolving the emitted
+        // table yields the four kinds in name order; resolving NO table yields none.
+        use crate::domain::item::resolve_item_kinds;
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        let cfg: crate::config::JitConfig =
+            ::toml::from_str(&toml).expect("generated template must parse");
+        let kinds = resolve_item_kinds(cfg.item_kinds.as_ref())
+            .expect("emitted [item_kinds] table resolves");
+        let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
+        assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
+        // With no table at all there are no kinds — proving the table, not a baked
+        // default, is what makes these kinds index.
+        assert!(resolve_item_kinds(None).unwrap().is_empty());
     }
 }

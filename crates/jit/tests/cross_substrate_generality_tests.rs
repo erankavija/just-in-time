@@ -1,10 +1,11 @@
-//! Acceptance test for cross-substrate generality across all four built-in item
-//! kinds (JIT issue 72cdf315, REQ-04).
+//! Acceptance test for cross-substrate generality across all four item kinds that
+//! `jit init` scaffolds (JIT issue 72cdf315, REQ-04).
 //!
 //! ## What this file proves
 //!
-//! All four item kinds ship as built-in defaults and route through ONE generic
-//! engine (`list_items` / `search_items` / `show_item` in `commands/item.rs`):
+//! All four item kinds are declared by the `[item_kinds]` table `jit init` emits
+//! (the engine bakes in none) and route through ONE generic engine (`list_items` /
+//! `search_items` / `show_item` in `commands/item.rs`):
 //!
 //! - **issue-scope, markdown-first** — `requirement` (`## Success Criteria`,
 //!   `REQ-NN`), `decision` (`## Decisions`, `D-NN`), and `risk` (`## Risks`,
@@ -36,8 +37,9 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-/// Bootstrap a default-initialized repo (no custom `[item_kinds]` config) and
-/// return the temp dir so the caller owns the lifetime.
+/// Bootstrap a default-initialized repo (whose `jit init`-emitted `[item_kinds]`
+/// table declares all four kinds) and return the temp dir so the caller owns the
+/// lifetime.
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let output = Command::new(jit_binary())

@@ -2075,12 +2075,52 @@ statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 ";
 
+    /// The complete `[item_kinds]` table `jit init` authors. The engine bakes in no
+    /// kinds, so the dangling-link pass (which owns a label's namespace only when a
+    /// declared kind claims it) needs the table to recognize the test labels.
+    const CANONICAL_ITEM_KINDS: &str = "\
+[item_kinds.requirement]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = [\"[hard]\"]
+link-namespaces = [\"satisfies\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.decision]
+section = \"decisions\"
+id-pattern = \"D-[0-9]+\"
+markers = []
+link-namespaces = [\"per\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.risk]
+section = \"risks\"
+id-pattern = \"RISK-[0-9]+\"
+markers = []
+link-namespaces = [\"mitigates\", \"resolves\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+";
+
     /// Build an executor over an in-memory `.jit` carrying a `.jit/invariants.toml`
-    /// (so the registry-first `invariant` kind resolves `enforces:@/<id>`), seeded
-    /// with `issues`. Default item kinds are active (no `[item_kinds]` table).
+    /// (so the registry-first `invariant` kind resolves `enforces:@/<id>`) and the
+    /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         // The registry-first `invariant` kind reads its toml through the storage
         // boundary at the descriptor path, so seed the in-memory repo-file map (not
         // the real fs) at `.jit/invariants.toml`.
@@ -2091,7 +2131,7 @@ kind = \"enforced\"
         CommandExecutor::new(storage)
     }
 
-    /// Like [`dangling_exec`] but writes a `config.toml` registering the link
+    /// Like [`dangling_exec`] but its `config.toml` ALSO registers the link
     /// namespaces used by these tests (`satisfies`/`enforces`) so the default
     /// `namespace-registry` local rule does not fire on the synthetic labels —
     /// isolating the dangling-item-link pass as the validation failure.
@@ -2104,9 +2144,12 @@ kind = \"enforced\"
         storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
         std::fs::write(
             storage.root().join("config.toml"),
-            "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
-             [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
-             [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n",
+            format!(
+                "[namespaces.type]\ndescription = \"issue type\"\nunique = true\n\
+                 [namespaces.satisfies]\ndescription = \"satisfied item\"\nunique = false\n\
+                 [namespaces.enforces]\ndescription = \"enforced invariant\"\nunique = false\n\
+                 {CANONICAL_ITEM_KINDS}"
+            ),
         )
         .unwrap();
         for issue in issues {

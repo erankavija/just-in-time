@@ -94,6 +94,57 @@ description = "Coverage credit: on an impl child, names a container [hard] crite
 unique = false
 examples = ["satisfies:REQ-01"]
 
+# =============================================================================
+# ITEM KINDS
+# =============================================================================
+# Addressable structured items. The engine bakes in NO kinds; this table is the
+# sole source. `jit init` scaffolds the first four (requirement/decision/risk/
+# invariant); this repo also dogfoods a `definition` kind over the glossary.
+
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.decision]
+section = "decisions"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.risk]
+section = "risks"
+id-pattern = "RISK-[0-9]+"
+markers = []
+link-namespaces = ["mitigates", "resolves"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+
+# Dogfood: glossary terms (under `## Core Concepts`) as addressable definitions,
+# sourced from the reference glossary markdown. `jit item list --kind definition`.
+[item_kinds.definition]
+section = "core_concepts"
+id-pattern = "[A-Z][a-z]+"
+markers = []
+link-namespaces = ["defines"]
+scope = "project"
+source = "docs/reference/glossary.md"
+source-of-truth = "markdown-first"
+
 [invariant_projection]
 # Region mode: replace only the delimited region inside CLAUDE.md (REQ-06).
 # The markers <!-- jit:invariants:begin --> and <!-- jit:invariants:end --> wrap

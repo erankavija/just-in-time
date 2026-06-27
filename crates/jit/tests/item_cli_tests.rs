@@ -499,9 +499,14 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     // source like any other markdown-first project kind.
     let temp = setup_test_repo();
     let config_path = temp.path().join(".jit").join("config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
-    config.push_str(
-        "\n[item_kinds.invariant]\n\
+    // REPLACE the init-emitted (registry-first) `invariant` kind with a
+    // markdown-first one: the `invariant` name carries no reserved routing, so a
+    // markdown-first project `invariant` kind (once rejected) now resolves as
+    // ordinary config and indexes from its declared markdown source.
+    std::fs::write(
+        &config_path,
+        "[version]\nschema = 2\n\n\
+         [item_kinds.invariant]\n\
          section = \"success_criteria\"\n\
          id-pattern = \"INV-[0-9]+\"\n\
          markers = []\n\
@@ -509,8 +514,8 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
          scope = \"project\"\n\
          source = \"project-items.md\"\n\
          source-of-truth = \"markdown-first\"\n",
-    );
-    std::fs::write(&config_path, config).unwrap();
+    )
+    .unwrap();
     std::fs::write(
         temp.path().join("project-items.md"),
         "## Success Criteria\n\n- INV-01: a markdown-sourced invariant item\n",

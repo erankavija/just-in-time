@@ -39,9 +39,10 @@ pub struct ItemShowResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Resolve the effective item kinds from the cached `[item_kinds]` registry,
-    /// falling back to the built-in default kinds (`requirement`, `decision`, ...)
-    /// when none is declared.
+    /// Resolve the effective item kinds from the cached `[item_kinds]` registry.
+    ///
+    /// The engine bakes in no kinds: with no `[item_kinds]` table the result is
+    /// empty (see [`resolve_item_kinds`]). `jit init` scaffolds the table.
     pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
         let config = self.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
@@ -178,9 +179,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   `.toml`: its file is read through the storage boundary and each entry
     ///   projected through the descriptor's field mapping by
     ///   [`load_toml_scope_items`] (REQ-02). An absent file contributes no items
-    ///   (graceful); a present-but-malformed file is a typed error. The built-in
-    ///   `invariant` kind is just such a descriptor-backed kind — it routes through
-    ///   this same generic path with no reserved-name branch (REQ-03). A
+    ///   (graceful); a present-but-malformed file is a typed error. Any
+    ///   descriptor-backed kind routes through this same generic path with no
+    ///   reserved-name branch (REQ-03). A
     ///   registry-first project kind that declares no descriptor is rejected at kind
     ///   resolution ([`ItemError::MissingProjectSource`]), so `toml_source` is
     ///   `Some` here.
@@ -416,9 +417,50 @@ mod tests {
     use super::*;
     use crate::storage::InMemoryStorage;
 
+    /// The complete `[item_kinds]` table `jit init` authors. The engine bakes in no
+    /// kinds, so helpers that exercise the canonical set write this to config (the
+    /// established `InMemoryStorage` pattern: a real `config.toml` at the synthetic
+    /// root, the only on-disk file config loading requires).
+    const CANONICAL_ITEM_KINDS: &str = "\
+[item_kinds.requirement]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = [\"[hard]\"]
+link-namespaces = [\"satisfies\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.decision]
+section = \"decisions\"
+id-pattern = \"D-[0-9]+\"
+markers = []
+link-namespaces = [\"per\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.risk]
+section = \"risks\"
+id-pattern = \"RISK-[0-9]+\"
+markers = []
+link-namespaces = [\"mitigates\", \"resolves\"]
+scope = \"issue\"
+source-of-truth = \"markdown-first\"
+
+[item_kinds.invariant]
+section = \"success_criteria\"
+id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
+source-of-truth = \"registry-first\"
+";
+
     fn executor_with(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         for issue in issues {
             storage.save_issue(issue).unwrap();
         }
@@ -672,7 +714,7 @@ mod tests {
     /// descriptor's toml file is served through the in-memory repo-file map (the
     /// storage boundary, NO real filesystem read); `policies_toml` (when `Some`)
     /// seeds it. Uses `policy` to exercise the GENERIC toml-descriptor path, the
-    /// same path the built-in `invariant` kind now routes through.
+    /// same path a descriptor-backed `invariant` kind routes through.
     fn policy_exec(policies_toml: Option<&str>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
@@ -753,9 +795,8 @@ statement = \"Every dependency edge stays acyclic.\"
     }
 
     /// Build an executor whose synthetic repo carries `.jit/invariants.toml` with
-    /// `invariants_toml` and NO `config.toml`, exercising the default-repo,
-    /// registry-first invariant path (the built-in `invariant` kind is active
-    /// because no `[item_kinds]` table replaces the defaults).
+    /// `invariants_toml` and the canonical `[item_kinds]` table (the set `jit init`
+    /// authors), exercising the registry-first invariant path.
     ///
     /// The registry is served through the storage boundary (the in-memory repo-file
     /// map) at the `.jit/invariants.toml` path the invariant kind's toml descriptor
@@ -766,6 +807,8 @@ statement = \"Every dependency edge stays acyclic.\"
     ) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         storage.add_repo_file(".jit/invariants.toml", invariants_toml);
         for issue in issues {
             storage.save_issue(issue).unwrap();
@@ -788,9 +831,9 @@ kind = \"advisory\"
 
     #[test]
     fn test_list_items_kind_invariant_returns_registry_entry() {
-        // REQ-01: in a default repo with a `.jit/invariants.toml` (no config.toml),
-        // `jit item list --kind invariant` returns each loaded invariant addressed
-        // as `@/<self-id>`.
+        // REQ-01: in a repo with the canonical `[item_kinds]` table and a
+        // `.jit/invariants.toml`, `jit item list --kind invariant` returns each
+        // loaded invariant addressed as `@/<self-id>`.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let result = exec.list_items(Some("invariant")).unwrap();
         assert_eq!(result.count, 2);
@@ -1033,8 +1076,8 @@ kind = \"advisory\"
         // REQ-01/REQ-02: for EACH shipped namespace a `<ns>:<scope>/<self-id>`
         // label resolves to the addressed item of the corresponding kind, across
         // all four kinds — requirement/decision/risk (issue-scope, markdown-first)
-        // and invariant (project-scope, registry-first). The default kinds are
-        // active (no `[item_kinds]` table), and a `.jit/invariants.toml` is loaded.
+        // and invariant (project-scope, registry-first). The canonical `[item_kinds]`
+        // table is declared, and a `.jit/invariants.toml` is loaded.
         let issue = Issue::new(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n\n\

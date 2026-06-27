@@ -4,17 +4,12 @@
 
 ## Core Concepts
 
-**Issue**: A unit of work tracked by JIT
-
-**Dependency**: A relationship where one issue blocks another
-
-**Gate**: A quality checkpoint that must pass before completion
-
-**State**: Current lifecycle stage of an issue
-
-**Label**: A namespace:value tag for categorization
-
-**Assignee**: Who is responsible for an issue
+- **Issue**: A unit of work tracked by JIT
+- **Dependency**: A relationship where one issue blocks another
+- **Gate**: A quality checkpoint that must pass before completion
+- **State**: Current lifecycle stage of an issue
+- **Label**: A namespace:value tag for categorization
+- **Assignee**: Who is responsible for an issue
 
 ## Issue States
 

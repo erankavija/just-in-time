@@ -2,13 +2,13 @@
 //!
 //! This is a STORY-LEVEL test file whose distinct contribution is exercising
 //! decision and risk kinds TOGETHER — both present in ONE issue description,
-//! sharing ONE generic code path — in a DEFAULT-initialized repo (no custom
-//! `[item_kinds]` config). The unit-kind files (`decision_kind_tests.rs`,
-//! `risk_kind_tests.rs`) test each kind in isolation; this file proves they
-//! coexist correctly and that the shared projection mechanism handles them both
-//! without interference.
+//! sharing ONE generic code path — in a repo whose `[item_kinds]` table declares
+//! both (the `jit init`-emitted shape). The unit-kind files
+//! (`decision_kind_tests.rs`, `risk_kind_tests.rs`) test each kind in isolation;
+//! this file proves they coexist correctly and that the shared projection
+//! mechanism handles them both without interference.
 //!
-//! ## Built-in kind tuples exercised
+//! ## Kind tuples exercised (as `jit init` emits them)
 //!
 //! ```text
 //! decision:
@@ -27,7 +27,8 @@
 //!
 //! ## Coverage of the story's `[hard]` success criteria
 //!
-//! All tests run against a DEFAULT repo (no custom config).
+//! All tests run against a repo whose `[item_kinds]` table declares decision and
+//! risk (the `jit init`-emitted shape).
 //!
 //! - REQ-01: [`test_story_item_list_decision_and_risk_coexist`] — `jit item list
 //!   --kind decision` returns only decisions; `jit item list --kind risk` returns
@@ -95,13 +96,14 @@ const STORY_BODY: &str = "\
 - RISK-01: parsing ambiguity between decision and risk ids\n\
 ";
 
-/// Build a [`JsonFileStorage`]-backed executor over a DEFAULT `.jit` repo (no
-/// custom `[item_kinds]` config), seed `issues`, and return it paired with the
-/// seeded issues' short ids in insertion order.
+/// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
+/// `config.toml` declares the `decision` and `risk` kinds (the engine bakes in no
+/// kinds), seed `issues`, and return it paired with the seeded issues' short ids
+/// in insertion order.
 ///
-/// With no config, the executor resolves the BUILT-IN default kind set which ships
-/// `decision` (namespace `per`) and `risk` (namespaces `mitigates`, `resolves`) —
-/// so this exercises shipped behavior, not a test-only override.
+/// The declared `decision` (namespace `per`) and `risk` (namespaces `mitigates`,
+/// `resolves`) kinds mirror the ones `jit init` emits, so this exercises the
+/// shipped kind shapes, not arbitrary overrides.
 fn default_executor_with(
     repo: &Path,
     issues: Vec<(&str, &str)>,
@@ -110,6 +112,24 @@ fn default_executor_with(
     std::fs::create_dir_all(&jit_dir).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     storage.init().unwrap();
+    std::fs::write(
+        jit_dir.join("config.toml"),
+        "[item_kinds.decision]\n\
+         section = \"decisions\"\n\
+         id-pattern = \"D-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"per\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n\n\
+         [item_kinds.risk]\n\
+         section = \"risks\"\n\
+         id-pattern = \"RISK-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"mitigates\", \"resolves\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n",
+    )
+    .unwrap();
     let mut shorts = Vec::new();
     for (title, body) in issues {
         let issue = Issue::new(title.to_string(), body.to_string());

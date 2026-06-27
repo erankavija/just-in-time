@@ -1812,7 +1812,18 @@ source-of-truth = "markdown-first"
         // The two qualified ids are distinct by scope even though the self-id is
         // shared, so neither shadows the other in any index.
         let parser = crate::document::MarkdownContentParser;
-        let kinds = vec![crate::domain::item::ItemKind::requirement_default().unwrap()];
+        // The canonical `requirement` kind, built from config (no baked defaults).
+        let kinds = vec![crate::domain::item::ItemKind::from_config(
+            "requirement",
+            &crate::config::ItemKindConfig {
+                section: Some("success_criteria".to_string()),
+                id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
+                markers: Some(vec!["[hard]".to_string()]),
+                link_namespaces: Some(vec!["satisfies".to_string()]),
+                ..Default::default()
+            },
+        )
+        .unwrap()];
         let container_items =
             crate::domain::item::index_items(&container, &kinds, &parser).unwrap();
         let task_items = crate::domain::item::index_items(&impl_node, &kinds, &parser).unwrap();
