@@ -75,7 +75,7 @@
           "title": "Add a prose (id-anchor) render style for the CLAUDE.md invariant projection",
           "classification": "implementation",
           "satisfies": "REQ-08 (owner-added enhancement)",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
