@@ -1,0 +1,26 @@
+{
+  "id": "07657508-b020-4aeb-9f3a-1a836314b229",
+  "title": "Retire the obsolete issue breakdown command",
+  "description": "Remove the obsolete jit issue breakdown CLI command. It is unused, redundant with existing commands, and produces the wrong structure for bracketed containers, so retiring it tightens the command surface.\n\n## Background\n\nThe jit issue breakdown command does flat parent-centric breakdown (parent depends on all children) with no template or bracket awareness, so on a breakable container it produces the wrong structure instead of the source/sink spine. It also copies every parent label, including the type label, mislabeling children with the parent's type. It has no real callers: the breakdown workflow uses the bracket engine (bracket_breakdown in commands/breakdown.rs) plus issue create and dep add, and bulk creation is covered by issue batch-create. The command therefore carries maintenance weight (CLI variant, dispatch, implementation, tests, and two stale analysis docs) while being redundant and a footgun.\n\n## Success Criteria\n\n- [hard] REQ-06: The issue breakdown command, its dispatch, its implementation (breakdown_issue and breakdown_issue_impl and breakdown_issue_with_inherit), and its tests are removed; the MCP-generated tool surface no longer exposes it; and a tree-wide search finds no remaining reference to an issue-breakdown command, while the bracket engine path (bracket_breakdown) the breakdown workflow relies on is unaffected.\n\n## Notes\n\nRemove the IssueCommands::Breakdown variant (cli.rs), its dispatch arm (main.rs around the IssueCommands::Breakdown match), and the breakdown_issue / breakdown_issue_with_inherit / breakdown_issue_impl functions (commands/breakdown.rs), keeping bracket_breakdown and bracket_breakdown_with_template. Drop the command's tests (including breakdown_description_preserves_commas_verbatim). Archive the stale planning artifacts dev/active/breakdown-analysis.md and dev/active/breakdown-improvement-plan.md (linked to issue 32f804f1). Sweep docs and the MCP surface for references.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "e3259063-2ac4-40a6-86a7-40dbc9716b2f"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-06"
+  ],
+  "created_at": "2026-06-27T22:36:35.778861518Z",
+  "updated_at": "2026-06-27T22:36:35.845603977Z"
+}

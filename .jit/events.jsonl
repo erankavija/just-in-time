@@ -4136,3 +4136,7 @@
 {"type":"issue_updated","id":"50d6b047-f573-4163-8816-7605dcdcb80d","issue_id":"252c947b-0a59-4c51-b63e-bd0ea6d60750","timestamp":"2026-06-27T22:18:50.408097423Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"973068ce-780b-4dc7-a1cb-9476dff34b8e","issue_id":"c4b56370-2ec0-42d6-8d56-70c4da60abc2","timestamp":"2026-06-27T22:18:50.436802691Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"c66f3076-f2b8-4304-a8c2-22d798d8cbdb","issue_id":"4b063bdf-9b24-432e-b3b8-08db52849b2b","timestamp":"2026-06-27T22:18:50.465347139Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_created","id":"39793529-7f37-4c2b-9383-3a870365eb24","issue_id":"07657508-b020-4aeb-9f3a-1a836314b229","timestamp":"2026-06-27T22:36:35.793058702Z","title":"Retire the obsolete issue breakdown command","priority":"normal"}
+{"type":"issue_state_changed","id":"d4c97230-d2f1-4f8e-b1a7-e41b792aefb5","issue_id":"07657508-b020-4aeb-9f3a-1a836314b229","timestamp":"2026-06-27T22:36:35.846050467Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"e1b33cb6-07ce-4ef3-9f77-ee37c77fdbb7","issue_id":"07657508-b020-4aeb-9f3a-1a836314b229","timestamp":"2026-06-27T22:36:35.846097037Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"02874714-555f-4287-b25f-03722ca085fc","issue_id":"2e926e39-906e-4952-8ae0-38215a7e5aac","timestamp":"2026-06-27T22:36:35.892292830Z","updated_by":"dependency-add","fields":["dependencies"]}

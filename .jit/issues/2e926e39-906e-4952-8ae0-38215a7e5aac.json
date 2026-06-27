@@ -6,15 +6,15 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "552ff75c-2c83-4d80-9e89-ea3c4ac4f3fc",
-    "b920ea57-1f80-45b9-9f9d-b4372daceb07",
-    "6c740a19-ad91-42d2-baa9-62d6d309cb9e",
-    "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
-    "e3259063-2ac4-40a6-86a7-40dbc9716b2f",
-    "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
-    "4b063bdf-9b24-432e-b3b8-08db52849b2b",
     "22826a75-ca56-4a96-b33d-b43a01112df2",
-    "f5054f15-e5b4-4be7-9816-6421c64d12fb"
+    "6c740a19-ad91-42d2-baa9-62d6d309cb9e",
+    "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
+    "f5054f15-e5b4-4be7-9816-6421c64d12fb",
+    "07657508-b020-4aeb-9f3a-1a836314b229",
+    "4b063bdf-9b24-432e-b3b8-08db52849b2b",
+    "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
+    "552ff75c-2c83-4d80-9e89-ea3c4ac4f3fc",
+    "b920ea57-1f80-45b9-9f9d-b4372daceb07"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -26,5 +26,5 @@
     "epic:agent-seamlessness"
   ],
   "created_at": "2026-06-27T20:49:27.406814196Z",
-  "updated_at": "2026-06-27T21:43:35.973069978Z"
+  "updated_at": "2026-06-27T22:36:35.891663640Z"
 }
