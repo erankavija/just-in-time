@@ -161,6 +161,22 @@ Full lifecycle from claim through completion.
    ```
    Use the user-specified assignee if provided instead of `agent:claude`.
 
+   **Assignment vs. advisory lease.** `jit issue claim` creates an *assignment*: it sets
+   the `assignee` field on the issue and transitions its state to `in_progress`. It does
+   not create a lease. `jit claim acquire` creates an *advisory lease* — a time-bounded
+   record in `.git/jit/claims.index.json` that prevents two agents from double-claiming
+   the same issue in multi-agent / worktree mode; it also sets the assignee as a side
+   effect. A single-agent session needs only the assignment.
+
+   **Dependency-blocked containers.** A container issue (epic, story) in `backlog` state
+   because its dependencies are unfinished cannot transition to `in_progress`. To record
+   ownership without a state change — and without creating a lease — use `--assign-only`:
+   ```bash
+   jit issue claim <id> agent:claude --assign-only
+   ```
+   Do not use `jit claim acquire` for blocked containers: no active work is happening, so
+   a time-bounded lease serves no coordination purpose and consumes the per-agent limit.
+
 4. Commit JIT state:
    ```bash
    git add .jit && git commit -m "chore: claim issue <short-id> (<title>)"

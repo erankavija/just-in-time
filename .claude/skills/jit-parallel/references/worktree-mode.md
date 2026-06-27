@@ -25,7 +25,10 @@ Set JIT_AGENT_ID=agent:claude-wt-1 for all jit commands.
 Commit your changes at the end: git -C /path/to/wt add -A && git -C /path/to/wt commit -m "..."
 ```
 
-Claims are shared via `.git/jit/` — agents cannot double-claim the same issue.
+Claims are shared via `.git/jit/` — agents cannot double-claim the same issue. The
+`active_claims` column in `jit worktree list` counts active *leases* (from `jit claim
+acquire`), not *assignments* (from `jit issue claim`). Assignments live in
+`.jit/issues/` and do not affect this count.
 
 ## Merge
 
