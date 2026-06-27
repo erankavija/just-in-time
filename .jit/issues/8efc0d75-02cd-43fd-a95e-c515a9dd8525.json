@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-06-27T20:49:54.398391189Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T21:28:24.809791382Z"
     }
   },
   "context": {},
@@ -32,5 +32,5 @@
     "type:planning"
   ],
   "created_at": "2026-06-27T20:49:54.394862468Z",
-  "updated_at": "2026-06-27T21:27:54.854045072Z"
+  "updated_at": "2026-06-27T21:30:32.116937375Z"
 }
