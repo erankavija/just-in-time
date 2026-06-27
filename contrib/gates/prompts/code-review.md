@@ -34,6 +34,8 @@ If `run_history` is non-empty, previous reviews have been performed. Check wheth
 
 Provide your review as a structured analysis with sections for each criterion above. Be specific — reference concrete code patterns, not vague generalities.
 
+Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
+
 End your response with exactly one of these lines:
 VERDICT: PASS
 VERDICT: FAIL

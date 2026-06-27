@@ -79,6 +79,8 @@ ${PROMPT}
 ${CONTEXT_JSON}
 \`\`\`
 
+Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
+
 You MUST end your response with exactly one of these lines:
 VERDICT: PASS
 VERDICT: FAIL
