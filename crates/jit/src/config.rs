@@ -228,13 +228,13 @@ pub struct NamespaceConfig {
 /// all six: [`JitConfig::load`] validates this via
 /// [`ItemKindConfig::missing_required_fields`] and rejects a partial declaration
 /// with a descriptive [`ItemKindConfigError::MissingFields`]. The `Option`s
-/// survive only so the IMPLICIT built-in default kinds (`requirement`,
-/// `decision`, ...; used when no `[item_kinds]` table is declared at all) and
-/// direct struct construction in tests can still rely on per-field defaults
-/// applied by
-/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config). The
-/// `source` PATH (project-scope source file) is NOT one of the six and stays
-/// optional.
+/// survive only so partial-declaration validation can report which fields are
+/// missing, and so direct struct construction in tests can rely on per-field
+/// defaults applied by
+/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config) — NOT for
+/// any implicit kinds (the engine bakes in none; with no `[item_kinds]` table the
+/// kind set is empty). The `source` PATH (project-scope source file) is NOT one of
+/// the six and stays optional.
 ///
 /// # Examples
 ///
@@ -959,10 +959,9 @@ pub enum ProjectionMode {
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
 ///
 /// Raised by [`JitConfig::validate_item_kinds`] (and thus [`JitConfig::load`])
-/// when a declared kind omits one or more of its six required fields. The
-/// implicit built-in default kinds (`requirement`, `decision`, ...; no
-/// `[item_kinds]` table at all) are never validated, so graceful degradation is
-/// preserved.
+/// when a declared kind omits one or more of its six required fields. A repo with
+/// no `[item_kinds]` table declares no kinds (the engine bakes in none), so there
+/// is nothing to validate in that case.
 ///
 /// # Examples
 ///
@@ -1435,8 +1434,8 @@ impl JitConfig {
 
         // Every EXPLICITLY-declared `[item_kinds.X]` table must set all six
         // required fields; reject a partial declaration with a descriptive error
-        // rather than silently filling defaults (the implicit built-in default,
-        // which has no table, is never reached here).
+        // rather than silently filling defaults. A repo with no `[item_kinds]`
+        // table declares no kinds, so there is nothing to validate in that case.
         config
             .validate_item_kinds()
             .context("invalid [item_kinds] in .jit/config.toml")?;
@@ -1455,18 +1454,17 @@ impl JitConfig {
     /// `source-of-truth`) on each.
     ///
     /// Called by [`JitConfig::load`]. A `None` registry (no `[item_kinds]` table
-    /// at all) is the IMPLICIT built-in path and validates trivially, so graceful
-    /// degradation via the built-in default kinds (`requirement`, `decision`, ...)
-    /// is preserved. Kinds are checked in
-    /// name order so the first error is deterministic. The optional `source` PATH
-    /// is not one of the six and is not required.
+    /// at all) declares no kinds (the engine bakes in none) and so validates
+    /// trivially. Kinds are checked in name order so the first error is
+    /// deterministic. The optional `source` PATH is not one of the six and is not
+    /// required.
     ///
     /// # Examples
     ///
     /// ```
     /// use jit::config::JitConfig;
     ///
-    /// // No `[item_kinds]` table -> nothing to validate (implicit default).
+    /// // No `[item_kinds]` table -> no kinds declared, nothing to validate.
     /// let empty: JitConfig = toml::from_str("").unwrap();
     /// assert!(empty.validate_item_kinds().is_ok());
     ///
@@ -2386,7 +2384,7 @@ source-of-truth = "registry-first"
     #[test]
     fn test_item_kinds_source_of_truth_defaults_when_unset() {
         // `source_of_truth()` resolves to markdown-first when the field is unset
-        // (used by the implicit default and direct struct construction).
+        // (relied on by direct struct construction).
         assert_eq!(
             ItemKindConfig::default().source_of_truth(),
             SourceOfTruth::MarkdownFirst
@@ -2416,8 +2414,8 @@ source-of-truth = "both"
     #[test]
     fn test_item_kinds_absent_is_none() {
         // A config with no `[item_kinds]` table leaves the registry None; the
-        // domain layer supplies the built-in default kinds (`requirement`,
-        // `decision`, ...) in that case.
+        // domain layer then resolves an EMPTY kind set (the engine bakes in no
+        // kinds) in that case.
         let config_toml = r#"
 [type_hierarchy]
 types = { task = 1 }
