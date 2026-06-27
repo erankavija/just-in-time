@@ -5,8 +5,8 @@
 //! fresh apply it:
 //!
 //! 1. validates every precondition BEFORE the first mutation (anchors resolve,
-//!    container type ∈ `applies_to`, gate presets exist, node writes would pass
-//!    validation, not already-applied unless `--force`);
+//!    container type ∈ `applies_to`, node AND anchor gate presets exist, node
+//!    writes would pass validation, not already-applied unless `--force`);
 //! 2. snapshots each bound anchor's current dependencies;
 //! 3. creates the template's nodes with interpolated descriptions and
 //!    their declared gate presets; then
@@ -15,7 +15,9 @@
 //!    the `move-upstream-to-role` transform that moves the container's pre-apply
 //!    snapshot deps onto the named role's node — all via
 //!    [`add_dependency`](CommandExecutor::add_dependency), so the result is
-//!    acyclic and transitively reduced.
+//!    acyclic and transitively reduced; then
+//! 5. attaches each anchor's declared gate presets to its bound anchor issue,
+//!    through the same shared preset path node gates use.
 //!
 //! This is the plan-before-fan-out scaffold: the create+gate+wire sequence
 //! that produces the `C → B → P` bracket from a template. The planning node's
@@ -141,12 +143,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **Validate before mutating** — the single complete gate. The container
     ///    type is in the template's `applies_to`; every declared anchor is bound
-    ///    and resolves to an existing issue; every node's gate presets exist and
-    ///    its projected write would pass validation; every transform's `kind` is
-    ///    supported; the container is not already-applied unless `force`. Any
-    ///    failure aborts BEFORE the first `create_issue`, so a validation failure
-    ///    creates zero nodes. After this gate the mutation phase can only fail on
-    ///    I/O.
+    ///    and resolves to an existing issue; every node's AND anchor's gate presets
+    ///    exist and each node's projected write would pass validation; every
+    ///    transform's `kind` is supported; the container is not already-applied
+    ///    unless `force`. Any failure aborts BEFORE the first `create_issue`, so a
+    ///    validation failure creates zero nodes. After this gate the mutation phase
+    ///    can only fail on I/O.
     /// 2. **Snapshot** each bound anchor's `dependencies` (the
     ///    `move-upstream-to-role` transform reads this pre-apply set).
     /// 3. **Instantiate** each template node in order (or refresh in place under
@@ -160,6 +162,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    [`add_dependency`](Self::add_dependency) (cycle-checked + transitively
     ///    reduced), then each transform (`move-upstream-to-role`) over the step-2
     ///    snapshot. The `--force` refresh path skips this: the edges already exist.
+    /// 5. **Attach anchor gates** (fresh apply only): each anchor's declared gate
+    ///    presets are attached to its bound anchor issue via the same shared
+    ///    `apply_gate_preset` path node gates use.
     ///
     /// # Examples
     ///
@@ -262,6 +267,22 @@ impl<S: IssueStore> CommandExecutor<S> {
                         "template '{}' node '{}' references gate preset '{preset}', \
                          which is not registered",
                         template.name, node.role
+                    )
+                })?;
+            }
+        }
+
+        // Anchor gate presets (jit:2614ecf2 — REQ-13) are validated the SAME way:
+        // an anchor's declared presets must resolve before any mutation, so an
+        // unknown anchor gate fails up front rather than after the bound anchor
+        // issue is mutated.
+        for anchor in &template.anchors {
+            for preset in &anchor.gates {
+                self.storage.get_gate_preset(preset).with_context(|| {
+                    format!(
+                        "template '{}' anchor '{}' references gate preset '{preset}', \
+                         which is not registered",
+                        template.name, anchor.name
                     )
                 })?;
             }
@@ -385,6 +406,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &anchor_dependency_snapshots,
                 &mut warnings,
             )?;
+
+            // === 5. Attach anchor-level gate presets (jit:2614ecf2 — REQ-13) ===
+            // After the bound anchor's template edges are wired, attach each
+            // anchor's declared gate presets to its bound issue, through the same
+            // shared preset path node gates use. Like node gates, this runs only
+            // on the fresh-apply path (the refresh path re-seeds prose only).
+            self.attach_anchor_gates(template, &resolved_bindings, &mut warnings)?;
 
             created
         };
@@ -600,7 +628,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             warnings.append(&mut create_warnings);
 
-            self.attach_node_gates(node, &node_id, warnings)?;
+            self.attach_gate_presets(&node.gates, &node_id, warnings)?;
 
             created.insert(node.role.clone(), node_id);
         }
@@ -828,16 +856,46 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(existing)
     }
 
-    /// Attach every gate preset declared on a template node to the created issue.
-    fn attach_node_gates(
+    /// Attach each named gate preset to `issue_id` through the shared
+    /// `apply_gate_preset` path, collecting any lease warnings. Shared by node-
+    /// and anchor-gate attachment (jit:2614ecf2 — REQ-13) so both flow through
+    /// the same preset resolution and application.
+    fn attach_gate_presets(
         &self,
-        node: &TemplateNode,
-        node_id: &str,
+        presets: &[String],
+        issue_id: &str,
         warnings: &mut Vec<String>,
     ) -> Result<()> {
-        for preset in &node.gates {
-            let (_, mut w) = self.apply_gate_preset(node_id, preset, None, false, false, &[])?;
+        for preset in presets {
+            let (_, mut w) = self.apply_gate_preset(issue_id, preset, None, false, false, &[])?;
             warnings.append(&mut w);
+        }
+        Ok(())
+    }
+
+    /// Attach every gate preset declared on each template anchor to its bound
+    /// anchor issue, through the shared [`attach_gate_presets`](Self::attach_gate_presets)
+    /// path node gates use (jit:2614ecf2 — REQ-13). Anchor gate-preset existence
+    /// is validated in the precondition phase, mirroring node gates, so this only
+    /// runs on the fresh-apply path after the bound anchor's template edges are wired.
+    fn attach_anchor_gates(
+        &self,
+        template: &GraphTemplate,
+        resolved_bindings: &BTreeMap<String, String>,
+        warnings: &mut Vec<String>,
+    ) -> Result<()> {
+        for anchor in &template.anchors {
+            if anchor.gates.is_empty() {
+                continue;
+            }
+            let anchor_id = resolved_bindings.get(&anchor.name).ok_or_else(|| {
+                anyhow!(
+                    "template '{}' anchor '{}' declares gates but has no resolved binding",
+                    template.name,
+                    anchor.name
+                )
+            })?;
+            self.attach_gate_presets(&anchor.gates, anchor_id, warnings)?;
         }
         Ok(())
     }

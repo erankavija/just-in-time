@@ -494,6 +494,87 @@ applies_to  = ["epic"]
     assert_eq!(h.all_issues().len(), before);
 }
 
+// === REQ-13: anchor-level gate presets (jit:2614ecf2) ===
+
+#[test]
+fn test_apply_attaches_anchor_gate_presets_to_bound_anchor() {
+    let h = TestHarness::new();
+    // A template whose `container` anchor declares a completion gate preset.
+    let toml = r#"
+[[template]]
+name        = "anchored"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["plan-review"]
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  description = "Break down {container.title}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("anchored")
+        .unwrap()
+        .clone();
+    let epic = create_epic(&h, "Anchor-gated epic");
+
+    h.executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    // REQ-13: the bound anchor (the container epic) carries the anchor's preset,
+    // attached through the same `apply_gate_preset` path node gates use.
+    let container = h.get_issue(&epic);
+    assert!(
+        container
+            .gates_required
+            .contains(&"plan-review".to_string()),
+        "bound anchor missing its declared gate preset: {:?}",
+        container.gates_required
+    );
+}
+
+#[test]
+fn test_apply_rejects_unknown_anchor_gate_preset_and_creates_nothing() {
+    let h = TestHarness::new();
+    // The `container` anchor references a gate preset that does not exist; this
+    // must be rejected up front, exactly like an unknown node gate preset.
+    let toml = r#"
+[[template]]
+name        = "ghostanchorgate"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["does-not-exist"]
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  description = "Break down {container.title}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("ghostanchorgate")
+        .unwrap()
+        .clone();
+    let epic = create_epic(&h, "Ghost-anchor-gate epic");
+
+    let before = h.all_issues().len();
+    let err = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap_err();
+    assert!(err.to_string().contains("does-not-exist"), "{err}");
+    // The missing-preset failure is caught before the first create (APPA-01).
+    assert_eq!(h.all_issues().len(), before);
+}
+
 #[test]
 fn test_apply_rejects_invalid_node_label_before_creating_any_node() {
     let h = TestHarness::new();

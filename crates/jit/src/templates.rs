@@ -236,13 +236,19 @@ pub struct GraphTemplate {
 /// ```
 /// use jit::templates::AnchorSlot;
 ///
-/// let slot = AnchorSlot { name: "container".to_string() };
+/// let slot = AnchorSlot { name: "container".to_string(), gates: vec![] };
 /// assert_eq!(slot.name, "container");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnchorSlot {
     /// The anchor's name, referenced by `anchor_edges.from`.
     pub name: String,
+    /// Gate-preset names attached to the BOUND anchor issue at apply time,
+    /// declared exactly like a node's [`gates`](TemplateNode::gates). Preset
+    /// existence is validated by the apply engine (not at config load), and the
+    /// presets are attached through the same shared `apply_gate_preset` path.
+    #[serde(default)]
+    pub gates: Vec<String>,
 }
 
 /// A node the template creates when applied.
@@ -932,6 +938,33 @@ applies_to  = ["epic"]
         assert_eq!(t.transforms.len(), 1);
         assert_eq!(t.transforms[0].kind, "move-upstream-to-role");
         assert_eq!(t.transforms[0].role, "planning");
+    }
+
+    #[test]
+    fn test_anchor_gates_default_empty_and_parse() {
+        // The shared fixture's anchor declares no gates → `#[serde(default)]`
+        // yields an empty vec, exactly like an omitted node `gates`.
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        assert!(reg.templates[0].anchors[0].gates.is_empty());
+
+        // An anchor may declare gate presets, parsed like a node's `gates`
+        // (jit:2614ecf2 — REQ-13).
+        let toml = r#"
+[[template]]
+name        = "anchored"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["plan-review", "coverage-preview"]
+  [[template.nodes]]
+  role = "planning"
+  type = "planning"
+"#;
+        let reg = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert_eq!(
+            reg.get("anchored").unwrap().anchors[0].gates,
+            vec!["plan-review", "coverage-preview"]
+        );
     }
 
     #[test]
