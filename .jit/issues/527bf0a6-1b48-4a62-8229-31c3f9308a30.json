@@ -13,7 +13,41 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/reference/cli-command-grammar.md",
+      "commit": null,
+      "label": "CLI Command Grammar Standard",
+      "doc_type": "reference",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "dd171481a89571e86fad37547102f0ed2e181136335c76a5ce4b47af293dc541",
+          "is_shared": false
+        },
+        {
+          "original_path": "glossary.md",
+          "resolved_path": "docs/reference/glossary.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "5340af10b528f64771c14a4910586fa73b7cdb3ad48b3d6ed855280a065f3b63",
+          "is_shared": false
+        },
+        {
+          "original_path": "../concepts/core-model.md",
+          "resolved_path": "docs/concepts/core-model.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "df00dad0b1273dacfb0929976900d8142d85607ba8c4df2d945e1151c0c65fd5",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
@@ -21,5 +55,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-06-27T21:43:32.887687756Z",
-  "updated_at": "2026-06-27T22:18:49.930066606Z"
+  "updated_at": "2026-06-27T22:55:51.598006010Z"
 }

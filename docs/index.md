@@ -42,6 +42,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 *Technical specifications and API documentation*
 
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
+- [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
 - [Configuration](reference/configuration.md) - config.toml and settings
 - [Glossary](reference/glossary.md) - Term definitions
