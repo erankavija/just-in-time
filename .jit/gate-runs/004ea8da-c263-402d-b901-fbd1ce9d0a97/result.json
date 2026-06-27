@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "004ea8da-c263-402d-b901-fbd1ce9d0a97",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f5054f15-e5b4-4be7-9816-6421c64d12fb",
+  "commit": "15f02e54cf234610674ef90111e56d41dc3e1077",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:03:13.575505491Z",
+  "completed_at": "2026-06-27T23:05:23.364290194Z",
+  "duration_ms": 129788,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. REQ-09 is satisfied across the ai-review prompt copies. The reviewer is now instructed to emit a single numbered enumeration of every finding across all categories plus an explicit total count in:\n\n- `scripts/code-review-prompt.md:76`\n- `scripts/ai-review.sh:82`\n- `contrib/gates/prompts/code-review.md:37`\n- `contrib/gates/ai-review.sh:82`\n\nThe wording also states that findings may not be withheld for later rounds, which directly addresses the issue description.\n\n## Architecture And Separation Of Concerns\n\nPass. The change is confined to prompt text and shell-script prompt assembly. No Rust domain, storage, command, CLI, or output boundary is modified.\n\n## Functional Paradigm\n\nPass. No production Rust logic changed.\n\n## Correctness And Invariants\n\nPass. No file-write, event logging, gate-transition, assignee/label parsing, or PID-handling code changed. The verdict parser remains untouched.\n\n## Safety\n\nPass. No unsafe code introduced.\n\n## Testing\n\nPass. `run_history` is empty, so there is no failed test evidence to act on. I did not run cargo tests; this is a prompt-only change and there is no succeeded cargo-ci gate in the provided issue context. I did run the required repository validation: `./scripts/jit-validate.sh` passed.\n\n## Error Handling\n\nPass. No fallible Rust code or error paths changed.\n\n## CLI Contract\n\nPass. No CLI command behavior or `--json` surface changed.\n\n## Documentation\n\nPass. No public Rust API was added or changed. The updated prompt text is clear and duplicated consistently across the active and contrib ai-review copies.\n\n## Prior Review Feedback\n\nPass. `run_history` is empty, so there is no prior review feedback to verify.\n\n## Jit Issue Management\n\nPass. The prerequisite issue `7f709152` is marked `done` locally and in the provided context. `./scripts/jit-validate.sh` passed.\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

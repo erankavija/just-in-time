@@ -11,7 +11,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-27T23:00:53.102234561Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,5 +27,5 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-06-27T21:43:33.923593312Z",
-  "updated_at": "2026-06-27T22:18:50.261078601Z"
+  "updated_at": "2026-06-27T23:09:37.583567366Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0de889c0-aeea-49f0-be3f-1e213295d06e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4b063bdf-9b24-432e-b3b8-08db52849b2b",
+  "commit": "15f02e54cf234610674ef90111e56d41dc3e1077",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-27T23:03:13.575506301Z",
+  "completed_at": "2026-06-27T23:10:40.367647259Z",
+  "duration_ms": 446792,
+  "exit_code": 1,
+  "stdout": "**Architecture And Separation Of Concerns**\n\nThe change is limited to skill prose in `.claude/skills/jit-manage/SKILL.md` and `.claude/skills/jit-parallel/references/worktree-mode.md`. No Rust module boundaries are affected.\n\n**Functional Paradigm**\n\nNo implementation code was changed.\n\n**Correctness And Invariants**\n\nREQ-18 is covered in the prose:\n- `.claude/skills/jit-manage/SKILL.md:164` distinguishes assignment from advisory leases.\n- `.claude/skills/jit-manage/SKILL.md:171` prescribes `--assign-only` for dependency-blocked containers.\n- `.claude/skills/jit-parallel/references/worktree-mode.md:28` states `active_claims` counts leases, not assignments.\n\nNo file-write, event-log, gate-transition, PID, assignee, or label logic was changed.\n\n**Safety**\n\nNo unsafe code was introduced; this is docs-only.\n\n**Testing**\n\n`./scripts/jit-validate.sh` passed.\n\nThere was no provided succeeded cargo-ci run history. I ran `./scripts/cargo-ci.sh`; the default run could not create its default TMPDIR under read-only `/home/.../.cache`, so I reran with `CARGO_CI_TMPDIR=/tmp/jit-cargo-ci-tmp`. That reached the test phase: `fmt` and `clippy` passed, but tests failed.\n\n**Error Handling**\n\nNo fallible Rust code was changed.\n\n**CLI Contract**\n\nNo CLI implementation was changed.\n\n**Documentation**\n\nThe changed skill prose satisfies the requested documentation clarification. No public Rust APIs were added or changed.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there is no prior review feedback to verify.\n\n**Jit Issue Management**\n\nThe prerequisite issue `7f709152-973d-49c9-8848-3845c6782e38` is `done`. `./scripts/jit-validate.sh` passed.\n\n1. `./scripts/cargo-ci.sh` fails in the workspace test phase, which blocks the review under the “No test or lint failures” criterion. With `CARGO_CI_TMPDIR=/tmp/jit-cargo-ci-tmp`, the summary reports `1276 passed; 5 failed`. The failing tests are `commands::issue::tests::test_claim_issue_enforces_prechecks` at `crates/jit/src/commands/issue.rs:968`, `commands::issue::tests::test_claim_issue_succeeds_when_prechecks_pass` at `crates/jit/src/commands/issue.rs:984`, `commands::serve::tests::test_find_available_port_returns_free_port` at `crates/jit/src/commands/serve.rs:712`, `commands::serve::tests::test_find_available_port_skips_bound_port` at `crates/jit/src/commands/serve.rs:720`, and `commands::serve::tests::test_start_server_errors_when_child_exits_immediately` at `crates/jit/src/commands/serve.rs:796`.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6947 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0b52-bff1-7400-aad5-187dd00553e2\n--------\nuser\n--- 6934 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

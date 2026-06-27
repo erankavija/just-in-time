@@ -203,6 +203,7 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
       "title":       "concise action-oriented title",
       "description": "self-contained description with context and acceptance criteria",
       "type":        "one of the configured child type names",
+      "gate_tier":    "one of the supplied gate-tier labels (per Decomposition rule 2a)",
       "priority":    "low | normal | high | critical",
       "depends_on":  ["ref-of-sibling-prerequisite"],
       "source":      "section heading or excerpt from the spec that motivated this issue",

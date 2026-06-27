@@ -33,7 +33,7 @@ Each area is verdict-affecting; a serious defect in any one is a blocking failur
 
 ### Structural integrity
 
-- Decomposition **depth suits the work size** (large work is multi-level — epic → story → task — not a flat layer of leaves); the spine/containment is intact; this breakdown introduced no isolated or dangling issues. (Repository `jit validate` greenness is enforced by the separate `jit-validate` gate — here, judge structure and levels.)
+- Decomposition **depth suits the work size** (large work is multi-level — epic → story → task — not a flat layer of leaves); the spine/containment is intact; this breakdown introduced no isolated or dangling issues. (Repository-wide `jit validate` greenness is enforced separately at container completion, not by the per-issue `jit-validate` gate — here, judge structure and levels.)
 
 ## Prior review feedback
 

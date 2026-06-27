@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "911ff93d-263c-42e2-93dc-3caacd49bf90",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "527bf0a6-1b48-4a62-8229-31c3f9308a30",
+  "commit": "15f02e54cf234610674ef90111e56d41dc3e1077",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-27T23:03:13.574760211Z",
+  "completed_at": "2026-06-27T23:04:52.523515420Z",
+  "duration_ms": 98948,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-06 is met. [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:5) names the standard as canonical, and it covers noun/verb structure, positional-versus-flag rules, identifier acceptance, `-t` semantics, and gate configuration/execution/inspection separation at lines 22, 48, 86, 113, and 156. It is discoverable from [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:45).\n\n**Architecture And Boundaries**\n\nDocs-only change. No domain/storage/command/CLI implementation boundaries are affected.\n\n**Functional Paradigm**\n\nNo Rust code changes reviewed for this issue.\n\n**Correctness And Invariants**\n\nNo persistence or state-changing code changes are present, so atomic writes, event logging, gate semantics, PID safety, labels, and assignee invariants are unaffected.\n\n**Safety**\n\nNo unsafe code introduced by this docs-only change.\n\n**Testing And Validation**\n\nProvided `run_history` is empty, so there is no failing test evidence. I did not run cargo tests. I ran `./scripts/jit-validate.sh`; it passed with `✓ Repository validation passed`.\n\n**Error Handling**\n\nNo fallible code paths changed.\n\n**CLI Contract**\n\nThe new grammar standard explicitly preserves `--json` as a flag on every command at [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:64). No CLI implementation changed.\n\n**Documentation**\n\nThe new reference document is self-contained and cross-links related references at [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:224).\n\n**Prior Review Feedback**\n\nNo prior `run_history` entries were provided.\n\n**Jit Issue Management**\n\nPrerequisite issue `7f709152` is `done`, with `coverage-preview` and `breakdown-review` passed. `./scripts/jit-validate.sh` passed.\n\n**Findings**\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
