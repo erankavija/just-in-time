@@ -1,0 +1,28 @@
+{
+  "id": "8efc0d75-02cd-43fd-a95e-c515a9dd8525",
+  "title": "planning: Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping",
+  "description": "Planning node for Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping (2e926e39). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2e926e39-906e-4952-8ae0-38215a7e5aac-plan.md and link it to this node once written.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-06-27T20:49:54.398391189Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:agent-seamlessness",
+    "type:planning"
+  ],
+  "created_at": "2026-06-27T20:49:54.394862468Z",
+  "updated_at": "2026-06-27T20:49:54.398428089Z"
+}

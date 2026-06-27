@@ -1,5 +1,25 @@
 {
   "gates": {
+    "clippy": {
+      "version": 1,
+      "key": "clippy",
+      "title": "Clippy Lints Pass",
+      "description": "Zero clippy warnings allowed",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "cargo clippy --lib -- -D warnings",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
     "coverage-preview": {
       "version": 1,
       "key": "coverage-preview",
@@ -63,38 +83,6 @@
       "auto": true,
       "example_integration": null
     },
-    "tdd-reminder": {
-      "version": 1,
-      "key": "tdd-reminder",
-      "title": "TDD Reminder",
-      "description": "Write tests first",
-      "stage": "precheck",
-      "mode": "manual",
-      "priority": 100,
-      "reserved": {},
-      "auto": false,
-      "example_integration": null
-    },
-    "tests": {
-      "version": 1,
-      "key": "tests",
-      "title": "All Tests Pass",
-      "description": "Full test suite must pass",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo test --lib",
-        "timeout_seconds": 300,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
     "fmt": {
       "version": 1,
       "key": "fmt",
@@ -106,72 +94,6 @@
         "type": "exec",
         "command": "cargo fmt -- --check",
         "timeout_seconds": 30,
-        "working_dir": null,
-        "env": {},
-        "pass_context": false
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "plan-review": {
-      "version": 1,
-      "key": "plan-review",
-      "title": "AI Plan Review",
-      "description": "AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 1800,
-        "working_dir": null,
-        "env": {
-          "REVIEWER_AGENT": "codex exec"
-        },
-        "pass_context": true,
-        "prompt_file": "./scripts/plan-review-prompt.md"
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "code-review": {
-      "version": 1,
-      "key": "code-review",
-      "title": "AI Code Review",
-      "description": "AI-powered code review against just-in-time project standards",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "./scripts/ai-review.sh",
-        "timeout_seconds": 1800,
-        "working_dir": null,
-        "env": {
-          "REVIEWER_AGENT": "codex exec"
-        },
-        "pass_context": true,
-        "prompt_file": "./scripts/code-review-prompt.md"
-      },
-      "priority": 100,
-      "reserved": {},
-      "auto": true,
-      "example_integration": null
-    },
-    "clippy": {
-      "version": 1,
-      "key": "clippy",
-      "title": "Clippy Lints Pass",
-      "description": "Zero clippy warnings allowed",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker": {
-        "type": "exec",
-        "command": "cargo clippy --lib -- -D warnings",
-        "timeout_seconds": 120,
         "working_dir": null,
         "env": {},
         "pass_context": false
@@ -201,6 +123,84 @@
       "auto": true,
       "example_integration": null
     },
+    "code-review": {
+      "version": 1,
+      "key": "code-review",
+      "title": "AI Code Review",
+      "description": "AI-powered code review against just-in-time project standards",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/code-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "tdd-reminder": {
+      "version": 1,
+      "key": "tdd-reminder",
+      "title": "TDD Reminder",
+      "description": "Write tests first",
+      "stage": "precheck",
+      "mode": "manual",
+      "priority": 100,
+      "reserved": {},
+      "auto": false,
+      "example_integration": null
+    },
+    "plan-review": {
+      "version": 1,
+      "key": "plan-review",
+      "title": "AI Plan Review",
+      "description": "AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "./scripts/ai-review.sh",
+        "timeout_seconds": 1800,
+        "working_dir": null,
+        "env": {
+          "REVIEWER_AGENT": "codex exec"
+        },
+        "pass_context": true,
+        "prompt_file": "./scripts/plan-review-prompt.md"
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
+    "jit-validate": {
+      "version": 1,
+      "key": "jit-validate",
+      "title": "JIT Validate",
+      "description": "Repository graph and content validation must pass (jit validate exits 0)",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "jit validate",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
     "cargo-ci-features": {
       "version": 1,
       "key": "cargo-ci-features",
@@ -221,17 +221,17 @@
       "auto": true,
       "example_integration": null
     },
-    "jit-validate": {
+    "tests": {
       "version": 1,
-      "key": "jit-validate",
-      "title": "JIT Validate",
-      "description": "Repository graph and content validation must pass (jit validate exits 0)",
+      "key": "tests",
+      "title": "All Tests Pass",
+      "description": "Full test suite must pass",
       "stage": "postcheck",
       "mode": "auto",
       "checker": {
         "type": "exec",
-        "command": "jit validate",
-        "timeout_seconds": 120,
+        "command": "cargo test --lib",
+        "timeout_seconds": 300,
         "working_dir": null,
         "env": {},
         "pass_context": false
