@@ -134,9 +134,12 @@ fi
 
 echo "$REVIEW_OUTPUT"
 
-# Extract verdict from the last non-blank line (portable — works on BSD and GNU).
-LAST_LINE=$(echo "$REVIEW_OUTPUT" | sed '/^[[:space:]]*$/d' | tail -1)
-VERDICT=$(echo "$LAST_LINE" | sed -n 's/.*VERDICT:[[:space:]]*\(PASS\|FAIL\).*/\1/p')
+# Extract the last line that matches VERDICT: PASS or VERDICT: FAIL (portable —
+# works on BSD and GNU). Scanning for the last *matching* line rather than the
+# last non-blank line makes the parser robust to reviewer prose that follows the
+# verdict line. Rule: if both PASS and FAIL appear, the last verdict line wins.
+# No matching line → verdict-unparseable → treated as failure.
+VERDICT=$(echo "$REVIEW_OUTPUT" | grep -E 'VERDICT:[[:space:]]*(PASS|FAIL)' | tail -1 | sed -n 's/.*VERDICT:[[:space:]]*\(PASS\|FAIL\).*/\1/p')
 
 if [ "$VERDICT" = "PASS" ]; then
   echo "---"
