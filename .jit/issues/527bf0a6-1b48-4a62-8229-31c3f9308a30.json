@@ -2,7 +2,7 @@
   "id": "527bf0a6-1b48-4a62-8229-31c3f9308a30",
   "title": "CLI command-grammar standard",
   "description": "A written command-grammar standard for the CLI that all commands follow.\n\n## Success Criteria\n\n- [hard] REQ-06: A reference document states the command grammar covering positional-versus-flag conventions, id-acceptance semantics across sibling commands, noun/verb structure, and the separation of gate configuration from gate execution and inspection, and it is the named standard the conformance work cites.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-06-27T21:43:32.887687756Z",
-  "updated_at": "2026-06-27T21:43:35.185570423Z"
+  "updated_at": "2026-06-27T21:53:35.746623735Z"
 }

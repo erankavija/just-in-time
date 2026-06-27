@@ -2,7 +2,7 @@
   "id": "2614ecf2-a54d-4491-a241-27035b245398",
   "title": "Anchor-level template gates",
   "description": "Let a template anchor declare gate presets that are attached to the bound anchor issue at apply time.\n\n## Success Criteria\n\n- [hard] REQ-13: a template anchor accepts a declarative gates field, the loader validates it like node gates, and applying a template attaches the anchor's gate presets to the bound anchor issue through the shared preset path.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "story:anchor-gates"
   ],
   "created_at": "2026-06-27T21:43:34.012354847Z",
-  "updated_at": "2026-06-27T21:45:39.767672056Z"
+  "updated_at": "2026-06-27T21:53:35.586748569Z"
 }
