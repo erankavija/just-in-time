@@ -652,19 +652,6 @@ pub struct GraphDownstreamResponse {
     pub count: usize,
 }
 
-/// Response for `graph deps` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphDepsResponse {
-    pub issue_id: String,
-    pub dependencies: Vec<MinimalIssue>,
-    pub count: usize,
-    /// Depth of traversal (1 = immediate, 0 = unlimited)
-    pub depth: u32,
-    /// Whether the list was truncated due to size limits
-    #[serde(default)]
-    pub truncated: bool,
-}
-
 /// Tree node for hierarchical dependency display
 #[derive(Debug, Serialize, JsonSchema, Clone)]
 pub struct DependencyTreeNode {

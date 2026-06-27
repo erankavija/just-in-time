@@ -419,8 +419,8 @@ impl CommandSchema {
 
             // Graph commands
             "graph_deps" => (
-                Some(schema_to_value::<GraphDepsResponse>()),
-                "GraphDepsResponse",
+                Some(schema_to_value::<GraphDepsTreeResponse>()),
+                "GraphDepsTreeResponse",
             ),
             "graph_downstream" => (
                 Some(schema_to_value::<GraphDownstreamResponse>()),
@@ -642,6 +642,54 @@ mod tests {
         assert!(
             json.contains("\"hidden\":true"),
             "hidden:true should be present in serialization"
+        );
+    }
+
+    #[test]
+    fn test_graph_deps_schema_matches_tree_response() {
+        let schema = CommandSchema::generate();
+
+        let graph = schema
+            .commands
+            .get("graph")
+            .expect("graph command should exist");
+        let deps = graph
+            .subcommands
+            .as_ref()
+            .and_then(|s| s.get("deps"))
+            .expect("graph deps subcommand should exist");
+
+        let output = deps
+            .output
+            .as_ref()
+            .expect("graph deps should have output schema");
+        assert_eq!(
+            output.success,
+            "GraphDepsTreeResponse",
+            "graph deps schema should reference GraphDepsTreeResponse (the actual emitted type), not GraphDepsResponse"
+        );
+
+        // Verify the schema contains the tree-structure properties actually emitted
+        let schema_val = output
+            .success_schema
+            .as_ref()
+            .expect("success_schema should be present");
+        let props = schema_val
+            .pointer("/definitions/GraphDepsTreeResponse/properties")
+            .or_else(|| schema_val.pointer("/properties"))
+            .expect("GraphDepsTreeResponse properties should be present in schema");
+
+        assert!(
+            props.get("tree").is_some(),
+            "schema should contain 'tree' property (from GraphDepsTreeResponse)"
+        );
+        assert!(
+            props.get("summary").is_some(),
+            "schema should contain 'summary' property (from GraphDepsTreeResponse)"
+        );
+        assert!(
+            props.get("dependencies").is_none(),
+            "schema must not contain 'dependencies' property (that belongs to the removed GraphDepsResponse)"
         );
     }
 }
