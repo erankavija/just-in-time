@@ -999,7 +999,18 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&id)?;
                         let msg = format!("Created issue {} - {}", issue.short_id(), issue.title);
-                        let output = JsonOutput::success(issue, "issue create").with_message(msg);
+                        let enriched_deps = executor.get_dependencies_enriched(&issue);
+                        let gate_runs =
+                            executor.list_gate_runs(&issue.id, None).with_context(|| {
+                                format!("Failed to load gate runs for issue {}", issue.id)
+                            })?;
+                        let response = jit::output::IssueShowResponse::from_issue(
+                            issue,
+                            enriched_deps,
+                            &gate_runs,
+                        );
+                        let output =
+                            JsonOutput::success(response, "issue create").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         // In quiet mode, output just the ID for scripting
