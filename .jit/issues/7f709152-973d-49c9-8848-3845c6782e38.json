@@ -2,7 +2,7 @@
   "id": "7f709152-973d-49c9-8848-3845c6782e38",
   "title": "breakdown: Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping",
   "description": "Breakdown node bracketing Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping (2e926e39). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -33,5 +33,5 @@
     "brackets:2e926e39"
   ],
   "created_at": "2026-06-27T20:49:54.398733339Z",
-  "updated_at": "2026-06-27T20:49:54.431757938Z"
+  "updated_at": "2026-06-27T21:38:13.967629972Z"
 }
