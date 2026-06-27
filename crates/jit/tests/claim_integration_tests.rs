@@ -839,3 +839,68 @@ fn test_claim_list_outside_git_repo_emits_git_requirement_error() {
         .stderr(predicate::str::contains("git repository"))
         .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
 }
+
+/// The `--json` claim path must honor the same exit-10 contract as the human
+/// path: running `claim acquire --json` outside a git repository emits a JSON
+/// error naming the git requirement and exits with code 10.
+#[test]
+fn test_claim_acquire_json_outside_git_repo_exits_10_with_git_requirement() {
+    let temp = setup_non_git_jit_repo();
+    let issue_id = create_issue(temp.path(), "Test Issue Outside Git JSON");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(10),
+        "claim acquire --json outside git must exit 10 (external dependency)"
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    let message = json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("git repository"),
+        "message must name the git requirement, got: {message}"
+    );
+}
+
+/// `claim list --json` outside a git repository must also exit 10 with a JSON
+/// error naming the git requirement.
+#[test]
+fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
+    let temp = setup_non_git_jit_repo();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "list", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(10),
+        "claim list --json outside git must exit 10 (external dependency)"
+    );
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    let message = json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("git repository"),
+        "message must name the git requirement, got: {message}"
+    );
+}

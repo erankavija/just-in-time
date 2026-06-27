@@ -361,6 +361,8 @@ impl ErrorCode {
     pub const GATE_FAILED: &'static str = "GATE_FAILED";
     pub const IO_ERROR: &'static str = "IO_ERROR";
     pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
+    /// A claim/lease command was run outside a git repository (exit code 10).
+    pub const CLAIM_REQUIRES_GIT: &'static str = "CLAIM_REQUIRES_GIT";
 }
 
 impl ErrorCode {
@@ -373,7 +375,7 @@ impl ErrorCode {
             }
             Self::INVALID_ARGUMENT | Self::INVALID_STATE => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
-            Self::IO_ERROR => ExitCode::ExternalError,
+            Self::IO_ERROR | Self::CLAIM_REQUIRES_GIT => ExitCode::ExternalError,
             _ => ExitCode::GenericError,
         }
     }

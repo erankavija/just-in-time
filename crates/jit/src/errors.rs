@@ -357,6 +357,16 @@ pub struct ClaimRequiresGitError {
 
 impl ClaimRequiresGitError {
     /// Build a [`ClaimRequiresGitError`] with the standard remediation message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::ClaimRequiresGitError;
+    ///
+    /// let err = ClaimRequiresGitError::new();
+    /// assert!(err.message().contains("git repository"));
+    /// assert!(err.message().contains("git init"));
+    /// ```
     pub fn new() -> Self {
         let msg = ActionableError::new("Claims and leases require a git repository")
             .with_cause("Claim tracking records the git worktree identity and current branch")
@@ -367,6 +377,15 @@ impl ClaimRequiresGitError {
     }
 
     /// The fully-rendered, user-facing message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::ClaimRequiresGitError;
+    ///
+    /// let err = ClaimRequiresGitError::new();
+    /// assert_eq!(err.message(), err.to_string());
+    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }

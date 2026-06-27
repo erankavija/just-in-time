@@ -212,6 +212,30 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     ExitCode::GenericError
 }
 
+/// Build the JSON error envelope for a failed claim/lease command.
+///
+/// The git-missing condition ([`jit::errors::ClaimRequiresGitError`]) is mapped
+/// to the `CLAIM_REQUIRES_GIT` code so the `--json` path resolves to exit code
+/// 10, matching the human path and the documented contract. The actionable
+/// message (which names the git requirement) is preserved on both paths. Any
+/// other failure keeps the command-specific `fallback_code`.
+fn claim_json_error(
+    error: &anyhow::Error,
+    fallback_code: &str,
+    command: &'static str,
+) -> jit::output::JsonError {
+    use jit::output::{ErrorCode, JsonError};
+    let code = if error
+        .downcast_ref::<jit::errors::ClaimRequiresGitError>()
+        .is_some()
+    {
+        ErrorCode::CLAIM_REQUIRES_GIT
+    } else {
+        fallback_code
+    };
+    JsonError::new(code, error.to_string(), command)
+}
+
 /// Render a failed `gate pass` / `gate pass-all` outcome and terminate appropriately.
 ///
 /// Shared by the `gate pass` and `gate pass-all` handlers so both classify the
@@ -5227,7 +5251,7 @@ fn run() -> Result<()> {
                 json,
             } => {
                 use jit::commands::claim::execute_claim_acquire;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_acquire(
                     &storage,
@@ -5259,11 +5283,8 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
-                                "CLAIM_ACQUIRE_ERROR",
-                                e.to_string(),
-                                "claim acquire",
-                            );
+                            let json_error =
+                                claim_json_error(&e, "CLAIM_ACQUIRE_ERROR", "claim acquire");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5274,7 +5295,7 @@ fn run() -> Result<()> {
             }
             ClaimCommands::Release { issue_id, json } => {
                 use jit::commands::claim::execute_claim_release_by_issue;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_release_by_issue(&storage, &issue_id) {
                     Ok((released, warnings)) => {
@@ -5308,11 +5329,8 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
-                                "CLAIM_RELEASE_ERROR",
-                                e.to_string(),
-                                "claim release",
-                            );
+                            let json_error =
+                                claim_json_error(&e, "CLAIM_RELEASE_ERROR", "claim release");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5327,7 +5345,7 @@ fn run() -> Result<()> {
                 json,
             } => {
                 use jit::commands::claim::execute_claim_renew;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_renew::<jit::JsonFileStorage>(&lease_id, extension) {
                     Ok((renewed_lease, warnings)) => {
@@ -5355,7 +5373,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             let json_error =
-                                JsonError::new("CLAIM_RENEW_ERROR", e.to_string(), "claim renew");
+                                claim_json_error(&e, "CLAIM_RENEW_ERROR", "claim renew");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5366,7 +5384,7 @@ fn run() -> Result<()> {
             }
             ClaimCommands::Heartbeat { lease_id, json } => {
                 use jit::commands::claim::execute_claim_heartbeat;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_heartbeat(&lease_id) {
                     Ok(warnings) => {
@@ -5388,11 +5406,8 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
-                                "CLAIM_HEARTBEAT_ERROR",
-                                e.to_string(),
-                                "claim heartbeat",
-                            );
+                            let json_error =
+                                claim_json_error(&e, "CLAIM_HEARTBEAT_ERROR", "claim heartbeat");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5403,7 +5418,7 @@ fn run() -> Result<()> {
             }
             ClaimCommands::Status { issue, agent, json } => {
                 use jit::commands::claim::execute_claim_status;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_status::<jit::JsonFileStorage>(
                     issue.as_deref(),
@@ -5482,7 +5497,7 @@ fn run() -> Result<()> {
                     Err(e) => {
                         if json {
                             let json_error =
-                                JsonError::new("CLAIM_STATUS_ERROR", e.to_string(), "claim status");
+                                claim_json_error(&e, "CLAIM_STATUS_ERROR", "claim status");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5493,7 +5508,7 @@ fn run() -> Result<()> {
             }
             ClaimCommands::List { json } => {
                 use jit::commands::claim::execute_claim_list;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_list() {
                     Ok((leases, warnings)) => {
@@ -5556,8 +5571,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error =
-                                JsonError::new("CLAIM_LIST_ERROR", e.to_string(), "claim list");
+                            let json_error = claim_json_error(&e, "CLAIM_LIST_ERROR", "claim list");
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -5572,7 +5586,7 @@ fn run() -> Result<()> {
                 json,
             } => {
                 use jit::commands::claim::execute_claim_force_evict;
-                use jit::output::{JsonError, JsonOutput, OutputContext};
+                use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_force_evict::<jit::JsonFileStorage>(&lease_id, &reason) {
                     Ok(warnings) => {
@@ -5596,9 +5610,9 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = JsonError::new(
+                            let json_error = claim_json_error(
+                                &e,
                                 "CLAIM_FORCE_EVICT_ERROR",
-                                e.to_string(),
                                 "claim force-evict",
                             );
                             println!("{}", json_error.to_json_string()?);
