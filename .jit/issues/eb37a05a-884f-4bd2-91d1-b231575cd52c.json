@@ -1,0 +1,26 @@
+{
+  "id": "eb37a05a-884f-4bd2-91d1-b231575cd52c",
+  "title": "Full gate report text",
+  "description": "Show the complete checker report on gate inspection rather than a truncated fragment.\n\n## Success Criteria\n\n- [hard] REQ-07: gate inspection output contains the complete checker report with no line truncation and no substitution of a file path for the report body.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "527bf0a6-1b48-4a62-8229-31c3f9308a30"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-07"
+  ],
+  "created_at": "2026-06-27T21:43:33.491360518Z",
+  "updated_at": "2026-06-27T21:43:34.964755350Z"
+}

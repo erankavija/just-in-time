@@ -1,0 +1,26 @@
+{
+  "id": "b920ea57-1f80-45b9-9f9d-b4372daceb07",
+  "title": "Short id in issue create json",
+  "description": "Include the short id in the machine-readable create output.\n\n## Success Criteria\n\n- [hard] REQ-14: the issue create --json payload contains short_id alongside id.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7f709152-973d-49c9-8848-3845c6782e38"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-14"
+  ],
+  "created_at": "2026-06-27T21:43:34.183383126Z",
+  "updated_at": "2026-06-27T21:43:35.446564408Z"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "1c94f4f1-9e6e-4fa2-8e28-e371474c2fbb",
+  "title": "Gate key as flag on pass and check",
+  "description": "Let gate execution and inspection accept the gate as a flag, matching what users reach for.\n\n## Success Criteria\n\n- [hard] REQ-03: gate pass and gate check accept the gate via --gate <key> and via the positional key, with identical behaviour.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "a1623187-240c-4077-8b83-48f04d1df04a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-03"
+  ],
+  "created_at": "2026-06-27T21:43:33.058695874Z",
+  "updated_at": "2026-06-27T21:43:34.685017490Z"
+}

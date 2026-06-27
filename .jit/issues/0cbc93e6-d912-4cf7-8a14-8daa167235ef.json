@@ -1,0 +1,26 @@
+{
+  "id": "0cbc93e6-d912-4cf7-8a14-8daa167235ef",
+  "title": "Bounded reverse-dependency depth",
+  "description": "Stop the reverse-dependency view from defaulting to unbounded output.\n\n## Success Criteria\n\n- [hard] REQ-19: graph rdeps defaults to a bounded depth and unbounded traversal is opt-in, consistent with graph deps.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "527bf0a6-1b48-4a62-8229-31c3f9308a30"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-19"
+  ],
+  "created_at": "2026-06-27T21:43:33.318893519Z",
+  "updated_at": "2026-06-27T21:43:34.799367552Z"
+}

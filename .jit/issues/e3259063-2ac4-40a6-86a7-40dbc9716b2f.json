@@ -1,0 +1,30 @@
+{
+  "id": "e3259063-2ac4-40a6-86a7-40dbc9716b2f",
+  "title": "Canonical command renames and consumer sweep",
+  "description": "Rename every deviating command to its canonical grammar form and update all consumers in the same change.\n\n## Success Criteria\n\n- [hard] REQ-06: Deviating commands, including the separation of gate configuration from gate execution and inspection, are renamed to their canonical forms and a tree-wide search over the crates, docs, skills, contrib, scripts, the MCP server, and the sibling consumer repo finds no reference to any retired command name.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "0cbc93e6-d912-4cf7-8a14-8daa167235ef",
+    "4b7407d3-b069-4a6e-a980-ef2e26391c22",
+    "3758ee60-4e9d-4bf0-9e89-9a4ed6ffdc3f",
+    "252c947b-0a59-4c51-b63e-bd0ea6d60750"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-06",
+    "story:cli-grammar-rename"
+  ],
+  "created_at": "2026-06-27T21:43:33.405578434Z",
+  "updated_at": "2026-06-27T21:45:39.715149261Z"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "3758ee60-4e9d-4bf0-9e89-9a4ed6ffdc3f",
+  "title": "Query default routing and ready alias",
+  "description": "Make a bare query and the natural ready alias work instead of erroring.\n\n## Success Criteria\n\n- [hard] REQ-04: A bare jit query returns all issues via the existing query-all path, jit query ready is accepted as an alias of available, and the existing --state/--assignee/--priority/--label filters work unchanged on that default path with no new traversal semantic.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "527bf0a6-1b48-4a62-8229-31c3f9308a30"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-04"
+  ],
+  "created_at": "2026-06-27T21:43:33.144505909Z",
+  "updated_at": "2026-06-27T21:43:34.722083130Z"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "252c947b-0a59-4c51-b63e-bd0ea6d60750",
+  "title": "Editable gate definition",
+  "description": "Allow editing an existing gate definition through the CLI without hand-editing the registry file.\n\n## Success Criteria\n\n- [hard] REQ-16: a gate-update command edits an existing gate's mutable fields with an atomic write and leaves per-issue gate status unchanged, requiring no registry hand-editing.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "073f9d13-16ac-4ee0-85db-d18b2d7a128a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-16"
+  ],
+  "created_at": "2026-06-27T21:43:34.357835696Z",
+  "updated_at": "2026-06-27T21:43:35.141802010Z"
+}

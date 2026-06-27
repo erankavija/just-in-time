@@ -1,0 +1,26 @@
+{
+  "id": "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
+  "title": "Claim git-requirement error and documentation",
+  "description": "Make claim and lease commands fail clearly outside a git repo and document the requirement.\n\n## Success Criteria\n\n- [hard] REQ-17: a claim or lease command run outside a git repository emits an actionable error naming the git requirement, and the project guidance documents that leases require git.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7f709152-973d-49c9-8848-3845c6782e38"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-17"
+  ],
+  "created_at": "2026-06-27T21:43:34.445918121Z",
+  "updated_at": "2026-06-27T21:43:35.532150492Z"
+}

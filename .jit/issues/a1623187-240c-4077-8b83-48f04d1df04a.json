@@ -1,0 +1,26 @@
+{
+  "id": "a1623187-240c-4077-8b83-48f04d1df04a",
+  "title": "First-guess command residuals",
+  "description": "Remove the remaining commands and flags that fail on the natural first guess.\n\n## Success Criteria\n\n- [hard] REQ-05: gate define --auto sets mode to auto; doc add --title is accepted as an alias for the human label; a gate-inspection call with the gate key and issue id transposed yields an actionable suggestion rather than a misparse; and a top-level reverse-dependency or issue-listing first guess resolves to the canonical command or an actionable error.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "527bf0a6-1b48-4a62-8229-31c3f9308a30"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-06-27T21:43:33.231677634Z",
+  "updated_at": "2026-06-27T21:43:34.760423561Z"
+}

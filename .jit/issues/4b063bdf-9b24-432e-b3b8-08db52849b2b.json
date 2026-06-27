@@ -1,0 +1,25 @@
+{
+  "id": "4b063bdf-9b24-432e-b3b8-08db52849b2b",
+  "title": "Claim and lease skill prose",
+  "description": "Clarify in skill prose how assignment differs from advisory leases and what the worktree claim count means.\n\n## Success Criteria\n\n- [hard] REQ-18: claim and lease skill prose distinguishes assignment from advisory leases, prescribes assign-only for dependency-blocked containers, and states the active-claims count reflects leases rather than assignments.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "7f709152-973d-49c9-8848-3845c6782e38"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-18"
+  ],
+  "created_at": "2026-06-27T21:43:34.532407546Z",
+  "updated_at": "2026-06-27T21:43:35.576976655Z"
+}

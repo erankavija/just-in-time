@@ -1,0 +1,27 @@
+{
+  "id": "552ff75c-2c83-4d80-9e89-ea3c4ac4f3fc",
+  "title": "Repo-wide integrity gate on the container",
+  "description": "Attach a whole-repository validation gate to breakable containers so it must pass before a container completes.\n\n## Success Criteria\n\n- [hard] REQ-13: a config-declared repo-validate gate whose checker runs whole-repository validation is declared on the plan template's container anchor and blocks the bound container from reaching Done until it passes, introducing no domain literal into engine code.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "2614ecf2-a54d-4491-a241-27035b245398",
+    "9e9a4f81-a803-4a3c-9303-bce8f0af93ad"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:agent-seamlessness",
+    "milestone:v1.0",
+    "satisfies:REQ-13"
+  ],
+  "created_at": "2026-06-27T21:43:34.099842932Z",
+  "updated_at": "2026-06-27T21:43:35.100690309Z"
+}
