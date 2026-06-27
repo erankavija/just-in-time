@@ -182,8 +182,8 @@ fn default_executor_with(
 fn test_default_repo_per_label_resolves_decision() {
     // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
     // through the existing generic `resolve_link_label`, with NO custom config —
-    // the `per` namespace is recognized because the BUILT-IN `decision` kind ships
-    // it.
+    // the `per` namespace is recognized because the `decision` kind that `jit init`
+    // emits declares it.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) = default_executor_with(
         temp.path(),

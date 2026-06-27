@@ -250,8 +250,8 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // REQ-04: BOTH a `mitigates:<issue>/RISK-01` AND a `resolves:<issue>/RISK-01`
     // label resolve to the addressed risk item through the generic
     // `resolve_link_label`, even when the same issue also carries a `## Decisions`
-    // section. Both namespaces are recognized because the BUILT-IN `risk` kind ships
-    // them; neither requires custom config.
+    // section. Both namespaces are recognized because the `risk` kind that `jit init`
+    // emits declares them; neither requires custom config.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) =
         default_executor_with(temp.path(), vec![("Architecture + risks", STORY_BODY)]);

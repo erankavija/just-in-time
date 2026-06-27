@@ -268,7 +268,7 @@ pub struct NamespaceConfig {
 /// `scope = "project"` and a `source` file (a repository-local path, relative to
 /// the repo root) whose markdown is scanned the SAME way an issue description is. It
 /// still declares all six required fields (the optional `source` PATH is in
-/// addition). The example uses `glossary`; the built-in `invariant` kind is an
+/// addition). The example uses `glossary`; the `invariant` kind is an
 /// ordinary registry-first kind whose `source` is a toml descriptor pointing at
 /// `.jit/invariants.toml` (a markdown `source` path applies only to markdown-first
 /// kinds):

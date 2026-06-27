@@ -185,7 +185,7 @@ fn test_default_repo_resolves_label_resolves_risk() {
     // REQ-02 (resolves): a `resolves:<issue>/RISK-01` label resolves to the
     // addressed risk item through the existing generic `resolve_link_label`, with
     // NO custom config — the `resolves` namespace is recognized because the
-    // BUILT-IN `risk` kind ships it.
+    // `risk` kind that `jit init` emits declares it.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) = default_executor_with(
         temp.path(),

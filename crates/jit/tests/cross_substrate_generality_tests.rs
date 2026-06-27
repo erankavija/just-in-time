@@ -134,7 +134,7 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 // REQ-01 + REQ-02 + REQ-03: single cohesive acceptance test
 // ---------------------------------------------------------------------------
 
-/// Cross-substrate generality: all four built-in item kinds resolve through the
+/// Cross-substrate generality: all four canonical item kinds resolve through the
 /// SAME `jit item list` / `jit item show` / `jit item search` operations with no
 /// separate command or implementation for either substrate.
 ///
