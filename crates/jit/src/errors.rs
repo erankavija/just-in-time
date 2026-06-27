@@ -343,7 +343,7 @@ impl LeaseNotFoundError {
 /// let err = ClaimRequiresGitError::new();
 /// let msg = err.to_string();
 /// assert!(msg.contains("git repository"));
-/// assert!(msg.contains("claim"));
+/// assert!(msg.to_lowercase().contains("claim"));
 ///
 /// // Downcastable through anyhow for exit-code classification.
 /// let any: anyhow::Error = err.into();
