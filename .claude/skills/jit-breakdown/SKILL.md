@@ -269,6 +269,8 @@ Notes from analysis agent:
 Show all sequencing edges. Cross-dependencies (where a child depends on another
 child that is not an immediate predecessor) should be explicitly called out.
 
+**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); and a non-empty `gate_tier` mapped to at least one gate (Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
+
 Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abort]"**
 
 - **yes** — proceed to Step 6

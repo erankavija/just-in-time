@@ -415,7 +415,7 @@ Gate enforcement, success criteria verification, state transition, commit.
 
 5. Handle gate results:
    - All pass -> proceed to step 7
-   - Auto gate failure -> show output, offer to fix and retry
+   - Auto gate failure -> read the **complete** gate report and resolve **every** numbered finding before re-requesting the gate. Do not loop back to step 4 with any finding unaddressed. Show the output and offer to fix and retry.
    - Manual gate pending -> prompt user, then:
      ```bash
      jit gate pass <id> <gate-key>

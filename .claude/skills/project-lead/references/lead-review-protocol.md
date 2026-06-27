@@ -114,6 +114,8 @@ This tier catches issues that per-issue gates and criteria cannot: problems that
 
 Before dispatching any rework, the lead must have completed Tiers 1.5 and 2.75 in addition to the other tiers. The 6-cycle loop pattern observed in practice (each round surfacing a different subset of findings) is preventable only if the lead audits holistically on every round — reviewers have no memory across rounds, so the lead must supply it.
 
+The rework dispatch must explicitly direct the worker to read the **complete** review verdict and account for **every** numbered finding before re-requesting the gate. A submission that leaves any finding unaddressed will fail the Tier 1.5 regression check on the next round.
+
 ## No-argue discipline
 
 When a reviewer cites a contract document (acceptance protocol, design doc, project CLAUDE.md, any governance file) and says the artifact violates it, the lead has exactly two responses: (a) change the artifact to satisfy the contract literally, or (b) escalate. The lead may not soften the contract's reading by argument. Wording such as "non-blocking marker", "redundant witness", "two independent witnesses already satisfy criterion N", "the contract doesn't really require this for our case", or "the marker is diagnostic rather than blocking" indicates the lead is in argue mode and must stop — argue-mode rework rounds will fail the next review and the cycle is wasted. If the contract is genuinely wrong for the project's needs, amend the contract; if it's right, comply. There is no soft middle. This rule applies even when the reviewer's reading appears to overstate a literal-vs-spirit interpretation: the reviewer is a contract enforcer, not an obstacle to argue past.
