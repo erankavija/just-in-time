@@ -2,7 +2,7 @@
   "id": "552ff75c-2c83-4d80-9e89-ea3c4ac4f3fc",
   "title": "Repo-wide integrity gate on the container",
   "description": "Attach a whole-repository validation gate to breakable containers so it must pass before a container completes.\n\n## Background\n\nNo repo-wide completion check is installed today; whole-repo validation is the reusable `run_rules(None)` entry (main.rs:4771). With anchors able to carry gate presets, a config-declared `repo-validate` preset can be declared on the `plan` template's `container` anchor. By INV-GATE-SEMANTICS an issue cannot reach Done with pending or failed gates, so the gate blocks the container's transition to done until whole-repo validation passes.\n\n## Success Criteria\n\n- [hard] REQ-13: a config-declared repo-validate gate whose checker runs whole-repository validation is declared on the plan template's container anchor and blocks the bound container from reaching Done until it passes, introducing no domain literal into engine code.\n\n## Notes\n\nDeclare a `repo-validate` gate preset (checker = whole-repo validation, `run_rules(None)`, main.rs:4771) and attach it to the `container` anchor of the `plan` template in .jit/templates.toml. The container's required-gate state rides the existing `Issue.gates_status` (types.rs:395). Introduce no domain literal into engine code; document the gate.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T02:55:58.687248770Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T02:54:58.739713989Z"
+      "updated_at": "2026-06-28T03:12:45.161439035Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-28T03:13:36.510176126Z"
     }
   },
   "context": {},
@@ -34,5 +34,5 @@
     "satisfies:REQ-13"
   ],
   "created_at": "2026-06-27T21:43:34.099842932Z",
-  "updated_at": "2026-06-28T02:57:40.685803552Z"
+  "updated_at": "2026-06-28T03:14:57.086916579Z"
 }
