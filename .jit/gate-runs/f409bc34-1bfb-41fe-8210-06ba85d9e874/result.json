@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f409bc34-1bfb-41fe-8210-06ba85d9e874",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "252c947b-0a59-4c51-b63e-bd0ea6d60750",
+  "commit": "290989681a38bae40359a6486403bca97a671930",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T04:33:26.306493037Z",
+  "completed_at": "2026-06-28T04:35:15.402603460Z",
+  "duration_ms": 109096,
+  "exit_code": 0,
+  "stdout": "**Architecture**\n\nLayering is respected. CLI parsing stays in `crates/jit/src/cli.rs:1039` and `crates/jit/src/main.rs:2458`; orchestration is in `crates/jit/src/commands/gate.rs:890`; persistence goes through `IssueStore::save_gate_registry` at `crates/jit/src/commands/gate.rs:1028`.\n\n**Correctness**\n\nREQ-16 is met. `gate update` edits existing gate definitions, preserves omitted fields, supports clearing checker fields via `FieldEdit`, writes through the atomic storage path (`crates/jit/src/storage/json.rs:128`), appends `gate_definition_updated` (`crates/jit/src/commands/gate.rs:1031`), and does not touch per-issue `gates_status`. Integration coverage verifies preservation and status isolation in `crates/jit/tests/gate_update_test.rs:197`.\n\n**Testing**\n\nI did not run cargo tests because the provided `cargo-ci` gate is passed. I ran `./scripts/jit-validate.sh`, and it passed. Existing gate-update tests cover JSON output/errors, clear flags, event logging, atomic registry validity, and per-issue status preservation.\n\n**CLI Contract**\n\n`gate update` supports `--json` and machine-readable errors in `crates/jit/src/main.rs:2552`. The documented CLI options include set/clear behavior and examples in `docs/reference/cli-commands.md:1262`.\n\n**Documentation**\n\nThe prior documentation finding is addressed. `FieldEdit::is_keep` now has a `# Examples` section at `crates/jit/src/commands/gate.rs:203`.\n\n**Jit Issue Management**\n\nPrerequisite issue `073f9d13` is marked `done` in the provided context. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
