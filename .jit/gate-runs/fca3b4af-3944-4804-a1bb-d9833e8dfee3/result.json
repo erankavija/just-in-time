@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "fca3b4af-3944-4804-a1bb-d9833e8dfee3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0cbc93e6-d912-4cf7-8a14-8daa167235ef",
+  "commit": "22cd3377624ff80ab67e401c21fa17083ad1eef5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T01:10:56.888822172Z",
+  "completed_at": "2026-06-28T01:12:12.696486601Z",
+  "duration_ms": 75807,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. `jit graph rdeps` defaults to bounded depth 1 at `crates/jit/src/cli.rs:1478-1479`, and the top-level `jit rdeps` alias now also defaults to depth 1 at `crates/jit/src/cli.rs:160-163`. `--depth 0` remains the explicit unbounded opt-in through `show_rdeps_with_depth` at `crates/jit/src/commands/graph.rs:153-156`.\n\n## Architecture And Separation Of Concerns\n\nPass. The CLI default and docs live in `cli.rs`; execution still routes through the canonical graph command in `main.rs:1017-1018`; traversal remains in `commands/graph.rs`. No new domain/storage/command/CLI boundary violation found.\n\n## Functional Paradigm\n\nPass. The new code is limited to CLI metadata and integration test coverage. Existing imperative BFS in `commands/graph.rs:165-188` is appropriate for graph traversal.\n\n## Correctness And Invariants\n\nPass. The prior alias correctness issue is fixed: `jit rdeps <id>` now preserves the same bounded default as `jit graph rdeps <id>`. No new file writes, event logging paths, state transitions, assignee/label validation, PID handling, or unsafe code were introduced.\n\n## Safety\n\nPass. No unsafe code introduced. Workspace safety enforcement remains present via `#![deny(unsafe_code)]` in `crates/jit/src/main.rs:14`.\n\n## Testing\n\nPass. I did not rerun Cargo tests because the issue has a succeeded `cargo-ci` gate. Evidence: `.jit/gate-runs/313a9109-b420-479c-b289-b954c2c99c5c/result.json` shows commit `22cd3377`, exit code 0, with `fmt`, `clippy`, and `2790 passed, 0 failed, 12 ignored`.\n\nNew regression coverage addresses the prior gap: `crates/jit/tests/first_guess_residuals_test.rs:213-260` verifies multi-level `jit rdeps` is bounded by default and `--depth 0` includes transitive dependents.\n\n## Error Handling\n\nPass. No new production fallible operations or error types were added. New `unwrap()` usage is confined to tests.\n\n## CLI Contract\n\nPass. `jit rdeps` retains `--json` at `crates/jit/src/cli.rs:165-166` and normalizes to the canonical JSON-capable `GraphCommands::Rdeps` path in `crates/jit/src/main.rs:1017-1018`.\n\n## Documentation\n\nPass. Top-level alias docs now document depth 1 default and unbounded opt-in at `crates/jit/src/cli.rs:160-161`. Canonical `graph rdeps` docs also describe the bounded default and `--depth 0` opt-in at `crates/jit/src/cli.rs:1463-1468`.\n\n## Prior Review Feedback\n\nPass. The most recent failed review found that the top-level alias still defaulted to unbounded depth and lacked multi-level alias coverage. Both are addressed by `crates/jit/src/cli.rs:160-163` and `crates/jit/tests/first_guess_residuals_test.rs:213-260`.\n\n## JIT Issue Management\n\nPass. Dependency `527bf0a6` is marked done in the provided issue context. I ran `./scripts/jit-validate.sh`; it exited 0 with `Repository validation passed`.\n\n## Findings\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

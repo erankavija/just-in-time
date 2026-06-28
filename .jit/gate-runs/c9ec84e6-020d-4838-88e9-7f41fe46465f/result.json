@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c9ec84e6-020d-4838-88e9-7f41fe46465f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a1623187-240c-4077-8b83-48f04d1df04a",
+  "commit": "22cd3377624ff80ab67e401c21fa17083ad1eef5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T01:10:56.887713671Z",
+  "completed_at": "2026-06-28T01:12:33.125011775Z",
+  "duration_ms": 96237,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. `gate define --auto` is parsed in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:998) and normalized to `GateMode::Auto` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2218). `doc add --title` is accepted via the visible alias on `label` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1288). Transposed `gate check` args produce an actionable suggestion in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2413). Top-level `list` and `rdeps` are normalized to canonical commands in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1013).\n\n## Architecture and Separation\n\nNo boundary violation found. The change stays in CLI definitions and command dispatch; persistence remains behind existing executor/storage APIs.\n\n## Functional Paradigm\n\nNo blocking issue found. The implementation is small dispatch/argument normalization code where imperative control flow is appropriate.\n\n## Correctness and Invariants\n\nNo blocking issue found. The prior `rdeps` default-depth divergence is fixed: top-level `rdeps` now defaults to depth `1` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:160), matching canonical `graph rdeps`.\n\n## Safety\n\nNo unsafe code found in the reviewed change surface. Workspace has `#![deny(unsafe_code)]` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:14).\n\n## Testing\n\nUsed the provided passed `cargo-ci` gate as primary test evidence and did not rerun cargo tests. I ran `./scripts/jit-validate.sh`; it passed.\n\nREQ-05 coverage exists in [first_guess_residuals_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/first_guess_residuals_test.rs:52), including the prior review regression for multi-level `rdeps` default depth at [first_guess_residuals_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/first_guess_residuals_test.rs:213).\n\n## Error Handling\n\nNo blocking issue found. The transposed gate-check path emits structured JSON error output with `INVALID_ARGUMENT`, details, and suggestion.\n\n## CLI Contract\n\nPass. The reviewed first-guess command surfaces include `--json`, and aliases normalize into canonical handlers that already emit machine-readable output.\n\n## Documentation\n\nNo blocking documentation issue found for this CLI change. Help text documents `--auto`, `--title`, top-level `list`, and top-level `rdeps`.\n\n## Prior Review Feedback\n\nResolved. The most recent failed review found that `jit rdeps <id>` defaulted to unbounded depth while `jit graph rdeps <id>` defaulted to immediate dependents. Current code sets the top-level default to `1` and adds a multi-level regression test.\n\n## Jit Issue Management\n\nThe listed dependency `527bf0a6` is `done` in the provided issue context. `./scripts/jit-validate.sh` passed.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
