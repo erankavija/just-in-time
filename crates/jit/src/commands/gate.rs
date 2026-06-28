@@ -168,6 +168,59 @@ pub struct GateRemoveResult {
     pub not_found: Vec<String>,
 }
 
+/// Mutable fields for [`update_gate`](CommandExecutor::update_gate).
+///
+/// Each `Some` field replaces the gate's current value; each `None` leaves it
+/// unchanged. The gate KEY is the gate's identity and is therefore not part of
+/// this struct. The checker fields (`checker_command`, `timeout`,
+/// `working_dir`, `pass_context`, `prompt`, `prompt_file`, `env`) are merged
+/// onto the gate's existing checker so an unprovided field is preserved.
+#[derive(Debug, Default, Clone)]
+pub struct GateUpdate {
+    /// New human-readable title.
+    pub title: Option<String>,
+    /// New description.
+    pub description: Option<String>,
+    /// New gate stage.
+    pub stage: Option<crate::domain::GateStage>,
+    /// New gate mode (manual or auto).
+    pub mode: Option<crate::domain::GateMode>,
+    /// New execution priority.
+    pub priority: Option<u32>,
+    /// New checker command.
+    pub checker_command: Option<String>,
+    /// New checker timeout in seconds.
+    pub timeout: Option<u64>,
+    /// New checker working directory (relative to repo root).
+    pub working_dir: Option<String>,
+    /// New `pass_context` flag for the checker.
+    pub pass_context: Option<bool>,
+    /// New inline prompt for the checker.
+    pub prompt: Option<String>,
+    /// New prompt-file path for the checker.
+    pub prompt_file: Option<String>,
+    /// Replacement environment set for the checker (replaces the whole map).
+    pub env: Option<std::collections::HashMap<String, String>>,
+}
+
+impl GateUpdate {
+    /// `true` when no field is set, i.e. the update would change nothing.
+    pub fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.description.is_none()
+            && self.stage.is_none()
+            && self.mode.is_none()
+            && self.priority.is_none()
+            && self.checker_command.is_none()
+            && self.timeout.is_none()
+            && self.working_dir.is_none()
+            && self.pass_context.is_none()
+            && self.prompt.is_none()
+            && self.prompt_file.is_none()
+            && self.env.is_none()
+    }
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Add a single gate to an issue.
     ///
@@ -690,6 +743,155 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         self.storage.save_gate_registry(&registry)?;
         Ok(())
+    }
+
+    /// Update an existing gate's mutable fields in the registry.
+    ///
+    /// Only the `Some` fields of `update` change; every other field keeps its
+    /// current value. The gate KEY is its identity and is never modified. The
+    /// write goes through [`save_gate_registry`](crate::storage::IssueStore::save_gate_registry)
+    /// (atomic temp-file + rename), and no per-issue `gates_status` is touched —
+    /// this edits the registry definition only.
+    ///
+    /// Updating a key that is not in the registry is a typed
+    /// [`GateNotFoundError`](crate::storage::GateNotFoundError) (exit code `3`).
+    /// Mirroring [`define_gate`](Self::define_gate): a gate that ends up in
+    /// automated mode must have a checker command, and a manual gate carries no
+    /// checker.
+    ///
+    /// Returns the updated [`Gate`] so callers can render it.
+    pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<Gate> {
+        use crate::domain::{GateChecker, GateMode};
+
+        // Global operation - enforce common history with main (mirrors define_gate).
+        crate::commands::worktree::enforce_main_only_operations()?;
+
+        let mut registry = self.storage.load_gate_registry()?;
+
+        let current = registry
+            .gates
+            .get(key)
+            .cloned()
+            .ok_or_else(|| crate::storage::GateNotFoundError::by_key(key))?;
+
+        let final_mode = update.mode.unwrap_or(current.mode);
+
+        // Decompose the existing checker (if any) and apply per-field overrides,
+        // so an unprovided checker field is preserved. A new checker is only
+        // synthesized when the gate had none AND at least one checker field is
+        // provided.
+        let any_checker_field = update.checker_command.is_some()
+            || update.timeout.is_some()
+            || update.working_dir.is_some()
+            || update.pass_context.is_some()
+            || update.prompt.is_some()
+            || update.prompt_file.is_some()
+            || update.env.is_some();
+
+        let merged_checker = if current.checker.is_some() || any_checker_field {
+            let (
+                mut command,
+                mut timeout_seconds,
+                mut working_dir,
+                mut env,
+                mut pass_context,
+                mut prompt,
+                mut prompt_file,
+            ) = match current.checker.clone() {
+                Some(GateChecker::Exec {
+                    command,
+                    timeout_seconds,
+                    working_dir,
+                    env,
+                    pass_context,
+                    prompt,
+                    prompt_file,
+                }) => (
+                    command,
+                    timeout_seconds,
+                    working_dir,
+                    env,
+                    pass_context,
+                    prompt,
+                    prompt_file,
+                ),
+                None => (
+                    String::new(),
+                    300u64,
+                    None,
+                    std::collections::HashMap::new(),
+                    false,
+                    None,
+                    None,
+                ),
+            };
+            if let Some(c) = update.checker_command {
+                command = c;
+            }
+            if let Some(t) = update.timeout {
+                timeout_seconds = t;
+            }
+            if let Some(wd) = update.working_dir {
+                working_dir = Some(wd);
+            }
+            if let Some(e) = update.env {
+                env = e;
+            }
+            if let Some(pc) = update.pass_context {
+                pass_context = pc;
+            }
+            if let Some(p) = update.prompt {
+                prompt = Some(p);
+            }
+            if let Some(pf) = update.prompt_file {
+                prompt_file = Some(pf);
+            }
+            Some(GateChecker::Exec {
+                command,
+                timeout_seconds,
+                working_dir,
+                env,
+                pass_context,
+                prompt,
+                prompt_file,
+            })
+        } else {
+            None
+        };
+
+        // Manual gates carry no checker (mirror define_gate).
+        let final_checker = if final_mode == GateMode::Manual {
+            None
+        } else {
+            merged_checker
+        };
+
+        // Automated gates must have a checker command (mirror define_gate).
+        if final_mode == GateMode::Auto
+            && !matches!(&final_checker, Some(GateChecker::Exec { command, .. }) if !command.is_empty())
+        {
+            return Err(anyhow!(
+                "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
+            ));
+        }
+
+        let updated = Gate {
+            version: current.version,
+            key: current.key.clone(),
+            title: update.title.unwrap_or(current.title),
+            description: update.description.unwrap_or(current.description),
+            stage: update.stage.unwrap_or(current.stage),
+            mode: final_mode,
+            checker: final_checker,
+            priority: update.priority.unwrap_or(current.priority),
+            reserved: current.reserved,
+            auto: final_mode == GateMode::Auto,
+            example_integration: current.example_integration,
+        };
+
+        registry.gates.insert(updated.key.clone(), updated.clone());
+        self.storage.save_gate_registry(&registry)?;
+        Ok(updated)
     }
 
     pub fn remove_gate_definition(&self, key: &str) -> Result<()> {

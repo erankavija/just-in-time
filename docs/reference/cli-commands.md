@@ -1259,6 +1259,56 @@ jit gate define review \
   --env REVIEWER_AGENT="codex review -"
 ```
 
+### `jit gate update`
+
+Edit an existing gate definition in the registry without hand-editing the
+registry file. Only the fields you pass change; every other field keeps its
+current value. The gate KEY is the gate's identity and cannot be changed. This
+edits the registry definition only — per-issue gate status (`gates_status`) is
+left untouched. The write is atomic (temp-file + rename).
+
+**Usage:**
+```bash
+jit gate update <KEY> [OPTIONS]
+```
+
+**Arguments:**
+- `KEY` - Exact registry key of the gate to update
+
+**Optional (each leaves its field unchanged when omitted):**
+- `--title <TITLE>` - New human-readable name
+- `--description <DESCRIPTION>` - New description
+- `--stage <STAGE>` - New stage: `precheck` or `postcheck`
+- `--mode <MODE>` - New mode: `manual` or `auto`
+- `--auto` - Convenience flag for `--mode auto` (overrides `--mode` when both are given)
+- `--checker-command <COMMAND>` - New checker command for automated gates
+- `--timeout <SECONDS>` - New checker timeout in seconds
+- `--working-dir <PATH>` - New checker working directory (relative to repo root)
+- `--pass-context` - Enable passing structured context to the checker
+- `--prompt <TEXT>` - New inline prompt/instructions
+- `--prompt-file <PATH>` - New prompt file path (relative to repo root)
+- `--env <KEY=VALUE>` - Checker environment variable (repeatable); when provided, replaces the gate's existing environment set
+- `--priority <N>` - New execution priority (lower runs first)
+- `--json` - Emit the updated gate definition as JSON
+
+Switching a gate to `auto` (via `--mode auto` or `--auto`) requires the gate to
+have a checker command — supply `--checker-command` in the same call if the gate
+had none. Switching to `manual` drops the checker. At least one field must be
+provided; an update with no fields is an `INVALID_ARGUMENT` error. Updating a key
+that is not in the registry is a `GATE_NOT_FOUND` error.
+
+**Examples:**
+```bash
+# Rename a gate
+jit gate update tests --title "All Tests Pass"
+
+# Raise the checker timeout, leaving everything else as-is
+jit gate update tests --timeout 600
+
+# Repoint an automated gate's checker command
+jit gate update tests --checker-command "cargo test --workspace"
+```
+
 ### `jit gate add`
 
 Add gate requirements to an issue. Gates must be defined in registry first.

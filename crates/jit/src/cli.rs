@@ -1036,6 +1036,77 @@ pub enum GateCommands {
         json: bool,
     },
 
+    /// Update an existing gate definition in the registry
+    ///
+    /// Edits only the fields you pass; every other field keeps its current
+    /// value. The gate KEY is the gate's identity and cannot be changed. This
+    /// edits the registry definition only — per-issue gate status is untouched.
+    ///
+    /// Examples:
+    ///   jit gate update tests --title "All Tests Pass"
+    ///   jit gate update tests --timeout 600 --checker-command "cargo test"
+    Update {
+        /// Gate key to update (exact registry key)
+        key: String,
+
+        /// New human-readable title
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// New description of what this gate checks
+        #[arg(short = 'd', long)]
+        description: Option<String>,
+
+        /// New gate stage: precheck or postcheck
+        #[arg(short, long, value_enum)]
+        stage: Option<crate::domain::GateStage>,
+
+        /// New gate mode: manual or auto
+        #[arg(short, long, value_enum)]
+        mode: Option<crate::domain::GateMode>,
+
+        /// Convenience flag for `--mode auto`: switch the gate to automated.
+        /// When set it overrides `--mode`.
+        #[arg(long)]
+        auto: bool,
+
+        /// New command to execute for automated gates
+        #[arg(long)]
+        checker_command: Option<String>,
+
+        /// New timeout in seconds for the checker command
+        #[arg(long)]
+        timeout: Option<u64>,
+
+        /// New working directory for the checker (relative to repo root)
+        #[arg(long)]
+        working_dir: Option<String>,
+
+        /// Enable passing structured context (issue data, run history, prompt) to the checker
+        #[arg(long)]
+        pass_context: bool,
+
+        /// New inline prompt/instructions for the checker process
+        #[arg(long)]
+        prompt: Option<String>,
+
+        /// New path to a prompt file (relative to repo root), read at check time
+        #[arg(long)]
+        prompt_file: Option<String>,
+
+        /// Environment variables for the checker (repeatable, format: KEY=VALUE).
+        /// When provided, replaces the gate's existing environment set.
+        #[arg(long)]
+        env: Vec<String>,
+
+        /// New execution priority (lower number runs first)
+        #[arg(long)]
+        priority: Option<u32>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// List all gate definitions
     List {
         #[arg(long)]

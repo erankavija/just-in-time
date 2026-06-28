@@ -2434,6 +2434,117 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            GateCommands::Update {
+                key,
+                title,
+                description,
+                stage,
+                mode,
+                auto,
+                checker_command,
+                timeout,
+                working_dir,
+                pass_context,
+                prompt,
+                prompt_file,
+                env,
+                priority,
+                json,
+            } => {
+                use jit::commands::GateUpdate;
+
+                let output_ctx = OutputContext::new(quiet, json);
+
+                // `--auto` is a convenience spelling of `--mode auto`; it wins
+                // over `--mode` when both are supplied.
+                let mode = if auto {
+                    Some(jit::domain::GateMode::Auto)
+                } else {
+                    mode
+                };
+
+                // An empty `--env` list means "leave the checker env unchanged";
+                // a non-empty list replaces the whole set. Parse KEY=VALUE pairs
+                // through the typed/JSON arg-error path (no eprintln + exit).
+                let env_update = if env.is_empty() {
+                    None
+                } else {
+                    let parsed: std::result::Result<
+                        std::collections::HashMap<String, String>,
+                        String,
+                    > = env
+                        .into_iter()
+                        .map(|pair| {
+                            pair.split_once('=')
+                                .map(|(k, v)| (k.to_string(), v.to_string()))
+                                .ok_or_else(|| {
+                                    format!("Invalid --env format '{}': expected KEY=VALUE", pair)
+                                })
+                        })
+                        .collect();
+                    match parsed {
+                        Ok(map) => Some(map),
+                        Err(msg) => return Err(invalid_argument(msg, "gate update", json)),
+                    }
+                };
+
+                let update = GateUpdate {
+                    title,
+                    description,
+                    stage,
+                    mode,
+                    priority,
+                    checker_command,
+                    timeout,
+                    working_dir,
+                    // A bare `--pass-context` enables the flag; absence leaves it
+                    // unchanged (it cannot be cleared via update).
+                    pass_context: if pass_context { Some(true) } else { None },
+                    prompt,
+                    prompt_file,
+                    env: env_update,
+                };
+
+                if update.is_empty() {
+                    return Err(invalid_argument(
+                        "no fields to update; provide at least one field to change \
+                         (e.g. --title, --description, --mode, --checker-command)"
+                            .to_string(),
+                        "gate update",
+                        json,
+                    ));
+                }
+
+                match executor.update_gate(&key, update) {
+                    Ok(gate) => {
+                        if json {
+                            use jit::output::JsonOutput;
+                            let msg = format!("Updated gate '{}'", gate.key);
+                            let output = JsonOutput::success(gate, "gate update").with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let _ = output_ctx.print_success(format!("Updated gate '{}'", key));
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error = if e
+                                .downcast_ref::<jit::storage::GateNotFoundError>()
+                                .is_some()
+                            {
+                                JsonError::gate_not_found(&key, "gate update")
+                            } else {
+                                JsonError::new("GATE_ERROR", e.to_string(), "gate update")
+                            };
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
             GateCommands::List { json } => {
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.list_gates() {
