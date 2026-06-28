@@ -37,6 +37,7 @@ fn create_labeled(exec: &CommandExecutor<JsonFileStorage>, title: &str, labels: 
             vec![],
             labels.iter().map(|s| s.to_string()).collect(),
             None,
+            None,
             false,
         )
         .unwrap();
@@ -99,6 +100,7 @@ unique = true
         Priority::Normal,
         vec![],
         vec!["priority:high".to_string(), "priority:low".to_string()],
+        None,
         None,
         false,
     );

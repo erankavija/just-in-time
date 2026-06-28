@@ -624,6 +624,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 vec![],
                 labels,
                 None,
+                None,
                 false,
             )?;
             warnings.append(&mut create_warnings);

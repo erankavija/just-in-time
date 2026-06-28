@@ -374,6 +374,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     def.gates.clone(),
                     labels,
                     None,
+                    None,
                     false,
                 )
                 .map_err(|e| Self::batch_write_error(&created, &def.key, "create", e))?;

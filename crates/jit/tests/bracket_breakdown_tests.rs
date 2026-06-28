@@ -116,6 +116,7 @@ fn scaffold_container(h: &TestHarness, template: &GraphTemplate, title: &str) ->
             vec![],
             vec!["type:epic".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -307,6 +308,7 @@ fn test_bracket_breakdown_children_carry_membership_not_bracket_types() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string(), "epic:auth".to_string()],
+            None,
             None,
             false,
         )
@@ -531,6 +533,7 @@ fn test_bracket_breakdown_rejects_non_breakable_container() {
             vec![],
             vec!["type:task".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -558,6 +561,7 @@ fn test_bracket_breakdown_errors_when_bracket_absent_points_at_apply_plan() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             None,
             false,
         )
@@ -660,6 +664,7 @@ fn test_bracket_breakdown_reads_template_from_disk() {
             vec![],
             vec!["type:epic".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -698,6 +703,7 @@ fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
             Priority::Normal,
             vec![],
             vec!["type:epic".to_string()],
+            None,
             None,
             false,
         )

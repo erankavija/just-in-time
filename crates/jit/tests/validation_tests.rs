@@ -20,6 +20,7 @@ fn test_validation_detects_broken_dependency() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -31,6 +32,7 @@ fn test_validation_detects_broken_dependency() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -66,6 +68,7 @@ fn test_validation_detects_cycle() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -76,6 +79,7 @@ fn test_validation_detects_cycle() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -110,6 +114,7 @@ fn test_validation_passes_with_valid_graph() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -121,6 +126,7 @@ fn test_validation_passes_with_valid_graph() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -131,6 +137,7 @@ fn test_validation_passes_with_valid_graph() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -155,6 +162,7 @@ fn test_validation_detects_multiple_broken_dependencies() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -196,6 +204,7 @@ fn test_validation_detects_invalid_gate_reference() {
             vec!["nonexistent-gate".to_string()],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -223,6 +232,7 @@ fn test_validation_detects_isolated_issues() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -234,6 +244,7 @@ fn test_validation_detects_isolated_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -249,6 +260,7 @@ fn test_validation_detects_isolated_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -275,6 +287,7 @@ fn test_validation_passes_with_all_connected_issues() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -287,6 +300,7 @@ fn test_validation_passes_with_all_connected_issues() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -298,6 +312,7 @@ fn test_validation_passes_with_all_connected_issues() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -324,6 +339,7 @@ fn test_validation_passes_with_single_issue() {
             Priority::Normal,
             vec![],
             vec![],
+            None,
             None,
             false,
         )

@@ -1035,6 +1035,7 @@ mod tests {
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -1045,6 +1046,7 @@ mod tests {
                 Priority::High,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1088,6 +1090,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -1098,6 +1101,7 @@ enforce_leases = "off"
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1135,6 +1139,7 @@ enforce_leases = "off"
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1440,6 +1445,7 @@ pattern = '^v\d+\.\d+$'
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -1556,6 +1562,7 @@ pattern = '^v\d+\.\d+$'
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1891,6 +1898,7 @@ pattern = '^v\d+\.\d+$'
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -1953,6 +1961,7 @@ pattern = '^v\d+\.\d+$'
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -2019,6 +2028,7 @@ pattern = '^v\d+\.\d+$'
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -2421,6 +2431,7 @@ pattern = '^v\d+\.\d+$'
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -2585,6 +2596,7 @@ pattern = '^v\d+\.\d+$'
                 Priority::Normal,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )

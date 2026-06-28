@@ -66,6 +66,7 @@ fn create_typed(jit_dir: &std::path::Path, type_label: &str) -> Vec<String> {
             vec![],
             vec![type_label.to_string()],
             None,
+            None,
             false,
         )
         .unwrap();

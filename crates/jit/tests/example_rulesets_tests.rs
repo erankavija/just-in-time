@@ -761,6 +761,7 @@ mod sdd_lifecycle {
             vec![],
             vec![],
             None,
+            None,
             false,
         );
 
@@ -871,6 +872,7 @@ mod sdd_lifecycle {
             Some(State::Done),
             vec![],
             vec![],
+            None,
             None,
             false,
         );
@@ -1628,6 +1630,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
             Some(State::Done),
             vec![],
             vec![],
+            None,
             None,
             false,
         );

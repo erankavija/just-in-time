@@ -189,6 +189,73 @@ fn test_update_type_flag_writes_label() {
     );
 }
 
+/// `--type` REPLACES any prior `type:*` label rather than accumulating a second
+/// one: the command layer derives a single canonical `type:<kind>` label. A
+/// create gets the configured default type, and `update --type story` must leave
+/// exactly one `type:` label (`type:story`).
+#[test]
+fn test_update_type_flag_replaces_existing_type_label() {
+    let repo = setup_repo();
+    // Create without explicit type (gets the configured default type label).
+    let out = create(&repo, &["Replace Type Test"]);
+    assert!(out.status.success());
+    let id = first_issue_id(&repo);
+
+    let out = Command::new(jit_binary())
+        .args(["issue", "update", &id, "--type", "story"])
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "update --type story should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let issue = show(&repo, &id);
+    let type_labels: Vec<&str> = issue["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .filter(|l| l.starts_with("type:"))
+        .collect();
+    assert_eq!(
+        type_labels,
+        vec!["type:story"],
+        "update --type must leave exactly one type label, got: {:?}",
+        type_labels
+    );
+}
+
+/// `--type` on create overrides the configured default type rather than adding a
+/// second `type:*` label.
+#[test]
+fn test_create_type_flag_overrides_default_type() {
+    let repo = setup_repo();
+    let out = create(&repo, &["Override Default Type", "--type", "epic"]);
+    assert!(
+        out.status.success(),
+        "--type epic should succeed; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let id = first_issue_id(&repo);
+    let issue = show(&repo, &id);
+    let type_labels: Vec<&str> = issue["labels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .filter(|l| l.starts_with("type:"))
+        .collect();
+    assert_eq!(
+        type_labels,
+        vec!["type:epic"],
+        "create --type must produce exactly one type label, got: {:?}",
+        type_labels
+    );
+}
+
 /// `issue update <id> --type <undeclared>` is rejected.
 #[test]
 fn test_update_unknown_type_is_rejected() {

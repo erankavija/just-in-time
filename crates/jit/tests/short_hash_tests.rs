@@ -176,7 +176,18 @@ fn test_cli_update_with_short_hash() {
     let prefix = &id[..8];
     let _ = h
         .executor
-        .update_issue(prefix, None, None, None, None, vec![], vec![], None, false)
+        .update_issue(
+            prefix,
+            None,
+            None,
+            None,
+            None,
+            vec![],
+            vec![],
+            None,
+            None,
+            false,
+        )
         .unwrap();
 
     // Verify it worked

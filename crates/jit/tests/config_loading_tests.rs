@@ -105,6 +105,7 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
             Vec::new(),
             vec!["type:task".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();

@@ -87,6 +87,7 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
             vec![],
             vec!["type:epic".to_string(), "area:auth".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -236,6 +237,7 @@ fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
             vec![],
             vec!["type:task".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -326,6 +328,7 @@ fn test_apply_rejects_legacy_planning_only_bracket() {
             vec![],
             vec!["type:planning".to_string()],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -370,6 +373,7 @@ fn test_force_refreshes_nodes_in_place_without_duplicating() {
             None,
             vec![],
             vec![],
+            None,
             None,
             false,
         )

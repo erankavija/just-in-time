@@ -74,6 +74,7 @@ fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
         vec![],
         vec![],
         None,
+        None,
         false,
     );
 
@@ -111,6 +112,7 @@ fn test_blocked_transition_records_event_in_log() {
         Some(State::Done),
         vec![],
         vec![],
+        None,
         None,
         false,
     );
@@ -158,6 +160,7 @@ fn test_force_bypasses_blocking_and_logs_graph_rule_bypassed_event() {
         Some(State::Done),
         vec![],
         vec![],
+        None,
         None,
         true, // --force
     );
@@ -221,6 +224,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .expect("a non-enforcing finding must not block the transition");
@@ -274,6 +278,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .expect("transition should succeed");
@@ -320,6 +325,7 @@ fn test_gated_diversion_runs_before_graph_enforcement() {
         Some(State::Done),
         vec![],
         vec![],
+        None,
         None,
         false,
     );
@@ -373,6 +379,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         vec![],
         vec![],
         None,
+        None,
         false,
     );
     let err = result.expect_err("the gated-keyed rule must block the diversion");
@@ -422,6 +429,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         vec![],
         vec![],
         None,
+        None,
         false,
     );
     let err = result.expect_err("unpassed gate still blocks done");
@@ -469,6 +477,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         Some(State::Done),
         vec![],
         vec![],
+        None,
         None,
         true, // --force
     );
@@ -535,6 +544,7 @@ fn test_enforce_rule_config_error_blocks_transition() {
         vec![],
         vec![],
         None,
+        None,
         false,
     );
 
@@ -585,6 +595,7 @@ assert = { dependency-shape = { mode = "must" } }
             Some(State::Done),
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -883,6 +894,7 @@ fn test_done_rule_does_not_fire_on_non_done_transition() {
         Some(State::Ready),
         vec![],
         vec![],
+        None,
         None,
         false,
     );

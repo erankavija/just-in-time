@@ -53,6 +53,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             vec![],
             vec![],
             None,
+            None,
             false,
         )
         .unwrap();
@@ -68,6 +69,7 @@ fn test_issue_lifecycle_works_without_coordinator() {
             None,
             vec![],
             vec![],
+            None,
             None,
             false,
         )
@@ -138,6 +140,7 @@ fn test_gates_work_without_coordinator() {
         Some(jit::domain::State::Done),
         vec![],
         vec![],
+        None,
         None,
         false,
     );

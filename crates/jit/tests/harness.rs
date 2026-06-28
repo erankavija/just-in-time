@@ -87,6 +87,7 @@ source-of-truth = \"registry-first\"
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -105,6 +106,7 @@ source-of-truth = \"registry-first\"
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -122,6 +124,7 @@ source-of-truth = \"registry-first\"
                 priority,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -144,6 +147,7 @@ source-of-truth = \"registry-first\"
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -161,6 +165,7 @@ source-of-truth = \"registry-first\"
                 Priority::Normal,
                 gates,
                 vec![],
+                None,
                 None,
                 false,
             )

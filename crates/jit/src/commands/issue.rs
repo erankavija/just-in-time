@@ -5,6 +5,31 @@ use crate::errors::{TransitionBlockedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Validate an `--type <kind>` value and return the canonical `type:<kind>`
+    /// label.
+    ///
+    /// Kind validity is checked against the repository's configured
+    /// `[type_hierarchy]` — the same declaration the `default:type-hierarchy-known`
+    /// schema is generated from (`validation::defaults`). That write-path rule
+    /// only WARNS on an unknown type, so `issue create`/`update` validate the kind
+    /// explicitly here to produce a hard error. When no hierarchy is configured
+    /// every kind is accepted, matching the rule's behavior. No type list is
+    /// hardcoded; the source of truth is config.
+    fn validate_type_kind(&self, kind: &str) -> Result<String> {
+        if let Some(hierarchy) = self.cached_config()?.type_hierarchy.as_ref() {
+            if !hierarchy.types.contains_key(kind) {
+                let mut known: Vec<&str> = hierarchy.types.keys().map(String::as_str).collect();
+                known.sort();
+                return Err(anyhow!(
+                    "unknown issue type '{}'; declared types are: {}",
+                    kind,
+                    known.join(", ")
+                ));
+            }
+        }
+        Ok(label_utils::type_label(kind))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create_issue(
         &self,
@@ -14,6 +39,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         gates: Vec<String>,
         mut labels: Vec<String>,
         content_format: Option<crate::domain::ContentFormat>,
+        issue_type: Option<String>,
         force: bool,
     ) -> Result<(String, Vec<String>)> {
         // Config comes from the executor cache so it is not re-parsed per call.
@@ -22,6 +48,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `validate_for_write` (a0f0f342 migration) — no inline format/uniqueness
         // check remains here.
         let config = self.cached_config()?;
+
+        // REQ-02: an explicit `--type <kind>` derives the canonical `type:<kind>`
+        // label, replacing any caller-supplied `type:*` label. The command layer
+        // owns this derivation (the CLI only forwards the typed value); kind
+        // validity routes through `validate_type_kind` against the configured
+        // `[type_hierarchy]`. Applied BEFORE the default-type fallback so an
+        // explicit type suppresses the default.
+        if let Some(kind) = issue_type {
+            let type_label = self.validate_type_kind(&kind)?;
+            labels.retain(|label| !label_utils::is_type_label(label));
+            labels.push(type_label);
+        }
 
         // Apply the configured default type when the issue carries no `type:*`
         // label. This is a write-time CONVENIENCE (not validation enforcement), so
@@ -181,6 +219,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Tri-state: `None` leaves the field unchanged; `Some(None)` clears the
         // override back to repo-default inheritance; `Some(Some(fmt))` sets it.
         content_format: Option<Option<crate::domain::ContentFormat>>,
+        issue_type: Option<String>,
         force: bool,
     ) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
@@ -228,6 +267,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
         for label in &remove_labels {
             issue.labels.retain(|l| l != label);
+        }
+
+        // REQ-02: an explicit `--type <kind>` rewrites the issue's `type:<kind>`
+        // label in place, replacing any existing `type:*` label. The command
+        // layer owns this (the CLI only forwards the typed value); kind validity
+        // routes through `validate_type_kind` against the configured
+        // `[type_hierarchy]`. Runs after the generic add/remove so the typed flag
+        // is authoritative for the `type` namespace.
+        if let Some(kind) = issue_type {
+            let type_label = self.validate_type_kind(&kind)?;
+            issue
+                .labels
+                .retain(|label| !label_utils::is_type_label(label));
+            issue.labels.push(type_label);
         }
 
         // Which editable fields actually changed (not merely whether edit flags
@@ -1180,6 +1233,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 None,
+                None,
                 false
             )
             .is_err());
@@ -1198,6 +1252,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 None,
                 false
             )
@@ -1240,6 +1295,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 Some(Some(ContentFormat::Html)),
+                None,
                 false,
             )
             .unwrap();
@@ -1262,6 +1318,7 @@ enforce_leases = "off"
                 None,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1287,6 +1344,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 Some(None),
+                None,
                 false,
             )
             .unwrap();
@@ -1325,6 +1383,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 None,
+                None,
                 false
             )
             .is_err());
@@ -1339,6 +1398,7 @@ enforce_leases = "off"
             Some(State::Done),
             vec![],
             vec![],
+            None,
             None,
             false,
         );
@@ -1395,6 +1455,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 None,
+                None,
                 false
             )
             .is_err());
@@ -1412,6 +1473,7 @@ enforce_leases = "off"
                 Some(State::Done),
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1492,6 +1554,7 @@ enforce_leases = "off"
                 vec![],
                 vec![],
                 None,
+                None,
                 false,
             )
             .unwrap();
@@ -1527,6 +1590,7 @@ enforce_leases = "off"
                 None,
                 vec![],
                 vec![],
+                None,
                 None,
                 false,
             )
@@ -1738,6 +1802,7 @@ enforce_leases = "off"
             Some(State::Ready), // state
             vec![],             // add_labels
             vec![],             // remove_labels
+            None,
             None,
             false, // force
         );
