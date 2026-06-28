@@ -418,7 +418,7 @@ fn setup_gitattributes() -> Result<()> {
     Ok(())
 }
 
-fn print_gate_run_details(result: &GateRunResult, result_path: &std::path::Path) {
+fn print_gate_run_details(result: &GateRunResult) {
     let status_str = match result.status {
         jit::domain::GateRunStatus::Passed => "passed",
         jit::domain::GateRunStatus::Failed => "failed",
@@ -448,14 +448,13 @@ fn print_gate_run_details(result: &GateRunResult, result_path: &std::path::Path)
         println!("  Commit: {}", commit);
     }
     if !result.stdout.is_empty() {
-        let lines: Vec<&str> = result.stdout.lines().take(20).collect();
+        let lines: Vec<&str> = result.stdout.lines().collect();
         println!("  stdout:\n    {}", lines.join("\n    "));
     }
     if !result.stderr.is_empty() {
-        let lines: Vec<&str> = result.stderr.lines().take(20).collect();
+        let lines: Vec<&str> = result.stderr.lines().collect();
         println!("  stderr:\n    {}", lines.join("\n    "));
     }
-    println!("  Full output: {}", result_path.display());
 }
 
 /// Print a dependency tree with tree symbols (├─, └─, │)
@@ -2387,10 +2386,7 @@ fn run() -> Result<()> {
                                 JsonOutput::success(result, "gate check").with_message(msg);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            print_gate_run_details(
-                                &result,
-                                &executor.storage().result_path(&result.run_id),
-                            );
+                            print_gate_run_details(&result);
                             let _ = output_ctx;
                         }
                     }
@@ -2466,10 +2462,7 @@ fn run() -> Result<()> {
                 } else {
                     let _ = output_ctx.print_info(format!("Gate run results for issue {}:", id));
                     for result in &results {
-                        print_gate_run_details(
-                            result,
-                            &executor.storage().result_path(&result.run_id),
-                        );
+                        print_gate_run_details(result);
                     }
                     for gate_key in not_run {
                         println!(

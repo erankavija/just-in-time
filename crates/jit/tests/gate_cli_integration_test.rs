@@ -981,3 +981,42 @@ fn test_gate_env_vars_passed_to_checker() {
         stdout
     );
 }
+
+#[test]
+fn test_gate_check_shows_complete_report_without_truncation() {
+    // Checker that produces 25 lines of stdout (more than the old 20-line truncation limit)
+    let checker_cmd =
+        "sh -c 'i=1; while [ $i -le 25 ]; do echo \"output-line-$i\"; i=$((i+1)); done'";
+    let (temp, issue_id) = setup_auto_gate_issue(checker_cmd);
+
+    // Run the gate to record a result with 25 lines of stdout
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .assert()
+        .success();
+
+    // gate check must emit the full stored report — line 21 must appear
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "test-gate"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout_str = String::from_utf8_lossy(&output);
+
+    assert!(
+        stdout_str.contains("output-line-21"),
+        "gate check must emit the full report; line 21 was absent. Output:\n{}",
+        stdout_str
+    );
+
+    assert!(
+        !stdout_str.contains("Full output:"),
+        "gate check must not substitute a file path for the report body. Output:\n{}",
+        stdout_str
+    );
+}
