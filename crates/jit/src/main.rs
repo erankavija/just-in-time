@@ -989,9 +989,37 @@ fn run() -> Result<()> {
         }
     }
 
+    // Normalize top-level first-guess aliases into their canonical noun/verb form
+    // so `jit rdeps <id>` and `jit list` resolve to `jit graph rdeps` /
+    // `jit issue list` and reuse those handlers verbatim.
+    let command = match command {
+        Commands::Rdeps { id, depth, json } => {
+            Commands::Graph(GraphCommands::Rdeps { id, depth, json })
+        }
+        Commands::List {
+            state,
+            assignee,
+            priority,
+            label,
+            full,
+            json,
+        } => Commands::Issue(IssueCommands::List {
+            state,
+            assignee,
+            priority,
+            label,
+            full,
+            json,
+        }),
+        other => other,
+    };
+
     match command {
         Commands::Init { .. } => {
             // Already handled above
+        }
+        Commands::Rdeps { .. } | Commands::List { .. } => {
+            unreachable!("top-level rdeps/list are normalized to canonical commands above")
         }
         Commands::Version { .. } => unreachable!("version is handled before repository validation"),
         Commands::Issue(issue_cmd) => {
@@ -2111,6 +2139,7 @@ fn run() -> Result<()> {
                 description,
                 stage,
                 mode,
+                auto,
                 checker_command,
                 timeout,
                 working_dir,
@@ -2122,6 +2151,14 @@ fn run() -> Result<()> {
                 json,
             } => {
                 use jit::domain::GateChecker;
+
+                // `--auto` is a convenience spelling of `--mode auto`; it wins
+                // over `--mode` when both are supplied.
+                let mode = if auto {
+                    jit::domain::GateMode::Auto
+                } else {
+                    mode
+                };
 
                 let output_ctx = OutputContext::new(quiet, json);
 
@@ -2303,6 +2340,44 @@ fn run() -> Result<()> {
             }
             GateCommands::Check { id, gate_key, json } => {
                 let output_ctx = OutputContext::new(quiet, json);
+
+                // Transposed-argument guard. The canonical form is
+                // `jit gate check <issue> <gate-key>`. If <id> is not an issue but
+                // <gate_key> resolves to one and <id> is a registered gate key, the
+                // two positionals are almost certainly swapped, so emit an
+                // actionable did-you-mean rather than misparsing into
+                // "issue not found".
+                if executor.storage().resolve_issue_id(&id).is_err() {
+                    let gate_key_is_issue = executor.storage().resolve_issue_id(&gate_key).is_ok();
+                    let id_is_gate = executor
+                        .list_gates()
+                        .map(|gates| gates.iter().any(|g| g.key == id))
+                        .unwrap_or(false);
+                    if gate_key_is_issue && id_is_gate {
+                        let canonical = format!("jit gate check {} {}", gate_key, id);
+                        let message = format!(
+                            "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
+                        );
+                        if json {
+                            use jit::output::JsonError;
+                            let json_error =
+                                JsonError::new("INVALID_ARGUMENT", message, "gate check")
+                                    .with_details(serde_json::json!({
+                                        "issue_id": gate_key,
+                                        "gate_key": id,
+                                        "transposed": true,
+                                    }))
+                                    .with_suggestion(format!("Did you mean: {canonical}"));
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            eprintln!("Error: {message}");
+                            eprintln!("  Did you mean: {canonical}");
+                            std::process::exit(2);
+                        }
+                    }
+                }
+
                 match executor.get_last_gate_run(&id, &gate_key) {
                     Ok(Some(result)) => {
                         if json {

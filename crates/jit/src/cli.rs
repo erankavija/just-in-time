@@ -48,6 +48,35 @@ pub enum Commands {
     #[command(subcommand)]
     Issue(IssueCommands),
 
+    /// List issues (top-level alias for `jit issue list`)
+    ///
+    /// Convenience first-guess spelling that routes to the canonical
+    /// `jit issue list`. Accepts the same filters and behaves identically.
+    List {
+        /// Filter by state
+        #[arg(short = 's', long)]
+        state: Option<String>,
+
+        /// Filter by assignee (format: type:identifier)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by priority
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern (exact match or wildcard)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries
+        #[arg(long)]
+        full: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Apply a graph template to a container (plan-before-fan-out scaffold)
     ///
     /// Instantiates the named template from `.jit/templates.toml` onto
@@ -119,6 +148,22 @@ pub enum Commands {
     /// Graph query commands
     #[command(subcommand)]
     Graph(GraphCommands),
+
+    /// Reverse dependencies (top-level alias for `jit graph rdeps`)
+    ///
+    /// Convenience first-guess spelling that routes to the canonical
+    /// `jit graph rdeps <id>`: shows the issues that depend on `<id>`.
+    Rdeps {
+        /// Issue ID
+        id: String,
+
+        /// Depth of traversal (1 = immediate, 0 = unlimited)
+        #[arg(long, default_value = "0")]
+        depth: u32,
+
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Query issues for orchestrators
     ///
@@ -918,6 +963,11 @@ pub enum GateCommands {
         #[arg(short, long, value_enum, default_value_t = crate::domain::GateMode::Manual)]
         mode: crate::domain::GateMode,
 
+        /// Convenience flag for `--mode auto`: define the gate as automated.
+        /// When set it overrides `--mode`.
+        #[arg(long)]
+        auto: bool,
+
         /// Command to execute for automated gates
         #[arg(long)]
         checker_command: Option<String>,
@@ -1203,12 +1253,12 @@ pub enum DocCommands {
         #[arg(short, long)]
         commit: Option<String>,
 
-        /// Human-readable label
-        #[arg(short, long)]
+        /// Human-readable label (alias: --title)
+        #[arg(short, long, visible_alias = "title")]
         label: Option<String>,
 
         /// Document type (e.g., design, implementation, notes)
-        #[arg(short = 't', long)]
+        #[arg(long)]
         doc_type: Option<String>,
 
         /// Skip scanning document for assets (default: false)

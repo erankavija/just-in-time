@@ -120,8 +120,9 @@ is never overloaded to mean different options on different commands.
 ### `-t` is reserved for `--title`
 
 `-t` binds to `--title` and nothing else. It already means `--title` on
-`issue create`, `issue update`, `gate define`, and `registry add`. The single
-violation is `doc add`, where `-t` is bound to `--doc-type`.
+`issue create`, `issue update`, `gate define`, and `registry add`. `doc add`
+formerly bound `-t` to `--doc-type`; it has been brought into line (see below) and
+now exposes `--title` as the alias of its human label `--label`.
 
 **Canonical resolution.** `doc add` drops the `-t` short flag; its type selector
 stays as `--doc-type`, long-only. The model already exists in the tree:
@@ -215,7 +216,7 @@ regroup the flat enum.
 | Positional subject vs flag modifier | Issue/gate/path/endpoint positionals; `--json`/filters as flags | — |
 | Positional list vs flag list | `gate add`, `dep add`, `issue show` (positional); `--label`/`--gate` (flag) | — |
 | Issue-id acceptance | `issue show` (documents all three forms) | Gate, claim, and doc issue-subject commands: accept and document full id / short id / prefix uniformly |
-| `-t` = `--title` | `issue create`, `issue update`, `gate define`, `registry add` | `doc add`: drop `-t`, keep `--doc-type` long-only |
+| `-t` = `--title` | `issue create`, `issue update`, `gate define`, `registry add`, `doc add` (`--title` aliases `--label`; `--doc-type` long-only) | — |
 | `-s` = `--state` | `issue list`, `issue search`, `query *` | `gate define`, `registry add`: make `--stage` long-only |
 | Gate config ÷ execution ÷ inspection | Group boundaries are well-defined by behavior | Flat `gate` enum regrouped; `jit registry` reconciled into the `gate` configuration surface |
 

@@ -1221,6 +1221,7 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 **Optional:**
 - `--stage <STAGE>` - When gate runs: `precheck` or `postcheck` (default: `postcheck`)
 - `--mode <MODE>` - How gate is checked: `manual` or `auto` (default: `manual`)
+- `--auto` - Convenience flag for `--mode auto` (overrides `--mode` when both are given)
 - `--checker-command <COMMAND>` - Command to run for automated gates
 - `--timeout <SECONDS>` - Checker timeout in seconds (default: 300)
 - `--working-dir <PATH>` - Working directory for checker (relative to repo root)
