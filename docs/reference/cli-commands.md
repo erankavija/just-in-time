@@ -1346,12 +1346,15 @@ Gate: tests
 
 ### `jit gate check`
 
-Run an automated gate checker for a specific issue.
+Show the last recorded run for a gate on an issue (inspection only, non-mutating).
 
 **Usage:**
 ```bash
 jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
+jit gate check <ISSUE_ID> --gate <GATE_KEY> [--json] [--quiet]
 ```
+
+The gate key may be supplied as a positional argument or via `--gate <key>`. Exactly one form must be used; supplying both or neither is an error.
 
 **Behavior:**
 - Shows the most recent recorded run for the gate
@@ -1360,9 +1363,12 @@ jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
 
 **Examples:**
 ```bash
-# Show the latest recorded run for a single gate
+# Show the latest recorded run for a single gate (positional form)
 jit gate check abc123 tests
 # Gate 'tests' last run: passed (exit code: 0)
+
+# Same command using the flag form
+jit gate check abc123 --gate tests
 
 # Show a failed recorded run
 jit gate check abc123 clippy
@@ -1396,21 +1402,28 @@ Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate pass' to run 
 
 ### `jit gate pass`
 
-Manually mark a gate as passed.
+Run the checker (auto gates) or record attestation (manual gates) for a gate on an issue.
 
 **Usage:**
 ```bash
 jit gate pass <ISSUE_ID> <GATE_KEY> [--by <WHO>] [--force]
+jit gate pass <ISSUE_ID> --gate <GATE_KEY> [--by <WHO>] [--force]
 ```
 
+The gate key may be supplied as a positional argument or via `--gate <key>`. Exactly one form must be used; supplying both or neither is an error.
+
 **Options:**
+- `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
 - `--by <WHO>` - Record who passed the gate (e.g., `human:alice`, `ci:github-actions`)
 - `--force` - Re-run the checker even if the gate already passed at the current HEAD commit
 
 **Examples:**
 ```bash
-# Pass manual gate
+# Pass manual gate (positional form)
 jit gate pass abc123 code-review --by "human:alice"
+
+# Same command using the flag form
+jit gate pass abc123 --gate code-review --by "human:alice"
 
 # Pass without attribution
 jit gate pass abc123 tdd-reminder
@@ -1420,6 +1433,7 @@ jit gate pass abc123 tests --by "human:admin"
 
 # Force a re-run even if it already passed at HEAD
 jit gate pass abc123 tests --force
+jit gate pass abc123 --gate tests --force
 ```
 
 **Behavior:**

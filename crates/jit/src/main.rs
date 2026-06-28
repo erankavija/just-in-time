@@ -418,6 +418,37 @@ fn setup_gitattributes() -> Result<()> {
     Ok(())
 }
 
+/// Resolve the gate key from the CLI's positional-or-flag pair (REQ-03).
+///
+/// Exactly one of `positional` and `flag` must be `Some`; supplying both or
+/// neither exits with an actionable error message.
+fn resolve_gate_key(
+    positional: Option<String>,
+    flag: Option<String>,
+    command: &str,
+) -> Result<String> {
+    match (positional, flag) {
+        (Some(pos), None) => Ok(pos),
+        (None, Some(flag_val)) => Ok(flag_val),
+        (Some(_), Some(_)) => {
+            eprintln!(
+                "Error: provide the gate key as a positional argument OR via --gate, not both.\n\
+                 Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+                 Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+            );
+            std::process::exit(2);
+        }
+        (None, None) => {
+            eprintln!(
+                "Error: a gate key is required; provide it as a positional argument or via --gate.\n\
+                 Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+                 Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+            );
+            std::process::exit(2);
+        }
+    }
+}
+
 fn print_gate_run_details(result: &GateRunResult) {
     let status_str = match result.status {
         jit::domain::GateRunStatus::Passed => "passed",
@@ -2407,7 +2438,13 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::Check { id, gate_key, json } => {
+            GateCommands::Check {
+                id,
+                gate_key,
+                gate_flag,
+                json,
+            } => {
+                let gate_key = resolve_gate_key(gate_key, gate_flag, "gate check")?;
                 let output_ctx = OutputContext::new(quiet, json);
 
                 // Transposed-argument guard. The canonical form is
@@ -2615,10 +2652,12 @@ fn run() -> Result<()> {
             GateCommands::Pass {
                 id,
                 gate_key,
+                gate_flag,
                 by,
                 force,
                 json,
             } => {
+                let gate_key = resolve_gate_key(gate_key, gate_flag, "gate pass")?;
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.pass_gate(&id, gate_key.clone(), by, force) {
                     Ok(outcome) => {

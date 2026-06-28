@@ -1084,12 +1084,24 @@ pub enum GateCommands {
     },
 
     /// Show the last run result for a gate (inspection only, non-mutating)
+    ///
+    /// The gate key may be supplied as a positional argument or via `--gate`:
+    ///
+    ///   jit gate check <ISSUE_ID> <GATE_KEY>
+    ///   jit gate check <ISSUE_ID> --gate <GATE_KEY>
+    ///
+    /// Exactly one of the two forms must be used; supplying both or neither is
+    /// an error.
     Check {
-        /// Issue ID
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
-        /// Gate key
-        gate_key: String,
+        /// Gate key (positional form)
+        gate_key: Option<String>,
+
+        /// Gate key (flag form — alternative to the positional)
+        #[arg(long = "gate")]
+        gate_flag: Option<String>,
 
         #[arg(long)]
         json: bool,
@@ -1114,6 +1126,14 @@ pub enum GateCommands {
 
     /// Run automated checker (auto gates) or record attestation (manual gates)
     ///
+    /// The gate key may be supplied as a positional argument or via `--gate`:
+    ///
+    ///   jit gate pass <ISSUE_ID> <GATE_KEY>
+    ///   jit gate pass <ISSUE_ID> --gate <GATE_KEY>
+    ///
+    /// Exactly one of the two forms must be used; supplying both or neither is
+    /// an error.
+    ///
     /// Exit codes:
     ///   0  - pass (checker passed or manual attestation recorded)
     ///   2  - bad arguments (gate not required for this issue)
@@ -1129,11 +1149,15 @@ pub enum GateCommands {
     /// skipped: the command exits 0 and reports `already_passed: true` in --json.
     /// Use --force to re-run the checker unconditionally.
     Pass {
-        /// Issue ID
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
-        /// Gate key
-        gate_key: String,
+        /// Gate key (positional form)
+        gate_key: Option<String>,
+
+        /// Gate key (flag form — alternative to the positional)
+        #[arg(long = "gate")]
+        gate_flag: Option<String>,
 
         /// Who passed the gate (optional)
         #[arg(short, long)]
