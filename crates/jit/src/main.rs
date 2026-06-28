@@ -2667,12 +2667,15 @@ fn run() -> Result<()> {
                                 let output = JsonOutput::success(response, "gate check");
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                // Verbatim: no headers, no decoration.
+                                // Verbatim: no headers, no decoration, no
+                                // injected trailing newline (print!, not
+                                // println!) so the stored report text is emitted
+                                // byte-for-byte.
                                 if let Some(s) = rendered_stdout {
-                                    println!("{}", s);
+                                    print!("{}", s);
                                 }
                                 if let Some(s) = rendered_stderr {
-                                    println!("{}", s);
+                                    print!("{}", s);
                                 }
                             }
                         }

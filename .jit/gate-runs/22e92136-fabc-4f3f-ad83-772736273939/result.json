@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "22e92136-fabc-4f3f-ad83-772736273939",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "073f9d13-16ac-4ee0-85db-d18b2d7a128a",
+  "commit": "c0917e1a10e7da1529f3961634ad4ca76588eb88",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T03:47:33.476814406Z",
+  "completed_at": "2026-06-28T03:49:07.044076486Z",
+  "duration_ms": 93567,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-08 is not fully met. `gate check` adds latest/history/flat paths, status and gate filters, and `gate check-all` is retained, but the flat report text path does not preserve the stored stream byte-for-byte.\n\n**Architecture And Separation**\n\nNo new domain/storage boundary violations found. The implementation reuses `CommandExecutor::list_gate_runs` and `get_last_gate_run`; storage remains behind `IssueStore`.\n\n**Functional Style**\n\nMostly consistent with existing CLI code. No blocking functional-style concern beyond the correctness issue below.\n\n**Correctness And Invariants**\n\nRead-only inspection paths do not introduce state changes, so event logging and atomic write invariants are not implicated. Gate transition semantics, assignee/label formats, PID safety, and unsafe code are unchanged.\n\n**Testing**\n\nI did not rerun tests because the issue has a passed `cargo-ci` gate. Evidence: `.jit/gate-runs/2fb38f3e-be89-40ba-a9bf-4d026f38a4b0/result.json` reports `fmt: ok`, `clippy: ok`, `test: 2825 passed, 0 failed`. New integration coverage exists, but it misses exact byte/newline preservation for flat output.\n\n**Error Handling**\n\nArgument errors are routed through typed/JSON-aware invalid argument handling. No new `unwrap()`/`expect()` in library code from this change.\n\n**CLI Contract**\n\nThe new `gate check` views support `--json`, and `gate check-all --json` is retained.\n\n**Documentation**\n\nThe new flags are documented in `docs/reference/cli-commands.md`, and new public output structs include doc comments with examples.\n\n**Dependencies And Validation**\n\nIssue dependencies `1c94f4f1` and `eb37a05a` are marked `done`. The provided `cargo-ci` gate passed. I did not run `./scripts/jit-validate.sh`.\n\n1. `crates/jit/src/main.rs:2671` and `crates/jit/src/main.rs:2675` use `println!(\"{}\", s)` for `--stdout`/`--stderr` flat output, which appends an extra newline even when the stored `GateRunResult.stdout`/`stderr` did not have one, and adds an additional blank line when the stored stream already ends with `\\n`. This violates the issue’s “flat unwrapped report-text view” requirement and the docs at `crates/jit/src/cli.rs:1105` / `docs/reference/cli-commands.md:1364` claiming the stored report text is printed verbatim. The tests at `crates/jit/tests/gate_check_history_flat_test.rs:247` and `:271` only check for marker text and lack of decoration, not exact output equality, so this regression is not caught. Use `print!(\"{}\", s)` for the flat non-JSON path and add an exact-output test with a checker command that emits no trailing newline.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3309 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0c56-fd08-7023-85e5-fbb5ce7d2e0a\n--------\nuser\n--- 3296 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

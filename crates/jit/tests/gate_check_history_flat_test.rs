@@ -269,6 +269,33 @@ fn test_check_stdout_flat_verbatim() {
 }
 
 #[test]
+fn test_check_stdout_flat_is_byte_exact_no_injected_newline() {
+    // The flat view must emit the stored report text byte-for-byte. A checker
+    // whose stdout has NO trailing newline must come back with NO trailing
+    // newline — `print!`, not `println!` (which would append one).
+    let temp = setup_repo();
+    // `printf` (no `\n`) stores stdout with no trailing newline.
+    define_auto_gate(&temp, "tests", "printf NO_TRAILING_NL; exit 0");
+    let id = create_issue(&temp, &["tests"]);
+    run_gate(&temp, &id, "tests");
+
+    let out = jit()
+        .current_dir(temp.path())
+        .args(["gate", "check", &id, "tests", "--stdout"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(
+        out,
+        b"NO_TRAILING_NL",
+        "flat --stdout must be byte-exact (no injected trailing newline), got: {:?}",
+        String::from_utf8_lossy(&out)
+    );
+}
+
+#[test]
 fn test_check_stderr_flat_verbatim() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo ERRLINE 1>&2; exit 1");
