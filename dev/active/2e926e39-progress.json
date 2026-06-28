@@ -1,7 +1,7 @@
 {
   "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
   "epic_short_id": "2e926e39",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -181,7 +181,7 @@
           "title": "Retire the obsolete flat-breakdown CLI command",
           "satisfies": "REQ-06",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -201,7 +201,8 @@
     "4b7407d3": 2,
     "552ff75c": 3,
     "252c947b": 2,
-    "e3259063": 1
+    "e3259063": 1,
+    "07657508": 2
   },
   "wave1_dispatch": {
     "base_sha": "3b493636f406d758c5141f26a6281a63ce641d14",

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e4edfb01-4500-44a9-94d5-5d9e271bedbe",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "07657508-b020-4aeb-9f3a-1a836314b229",
+  "commit": "a240f55518e0b60db241f25764686a359ef2c76d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T05:38:09.044609017Z",
+  "completed_at": "2026-06-28T05:39:06.955433715Z",
+  "duration_ms": 57910,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nFail. The Rust CLI surface and MCP-generated tool exposure appear retired, and `bracket_breakdown` remains intact. However, hard REQ-06 is still not met because tree-wide references to the retired command/function remain.\n\n**Prior Review Feedback**\n\nPartially addressed. `./scripts/jit-validate.sh` now passes, so the prior broken document-reference finding is fixed. The prior tree-wide reference finding is still unresolved.\n\n**Architecture And Correctness**\n\nNo new domain/storage/commands/CLI boundary violation found in the reviewed source. No new atomic-write, event-log, gate-transition, assignee/label-format, PID-safety, or unsafe-code issue found in the changed Rust surface.\n\n**Testing**\n\nUsed the provided succeeded `cargo-ci` gate as primary evidence and did not rerun Rust tests. I ran `./scripts/jit-validate.sh`; it passed.\n\n**CLI Contract And MCP**\n\nNo remaining `IssueCommands::Breakdown`, dispatch arm, or `jit_issue_breakdown`/`issue_breakdown` source exposure was found in the Rust/MCP surface.\n\n**Documentation**\n\nDocumentation cleanup remains incomplete because retired command references and examples are still present.\n\n1. Hard REQ-06 is not met: a tree-wide search still finds references to the retired issue-breakdown command/function, including [dev/archive/breakdown-analysis.md:1](/home/vkaskivuo/Projects/just-in-time/dev/archive/breakdown-analysis.md:1), [dev/archive/breakdown-analysis.md:25](/home/vkaskivuo/Projects/just-in-time/dev/archive/breakdown-analysis.md:25), [dev/archive/breakdown-improvement-plan.md:65](/home/vkaskivuo/Projects/just-in-time/dev/archive/breakdown-improvement-plan.md:65), [dev/active/planning-bracket-design.md:20](/home/vkaskivuo/Projects/just-in-time/dev/active/planning-bracket-design.md:20), and [dev/studies/short-hash-implementation-plan.md:133](/home/vkaskivuo/Projects/just-in-time/dev/studies/short-hash-implementation-plan.md:133). The added archive disclaimers do not satisfy the explicit criterion that a tree-wide search find no remaining reference to the issue-breakdown command.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1173 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0cbc-3d26-7a62-947e-e001eb470b20\n--------\nuser\n--- 1160 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
