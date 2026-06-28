@@ -425,6 +425,33 @@ mod tests {
         assert!(BuiltinPresets::names().contains(&"breakdown-review".to_string()));
     }
 
+    // REQ-13: the production preset-load path (the one the apply engine resolves
+    // anchor gates through) yields `repo-validate` wired to WHOLE-REPO validation
+    // — `jit validate` with no issue id — and registered in `names()`. This proves
+    // the gate the `plan` template's container anchor references is the real,
+    // loaded preset, distinct from the per-issue `jit-validate` gate.
+    #[test]
+    fn test_repo_validate_loaded_with_whole_repo_checker() {
+        use crate::domain::GateChecker;
+
+        let presets = BuiltinPresets::load().unwrap();
+        let repo_validate = presets
+            .get("repo-validate")
+            .expect("repo-validate must be in the loaded built-in presets");
+        assert_eq!(repo_validate.gates.len(), 1);
+        let gate = &repo_validate.gates[0];
+        assert_eq!(gate.key, "repo-validate");
+        assert_eq!(gate.mode, GateMode::Auto);
+        match gate.checker.as_ref().expect("repo-validate has a checker") {
+            GateChecker::Exec { command, .. } => assert_eq!(
+                command, "jit validate",
+                "repo-validate must run whole-repo validation (no issue id), \
+                 distinct from the per-issue `jit validate \"$JIT_ISSUE_ID\"` gate"
+            ),
+        }
+        assert!(BuiltinPresets::names().contains(&"repo-validate".to_string()));
+    }
+
     #[test]
     fn test_rust_tdd_preset_structure() {
         let presets = BuiltinPresets::load().unwrap();
