@@ -206,6 +206,60 @@ fn test_top_level_rdeps_routes_to_graph_rdeps() {
     );
 }
 
+// 4a-bis. Top-level `jit rdeps` shares the canonical bounded default: depth 1
+// (immediate dependents only) by default; `--depth 0` opts into transitive.
+// Multi-level chain A <- B <- C so bounded and unbounded outputs differ.
+#[test]
+fn test_top_level_rdeps_default_is_bounded_multi_level() {
+    let temp = setup_repo();
+    let a = create_issue(&temp, "A root");
+    let b = create_issue(&temp, "B mid");
+    let c = create_issue(&temp, "C leaf");
+    // B depends on A; C depends on B. So A's transitive dependents are B and C,
+    // but A's immediate dependent is only B.
+    for (dependent, blocker) in [(&b, &a), (&c, &b)] {
+        jit()
+            .current_dir(temp.path())
+            .args(["dep", "add", dependent, blocker])
+            .assert()
+            .success();
+    }
+
+    // Default `jit rdeps A`: immediate dependent B present, transitive C absent.
+    let default_out = jit()
+        .current_dir(temp.path())
+        .args(["rdeps", &a, "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let default_str = String::from_utf8_lossy(&default_out);
+    assert!(
+        default_str.contains(&b),
+        "bounded default must include the immediate dependent B"
+    );
+    assert!(
+        !default_str.contains(&c),
+        "bounded default must NOT include the transitive dependent C (depth 1)"
+    );
+
+    // Opt-in `jit rdeps A --depth 0`: both B and C present.
+    let unbounded_out = jit()
+        .current_dir(temp.path())
+        .args(["rdeps", &a, "--depth", "0", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let unbounded_str = String::from_utf8_lossy(&unbounded_out);
+    assert!(
+        unbounded_str.contains(&b) && unbounded_str.contains(&c),
+        "unbounded opt-in (--depth 0) must include transitive dependent C"
+    );
+}
+
 // 4b. Top-level `jit list` routes to the canonical `jit issue list`.
 #[test]
 fn test_top_level_list_routes_to_issue_list() {

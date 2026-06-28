@@ -157,8 +157,9 @@ pub enum Commands {
         /// Issue ID
         id: String,
 
-        /// Depth of traversal (1 = immediate, 0 = unlimited)
-        #[arg(long, default_value = "0")]
+        /// Depth of traversal: 1 = immediate dependents (default), 0 = all
+        /// transitive dependents (unlimited, opt-in). Matches `jit graph rdeps`.
+        #[arg(long, default_value = "1")]
         depth: u32,
 
         #[arg(long)]
