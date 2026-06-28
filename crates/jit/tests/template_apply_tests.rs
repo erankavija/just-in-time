@@ -26,8 +26,9 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 
 /// The repo's `plan`-shaped template: a planning node `P` and a breakdown node
 /// `B` with `brackets:<short-id>`, each with gate presets, doc, and seeded
-/// description. A fresh apply wires the `depends_on` edge (B→P), the `anchor_edge`
-/// (C→B), and runs the `move-upstream-to-role` transform onto P.
+/// description, plus the `repo-validate` whole-repo integrity gate on the
+/// `container` anchor (REQ-13). A fresh apply wires the `depends_on` edge (B→P),
+/// the `anchor_edge` (C→B), and runs the `move-upstream-to-role` transform onto P.
 fn plan_template() -> GraphTemplate {
     let toml = r#"
 [[template]]
@@ -35,7 +36,8 @@ name        = "plan"
 applies_to  = ["epic"]
 
   [[template.anchors]]
-  name = "container"
+  name  = "container"
+  gates = ["repo-validate"]
 
   [[template.nodes]]
   role        = "planning"
@@ -495,6 +497,29 @@ applies_to  = ["epic"]
 }
 
 // === REQ-13: anchor-level gate presets (jit:2614ecf2) ===
+
+#[test]
+fn test_apply_plan_template_attaches_repo_validate_to_container() {
+    // REQ-13 (issue 552ff75c): applying the `plan` template attaches the
+    // whole-repo integrity gate `repo-validate` to the bound container anchor,
+    // so the container cannot reach Done until whole-repo validation passes.
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Repo-validate epic");
+
+    h.executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let container = h.get_issue(&epic);
+    assert!(
+        container
+            .gates_required
+            .contains(&"repo-validate".to_string()),
+        "bound container missing the plan template's repo-validate anchor gate: {:?}",
+        container.gates_required
+    );
+}
 
 #[test]
 fn test_apply_attaches_anchor_gate_presets_to_bound_anchor() {

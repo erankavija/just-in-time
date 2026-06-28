@@ -12,7 +12,13 @@ description = "Plan-before-fan-out bracket: planning node P and breakdown node B
 applies_to  = ["epic"]           # container types this template may be applied to
 
   [[template.anchors]]
-  name = "container"             # bound at apply time to the target issue
+  name  = "container"            # bound at apply time to the target issue
+  # REQ-13 (issue 552ff75c): whole-repo integrity gate on the breakable
+  # container. The `repo-validate` preset's checker runs `jit validate` with NO
+  # issue id (whole-repo run_rules(None)), distinct from the per-issue
+  # `jit-validate` gate. By INV-GATE-SEMANTICS the bound container cannot reach
+  # Done until whole-repo validation passes.
+  gates = ["repo-validate"]      # gate-preset name (apply_gate_preset)
 
   [[template.nodes]]
   role        = "planning"
