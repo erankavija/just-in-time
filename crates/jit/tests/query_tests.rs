@@ -1389,3 +1389,47 @@ fn test_query_bare_label_filter() {
     assert_eq!(json["count"], 1);
     assert_eq!(json["issues"][0]["id"], id_tagged);
 }
+
+/// A parent-level filter placed before a query subcommand must be rejected with
+/// an actionable error, not silently ignored. `jit query -s open available`
+/// (and the `--state`/`--priority`/etc. long forms) would otherwise drop the
+/// filter and return wrong results to `--json` consumers.
+#[test]
+fn test_query_subcommand_rejects_parent_filter() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Filter supplied BEFORE the subcommand binds to the parent `query` and is
+    // not honored by the subcommand — this must error rather than run.
+    let output = Command::new(jit)
+        .args(["query", "-s", "open", "available"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "parent filter before subcommand should be rejected, but it succeeded"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--state") && stderr.contains("available"),
+        "error should name the ignored filter and the subcommand, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("bare form") || stderr.contains("after the subcommand"),
+        "error should be actionable, got: {stderr}"
+    );
+
+    // The bare form (no subcommand) must still apply the same filter cleanly.
+    let bare = Command::new(jit)
+        .args(["query", "--state", "ready", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        bare.status.success(),
+        "bare `jit query --state ready` must still work: {}",
+        String::from_utf8_lossy(&bare.stderr)
+    );
+}
