@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a9f4966d-bb6e-4012-8540-60d6a9b30e8f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "eb37a05a-884f-4bd2-91d1-b231575cd52c",
+  "commit": "f32e3beab41e244855e6239235bdde22a21dd039",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T01:00:58.007124020Z",
+  "completed_at": "2026-06-28T01:02:29.012701377Z",
+  "duration_ms": 91005,
+  "exit_code": 0,
+  "stdout": "**Architecture**\nThe change is confined to CLI presentation in [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:421) and a CLI integration test in [crates/jit/tests/gate_cli_integration_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_cli_integration_test.rs:985). No domain/storage/command boundary violation found.\n\n**Functional Correctness**\nREQ-07 is met. `print_gate_run_details` now emits all stored stdout/stderr lines without `.take(20)` at [main.rs:450](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:450) and [main.rs:454](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:454), and the previous `Full output: <path>` substitution is removed. Both `gate check` and human `gate check-all` call the full printer at [main.rs:2453](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2453) and [main.rs:2529](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2529).\n\n**Correctness And Invariants**\nNo file writes, state transitions, event logging, gate transition semantics, assignee/label parsing, or PID handling were changed by the target commit. Atomic-write and event-log invariants are not affected.\n\n**Safety**\nNo unsafe code introduced. The target commit only changes safe Rust formatting logic and a test.\n\n**Testing**\nThe issue context reports `cargo-ci` passed with exit code 0 on 2026-06-28T00:59:01Z, so I did not rerun cargo tests. The added regression test `test_gate_check_shows_complete_report_without_truncation` verifies a 25-line checker report includes line 21 and does not contain `Full output:` at [gate_cli_integration_test.rs:985](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_cli_integration_test.rs:985). I also ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\nNo new fallible operations or library `unwrap()`/`expect()` were introduced in production code. Test-only assertions and unwraps remain within test scope.\n\n**CLI Contract**\n`gate check --json` remains unchanged and continues returning the stored `GateRunResult`. Human output now matches the required full-report behavior.\n\n**Documentation**\nNo public APIs were added or changed. No doc-comment requirement applies to the private helper signature change.\n\n**Issue Management**\nThe prerequisite dependency `527bf0a6` is marked `done` in the provided issue context. `run_history` is empty, so there is no prior review feedback to re-check.\n\n**Findings**\n1. None.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

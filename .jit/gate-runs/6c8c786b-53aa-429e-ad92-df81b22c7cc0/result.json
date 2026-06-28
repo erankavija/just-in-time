@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "6c8c786b-53aa-429e-ad92-df81b22c7cc0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a1623187-240c-4077-8b83-48f04d1df04a",
+  "commit": "f32e3beab41e244855e6239235bdde22a21dd039",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T01:00:58.007121410Z",
+  "completed_at": "2026-06-28T01:02:33.616448304Z",
+  "duration_ms": 95609,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nFail. `jit rdeps <id>` is documented and normalized as a top-level alias for `jit graph rdeps <id>`, but it no longer behaves like the canonical command by default.\n\n## Architecture and Separation\n\nNo new storage/file I/O boundary violation found in the reviewed change surface.\n\n## Functional Paradigm\n\nNo blocking functional-style issue found.\n\n## Correctness and Invariants\n\nBlocking issue below: alias semantics diverge from canonical command semantics.\n\n## Safety\n\nNo unsafe-code concern found.\n\n## Testing\n\nUsed the provided passed `cargo-ci` gate as primary evidence and did not rerun cargo tests. I did run `./scripts/jit-validate.sh`; it passed.\n\nCoverage gap: existing `first_guess_residuals_test.rs` only checks a one-level reverse dependency, so it does not catch the alias/default-depth divergence.\n\n## Error Handling\n\nNo blocking error-handling issue found.\n\n## CLI Contract\n\nBlocking issue below affects the CLI contract for the new top-level `rdeps` first guess.\n\n## Documentation\n\nDocs state `jit rdeps` routes to `jit graph rdeps`, but current defaults make that inaccurate.\n\n## Prior Review Feedback\n\n`run_history` is empty, so there is no prior feedback to verify.\n\n## Jit Issue Management\n\nThe listed dependency `527bf0a6` is `done`. `./scripts/jit-validate.sh` passed.\n\n## Findings\n\n1. `jit rdeps` is not equivalent to `jit graph rdeps` after the later bounded-depth change. `crates/jit/src/cli.rs:160-162` defines the top-level `Commands::Rdeps` default as `--depth 0`, while canonical `GraphCommands::Rdeps` defaults to `--depth 1` at `crates/jit/src/cli.rs:1477-1479`. `main.rs:1017-1019` then normalizes the already-parsed top-level value into `GraphCommands::Rdeps`, so `jit rdeps <id>` returns all transitive dependents by default while `jit graph rdeps <id>` returns only immediate dependents. This violates the issue criterion that the top-level reverse-dependency first guess resolve to the canonical command.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6643 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0bbe-7ab8-7822-94a1-0b6f80c25825\n--------\nuser\n--- 6630 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f6de6947-2779-47b4-914b-ee156c085d9e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3758ee60-4e9d-4bf0-9e89-9a4ed6ffdc3f",
+  "commit": "f32e3beab41e244855e6239235bdde22a21dd039",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T01:00:58.007125240Z",
+  "completed_at": "2026-06-28T01:02:38.721166595Z",
+  "duration_ms": 100714,
+  "exit_code": 1,
+  "stdout": "**Architecture**\n- Query routing remains in CLI dispatch and delegates storage/domain work through `CommandExecutor`; no new storage or domain boundary violation found.\n\n**Functional Correctness**\n- Bare `jit query` routes to `run_query_all` at `crates/jit/src/main.rs:3637`.\n- `jit query ready` is implemented as a visible alias of `available` at `crates/jit/src/cli.rs:1600`.\n\n**Tests And Validation**\n- Used provided `cargo-ci` gate evidence: passed.\n- Did not run tests, per instruction.\n- Ran `./scripts/jit-validate.sh`: passed.\n- Dependency issue `527bf0a6` is marked `done`.\n\n**Findings**\n1. `crates/jit/src/cli.rs:179` and `crates/jit/src/main.rs:3637`: the new parent-level bare-query flags are accepted before a query subcommand but ignored when `subcommand` is `Some`. For example, `jit query --json all` is accepted by Clap but prints human output, while `jit query all --json` prints JSON. The same silent ignore applies to parent `--state`, `--assignee`, `--priority`, `--label`, and `--full` before subcommands. This introduces a CLI contract footgun for machine-readable output; the implementation should either reject bare-only flags when a subcommand is present or propagate/merge them consistently.\n\nTotal findings: 1\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6482 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0bbe-7ab8-7b02-9466-018263f5d6fa\n--------\nuser\n--- 6469 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
