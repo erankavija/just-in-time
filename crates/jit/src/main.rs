@@ -852,6 +852,28 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
     }
 }
 
+/// Validate an `--type <kind>` value against the repository's configured type
+/// hierarchy. Returns `Err` when the kind is not declared in `[type_hierarchy]`.
+///
+/// This mirrors the explicit pre-validation in `batch_create_from_json` (the
+/// write-time `default:type-hierarchy-known` rule only warns, so the CLI must
+/// validate explicitly to produce a hard error on unknown types).
+fn validate_issue_type<S: IssueStore>(kind: &str, executor: &CommandExecutor<S>) -> Result<()> {
+    let config = executor.config_manager.load()?;
+    if let Some(h) = config.type_hierarchy.as_ref() {
+        if !h.types.contains_key(kind) {
+            let mut known: Vec<&str> = h.types.keys().map(String::as_str).collect();
+            known.sort();
+            return Err(anyhow!(
+                "unknown issue type '{}'; declared types are: {}",
+                kind,
+                known.join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     let exit_code = match run() {
         Ok(()) => ExitCode::Success,
@@ -1024,20 +1046,35 @@ fn run() -> Result<()> {
         Commands::Issue(issue_cmd) => {
             match issue_cmd {
                 IssueCommands::Create {
+                    positional_title,
                     title,
                     description,
                     priority,
+                    issue_type,
                     gate,
-                    label,
+                    mut label,
                     content_format,
                     force,
                     orphan,
                     json,
                 } => {
+                    // Clap guarantees exactly one of the two title forms is set.
+                    let title = positional_title
+                        .or(title)
+                        .expect("clap requires title (positional or --title)");
+
                     let prio = Priority::from_str(&priority)?;
                     let content_format = content_format
                         .map(|s| jit::domain::ContentFormat::from_str(&s))
                         .transpose()?;
+
+                    // Validate --type against config and inject a type:<kind> label,
+                    // replacing any type label already in the list.
+                    if let Some(ref kind) = issue_type {
+                        validate_issue_type(kind, &executor)?;
+                        label.retain(|l| !l.starts_with("type:"));
+                        label.push(jit::labels::type_label(kind));
+                    }
 
                     let (id, warnings) = executor.create_issue(
                         title,
@@ -1389,8 +1426,9 @@ fn run() -> Result<()> {
                     description,
                     priority,
                     state,
-                    label,
-                    remove_label,
+                    issue_type,
+                    mut label,
+                    mut remove_label,
                     add_gate,
                     remove_gate,
                     assignee,
@@ -1419,11 +1457,37 @@ fn run() -> Result<()> {
                             "--content-format is not supported with --filter (batch mode); set it per issue"
                         ));
                     }
+                    // --type is a per-issue field; batch mode does not support it.
+                    if filter.is_some() && issue_type.is_some() {
+                        return Err(anyhow!(
+                            "--type is not supported with --filter (batch mode); set it per issue"
+                        ));
+                    }
 
                     // Single issue mode
                     if let Some(id_str) = id {
                         // Resolve short hash to full UUID first
                         let full_id = storage.resolve_issue_id(&id_str)?;
+
+                        // Validate --type and translate to label add/remove so that
+                        // the existing `type` namespace-uniqueness rule is satisfied.
+                        if let Some(ref kind) = issue_type {
+                            validate_issue_type(kind, &executor)?;
+                            let current_issue = storage.load_issue(&full_id)?;
+                            for old in current_issue
+                                .labels
+                                .iter()
+                                .filter(|l| l.starts_with("type:"))
+                            {
+                                if !remove_label.contains(old) {
+                                    remove_label.push(old.clone());
+                                }
+                            }
+                            let new_type_label = jit::labels::type_label(kind);
+                            if !label.contains(&new_type_label) {
+                                label.push(new_type_label);
+                            }
+                        }
 
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;

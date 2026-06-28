@@ -509,16 +509,41 @@ pub enum InvariantCommands {
 
 #[derive(Subcommand)]
 pub enum IssueCommands {
-    /// Create a new issue
+    /// Create a new issue.
+    ///
+    /// The title is the subject of the verb and may be given positionally
+    /// (`jit issue create "Title"`) or via the `-t`/`--title` flag.
+    /// Exactly one form is required; providing both is an error.
+    ///
+    /// Examples:
+    ///   jit issue create "Fix login bug"
+    ///   jit issue create "Fix login bug" --type bug --priority high
+    ///   jit issue create --title "Fix login bug" --gate tests
     Create {
-        #[arg(short, long)]
-        title: String,
+        /// Issue title (positional form; alternative to `-t`/`--title`).
+        #[arg(
+            value_name = "TITLE",
+            required_unless_present = "title",
+            conflicts_with = "title"
+        )]
+        positional_title: Option<String>,
+
+        /// Issue title (flag form; alternative to the positional argument).
+        #[arg(short = 't', long, conflicts_with = "positional_title")]
+        title: Option<String>,
 
         #[arg(short = 'd', long = "description", default_value = "")]
         description: String,
 
         #[arg(short, long, default_value = "normal")]
         priority: String,
+
+        /// Issue type (e.g. `task`, `story`, `epic`). Must be declared in
+        /// `[type_hierarchy]` in config.toml. Writes a `type:<kind>` label and
+        /// overrides any type label already carried by the issue. Long-only
+        /// (`-t` is reserved for `--title`).
+        #[arg(long = "type", value_name = "KIND")]
+        issue_type: Option<String>,
 
         /// Gate keys from registry to require (e.g., 'tests', 'code-review').
         /// Gates are quality checkpoints that must pass before issue completion.
@@ -692,6 +717,12 @@ pub enum IssueCommands {
 
         #[arg(short, long)]
         state: Option<String>,
+
+        /// Issue type (e.g. `task`, `story`, `epic`). Must be declared in
+        /// `[type_hierarchy]` in config.toml. Replaces the existing `type:*`
+        /// label with `type:<kind>`. Long-only (`-t` is reserved for `--title`).
+        #[arg(long = "type", value_name = "KIND")]
+        issue_type: Option<String>,
 
         /// Add label(s) (format: namespace:value, repeatable)
         #[arg(short, long, value_delimiter = ',', visible_alias = "add-label")]

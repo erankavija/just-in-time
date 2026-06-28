@@ -65,15 +65,29 @@ fn test_schema_issue_create_details() {
 
     assert_eq!(create["description"], "Create a new issue");
 
-    // Check args (issue create has no positional args)
+    // issue create now has one positional arg: the title (REQ-01).
     let args = create["args"].as_array().unwrap();
-    assert_eq!(args.len(), 0, "issue create should have no positional args");
+    assert_eq!(
+        args.len(),
+        1,
+        "issue create should have exactly one positional arg (title)"
+    );
+    assert!(
+        args.iter().any(|a| a["name"] == "positional_title"),
+        "positional title arg must be named 'positional_title' in schema"
+    );
 
-    // Check flags (title, priority are flags with automatic schema generation)
+    // Check flags: --title preserved alongside positional; --type added (REQ-02).
     let flags = create["flags"].as_array().unwrap();
     assert!(flags.iter().any(|f| f["name"] == "title"));
     assert!(flags.iter().any(|f| f["name"] == "priority"));
     assert!(flags.iter().any(|f| f["name"] == "json"));
+    assert!(
+        flags
+            .iter()
+            .any(|f| f["name"] == "type" || f["name"] == "issue_type"),
+        "issue create must expose a --type flag in --schema"
+    );
 }
 
 /// The `--content-format` flag must surface in the auto-generated `--schema`
