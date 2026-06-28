@@ -885,9 +885,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// when the name is neither, so callers keep the existing hard failure for an
     /// unknown gate. Pure read; performs no mutation.
     fn resolve_template_gate(&self, name: &str) -> Result<TemplateGateResolution> {
-        // Prefer a preset bundle; fall back to a single registry gate key.
-        if self.storage.get_gate_preset(name).is_ok() {
-            return Ok(TemplateGateResolution::Preset);
+        // Prefer a preset bundle; fall back to a single registry gate key ONLY
+        // when `name` is genuinely not a known preset. Any OTHER error from
+        // preset loading (e.g. a malformed custom preset under
+        // `.jit/config/gate-presets/`) must propagate with context rather than be
+        // silently treated as "not a preset" — otherwise a broken preset config
+        // could let `jit apply` succeed by accidentally matching a registry key.
+        match self.storage.get_gate_preset(name) {
+            Ok(_) => return Ok(TemplateGateResolution::Preset),
+            Err(e)
+                if e.downcast_ref::<crate::storage::PresetNotFoundError>()
+                    .is_some() =>
+            {
+                // Not a registered preset — fall through to the registry-key lookup.
+            }
+            Err(e) => return Err(e),
         }
         if self.storage.load_gate_registry()?.gates.contains_key(name) {
             return Ok(TemplateGateResolution::RegistryKey);
