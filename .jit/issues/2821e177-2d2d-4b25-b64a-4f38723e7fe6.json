@@ -5,7 +5,9 @@
   "state": "ready",
   "priority": "normal",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "2e926e39-906e-4952-8ae0-38215a7e5aac"
+  ],
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,5 +29,5 @@
     "type:epic"
   ],
   "created_at": "2026-06-28T11:52:45.519022826Z",
-  "updated_at": "2026-06-28T11:52:57.338811848Z"
+  "updated_at": "2026-06-28T12:00:50.111746939Z"
 }
