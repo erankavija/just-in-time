@@ -214,12 +214,12 @@ fn test_workflow_gates() {
     run_jit(
         &temp,
         &[
-            "registry",
-            "add",
+            "gate",
+            "define",
             "review",
             "--title",
             "Code Review",
-            "--desc",
+            "--description",
             "Manual review",
         ],
     );
@@ -227,14 +227,16 @@ fn test_workflow_gates() {
     run_jit(
         &temp,
         &[
-            "registry",
-            "add",
+            "gate",
+            "define",
             "tests",
             "--title",
             "Tests",
-            "--desc",
+            "--description",
             "Unit tests",
             "--auto",
+            "--checker-command",
+            "true",
         ],
     );
 
@@ -326,13 +328,28 @@ fn test_workflow_complex_epic() {
     run_jit(
         &temp,
         &[
-            "registry", "add", "tests", "--title", "Tests", "--desc", "Tests", "--auto",
+            "gate",
+            "define",
+            "tests",
+            "--title",
+            "Tests",
+            "--description",
+            "Tests",
+            "--auto",
+            "--checker-command",
+            "true",
         ],
     );
     run_jit(
         &temp,
         &[
-            "registry", "add", "review", "--title", "Review", "--desc", "Review",
+            "gate",
+            "define",
+            "review",
+            "--title",
+            "Review",
+            "--description",
+            "Review",
         ],
     );
 

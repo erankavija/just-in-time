@@ -16,7 +16,6 @@ fn test_schema_has_all_top_level_commands() {
     assert!(schema.commands.contains_key("issue"));
     assert!(schema.commands.contains_key("dep"));
     assert!(schema.commands.contains_key("gate"));
-    assert!(schema.commands.contains_key("registry"));
     assert!(schema.commands.contains_key("events"));
     assert!(schema.commands.contains_key("graph"));
     assert!(schema.commands.contains_key("query"));

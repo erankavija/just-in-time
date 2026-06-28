@@ -58,12 +58,12 @@ fn test_query_ready_returns_unblocked_issues() {
     // Create task 3 with a gate to keep it in Open state
     Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "test-gate",
             "--title",
             "Test",
-            "--desc",
+            "--description",
             "Test",
         ])
         .current_dir(temp.path())
@@ -120,7 +120,13 @@ fn test_query_ready_excludes_assigned_issues() {
     // Add gate for blocking
     Command::new(jit)
         .args([
-            "registry", "add", "block", "--title", "Block", "--desc", "Block",
+            "gate",
+            "define",
+            "block",
+            "--title",
+            "Block",
+            "--description",
+            "Block",
         ])
         .current_dir(temp.path())
         .output()

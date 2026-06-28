@@ -29,11 +29,11 @@ fi
 
 echo "📋 Phase 1: Setup Gate Registry"
 echo "--------------------------------"
-jit registry add unit-tests --title "Unit Tests" --auto 2>/dev/null || echo "  ↳ unit-tests already exists"
-jit registry add integration-tests --title "Integration Tests" --auto 2>/dev/null || echo "  ↳ integration-tests already exists"
-jit registry add review --title "Code Review" 2>/dev/null || echo "  ↳ review already exists"
-jit registry add security-scan --title "Security Scan" --auto 2>/dev/null || echo "  ↳ security-scan already exists"
-jit registry add docs --title "Documentation" 2>/dev/null || echo "  ↳ docs already exists"
+jit gate define unit-tests --title "Unit Tests" --description "Unit Tests" --auto --checker-command "true" 2>/dev/null || echo "  ↳ unit-tests already exists"
+jit gate define integration-tests --title "Integration Tests" --description "Integration Tests" --auto --checker-command "true" 2>/dev/null || echo "  ↳ integration-tests already exists"
+jit gate define review --title "Code Review" --description "Code Review" 2>/dev/null || echo "  ↳ review already exists"
+jit gate define security-scan --title "Security Scan" --description "Security Scan" --auto --checker-command "true" 2>/dev/null || echo "  ↳ security-scan already exists"
+jit gate define docs --title "Documentation" --description "Documentation" 2>/dev/null || echo "  ↳ docs already exists"
 echo "✅ Gate registry configured"
 echo ""
 

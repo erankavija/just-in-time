@@ -115,14 +115,14 @@ The server exposes 60+ tools organized by command, including nested subcommands:
 - `jit_dep_rm` - Remove dependency
 
 ### Gate Management
+- `jit_gate_define` - Define a new gate in the registry
+- `jit_gate_update` - Update an existing gate definition
+- `jit_gate_remove` - Remove a gate definition from the registry
+- `jit_gate_list` - List registered gate definitions
+- `jit_gate_show` - Show a gate definition
 - `jit_gate_add` - Add gate to issue
 - `jit_gate_pass` - Mark gate as passed
 - `jit_gate_fail` - Mark gate as failed
-
-### Registry Management
-- `jit_registry_add` - Register new gate definition
-- `jit_registry_list` - List registered gates
-- `jit_registry_show` - Show gate definition
 
 ### Events
 - `jit_events_tail` - Show recent events

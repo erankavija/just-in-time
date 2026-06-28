@@ -133,10 +133,6 @@ pub enum Commands {
     #[command(subcommand)]
     Gate(GateCommands),
 
-    /// Gate registry management commands
-    #[command(subcommand)]
-    Registry(RegistryCommands),
-
     /// Event log commands
     #[command(subcommand)]
     Events(EventCommands),
@@ -972,8 +968,18 @@ pub enum DepCommands {
     },
 }
 
+/// Gate commands, partitioned along the grammar standard's three
+/// responsibilities (see docs/reference/cli-command-grammar.md):
+///
+/// * Configuration — shapes what gates exist and which issues require them:
+///   `define`, `update`, `remove`, `add`, and `preset *`.
+/// * Execution — produces a verdict and may advance issue state:
+///   `pass`, `pass-all`, `fail`.
+/// * Inspection — reports definitions or run results with no side effects:
+///   `list`, `show`, `check`, `check-all`.
 #[derive(Subcommand)]
 pub enum GateCommands {
+    // ===== Configuration: define what gates exist and which issues require them =====
     /// Define a new gate in the registry
     Define {
         /// Unique gate key
@@ -987,8 +993,8 @@ pub enum GateCommands {
         #[arg(short = 'd', long)]
         description: String,
 
-        /// Gate stage: precheck or postcheck
-        #[arg(short, long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
+        /// Gate stage: precheck or postcheck (long-only; `-s` is reserved for `--state`)
+        #[arg(long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
         stage: crate::domain::GateStage,
 
         /// Gate mode: manual or auto
@@ -999,6 +1005,10 @@ pub enum GateCommands {
         /// When set it overrides `--mode`.
         #[arg(long)]
         auto: bool,
+
+        /// Optional example integration snippet recorded with the definition
+        #[arg(long)]
+        example: Option<String>,
 
         /// Command to execute for automated gates
         #[arg(long)]
@@ -1057,8 +1067,8 @@ pub enum GateCommands {
         #[arg(short = 'd', long)]
         description: Option<String>,
 
-        /// New gate stage: precheck or postcheck
-        #[arg(short, long, value_enum)]
+        /// New gate stage: precheck or postcheck (long-only; `-s` is reserved for `--state`)
+        #[arg(long, value_enum)]
         stage: Option<crate::domain::GateStage>,
 
         /// New gate mode: manual or auto
@@ -1124,21 +1134,6 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// List all gate definitions
-    List {
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Show gate definition details
-    Show {
-        /// Gate key
-        key: String,
-
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Remove a gate definition from the registry
     Remove {
         /// Gate key
@@ -1159,13 +1154,124 @@ pub enum GateCommands {
     ///   jit gate add abc123 code-review
     ///   jit gate add abc123 tests clippy fmt
     Add {
-        /// Issue ID
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
         /// Gate key(s) from registry (e.g., 'tests', 'code-review', 'clippy')
         /// Can specify multiple: jit gate add <issue> gate1 gate2 gate3
         #[arg(required = true)]
         gate_keys: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Gate preset management
+    #[command(subcommand)]
+    Preset(PresetCommands),
+
+    // ===== Execution: produce a verdict and may advance issue state =====
+    /// Run automated checker (auto gates) or record attestation (manual gates)
+    ///
+    /// The gate key may be supplied as a positional argument or via `--gate`:
+    ///
+    ///   jit gate pass <ISSUE_ID> <GATE_KEY>
+    ///   jit gate pass <ISSUE_ID> --gate <GATE_KEY>
+    ///
+    /// Exactly one of the two forms must be used; supplying both or neither is
+    /// an error.
+    ///
+    /// Exit codes:
+    ///   0  - pass (checker passed or manual attestation recorded)
+    ///   2  - bad arguments (gate not required for this issue)
+    ///   3  - issue not found
+    ///   4  - checker failure (the checker ran and the verdict was fail)
+    ///   10 - runner error (timeout, command-not-found, crash; infra failure)
+    ///
+    /// With --json, the response carries a `verdict` field: `pass` on success,
+    /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
+    /// and lookup errors (codes 2 and 3) carry no `verdict` field.
+    ///
+    /// When the gate already passed at the current HEAD commit, the checker is
+    /// skipped: the command exits 0 and reports `already_passed: true` in --json.
+    /// Use --force to re-run the checker unconditionally.
+    Pass {
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
+        id: String,
+
+        /// Gate key (positional form)
+        gate_key: Option<String>,
+
+        /// Gate key (flag form — alternative to the positional)
+        #[arg(long = "gate")]
+        gate_flag: Option<String>,
+
+        /// Who passed the gate (optional)
+        #[arg(short, long)]
+        by: Option<String>,
+
+        /// Re-run the checker even if the gate already passed at the current HEAD
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Pass all of an issue's required gates in one command, fail-fast
+    ///
+    /// Runs each required gate in declaration order, stopping at the FIRST gate
+    /// that does not pass and exiting with that gate's code from the `gate pass`
+    /// taxonomy (0 pass / 2 bad-args / 3 not-found / 4 checker-failed / 10
+    /// runner-error). Later gates are not attempted once one fails.
+    ///
+    /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
+    /// passed at the current HEAD commit is not re-run. Use --force to re-run
+    /// every gate's checker unconditionally. An issue with no required gates
+    /// succeeds (exit 0) with an empty result set.
+    PassAll {
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
+        id: String,
+
+        /// Who passed the gates (optional)
+        #[arg(short, long)]
+        by: Option<String>,
+
+        /// Re-run checkers even if gates already passed at the current HEAD
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Mark a gate as failed
+    Fail {
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
+        id: String,
+
+        /// Gate key
+        gate_key: String,
+
+        /// Who failed the gate (optional)
+        #[arg(short, long)]
+        by: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    // ===== Inspection: report definitions or run results, no side effects =====
+    /// List all gate definitions
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show gate definition details
+    Show {
+        /// Gate key
+        key: String,
 
         #[arg(long)]
         json: bool,
@@ -1245,7 +1351,7 @@ pub enum GateCommands {
     /// omitted from passing runs by default; pass `--full` to include them.
     /// Failing runs always include stdout/stderr.
     CheckAll {
-        /// Issue ID
+        /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
         /// Include stdout/stderr for every run in the --json response
@@ -1256,100 +1362,6 @@ pub enum GateCommands {
         #[arg(long)]
         json: bool,
     },
-
-    /// Run automated checker (auto gates) or record attestation (manual gates)
-    ///
-    /// The gate key may be supplied as a positional argument or via `--gate`:
-    ///
-    ///   jit gate pass <ISSUE_ID> <GATE_KEY>
-    ///   jit gate pass <ISSUE_ID> --gate <GATE_KEY>
-    ///
-    /// Exactly one of the two forms must be used; supplying both or neither is
-    /// an error.
-    ///
-    /// Exit codes:
-    ///   0  - pass (checker passed or manual attestation recorded)
-    ///   2  - bad arguments (gate not required for this issue)
-    ///   3  - issue not found
-    ///   4  - checker failure (the checker ran and the verdict was fail)
-    ///   10 - runner error (timeout, command-not-found, crash; infra failure)
-    ///
-    /// With --json, the response carries a `verdict` field: `pass` on success,
-    /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
-    /// and lookup errors (codes 2 and 3) carry no `verdict` field.
-    ///
-    /// When the gate already passed at the current HEAD commit, the checker is
-    /// skipped: the command exits 0 and reports `already_passed: true` in --json.
-    /// Use --force to re-run the checker unconditionally.
-    Pass {
-        /// Issue ID (full UUID, 8-char short id, or unique prefix)
-        id: String,
-
-        /// Gate key (positional form)
-        gate_key: Option<String>,
-
-        /// Gate key (flag form — alternative to the positional)
-        #[arg(long = "gate")]
-        gate_flag: Option<String>,
-
-        /// Who passed the gate (optional)
-        #[arg(short, long)]
-        by: Option<String>,
-
-        /// Re-run the checker even if the gate already passed at the current HEAD
-        #[arg(long)]
-        force: bool,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Pass all of an issue's required gates in one command, fail-fast
-    ///
-    /// Runs each required gate in declaration order, stopping at the FIRST gate
-    /// that does not pass and exiting with that gate's code from the `gate pass`
-    /// taxonomy (0 pass / 2 bad-args / 3 not-found / 4 checker-failed / 10
-    /// runner-error). Later gates are not attempted once one fails.
-    ///
-    /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
-    /// passed at the current HEAD commit is not re-run. Use --force to re-run
-    /// every gate's checker unconditionally. An issue with no required gates
-    /// succeeds (exit 0) with an empty result set.
-    PassAll {
-        /// Issue ID
-        id: String,
-
-        /// Who passed the gates (optional)
-        #[arg(short, long)]
-        by: Option<String>,
-
-        /// Re-run checkers even if gates already passed at the current HEAD
-        #[arg(long)]
-        force: bool,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Mark a gate as failed
-    Fail {
-        /// Issue ID
-        id: String,
-
-        /// Gate key
-        gate_key: String,
-
-        /// Who failed the gate (optional)
-        #[arg(short, long)]
-        by: Option<String>,
-
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Gate preset management
-    #[command(subcommand)]
-    Preset(PresetCommands),
 }
 
 #[derive(Subcommand)]
@@ -1655,48 +1667,6 @@ pub enum GraphCommands {
         /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]
         output: Option<String>,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum RegistryCommands {
-    /// List all gate definitions
-    List {
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Add a gate definition to the registry
-    Add {
-        /// Unique gate key
-        key: String,
-
-        #[arg(short, long)]
-        title: String,
-
-        #[arg(short = 'd', long = "description", default_value = "")]
-        description: String,
-
-        #[arg(short, long)]
-        auto: bool,
-
-        #[arg(short, long)]
-        example: Option<String>,
-
-        /// Gate execution stage (precheck or postcheck)
-        #[arg(short, long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
-        stage: crate::domain::GateStage,
-    },
-
-    /// Remove a gate definition
-    Remove { key: String },
-
-    /// Show gate definition details
-    Show {
-        key: String,
-
-        #[arg(long)]
-        json: bool,
     },
 }
 

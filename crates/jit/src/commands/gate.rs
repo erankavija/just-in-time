@@ -780,6 +780,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         mode: crate::domain::GateMode,
         checker: Option<crate::domain::GateChecker>,
         priority: u32,
+        example_integration: Option<String>,
     ) -> Result<()> {
         // Global operation - enforce common history with main
         crate::commands::worktree::enforce_main_only_operations()?;
@@ -817,7 +818,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 priority,
                 reserved: std::collections::HashMap::new(),
                 auto: mode == crate::domain::GateMode::Auto,
-                example_integration: None,
+                example_integration,
             },
         );
 

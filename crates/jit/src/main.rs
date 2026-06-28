@@ -20,7 +20,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, RegistryCommands,
+    GraphCommands, InvariantCommands, IssueCommands, ItemCommands,
 };
 use jit::commands::CommandExecutor;
 use jit::domain::{GateRunResult, Priority, State};
@@ -2348,6 +2348,7 @@ fn run() -> Result<()> {
                 stage,
                 mode,
                 auto,
+                example,
                 checker_command,
                 timeout,
                 working_dir,
@@ -2408,6 +2409,7 @@ fn run() -> Result<()> {
                     mode,
                     checker,
                     priority,
+                    example,
                 ) {
                     Ok(_) => {
                         if json {
@@ -2633,6 +2635,9 @@ fn run() -> Result<()> {
                         println!("  Description: {}", gate.description);
                         println!("  Stage: {:?}", gate.stage);
                         println!("  Mode: {:?}", gate.mode);
+                        if let Some(example) = &gate.example_integration {
+                            println!("  Example Integration: {}", example);
+                        }
                         if let Some(checker) = gate.checker {
                             match checker {
                                 jit::domain::GateChecker::Exec {
@@ -3545,72 +3550,6 @@ fn run() -> Result<()> {
                     let _ = output_ctx.print_success(format!("Graph exported to: {}", path));
                 } else {
                     println!("{}", graph_output);
-                }
-            }
-        },
-        Commands::Registry(registry_cmd) => match registry_cmd {
-            RegistryCommands::List { json } => {
-                let gates = executor.list_gates()?;
-                if json {
-                    use jit::output::{GateDefinition, JsonOutput, RegistryListResponse};
-
-                    let gate_defs: Vec<GateDefinition> =
-                        gates.into_iter().map(GateDefinition::from).collect();
-
-                    let response = RegistryListResponse {
-                        count: gate_defs.len(),
-                        gates: gate_defs,
-                    };
-                    let msg = format!("{} gate definition(s)", response.count);
-                    let output = JsonOutput::success(response, "registry list").with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    for gate in gates {
-                        println!("{} | {} | auto:{}", gate.key, gate.title, gate.auto);
-                    }
-                }
-            }
-            RegistryCommands::Add {
-                key,
-                title,
-                description,
-                auto,
-                example,
-                stage,
-            } => {
-                let output_ctx = OutputContext::new(quiet, false);
-                executor.add_gate_definition(
-                    key.clone(),
-                    title,
-                    description,
-                    auto,
-                    example,
-                    stage,
-                )?;
-                let _ = output_ctx.print_success(format!("Added gate definition: {}", key));
-            }
-            RegistryCommands::Remove { key } => {
-                let output_ctx = OutputContext::new(quiet, false);
-                executor.remove_gate_definition(&key)?;
-                let _ = output_ctx.print_success(format!("Removed gate definition: {}", key));
-            }
-            RegistryCommands::Show { key, json } => {
-                let gate = executor.show_gate_definition(&key)?;
-                if json {
-                    use jit::output::{GateDefinition, JsonOutput};
-
-                    let msg = format!("Gate {}: {}", gate.key, gate.title);
-                    let gate_def = GateDefinition::from(gate);
-                    let output = JsonOutput::success(gate_def, "registry show").with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Key: {}", gate.key);
-                    println!("Title: {}", gate.title);
-                    println!("Description: {}", gate.description);
-                    println!("Auto: {}", gate.auto);
-                    println!("Example Integration: {:?}", gate.example_integration);
-                    println!("Stage: {:?}", gate.stage);
-                    println!("Mode: {:?}", gate.mode);
                 }
             }
         },

@@ -469,8 +469,8 @@ fn test_gates() {
     // Add gate definition
     Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "tests",
             "-t",
             "Unit Tests",
@@ -483,7 +483,7 @@ fn test_gates() {
 
     // List gates
     let output = Command::new(jit)
-        .args(["registry", "list"])
+        .args(["gate", "list"])
         .current_dir(temp.path())
         .output()
         .unwrap();

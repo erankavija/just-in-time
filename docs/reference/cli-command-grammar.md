@@ -25,7 +25,7 @@ The command line is `jit <noun> <verb> [arguments] [flags]`.
 
 - A **noun** is a subcommand group naming a domain entity or subsystem: `issue`,
   `gate`, `gate preset`, `dep`, `doc`, `graph`, `query`, `claim`, `config`,
-  `label`, `events`, `registry`, `snapshot`, `worktree`, `hooks`, `item`,
+  `label`, `events`, `snapshot`, `worktree`, `hooks`, `item`,
   `invariant`, and `apply`'s target. Nouns are singular (`issue`, not `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
   `add`, `remove`, `pass`, `define`, `acquire`. Verbs are imperative and shared
@@ -120,7 +120,7 @@ is never overloaded to mean different options on different commands.
 ### `-t` is reserved for `--title`
 
 `-t` binds to `--title` and nothing else. It already means `--title` on
-`issue create`, `issue update`, `gate define`, and `registry add`. `doc add`
+`issue create`, `issue update`, and `gate define`. `doc add`
 formerly bound `-t` to `--doc-type`; it has been brought into line (see below) and
 now exposes `--title` as the alias of its human label `--label`.
 
@@ -143,10 +143,10 @@ the secondary collisions the conformance sweep encounters:
 | Short | Canonical meaning | Long-only exception | Conformance note |
 |-------|-------------------|---------------------|------------------|
 | `-t` | `--title` | `--doc-type`, `--type` | `doc add` drops `-t`. |
-| `-d` | `--description` | — | Already consistent across `issue create`, `issue update`, `gate define`, `registry add`. |
+| `-d` | `--description` | — | Already consistent across `issue create`, `issue update`, and `gate define`. |
 | `-l` | `--label` | — | Already consistent. |
 | `-p` | `--priority` | — | Already consistent across `issue create`, `issue update`, `issue list`, and `query *`. |
-| `-s` | `--state` | `--stage` | `gate define` and `registry add` bind `-s` to `--stage`; the standard makes `--stage` long-only so `-s` is `--state` everywhere. |
+| `-s` | `--state` | `--stage` | `gate define` formerly bound `-s` to `--stage`; the standard makes `--stage` long-only so `-s` is `--state` everywhere. |
 
 Short flags `-d`, `-l`, and `-p` are already uniform and the standard records them
 as fixed. `-t` and `-s` are the two letters the conformance work must
@@ -199,12 +199,11 @@ regroup the flat enum.
   confused with `gate define` (registry creation). The standard keeps attachment
   (configuration) and definition (configuration) as distinct verbs within the
   configuration group.
-- **`jit registry` duplicates gate-registry configuration.** `registry list`,
-  `registry add`, `registry remove`, and `registry show` operate on the same gate
-  registry as `gate define` / `gate remove` / `gate list` / `gate show`. `jit
-  gate` is the canonical home for gate-registry configuration; the duplicate
-  `registry` noun is reconciled to a single surface by the conformance work rather
-  than left as two spellings of one operation.
+- **`jit gate` is the single gate-registry surface.** Gate-registry
+  configuration lives solely under `jit gate` (`gate define` / `gate remove` /
+  `gate list` / `gate show`). A separate top-level noun once offered the same
+  operations against the same registry; that duplicate has been reconciled away
+  so one operation has exactly one spelling.
 
 ---
 
@@ -216,9 +215,9 @@ regroup the flat enum.
 | Positional subject vs flag modifier | Issue/gate/path/endpoint positionals; `--json`/filters as flags | — |
 | Positional list vs flag list | `gate add`, `dep add`, `issue show` (positional); `--label`/`--gate` (flag) | — |
 | Issue-id acceptance | `issue show` (documents all three forms) | Gate, claim, and doc issue-subject commands: accept and document full id / short id / prefix uniformly |
-| `-t` = `--title` | `issue create`, `issue update`, `gate define`, `registry add`, `doc add` (`--title` aliases `--label`; `--doc-type` long-only) | — |
-| `-s` = `--state` | `issue list`, `issue search`, `query *` | `gate define`, `registry add`: make `--stage` long-only |
-| Gate config ÷ execution ÷ inspection | Group boundaries are well-defined by behavior | Flat `gate` enum regrouped; `jit registry` reconciled into the `gate` configuration surface |
+| `-t` = `--title` | `issue create`, `issue update`, `gate define`, `doc add` (`--title` aliases `--label`; `--doc-type` long-only) | — |
+| `-s` = `--state` | `issue list`, `issue search`, `query *` | `gate define`: make `--stage` long-only |
+| Gate config ÷ execution ÷ inspection | Group boundaries are well-defined by behavior | Flat `gate` enum regrouped; the duplicate gate-registry noun reconciled into the `gate` configuration surface |
 
 ---
 

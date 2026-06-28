@@ -190,7 +190,15 @@ fn test_exit_code_already_exists() {
     // Add a gate to registry
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "add", "--title", "Test gate", "test-gate"])
+        .args([
+            "gate",
+            "define",
+            "--title",
+            "Test gate",
+            "--description",
+            "Test gate",
+            "test-gate",
+        ])
         .status()
         .unwrap();
     assert!(status.success());
@@ -198,7 +206,15 @@ fn test_exit_code_already_exists() {
     // Try to add same gate again - should return exit code 6
     let output = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "add", "--title", "Test gate", "test-gate"])
+        .args([
+            "gate",
+            "define",
+            "--title",
+            "Test gate",
+            "--description",
+            "Test gate",
+            "test-gate",
+        ])
         .output()
         .unwrap();
 
@@ -299,7 +315,15 @@ fn test_exit_code_state_transition_blocked_by_gates() {
     // Define a gate
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "add", "--title", "Tests", "tests"])
+        .args([
+            "gate",
+            "define",
+            "--title",
+            "Tests",
+            "--description",
+            "Tests",
+            "tests",
+        ])
         .status()
         .unwrap();
     assert!(status.success());
@@ -384,7 +408,15 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
     // Define a gate
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "add", "--title", "Tests", "tests"])
+        .args([
+            "gate",
+            "define",
+            "--title",
+            "Tests",
+            "--description",
+            "Tests",
+            "tests",
+        ])
         .status()
         .unwrap();
     assert!(status.success());
@@ -1045,7 +1077,15 @@ fn test_exit_code_gate_preset_create_missing_registry_gate() {
     // the issue references a gate that no longer exists.
     assert!(Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "add", "--title", "My gate", "mygate"])
+        .args([
+            "gate",
+            "define",
+            "--title",
+            "My gate",
+            "--description",
+            "My gate",
+            "mygate"
+        ])
         .status()
         .unwrap()
         .success());
@@ -1065,7 +1105,7 @@ fn test_exit_code_gate_preset_create_missing_registry_gate() {
         .success());
     assert!(Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["registry", "remove", "mygate"])
+        .args(["gate", "remove", "mygate"])
         .status()
         .unwrap()
         .success());

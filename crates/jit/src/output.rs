@@ -402,8 +402,8 @@ impl JsonError {
             command,
         )
         .with_details(serde_json::json!({"gate_key": gate_key}))
-        .with_suggestion("Run 'jit registry list' to see available gates")
-        .with_suggestion("Add the gate to the registry first with 'jit registry add'")
+        .with_suggestion("Run 'jit gate list' to see available gates")
+        .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
 
     pub fn cycle_detected(from: &str, to: &str, command: impl Into<String>) -> Self {
@@ -1268,15 +1268,8 @@ pub struct GateFlatReportResponse {
 }
 
 // ============================================================================
-// Registry Response Types
+// Gate Registry Response Types
 // ============================================================================
-
-/// Response for `registry list` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct RegistryListResponse {
-    pub gates: Vec<GateDefinition>,
-    pub count: usize,
-}
 
 /// Response for `gate list` command
 #[derive(Debug, Serialize, JsonSchema)]

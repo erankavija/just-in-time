@@ -179,10 +179,6 @@ impl CommandSchema {
             "issue_unassign",
             "query_closed",
             "query_strategic",
-            "registry_add",
-            "registry_list",
-            "registry_remove",
-            "registry_show",
             "snapshot_export",
             "serve",
             "worktree_info",
@@ -431,11 +427,6 @@ impl CommandSchema {
                 "GraphRootsResponse",
             ),
 
-            // Registry commands
-            "registry_list" => (
-                Some(schema_to_value::<RegistryListResponse>()),
-                "RegistryListResponse",
-            ),
             "gate_list" => (
                 Some(schema_to_value::<GateListResponse>()),
                 "GateListResponse",

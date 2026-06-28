@@ -1,3 +1,8 @@
+//! JSON-output tests for the gate registry surface (`jit gate list` / `gate show`).
+//!
+//! Gate-registry configuration lives solely under `jit gate`; these tests cover
+//! the machine-readable shapes of its list and show verbs.
+
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -17,21 +22,23 @@ fn setup_test_repo() -> TempDir {
 }
 
 #[test]
-fn test_registry_list_json_output() {
+fn test_gate_list_json_output() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Add a gate definition
+    // Define a gate
     Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "test-gate",
             "-t",
             "Test Gate",
             "-d",
             "A test gate",
             "--auto",
+            "--checker-command",
+            "true",
         ])
         .current_dir(temp.path())
         .output()
@@ -39,7 +46,7 @@ fn test_registry_list_json_output() {
 
     // List gates with JSON
     let output = Command::new(jit)
-        .args(["registry", "list", "--json"])
+        .args(["gate", "list", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -49,7 +56,6 @@ fn test_registry_list_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    // success field removed
     assert!(json["gates"].is_array());
     assert_eq!(json["count"], 1);
     assert_eq!(json["gates"][0]["key"], "test-gate");
@@ -58,22 +64,24 @@ fn test_registry_list_json_output() {
 }
 
 #[test]
-fn test_registry_show_json_output() {
+fn test_gate_show_json_output() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Add a gate definition
+    // Define a gate with an example-integration snippet
     Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "test-gate",
             "-t",
             "Test Gate",
             "-d",
             "A test gate description",
             "--auto",
-            "-e",
+            "--checker-command",
+            "true",
+            "--example",
             "Example command",
         ])
         .current_dir(temp.path())
@@ -82,7 +90,7 @@ fn test_registry_show_json_output() {
 
     // Show gate with JSON
     let output = Command::new(jit)
-        .args(["registry", "show", "test-gate", "--json"])
+        .args(["gate", "show", "test-gate", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -92,7 +100,6 @@ fn test_registry_show_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    // success field removed
     assert_eq!(json["key"], "test-gate");
     assert_eq!(json["title"], "Test Gate");
     assert_eq!(json["description"], "A test gate description");
@@ -101,13 +108,13 @@ fn test_registry_show_json_output() {
 }
 
 #[test]
-fn test_registry_list_empty_json_output() {
+fn test_gate_list_empty_json_output() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
     // List gates when empty
     let output = Command::new(jit)
-        .args(["registry", "list", "--json"])
+        .args(["gate", "list", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -117,21 +124,20 @@ fn test_registry_list_empty_json_output() {
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
     // Verify structure
-    // success field removed
     assert!(json["gates"].is_array());
     assert_eq!(json["count"], 0);
 }
 
 #[test]
-fn test_registry_add_with_stage_option() {
+fn test_gate_define_with_stage_option() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Add a precheck gate using --stage option
+    // Define a precheck gate using --stage option
     let output = Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "tdd-reminder",
             "-t",
             "TDD Reminder",
@@ -146,12 +152,12 @@ fn test_registry_add_with_stage_option() {
 
     assert!(
         output.status.success(),
-        "Failed to add gate with --stage precheck"
+        "Failed to define gate with --stage precheck"
     );
 
     // Verify the gate was created with precheck stage
     let output = Command::new(jit)
-        .args(["registry", "show", "tdd-reminder", "--json"])
+        .args(["gate", "show", "tdd-reminder", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -166,15 +172,15 @@ fn test_registry_add_with_stage_option() {
 }
 
 #[test]
-fn test_registry_add_defaults_to_postcheck() {
+fn test_gate_define_defaults_to_postcheck() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Add gate without --stage option (should default to postcheck)
+    // Define gate without --stage option (should default to postcheck)
     let output = Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "code-review",
             "-t",
             "Code Review",
@@ -189,7 +195,7 @@ fn test_registry_add_defaults_to_postcheck() {
 
     // Verify it defaulted to postcheck
     let output = Command::new(jit)
-        .args(["registry", "show", "code-review", "--json"])
+        .args(["gate", "show", "code-review", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -203,18 +209,20 @@ fn test_registry_add_defaults_to_postcheck() {
 }
 
 #[test]
-fn test_registry_add_with_invalid_stage() {
+fn test_gate_define_with_invalid_stage() {
     let temp = setup_test_repo();
     let jit = jit_binary();
 
-    // Try to add gate with invalid stage value
+    // Try to define gate with invalid stage value
     let output = Command::new(jit)
         .args([
-            "registry",
-            "add",
+            "gate",
+            "define",
             "invalid-gate",
             "-t",
             "Invalid",
+            "-d",
+            "Invalid stage",
             "--stage",
             "invalid",
         ])
