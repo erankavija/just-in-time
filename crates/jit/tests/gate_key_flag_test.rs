@@ -341,3 +341,48 @@ fn test_gate_check_neither_positional_nor_flag_errors() {
         .failure()
         .stderr(predicate::str::contains("--gate").or(predicate::str::contains("gate key")));
 }
+
+// ---------------------------------------------------------------------------
+// --json contract: the both/neither error is machine-readable, not plain text
+// (REQ-03 must not violate the every-command-supports-`--json` contract).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_gate_pass_both_with_json_emits_machine_readable_error() {
+    let (temp, issue_id) = setup_manual_gate_issue("code-review");
+    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "pass",
+            &issue_id,
+            "code-review",
+            "--gate",
+            "code-review",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out)
+        .expect("`gate pass --json` argument error must be valid JSON on stdout");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+}
+
+#[test]
+fn test_gate_check_neither_with_json_emits_machine_readable_error() {
+    let (temp, issue_id) = setup_auto_gate_issue("tests");
+    let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "check", &issue_id, "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out)
+        .expect("`gate check --json` argument error must be valid JSON on stdout");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+}

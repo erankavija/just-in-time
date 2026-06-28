@@ -420,8 +420,11 @@ fn setup_gitattributes() -> Result<()> {
 
 /// Resolve the gate key from the CLI's positional-or-flag pair (REQ-03).
 ///
-/// Exactly one of `positional` and `flag` must be `Some`; supplying both or
-/// neither exits with an actionable error message.
+/// Exactly one of `positional` and `flag` must be `Some`. Supplying both or
+/// neither returns a typed [`InvalidArgumentError`](jit::errors::InvalidArgumentError)
+/// (exit code 2) carrying an actionable message — routed through the normal error
+/// path so `error_to_exit_code` classifies it and `--json` callers can render it
+/// as a machine-readable error (see [`resolve_gate_key_for`]).
 fn resolve_gate_key(
     positional: Option<String>,
     flag: Option<String>,
@@ -430,21 +433,44 @@ fn resolve_gate_key(
     match (positional, flag) {
         (Some(pos), None) => Ok(pos),
         (None, Some(flag_val)) => Ok(flag_val),
-        (Some(_), Some(_)) => {
-            eprintln!(
-                "Error: provide the gate key as a positional argument OR via --gate, not both.\n\
-                 Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
-                 Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
-            );
-            std::process::exit(2);
-        }
-        (None, None) => {
-            eprintln!(
-                "Error: a gate key is required; provide it as a positional argument or via --gate.\n\
-                 Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
-                 Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
-            );
-            std::process::exit(2);
+        (Some(_), Some(_)) => Err(jit::errors::InvalidArgumentError::new(format!(
+            "provide the gate key as a positional argument OR via --gate, not both.\n\
+             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+        ))
+        .into()),
+        (None, None) => Err(jit::errors::InvalidArgumentError::new(format!(
+            "a gate key is required; provide it as a positional argument or via --gate.\n\
+             Usage: jit {command} <ISSUE_ID> <GATE_KEY>\n\
+             Usage: jit {command} <ISSUE_ID> --gate <GATE_KEY>"
+        ))
+        .into()),
+    }
+}
+
+/// [`resolve_gate_key`] with `--json`-aware error rendering. On the both/neither
+/// error, a `--json` caller emits a machine-readable `INVALID_ARGUMENT` JSON
+/// error (exit 2) instead of letting the plain-text error bubble to the top-level
+/// handler; a non-`--json` caller propagates the typed error unchanged.
+fn resolve_gate_key_for(
+    positional: Option<String>,
+    flag: Option<String>,
+    command: &str,
+    json: bool,
+) -> Result<String> {
+    match resolve_gate_key(positional, flag, command) {
+        Ok(key) => Ok(key),
+        Err(e) => {
+            if json {
+                let json_error = jit::output::JsonError::new(
+                    jit::output::ErrorCode::INVALID_ARGUMENT,
+                    e.to_string(),
+                    command,
+                );
+                println!("{}", json_error.to_json_string()?);
+                std::process::exit(json_error.exit_code().code());
+            }
+            Err(e)
         }
     }
 }
@@ -2444,7 +2470,7 @@ fn run() -> Result<()> {
                 gate_flag,
                 json,
             } => {
-                let gate_key = resolve_gate_key(gate_key, gate_flag, "gate check")?;
+                let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate check", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
 
                 // Transposed-argument guard. The canonical form is
@@ -2657,7 +2683,7 @@ fn run() -> Result<()> {
                 force,
                 json,
             } => {
-                let gate_key = resolve_gate_key(gate_key, gate_flag, "gate pass")?;
+                let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate pass", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.pass_gate(&id, gate_key.clone(), by, force) {
                     Ok(outcome) => {

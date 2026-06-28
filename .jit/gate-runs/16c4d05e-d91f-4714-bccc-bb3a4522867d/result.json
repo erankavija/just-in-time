@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "16c4d05e-d91f-4714-bccc-bb3a4522867d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "1c94f4f1-9e6e-4fa2-8e28-e371474c2fbb",
+  "commit": "f9b66c8ff2c910a7602427a97ab41ec32201e456",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T03:25:34.352413462Z",
+  "completed_at": "2026-06-28T03:26:47.998816032Z",
+  "duration_ms": 73646,
+  "exit_code": 1,
+  "stdout": "**Architecture**\nCLI-only change; domain, storage, and commands boundaries are not crossed.\n\n**Functional Correctness**\nThe success path accepts both `gate check/pass <id> <key>` and `gate check/pass <id> --gate <key>`. However, the new validation path breaks the JSON CLI contract for invalid argument cases.\n\n**Testing**\n`cargo-ci` gate evidence is passed, so I did not rerun tests. New integration coverage exists for positional, flag, both, and neither forms, but it does not cover `--json` error output. `./scripts/jit-validate.sh` passed.\n\n**Issue Management**\nDependency `a1623187` is marked `done`. No prior run feedback to verify.\n\n**Findings**\n1. [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:425): `resolve_gate_key` handles the new “both positional and --gate” and “neither” cases by printing plain text to stderr and calling `std::process::exit(2)` directly. The callers invoke it before JSON-aware handling at [main.rs:2447](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2447) and [main.rs:2660](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2660), so `jit gate check <id> --json` and `jit gate pass <id> key --gate key --json` do not produce machine-readable JSON errors. This violates the CLI contract that every command support `--json`, and bypasses the project’s typed invalid-argument error path documented in [errors.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:107).\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6207 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0c42-dc1e-7fe2-85d7-b22a1d1ac26b\n--------\nuser\n--- 6194 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
