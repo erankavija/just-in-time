@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "25051a2b-5ec6-493f-a2fe-ec629bf9ee3f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "e3259063-2ac4-40a6-86a7-40dbc9716b2f",
+  "commit": "61971043ad42cf0abbb5fb13fe46344e71af33cc",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T05:11:29.362964465Z",
+  "completed_at": "2026-06-28T05:13:43.094658116Z",
+  "duration_ms": 133731,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-06 is satisfied. The retired `jit registry` surface and schema/tool names are gone, and canonical gate commands are under `jit gate define/list/show/remove/update/...`. A tree-wide search across `crates`, `docs`, `contrib`, `scripts`, `mcp-server`, `.codex`, `.agents`, and `../gf2` found no retired `jit registry`, `registry_add/list/remove/show`, `jit_registry_*`, `RegistryCommands`, or `RegistryListResponse` references.\n\nDependencies listed on the issue are all `done`.\n\n**Architecture**\n\nNo boundary violations found. The change stays in CLI/schema/output/tests/docs, with command orchestration still in `crates/jit/src/main.rs` and gate persistence behind `IssueStore`/storage APIs.\n\n**Functional / Correctness / Safety**\n\nNo new unsafe code, PID handling, gate-transition semantics, assignee/label parsing, or atomic-write behavior changes were introduced. Gate registry writes still route through storage methods.\n\n**Testing / Validation**\n\nUsed the provided `cargo-ci` passed gate as primary test evidence and did not rerun tests. I ran `./scripts/jit-validate.sh`; it passed.\n\n**CLI Contract**\n\n`target/debug/jit --help` no longer lists `registry`; `target/debug/jit registry --help` fails as unrecognized; `target/debug/jit gate --help` exposes the canonical gate surface. The touched gate commands retain `--json`.\n\n**Documentation**\n\nThe prior failed review finding is addressed: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:971) now documents `GateCommands` with `# Examples`, and [crates/jit/src/commands/gate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate.rs:772) now documents `define_gate` with `# Examples`.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
