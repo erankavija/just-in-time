@@ -17,7 +17,7 @@ enforcement shipped by epic `94d26c42`.
 > **Revision 2** addressed the round-1 plan-review FAIL: fixed the contradictory `B`
 > ownership (scaffold creates `C`+`P` only; `B` born at breakdown); added D13 for the
 > preview/closure assertion split; confirmed R1; made R5 mandatory; clarified T10 replaces
-> `breakdown_issue`'s wiring.
+> the former flat-breakdown wiring.
 >
 > **Revision 3** addresses the round-2 plan-review FAIL:
 > - **Transitive traversal scope:** applies to `label-coverage` **only** —
@@ -178,11 +178,11 @@ consumes both). The waves are coarse buckets; the per-task `→` edges are autho
 - **T10 `jit-breakdown` re-sequenced**: consume the approved plan → create `B`
   (`type:breakdown`, `brackets:<C-id>`, coverage-preview gate) depending on `P` → draft
   impl children in Backlog → wire the spine (sources → `B`, sinks → `C`; reduction drops
-  `C → P`) → run the coverage-preview gate. **Replaces the spine wiring of the existing
-  `breakdown_issue`** (`breakdown.rs:37-95`), which is parent-centric (copies parent deps
-  to every child, makes the parent depend on *all* children) and does not produce
-  source/sink-only spine edges — T10 adds a new breakdown path or reworks that helper and
-  must not reuse its wiring as-is. (→ T5, T6)
+  `C → P`) → run the coverage-preview gate. **Replaces the spine wiring of the former flat
+  breakdown helper** (`breakdown.rs`, since removed in jit:07657508), which was
+  parent-centric (copied parent deps to every child, made the parent depend on *all*
+  children) and did not produce source/sink-only spine edges — T10 adds a new breakdown
+  path or reworks that helper and must not reuse its wiring as-is. (→ T5, T6)
 - **T11 `project-lead` re-sequenced**: scaffold `C`+`P` → plan-quality gate → breakdown
   → coverage gate → implementation; read breakable types from the ruleset; configurable
   opt-out. (→ T5, T10)

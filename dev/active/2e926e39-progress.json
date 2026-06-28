@@ -178,7 +178,7 @@
       "issues": [
         {
           "short_id": "07657508",
-          "title": "Retire the obsolete issue breakdown command",
+          "title": "Retire the obsolete flat-breakdown CLI command",
           "satisfies": "REQ-06",
           "classification": "implementation",
           "status": "pending"

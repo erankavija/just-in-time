@@ -36,7 +36,7 @@
   - `graph.rs`: show_graph, show_downstream
   - `document.rs`: add_document_reference, list_document_references, remove_document_reference, show_document_content, document_history, document_diff
   - `labels.rs`: add_label
-  - `breakdown.rs`: breakdown_issue
+  - `breakdown.rs`: bracket_breakdown
 
 ## Remaining Work
 

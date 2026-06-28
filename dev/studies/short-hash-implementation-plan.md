@@ -130,7 +130,7 @@ let issue = self.storage.load_issue(&full_id)?;
 - `gate_check.rs`: `check_gate`, `check_all_gates`
 - `document.rs`: `add_document`, `remove_document`, `list_documents`, `show_document`, `document_history`, `document_diff`
 - `graph.rs`: `show_graph`, `show_downstream`
-- `breakdown.rs`: `breakdown_issue`
+- `breakdown.rs`: `bracket_breakdown`
 
 **Note**: Only update commands that take issue ID from user input. Internal operations using IDs from the database should continue using full UUIDs.
 

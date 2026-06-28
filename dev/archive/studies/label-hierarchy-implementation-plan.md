@@ -208,7 +208,7 @@ jit query all --label "epic:*" --or label "milestone:*"  # Strategic view
 - [ ] Handle label inheritance rules (based on decision above)
 
 **Files changed:**
-- `crates/jit/src/commands.rs` (modify `breakdown_issue`)
+- `crates/jit/src/commands.rs` (modify the breakdown command path)
 
 **Tests**: 5-8 breakdown tests
 
