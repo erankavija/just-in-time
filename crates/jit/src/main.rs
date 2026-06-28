@@ -2444,14 +2444,18 @@ fn run() -> Result<()> {
                 checker_command,
                 timeout,
                 working_dir,
+                clear_working_dir,
                 pass_context,
                 prompt,
+                clear_prompt,
                 prompt_file,
+                clear_prompt_file,
                 env,
+                clear_env,
                 priority,
                 json,
             } => {
-                use jit::commands::GateUpdate;
+                use jit::commands::{FieldEdit, GateUpdate};
 
                 let output_ctx = OutputContext::new(quiet, json);
 
@@ -2463,10 +2467,39 @@ fn run() -> Result<()> {
                     mode
                 };
 
-                // An empty `--env` list means "leave the checker env unchanged";
-                // a non-empty list replaces the whole set. Parse KEY=VALUE pairs
-                // through the typed/JSON arg-error path (no eprintln + exit).
-                let env_update = if env.is_empty() {
+                // Resolve a set/clear flag pair into a tri-state `FieldEdit`. A
+                // set value AND its --clear-* twin together is an actionable,
+                // JSON-aware INVALID_ARGUMENT error (no eprintln + exit).
+                fn resolve_field_edit<T>(
+                    set: Option<T>,
+                    clear: bool,
+                    flag: &str,
+                    json: bool,
+                ) -> std::result::Result<FieldEdit<T>, anyhow::Error> {
+                    match (set, clear) {
+                        (Some(_), true) => Err(invalid_argument(
+                            format!(
+                                "--{flag} and --clear-{flag} are mutually exclusive; provide only one."
+                            ),
+                            "gate update",
+                            json,
+                        )),
+                        (Some(v), false) => Ok(FieldEdit::Set(v)),
+                        (None, true) => Ok(FieldEdit::Clear),
+                        (None, false) => Ok(FieldEdit::Keep),
+                    }
+                }
+
+                let working_dir_edit =
+                    resolve_field_edit(working_dir, clear_working_dir, "working-dir", json)?;
+                let prompt_edit = resolve_field_edit(prompt, clear_prompt, "prompt", json)?;
+                let prompt_file_edit =
+                    resolve_field_edit(prompt_file, clear_prompt_file, "prompt-file", json)?;
+
+                // `--env` (non-empty) sets the whole set; `--clear-env` empties
+                // it; the two together are mutually exclusive. Parse KEY=VALUE
+                // pairs through the typed/JSON arg-error path.
+                let env_set = if env.is_empty() {
                     None
                 } else {
                     let parsed: std::result::Result<
@@ -2487,6 +2520,7 @@ fn run() -> Result<()> {
                         Err(msg) => return Err(invalid_argument(msg, "gate update", json)),
                     }
                 };
+                let env_edit = resolve_field_edit(env_set, clear_env, "env", json)?;
 
                 let update = GateUpdate {
                     title,
@@ -2496,13 +2530,13 @@ fn run() -> Result<()> {
                     priority,
                     checker_command,
                     timeout,
-                    working_dir,
-                    // A bare `--pass-context` enables the flag; absence leaves it
-                    // unchanged (it cannot be cleared via update).
-                    pass_context: if pass_context { Some(true) } else { None },
-                    prompt,
-                    prompt_file,
-                    env: env_update,
+                    working_dir: working_dir_edit,
+                    // `--pass-context true|false` sets the flag; absence leaves
+                    // it unchanged.
+                    pass_context,
+                    prompt: prompt_edit,
+                    prompt_file: prompt_file_edit,
+                    env: env_edit,
                 };
 
                 if update.is_empty() {

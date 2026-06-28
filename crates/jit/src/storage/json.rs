@@ -133,12 +133,9 @@ impl JsonFileStorage {
             fs::create_dir_all(parent).context("Failed to create parent directory")?;
         }
 
-        // Atomic write: write to temp file, then rename
-        let temp_path = path.with_extension("json.tmp");
-        fs::write(&temp_path, json).context("Failed to write temporary file")?;
-        fs::rename(&temp_path, path).context("Failed to rename temporary file")?;
-
-        Ok(())
+        // Route through the canonical atomic-write primitive (temp file + rename
+        // with a UNIQUE per-process temp name, safe under concurrent writers).
+        crate::storage::atomic_write::write_file_atomic(path, &json)
     }
 
     fn read_json<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<T> {

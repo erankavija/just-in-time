@@ -168,13 +168,70 @@ pub struct GateRemoveResult {
     pub not_found: Vec<String>,
 }
 
+/// A tri-state edit for an optional/clearable field.
+///
+/// Distinguishes "leave the field as it is" from "clear the field", which a
+/// plain `Option<T>` cannot: `Some(v)` would set and `None` is ambiguous
+/// between "unchanged" and "remove". Used by [`GateUpdate`] for the fields that
+/// `jit gate update` must be able to both set AND clear (working dir, prompt,
+/// prompt file, checker env) so editing never requires hand-editing the
+/// registry file.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::FieldEdit;
+///
+/// // The default is `Keep` (leave unchanged).
+/// let keep: FieldEdit<String> = FieldEdit::default();
+/// assert!(keep.is_keep());
+/// assert!(!FieldEdit::Set("x".to_string()).is_keep());
+/// assert!(!FieldEdit::<String>::Clear.is_keep());
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum FieldEdit<T> {
+    /// Leave the field unchanged.
+    #[default]
+    Keep,
+    /// Replace the field with a new value.
+    Set(T),
+    /// Clear the field (set it to none / empty).
+    Clear,
+}
+
+impl<T> FieldEdit<T> {
+    /// `true` when this edit leaves the field unchanged.
+    pub fn is_keep(&self) -> bool {
+        matches!(self, FieldEdit::Keep)
+    }
+}
+
 /// Mutable fields for [`update_gate`](CommandExecutor::update_gate).
 ///
-/// Each `Some` field replaces the gate's current value; each `None` leaves it
-/// unchanged. The gate KEY is the gate's identity and is therefore not part of
-/// this struct. The checker fields (`checker_command`, `timeout`,
-/// `working_dir`, `pass_context`, `prompt`, `prompt_file`, `env`) are merged
-/// onto the gate's existing checker so an unprovided field is preserved.
+/// Each `Some`/`Set` field replaces the gate's current value; each `None`/`Keep`
+/// leaves it unchanged. The clearable fields ([`FieldEdit`]) additionally
+/// support `Clear`, so every mutable field is reachable from the CLI without
+/// hand-editing the registry. The gate KEY is the gate's identity and is
+/// therefore not part of this struct. The checker fields (`checker_command`,
+/// `timeout`, `working_dir`, `pass_context`, `prompt`, `prompt_file`, `env`)
+/// are merged onto the gate's existing checker so an unprovided field is
+/// preserved.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::GateUpdate;
+///
+/// // A default (no-field) update would change nothing.
+/// assert!(GateUpdate::default().is_empty());
+///
+/// // Setting any field makes it non-empty.
+/// let update = GateUpdate {
+///     title: Some("New title".to_string()),
+///     ..Default::default()
+/// };
+/// assert!(!update.is_empty());
+/// ```
 #[derive(Debug, Default, Clone)]
 pub struct GateUpdate {
     /// New human-readable title.
@@ -191,20 +248,33 @@ pub struct GateUpdate {
     pub checker_command: Option<String>,
     /// New checker timeout in seconds.
     pub timeout: Option<u64>,
-    /// New checker working directory (relative to repo root).
-    pub working_dir: Option<String>,
+    /// New checker working directory (set or clear).
+    pub working_dir: FieldEdit<String>,
     /// New `pass_context` flag for the checker.
     pub pass_context: Option<bool>,
-    /// New inline prompt for the checker.
-    pub prompt: Option<String>,
-    /// New prompt-file path for the checker.
-    pub prompt_file: Option<String>,
-    /// Replacement environment set for the checker (replaces the whole map).
-    pub env: Option<std::collections::HashMap<String, String>>,
+    /// New inline prompt for the checker (set or clear).
+    pub prompt: FieldEdit<String>,
+    /// New prompt-file path for the checker (set or clear).
+    pub prompt_file: FieldEdit<String>,
+    /// Replacement environment set for the checker (set replaces the whole map;
+    /// clear empties it).
+    pub env: FieldEdit<std::collections::HashMap<String, String>>,
 }
 
 impl GateUpdate {
     /// `true` when no field is set, i.e. the update would change nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::GateUpdate;
+    ///
+    /// assert!(GateUpdate::default().is_empty());
+    ///
+    /// let mut update = GateUpdate::default();
+    /// update.timeout = Some(60);
+    /// assert!(!update.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.title.is_none()
             && self.description.is_none()
@@ -213,11 +283,11 @@ impl GateUpdate {
             && self.priority.is_none()
             && self.checker_command.is_none()
             && self.timeout.is_none()
-            && self.working_dir.is_none()
+            && self.working_dir.is_keep()
             && self.pass_context.is_none()
-            && self.prompt.is_none()
-            && self.prompt_file.is_none()
-            && self.env.is_none()
+            && self.prompt.is_keep()
+            && self.prompt_file.is_keep()
+            && self.env.is_keep()
     }
 }
 
@@ -747,11 +817,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Update an existing gate's mutable fields in the registry.
     ///
-    /// Only the `Some` fields of `update` change; every other field keeps its
-    /// current value. The gate KEY is its identity and is never modified. The
-    /// write goes through [`save_gate_registry`](crate::storage::IssueStore::save_gate_registry)
-    /// (atomic temp-file + rename), and no per-issue `gates_status` is touched —
-    /// this edits the registry definition only.
+    /// Each set field of `update` replaces the gate's current value; every
+    /// unprovided field keeps its current value; the clearable checker fields
+    /// ([`FieldEdit::Clear`]) reset to none/empty. The gate KEY is its identity
+    /// and is never modified. The write goes through
+    /// [`save_gate_registry`](crate::storage::IssueStore::save_gate_registry)
+    /// (the canonical atomic temp-file + rename primitive), a
+    /// `gate_definition_updated` event is appended, and no per-issue
+    /// `gates_status` is touched — this edits the registry definition only.
     ///
     /// Updating a key that is not in the registry is a typed
     /// [`GateNotFoundError`](crate::storage::GateNotFoundError) (exit code `3`).
@@ -760,6 +833,50 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// checker.
     ///
     /// Returns the updated [`Gate`] so callers can render it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::{CommandExecutor, GateUpdate};
+    /// use jit::domain::{Gate, GateMode, GateStage};
+    /// use jit::{InMemoryStorage, IssueStore};
+    ///
+    /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
+    /// let executor = CommandExecutor::new(InMemoryStorage::new());
+    ///
+    /// // Seed a gate in the registry.
+    /// let mut registry = executor.storage().load_gate_registry().unwrap();
+    /// registry.gates.insert(
+    ///     "tests".to_string(),
+    ///     Gate {
+    ///         version: 1,
+    ///         key: "tests".to_string(),
+    ///         title: "Old title".to_string(),
+    ///         description: "Desc".to_string(),
+    ///         stage: GateStage::Postcheck,
+    ///         mode: GateMode::Manual,
+    ///         checker: None,
+    ///         priority: 100,
+    ///         reserved: Default::default(),
+    ///         auto: false,
+    ///         example_integration: None,
+    ///     },
+    /// );
+    /// executor.storage().save_gate_registry(&registry).unwrap();
+    ///
+    /// // Update only the title; every other field is preserved.
+    /// let updated = executor
+    ///     .update_gate(
+    ///         "tests",
+    ///         GateUpdate {
+    ///             title: Some("All Tests Pass".to_string()),
+    ///             ..Default::default()
+    ///         },
+    ///     )
+    ///     .unwrap();
+    /// assert_eq!(updated.title, "All Tests Pass");
+    /// assert_eq!(updated.description, "Desc");
+    /// ```
     pub fn update_gate(&self, key: &str, update: GateUpdate) -> Result<Gate> {
         use crate::domain::{GateChecker, GateMode};
 
@@ -779,14 +896,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Decompose the existing checker (if any) and apply per-field overrides,
         // so an unprovided checker field is preserved. A new checker is only
         // synthesized when the gate had none AND at least one checker field is
-        // provided.
+        // set or cleared.
         let any_checker_field = update.checker_command.is_some()
             || update.timeout.is_some()
-            || update.working_dir.is_some()
             || update.pass_context.is_some()
-            || update.prompt.is_some()
-            || update.prompt_file.is_some()
-            || update.env.is_some();
+            || !update.working_dir.is_keep()
+            || !update.prompt.is_keep()
+            || !update.prompt_file.is_keep()
+            || !update.env.is_keep();
 
         let merged_checker = if current.checker.is_some() || any_checker_field {
             let (
@@ -831,21 +948,29 @@ impl<S: IssueStore> CommandExecutor<S> {
             if let Some(t) = update.timeout {
                 timeout_seconds = t;
             }
-            if let Some(wd) = update.working_dir {
-                working_dir = Some(wd);
-            }
-            if let Some(e) = update.env {
-                env = e;
-            }
             if let Some(pc) = update.pass_context {
                 pass_context = pc;
             }
-            if let Some(p) = update.prompt {
-                prompt = Some(p);
-            }
-            if let Some(pf) = update.prompt_file {
-                prompt_file = Some(pf);
-            }
+            working_dir = match update.working_dir {
+                FieldEdit::Keep => working_dir,
+                FieldEdit::Set(v) => Some(v),
+                FieldEdit::Clear => None,
+            };
+            prompt = match update.prompt {
+                FieldEdit::Keep => prompt,
+                FieldEdit::Set(v) => Some(v),
+                FieldEdit::Clear => None,
+            };
+            prompt_file = match update.prompt_file {
+                FieldEdit::Keep => prompt_file,
+                FieldEdit::Set(v) => Some(v),
+                FieldEdit::Clear => None,
+            };
+            env = match update.env {
+                FieldEdit::Keep => env,
+                FieldEdit::Set(m) => m,
+                FieldEdit::Clear => std::collections::HashMap::new(),
+            };
             Some(GateChecker::Exec {
                 command,
                 timeout_seconds,
@@ -891,6 +1016,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.insert(updated.key.clone(), updated.clone());
         self.storage.save_gate_registry(&registry)?;
+
+        // INV-EVENT-LOG: registry-scoped audit entry for the definition edit.
+        self.storage
+            .append_event(&Event::new_gate_definition_updated(updated.key.clone()))?;
+
         Ok(updated)
     }
 

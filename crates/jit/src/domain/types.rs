@@ -1318,6 +1318,18 @@ pub enum Event {
         /// Name of the enforce graph rule that was bypassed
         rule: String,
     },
+    /// A gate definition in the registry was edited (`jit gate update`).
+    ///
+    /// Registry-scoped, like [`Event::DocumentArchived`]: it carries no issue id
+    /// because it mutates the shared gate registry rather than a single issue.
+    GateDefinitionUpdated {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Registry key of the gate that was updated
+        gate_key: String,
+    },
 }
 
 impl Event {
@@ -1628,6 +1640,29 @@ impl Event {
         }
     }
 
+    /// Create a gate-definition-updated event.
+    ///
+    /// Registry-scoped (issue-less, like
+    /// [`new_document_archived`](Self::new_document_archived)): records that the
+    /// gate registry entry `gate_key` was edited via `jit gate update`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_gate_definition_updated("tests".to_string());
+    /// assert_eq!(event.get_type(), "gate_definition_updated");
+    /// assert_eq!(event.get_issue_id(), "");
+    /// ```
+    pub fn new_gate_definition_updated(gate_key: String) -> Self {
+        Event::GateDefinitionUpdated {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            gate_key,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1647,6 +1682,7 @@ impl Event {
             Event::LocalRuleBypassed { issue_id, .. } => issue_id,
             Event::TransitionBlocked { issue_id, .. } => issue_id,
             Event::GraphRuleBypassed { issue_id, .. } => issue_id,
+            Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
         }
     }
 
@@ -1669,6 +1705,7 @@ impl Event {
             Event::LocalRuleBypassed { .. } => "local_rule_bypassed",
             Event::TransitionBlocked { .. } => "transition_blocked",
             Event::GraphRuleBypassed { .. } => "graph_rule_bypassed",
+            Event::GateDefinitionUpdated { .. } => "gate_definition_updated",
         }
     }
 }

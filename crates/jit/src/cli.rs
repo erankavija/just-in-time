@@ -1082,22 +1082,39 @@ pub enum GateCommands {
         #[arg(long)]
         working_dir: Option<String>,
 
-        /// Enable passing structured context (issue data, run history, prompt) to the checker
+        /// Clear the checker's working directory (mutually exclusive with --working-dir)
         #[arg(long)]
-        pass_context: bool,
+        clear_working_dir: bool,
+
+        /// Set whether structured context (issue data, run history, prompt) is
+        /// passed to the checker: `--pass-context true` or `--pass-context false`
+        #[arg(long)]
+        pass_context: Option<bool>,
 
         /// New inline prompt/instructions for the checker process
         #[arg(long)]
         prompt: Option<String>,
 
+        /// Clear the checker's inline prompt (mutually exclusive with --prompt)
+        #[arg(long)]
+        clear_prompt: bool,
+
         /// New path to a prompt file (relative to repo root), read at check time
         #[arg(long)]
         prompt_file: Option<String>,
+
+        /// Clear the checker's prompt file (mutually exclusive with --prompt-file)
+        #[arg(long)]
+        clear_prompt_file: bool,
 
         /// Environment variables for the checker (repeatable, format: KEY=VALUE).
         /// When provided, replaces the gate's existing environment set.
         #[arg(long)]
         env: Vec<String>,
+
+        /// Clear the checker's environment set (mutually exclusive with --env)
+        #[arg(long)]
+        clear_env: bool,
 
         /// New execution priority (lower number runs first)
         #[arg(long)]

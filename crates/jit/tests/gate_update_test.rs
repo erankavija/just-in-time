@@ -321,3 +321,164 @@ fn test_gate_update_is_atomic_sibling_gate_intact() {
         777
     );
 }
+
+/// Define an auto gate carrying every clearable checker field so clears can be
+/// exercised.
+fn define_rich_gate(temp: &TempDir, key: &str) {
+    jit(temp)
+        .args([
+            "gate",
+            "define",
+            key,
+            "--title",
+            "Rich Gate",
+            "--description",
+            "Has checker fields",
+            "--mode",
+            "auto",
+            "--checker-command",
+            "run.sh",
+            "--working-dir",
+            "subdir",
+            "--prompt",
+            "do the thing",
+            "--prompt-file",
+            "p.md",
+            "--pass-context",
+            "--env",
+            "FOO=bar",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_gate_update_clear_working_dir() {
+    let temp = setup_repo();
+    define_rich_gate(&temp, "g");
+
+    jit(&temp)
+        .args(["gate", "update", "g", "--clear-working-dir"])
+        .assert()
+        .success();
+
+    let gate = gate_show(&temp, "g");
+    assert!(
+        gate["checker"]["working_dir"].is_null(),
+        "working_dir must be cleared"
+    );
+    // Other checker fields preserved.
+    assert_eq!(gate["checker"]["command"], "run.sh");
+    assert_eq!(gate["checker"]["prompt"], "do the thing");
+}
+
+#[test]
+fn test_gate_update_clear_prompt_and_prompt_file() {
+    let temp = setup_repo();
+    define_rich_gate(&temp, "g");
+
+    jit(&temp)
+        .args([
+            "gate",
+            "update",
+            "g",
+            "--clear-prompt",
+            "--clear-prompt-file",
+        ])
+        .assert()
+        .success();
+
+    let gate = gate_show(&temp, "g");
+    assert!(
+        gate["checker"]["prompt"].is_null(),
+        "prompt must be cleared"
+    );
+    assert!(
+        gate["checker"]["prompt_file"].is_null(),
+        "prompt_file must be cleared"
+    );
+    // Working dir preserved.
+    assert_eq!(gate["checker"]["working_dir"], "subdir");
+}
+
+#[test]
+fn test_gate_update_clear_env() {
+    let temp = setup_repo();
+    define_rich_gate(&temp, "g");
+
+    jit(&temp)
+        .args(["gate", "update", "g", "--clear-env"])
+        .assert()
+        .success();
+
+    let gate = gate_show(&temp, "g");
+    assert_eq!(
+        gate["checker"]["env"],
+        serde_json::json!({}),
+        "env must be cleared to an empty map"
+    );
+}
+
+#[test]
+fn test_gate_update_pass_context_false_sets_false() {
+    let temp = setup_repo();
+    define_rich_gate(&temp, "g"); // defined with pass_context = true
+
+    jit(&temp)
+        .args(["gate", "update", "g", "--pass-context", "false"])
+        .assert()
+        .success();
+
+    let gate = gate_show(&temp, "g");
+    assert_eq!(gate["checker"]["pass_context"], false);
+    // The command is preserved (only pass_context changed).
+    assert_eq!(gate["checker"]["command"], "run.sh");
+}
+
+#[test]
+fn test_gate_update_set_and_clear_same_field_errors_json() {
+    let temp = setup_repo();
+    define_rich_gate(&temp, "g");
+
+    let assert = jit(&temp)
+        .args([
+            "gate",
+            "update",
+            "g",
+            "--working-dir",
+            "x",
+            "--clear-working-dir",
+            "--json",
+        ])
+        .assert()
+        .failure();
+    let out = assert.get_output().stdout.clone();
+    let value: serde_json::Value = serde_json::from_slice(&out).expect("error must be valid JSON");
+    assert_eq!(value["error"]["code"], "INVALID_ARGUMENT");
+
+    // The gate is unchanged (working_dir still set).
+    let gate = gate_show(&temp, "g");
+    assert_eq!(gate["checker"]["working_dir"], "subdir");
+}
+
+#[test]
+fn test_gate_update_appends_event() {
+    let temp = setup_repo();
+    define_auto_gate(&temp, "tests");
+
+    jit(&temp)
+        .args(["gate", "update", "tests", "--title", "New"])
+        .assert()
+        .success();
+
+    let events_path = temp.path().join(".jit").join("events.jsonl");
+    let contents = fs::read_to_string(&events_path).unwrap();
+    let found = contents.lines().any(|line| {
+        let v: serde_json::Value = serde_json::from_str(line).unwrap();
+        v["type"] == "gate_definition_updated" && v["gate_key"] == "tests"
+    });
+    assert!(
+        found,
+        "a gate_definition_updated event for 'tests' must be logged"
+    );
+}

@@ -1264,7 +1264,7 @@ jit gate define review \
 Edit an existing gate definition in the registry without hand-editing the
 registry file. Only the fields you pass change; every other field keeps its
 current value. The gate KEY is the gate's identity and cannot be changed. This
-edits the registry definition only — per-issue gate status (`gates_status`) is
+edits the registry definition only; per-issue gate status (`gates_status`) is
 left untouched. The write is atomic (temp-file + rename).
 
 **Usage:**
@@ -1284,18 +1284,30 @@ jit gate update <KEY> [OPTIONS]
 - `--checker-command <COMMAND>` - New checker command for automated gates
 - `--timeout <SECONDS>` - New checker timeout in seconds
 - `--working-dir <PATH>` - New checker working directory (relative to repo root)
-- `--pass-context` - Enable passing structured context to the checker
+- `--clear-working-dir` - Clear the checker working directory (mutually exclusive with `--working-dir`)
+- `--pass-context <BOOL>` - Set whether structured context is passed to the checker: `--pass-context true` or `--pass-context false`
 - `--prompt <TEXT>` - New inline prompt/instructions
+- `--clear-prompt` - Clear the inline prompt (mutually exclusive with `--prompt`)
 - `--prompt-file <PATH>` - New prompt file path (relative to repo root)
+- `--clear-prompt-file` - Clear the prompt file (mutually exclusive with `--prompt-file`)
 - `--env <KEY=VALUE>` - Checker environment variable (repeatable); when provided, replaces the gate's existing environment set
+- `--clear-env` - Clear the checker environment set (mutually exclusive with `--env`)
 - `--priority <N>` - New execution priority (lower runs first)
 - `--json` - Emit the updated gate definition as JSON
 
+Every mutable field is reachable from the CLI: each clearable checker field has
+both a set flag and a `--clear-*` flag, so editing a gate never requires
+hand-editing the registry file. Passing a set flag together with its `--clear-*`
+twin is an `INVALID_ARGUMENT` error.
+
 Switching a gate to `auto` (via `--mode auto` or `--auto`) requires the gate to
-have a checker command — supply `--checker-command` in the same call if the gate
+have a checker command; supply `--checker-command` in the same call if the gate
 had none. Switching to `manual` drops the checker. At least one field must be
 provided; an update with no fields is an `INVALID_ARGUMENT` error. Updating a key
 that is not in the registry is a `GATE_NOT_FOUND` error.
+
+The write goes through the canonical atomic-write primitive (temp file + rename)
+and appends a `gate_definition_updated` event to the event log.
 
 **Examples:**
 ```bash
@@ -1307,6 +1319,9 @@ jit gate update tests --timeout 600
 
 # Repoint an automated gate's checker command
 jit gate update tests --checker-command "cargo test --workspace"
+
+# Clear a gate's prompt file and disable context passing
+jit gate update review --clear-prompt-file --pass-context false
 ```
 
 ### `jit gate add`

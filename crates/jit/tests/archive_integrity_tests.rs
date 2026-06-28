@@ -336,41 +336,45 @@ fn test_archive_event_failure_after_relink_leaves_no_dangling_reference() {
 #[cfg(unix)]
 #[test]
 fn test_archive_partial_relink_failure_leaves_no_dangling_reference() {
-    // Three issues reference the document. The first relink succeeds, then a
-    // later one fails mid-batch. The rollback must leave every reference
-    // resolving to an existing file. We force the second issue's `save_issue` to
-    // fail by pre-occupying its atomic-write temp path (`{id}.json.tmp`) with a
-    // directory: reads of `{id}.json` still succeed (so the issue is relinked),
-    // but the temp-file write during save fails.
+    use std::os::unix::fs::PermissionsExt;
+
+    // Three issues reference the document. We force the relink's per-issue
+    // `save_issue` to fail by making the issue-store directory read-only for the
+    // duration of the archive call: every issue still LOADS (reads succeed), but
+    // the atomic write cannot create its temp file, so the relink save fails
+    // inside the archive transaction. The rollback must still leave every
+    // reference resolving to an existing file. (The atomic-write temp name is
+    // unique per process and cannot be predicted, so the failure is injected via
+    // directory permissions rather than by occupying a fixed temp path.)
     let (repo_root, executor) = executor();
 
     let src = "dev/active/spec.md";
     std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
     std::fs::write(repo_root.path().join(src), "# Spec\n\nProse only.\n").unwrap();
 
-    // Seed order fixes the relink order (index push order), so `beta` is the
-    // second issue processed and the one we make fail.
     let a = seed_issue_referencing(&executor, "alpha", src);
     let b = seed_issue_referencing(&executor, "beta", src);
     let c = seed_issue_referencing(&executor, "gamma", src);
 
-    // Block `beta`'s save: a directory at its atomic-write temp path.
-    let beta_tmp = repo_root.path().join(format!(".jit/issues/{b}.json.tmp"));
-    std::fs::create_dir(&beta_tmp).unwrap();
+    // Block the relink saves: a read-only issue store. Reads still succeed; the
+    // atomic-write temp file cannot be created, so the save fails.
+    let issues_dir = repo_root.path().join(".jit/issues");
+    let original_perms = std::fs::metadata(&issues_dir).unwrap().permissions();
+    std::fs::set_permissions(&issues_dir, std::fs::Permissions::from_mode(0o555)).unwrap();
 
     let result = executor.archive_document(src, "design", false, false);
 
-    // Remove the injected blocker so subsequent saves/reads are unaffected.
-    std::fs::remove_dir(&beta_tmp).unwrap();
+    // Restore writability so the assertions below can read/load issues.
+    std::fs::set_permissions(&issues_dir, original_perms).unwrap();
 
     assert!(
         result.is_err(),
-        "a mid-batch relink failure must surface as an error"
+        "a relink save failure must surface as an error"
     );
 
-    // Invariant: every reference resolves to an existing file, regardless of how
-    // far the partial relink got. The rollback restored the already-relinked
-    // `alpha` to the source; `beta` and `gamma` were never moved.
+    // Invariant: every reference resolves to an existing file. The relink save
+    // never persisted, so no reference reached the destination; the rollback
+    // leaves every issue resolving to the still-present source.
     assert_no_dangling_reference(&repo_root, &executor, &[&a, &b, &c]);
     for id in [&a, &b, &c] {
         assert_eq!(
@@ -381,7 +385,7 @@ fn test_archive_partial_relink_failure_leaves_no_dangling_reference() {
     }
     assert!(
         repo_root.path().join(src).exists(),
-        "the source is left in place when the relink fails partway"
+        "the source is left in place when the relink fails"
     );
     assert!(
         !repo_root
