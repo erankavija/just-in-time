@@ -1,7 +1,7 @@
 {
   "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
   "epic_short_id": "2e926e39",
-  "current_wave": 8,
+  "current_wave": "complete",
   "waves": [
     {
       "wave_number": 1,
@@ -233,5 +233,6 @@
       "eb37a05a": "a7838714d6615cbc0",
       "552ff75c": "a2fe9f5bb5a45d2fc"
     }
-  }
+  },
+  "epic_state": "done"
 }
