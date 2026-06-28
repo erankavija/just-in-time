@@ -6,14 +6,15 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "22826a75-ca56-4a96-b33d-b43a01112df2",
     "6c740a19-ad91-42d2-baa9-62d6d309cb9e",
-    "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
-    "f5054f15-e5b4-4be7-9816-6421c64d12fb",
-    "07657508-b020-4aeb-9f3a-1a836314b229",
+    "22826a75-ca56-4a96-b33d-b43a01112df2",
     "4b063bdf-9b24-432e-b3b8-08db52849b2b",
-    "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
+    "07657508-b020-4aeb-9f3a-1a836314b229",
     "552ff75c-2c83-4d80-9e89-ea3c4ac4f3fc",
+    "f5054f15-e5b4-4be7-9816-6421c64d12fb",
+    "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
+    "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
+    "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
     "b920ea57-1f80-45b9-9f9d-b4372daceb07"
   ],
   "gates_required": [],
@@ -39,5 +40,5 @@
     "epic:agent-seamlessness"
   ],
   "created_at": "2026-06-27T20:49:27.406814196Z",
-  "updated_at": "2026-06-28T07:22:53.796824849Z"
+  "updated_at": "2026-06-28T18:21:56.193378576Z"
 }
