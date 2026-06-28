@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "3b5ab233-f53e-458b-85ce-a747cf009991",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "e3259063-2ac4-40a6-86a7-40dbc9716b2f",
+  "commit": "521040f99a1833a74b0f712c12f7340ac523e30c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-06-28T05:04:53.301919351Z",
+  "completed_at": "2026-06-28T05:06:59.020670759Z",
+  "duration_ms": 125718,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-06 is mostly implemented: `jit registry` is removed, `jit gate define/list/show/remove` are canonical, exact retired-name searches found no `jit registry`, `registry_add/list/remove/show`, `jit_registry_*`, `RegistryCommands`, or `RegistryListResponse` references across checked roots. Dependencies are all `done`.\n\n**Architecture**\nNo new domain/storage/commands/CLI boundary violation found. Persistence remains behind storage APIs; CLI handling stays in `crates/jit/src/main.rs`.\n\n**Functional / Correctness / Safety**\nNo unsafe code or PID-related changes found. Gate semantics and atomic persistence paths were not weakened in the reviewed diff.\n\n**Testing / Validation**\nUsed the provided `cargo-ci` passed gate as primary test evidence and did not rerun tests. I ran `./scripts/jit-validate.sh`; it passed.\n\n**CLI / Consumers**\nTop-level `registry` is gone from `jit --help`, and `jit registry --help` fails with an unrecognized subcommand. Schema exposes `gate` and no top-level `registry`. MCP references use generated schema and README now names `jit_gate_define/list/show/remove`.\n\n**Documentation**\nOne blocking documentation issue remains.\n\n1. `crates/jit/src/cli.rs:971` and `crates/jit/src/commands/gate.rs:772` modify public API surfaces (`pub enum GateCommands` and `pub fn define_gate`) without adding the required `# Examples` sections. The review criteria require all public APIs to have doc comments with description and `# Examples`; this touched public command/API surface still does not meet that standard.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 17278 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f0c9d-ca40-7181-8fa7-d3e9cdb35910\n--------\nuser\n--- 17265 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

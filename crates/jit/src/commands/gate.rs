@@ -769,7 +769,35 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Define a new gate with full control over stage, mode, and checker
+    /// Define a new gate with full control over stage, mode, and checker.
+    ///
+    /// `example_integration` is an optional usage snippet stored on the gate
+    /// definition (surfaced by `jit gate show`). Returns an error if `key` is
+    /// already registered, or if `mode` is [`GateMode::Auto`](crate::domain::GateMode)
+    /// without a `checker`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    /// use jit::domain::{GateStage, GateMode};
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // A manual review gate: no checker, postcheck stage, no example snippet.
+    /// executor
+    ///     .define_gate(
+    ///         "code-review".to_string(),
+    ///         "Code Review".to_string(),
+    ///         "Human review before done".to_string(),
+    ///         GateStage::Postcheck,
+    ///         GateMode::Manual,
+    ///         None,
+    ///         100,
+    ///         None,
+    ///     )
+    ///     .unwrap();
+    /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn define_gate(
         &self,

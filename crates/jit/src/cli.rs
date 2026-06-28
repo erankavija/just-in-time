@@ -977,6 +977,23 @@ pub enum DepCommands {
 ///   `pass`, `pass-all`, `fail`.
 /// * Inspection — reports definitions or run results with no side effects:
 ///   `list`, `show`, `check`, `check-all`.
+///
+/// # Examples
+///
+/// ```text
+/// # Configuration
+/// jit gate define code-review --title "Code Review" --description "Human review"
+/// jit gate add abc123 code-review            # attach a registered gate to an issue
+/// jit gate preset apply rust-tdd abc123      # attach a preset bundle
+///
+/// # Execution
+/// jit gate pass abc123 code-review           # run/attest, record a verdict
+/// jit gate pass-all abc123                   # pass every required gate
+///
+/// # Inspection (non-mutating)
+/// jit gate list                              # registered gate definitions
+/// jit gate check abc123 code-review          # last recorded run for one gate
+/// ```
 #[derive(Subcommand)]
 pub enum GateCommands {
     // ===== Configuration: define what gates exist and which issues require them =====
