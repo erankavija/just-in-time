@@ -1918,7 +1918,30 @@ jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
 
 ## Query Commands
 
-<!-- jit query available, blocked, etc. -->
+### Default (bare) form
+
+`jit query` with no subcommand returns all issues, equivalent to `jit query all`. All
+four filters work on the bare form:
+
+```bash
+jit query                                    # all issues
+jit query --state ready                      # filter by state
+jit query --assignee agent:worker-1          # filter by assignee
+jit query --priority critical                # filter by priority
+jit query --label component:api              # filter by label pattern
+jit query --state in_progress --json         # combine with --json
+```
+
+### Subcommands
+
+| Subcommand | Alias | Description |
+|------------|-------|-------------|
+| `jit query all` | — | All issues with optional `--state`/`--assignee`/`--priority`/`--label` filters |
+| `jit query available` | `ready` | Unassigned, unblocked, state=ready issues |
+| `jit query ready` | — | Visible alias of `available` |
+| `jit query blocked` | — | Blocked issues with blocking reasons |
+| `jit query strategic` | — | Issues carrying labels from strategic namespaces |
+| `jit query closed` | — | Issues in Done or Rejected state |
 
 ## Document Commands
 

@@ -121,8 +121,40 @@ pub enum Commands {
     Graph(GraphCommands),
 
     /// Query issues for orchestrators
-    #[command(subcommand)]
-    Query(QueryCommands),
+    ///
+    /// With no subcommand, returns all issues (equivalent to `jit query all`).
+    /// Filters (`--state`, `--assignee`, `--priority`, `--label`) narrow the
+    /// default listing. Use `jit query ready` (alias of `available`) for
+    /// unassigned, unblocked ready issues.
+    Query {
+        /// Subcommand — omit to list all issues
+        #[command(subcommand)]
+        subcommand: Option<QueryCommands>,
+
+        /// Filter by state (used when no subcommand is given)
+        #[arg(short = 's', long)]
+        state: Option<String>,
+
+        /// Filter by assignee — format: type:identifier (used when no subcommand is given)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by priority (used when no subcommand is given)
+        #[arg(short = 'p', long)]
+        priority: Option<String>,
+
+        /// Filter by label pattern — exact match or wildcard (used when no subcommand is given)
+        #[arg(short = 'l', long)]
+        label: Option<String>,
+
+        /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
+        #[arg(long)]
+        full: bool,
+
+        /// Output in JSON format (used when no subcommand is given)
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Label namespace management commands
     #[command(subcommand)]
@@ -1481,6 +1513,7 @@ pub enum QueryCommands {
     },
 
     /// Query available issues (unassigned, state=ready, unblocked)
+    #[command(visible_alias = "ready")]
     Available {
         /// Filter by priority
         #[arg(short = 'p', long)]

@@ -1113,3 +1113,279 @@ fn test_query_by_priority_all_levels() {
         assert_eq!(json["issues"][0]["priority"], *p);
     }
 }
+
+// ── REQ-04: bare `jit query` and `jit query ready` alias ─────────────────────
+
+/// Bare `jit query --json` returns all issues via the query-all path.
+#[test]
+fn test_query_bare_returns_all_issues() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    for title in &["Alpha", "Beta", "Gamma"] {
+        Command::new(jit)
+            .args(["issue", "create", "-t", title, "-d", "desc"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+    }
+
+    let output = Command::new(jit)
+        .args(["query", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "bare jit query failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 3, "bare query should return all 3 issues");
+}
+
+/// `jit query ready` is accepted and returns the same count as `jit query available`.
+#[test]
+fn test_query_ready_alias_matches_available() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Two unassigned ready issues
+    for title in &["Ready One", "Ready Two"] {
+        Command::new(jit)
+            .args(["issue", "create", "-t", title, "-d", "desc"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+    }
+
+    let out_available = Command::new(jit)
+        .args(["query", "available", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(out_available.status.success());
+    let json_available: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out_available.stdout)).unwrap();
+
+    let out_ready = Command::new(jit)
+        .args(["query", "ready", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        out_ready.status.success(),
+        "jit query ready failed: {}",
+        String::from_utf8_lossy(&out_ready.stderr)
+    );
+    let json_ready: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&out_ready.stdout)).unwrap();
+
+    assert_eq!(
+        json_ready["count"], json_available["count"],
+        "`jit query ready` count should match `jit query available`"
+    );
+    assert_eq!(
+        json_ready["issues"], json_available["issues"],
+        "`jit query ready` issues should match `jit query available`"
+    );
+}
+
+/// Bare `jit query --state ready --json` filters by state on the default path.
+#[test]
+fn test_query_bare_state_filter() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(jit)
+        .args(["issue", "create", "-t", "Ready Task", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_ready = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    let out2 = Command::new(jit)
+        .args(["issue", "create", "-t", "Done Task", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_done = String::from_utf8_lossy(&out2.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+    Command::new(jit)
+        .args(["issue", "update", &id_done, "--state", "done"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["query", "--state", "ready", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "bare jit query --state failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1, "should find exactly 1 ready issue");
+    assert_eq!(json["issues"][0]["id"], id_ready);
+}
+
+/// Bare `jit query --assignee agent:worker-1 --json` filters by assignee.
+#[test]
+fn test_query_bare_assignee_filter() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(jit)
+        .args(["issue", "create", "-t", "Assigned", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_assigned = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(jit)
+        .args(["issue", "create", "-t", "Unassigned", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    Command::new(jit)
+        .args(["issue", "claim", &id_assigned, "agent:worker-1"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["query", "--assignee", "agent:worker-1", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "bare jit query --assignee failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id_assigned);
+}
+
+/// Bare `jit query --priority critical --json` filters by priority.
+#[test]
+fn test_query_bare_priority_filter() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Critical",
+            "-d",
+            "d",
+            "--priority",
+            "critical",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    Command::new(jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Low",
+            "-d",
+            "d",
+            "--priority",
+            "low",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["query", "--priority", "critical", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "bare jit query --priority failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["priority"], "critical");
+}
+
+/// Bare `jit query --label component:api --json` filters by label.
+#[test]
+fn test_query_bare_label_filter() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let out = Command::new(jit)
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "Tagged",
+            "-d",
+            "d",
+            "--label",
+            "component:api",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let id_tagged = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+
+    Command::new(jit)
+        .args(["issue", "create", "-t", "Untagged", "-d", "d"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["query", "--label", "component:api", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "bare jit query --label failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+    assert_eq!(json["count"], 1);
+    assert_eq!(json["issues"][0]["id"], id_tagged);
+}
