@@ -293,3 +293,121 @@ fn test_graph_deps_summary_stats() {
     assert_eq!(summary["by_state"]["done"], 2);
     assert_eq!(summary["by_state"]["ready"], 1);
 }
+
+// ── rdeps depth tests ────────────────────────────────────────────────────────
+
+/// `graph rdeps` with no `--depth` flag must be bounded (depth 1 = immediate
+/// dependents only), consistent with `graph deps` defaulting to depth 1.
+#[test]
+fn test_graph_rdeps_depth_default_is_bounded() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create a 3-level chain: C <- B <- A  (A depends on B, B depends on C)
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+
+    // Default (no --depth): rdeps of C should return B only, not A
+    let output = Command::new(jit)
+        .args(["graph", "rdeps", &c, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    let dependents = json["dependents"].as_array().unwrap();
+    // Only immediate dependent B, not transitive A
+    assert_eq!(
+        dependents.len(),
+        1,
+        "default rdeps must be bounded to depth 1"
+    );
+    assert_eq!(dependents[0]["id"], b);
+    assert!(
+        !dependents.iter().any(|d| d["id"] == a),
+        "A must not appear at depth 1"
+    );
+}
+
+/// `graph rdeps --depth 0` must traverse all transitive dependents (opt-in unbounded).
+#[test]
+fn test_graph_rdeps_depth_zero_is_unbounded() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Create chain: C <- B <- A
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+
+    // --depth 0 = unlimited: rdeps of C should include both B and A
+    let output = Command::new(jit)
+        .args(["graph", "rdeps", &c, "--depth", "0", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    let dependents = json["dependents"].as_array().unwrap();
+    let ids: Vec<&str> = dependents
+        .iter()
+        .map(|d| d["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        dependents.len(),
+        2,
+        "--depth 0 must include all transitive dependents"
+    );
+    assert!(ids.contains(&b.as_str()), "B must be present");
+    assert!(ids.contains(&a.as_str()), "A must be present");
+}
+
+/// Both `graph deps` and `graph rdeps` default to depth 1 (symmetric behaviour).
+#[test]
+fn test_graph_rdeps_and_deps_both_default_to_depth_1() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    // Chain: C <- B <- A
+    let c = create_issue(jit, &temp, "Task C", "Leaf");
+    let b = create_issue_with_dep(jit, &temp, "Task B", "Middle", &c);
+    let _a = create_issue_with_dep(jit, &temp, "Task A", "Root", &b);
+
+    // deps default: A's immediate dep is B only
+    let deps_out = Command::new(jit)
+        .args(["graph", "deps", &_a, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(deps_out.status.success());
+    let deps_json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&deps_out.stdout)).unwrap();
+    assert_eq!(
+        deps_json["depth"], 1,
+        "graph deps must report depth 1 by default"
+    );
+
+    // rdeps default: C's immediate dependent is B only
+    let rdeps_out = Command::new(jit)
+        .args(["graph", "rdeps", &c, "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(rdeps_out.status.success());
+    let rdeps_json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&rdeps_out.stdout)).unwrap();
+    let dependents = rdeps_json["dependents"].as_array().unwrap();
+    // Exactly 1 immediate dependent
+    assert_eq!(
+        dependents.len(),
+        1,
+        "graph rdeps must also be bounded to depth 1 by default"
+    );
+}

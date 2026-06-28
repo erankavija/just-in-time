@@ -1407,7 +1407,7 @@ pub enum GraphCommands {
     /// Examples:
     ///   jit graph deps epic-123              # immediate dependencies (default)
     ///   jit graph deps epic-123 --depth 2    # two levels deep
-    ///   jit graph deps epic-123 --depth 0    # all transitive (unlimited)
+    ///   jit graph deps epic-123 --depth 0    # all transitive (unlimited, opt-in)
     ///
     /// "Dependencies" = what this issue needs (upstream in work flow).
     /// "Dependents" = what needs this issue (downstream in work flow).
@@ -1428,9 +1428,13 @@ pub enum GraphCommands {
     ///
     /// Symmetric counterpart to `deps`: where `deps` shows what this issue needs,
     /// `rdeps` shows what needs this issue.
+    /// By default shows immediate dependents only (depth 1).
     ///
-    /// Example:
-    ///   jit graph rdeps task-456
+    /// Examples:
+    ///   jit graph rdeps task-456              # immediate dependents (default)
+    ///   jit graph rdeps task-456 --depth 2    # two levels deep
+    ///   jit graph rdeps task-456 --depth 0    # all transitive (unlimited, opt-in)
+    ///
     ///   Shows: epic-123, milestone-789 (they depend on this task)
     ///
     /// Note: This shows dependency relationships, not label hierarchy.
@@ -1440,7 +1444,7 @@ pub enum GraphCommands {
         id: String,
 
         /// Depth of traversal (1 = immediate, 0 = unlimited)
-        #[arg(long, default_value = "0")]
+        #[arg(long, default_value = "1")]
         depth: u32,
 
         #[arg(long)]

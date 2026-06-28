@@ -472,8 +472,8 @@ fn test_workflow_graph_visualization() {
     assert!(stdout.contains(&foundation));
     assert!(!stdout.contains(&integration));
 
-    // Show downstream of foundation
-    let output = run_jit(&temp, &["graph", "downstream", &foundation]);
+    // Show downstream of foundation (--depth 0 opts in to unbounded traversal)
+    let output = run_jit(&temp, &["graph", "downstream", &foundation, "--depth", "0"]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&feature_a));
     assert!(stdout.contains(&feature_b));

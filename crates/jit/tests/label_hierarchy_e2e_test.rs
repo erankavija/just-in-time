@@ -377,8 +377,9 @@ fn test_label_hierarchy_complete_workflow() {
     // Show downstream of milestone (should show issues that depend on milestone)
     // Note: In the dependency graph, milestone depends on epic and tasks
     // So milestone has NO downstream dependents (nothing depends on the milestone)
-    // Let's check downstream of a task instead (epic depends on tasks)
-    let output = run_jit(&temp, &["graph", "downstream", &task1_id]);
+    // Let's check downstream of a task instead (epic depends on tasks).
+    // Use --depth 0 to opt-in to unbounded traversal and see transitive dependents.
+    let output = run_jit(&temp, &["graph", "downstream", &task1_id, "--depth", "0"]);
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
