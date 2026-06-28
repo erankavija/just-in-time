@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Closing the agent-seamlessness gaps — JIT epic 2e926e39</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- reveal.js core only (no reveal theme — base.css + the theme token file own all appearance) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<!-- KaTeX (synchronous math; deterministic heights for the fit-checker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── 1 · TITLE ───────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Closing the agent-seamlessness gaps</h1>
+  <p class="tagline">JIT epic 2e926e39 — first-guess CLI, readable gates, scoped validation</p>
+  <p>project-lead &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-06-28</p>
+  <p class="caption">19 / 19 <span class="kbd">[hard]</span> criteria · 7 waves · every change gated on a real build</p>
+</section>
+
+<!-- ── 2 · OVERVIEW ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Overview <span class="num">· 2 / 16</span></span>
+  <h2>The epic, at a glance</h2>
+  <p>Residual friction that made the CLI hard for an agent to drive on the first try:
+     guess-the-flag commands, truncated gate output, all-or-nothing validation.</p>
+  <ul>
+    <li><strong>19 of 19</strong> <span class="kbd">[hard]</span> criteria (REQ-01 … REQ-19) delivered</li>
+    <li><strong>7 topological waves</strong> — each fully gated before the next began</li>
+    <li>Two whole-tree gates per child: <span class="highlight">cargo-ci</span> (fmt + clippy + 2834 tests) and an AI <span class="highlight">code-review</span></li>
+    <li>Gates were <strong>inviolable</strong>: every review failure was reworked until it passed on merit</li>
+    <li>Net CLI surface: <strong>2 commands retired</strong>, ~6 made first-guess-correct</li>
+  </ul>
+</section>
+
+<!-- ── 3 · FIRST-GUESS: CREATE ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">First-guess CLI <span class="num">· 3 / 16</span></span>
+  <h2>The first guess should just work</h2>
+<pre><code class="language-bash" data-trim># before — the title was only reachable through a flag
+jit issue create --title "Parse frontmatter"
+
+# after — the title is the positional subject; the type is a flag
+jit issue create "Parse frontmatter" --type task
+#   -&gt; Created issue: d3d666e1</code></pre>
+  <div class="note">REQ-01 / REQ-02. The flag form still works; the long nouns <code>dependency</code> and <code>document</code> stay as aliases of <code>dep</code> / <code>doc</code>.</div>
+</section>
+
+<!-- ── 4 · FIRST-GUESS: NAVIGATE ───────────────────────────────────────── -->
+<section>
+  <span class="seclabel">First-guess CLI <span class="num">· 4 / 16</span></span>
+  <h2>Find your way around</h2>
+<pre><code class="language-bash" data-trim># before — you had to recall the full noun path
+jit graph rdeps abc123
+jit query available
+
+# after — top-level first guesses route to the canonical command
+jit list            # = jit issue list
+jit rdeps abc123    # = jit graph rdeps  (depth 1 by default)
+jit query ready     # visible alias of `available`</code></pre>
+  <div class="note">REQ-04 / REQ-19. <code>rdeps</code> now defaults to immediate dependents; <code>--depth 0</code> opts into the full transitive set.</div>
+</section>
+
+<!-- ── 5 · GUARDRAILS ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">First-guess CLI <span class="num">· 5 / 16</span></span>
+  <h2>Guardrails, not gotchas</h2>
+<pre><code class="language-bash" data-trim>$ jit gate check tests 03202492      # key and id accidentally swapped
+Error: 'tests' is a gate key and '03202492' is an issue;
+       the issue id and gate key look transposed.
+Did you mean: jit gate check 03202492 tests</code></pre>
+  <ul>
+    <li>A misparse used to surface as a baffling "issue not found"</li>
+    <li>Also new: <code>gate define --auto</code>, and <code>doc add --title</code> as an alias of the human label (REQ-05)</li>
+  </ul>
+</section>
+
+<!-- ── 6 · GATE EXECUTION ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 6 / 16</span></span>
+  <h2>Pass a gate the way you reach for it</h2>
+<pre><code class="language-bash" data-trim># before — the gate key was positional-only
+jit gate pass abc123 ci
+
+# after — positional OR flag, identical behaviour
+jit gate pass abc123 --gate ci</code></pre>
+  <div class="note">REQ-03. The same flag lands on <code>gate check</code>; supplying both forms (or neither) is a machine-readable <code>--json</code> error, not a panic.</div>
+</section>
+
+<!-- ── 7 · GATE INSPECTION ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 7 / 16</span></span>
+  <h2>Gate inspection becomes one surface</h2>
+<pre><code class="language-bash" data-trim>jit gate check abc123 ci                  # latest run (default, unchanged)
+jit gate check abc123 --all               # full history, newest first
+jit gate check abc123 --all --status failed   # filter by gate / outcome
+jit gate check abc123 ci --stdout         # raw report text, verbatim</code></pre>
+  <div class="note">REQ-08. One verb — latest, history (<code>--all</code>/<code>--limit</code>), and flat output (<code>--stdout</code>/<code>--stderr</code>/<code>--tail</code>). Both <code>check</code> and <code>check-all</code> stay.</div>
+</section>
+
+<!-- ── 8 · FULL REPORTS ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 8 / 16</span></span>
+  <h2>The whole report, not the first 20 lines</h2>
+  <ul>
+    <li>Gate runs store and surface the <strong>complete</strong> stdout/stderr — no silent truncation (REQ-07)</li>
+    <li>The flat view is <strong>byte-exact</strong>: no injected trailing newline, no decoration</li>
+    <li>Gate prompts and gate output were reformatted for readability (REQ-09 / REQ-10)</li>
+  </ul>
+<pre><code class="language-bash" data-trim>$ jit gate check abc123 lint --stdout
+FRONTMATTER_OK</code></pre>
+</section>
+
+<!-- ── 9 · EDITABLE GATES ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Gates <span class="num">· 9 / 16</span></span>
+  <h2>Edit a gate without hand-editing JSON</h2>
+<pre><code class="language-bash" data-trim># before — open the registry file and hope the JSON stays valid
+$EDITOR .jit/gates.json
+
+# after — every mutable field is reachable from the CLI
+jit gate update ci --title "Continuous Integration"
+jit gate update ci --pass-context false --clear-prompt</code></pre>
+  <div class="note">REQ-16. Atomic write through the shared primitive; per-issue gate <em>status</em> is left untouched; <code>--clear-*</code> distinguishes "set" from "remove".</div>
+</section>
+
+<!-- ── 10 · REGISTRY RETIRED ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Canonical renames <span class="num">· 10 / 16</span></span>
+  <h2>One home for gate configuration</h2>
+<pre><code class="language-bash" data-trim># before — `jit registry` duplicated gate-registry config
+jit registry add ci --title "CI" ...
+
+# after — `jit gate` is the single surface
+jit gate define ci --title "CI" --description "build + test"
+
+$ jit registry list
+error: unrecognized subcommand 'registry'</code></pre>
+  <div class="note">REQ-06. Clean rename, no shims; <code>--example</code> ported onto <code>gate define</code>; <code>-s</code> is now unambiguously <code>--state</code>.</div>
+</section>
+
+<!-- ── 11 · BREAKDOWN RETIRED ──────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Canonical renames <span class="num">· 11 / 16</span></span>
+  <h2>Retiring a footgun</h2>
+  <p><code>jit issue breakdown</code> did flat, parent-centric breakdown: the wrong shape for a
+     bracketed container, and it copied the parent's <em>type</em> label onto every child.</p>
+<pre><code class="language-bash" data-trim>$ jit issue breakdown abc123
+error: unrecognized subcommand 'breakdown'
+
+# decompose with the bracket engine instead
+jit apply plan epic-123      # scaffolds the plan -&gt; breakdown -&gt; impl spine</code></pre>
+  <div class="note">REQ-06. Command, dispatch, implementation, tests and the MCP tool all removed; the bracket engine (driven by the <code>plan</code> template in <code>.jit/templates.toml</code>) is untouched.</div>
+</section>
+
+<!-- ── 12 · VALIDATION SCOPE ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Validation <span class="num">· 12 / 16</span></span>
+  <h2>Validate exactly what you mean</h2>
+<pre><code class="language-bash" data-trim>jit validate                      # whole repository (unchanged)
+jit validate &lt;full-issue-id&gt;       # NEW — only this issue's rules
+jit validate --scope epic-123     # a container's bracket subtree (gate checker)</code></pre>
+  <ul>
+    <li>REQ-12 — per-issue scoping; <code>--explain</code> shows which rules matched</li>
+    <li>REQ-13 — template anchors resolve a config-declared <code>.jit/gates.json</code> key (e.g. <code>repo-validate</code>), not only Rust presets</li>
+  </ul>
+</section>
+
+<!-- ── 13 · SAFETY / PARITY ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Safety <span class="num">· 13 / 16</span></span>
+  <h2>Safer defaults, honest contracts</h2>
+<pre><code class="language-bash" data-trim>$ jit claim acquire abc123        # run outside a git repository
+Error: Claims and leases require a git repository    # typed error, exit 10</code></pre>
+  <ul>
+    <li>REQ-17 — a typed <code>ClaimRequiresGitError</code> (exit 10) instead of a confusing low-level failure</li>
+    <li>REQ-14 — <code>issue create --json</code> now carries the same <code>gates[]</code> / <code>short_id</code> contract as <code>issue show</code></li>
+  </ul>
+</section>
+
+<!-- ── 14 · HOW IT WAS BUILT ───────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Delivery <span class="num">· 14 / 16</span></span>
+  <h2>How it was built</h2>
+  <ul>
+    <li>Decomposed behind an <strong>approved plan bracket</strong>, then driven in 7 topological waves</li>
+    <li>Each child: authored by a sub-agent in an isolated worktree → self-verified → integrated to <code>main</code> → gated</li>
+    <li>Gates never bypassed — <strong>12 rework rounds</strong>, every one passed on merit</li>
+    <li>One decision escalated to the owner: config-declared gates over Rust presets</li>
+  </ul>
+  <table>
+    <thead><tr><th>Reworks before passing</th><th>Items</th></tr></thead>
+    <tbody>
+      <tr><td>×3</td><td>552ff75c (config-declared gate)</td></tr>
+      <tr><td>×2</td><td>4b7407d3 · 252c947b · 07657508</td></tr>
+      <tr><td>×1</td><td>c4b56370 · 9e9a4f81 · 6c740a19 · e3259063</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── 15 · HONEST: REMAINING WORK ─────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Honesty <span class="num">· 15 / 16</span></span>
+  <h2>What still needs work</h2>
+  <div class="warning">These are real edges left open — the epic closed its 19 criteria, not every rough corner.</div>
+  <ul>
+    <li><code>jit validate &lt;id&gt;</code> resolves only the <strong>full UUID</strong> — short-id / prefix isn't wired there yet, unlike its sibling commands</li>
+    <li>The MCP server has one <strong>pre-existing</strong> integration failure ("CRUD round-trip — No data in response"), unrelated to this epic</li>
+    <li>5 tests are <strong>environment-flaky</strong> in restricted review sandboxes (port binding, no git, read-only cache) — green on a real build</li>
+    <li>Out of scope, still open: <code>jit issue delete</code> leaves dangling edges (f847df3f); the Web UI, Docs-Lifecycle, and v1.0 epics</li>
+  </ul>
+</section>
+
+<!-- ── 16 · CLOSING ────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Takeaways</h1>
+  <p class="tagline">First guesses resolve · the gate surface splits cleanly into config / execution / inspection · clean renames absorbed by sweeping every consumer</p>
+  <p>Validated against real <code>jit</code> 0.2.1 — every command on these slides was run.</p>
+  <p class="caption">Epic 2e926e39 · just-in-time · honest about the edges that remain</p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  // fitcheck.py waits on these flags before measuring.
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  // KaTeX scripts are deferred; run once they (and the DOM) are available.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      // give deferred KaTeX a tick to attach renderMathInElement
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>

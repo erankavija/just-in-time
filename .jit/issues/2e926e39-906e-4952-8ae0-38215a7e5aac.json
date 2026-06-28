@@ -25,6 +25,12 @@
       "commit": null,
       "label": "Completion Report",
       "doc_type": "notes"
+    },
+    {
+      "path": "dev/presentations/2e926e39/talk.html",
+      "commit": null,
+      "label": "Showcase Deck (reveal.js)",
+      "doc_type": "notes"
     }
   ],
   "labels": [
@@ -33,5 +39,5 @@
     "epic:agent-seamlessness"
   ],
   "created_at": "2026-06-27T20:49:27.406814196Z",
-  "updated_at": "2026-06-28T05:48:08.360234653Z"
+  "updated_at": "2026-06-28T07:22:53.796824849Z"
 }

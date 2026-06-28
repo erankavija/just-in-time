@@ -1,0 +1,99 @@
+/* ============================================================================
+   Theme: gruvbox  (dark, full monospace TUI)
+   Gruvbox dark palette. Monospace EVERYWHERE — body, headings, labels, code —
+   for a genuine text-editor / TUI look. Fully static: no animation, no CRT
+   effects. The :root block holds the tokens; a small static chrome block
+   below sets the monospace fonts, the denser type scale, sharp corners,
+   box borders, and markdown-style heading/prompt markers.
+   ============================================================================ */
+
+:root {
+  /* surfaces & text */
+  --bg:         #282828;
+  --text:       #ebdbb2;
+  --text-mute:  #a89984;
+  --surface:    #3c3836;
+  --border:     #504945;
+  --rule:       #665c54;
+
+  /* semantic accents */
+  --link:       #83a598;
+  --accent:     #fe8019;
+
+  /* syntax highlighting */
+  --kw:         #fb4934;
+  --str:        #b8bb26;
+  --cmt:        #928374;
+  --fn:         #8ec07c;
+
+  /* callout hues (bright gruvbox accents read well on the dark fill) */
+  --c-def:      #b8bb26;
+  --c-thm:      #d3869b;
+  --c-lemma:    #83a598;
+  --c-proof:    #a89984;
+  --c-note:     #8ec07c;
+  --c-warn:     #fabd2f;
+  --c-example:  #928374;
+
+  /* typography: one monospace typeface everywhere (TUI) */
+  --font-mono:  "JetBrains Mono", "IBM Plex Mono", "Source Code Pro", ui-monospace, Menlo, monospace;
+  --font-body:  var(--font-mono);
+  --font-head:  var(--font-mono);
+  --font-label: var(--font-mono);
+}
+
+/* ============================================================================
+   TUI chrome — fully static. base.css loads AFTER this file, so rules that
+   override a property base.css also sets use a `.reveal.reveal` specificity
+   bump (0,2,0 > base's 0,1,0) to win regardless of source order.
+   ============================================================================ */
+
+/* Monospace is wide and base.css's 30px is large for code. Size the whole
+   deck down: denser text, code blocks no longer oversized. Mono line-height
+   is tighter than the sans default so slides stay compact. */
+.reveal.reveal            { font-size: 24px; }
+.reveal.reveal pre code   { font-size: 0.8em; line-height: 1.35; }
+.reveal.reveal :not(pre) > code { font-size: 0.85em; }
+
+/* Blocky — no rounded corners anywhere. */
+.reveal pre, .reveal :not(pre) > code, .reveal .badge, .reveal .item-decl,
+.reveal .def, .reveal .theorem, .reveal .lemma, .reveal .proof,
+.reveal .note, .reveal .warning, .reveal .example, .reveal .math-block {
+  border-radius: 0 !important;
+}
+
+/* TUI boxes: a full 1px frame in addition to the coloured left rule.
+   base.css only sets border-left on callouts, so adding the other three
+   sides here does not conflict. */
+.reveal .def, .reveal .theorem, .reveal .lemma, .reveal .proof,
+.reveal .note, .reveal .warning, .reveal .example, .reveal .math-block,
+.reveal .item-decl {
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Static markdown/shell markers (no animation). */
+.reveal .seclabel::before {
+  content: "$ ";
+  color: var(--c-def);
+}
+.reveal section:not(.title):not(.title-slide) > h2::before {
+  content: "## ";
+  color: var(--text-mute);
+}
+.reveal section.title > h1::before,
+.reveal section.title-slide > h1::before {
+  content: "# ";
+  color: var(--text-mute);
+}
+
+/* A single static 1px window frame around the slide area. position:fixed +
+   pointer-events:none → zero layout-height impact, fitcheck unaffected. */
+.reveal::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid var(--border);
+}
