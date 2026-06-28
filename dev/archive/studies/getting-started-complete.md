@@ -309,20 +309,19 @@ jit graph show
 ### Step 3: Break Down into Subtasks
 
 ```bash
-# Break down the parser issue
-jit issue breakdown "$PARSER_ID"
-# This will open an editor. Enter subtasks:
-
-# --- Subtasks (one per line) ---
-# Create parser module structure
-# Implement frontmatter extraction
-# Add markdown AST traversal
-# Write parser unit tests
-# [Press Ctrl+O, Enter, Ctrl+X to save in nano]
+# Create subtasks under the parser issue and wire each to depend on it
+for title in \
+  "Create parser module structure" \
+  "Implement frontmatter extraction" \
+  "Add markdown AST traversal" \
+  "Write parser unit tests"; do
+  child=$(jit issue create --title "$title" --json | jq -r .id)
+  jit dep add "$child" "$PARSER_ID"
+done
 
 # View the created subtasks
 jit issue show "$PARSER_ID"
-# Output will show 4 child issues with automatic dependency inheritance
+# Output will show the 4 child issues depending on the parser issue
 ```
 
 ### Step 4: Add Document References
@@ -758,8 +757,8 @@ time jit search "function"
 ### 1. Explore Advanced Features
 
 ```bash
-# Break down large issues into subtasks
-jit issue breakdown <parent-id>
+# Scaffold a plan→breakdown bracket on a container
+jit apply plan <container-id>
 
 # Add custom context to issues
 jit issue update <id> --context "complexity:high" --context "team:backend"

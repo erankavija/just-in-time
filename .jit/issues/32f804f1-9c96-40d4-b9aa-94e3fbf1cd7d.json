@@ -17,25 +17,23 @@
       "doc_type": "design"
     },
     {
-      "path": "dev/active/breakdown-analysis.md",
-      "commit": null,
-      "label": "Breakdown Analysis",
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/breakdown-improvement-plan.md",
-      "commit": null,
-      "label": "Breakdown Fix Plan",
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
       "path": "dev/active/json-output-standardization-plan.md",
       "commit": null,
       "label": "Item 12 Implementation Plan",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/archive/breakdown-analysis.md",
+      "commit": null,
+      "label": "Breakdown Analysis",
+      "doc_type": "design"
+    },
+    {
+      "path": "dev/archive/breakdown-improvement-plan.md",
+      "commit": null,
+      "label": "Breakdown Fix Plan",
+      "doc_type": "design"
     }
   ],
   "labels": [
@@ -44,5 +42,5 @@
     "component:cli"
   ],
   "created_at": "2025-12-27T20:47:03.229031692Z",
-  "updated_at": "2026-02-17T19:10:35.402339303+00:00"
+  "updated_at": "2026-06-28T05:34:32.873527310Z"
 }

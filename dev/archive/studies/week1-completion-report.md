@@ -75,10 +75,10 @@ Week 1 of the label hierarchy audit is **complete**. All critical blocking issue
    - Tests membership reference validation
    - Verifies orphaned references are warnings not errors
 
-3. **test_breakdown_label_inheritance**
-   - Tests issue breakdown with label inheritance
-   - Verifies all parent labels copied to subtasks
-   - Tests query by inherited labels
+3. **test_breakdown_label_inheritance** (historical; test and its command removed in jit:07657508)
+   - Tested label inheritance for the since-retired flat-breakdown command
+   - Verified all parent labels copied to subtasks
+   - Tested query by inherited labels
 
 4. **test_label_operations_json_output**
    - Tests JSON output for all label operations

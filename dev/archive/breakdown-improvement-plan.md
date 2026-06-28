@@ -1,5 +1,10 @@
 # Implementation Plan: Fix `jit issue breakdown` Ergonomics
 
+> **ARCHIVED / SUPERSEDED.** This plan targeted the flat-breakdown command,
+> which was retired instead (jit:07657508). Kept only as a historical record;
+> the command examples below no longer exist. Decompose containers with the plan
+> bracket (`jit apply plan`) plus `jit issue create` + `jit dep add`.
+
 ## Problem Statement
 
 Items 10 & 11 from issue 32f804f1 identify two ergonomics issues:

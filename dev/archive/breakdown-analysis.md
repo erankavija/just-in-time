@@ -1,5 +1,10 @@
 # Analysis: `jit issue breakdown` Ergonomics Issues
 
+> **ARCHIVED / RETIRED.** The flat-breakdown command this analysis studied was
+> removed in jit:07657508. This document is kept only as a historical record of
+> the analysis; the command examples below no longer exist. Decompose containers
+> with the plan bracket (`jit apply plan`) plus `jit issue create` + `jit dep add`.
+
 ## Executive Summary
 
 The `jit issue breakdown` command has two significant ergonomics issues that create friction in hierarchical workflows:

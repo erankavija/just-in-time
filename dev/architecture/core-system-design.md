@@ -124,7 +124,7 @@ Issue management
 - jit issue show <id>
 - jit issue update <id> [--title ...] [--desc ...] [--priority ...]
 - jit issue delete <id>
-- **jit issue breakdown <parent_id> --subtask "Title" --desc "Desc"** (atomically creates subtasks with automatic dependency inheritance)
+- Decompose a container with the plan bracket (jit apply plan <container_id>) plus jit issue create + jit dep add for the children
 Assignment (for agent coordination)
 - jit issue assign <id> --to <assignee>
 - jit issue claim <id> --to <assignee>     (atomic: only succeeds if unassigned)
