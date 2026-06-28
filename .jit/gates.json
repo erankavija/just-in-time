@@ -201,6 +201,26 @@
       "auto": true,
       "example_integration": null
     },
+    "repo-validate": {
+      "version": 1,
+      "key": "repo-validate",
+      "title": "Repo Validate",
+      "description": "Whole-repository validation must pass (`jit validate` with NO issue id runs run_rules(None) plus the repo-integrity checks); blocks the bound container from reaching Done until the entire repository validates. Distinct from the per-issue jit-validate gate, which scopes to one issue via $JIT_ISSUE_ID.",
+      "stage": "postcheck",
+      "mode": "auto",
+      "checker": {
+        "type": "exec",
+        "command": "jit validate",
+        "timeout_seconds": 120,
+        "working_dir": null,
+        "env": {},
+        "pass_context": false
+      },
+      "priority": 100,
+      "reserved": {},
+      "auto": true,
+      "example_integration": null
+    },
     "cargo-ci-features": {
       "version": 1,
       "key": "cargo-ci-features",

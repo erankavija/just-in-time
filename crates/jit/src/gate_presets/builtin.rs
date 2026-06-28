@@ -1,9 +1,8 @@
 //! Built-in gate presets
 
 use super::{
-    breakdown_review_preset, coverage_preview_preset, plan_review_preset, repo_validate_preset,
-    GatePresetDefinition, GateTemplate, BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_PRESET,
-    PLAN_REVIEW_PRESET, REPO_VALIDATE_PRESET,
+    breakdown_review_preset, coverage_preview_preset, plan_review_preset, GatePresetDefinition,
+    GateTemplate, BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
 };
 use crate::domain::{GateChecker, GateMode, GateStage};
 use anyhow::Result;
@@ -25,7 +24,6 @@ use std::collections::HashMap;
 /// assert!(presets.contains_key("plan-review"));
 /// assert!(presets.contains_key("coverage-preview"));
 /// assert!(presets.contains_key("breakdown-review"));
-/// assert!(presets.contains_key("repo-validate"));
 /// ```
 pub struct BuiltinPresets;
 
@@ -38,7 +36,7 @@ impl BuiltinPresets {
     /// use jit::gate_presets::BuiltinPresets;
     ///
     /// let presets = BuiltinPresets::load().unwrap();
-    /// assert_eq!(presets.len(), 9);
+    /// assert_eq!(presets.len(), 8);
     /// let security = presets.get("security-audit").unwrap();
     /// assert_eq!(security.gates.len(), 3);
     /// ```
@@ -322,11 +320,6 @@ impl BuiltinPresets {
         // counterpart to the deterministic coverage-preview gate (quality vs
         // coverage split on `B`).
         let breakdown_review = breakdown_review_preset();
-        // The whole-repo integrity gate attached to the container anchor `C` by
-        // the `plan` template: `jit validate` with no issue id (run_rules(None)),
-        // so a breakable container cannot reach Done until the whole repo
-        // validates. Distinct from the per-issue jit-validate gate.
-        let repo_validate = repo_validate_preset();
 
         // Validate all presets
         let all_presets = [
@@ -338,7 +331,6 @@ impl BuiltinPresets {
             &plan_review,
             &coverage_preview,
             &breakdown_review,
-            &repo_validate,
         ];
         for preset in &all_presets {
             preset.validate()?;
@@ -352,7 +344,6 @@ impl BuiltinPresets {
         presets.insert(plan_review.name.clone(), plan_review);
         presets.insert(coverage_preview.name.clone(), coverage_preview);
         presets.insert(breakdown_review.name.clone(), breakdown_review);
-        presets.insert(repo_validate.name.clone(), repo_validate);
 
         Ok(presets)
     }
@@ -377,7 +368,6 @@ impl BuiltinPresets {
             PLAN_REVIEW_PRESET.to_string(),
             COVERAGE_PREVIEW_PRESET.to_string(),
             BREAKDOWN_REVIEW_PRESET.to_string(),
-            REPO_VALIDATE_PRESET.to_string(),
         ]
     }
 }
@@ -389,7 +379,7 @@ mod tests {
     #[test]
     fn test_load_builtin_presets() {
         let presets = BuiltinPresets::load().unwrap();
-        assert_eq!(presets.len(), 9);
+        assert_eq!(presets.len(), 8);
         assert!(presets.contains_key("rust-tdd"));
         assert!(presets.contains_key("minimal"));
         assert!(presets.contains_key("python-tdd"));
@@ -398,7 +388,6 @@ mod tests {
         assert!(presets.contains_key("plan-review"));
         assert!(presets.contains_key("coverage-preview"));
         assert!(presets.contains_key("breakdown-review"));
-        assert!(presets.contains_key("repo-validate"));
     }
 
     #[test]
@@ -423,33 +412,6 @@ mod tests {
         assert!(BuiltinPresets::names().contains(&"plan-review".to_string()));
         assert!(BuiltinPresets::names().contains(&"coverage-preview".to_string()));
         assert!(BuiltinPresets::names().contains(&"breakdown-review".to_string()));
-    }
-
-    // REQ-13: the production preset-load path (the one the apply engine resolves
-    // anchor gates through) yields `repo-validate` wired to WHOLE-REPO validation
-    // — `jit validate` with no issue id — and registered in `names()`. This proves
-    // the gate the `plan` template's container anchor references is the real,
-    // loaded preset, distinct from the per-issue `jit-validate` gate.
-    #[test]
-    fn test_repo_validate_loaded_with_whole_repo_checker() {
-        use crate::domain::GateChecker;
-
-        let presets = BuiltinPresets::load().unwrap();
-        let repo_validate = presets
-            .get("repo-validate")
-            .expect("repo-validate must be in the loaded built-in presets");
-        assert_eq!(repo_validate.gates.len(), 1);
-        let gate = &repo_validate.gates[0];
-        assert_eq!(gate.key, "repo-validate");
-        assert_eq!(gate.mode, GateMode::Auto);
-        match gate.checker.as_ref().expect("repo-validate has a checker") {
-            GateChecker::Exec { command, .. } => assert_eq!(
-                command, "jit validate",
-                "repo-validate must run whole-repo validation (no issue id), \
-                 distinct from the per-issue `jit validate \"$JIT_ISSUE_ID\"` gate"
-            ),
-        }
-        assert!(BuiltinPresets::names().contains(&"repo-validate".to_string()));
     }
 
     #[test]

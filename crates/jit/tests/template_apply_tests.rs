@@ -19,6 +19,7 @@ mod harness;
 use harness::TestHarness;
 use jit::domain::Priority;
 use jit::labels::parse_label;
+use jit::storage::IssueStore;
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use std::collections::BTreeMap;
 
@@ -78,6 +79,16 @@ fn type_of(issue: &jit::domain::Issue) -> Option<String> {
 }
 
 fn create_epic(h: &TestHarness, title: &str) -> String {
+    // `repo-validate` is a CONFIG-DECLARED gate (it lives in `.jit/gates.json`,
+    // not the built-in preset set), so the in-memory registry must declare it for
+    // the `plan` template's `container` anchor to resolve it as a registry gate
+    // key. Mirrors the shipped whole-repo `jit validate` gate.
+    h.add_gate(
+        "repo-validate",
+        "Repo Validate",
+        "Whole-repository validation must pass (jit validate with no issue id)",
+        true,
+    );
     let (id, _) = h
         .executor
         .create_issue(
@@ -505,8 +516,10 @@ applies_to  = ["epic"]
 #[test]
 fn test_apply_plan_template_attaches_repo_validate_to_container() {
     // REQ-13 (issue 552ff75c): applying the `plan` template attaches the
-    // whole-repo integrity gate `repo-validate` to the bound container anchor,
-    // so the container cannot reach Done until whole-repo validation passes.
+    // whole-repo integrity gate `repo-validate` to the bound container anchor —
+    // now via the registry-gate-key path (`repo-validate` is config-declared in
+    // `.jit/gates.json`, registered here by `create_epic`, NOT a built-in preset)
+    // — so the container cannot reach Done until whole-repo validation passes.
     let h = TestHarness::new();
     let template = plan_template();
     let epic = create_epic(&h, "Repo-validate epic");
@@ -522,6 +535,74 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
             .contains(&"repo-validate".to_string()),
         "bound container missing the plan template's repo-validate anchor gate: {:?}",
         container.gates_required
+    );
+}
+
+#[test]
+fn test_apply_attaches_registry_gate_key_not_preset() {
+    // REQ-13 (issue 552ff75c): a template gate that names a REGISTRY GATE KEY
+    // (declared in `.jit/gates.json`, NOT a built-in preset) is attached to the
+    // bound issue at apply time — the same effect as `jit gate add <issue> <key>`.
+    // Here the anchor and a node each name `deploy-check`, a registry-only gate.
+    let h = TestHarness::new();
+    h.add_gate(
+        "deploy-check",
+        "Deploy Check",
+        "A config-declared gate, not a preset",
+        true,
+    );
+    // Guard: the name must NOT also be a preset, so the test exercises the
+    // registry-key branch and not the preset branch.
+    assert!(
+        h.storage.get_gate_preset("deploy-check").is_err(),
+        "deploy-check must be a registry-only gate, not a preset"
+    );
+
+    let toml = r#"
+[[template]]
+name        = "registrygate"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["deploy-check"]
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  gates       = ["deploy-check"]
+  description = "Break down {container.title}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("registrygate")
+        .unwrap()
+        .clone();
+    let epic = create_epic(&h, "Registry-gate epic");
+
+    let (result, _w) = h
+        .executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    // The bound anchor (container) carries the registry gate...
+    let container = h.get_issue(&epic);
+    assert!(
+        container
+            .gates_required
+            .contains(&"deploy-check".to_string()),
+        "bound anchor missing its registry-key gate: {:?}",
+        container.gates_required
+    );
+    // ...and so does the created node.
+    let breakdown = h.get_issue(&result.created_node_ids_by_role["breakdown"]);
+    assert!(
+        breakdown
+            .gates_required
+            .contains(&"deploy-check".to_string()),
+        "node missing its registry-key gate: {:?}",
+        breakdown.gates_required
     );
 }
 
@@ -570,8 +651,9 @@ applies_to  = ["epic"]
 #[test]
 fn test_apply_rejects_unknown_anchor_gate_preset_and_creates_nothing() {
     let h = TestHarness::new();
-    // The `container` anchor references a gate preset that does not exist; this
-    // must be rejected up front, exactly like an unknown node gate preset.
+    // The `container` anchor references a gate name that is NEITHER a preset NOR
+    // a registry gate key; this must be rejected up front, exactly like an
+    // unknown node gate.
     let toml = r#"
 [[template]]
 name        = "ghostanchorgate"
@@ -600,8 +682,46 @@ applies_to  = ["epic"]
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("does-not-exist"), "{err}");
-    // The missing-preset failure is caught before the first create (APPA-01).
+    // The unknown-gate failure is caught before the first create (APPA-01).
     assert_eq!(h.all_issues().len(), before);
+}
+
+#[test]
+fn test_repo_gates_json_declares_repo_validate_whole_repo_checker() {
+    // REQ-13 (issue 552ff75c): `repo-validate` is CONFIG-DECLARED in the repo's
+    // own `.jit/gates.json` (not a built-in preset), with a whole-repo checker —
+    // `jit validate` with NO issue id — distinct from the per-issue `jit-validate`
+    // gate (`jit validate "$JIT_ISSUE_ID"`).
+    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.json");
+    let raw = std::fs::read_to_string(&gates_path)
+        .unwrap_or_else(|e| panic!("reading {}: {e}", gates_path.display()));
+    let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+    let gate = &json["gates"]["repo-validate"];
+    assert!(
+        gate.is_object(),
+        ".jit/gates.json must declare the `repo-validate` gate"
+    );
+    assert_eq!(gate["stage"], "postcheck");
+    assert_eq!(gate["mode"], "auto");
+
+    let command = gate["checker"]["command"]
+        .as_str()
+        .expect("repo-validate checker must have a string command");
+    assert_eq!(
+        command, "jit validate",
+        "repo-validate must run whole-repo validation (no issue id)"
+    );
+    assert!(
+        !command.contains("JIT_ISSUE_ID"),
+        "repo-validate must NOT scope to a single issue like the jit-validate gate"
+    );
+
+    // Sanity: the per-issue jit-validate gate is the distinct, id-scoped one.
+    assert_eq!(
+        json["gates"]["jit-validate"]["checker"]["command"],
+        "jit validate \"$JIT_ISSUE_ID\""
+    );
 }
 
 #[test]

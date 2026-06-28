@@ -45,9 +45,6 @@ pub const COVERAGE_PREVIEW_GATE: &str = "coverage-preview";
 /// Preset name for the agent breakdown-review gate (breakdown node `B`).
 pub const BREAKDOWN_REVIEW_PRESET: &str = "breakdown-review";
 
-/// Preset name for the whole-repo integrity gate on the container anchor `C`.
-pub const REPO_VALIDATE_PRESET: &str = "repo-validate";
-
 /// Build the `plan-review` preset: an agent review gate for the planning node.
 ///
 /// The single bundled gate is an auto (command-backed) postcheck mirroring the
@@ -220,77 +217,6 @@ pub fn breakdown_review_preset() -> GatePresetDefinition {
                 pass_context: true,
                 prompt: None,
                 prompt_file: Some("./scripts/breakdown-review-prompt.md".to_string()),
-            }),
-        }],
-    }
-}
-
-/// Build the `repo-validate` preset: a **whole-repository** integrity gate for
-/// the container anchor `C`.
-///
-/// The single bundled gate is an auto postcheck whose checker is `jit validate`
-/// with **no issue id** — the whole-repo validation entry that runs
-/// `run_rules(None)` plus the repo-integrity checks (broken deps, gates, labels,
-/// DAG, transitive reduction, claims index). Attached to the bound container
-/// anchor by the `plan` template, it makes the container un-completable until the
-/// entire repository validates (INV-GATE-SEMANTICS): a breakable container cannot
-/// reach Done while whole-repo validation fails.
-///
-/// This is deliberately **distinct from the per-issue `jit-validate` gate**
-/// (checker `jit validate "$JIT_ISSUE_ID"`, which evaluates only the issue under
-/// review): this gate passes no issue id, so it validates the repository as a
-/// whole. The checker is config/preset-declared; nothing about the container or
-/// the gate is baked into engine logic — the wiring lives in the `plan` template
-/// (`.jit/templates.toml`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::repo_validate_preset;
-/// use jit::domain::{GateChecker, GateMode};
-///
-/// let preset = repo_validate_preset();
-/// assert_eq!(preset.name, "repo-validate");
-/// assert_eq!(preset.gates.len(), 1);
-/// let gate = &preset.gates[0];
-/// assert_eq!(gate.key, "repo-validate");
-/// assert_eq!(gate.mode, GateMode::Auto);
-/// match gate.checker.as_ref().unwrap() {
-///     GateChecker::Exec { command, .. } => {
-///         // Whole-repo validation: NO issue id (distinct from jit-validate).
-///         assert_eq!(command, "jit validate");
-///     }
-/// }
-/// assert!(preset.validate().is_ok());
-/// ```
-pub fn repo_validate_preset() -> GatePresetDefinition {
-    GatePresetDefinition {
-        name: REPO_VALIDATE_PRESET.to_string(),
-        description:
-            "Whole-repository integrity validation on the container before it can complete"
-                .to_string(),
-        gates: vec![GateTemplate {
-            key: REPO_VALIDATE_PRESET.to_string(),
-            title: "Repo Validate".to_string(),
-            description:
-                "Whole-repository validation must pass (`jit validate` with no issue id \
-                          runs run_rules(None) plus the repo-integrity checks); blocks the bound \
-                          container from reaching Done until the entire repository validates. \
-                          Distinct from the per-issue jit-validate gate, which scopes to one issue."
-                    .to_string(),
-            stage: GateStage::Postcheck,
-            mode: GateMode::Auto,
-            checker: Some(GateChecker::Exec {
-                // Whole-repo validation: `jit validate` with NO issue id. The
-                // per-issue jit-validate gate instead runs `jit validate
-                // "$JIT_ISSUE_ID"`; this one is deliberately repo-wide.
-                command: "jit validate".to_string(),
-                timeout_seconds: 120,
-                working_dir: None,
-                env: HashMap::new(),
-                pass_context: false,
-                prompt: None,
-                prompt_file: None,
             }),
         }],
     }
@@ -520,36 +446,6 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
                 // JIT_ISSUE_ID) and runs `jit validate --scope <C>`.
                 assert_eq!(command, "./scripts/coverage-preview.sh");
                 assert!(*pass_context);
-            }
-        }
-        assert!(preset.validate().is_ok());
-    }
-
-    #[test]
-    fn test_repo_validate_preset_runs_whole_repo_validate() {
-        let preset = repo_validate_preset();
-        assert_eq!(preset.name, "repo-validate");
-        assert_eq!(preset.gates.len(), 1);
-
-        let gate = &preset.gates[0];
-        assert_eq!(gate.key, "repo-validate");
-        assert_eq!(gate.stage, GateStage::Postcheck);
-        assert_eq!(gate.mode, GateMode::Auto);
-
-        match gate
-            .checker
-            .as_ref()
-            .expect("repo-validate gate has a checker")
-        {
-            GateChecker::Exec { command, .. } => {
-                // Whole-repo validation: `jit validate` with NO issue id (→
-                // run_rules(None)). It must NOT be the per-issue jit-validate
-                // checker, which scopes to a single issue via $JIT_ISSUE_ID.
-                assert_eq!(command, "jit validate");
-                assert!(
-                    !command.contains("JIT_ISSUE_ID"),
-                    "repo-validate must be whole-repo, not the per-issue jit-validate checker"
-                );
             }
         }
         assert!(preset.validate().is_ok());

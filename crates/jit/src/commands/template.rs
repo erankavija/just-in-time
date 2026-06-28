@@ -5,19 +5,21 @@
 //! fresh apply it:
 //!
 //! 1. validates every precondition BEFORE the first mutation (anchors resolve,
-//!    container type ∈ `applies_to`, node AND anchor gate presets exist, node
-//!    writes would pass validation, not already-applied unless `--force`);
+//!    container type ∈ `applies_to`, every node AND anchor gate resolves — as a
+//!    gate preset OR a registry gate key, node writes would pass validation, not
+//!    already-applied unless `--force`);
 //! 2. snapshots each bound anchor's current dependencies;
 //! 3. creates the template's nodes with interpolated descriptions and
-//!    their declared gate presets; then
+//!    their declared gates; then
 //! 4. wires the template's edges and runs its transforms: the internal
 //!    `depends_on` edges (e.g. `B → P`), the `anchor_edges` (e.g. `C → B`), and
 //!    the `move-upstream-to-role` transform that moves the container's pre-apply
 //!    snapshot deps onto the named role's node — all via
 //!    [`add_dependency`](CommandExecutor::add_dependency), so the result is
 //!    acyclic and transitively reduced; then
-//! 5. attaches each anchor's declared gate presets to its bound anchor issue,
-//!    through the same shared preset path node gates use.
+//! 5. attaches each anchor's declared gates to its bound anchor issue, through
+//!    the same shared resolve-and-attach path node gates use (each gate is a
+//!    preset OR a registry gate key).
 //!
 //! This is the plan-before-fan-out scaffold: the create+gate+wire sequence
 //! that produces the `C → B → P` bracket from a template. The planning node's
@@ -31,8 +33,9 @@
 //!
 //! # Domain-agnostic
 //!
-//! No `epic` / `planning` / `breakdown` literal is hardcoded. Node types, gate
-//! presets, doc locations, descriptions, and labels all come from the template;
+//! No `epic` / `planning` / `breakdown` literal is hardcoded. Node types, gates
+//! (preset or registry key), doc locations, descriptions, and labels all come
+//! from the template;
 //! the only roles this engine reaches for by name are the conventional
 //! [`PLANNING_ROLE`](crate::templates::PLANNING_ROLE) /
 //! [`BREAKDOWN_ROLE`](crate::templates::BREAKDOWN_ROLE), and only on the
@@ -43,6 +46,19 @@ use std::collections::BTreeMap;
 use super::*;
 use crate::templates::{GraphTemplate, TemplateNode, BREAKDOWN_ROLE};
 use serde::Serialize;
+
+/// How a template node/anchor gate NAME resolves: a registered gate PRESET
+/// bundle, or a single gate KEY declared in the gate registry (`.jit/gates.json`).
+///
+/// Resolving anchors/nodes against BOTH lets a config-declared gate (e.g.
+/// `repo-validate`) be referenced from a template without being a built-in
+/// preset, keeping engine code free of any gate/container literal.
+enum TemplateGateResolution {
+    /// A registered gate preset; apply its whole bundle via `apply_gate_preset`.
+    Preset,
+    /// A single gate key in the registry; attach that one gate via `add_gates`.
+    RegistryKey,
+}
 
 /// Outcome of applying a graph template to a container.
 ///
@@ -255,33 +271,36 @@ impl<S: IssueStore> CommandExecutor<S> {
             resolved_bindings.insert(anchor.name.clone(), full);
         }
 
-        // Every gate preset declared across the template's nodes must resolve in
-        // the preset registry BEFORE the first mutation. `apply_gate_preset`
-        // resolves a preset lazily during instantiation, so an unknown name would
-        // otherwise fail AFTER one or more nodes are persisted — violating "a
-        // failure creates zero nodes" (APPA-01). Look it up read-only up front.
+        // Every gate NAME declared across the template's nodes must resolve
+        // BEFORE the first mutation — either as a registered gate PRESET bundle
+        // or as a single gate KEY in the gate registry (`.jit/gates.json`).
+        // `apply_gate_preset` / `add_gates` resolve lazily during instantiation,
+        // so an unknown name would otherwise fail AFTER one or more nodes are
+        // persisted — violating "a failure creates zero nodes" (APPA-01). Resolve
+        // it read-only up front.
         for node in &template.nodes {
-            for preset in &node.gates {
-                self.storage.get_gate_preset(preset).with_context(|| {
+            for gate in &node.gates {
+                self.resolve_template_gate(gate).with_context(|| {
                     format!(
-                        "template '{}' node '{}' references gate preset '{preset}', \
-                         which is not registered",
+                        "template '{}' node '{}' references gate '{gate}', which is neither a \
+                         registered gate preset nor a gate defined in the registry",
                         template.name, node.role
                     )
                 })?;
             }
         }
 
-        // Anchor gate presets (jit:2614ecf2 — REQ-13) are validated the SAME way:
-        // an anchor's declared presets must resolve before any mutation, so an
-        // unknown anchor gate fails up front rather than after the bound anchor
-        // issue is mutated.
+        // Anchor gates (jit:2614ecf2 — REQ-13) resolve the SAME way (preset OR
+        // registry gate key) before any mutation, so an unknown anchor gate fails
+        // up front rather than after the bound anchor issue is mutated. This is
+        // what makes a config-declared gate like `repo-validate` usable from an
+        // anchor without being a built-in preset.
         for anchor in &template.anchors {
-            for preset in &anchor.gates {
-                self.storage.get_gate_preset(preset).with_context(|| {
+            for gate in &anchor.gates {
+                self.resolve_template_gate(gate).with_context(|| {
                     format!(
-                        "template '{}' anchor '{}' references gate preset '{preset}', \
-                         which is not registered",
+                        "template '{}' anchor '{}' references gate '{gate}', which is neither a \
+                         registered gate preset nor a gate defined in the registry",
                         template.name, anchor.name
                     )
                 })?;
@@ -629,7 +648,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             warnings.append(&mut create_warnings);
 
-            self.attach_gate_presets(&node.gates, &node_id, warnings)?;
+            self.attach_template_gates(&node.gates, &node_id, warnings)?;
 
             created.insert(node.role.clone(), node_id);
         }
@@ -857,28 +876,61 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(existing)
     }
 
-    /// Attach each named gate preset to `issue_id` through the shared
-    /// `apply_gate_preset` path, collecting any lease warnings. Shared by node-
-    /// and anchor-gate attachment (jit:2614ecf2 — REQ-13) so both flow through
-    /// the same preset resolution and application.
-    fn attach_gate_presets(
+    /// Resolve a template node/anchor gate `name` to either a registered gate
+    /// PRESET bundle or a single gate KEY declared in the gate registry
+    /// (`.jit/gates.json`), PREFERRING the preset.
+    ///
+    /// Config-declared gates (e.g. `repo-validate`) are usable from template
+    /// anchors/nodes this way without being built-in presets. Returns an error
+    /// when the name is neither, so callers keep the existing hard failure for an
+    /// unknown gate. Pure read; performs no mutation.
+    fn resolve_template_gate(&self, name: &str) -> Result<TemplateGateResolution> {
+        // Prefer a preset bundle; fall back to a single registry gate key.
+        if self.storage.get_gate_preset(name).is_ok() {
+            return Ok(TemplateGateResolution::Preset);
+        }
+        if self.storage.load_gate_registry()?.gates.contains_key(name) {
+            return Ok(TemplateGateResolution::RegistryKey);
+        }
+        Err(anyhow!(
+            "gate '{name}' is neither a registered gate preset nor a gate defined in the registry"
+        ))
+    }
+
+    /// Attach each named template gate to `issue_id`, collecting any lease
+    /// warnings. Each name resolves through
+    /// [`resolve_template_gate`](Self::resolve_template_gate) to either a gate
+    /// PRESET (applied as a bundle via `apply_gate_preset`) or a single gate KEY
+    /// in the registry (attached via `add_gates`, the same effect as
+    /// `jit gate add <issue> <key>`). Shared by node- and anchor-gate attachment
+    /// (jit:2614ecf2 — REQ-13) so both flow through the same resolution.
+    fn attach_template_gates(
         &self,
-        presets: &[String],
+        gates: &[String],
         issue_id: &str,
         warnings: &mut Vec<String>,
     ) -> Result<()> {
-        for preset in presets {
-            let (_, mut w) = self.apply_gate_preset(issue_id, preset, None, false, false, &[])?;
+        for gate in gates {
+            let mut w = match self.resolve_template_gate(gate)? {
+                TemplateGateResolution::Preset => {
+                    self.apply_gate_preset(issue_id, gate, None, false, false, &[])?
+                        .1
+                }
+                TemplateGateResolution::RegistryKey => {
+                    self.add_gates(issue_id, std::slice::from_ref(gate))?.1
+                }
+            };
             warnings.append(&mut w);
         }
         Ok(())
     }
 
-    /// Attach every gate preset declared on each template anchor to its bound
-    /// anchor issue, through the shared [`attach_gate_presets`](Self::attach_gate_presets)
-    /// path node gates use (jit:2614ecf2 — REQ-13). Anchor gate-preset existence
-    /// is validated in the precondition phase, mirroring node gates, so this only
-    /// runs on the fresh-apply path after the bound anchor's template edges are wired.
+    /// Attach every gate declared on each template anchor to its bound anchor
+    /// issue, through the shared [`attach_template_gates`](Self::attach_template_gates)
+    /// path node gates use (jit:2614ecf2 — REQ-13). Each anchor gate resolves as a
+    /// preset OR a registry gate key; existence is validated in the precondition
+    /// phase, mirroring node gates, so this only runs on the fresh-apply path after
+    /// the bound anchor's template edges are wired.
     fn attach_anchor_gates(
         &self,
         template: &GraphTemplate,
@@ -896,7 +948,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     anchor.name
                 )
             })?;
-            self.attach_gate_presets(&anchor.gates, anchor_id, warnings)?;
+            self.attach_template_gates(&anchor.gates, anchor_id, warnings)?;
         }
         Ok(())
     }
