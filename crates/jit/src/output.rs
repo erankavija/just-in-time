@@ -1212,6 +1212,61 @@ pub struct GateCheckAllResponse {
     pub not_run: Vec<String>,
 }
 
+/// JSON payload of `jit gate check --all` / `--limit` (the history view).
+///
+/// `results` holds one [`GateRunSummary`] per matching run, newest-first, after
+/// any `--gate` / `--status` filtering and `--limit` capping. Each summary is the
+/// full form (stdout/stderr included) so history inspection never loses report
+/// text. `count` is `results.len()` (the number returned, after filtering).
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::GateRunHistoryResponse;
+///
+/// let payload = GateRunHistoryResponse {
+///     results: vec![],
+///     count: 0,
+/// };
+/// assert_eq!(payload.count, 0);
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateRunHistoryResponse {
+    pub results: Vec<GateRunSummary>,
+    pub count: usize,
+}
+
+/// JSON payload of `jit gate check`'s flat report-text view
+/// (`--stdout` / `--stderr` / `--tail`).
+///
+/// Carries the latest run's stored report text for the selected stream(s),
+/// already tail-trimmed when `--tail <N>` was supplied. `stdout` / `stderr` are
+/// present only for the streams the caller asked for, so the JSON mirrors the
+/// plain verbatim output exactly.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::GateFlatReportResponse;
+///
+/// let payload = GateFlatReportResponse {
+///     gate_key: "tests".into(),
+///     run_id: "r1".into(),
+///     stdout: Some("the report text".into()),
+///     stderr: None,
+/// };
+/// assert_eq!(payload.stderr, None);
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateFlatReportResponse {
+    pub gate_key: String,
+    pub run_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
 // ============================================================================
 // Registry Response Types
 // ============================================================================

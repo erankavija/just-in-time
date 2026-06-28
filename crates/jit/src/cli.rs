@@ -1083,25 +1083,70 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Show the last run result for a gate (inspection only, non-mutating)
+    /// Inspect gate run results (inspection only, non-mutating)
     ///
-    /// The gate key may be supplied as a positional argument or via `--gate`:
+    /// `gate check` is the unified gate-run inspection surface. By default it
+    /// shows the latest run for one gate:
     ///
     ///   jit gate check <ISSUE_ID> <GATE_KEY>
     ///   jit gate check <ISSUE_ID> --gate <GATE_KEY>
     ///
-    /// Exactly one of the two forms must be used; supplying both or neither is
-    /// an error.
+    /// Exactly one of the two gate-key forms must be used for the default
+    /// latest-run view; supplying both or neither is an error.
+    ///
+    /// History view (`--all` / `--limit <N>`) lists prior runs newest-first.
+    /// Here the gate key is OPTIONAL and acts as a filter (positional or
+    /// `--gate`); `--status <passed|failed|error|pending|skipped>` filters by
+    /// outcome:
+    ///
+    ///   jit gate check <ISSUE_ID> --all
+    ///   jit gate check <ISSUE_ID> --limit 5 --gate tests --status failed
+    ///
+    /// Flat view (`--stdout` / `--stderr` / `--tail <N>`) prints the latest
+    /// run's stored report text verbatim, with no wrapping or decoration. The
+    /// gate key is required here; `--tail <N>` keeps only the last N lines:
+    ///
+    ///   jit gate check <ISSUE_ID> <GATE_KEY> --stdout
+    ///   jit gate check <ISSUE_ID> <GATE_KEY> --stderr --tail 40
+    ///
+    /// History flags and flat-output flags are mutually exclusive. Every view
+    /// supports `--json`.
     Check {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
-        /// Gate key (positional form)
+        /// Gate key (positional form). Required for the latest-run and flat
+        /// views; an optional filter in the history view.
         gate_key: Option<String>,
 
         /// Gate key (flag form — alternative to the positional)
         #[arg(long = "gate")]
         gate_flag: Option<String>,
+
+        /// History view: list all prior runs newest-first
+        #[arg(long)]
+        all: bool,
+
+        /// History view: list the most recent N runs newest-first
+        #[arg(long, value_name = "N")]
+        limit: Option<usize>,
+
+        /// History view: filter runs by status
+        /// (passed|failed|error|pending|skipped)
+        #[arg(long, value_name = "STATUS")]
+        status: Option<String>,
+
+        /// Flat view: print the latest run's stdout verbatim
+        #[arg(long)]
+        stdout: bool,
+
+        /// Flat view: print the latest run's stderr verbatim
+        #[arg(long)]
+        stderr: bool,
+
+        /// Flat view: keep only the last N lines of the printed report text
+        #[arg(long, value_name = "N")]
+        tail: Option<usize>,
 
         #[arg(long)]
         json: bool,

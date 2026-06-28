@@ -475,6 +475,88 @@ fn resolve_gate_key_for(
     }
 }
 
+/// Build an `INVALID_ARGUMENT` error, rendering it `--json`-aware.
+///
+/// Mirrors [`resolve_gate_key_for`]: a `--json` caller emits a machine-readable
+/// `INVALID_ARGUMENT` JSON error (exit 2) and the process exits; a non-`--json`
+/// caller receives the typed [`InvalidArgumentError`](jit::errors::InvalidArgumentError)
+/// so the top-level handler classifies it (exit 2) and prints the plain message.
+/// Never returns when `json` is true.
+fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error {
+    if json {
+        let json_error =
+            jit::output::JsonError::new(jit::output::ErrorCode::INVALID_ARGUMENT, message, command);
+        if let Ok(s) = json_error.to_json_string() {
+            println!("{}", s);
+        }
+        std::process::exit(json_error.exit_code().code());
+    }
+    jit::errors::InvalidArgumentError::new(message).into()
+}
+
+/// Resolve the optional gate key from the positional-or-flag pair.
+///
+/// Unlike [`resolve_gate_key`], neither form is required: `Ok(None)` is a valid
+/// result (used by the history view, where the gate key is only a filter).
+/// Supplying BOTH is still an error, routed `--json`-aware via
+/// [`invalid_argument`].
+fn resolve_optional_gate_key(
+    positional: Option<String>,
+    flag: Option<String>,
+    command: &str,
+    json: bool,
+) -> Result<Option<String>> {
+    match (positional, flag) {
+        (None, None) => Ok(None),
+        (Some(pos), None) => Ok(Some(pos)),
+        (None, Some(flag_val)) => Ok(Some(flag_val)),
+        (Some(_), Some(_)) => Err(invalid_argument(
+            "provide the gate key as a positional argument OR via --gate, not both.".to_string(),
+            command,
+            json,
+        )),
+    }
+}
+
+/// Parse a `--status` filter value into a [`GateRunStatus`].
+///
+/// Accepts the snake_case status names; an unknown value is an
+/// `INVALID_ARGUMENT` error (routed `--json`-aware).
+fn parse_run_status(value: &str, command: &str, json: bool) -> Result<jit::domain::GateRunStatus> {
+    use jit::domain::GateRunStatus;
+    match value.to_ascii_lowercase().as_str() {
+        "passed" => Ok(GateRunStatus::Passed),
+        "failed" => Ok(GateRunStatus::Failed),
+        "error" => Ok(GateRunStatus::Error),
+        "pending" => Ok(GateRunStatus::Pending),
+        "skipped" => Ok(GateRunStatus::Skipped),
+        other => Err(invalid_argument(
+            format!(
+                "unknown --status value '{other}'; expected one of: \
+                 passed, failed, error, pending, skipped."
+            ),
+            command,
+            json,
+        )),
+    }
+}
+
+/// Render a report stream verbatim, keeping only the last `tail` lines when set.
+///
+/// With no `--tail`, the stored text is returned unchanged. With `--tail N`, only
+/// the final N lines are kept (rejoined with `\n`); the content is otherwise
+/// undecorated.
+fn render_report_stream(text: &str, tail: Option<usize>) -> String {
+    match tail {
+        Some(n) => {
+            let lines: Vec<&str> = text.lines().collect();
+            let start = lines.len().saturating_sub(n);
+            lines[start..].join("\n")
+        }
+        None => text.to_string(),
+    }
+}
+
 fn print_gate_run_details(result: &GateRunResult) {
     let status_str = match result.status {
         jit::domain::GateRunStatus::Passed => "passed",
@@ -2468,84 +2550,235 @@ fn run() -> Result<()> {
                 id,
                 gate_key,
                 gate_flag,
+                all,
+                limit,
+                status,
+                stdout,
+                stderr,
+                tail,
                 json,
             } => {
-                let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate check", json)?;
                 let output_ctx = OutputContext::new(quiet, json);
 
-                // Transposed-argument guard. The canonical form is
-                // `jit gate check <issue> <gate-key>`. If <id> is not an issue but
-                // <gate_key> resolves to one and <id> is a registered gate key, the
-                // two positionals are almost certainly swapped, so emit an
-                // actionable did-you-mean rather than misparsing into
-                // "issue not found".
-                if executor.storage().resolve_issue_id(&id).is_err() {
-                    let gate_key_is_issue = executor.storage().resolve_issue_id(&gate_key).is_ok();
-                    let id_is_gate = executor
-                        .list_gates()
-                        .map(|gates| gates.iter().any(|g| g.key == id))
-                        .unwrap_or(false);
-                    if gate_key_is_issue && id_is_gate {
-                        let canonical = format!("jit gate check {} {}", gate_key, id);
-                        let message = format!(
-                            "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
-                        );
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error =
-                                JsonError::new("INVALID_ARGUMENT", message, "gate check")
-                                    .with_details(serde_json::json!({
-                                        "issue_id": gate_key,
-                                        "gate_key": id,
-                                        "transposed": true,
-                                    }))
-                                    .with_suggestion(format!("Did you mean: {canonical}"));
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            eprintln!("Error: {message}");
-                            eprintln!("  Did you mean: {canonical}");
-                            std::process::exit(2);
-                        }
-                    }
+                // Three views share one inspection surface (REQ-08, decision D11):
+                //   - history: list prior runs (`--all` / `--limit`),
+                //   - flat:    verbatim report text (`--stdout` / `--stderr` / `--tail`),
+                //   - default: the latest run for one gate (unchanged behaviour).
+                let history_mode = all || limit.is_some();
+                let flat_mode = stdout || stderr || tail.is_some();
+
+                // History and flat views answer different questions (a list of
+                // runs vs one run's report text); combining them is ambiguous.
+                if history_mode && flat_mode {
+                    return Err(invalid_argument(
+                        "history flags (--all/--limit) cannot be combined with \
+                         flat-output flags (--stdout/--stderr/--tail)."
+                            .to_string(),
+                        "gate check",
+                        json,
+                    ));
+                }
+                // `--status` filters a history listing; it is meaningless without one.
+                if status.is_some() && !history_mode {
+                    return Err(invalid_argument(
+                        "--status only applies to the history view; pass --all or --limit."
+                            .to_string(),
+                        "gate check",
+                        json,
+                    ));
                 }
 
-                match executor.get_last_gate_run(&id, &gate_key) {
-                    Ok(Some(result)) => {
-                        if json {
-                            use jit::output::JsonOutput;
-                            let msg = format!("Gate '{}': {:?}", gate_key, result.status);
-                            let output =
-                                JsonOutput::success(result, "gate check").with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            print_gate_run_details(&result);
-                            let _ = output_ctx;
-                        }
-                    }
-                    Ok(None) => {
-                        let msg = format!(
-                            "Gate '{}' has not been run yet for issue {}. Use 'jit gate pass' to run it.",
-                            gate_key, id
-                        );
-                        if json {
-                            use jit::output::JsonOutput;
-                            let output = JsonOutput::<Option<()>>::success(None, "gate check")
-                                .with_message(msg);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            println!("{}", msg);
-                        }
-                    }
-                    Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let json_error =
-                                JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
+                if history_mode {
+                    // Gate key is an optional filter here (positional or --gate).
+                    let gate_filter =
+                        resolve_optional_gate_key(gate_key, gate_flag, "gate check", json)?;
+                    let status_filter = match status {
+                        Some(ref s) => Some(parse_run_status(s, "gate check", json)?),
+                        None => None,
+                    };
+
+                    let runs = match executor.list_gate_runs(&id, gate_filter.as_deref()) {
+                        Ok(runs) => runs,
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error =
+                                    JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            }
                             return Err(e);
+                        }
+                    };
+                    // list_gate_runs already returns newest-first; apply the
+                    // status filter and the --limit cap on top of that order.
+                    let mut runs: Vec<_> = runs
+                        .into_iter()
+                        .filter(|r| status_filter.is_none_or(|s| r.status == s))
+                        .collect();
+                    if let Some(n) = limit {
+                        runs.truncate(n);
+                    }
+
+                    if json {
+                        use jit::output::{GateRunHistoryResponse, GateRunSummary, JsonOutput};
+                        let summaries: Vec<GateRunSummary> =
+                            runs.iter().map(GateRunSummary::full).collect();
+                        let count = summaries.len();
+                        let response = GateRunHistoryResponse {
+                            results: summaries,
+                            count,
+                        };
+                        let msg = format!("{} gate run(s) listed for issue {}", count, id);
+                        let output = JsonOutput::success(response, "gate check").with_message(msg);
+                        println!("{}", output.to_json_string()?);
+                    } else if runs.is_empty() {
+                        let _ = output_ctx
+                            .print_info(format!("No matching gate runs for issue {}", id));
+                    } else {
+                        let _ =
+                            output_ctx.print_info(format!("Gate run history for issue {}:", id));
+                        for run in &runs {
+                            print_gate_run_details(run);
+                        }
+                    }
+                } else if flat_mode {
+                    // Flat view selects exactly one gate's latest run.
+                    let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate check", json)?;
+                    // stderr alone shows only stderr; --stdout (or the tail-only
+                    // form, where neither stream flag is set) includes stdout.
+                    let want_stdout = stdout || !stderr;
+                    let want_stderr = stderr;
+
+                    match executor.get_last_gate_run(&id, &gate_key) {
+                        Ok(Some(result)) => {
+                            let rendered_stdout =
+                                want_stdout.then(|| render_report_stream(&result.stdout, tail));
+                            let rendered_stderr =
+                                want_stderr.then(|| render_report_stream(&result.stderr, tail));
+                            if json {
+                                use jit::output::{GateFlatReportResponse, JsonOutput};
+                                let response = GateFlatReportResponse {
+                                    gate_key: gate_key.clone(),
+                                    run_id: result.run_id.clone(),
+                                    stdout: rendered_stdout,
+                                    stderr: rendered_stderr,
+                                };
+                                let output = JsonOutput::success(response, "gate check");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                // Verbatim: no headers, no decoration.
+                                if let Some(s) = rendered_stdout {
+                                    println!("{}", s);
+                                }
+                                if let Some(s) = rendered_stderr {
+                                    println!("{}", s);
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            let msg = format!(
+                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate pass' to run it.",
+                                gate_key, id
+                            );
+                            if json {
+                                use jit::output::JsonOutput;
+                                let output = JsonOutput::<Option<()>>::success(None, "gate check")
+                                    .with_message(msg);
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!("{}", msg);
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error =
+                                    JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            }
+                            return Err(e);
+                        }
+                    }
+                } else {
+                    let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate check", json)?;
+
+                    // Transposed-argument guard. The canonical form is
+                    // `jit gate check <issue> <gate-key>`. If <id> is not an issue but
+                    // <gate_key> resolves to one and <id> is a registered gate key, the
+                    // two positionals are almost certainly swapped, so emit an
+                    // actionable did-you-mean rather than misparsing into
+                    // "issue not found".
+                    if executor.storage().resolve_issue_id(&id).is_err() {
+                        let gate_key_is_issue =
+                            executor.storage().resolve_issue_id(&gate_key).is_ok();
+                        let id_is_gate = executor
+                            .list_gates()
+                            .map(|gates| gates.iter().any(|g| g.key == id))
+                            .unwrap_or(false);
+                        if gate_key_is_issue && id_is_gate {
+                            let canonical = format!("jit gate check {} {}", gate_key, id);
+                            let message = format!(
+                                "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
+                            );
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error =
+                                    JsonError::new("INVALID_ARGUMENT", message, "gate check")
+                                        .with_details(serde_json::json!({
+                                            "issue_id": gate_key,
+                                            "gate_key": id,
+                                            "transposed": true,
+                                        }))
+                                        .with_suggestion(format!("Did you mean: {canonical}"));
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                eprintln!("Error: {message}");
+                                eprintln!("  Did you mean: {canonical}");
+                                std::process::exit(2);
+                            }
+                        }
+                    }
+
+                    match executor.get_last_gate_run(&id, &gate_key) {
+                        Ok(Some(result)) => {
+                            if json {
+                                use jit::output::JsonOutput;
+                                let msg = format!("Gate '{}': {:?}", gate_key, result.status);
+                                let output =
+                                    JsonOutput::success(result, "gate check").with_message(msg);
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                print_gate_run_details(&result);
+                                let _ = output_ctx;
+                            }
+                        }
+                        Ok(None) => {
+                            let msg = format!(
+                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate pass' to run it.",
+                                gate_key, id
+                            );
+                            if json {
+                                use jit::output::JsonOutput;
+                                let output = JsonOutput::<Option<()>>::success(None, "gate check")
+                                    .with_message(msg);
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!("{}", msg);
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error =
+                                    JsonError::new("GATE_CHECK_ERROR", e.to_string(), "gate check");
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            } else {
+                                return Err(e);
+                            }
                         }
                     }
                 }

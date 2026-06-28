@@ -1346,34 +1346,64 @@ Gate: tests
 
 ### `jit gate check`
 
-Show the last recorded run for a gate on an issue (inspection only, non-mutating).
+The unified gate-run inspection surface (inspection only, non-mutating). It
+offers three views over the stored run records: the latest run (default), prior
+runs (history), and the raw report text (flat). All three are read-only and
+reuse already-recorded runs; none executes a checker or mutates gate state.
 
 **Usage:**
 ```bash
+# Latest-run view (default): one gate, its most recent recorded run
 jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
 jit gate check <ISSUE_ID> --gate <GATE_KEY> [--json] [--quiet]
+
+# History view: prior runs newest-first, gate key OPTIONAL (acts as a filter)
+jit gate check <ISSUE_ID> --all [--gate <GATE_KEY>] [--status <STATUS>] [--json]
+jit gate check <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>] [--json]
+
+# Flat view: the latest run's stored report text, verbatim
+jit gate check <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>] [--json]
+jit gate check <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>] [--json]
 ```
 
-The gate key may be supplied as a positional argument or via `--gate <key>`. Exactly one form must be used; supplying both or neither is an error.
+For the latest-run and flat views the gate key may be supplied as a positional
+argument or via `--gate <key>`; exactly one form must be used (supplying both or
+neither is an error). In the history view the gate key is optional and, when
+present, filters the listing to that gate.
 
-**Behavior:**
-- Shows the most recent recorded run for the gate
-- Does not execute the checker or update gate state
-- Only works for automated gates that have recorded runs
+**Options:**
+- `--gate <KEY>` - Gate key (flag form). Required (with the positional as the
+  alternative) for the latest-run and flat views; an optional filter in the
+  history view.
+- `--all` - History view: list every prior run, newest-first.
+- `--limit <N>` - History view: list the most recent `N` runs, newest-first.
+- `--status <STATUS>` - History view: keep only runs with this outcome
+  (`passed`, `failed`, `error`, `pending`, `skipped`).
+- `--stdout` - Flat view: print the latest run's stored stdout verbatim.
+- `--stderr` - Flat view: print the latest run's stored stderr verbatim.
+- `--tail <N>` - Flat view: keep only the last `N` lines of the printed text.
+- `--json` - Machine-readable output (supported by all three views).
+
+History flags (`--all` / `--limit`) and flat-output flags
+(`--stdout` / `--stderr` / `--tail`) are mutually exclusive, and `--status`
+applies only to the history view. Each violation is reported as an
+`INVALID_ARGUMENT` error (machine-readable under `--json`).
 
 **Examples:**
 ```bash
-# Show the latest recorded run for a single gate (positional form)
+# Latest-run view (positional and flag forms are equivalent)
 jit gate check abc123 tests
 # Gate 'tests' last run: passed (exit code: 0)
-
-# Same command using the flag form
 jit gate check abc123 --gate tests
 
-# Show a failed recorded run
-jit gate check abc123 clippy
-# Gate 'clippy' last run: failed (exit code: 1)
-# stdout/stderr from the stored run are shown inline
+# History view: all prior runs of every gate, newest-first
+jit gate check abc123 --all
+
+# History view: the 5 most recent failed runs of the 'tests' gate
+jit gate check abc123 --limit 5 --gate tests --status failed
+
+# Flat view: the latest 'clippy' run's stderr, last 40 lines, undecorated
+jit gate check abc123 clippy --stderr --tail 40
 ```
 
 ### `jit gate check-all`
@@ -1389,6 +1419,11 @@ jit gate check-all <ISSUE_ID> [--json]
 - Shows the latest recorded run for each automated gate on the issue
 - Does not execute any checker commands
 - Reports which automated gates do not have recorded runs yet
+
+`check-all` stays the cross-gate latest snapshot; it does not take the history
+(`--all` / `--limit` / `--status`) or flat (`--stdout` / `--stderr` / `--tail`)
+flags. Those views operate on a single gate's run records and live on
+`gate check` (use `gate check <id> --all` for history across all gates).
 
 **Example:**
 ```bash
