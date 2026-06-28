@@ -19,9 +19,11 @@ mod harness;
 use harness::TestHarness;
 use jit::domain::Priority;
 use jit::labels::parse_label;
-use jit::storage::IssueStore;
+use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::{GraphTemplate, TemplateRegistry};
+use jit::CommandExecutor;
 use std::collections::BTreeMap;
+use tempfile::TempDir;
 
 const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 
@@ -684,6 +686,132 @@ applies_to  = ["epic"]
     assert!(err.to_string().contains("does-not-exist"), "{err}");
     // The unknown-gate failure is caught before the first create (APPA-01).
     assert_eq!(h.all_issues().len(), before);
+}
+
+// === REQ-13 regression: a malformed custom preset must propagate, NOT silently
+// fall back to a same-named registry gate key (issue 552ff75c) ===
+
+#[test]
+fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key() {
+    // Regression for issue 552ff75c (REQ-13). `resolve_template_gate` resolves a
+    // template gate NAME by preferring a gate preset, falling back to a registry
+    // gate key ONLY when the name is genuinely not a preset (`PresetNotFoundError`).
+    // If the preset store itself fails to LOAD (a malformed custom preset under
+    // `.jit/config/gate-presets/`), that error must PROPAGATE. The prior bug treated
+    // ANY preset-load error as "not a preset" and fell back to the registry key, so a
+    // broken preset config could let `jit apply` SUCCEED by accidentally matching a
+    // same-named registry gate. This is exercised over a real file-based
+    // `JsonFileStorage`: the parse-error path lives in `PresetManager::new`, which the
+    // in-memory `TestHarness` (a HashMap lookup) cannot reproduce.
+    std::env::set_var("JIT_TEST_MODE", "1");
+    let temp = TempDir::new().unwrap();
+    let storage = JsonFileStorage::new(temp.path());
+    storage.init().unwrap();
+    let executor = CommandExecutor::new(storage);
+
+    // `repo-validate` is a config-declared REGISTRY gate, NOT a built-in preset, so
+    // the registry-key fallback WOULD match it.
+    executor
+        .add_gate_definition(
+            "repo-validate".to_string(),
+            "Repo Validate".to_string(),
+            "Whole-repository validation".to_string(),
+            true,
+            None,
+            jit::domain::GateStage::Postcheck,
+        )
+        .unwrap();
+
+    // Guard: with no preset file yet, the name resolves only as a registry key — the
+    // preset lookup returns `PresetNotFoundError`, the swallowed-error case the bug
+    // abused to fall through to the registry key.
+    let pre_err = executor
+        .storage()
+        .get_gate_preset("repo-validate")
+        .unwrap_err();
+    assert!(
+        pre_err.downcast_ref::<PresetNotFoundError>().is_some(),
+        "repo-validate must be a registry-only gate so the fallback would match: {pre_err}"
+    );
+
+    // Plant a MALFORMED custom preset file named for that SAME gate. Loading it makes
+    // `PresetManager::new` fail with a parse error, NOT `PresetNotFoundError`.
+    let presets_dir = temp.path().join("config").join("gate-presets");
+    std::fs::create_dir_all(&presets_dir).unwrap();
+    std::fs::write(
+        presets_dir.join("repo-validate.json"),
+        "{ this is not valid json",
+    )
+    .unwrap();
+
+    // Sanity: the preset store now FAILS TO LOAD, and the failure is NOT a mere
+    // `PresetNotFoundError` — it is the parse error that `resolve_template_gate` must
+    // propagate rather than swallow.
+    let load_err = executor
+        .storage()
+        .get_gate_preset("repo-validate")
+        .unwrap_err();
+    assert!(
+        load_err.downcast_ref::<PresetNotFoundError>().is_none(),
+        "a malformed preset must surface a real load error, not PresetNotFoundError: {load_err}"
+    );
+
+    // A template whose `container` anchor declares exactly that gate name, so apply
+    // must resolve `repo-validate` — hitting the broken preset store.
+    let toml = r#"
+[[template]]
+name        = "brokenpreset"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["repo-validate"]
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  description = "Break down {container.title}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "breakdown"
+"#;
+    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+        .unwrap()
+        .get("brokenpreset")
+        .unwrap()
+        .clone();
+
+    let (epic, _) = executor
+        .create_issue(
+            "Broken-preset epic".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["type:epic".to_string()],
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+
+    let before = executor.storage().list_issues().unwrap().len();
+    // Under the BUGGY code this would be `Ok(_)` (silent registry-key fallback), so
+    // `unwrap_err` itself pins the regression: apply MUST abort.
+    let err = executor
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap_err();
+    // The malformed-preset load error PROPAGATES. It must NOT be `PresetNotFoundError`
+    // (which would mean the broken file was swallowed as "not a preset").
+    assert!(
+        err.downcast_ref::<PresetNotFoundError>().is_none(),
+        "apply must surface the malformed-preset error, not swallow it as not-a-preset: {err:#}"
+    );
+
+    // Nothing was created: no breakdown node, no spine edges — the registry-key
+    // fallback never ran, and the failure is caught before any mutation.
+    assert_eq!(
+        executor.storage().list_issues().unwrap().len(),
+        before,
+        "a propagated preset-load failure must create nothing"
+    );
 }
 
 #[test]
