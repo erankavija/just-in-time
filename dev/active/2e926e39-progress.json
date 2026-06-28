@@ -1,7 +1,7 @@
 {
   "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
   "epic_short_id": "2e926e39",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -133,7 +133,7 @@
           "title": "Gate key as flag on pass and check",
           "satisfies": "REQ-03",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },

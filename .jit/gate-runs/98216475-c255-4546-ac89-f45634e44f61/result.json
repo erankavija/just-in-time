@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "98216475-c255-4546-ac89-f45634e44f61",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "1c94f4f1-9e6e-4fa2-8e28-e371474c2fbb",
+  "commit": "2bade03f9c5c804a10394d512aa7947a4f9bb2b9",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T03:31:57.802067308Z",
+  "completed_at": "2026-06-28T03:33:18.346276442Z",
+  "duration_ms": 80544,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nMet. `gate check` and `gate pass` now accept the gate key positionally and via `--gate <key>` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1095) and [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1151), with shared resolution in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:428).\n\n**Prior Feedback**\nResolved. The previous review finding about plain-text `--json` argument errors is addressed by `resolve_gate_key_for`, which emits `INVALID_ARGUMENT` JSON for missing/conflicting gate-key forms at [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:455). Regression tests cover `gate pass` both-forms JSON and `gate check` neither-form JSON at [gate_key_flag_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_key_flag_test.rs:350).\n\n**Architecture**\nNo boundary violations found. Changes are limited to CLI argument shape, CLI orchestration, integration tests, and reference docs. Domain, storage, and command-layer persistence behavior are not changed.\n\n**Functional Paradigm**\nNo concerning imperative or side-effect-heavy code introduced beyond CLI boundary handling. The resolver is expression-oriented and scoped.\n\n**Correctness And Invariants**\nNo state-transition, gate semantics, event logging, atomic write, assignee/label, or PID-safety regressions found. The change only resolves CLI input into the existing gate handlers.\n\n**Safety**\n`#![deny(unsafe_code)]` remains present in the Rust crates, and no Rust `unsafe` blocks were introduced.\n\n**Testing**\nI did not rerun cargo tests because the issue has a passed `cargo-ci` gate dated 2026-06-28T03:30:38Z. New integration tests cover positional, flag, both, neither, and JSON error contract cases. `./scripts/jit-validate.sh` passed during review.\n\n**Error Handling**\nThe missing/conflicting key paths now return `InvalidArgumentError` for non-JSON callers and produce structured JSON errors for JSON callers. No new library `unwrap()`/`expect()` usage outside tests was introduced.\n\n**CLI Contract**\n`--json` behavior is preserved for the new invalid-argument cases. The user-facing docs were updated for both positional and flag forms in [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1346).\n\n**Documentation**\nReference documentation reflects the new `--gate` form for `gate check` and `gate pass`. No new exported library APIs requiring examples were added.\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The prerequisite issue `a1623187` is marked done, and this change builds directly on it.\n\n**Findings**\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
