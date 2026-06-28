@@ -201,6 +201,16 @@ pub enum FieldEdit<T> {
 
 impl<T> FieldEdit<T> {
     /// `true` when this edit leaves the field unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::FieldEdit;
+    ///
+    /// assert!(FieldEdit::<String>::Keep.is_keep());
+    /// assert!(!FieldEdit::Set("ci".to_string()).is_keep());
+    /// assert!(!FieldEdit::<String>::Clear.is_keep());
+    /// ```
     pub fn is_keep(&self) -> bool {
         matches!(self, FieldEdit::Keep)
     }
