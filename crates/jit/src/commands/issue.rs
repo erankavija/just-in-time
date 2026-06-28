@@ -5,29 +5,37 @@ use crate::errors::{TransitionBlockedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Validate an `--type <kind>` value and return the canonical `type:<kind>`
-    /// label.
+    /// Hard-reject an explicit `--type <kind>` whose kind is not declared in the
+    /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
+    /// write path uses — NOT a parallel `config.toml` containment check.
     ///
-    /// Kind validity is checked against the repository's configured
-    /// `[type_hierarchy]` — the same declaration the `default:type-hierarchy-known`
-    /// schema is generated from (`validation::defaults`). That write-path rule
-    /// only WARNS on an unknown type, so `issue create`/`update` validate the kind
-    /// explicitly here to produce a hard error. When no hierarchy is configured
-    /// every kind is accepted, matching the rule's behavior. No type list is
-    /// hardcoded; the source of truth is config.
-    fn validate_type_kind(&self, kind: &str) -> Result<String> {
-        if let Some(hierarchy) = self.cached_config()?.type_hierarchy.as_ref() {
-            if !hierarchy.types.contains_key(kind) {
-                let mut known: Vec<&str> = hierarchy.types.keys().map(String::as_str).collect();
-                known.sort();
-                return Err(anyhow!(
-                    "unknown issue type '{}'; declared types are: {}",
-                    kind,
-                    known.join(", ")
-                ));
-            }
+    /// The `default:type-hierarchy-known` default rule (`validation::defaults`)
+    /// reports an undeclared `type:<kind>` as an `error` finding, but because it
+    /// is `enforce = false` it only WARNS on the normal write path
+    /// (`validate_for_write`). An explicit `--type` is a deliberate, hard
+    /// contract, so this PROMOTES that one rule's finding to a hard rejection for
+    /// the explicit-type create/update path ONLY. The rule's global
+    /// severity/enforce is untouched, so non-`--type` writes (and every other
+    /// path) keep their existing warn-only behavior.
+    ///
+    /// Config stays the single source of truth via the existing validation layer:
+    /// the decision is the rule engine's `default:type-hierarchy-known` finding
+    /// for THIS issue's final shape. When no `[type_hierarchy]` is configured the
+    /// behavior matches that rule. `issue` MUST already carry the derived
+    /// `type:<kind>` label.
+    fn reject_undeclared_type(&self, issue: &Issue) -> Result<()> {
+        let rules = self.effective_rules()?;
+        let repo_format = self.repo_content_format()?;
+        let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)
+            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
+        if let Some(finding) = evaluation
+            .findings()
+            .into_iter()
+            .find(|finding| finding.rule == "default:type-hierarchy-known")
+        {
+            return Err(crate::errors::ValidationFailedError::new(finding.message.clone()).into());
         }
-        Ok(label_utils::type_label(kind))
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -51,14 +59,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // REQ-02: an explicit `--type <kind>` derives the canonical `type:<kind>`
         // label, replacing any caller-supplied `type:*` label. The command layer
-        // owns this derivation (the CLI only forwards the typed value); kind
-        // validity routes through `validate_type_kind` against the configured
-        // `[type_hierarchy]`. Applied BEFORE the default-type fallback so an
-        // explicit type suppresses the default.
+        // owns this derivation (the CLI only forwards the typed value). Applied
+        // BEFORE the default-type fallback so an explicit type suppresses the
+        // default. Kind validity is enforced below via `reject_undeclared_type`,
+        // which routes the decision through the rule engine on the final shape.
+        let explicit_type = issue_type.is_some();
         if let Some(kind) = issue_type {
-            let type_label = self.validate_type_kind(&kind)?;
             labels.retain(|label| !label_utils::is_type_label(label));
-            labels.push(type_label);
+            labels.push(label_utils::type_label(&kind));
         }
 
         // Apply the configured default type when the issue carries no `type:*`
@@ -96,6 +104,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // below covers create-time validation.
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
+        }
+
+        // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
+        // kind through the SAME rule engine the write uses
+        // (`default:type-hierarchy-known`), which only warns on the normal path.
+        // Scoped to the explicit-type path so non-`--type` writes keep warn-only
+        // behavior; runs before the write so a bad type changes nothing.
+        if explicit_type {
+            self.reject_undeclared_type(&issue)?;
         }
 
         // Single write-time validation entry point: runs the legacy validator
@@ -271,16 +288,27 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // REQ-02: an explicit `--type <kind>` rewrites the issue's `type:<kind>`
         // label in place, replacing any existing `type:*` label. The command
-        // layer owns this (the CLI only forwards the typed value); kind validity
-        // routes through `validate_type_kind` against the configured
-        // `[type_hierarchy]`. Runs after the generic add/remove so the typed flag
-        // is authoritative for the `type` namespace.
+        // layer owns this (the CLI only forwards the typed value). Runs after the
+        // generic add/remove so the typed flag is authoritative for the `type`
+        // namespace. Kind validity is enforced below via `reject_undeclared_type`
+        // on the final shape, through the rule engine.
+        let explicit_type = issue_type.is_some();
         if let Some(kind) = issue_type {
-            let type_label = self.validate_type_kind(&kind)?;
             issue
                 .labels
                 .retain(|label| !label_utils::is_type_label(label));
-            issue.labels.push(type_label);
+            issue.labels.push(label_utils::type_label(&kind));
+        }
+
+        // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
+        // kind through the SAME rule engine the write uses
+        // (`default:type-hierarchy-known`), which only warns on the normal path.
+        // Scoped to the explicit-type path so non-`--type` updates keep warn-only
+        // behavior; runs before any persistence so a bad type changes nothing. The
+        // `type` rule is state-independent, so evaluating against the pre-transition
+        // shape here matches what the projected write below would report.
+        if explicit_type {
+            self.reject_undeclared_type(&issue)?;
         }
 
         // Which editable fields actually changed (not merely whether edit flags
@@ -1773,6 +1801,133 @@ enforce_leases = "off"
             executor.storage.read_events().unwrap().len(),
             events_before,
             "a no-op dependency removal must not append an event"
+        );
+    }
+
+    /// REQ-02: an explicit `--type` whose kind IS declared in the configured
+    /// `[type_hierarchy]` is accepted and the canonical `type:<kind>` label is
+    /// written. Acceptance is decided by the rule engine: the
+    /// `default:type-hierarchy-known` rule produces no finding for a declared
+    /// kind, the SAME validation layer the write path uses.
+    #[test]
+    fn test_create_explicit_declared_type_accepted_via_rule_engine() {
+        let executor = setup();
+        let (id, _warnings) = executor
+            .create_issue(
+                "Declared type".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                Some("task".to_string()),
+                false,
+            )
+            .expect("a declared --type kind must be accepted");
+        let issue = executor.storage.load_issue(&id).unwrap();
+        assert!(
+            issue.labels.iter().any(|l| l == "type:task"),
+            "declared --type must write the canonical label, got: {:?}",
+            issue.labels
+        );
+    }
+
+    /// REQ-02: an explicit `--type` whose kind is NOT declared is hard-rejected
+    /// through the existing rule engine (the `default:type-hierarchy-known`
+    /// finding), surfacing as a `ValidationFailedError` (exit 4) and persisting
+    /// nothing — NOT via a parallel config containment check.
+    #[test]
+    fn test_create_explicit_undeclared_type_rejected_via_rule_engine() {
+        let executor = setup();
+        let before = executor.storage.list_issues().unwrap().len();
+        let err = executor
+            .create_issue(
+                "Undeclared type".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                Some("xyzzy-unknown-type".to_string()),
+                false,
+            )
+            .expect_err("an undeclared --type kind must be rejected");
+        assert!(
+            err.downcast_ref::<crate::errors::ValidationFailedError>()
+                .is_some(),
+            "rejection must be a ValidationFailedError, got: {err:?}"
+        );
+        assert_eq!(
+            executor.storage.list_issues().unwrap().len(),
+            before,
+            "a rejected create must persist nothing"
+        );
+    }
+
+    /// REQ-02: `issue update --type <declared>` is accepted via the rule engine
+    /// and leaves exactly one canonical `type:` label.
+    #[test]
+    fn test_update_explicit_declared_type_accepted_via_rule_engine() {
+        let executor = setup();
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                Some("story".to_string()),
+                false,
+            )
+            .expect("a declared --type update must be accepted");
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        let type_labels: Vec<&str> = issue
+            .labels
+            .iter()
+            .filter(|l| l.starts_with("type:"))
+            .map(|s| s.as_str())
+            .collect();
+        assert_eq!(
+            type_labels,
+            vec!["type:story"],
+            "update --type must leave exactly one canonical type label"
+        );
+    }
+
+    /// REQ-02: `issue update --type <undeclared>` is hard-rejected through the
+    /// rule engine (mirroring create), as a `ValidationFailedError`.
+    #[test]
+    fn test_update_explicit_undeclared_type_rejected_via_rule_engine() {
+        let executor = setup();
+        let issue = crate::domain::Issue::new("T".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        let err = executor
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                Some("xyzzy-unknown-type".to_string()),
+                false,
+            )
+            .expect_err("update with an undeclared --type must be rejected");
+        assert!(
+            err.downcast_ref::<crate::errors::ValidationFailedError>()
+                .is_some(),
+            "rejection must be a ValidationFailedError, got: {err:?}"
         );
     }
 
