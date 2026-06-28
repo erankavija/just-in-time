@@ -2,7 +2,7 @@
   "id": "3758ee60-4e9d-4bf0-9e89-9a4ed6ffdc3f",
   "title": "Query default routing and ready alias",
   "description": "Make a bare query and the natural ready alias work instead of erroring.\n\n## Background\n\nToday `query` requires a subcommand and exposes `available` (cli.rs:1483), with no `ready` alias and no bare default, so the natural first guesses error. The shared `run_query_all` helper already exists (main.rs:689) with `--state`/`--assignee`/`--priority`/`--label` filters (main.rs:705-710; cli.rs:1458-1481) that can serve the default path.\n\n## Success Criteria\n\n- [hard] REQ-04: A bare jit query returns all issues via the existing query-all path, jit query ready is accepted as an alias of available, and the existing --state/--assignee/--priority/--label filters work unchanged on that default path with no new traversal semantic.\n\n## Notes\n\nMake the query subcommand optional so a bare `jit query` routes to `run_query_all` (main.rs:689, dispatched main.rs:3461-3470), and add `ready` as a visible alias of the existing `available` variant. `available` is retained, so no query name is retired, and there is no new traversal semantic. Update docs to mention `ready` and the bare default.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-28T02:30:24.073503184Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T00:56:27.160642461Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T01:00:58.007125240Z"
+      "updated_at": "2026-06-28T02:27:12.665894522Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-06-27T21:43:33.144505909Z",
-  "updated_at": "2026-06-28T01:02:38.721373115Z"
+  "updated_at": "2026-06-28T02:32:29.100742464Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a04e2cc8-1fbd-4397-a164-b3bf49a5edd8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3758ee60-4e9d-4bf0-9e89-9a4ed6ffdc3f",
+  "commit": "02f5e6317b728b88987f043b1e67947b122e67e7",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T02:30:24.073503184Z",
+  "completed_at": "2026-06-28T02:31:28.970036321Z",
+  "duration_ms": 64896,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nBare `jit query` now routes through `run_query_all` in `crates/jit/src/main.rs:3651`, using the same filters as `query all`. `jit query ready` is a visible alias for `available` in `crates/jit/src/cli.rs:1601`. Docs cover the bare default and alias in `docs/reference/cli-commands.md:1922`.\n\n**Prior Review**\nThe previous finding is addressed: parent-level query flags before a subcommand are rejected by `reject_parent_query_filters` in `crates/jit/src/main.rs:863`, and covered by `test_query_subcommand_rejects_parent_filter` in `crates/jit/tests/query_tests.rs:1398`.\n\n**Architecture**\nNo boundary violations found. CLI parsing remains in `cli.rs`, dispatch/output in `main.rs`, and query behavior still goes through `CommandExecutor`/storage abstractions.\n\n**Functional Paradigm**\nNo problematic imperative debt introduced in the reviewed change. The new parent-flag detection uses iterator combinators in `crates/jit/src/main.rs:874`.\n\n**Correctness And Invariants**\nNo state-changing behavior added, so atomic writes, event logging, gate transitions, assignee/label formats, and PID safety are not affected by this issue.\n\n**Safety**\nNo unsafe code introduced in the reviewed change.\n\n**Testing**\nUsed provided evidence: `cargo-ci` passed at `2026-06-28T02:27:12Z`; per instruction, I did not rerun Rust tests. Required `./scripts/jit-validate.sh` passes. Coverage includes bare query, ready alias, default-path filters, and the prior footgun regression in `crates/jit/tests/query_tests.rs:1121`.\n\n**Error Handling**\nThe new rejection path returns `Result<()>` with contextual error text naming the ignored flag and subcommand in `crates/jit/src/main.rs:898`.\n\n**CLI Contract**\n`--json` remains supported on bare `jit query` and subcommand-specific forms. Ambiguous parent-level flags before subcommands are rejected instead of silently ignored.\n\n**Documentation**\nDocs mention the bare default, filters, `ready` alias, and parent-flag usage error in `docs/reference/cli-commands.md:1924`.\n\n**Jit Issue Management**\nDependency `527bf0a6` is marked `done` in the issue context. `./scripts/jit-validate.sh` passed.\n\n**Findings**\nNo findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

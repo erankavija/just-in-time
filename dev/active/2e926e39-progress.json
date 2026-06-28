@@ -86,42 +86,42 @@
           "title": "Positional issue title and type flag",
           "satisfies": "REQ-01,REQ-02",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "rework-2"
         },
         {
           "short_id": "3758ee60",
           "title": "Query default routing and ready alias",
           "satisfies": "REQ-04",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "a1623187",
           "title": "First-guess command residuals",
           "satisfies": "REQ-05",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "0cbc93e6",
           "title": "Bounded reverse-dependency depth",
           "satisfies": "REQ-19",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "eb37a05a",
           "title": "Full gate report text",
           "satisfies": "REQ-07",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "552ff75c",
           "title": "Repo-wide integrity gate on the container",
           "satisfies": "REQ-13",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "rework-1-config-declared"
         }
       ]
     },
@@ -187,11 +187,19 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "552ff75c",
+      "topic": "REQ-13 repo-validate config-declared vs Rust preset",
+      "resolution": "user chose config-declared in .jit/gates.json + extend anchor-attach to resolve registry gate keys"
+    }
+  ],
   "rework_counts": {
     "c4b56370": 1,
     "9e9a4f81": 1,
-    "6c740a19": 1
+    "6c740a19": 1,
+    "4b7407d3": 2,
+    "552ff75c": 1
   },
   "wave1_dispatch": {
     "base_sha": "3b493636f406d758c5141f26a6281a63ce641d14",
