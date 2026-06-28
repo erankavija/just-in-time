@@ -72,9 +72,7 @@ Canonical rules:
   verb rather than naming its subjects, it is a flag that accepts both repetition
   and comma-separation: `--label a:b --label c:d` or `--label a:b,c:d`. This
   governs `--label`, `--gate`, `--add-gate`, `--remove-label`, `--remove-gate`,
-  `--subtask`, and `--except`. (`--description` on `issue breakdown` is the one
-  list flag that is repeatable-only and never comma-split, because prose
-  descriptions legitimately contain commas.)
+  and `--except`.
 
 The positional-list-versus-flag-list split is the canonical reason
 `jit gate add abc tests clippy` (subjects) reads differently from

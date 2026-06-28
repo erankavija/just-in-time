@@ -768,64 +768,6 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Break down an issue into subtasks with automatic dependency inheritance
-    /// Break down an issue into subtasks
-    ///
-    /// Creates smaller work items from a larger issue. Subtasks inherit:
-    /// - Parent's non-type labels (epic, milestone, etc.)
-    /// - Parent's dependencies
-    /// - Parent becomes dependent on all subtasks
-    ///
-    /// Gate handling (choose one):
-    /// - Default: No gates (apply manually later)
-    /// - --gate-preset <name>: Apply preset to all subtasks
-    /// - --inherit-gates: Copy parent's gates
-    ///
-    /// Examples:
-    ///   # Break story into tasks (no gates)
-    ///   jit issue breakdown story-123 --child-type task \
-    ///     --subtask "Login" --subtask "Password"
-    ///
-    ///   # Apply rust-tdd preset to all subtasks
-    ///   jit issue breakdown story-123 --child-type task \
-    ///     --gate-preset rust-tdd \
-    ///     --subtask "Login" --subtask "Password"
-    ///
-    ///   # Inherit parent's gates
-    ///   jit issue breakdown story-123 --child-type task \
-    ///     --inherit-gates \
-    ///     --subtask "Login" --subtask "Password"
-    Breakdown {
-        /// Parent issue ID to break down
-        parent_id: String,
-
-        /// Type for child issues (e.g., 'task', 'story', 'bug')
-        /// Must match a type: label value from your hierarchy
-        #[arg(long, required = true)]
-        child_type: String,
-
-        /// Subtask titles (use multiple times)
-        #[arg(long = "subtask", required = true, value_delimiter = ',')]
-        subtask_titles: Vec<String>,
-
-        /// Subtask descriptions (optional, must match number of subtasks)
-        // Descriptions are prose; never split on commas.
-        #[arg(long = "description")]
-        subtask_descriptions: Vec<String>,
-
-        /// Apply gate preset to all subtasks
-        #[arg(long, conflicts_with = "inherit_gates")]
-        gate_preset: Option<String>,
-
-        /// Inherit parent's gates to all subtasks
-        #[arg(long, conflicts_with = "gate_preset")]
-        inherit_gates: bool,
-
-        /// Output as JSON for machine consumption
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Assign issue to someone
     Assign {
         /// Issue ID
@@ -2179,47 +2121,4 @@ pub enum HooksCommands {
         #[arg(long)]
         json: bool,
     },
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use clap::Parser;
-
-    // Regression: each --description was being split on commas before being
-    // zipped against --subtask, shredding prose descriptions. Descriptions
-    // must be taken verbatim.
-    #[test]
-    fn breakdown_description_preserves_commas_verbatim() {
-        let d1 = "This is A. It mentions X, Y, and Z.";
-        let d2 = "This is B. Short, but, commas.";
-        let cli = Cli::parse_from([
-            "jit",
-            "issue",
-            "breakdown",
-            "parent-id",
-            "--child-type",
-            "task",
-            "--subtask",
-            "Task A",
-            "--subtask",
-            "Task B",
-            "--description",
-            d1,
-            "--description",
-            d2,
-        ]);
-
-        let Some(Commands::Issue(IssueCommands::Breakdown {
-            subtask_titles,
-            subtask_descriptions,
-            ..
-        })) = cli.command
-        else {
-            panic!("expected issue breakdown variant");
-        };
-
-        assert_eq!(subtask_titles, vec!["Task A", "Task B"]);
-        assert_eq!(subtask_descriptions, vec![d1, d2]);
-    }
 }

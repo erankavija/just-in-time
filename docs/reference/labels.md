@@ -580,16 +580,24 @@ EPIC=$(jit issue create \
   --label "milestone:v1.0" \
   --json | jq -r '.id')
 
-# 3. Creates tasks under epic (labels inherited if using breakdown)
-jit issue breakdown $EPIC
-# Editor opens, agent adds:
-# - JWT token implementation
-# - OAuth provider integration
-# - Password reset flow
+# 3. Creates tasks under the epic, carrying the epic's grouping labels and
+#    wiring each as a dependency of the epic.
+for title in \
+  "JWT token implementation" \
+  "OAuth provider integration" \
+  "Password reset flow"; do
+  TASK=$(jit issue create \
+    --title "$title" \
+    --label "type:task" \
+    --label "epic:auth" \
+    --label "milestone:v1.0" \
+    --json | jq -r '.id')
+  jit dep add "$EPIC" "$TASK"
+done
 
-# All subtasks automatically get:
-# - epic:auth (inherited)
-# - milestone:v1.0 (inherited)
+# All tasks carry:
+# - epic:auth
+# - milestone:v1.0
 
 # 4. Agent can add component labels to tasks
 TASK_IDS=$(jit query all --json | jq -r '.[] | select(.dependencies[] == "'$EPIC'") | .id')

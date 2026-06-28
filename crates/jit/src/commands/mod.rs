@@ -6,7 +6,7 @@
 //! This module is organized into submodules by functional area:
 //! - `issue`: Issue CRUD operations and lifecycle management
 //! - `dependency`: Dependency graph operations  
-//! - `breakdown`: Issue breakdown operations
+//! - `breakdown`: Bracket-aware breakdown operations
 //! - `template`: Graph-template apply engine (`jit apply <template> <container>`):
 //!   the plan-before-fan-out scaffold (planning node `P` + breakdown node `B`),
 //!   validating, snapshotting anchors, and instantiating the template's nodes

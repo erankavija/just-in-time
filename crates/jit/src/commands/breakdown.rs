@@ -1,18 +1,13 @@
-//! Issue breakdown operations.
+//! Bracket-aware breakdown operations.
 //!
-//! Two distinct breakdown paths live here, and they must NOT be conflated:
+//! The bracket-aware breakdown path lives here:
 //!
-//! - [`breakdown_issue`](CommandExecutor::breakdown_issue) — the legacy,
-//!   **parent-centric** helper. It copies the parent's dependencies onto every
-//!   child and makes the parent depend on *all* children. Used for plain
-//!   (non-breakable) containers where simple containment is the desired shape.
 //! - [`bracket_breakdown`](CommandExecutor::bracket_breakdown) — the
 //!   **bracket-aware** path (design doc T10). For a breakable container `C`
 //!   already scaffolded by `jit apply plan <C>` into the bracket `C → B → P`,
 //!   it **consumes** the pre-created breakdown node `B` (it does NOT create it),
 //!   drafts the impl children in Backlog, and splices a **source/sink-only
-//!   spine** `C → impl → B → P`. It deliberately does NOT reuse the
-//!   parent-centric wiring.
+//!   spine** `C → impl → B → P`.
 //!
 //! The bracket-aware path reads its vocabulary (planning/breakdown types, the
 //! plan-quality gate) from the [`TemplateRegistry`](crate::templates::TemplateRegistry)
@@ -221,9 +216,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    drops the scaffold's now-redundant `C → B` edge and any redundant
     ///    `C → non-sink` edge.
     ///
-    /// It deliberately does **not** reuse the parent-centric wiring of
-    /// [`breakdown_issue`](Self::breakdown_issue): children never copy `C`'s
-    /// dependencies, and `C` depends on sinks only — not on every child.
+    /// It deliberately avoids any parent-centric wiring: children never copy
+    /// `C`'s dependencies, and `C` depends on sinks only — not on every child.
     ///
     /// All pre-mutation checks (empty child set, out-of-range/self `deps`, cycles
     /// in the child subgraph, breakable container type, a located `B`, and an
@@ -608,100 +602,4 @@ fn membership_labels(labels: &[String]) -> Vec<String> {
         .filter(|l| label_utils::type_label_value(std::slice::from_ref(*l)).is_none())
         .cloned()
         .collect()
-}
-
-impl<S: IssueStore> CommandExecutor<S> {
-    /// Break down an issue into subtasks with optional gate handling
-    pub fn breakdown_issue(
-        &self,
-        parent_id: &str,
-        child_type: &str,
-        subtasks: Vec<(String, String)>,
-        gate_preset: Option<String>,
-    ) -> Result<Vec<String>> {
-        self.breakdown_issue_impl(parent_id, child_type, subtasks, gate_preset, false)
-    }
-
-    /// Break down an issue with inherited gates
-    pub fn breakdown_issue_with_inherit(
-        &self,
-        parent_id: &str,
-        child_type: &str,
-        subtasks: Vec<(String, String)>,
-        inherit_gates: bool,
-    ) -> Result<Vec<String>> {
-        self.breakdown_issue_impl(parent_id, child_type, subtasks, None, inherit_gates)
-    }
-
-    /// Internal implementation for breakdown with all gate options
-    fn breakdown_issue_impl(
-        &self,
-        parent_id: &str,
-        child_type: &str,
-        subtasks: Vec<(String, String)>,
-        gate_preset: Option<String>,
-        inherit_gates: bool,
-    ) -> Result<Vec<String>> {
-        // Load parent issue
-        let full_parent_id = self.storage.resolve_issue_id(parent_id)?;
-        let parent = self.storage.load_issue(&full_parent_id)?;
-        let original_deps = parent.dependencies.clone();
-
-        // Transform labels: replace type: with child_type
-        let mut child_labels = parent.labels.clone();
-        child_labels.retain(|l| label_utils::type_label_value(std::slice::from_ref(l)).is_none());
-        child_labels.push(label_utils::type_label(child_type));
-
-        // Create subtasks with transformed labels and no gates initially
-        let mut subtask_ids = Vec::new();
-        for (title, desc) in subtasks {
-            let (subtask_id, _warnings) = self.create_issue(
-                title,
-                desc,
-                parent.priority,
-                vec![], // No gates initially
-                child_labels.clone(),
-                None, // inherit repo-default content format
-                None,
-                false, // breakdown subtasks are not force-bypassed
-            )?;
-            subtask_ids.push(subtask_id);
-        }
-
-        // Apply gate option after creating all subtasks
-        if let Some(preset_name) = gate_preset {
-            // Apply preset via the proper flow (registers gates, initializes status, logs events)
-            for subtask_id in &subtask_ids {
-                self.apply_gate_preset(subtask_id, &preset_name, None, false, false, &[])?;
-            }
-        } else if inherit_gates {
-            // Copy parent's gates to all subtasks via add_gates (validates registry, initializes status)
-            let parent_gates = parent.gates_required.clone();
-            if !parent_gates.is_empty() {
-                for subtask_id in &subtask_ids {
-                    self.add_gates(subtask_id, &parent_gates)?;
-                }
-            }
-        }
-        // else: no gates (default)
-
-        // Copy parent's dependencies to each subtask
-        for subtask_id in &subtask_ids {
-            for dep_id in &original_deps {
-                self.add_dependency(subtask_id, dep_id)?;
-            }
-        }
-
-        // Make parent depend on all subtasks
-        for subtask_id in &subtask_ids {
-            self.add_dependency(&full_parent_id, subtask_id)?;
-        }
-
-        // Remove parent's original dependencies (now transitive through subtasks)
-        for dep_id in &original_deps {
-            self.remove_dependency(&full_parent_id, dep_id)?;
-        }
-
-        Ok(subtask_ids)
-    }
 }

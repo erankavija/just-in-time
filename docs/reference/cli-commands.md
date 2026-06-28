@@ -288,16 +288,6 @@ jit_issue_create({
 }
 ```
 
-**`jit_issue_breakdown`** - Break issue into subtasks
-```javascript
-{
-  parent_id: string,
-  subtask: string[],          // Subtask titles
-  description?: string[],     // Optional descriptions
-  json?: boolean
-}
-```
-
 #### Dependencies
 
 **`jit_dep_add`** - Add dependency (FROM depends on TO)

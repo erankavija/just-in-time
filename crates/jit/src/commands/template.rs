@@ -821,11 +821,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // persisted breakdown issue's dependencies, matching each role's node by
         // its `type:` label. The plan template wires `B → P`, so this resolves P.
         if let Some(breakdown_node) = template.node(BREAKDOWN_ROLE) {
-            let breakdown_issue = self.storage.load_issue(breakdown_id)?;
+            let breakdown_node_issue = self.storage.load_issue(breakdown_id)?;
             for dep_role in &breakdown_node.depends_on {
                 if let Some(dep_node) = template.node(dep_role) {
                     if let Some(dep_id) =
-                        self.find_dep_by_type(&breakdown_issue, &dep_node.type_name)?
+                        self.find_dep_by_type(&breakdown_node_issue, &dep_node.type_name)?
                     {
                         existing.insert(dep_role.clone(), dep_id);
                     }
