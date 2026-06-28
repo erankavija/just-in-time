@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "69c844fc-41ec-4c6e-b4a5-dfb652824128",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4b7407d3-b069-4a6e-a980-ef2e26391c22",
+  "commit": "aeda07a3a309a7b45e5c42521bbdeb53985f1190",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-06-28T02:50:16.252746729Z",
+  "completed_at": "2026-06-28T02:51:44.733949994Z",
+  "duration_ms": 88481,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 is met: positional title and `--title`/`-t` are both supported in `crates/jit/src/cli.rs:523` and resolved in `crates/jit/src/main.rs:1091`.\n\nREQ-02 is met: create/update accept long-only `--type`, write a canonical `type:<kind>` label, replace existing `type:*` labels, and reject undeclared types via the validation rule engine in `crates/jit/src/commands/issue.rs:26`.\n\n**Architecture And Separation Of Concerns**\nPass. The CLI forwards `issue_type` only; derivation and validation live in command orchestration. Storage remains behind `IssueStore`, and validation policy is routed through the existing validation layer.\n\n**Functional Paradigm**\nNo blocking functional-style issues found in the changed surface.\n\n**Correctness And Invariants**\nNo new violations found for atomic writes, event logging, gate semantics, assignee/label formats, or PID safety. Type-label rewriting happens before persistence and invalid explicit types persist nothing.\n\n**Safety**\n`#![deny(unsafe_code)]` remains in place. No unsafe code found in the reviewed change.\n\n**Testing**\nI did not run cargo tests because the provided `cargo-ci` gate passed at `2026-06-28T02:46:52.354843833+00:00`. Issue-specific CLI and command tests cover positional title, flagged title, create/update `--type`, replacement, and unknown-type rejection.\n\n**Error Handling**\nUnknown explicit type rejection now surfaces as `ValidationFailedError` from the validation finding in `crates/jit/src/commands/issue.rs:36`, with contextual validation output.\n\n**CLI Contract**\nCreate and update retain `--json` in `crates/jit/src/cli.rs:575` and `crates/jit/src/cli.rs:760`.\n\n**Documentation**\nRelevant CLI doc comments were updated for positional title and `--type`.\n\n**Prior Review Feedback**\nAddressed. The prior bespoke config containment check has been replaced by `reject_undeclared_type`, which evaluates `default:type-hierarchy-known` through the validation engine.\n\n**Jit Issue Management**\nDependency `527bf0a6` is marked done. I ran `./scripts/jit-validate.sh`; it passed.\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
