@@ -1,0 +1,31 @@
+{
+  "id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
+  "title": "Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+  "description": "Epic `90a2dbfd` (declarative kinds over sources, done) made declaring a new kind pure config: REQ-02 added a config-declared toml source descriptor and REQ-04 made `jit init` author the `[item_kinds]` table. Its REQ-07 (rule/gate as addressable items) was deferred because rule self-ids carry colons that collide with the label `namespace:value` separator.\n\nInvestigation reopened that thread and grew it into an addressing redesign. The real blocker is not the colon: `@` is not a legal label-value character today (`crates/jit/src/labels.rs:24`), so project-scoped links (`enforces:@/...`) cannot be authored at all. This epic introduces one uniform, colon-free, path-based address scheme over the project, makes `rule` and `gate` addressable kinds over toml sources, rebinds `enforced-by` to real items, renders a rules/gates reference, re-addresses all existing kinds, and lands the multi-jit address form (resolution deferred).\n\nFull motivation, grounded findings, the converged design, the target grammar, and every open point to settle in planning are in the linked design brief `dev/studies/addressing-v2-rule-gate-items.md`. The open points there are decisions for the formal jit-plan; this epic states the end-state requirements.\n\n## Success Criteria\n\n- REQ-01 [hard] One uniform address scheme is minted, parsed, and resolved: project items `@[<project>]/<kind>/<self-id>`, issue items `@/issue/<short-id>/<kind>/<self-id>`, with `<short-id>/<self-id>` as sugar expanding to the issue form. The colon `:` is reserved solely as the label `namespace:value` separator and is never overloaded inside a value. Verified by parser/resolution tests over project and issue scopes plus the sugar form.\n- REQ-02 [hard] The label-value grammar admits a leading `@` and `@<project>` and the deeper `/`-path form; the single-colon split (`splitn(2, ':')`) is retained; every site that re-splits a value is audited so the wider grammar breaks no parsing or resolution. Verified by grammar tests covering accepted/rejected values.\n- REQ-03 [hard] `rule` is an addressable kind sourced from `rules.toml` via the config toml source descriptor; rule self-ids carry no colon (the origin such as `default`/`bracket` moves out of the id into a field). Verified by indexing rules as items and resolving `@/rule/<self-id>`.\n- REQ-04 [hard] `gate` is an addressable kind; `gates.json` is migrated to `gates.toml` with schema parity (key, title, description, stage, mode, checker, priority, and any prompt/env fields); no consumer still reads `gates.json`. Verified by gate operations running over the toml source and resolving `@/gate/<key>`.\n- REQ-05 [hard] Every invariant `enforced-by` binding resolves to a real addressable item (`@/rule/...` or `@/gate/...`); `invariants.toml` bindings are rebound to the new addresses. Verified by a resolution check over the seed registry that fails on any unresolved binding.\n- REQ-06 [hard] Work can be linked via `enforces:@/<rule-or-gate>` and that link resolves like `satisfies:`/`per:`/`mitigates:` today. Verified by authoring such a label and resolving it to the target item.\n- REQ-07 [hard] A rules/gates reference document is rendered from the registry (analogous to the CLAUDE.md invariant projection), reusing the projection style mechanism. Verified by a render test producing the reference from the registry.\n- REQ-08 [hard] All existing kinds are re-addressed uniformly (invariant, requirement, decision, risk, definition) and this repo's existing qualified-id links, labels, docs, and `.jit/` data are migrated; `jit validate` is green after migration. Verified by a green validate plus a scan showing no legacy-form addresses remain.\n- REQ-09 [hard] The multi-jit address form is accepted now with resolution deferred: the grammar/parser accept `@<project>`; only the local project resolves; a non-local reference is parse-valid and returns a clear not-resolvable error. No federation or project registry is built. Verified by tests over local resolution and the non-local error path.\n\n## Out of Scope\n\n- Cross-jit federation / actual remote resolution (only the address form lands; resolution is local-only).\n- Re-introducing enforcement-drift accounting (epic `90a2dbfd` REQ-05 removed it; it stays removed).\n- Value injection / codegen: jit makes rules/gates addressable and citable, it does not rewrite the code that physically holds a value.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/studies/addressing-v2-rule-gate-items.md",
+      "commit": null,
+      "label": "Addressing v2 design brief (pre-plan)",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "type:epic"
+  ],
+  "created_at": "2026-06-28T11:52:45.519022826Z",
+  "updated_at": "2026-06-28T11:52:57.338811848Z"
+}

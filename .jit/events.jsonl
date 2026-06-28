@@ -4278,3 +4278,4 @@
 {"type":"issue_state_changed","id":"55547464-51f1-417b-ac72-15482da71d65","issue_id":"2e926e39-906e-4952-8ae0-38215a7e5aac","timestamp":"2026-06-28T05:46:36.772422659Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"e57be731-1062-42cd-9a95-6ea326d6f98a","issue_id":"2e926e39-906e-4952-8ae0-38215a7e5aac","timestamp":"2026-06-28T05:48:08.360783593Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"cbca5958-54d4-4ac1-82a2-a5173c8cc092","issue_id":"2e926e39-906e-4952-8ae0-38215a7e5aac","timestamp":"2026-06-28T05:48:08.360822463Z"}
+{"type":"issue_created","id":"4e773996-baf1-476c-a445-2862c85edb4b","issue_id":"2821e177-2d2d-4b25-b64a-4f38723e7fe6","timestamp":"2026-06-28T11:52:45.528731429Z","title":"Addressing v2: uniform path-based addresses; rule/gate as addressable items","priority":"normal"}
