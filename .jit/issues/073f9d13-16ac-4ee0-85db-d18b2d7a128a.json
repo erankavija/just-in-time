@@ -2,7 +2,7 @@
   "id": "073f9d13-16ac-4ee0-85db-d18b2d7a128a",
   "title": "Gate check history and flat output",
   "description": "Make gate inspection the single surface for the latest run, prior-run history, and unwrapped report text.\n\n## Background\n\n`gate check` and `gate check-all` are the existing inspection variants (cli.rs:971-981) but expose only the latest run with no history and no flat output. `GateRunResult` already stores full stdout/stderr (types.rs:1072,1074) and `list_gate_runs_for_issue` (storage/mod.rs:230) already lists prior runs, so history and flat output reuse stored data rather than a new command.\n\n## Success Criteria\n\n- [hard] REQ-08: gate check returns the latest run by default, lists prior runs via a history flag filterable by gate and by status, and offers a flat unwrapped report-text view, with both gate check and gate check-all retained.\n\n## Notes\n\nTouch the Check/CheckAll variants and handlers in cli.rs, reusing `list_gate_runs_for_issue` (storage/mod.rs:230) and the stored stdout/stderr (types.rs:1072,1074). Add latest-by-default, a history flag filterable by gate and status, and flat unwrapped report views; retain both `gate check` and `gate check-all`. Document the new flags.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-28T03:53:13.201253332Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T03:46:41.143214344Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T03:47:33.476814406Z"
+      "updated_at": "2026-06-28T03:51:50.634137930Z"
     }
   },
   "context": {},
@@ -35,5 +35,5 @@
     "story:gate-inspection"
   ],
   "created_at": "2026-06-27T21:43:33.578012193Z",
-  "updated_at": "2026-06-28T03:49:07.044264586Z"
+  "updated_at": "2026-06-28T03:54:46.493093033Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
   "epic_short_id": "2e926e39",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -145,7 +145,7 @@
           "title": "Gate check history and flat output",
           "satisfies": "REQ-08",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
