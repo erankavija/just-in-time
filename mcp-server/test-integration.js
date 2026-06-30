@@ -221,7 +221,7 @@ async function main() {
 
     await runTest('CLI error returns structured error envelope', async () => {
       await tester.callToolRaw('jit_init', {});
-      const result = await tester.callToolRaw('jit_issue_show', { id: 'NONEXISTENT_999' });
+      const result = await tester.callToolRaw('jit_issue_show', { ids: ['NONEXISTENT_999'] });
       assert.ok(result.isError);
       const parsed = JSON.parse(result.content[0].text);
       assert.strictEqual(parsed.success, false);
@@ -276,7 +276,7 @@ async function main() {
       assert.strictEqual(created.title, 'Integration test issue');
       assert.strictEqual(created.priority, 'high');
 
-      const shown = await tester.callTool('jit_issue_show', { id: created.id });
+      const shown = await tester.callTool('jit_issue_show', { ids: [created.id] });
       assert.strictEqual(shown.id, created.id);
       assert.strictEqual(shown.title, 'Integration test issue');
       assert.ok(shown.labels.includes('type:task'));
