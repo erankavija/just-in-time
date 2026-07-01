@@ -1,0 +1,24 @@
+{
+  "id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
+  "title": "Skill-suite maintenance",
+  "description": "Umbrella for standalone maintenance and defect-fix work on the jit skill suite (jit-planning-lead, jit-breakdown, jit-execution-lead, jit-manage, and their reference prompts) that is not part of a feature epic.\n\n## Success Criteria\n\n- [ ] Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "6846d37e-fceb-46ce-8a16-1b5ea559d0af",
+    "4817c1bc-74a9-4d85-be7c-135751c78961",
+    "eeb5f05a-cb4a-4dc3-be03-55ca4ff7c39e"
+  ],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:epic",
+    "epic:skill-suite-maintenance",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T22:38:10.660996776Z",
+  "updated_at": "2026-07-01T22:38:41.570906153Z"
+}

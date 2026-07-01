@@ -1,0 +1,22 @@
+{
+  "id": "eeb5f05a-cb4a-4dc3-be03-55ca4ff7c39e",
+  "title": "Route cross-sibling coherence findings through the plan contract",
+  "description": "The jit-planning-lead workflow dispatches a cross-sibling coherence review after fan-out and folds findings back into affected children, while the breakdown quality gate holds the approved plan's decomposition sketch authoritative. When a coherence finding adds dependency edges or changes type tiers in ways the sketch does not sanction, the gate fails the fan-out. The two authorities need an explicit precedence rule.\n\n## Background\n\nObserved on the f2532a2d fan-out (2026-07-02): the coherence reviewer recommended three edge additions and the gate subsequently failed two rounds, each time citing the approved plan's decomposition sketch as the contract (its intended parallelism and its per-item tiers). The resolution that satisfied both reviewers was rewording the affected child's criterion to respect the plan's boundaries instead of rewiring the graph. Neither skill documents this precedence, so every planning lead rediscovers it through burned gate rounds.\n\n## Success Criteria\n\n- [hard] REQ-01: The jit-planning-lead coherence-review step states the precedence rule: the approved plan's decomposition sketch is the contract; a finding that contradicts it is folded in as a plan-document amendment or a child-criterion rewording, never as a direct graph edit against the sketch.\n- [hard] REQ-02: The coherence reviewer instructions require checking every proposed graph or tier change against the approved plan's sketch and marking conflicts explicitly in the findings, with the sanctioned resolution paths named.\n- [hard] REQ-03: A material plan amendment triggered by a coherence finding is re-reviewed before the fan-out proceeds; the skill states this loop and its bound.\n",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:skill-suite-maintenance",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T22:38:41.444144211Z",
+  "updated_at": "2026-07-01T22:38:41.445594602Z"
+}
