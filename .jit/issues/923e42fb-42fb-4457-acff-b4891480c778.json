@@ -1,0 +1,37 @@
+{
+  "id": "923e42fb-42fb-4457-acff-b4891480c778",
+  "title": "breakdown: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+  "description": "Breakdown node bracketing Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "0b611ccf-7763-47a5-8401-2e033aa01523"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-01T22:44:11.635855428Z"
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-01T22:44:11.635317838Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "type:breakdown",
+    "brackets:2821e177"
+  ],
+  "created_at": "2026-07-01T22:44:11.632362556Z",
+  "updated_at": "2026-07-01T22:44:11.647400857Z"
+}

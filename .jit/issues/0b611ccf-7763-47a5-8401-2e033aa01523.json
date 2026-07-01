@@ -1,0 +1,30 @@
+{
+  "id": "0b611ccf-7763-47a5-8401-2e033aa01523",
+  "title": "planning: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+  "description": "Planning node for Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md and link it to this node once written.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "2e926e39-906e-4952-8ae0-38215a7e5aac"
+  ],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-01T22:44:11.632233966Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "type:planning"
+  ],
+  "created_at": "2026-07-01T22:44:11.631509015Z",
+  "updated_at": "2026-07-01T22:44:11.672190865Z"
+}
