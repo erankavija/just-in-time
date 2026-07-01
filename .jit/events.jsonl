@@ -4500,3 +4500,6 @@
 {"type":"issue_updated","id":"7282dec6-8db7-42ea-9016-11131cd5821c","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-01T23:26:18.738883337Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"9c63bbdf-373c-488d-9682-1657c087a45f","issue_id":"9a7106ae-e935-4e10-a76b-c0674a4d1642","timestamp":"2026-07-01T23:26:18.748742914Z","updated_by":"issue-update","fields":["description"]}
 {"type":"gate_passed","id":"20fec532-edca-4074-9f1b-9233be035ce1","issue_id":"923e42fb-42fb-4457-acff-b4891480c778","timestamp":"2026-07-01T23:27:16.028435707Z","gate_key":"breakdown-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"d7e36687-2050-465f-a3f3-f98727824c56","issue_id":"cd1da611-c869-4d7b-968e-4ea20ff4481f","timestamp":"2026-07-01T23:32:09.665139293Z","title":"Human-readable slug for containers, set at creation and usable in template interpolation","priority":"normal"}
+{"type":"issue_state_changed","id":"40939ed6-580f-451d-a0af-2e10caa1361c","issue_id":"cd1da611-c869-4d7b-968e-4ea20ff4481f","timestamp":"2026-07-01T23:34:59.304550090Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"f28a1522-2031-45f2-87ec-6a87bc5e6fe7","issue_id":"cd1da611-c869-4d7b-968e-4ea20ff4481f","timestamp":"2026-07-01T23:34:59.304593560Z","updated_by":"dependency-add","fields":["dependencies"]}
