@@ -1,8 +1,8 @@
 {
   "id": "a4e3cfb0-626e-4a73-8be4-364dd0597833",
   "title": "Evaluate and implement documentation tooling for v1.0",
-  "description": "Evaluate documentation rendering options (Docsify, MDBook, Jekyll, etc.) and implement chosen solution before v1.0 release.\n\n## Goal\n\nProvide professional, searchable documentation site for v1.0 users while maintaining markdown source for agent accessibility.\n\n## Key Requirements\n\n- Full-text search across all documentation\n- Professional appearance and navigation\n- Preserve markdown source files (agent-readable)\n- Minimal maintenance overhead\n- GitLab Pages compatible\n\n## Deliverables\n\n- Evaluation of all viable options (see attached document)\n- Decision made and documented\n- Chosen solution implemented\n- Documentation hosted and accessible\n- Maintenance process documented\n\nSee attached document for detailed option analysis and recommendation (Docsify).",
-  "state": "ready",
+  "description": "Evaluate documentation rendering options (Docsify, MDBook, Jekyll, etc.) and implement chosen solution before v1.0 release.\n\n## Goal\n\nProvide professional, searchable documentation site for v1.0 users while maintaining markdown source for agent accessibility.\n\n## Key Requirements\n\n- Full-text search across all documentation\n- Professional appearance and navigation\n- Preserve markdown source files (agent-readable)\n- Minimal maintenance overhead\n- GitLab Pages compatible\n\n## Deliverables\n\n- Evaluation of all viable options (see attached document)\n- Decision made and documented\n- Chosen solution implemented\n- Documentation hosted and accessible\n- Maintenance process documented\n\nSee attached document for detailed option analysis and recommendation (Docsify).\n\n---\n\n## Resolution (Rejected 2026-07-02)\n\nExternal static docs site is out of v1.0 scope.\n\n**Decision:** v1.0 does not owe external human readers a hosted, searchable docs site. JIT is CLI-first, repository-local, and agent-oriented; agents and developers consume the Diátaxis markdown in `docs/` directly, and the web UI (`jit serve` + DocumentViewer) already covers the internal/operator doc-viewing case.\n\n**Why not fold into the web UI:** The web UI renders any `docs/` file but is a live server, not a static artifact, and would still need (a) search widened beyond issue-linked docs, and (b) a docs-tree nav. Rejecting in favor of the web UI would relocate the work plus add server-hosting burden, so nothing is built instead.\n\n**Evaluation preserved:** `dev/studies/documentation-tooling-evaluation.md` (Docsify recommended) remains for if/when an external static site is reconsidered post-v1.0 — see the Doc Phase 2 epic (94f873c8).",
+  "state": "rejected",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -21,8 +21,9 @@
   "labels": [
     "type:task",
     "milestone:v1.0",
-    "component:docs"
+    "component:docs",
+    "resolution:external-static-docs-site-out-of-v1.0-scope"
   ],
   "created_at": "2026-01-02T21:26:44.765052408Z",
-  "updated_at": "2026-01-02T21:26:44.765052408Z"
+  "updated_at": "2026-07-01T23:24:40.607901609Z"
 }
