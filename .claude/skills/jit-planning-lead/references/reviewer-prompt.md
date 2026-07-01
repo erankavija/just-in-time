@@ -1,8 +1,8 @@
-# Adversarial Reviewer Prompt (Phase 6)
+# Adversarial Reviewer Prompt (Step 4d)
 
 Dispatch a `general-purpose` sub-agent to **try to fail** the plan before the real
 `plan-review` gate runs. It mirrors the gate's rubric and grounds in the **actual code** —
-a checklist skim is not enough. Its findings are fixed before Phase 7. A pre-gate PASS is
+a checklist skim is not enough. Its findings are fixed before the gate (Step 4e). A pre-gate PASS is
 **not** predictive of the gate (a prior run saw pre-review PASS then the gate FAIL with
 three deeper findings), so this reduces but never replaces gate rounds.
 

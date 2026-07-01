@@ -1,4 +1,4 @@
-# Synthesizer Agent Prompt (Phase 5)
+# Synthesizer Agent Prompt (Step 4c)
 
 Fill the bracketed fields and dispatch a `general-purpose` sub-agent. The synthesizer
 turns confirmed intent + grounded findings into the **plan document** at P's plan-doc
@@ -29,16 +29,15 @@ short-id, NOT the container's. C and P are different issues; do not conflate the
 **Coverage contract:** criteria id-pattern `[ID_PATTERN]`, satisfies-namespace
 `[SATISFIES_NS]`, child types excluded from coverage `[EXCLUDED_TYPES]`.
 **Type hierarchy (for sketch tiers):** [TYPE_HIERARCHY]
-**Content standards (authoring SSOT):** `.claude/skills/jit-manage/references/content-standards.md`
+**Content standards (authoring SSOT):** [CONTENT_STANDARDS_PATH]
 
 ## Structure — the four plan-review areas are the sections AND the self-check
 
 1. **Completeness vs criteria.** Address **every** `[hard]` criterion explicitly, in
    **prose / approach** form. Do not silently narrow or drop scope. If the work reveals a
    missing criterion, flag it for the owner — do not invent or quietly add one. **Do not
-   restate the criterion→item mapping here** — that lives once, in the §3 coverage map
-   (the single source). The two drift if both list items; keep §1 narrative and §3 the
-   contract.
+   restate the criterion→item mapping here**; it lives once, in the §3 coverage map. Keep
+   §1 narrative and §3 the contract.
 
 2. **Technical soundness + architectural fit.** Build only on the investigator's findings;
    cite real `file:line`. Reuse the named existing primitives; respect layer boundaries.

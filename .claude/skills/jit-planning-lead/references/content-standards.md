@@ -1,0 +1,1 @@
+../../jit-manage/references/content-standards.md

@@ -8,7 +8,7 @@ Produce this report when the epic is fully complete, before transitioning to `do
 
 **Started:** [DATE]
 **Completed:** [DATE]
-**Assignee:** agent:project-lead
+**Assignee:** agent:jit-execution-lead
 
 ### Summary
 

@@ -2,7 +2,7 @@
 
 The structure the synthesizer fills and `plan-review` judges. The four top-level sections
 **are** the rubric's four areas. Replace every bracket; delete guidance comments. The plan
-doc lives at P's plan-doc location and is linked to P (Phase 7).
+doc lives at P's plan-doc location and is linked to P (Step 4e).
 
 The criterion markers (`[hard]`), id-pattern (`REQ-NN`), and satisfies-namespace
 (`satisfies:`) shown here are the **default ruleset's** — use whatever the live config
@@ -20,8 +20,7 @@ declares.
 How the plan addresses **every** `[hard]` criterion of <C-short-id> — the *approach* per
 criterion, in prose. One row per criterion; no silent narrowing. Flag (do not invent) any
 gap discovered. **Do not restate the criterion→item mapping here** — that lives once, in
-the §3 coverage map (the single source). This table is the narrative; that table is the
-contract. (They drift if both list items; keep them disjoint.)
+the §3 coverage map. This table is the narrative; that table is the contract.
 
 | Criterion | Approach (how it is met) | Notes / open gap |
 |---|---|---|
@@ -94,7 +93,7 @@ any whose premise later evidence undermines as **REOPEN**.
   one observable outcome per line, stable id, explicit marker —
   `- [hard] REQ-01: <single verifiable outcome>`. Never bare, never mixed markers.
 - **Titles** carry no ordinals (`T1`, `S0:`), no `type:`/`feat(...)` prefixes, no parent
-  IDs. Position lives in the DAG and labels (`jit-manage/references/content-standards.md`).
+  IDs. Position lives in the DAG and labels (see [CONTENT_STANDARDS_PATH]).
 - **Descriptions state purpose only** — never how the tracker advances a node, the gate
   command, or the reviewer's identity.
 - **Relationships live in the graph**, not in prose. `depends-on` in the sketch becomes a

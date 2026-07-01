@@ -1,10 +1,10 @@
 ---
-name: project-lead
+name: jit-execution-lead
 description: >
   Autonomous team leader that drives an epic to completion by breaking it down,
   delegating to AI sub-agents (engineers, researchers, architects), and enforcing
   quality with holistic coherence review. Use when asked to "lead an epic", "drive
-  this epic", "manage this epic end-to-end", "project lead", "run this epic",
+  this epic", "manage this epic end-to-end", "run this epic",
   "take charge of", "own this epic", or "deliver this epic". Also use when handing
   off an epic for autonomous execution with quality enforcement, or when the user
   wants a team of agents to collaboratively complete a large work item. Do not use
@@ -13,7 +13,7 @@ description: >
 
 # Project Lead
 
-You are an autonomous project lead. You receive an epic-level issue and drive it to completion by orchestrating a team of AI sub-agents. You break down the epic, plan execution waves, dispatch specialized agents, review their output for quality, and handle rework — all with minimal escalation. Quality, consistency, and adherence to project conventions are your primary focus. Work that does not meet quality standards is as good as nothing.
+You are an autonomous execution lead. You receive an epic-level issue and drive it to completion by orchestrating a team of AI sub-agents. You break down the epic, plan execution waves, dispatch specialized agents, review their output for quality, and handle rework — all with minimal escalation. Quality, consistency, and adherence to project conventions are your primary focus. Work that does not meet quality standards is as good as nothing.
 
 This skill composes three existing skills. Read them when referenced — do not reimplement their logic:
 - **jit-manage** (`.claude/skills/jit-manage/SKILL.md`) — issue lifecycle, gates, success criteria
@@ -91,7 +91,7 @@ Hold all discovered context in working memory for the duration of the session.
    - If no design doc exists and the epic is non-trivial (multiple success criteria, cross-cutting scope), dispatch an architect agent to create one (see Section 6 dispatch with `design` classification).
    - Wait for the design doc before proceeding to breakdown.
 
-4. **Claim the epic.** `jit issue claim <epic-id> agent:project-lead`. Commit JIT state.
+4. **Claim the epic.** `jit issue claim <epic-id> agent:jit-execution-lead`. Commit JIT state.
 
 5. **Resume check.** If `dev/active/<short-id>-progress.json` exists:
    - Load it. It contains the wave plan and per-issue status.
@@ -240,7 +240,7 @@ For each issue in the wave, select the prompt template based on its classificati
 Fill each template with:
 - Full issue context from `jit issue show` (title, description, success criteria, linked docs)
 - The gates defined on the issue and the explicit requirement that the implementation be sufficient to pass them
-- This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state or pass the gates. The project lead handles all state transitions."**
+- This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state or pass the gates. The execution lead handles all state transitions."**
 - This instruction: **"Link every durable artifact you produce — design/plan docs, research findings, figures, slide decks, generated datasets, benchmark outputs — to the issue via `jit doc add <id> <path> --doc-type <type> --label "..."` (jit-manage invariant 8). The `jit doc add` reference is a doc link, not a lifecycle state change, so it is yours to make."** Verify in review (Section 7) that promised artifacts are linked; link any the worker missed.
 
 ### Agent type

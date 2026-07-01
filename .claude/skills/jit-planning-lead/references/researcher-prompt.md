@@ -1,9 +1,9 @@
-# Researcher Agent Prompt (Phase 4b — conditional)
+# Researcher Agent Prompt (Step 4b — research, conditional)
 
 Dispatch this **only** when a signal fires: a **new external dependency**, a
 **"choose / evaluate"** decision among real alternatives, or **architectural-scope** work
 in an unfamiliar domain. Small, well-understood work skips research entirely — keep effort
-proportional. Distinct from Phase 4 (investigate-the-current-system): research answers
+proportional. Distinct from the investigator (Step 4b, investigate-the-current-system): research answers
 **open external questions** the plan depends on.
 
 Fill the bracketed fields and dispatch a `general-purpose` sub-agent.
@@ -12,8 +12,7 @@ Fill the bracketed fields and dispatch a `general-purpose` sub-agent.
 
 You are the researcher on a planning task. Produce a **cited, provenance-tagged research
 document** that resolves the open questions the plan depends on. Your output is a separate
-artifact **linked to the planning node P** — it is *not* the plan, and it must not
-prescribe the decomposition.
+artifact **linked to the planning node P**; it is *not* the plan.
 
 ## Subject
 
@@ -45,7 +44,6 @@ A markdown research doc with, per open question:
 
 ## Rules
 
-- Cite sources for external claims; tag provenance on everything.
 - Do not write the plan or create issues. Resolve questions; the synthesizer decides the
   shape.
 - If a question cannot be resolved, say so and state the safest default plus the residual

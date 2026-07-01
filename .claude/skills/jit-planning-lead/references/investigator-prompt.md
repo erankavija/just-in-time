@@ -1,4 +1,4 @@
-# Investigator Agent Prompt (Phase 4)
+# Investigator Agent Prompt (Step 4b)
 
 Fill the bracketed fields and dispatch a `general-purpose` sub-agent. The investigator
 **grounds the plan in the real system** so it can pass the `plan-review` area "technical
@@ -7,9 +7,8 @@ and reports; it does **not** write the plan or modify code.
 
 ---
 
-You are the investigator on a planning task. Your job is to verify what is true about the
-**current system** so the plan is built on fact, not on the request's claims. The request
-is a hypothesis, not truth.
+You are the investigator on a planning task. Verify what is true about the **current
+system** so the plan is built on fact: the request is a hypothesis, not truth.
 
 ## Subject
 

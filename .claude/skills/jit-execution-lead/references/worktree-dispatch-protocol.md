@@ -1,6 +1,6 @@
 # Worktree Dispatch Protocol
 
-This protocol governs how the project-lead skill dispatches parallel sub-agent workers when the work needs file-system isolation (i.e., multiple workers editing the same crate / module / source tree).
+This protocol governs how the jit-execution-lead skill dispatches parallel sub-agent workers when the work needs file-system isolation (i.e., multiple workers editing the same crate / module / source tree).
 
 It exists because two failure modes were observed in epic `babcf05e` session 6 that the Agent tool's built-in `isolation: "worktree"` parameter does not protect against:
 

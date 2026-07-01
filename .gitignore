@@ -19,5 +19,5 @@ mcp-server/jit-schema.json
 coverage.json
 badges/
 
-# project-lead worktrees (transient, never tracked)
+# jit-execution-lead worktrees (transient, never tracked)
 .claude/worktrees/
