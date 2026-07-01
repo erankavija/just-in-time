@@ -6,7 +6,8 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "0efbc594-cad7-4afe-9f99-e888a12c6bc1"
+    "42898915-b8c3-4248-b8d0-c69b3f15b697",
+    "943abd0b-8279-457a-a792-74c013edd0a4"
   ],
   "gates_required": [
     "cargo-ci",
@@ -15,7 +16,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/bb7d57a2-breakdown-spec.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:story",
     "epic:addressing-v2",
@@ -24,5 +33,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:19:51.086829876Z",
-  "updated_at": "2026-07-01T23:21:44.133368731Z"
+  "updated_at": "2026-07-01T23:42:42.386879393Z"
 }

@@ -1,0 +1,26 @@
+{
+  "id": "0910a381-2e39-4853-be9d-252c5e79a7df",
+  "title": "Expand short-id/self-id sugar to a canonical issue address via kind inference",
+  "description": "One address form is sugar: `<short-id>/<self-id>` (e.g. `56ab0224/REQ-01`) must expand to the canonical issue form `@/issue/<short-id>/<kind>/<self-id>` by inferring `kind` from which configured kind's `id-pattern` regex matches `<self-id>` — no code path does this today (`split_qualified_id` just treats the whole thing as an opaque self-id).\n\nInference applies ONLY to issue-scoped kinds (`scope = \"issue\"` in `[item_kinds]`, e.g. this repo's `requirement`, `decision`, `risk`) — project-scoped kinds (e.g. `invariant`, `definition`, and any future registry-first kind) require the explicit kind segment and have no sugar form, because their self-ids are free-form slugs with no distinguishing shape.\n\nAdd a pure domain-layer expansion function taking the sugar string plus the configured kind list as a parameter — mirroring how `resolve_item_kinds` (`domain/item.rs:1219-1233`) takes the kind registry as a parameter rather than hardcoding kind names — that:\n1. Filters the kind list to issue-scoped kinds only.\n2. Finds every issue-scoped kind whose `id_pattern` regex matches `<self-id>` (the same `id_pattern.find` mechanism `extract_raw_items` already uses at `domain/item.rs:870`).\n3. Exactly one match: expands to `(Scope::Issue(short_id), matched_kind_name, self_id)` — the triple shape produced by the address parser.\n4. Zero matches: returns a clear typed error (self-id matches no configured issue-scoped kind's pattern).\n5. More than one match: returns a clear typed error naming every ambiguous candidate kind — never silently picks the first.\n\nThis does not touch any resolver call site; that is separate, later work.\n\n## Success Criteria\n\n- [hard] REQ-01: a sugar string whose self-id matches exactly one issue-scoped kind's `id_pattern` (e.g. `D-1` against this repo's `decision` kind pattern `D-[0-9]+`, or `RISK-1` against `risk`'s `RISK-[0-9]+`) expands to `(Scope::Issue(short_id), \"decision\"/\"risk\", self_id)`; covered by unit tests for at least two distinct issue-scoped kinds.\n- [hard] REQ-02: a sugar string whose self-id matches NO issue-scoped kind's `id_pattern` returns a distinct typed error (not the ambiguous-match error); covered by a unit test.\n- [hard] REQ-03: a sugar string whose self-id matches MORE THAN ONE issue-scoped kind's `id_pattern` (construct two issue-scoped test kinds with deliberately overlapping patterns) returns a typed error naming every matching candidate kind, verified by a unit test asserting the error lists all matched kind names.\n- [hard] REQ-04: project-scoped kinds (`scope = \"project\"`) are excluded from candidate matching regardless of whether their `id_pattern` would otherwise match, verified by a unit test using a project-scoped kind whose pattern matches the input self-id but is correctly not selected.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "d6c3bff6-2333-4444-97b1-f43bb243e06c"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:addressing-core-parser-resolver"
+  ],
+  "created_at": "2026-07-01T23:41:53.843462193Z",
+  "updated_at": "2026-07-01T23:41:53.894464270Z"
+}

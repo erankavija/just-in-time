@@ -1,0 +1,26 @@
+{
+  "id": "a1b6b3da-75cf-4021-b879-832fafb48284",
+  "title": "Bind the named-project scope token to local resolution or a not-resolvable error",
+  "description": "Extend the addressing core's scope parsing so a `@<project>` address distinguishes the local project (which resolves) from any other named project (which is syntactically valid but not resolvable locally), per this epic's REQ-09 and this story's design decision D5. This item adds no path parsing of its own and builds no federation or remote lookup — only the local-vs-other binding.\n\nToday `Scope` (crates/jit/src/domain/item.rs:89-152) has exactly two variants, `Scope::Issue(String)` and `Scope::Project`, and `Scope::parse` (item.rs:113-119) treats a bare `@` as `Scope::Project` and every other string as an issue short-id verbatim — it has no notion of a project NAME at all. A repo-wide search shows `Scope::parse` is currently called only from item.rs's own doctests and unit tests; no production call site exists yet (the kind-segmented address parser/resolver that will eventually call this lives in a separate, sibling story of this epic).\n\nWhat to build, in `crates/jit/src/domain/item.rs`:\n- Add a third `Scope` variant representing a reference to a project other than the local one, e.g. `Scope::OtherProject(String)`, carrying the referenced project name verbatim.\n- Extend the parsing entry point (either by adding a local-project-name parameter to `Scope::parse` itself, or a sibling pure function, at item.rs:113-119) so that, given the declared local project name as a plain `&str` input (the caller supplies the already-loaded config value — this keeps the function pure domain code with no file I/O, per this project's layering rule that domain logic must be free of I/O):\n  - segment `\"@\"` -> `Scope::Project` (unchanged from today).\n  - segment `\"@<name>\"` where `<name>` equals the supplied local project name -> `Scope::Project`.\n  - segment `\"@<name>\"` where `<name>` differs from the supplied local project name -> `Scope::OtherProject(name)`.\n  - No case returns an `Err` from parsing itself — every `@`-prefixed segment is syntactically valid. The `@`-vs-other structural check must be the same one `Scope::parse` already performs, not a re-implemented ad hoc string match.\n- Add a new `ItemError` variant (crates/jit/src/domain/item.rs:245-355 shows the existing `thiserror` enum pattern to follow), e.g. `ItemError::NotResolvable { project: String }`, with a `#[error(...)]` message that names the unresolvable project and states plainly that no federation or remote lookup was attempted.\n- Add a resolution-facing function (or method on `Scope`) that, given a `Scope::OtherProject(name)`, returns `Err(ItemError::NotResolvable { project: name })`; given `Scope::Project` or `Scope::Issue`, returns the existing successful path. This is the \"returns a clear not-resolvable error\" behavior the story requires, exercised at the domain layer since no consuming CLI command exists yet in this codebase.\n\n## Success Criteria\n\n- [hard] REQ-01: unit tests in `domain/item.rs` prove that, given a supplied local project name (e.g. `\"acme\"`), both `\"@\"` and `\"@acme\"` parse to `Scope::Project`, and that the same structural `@`-prefix check used by the existing `Scope::parse` is reused (no duplicate ad hoc string-matching function).\n- [hard] REQ-02: a unit test proves `\"@other-project\"` (local name `\"acme\"`) parses without error into `Scope::OtherProject(\"other-project\".to_string())`, distinct from `Scope::Project` and `Scope::Issue`; a second unit test proves the resolution-facing function returns `Err(ItemError::NotResolvable { project })` for that value, with a `to_string()` message that contains `\"other-project\"` and contains no mention of any network/remote attempt (the message states resolution is local-only).",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "37506c12-ecb2-45be-bb85-e99d92e52855"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:multi-jit-address-form"
+  ],
+  "created_at": "2026-07-01T23:42:22.037667235Z",
+  "updated_at": "2026-07-01T23:42:42.327920100Z"
+}

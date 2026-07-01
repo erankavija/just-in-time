@@ -1,0 +1,26 @@
+{
+  "id": "a8889340-8f85-468d-9448-93f6f94e72ce",
+  "title": "Update jit item show/resolve CLI help text to the new addressing scheme",
+  "description": "`crates/jit/src/cli.rs:413-442` (the `Show` and `Resolve` variants of `ItemCommands`) documents and exemplifies the old two-segment qualified-id scheme (`<scope>/<self-id>`, scope = issue-ref or `@`) and shows `jit item show @/INV-01` as its project-scope example. The kind-segmented parser/resolver (`@[<project>]/<kind>/<self-id>` for project items, `<short-id>/<self-id>` sugar for issue items) has already landed elsewhere in this epic, so this doc comment is now the exact stale-documentation trap the prior epic's completion report flagged as a recurring pattern (`dev/archive/features/25064508/completion-report.md`: \"every behavior-change task first failed code-review solely on stale prose describing the old behavior — most often CLI help text\"), and it is named directly in this story's own blast radius.\n\nUpdate the doc comments to describe the current scheme, keeping both address forms that remain valid:\n- The sugar form for issue-scoped items: `56ab0224/REQ-01` (unchanged, still valid per the story's own criteria).\n- The canonical project-scope form with the kind segment: `@/invariant/INV-01` (replacing the now-invalid `@/INV-01`).\n\nConcretely:\n- `cli.rs:413` doc comment \"Show / resolve a single item by its qualified id `<scope>/<self-id>`\" -> describe the scheme as `@[<project>]/<kind>/<self-id>` for project-scope items, or the `<short-id>/<self-id>` sugar for issue-scope items.\n- `cli.rs:420` example `jit item show @/INV-01` -> `jit item show @/invariant/INV-01`.\n- `cli.rs:423` and `cli.rs:436` doc comment \"Qualified id of the item, `<scope>/<self-id>` (scope = issue or `@`)\" -> reflect the kind-segmented form.\n\nDo not change the `List`/`Search` subcommand doc comments (lines 397-411, 444+) — they use `--kind requirement`-style examples unaffected by the address-form change.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli.rs:413-442`'s doc comments and examples for `jit item show`/`jit item resolve` describe the current `@[<project>]/<kind>/<self-id>` project-scope form and the `<short-id>/<self-id>` issue-scope sugar form; no example shows the kindless `@/<self-id>` form.\n- [hard] REQ-02: `cargo build` compiles clean and `cargo clippy --workspace --all-targets` reports zero warnings after the doc-comment edit.\n- [hard] REQ-03: `grep -n '@/[A-Z]' crates/jit/src/cli.rs` returns zero matches, confirming no other kindless-form example remains in the file this task touches.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "10db7a00-9fc3-46db-ac87-ac59580cd305"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:uniform-readdressing-migration"
+  ],
+  "created_at": "2026-07-01T23:42:21.902816217Z",
+  "updated_at": "2026-07-01T23:42:42.279704025Z"
+}

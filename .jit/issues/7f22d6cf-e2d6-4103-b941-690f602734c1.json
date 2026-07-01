@@ -6,7 +6,7 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "10db7a00-9fc3-46db-ac87-ac59580cd305"
+    "637764ef-534a-4ee5-a4ad-331f0f23fb62"
   ],
   "gates_required": [
     "cargo-ci",
@@ -15,7 +15,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/7f22d6cf-breakdown-spec.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:story",
     "epic:addressing-v2",
@@ -24,5 +32,5 @@
     "story:uniform-readdressing-migration"
   ],
   "created_at": "2026-07-01T23:19:51.166972984Z",
-  "updated_at": "2026-07-01T23:21:44.142678878Z"
+  "updated_at": "2026-07-01T23:42:42.384112541Z"
 }

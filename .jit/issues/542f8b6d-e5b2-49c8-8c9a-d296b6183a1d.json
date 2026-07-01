@@ -1,0 +1,26 @@
+{
+  "id": "542f8b6d-e5b2-49c8-8c9a-d296b6183a1d",
+  "title": "Keep the label-format regex and generated JSON Schema in lockstep",
+  "description": "Propagate the widened value grammar into the duplicated `CANONICAL_LABEL_REGEX` constant and this repo's generated label-format JSON Schema, and add a regression test that keeps the two sources from silently diverging again.\n\n## Background\n\nThe canonical label regex exists in two places: `labels.rs:22-26` (updated by the grammar-widening work this depends on) and `CANONICAL_LABEL_REGEX` at `crates/jit/src/validation/defaults.rs:55`, documented there only as \"Kept in sync with `labels::label_regex`\" — a manual-sync code comment, not an enforced check. `CANONICAL_LABEL_REGEX` feeds `default_ruleset`'s `default:label-format` rule (`defaults.rs:104-108`, via `raw_labels_pattern_schema(CANONICAL_LABEL_REGEX)`), which is the write-path rule that blocks (`enforce = true`) any issue write with a malformed label. If this constant is not updated to the same widened pattern, newly-valid `@`-form label values would pass `labels::validate_label` (the CLI search-filter validator at `main.rs:1372`) yet still be rejected when actually written to an issue — the write path and the CLI filter diverge.\n\nThis repository's own baked schema file, `.jit/schemas/default-label-format.json`, also needs its `\"pattern\"` field updated to match. That file is currently already stale relative to the pre-widening regex (its pattern, `^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$`, is missing `/` even though `labels.rs`/`CANONICAL_LABEL_REGEX` both already allow it) because nothing currently regenerates it after `CANONICAL_LABEL_REGEX` changes — unlike `default-type-hierarchy-known.json`, which has a dedicated `regenerate_type_hierarchy_schema` regenerator (`crates/jit/src/commands/mod.rs:991`), there is no equivalent for the label-format schema. Bring the on-disk file's pattern in line with the new `CANONICAL_LABEL_REGEX` as part of this change (adding a dedicated regenerator function is one valid way to do this, but is not itself required — a direct, verified update to the file's content is sufficient).\n\n## Success Criteria\n\n- [hard] REQ-01: `CANONICAL_LABEL_REGEX` (`defaults.rs:55`) is updated to be character-for-character identical to the widened pattern `label_regex()` now compiles in `labels.rs`.\n- [hard] REQ-02: a new test asserts the two regex source strings are equal (exposing whichever accessor is needed, e.g. widening `label_regex`'s visibility to `pub(crate)`, so `validation/defaults.rs` or a cross-module test can read it) — the test must fail if either pattern changes without the other, replacing the current manual-sync comment with an enforced check.\n- [hard] REQ-03: `.jit/schemas/default-label-format.json`'s `\"pattern\"` field is updated to equal the new `CANONICAL_LABEL_REGEX` string exactly.\n- [hard] REQ-04: existing fixed-contract tests (`test_fixed_default_contract_mf1`, `test_empty_registry_emits_exactly_the_unconditional_rules` in `validation/defaults.rs`, and `test_round_trip_canonical_label_format_specifically` in `validation/serialize.rs`) continue to pass unchanged in rule names/order/severity — only the regex pattern content differs.\n- [hard] REQ-05: `cargo test` and `cargo clippy --workspace --all-targets` pass with zero warnings.\n\n## Notes\n\nThis is a mechanical propagation of the pattern decided in the grammar-widening work it depends on; no new grammar design happens here.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "0597febe-a888-40f5-8b29-fb86484e3a06"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:label-value-grammar"
+  ],
+  "created_at": "2026-07-01T23:41:54.028797878Z",
+  "updated_at": "2026-07-01T23:41:54.079998925Z"
+}

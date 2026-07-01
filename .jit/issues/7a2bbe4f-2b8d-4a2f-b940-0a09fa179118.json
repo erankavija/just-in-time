@@ -1,0 +1,26 @@
+{
+  "id": "7a2bbe4f-2b8d-4a2f-b940-0a09fa179118",
+  "title": "Audit label-value re-split sites against the widened grammar",
+  "description": "Confirm, with tests, that every site in the codebase that re-splits a label value beyond the namespace `:`-split behaves correctly once the value grammar admits `@`-prefixed addresses — and record which sites were checked and found out of scope.\n\n## Background\n\nA full grep-based inventory of `splitn`/`split_once`/`split(` over `crates/jit/src` (excluding tests) puts every re-split site into one of three buckets:\n\n1. **Colon-split (namespace) sites — unaffected by design.** These stop at the first colon and never look at the rest of the value, so the widened value grammar cannot change their behavior: `labels.rs:77` (`parse_label`) and `labels.rs:187` (`suggest_label_fix`), `commands/item.rs:385`, `commands/validate.rs:308`, `validation/desugar.rs:125`, `commands/query.rs:46`, `snapshot.rs:177`, `commands/claim.rs:937` (assignee parsing, unrelated namespace), `domain/types.rs:301,336` (assignee parsing, unrelated namespace).\n2. **Slash-decode qualified-id sites — must route through the structural address parser.** `domain/item.rs:679` (`split_qualified_id`, `qualified.split_once('/')`) and its four callers: `commands/item.rs:292` (`show_item`), `commands/item.rs:402`, `commands/validate.rs:317`, and `validation/graph.rs:90` (`label_credits_id`). These are the sites in the direct blast radius of the deeper grammar: today they treat \"everything after the first `/`\" as the literal self-id. Making them kind-aware and `@`-project-aware (recognizing the deeper `@[<project>]/<kind>/<self-id>` form) is separate, already-landed prerequisite work, not part of this task — this task's job is purely to confirm, via tests exercising the widened-grammar value forms produced by this story, that the resulting behavior is correct (no silent mis-split, no panic, correct routing), not to implement that parsing logic itself.\n3. **Slash-splitters unrelated to qualified ids — confirmed out of scope, no change needed.** `storage/memory.rs:335` (repo-relative file-path segment check), `storage/path_errors.rs:94` (`..`-traversal check), `validation/engine.rs:698,737,807,914` (JSON-pointer-style instance-path segments), `crates/server/src/routes.rs:384` (unrelated route path). These never see label values.\n\n## Success Criteria\n\n- [hard] REQ-01: a test (new or extended) exercises every colon-split site listed in bucket 1 with a widened-grammar `@`-form label value (e.g. `enforces:@/rule/label-format`) and asserts the namespace/value split is unaffected — the value passes through whole, unsplit further.\n- [hard] REQ-02: a test exercises `split_qualified_id` and each of its four listed callers with widened-grammar values (bare `@/kind/self-id` and `@project/kind/self-id` forms) and confirms each site routes to the correct scope/self-id (or kind, where the caller is kind-aware) with no mis-split and no panic.\n- [hard] REQ-03: the audit's conclusion for bucket 3 (the four file-path/JSON-pointer sites are out of scope) is recorded in a code comment or test-module doc comment near one of the audited call sites, so a future reader does not need to re-derive the inventory.\n- [hard] REQ-04: `cargo test` and `cargo clippy --workspace --all-targets` pass with zero warnings.\n\n## Notes\n\nThis task adds verification coverage; it does not rewrite `split_qualified_id` or its callers into kind-aware parsing — that structural change is a prerequisite delivered by separate work this story's parent story depends on.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "542f8b6d-e5b2-49c8-8c9a-d296b6183a1d"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:label-value-grammar"
+  ],
+  "created_at": "2026-07-01T23:41:54.048819962Z",
+  "updated_at": "2026-07-01T23:41:54.097405728Z"
+}

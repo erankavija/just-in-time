@@ -2,11 +2,12 @@
   "id": "37506c12-ecb2-45be-bb85-e99d92e52855",
   "title": "Kind-segmented scope-aware address parser and resolver",
   "description": "Replace the current two-segment qualified-id parser with a kind-segmented, scope-aware address parser and resolver, in jit's pure domain layer. Support three address forms: local-project items `@/<kind>/<self-id>`, issue items `@/issue/<short-id>/<kind>/<self-id>`, and a `<short-id>/<self-id>` sugar form that expands to the canonical issue form by inferring kind from id-pattern matching. A named-project segment (`@<name>` in place of the bare `@`) is recognized structurally as a scope token; declaring the project name and resolving named-project addresses are separate work outside this item. Resolution must match on the triple (scope, kind, self-id) rather than self-id alone, so items of different kinds sharing a scope no longer collide (for example a rule and a gate both named `coverage-preview`). The colon `:` stays reserved for the label `namespace:value` separator and never appears inside an address value.\n\nThis is foundational addressing-core work: jit's current qualified-id parser only splits a value on the first `/`, and its call sites compare the second segment by equality with no kind filter; per-scope self-id uniqueness is also enforced across all kinds sharing a scope with no kind dimension today. Both are barriers to introducing new addressable kinds without collision risk.\n\n## Success Criteria\n\n- [hard] REQ-01: local-project and issue-item address forms parse into scope, kind, and self-id components; a `@<name>` named-project segment parses structurally as a scope token, with its resolution against a declared project name outside this item.\n- [hard] REQ-02: the sugar form expands to the canonical issue form by inferring kind from the id-pattern; ambiguous inference produces a clear error.\n- [hard] REQ-03: resolution matches on (scope, kind, self-id); per-scope self-id uniqueness is rescoped to per-(scope, kind) so same-slug items of different kinds coexist.\n\nBlast radius: the existing two-segment parser and its call sites across issue-show/resolve paths, validation, and blocking-graph analysis are replaced; per-scope self-id uniqueness enforcement gains the kind dimension, and any existing test asserting duplicate-self-id detection across kinds within one scope is updated to match. The resolver takes the configured kind list as a parameter, mirroring the existing kind-resolution function, so no kind name is hardcoded into engine code and the domain layer stays free of I/O.",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "923e42fb-42fb-4457-acff-b4891480c778"
+    "923e42fb-42fb-4457-acff-b4891480c778",
+    "f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c"
   ],
   "gates_required": [
     "cargo-ci",
@@ -14,7 +15,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/37506c12-breakdown-spec.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:story",
     "epic:addressing-v2",
@@ -23,5 +32,5 @@
     "story:addressing-core-parser-resolver"
   ],
   "created_at": "2026-07-01T23:19:51.026185352Z",
-  "updated_at": "2026-07-01T23:26:18.728752660Z"
+  "updated_at": "2026-07-01T23:41:54.004294170Z"
 }

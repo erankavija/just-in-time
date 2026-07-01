@@ -1,0 +1,25 @@
+{
+  "id": "ae9dd95a-ce1d-428b-b1f0-efab90b20f8f",
+  "title": "Update rule-naming documentation for the origin/id split",
+  "description": "`docs/reference/configuration.md` and `docs/reference/labels.md` document the fixed default rule set using its old colon-embedded names (e.g. `default:namespace-registry`, `default:namespace-unique:<ns>`). Once rule identity splits origin out of the id (a colon-free `name` plus a separate `origin` field, e.g. `label-format` with origin `default`, `namespace-unique-<ns>` with origin `default`), these references go stale.\n\nUpdate:\n- `docs/reference/configuration.md:108` — the sentence describing the namespace registry driving `default:namespace-registry` and `default:namespace-unique:*` to the colon-free names `namespace-registry` and `namespace-unique-<ns>`.\n- `docs/reference/labels.md:168` — \"Drives the `default:namespace-unique:<ns>` rule\" to \"Drives the `namespace-unique-<ns>` rule\".\n- `docs/reference/labels.md:172-173` — the `default:namespace-registry` / `default:namespace-unique:<ns>` rule-name references to their colon-free equivalents.\n- `docs/reference/labels.md:195` — \"the `default:namespace-registry` rule names the offending label\" to \"the `namespace-registry` rule names the offending label\".\n\nAlso add a short note near these references that a rule's origin (`default`/`bracket`) is a separate field on its `.jit/rules.toml` entry, not part of its name, and that rules are addressable at `@/rule/<self-id>`.\n\n## Success Criteria\n- [hard] REQ-01: `docs/reference/configuration.md` and `docs/reference/labels.md` reference only colon-free rule names (`namespace-registry`, `namespace-unique-<ns>`, `label-format`, `type-hierarchy-known`, `orphan-leaf`, `strategic-consistency`, `coverage-preview`); a grep for `default:namespace-registry`, `default:namespace-unique`, `default:label-format`, `default:type-hierarchy-known`, `default:orphan-leaf`, `default:strategic-consistency`, or `bracket:coverage-preview` under `docs/` returns no hits.\n- [hard] REQ-02: the updated docs state that a rule's origin is a separate schema field and that rules resolve at `@/rule/<self-id>`.",
+  "state": "backlog",
+  "priority": "low",
+  "assignee": null,
+  "dependencies": [
+    "0efbc594-cad7-4afe-9f99-e888a12c6bc1"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "story:rule-addressable-kind"
+  ],
+  "created_at": "2026-07-01T23:42:21.650050823Z",
+  "updated_at": "2026-07-01T23:42:42.206643722Z"
+}
