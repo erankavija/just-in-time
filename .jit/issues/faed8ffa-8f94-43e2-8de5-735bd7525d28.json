@@ -1,0 +1,26 @@
+{
+  "id": "faed8ffa-8f94-43e2-8de5-735bd7525d28",
+  "title": "Promote content standards to a canonical doc",
+  "description": "Moves jit's scattered content-standards guidance (issue-description structure, `[hard]`/`[aspirational]` criteria markers, `REQ-NN` ids, clean titles, standalone-readability, Mermaid/LaTeX rules) into a single versioned document that every consumer references directly, replacing two byte-identical copies.\n\n## Background\n\nThe content standards currently live at `.claude/skills/jit-manage/references/content-standards.md` (168 lines) and are duplicated byte-for-byte at `.claude/skills/jit-planning-lead/references/content-standards.md`. Seven other locations point at the `jit-manage` copy: `jit-execution-lead/references/doc-agent-prompt.md`, `jit-execution-lead/references/architect-agent-prompt.md`, `jit-breakdown/references/analysis-prompt.md`, two mentions in `jit-breakdown/SKILL.md`, `jit-manage/SKILL.md`, and `jit-manage/references/design-doc-template.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: `docs/reference/jit-content-standards.md` is the single physical copy of the content standards, versioned under `docs/` (a `permanent_paths` location, never auto-archived).\n- [hard] REQ-02: Both existing copies (`jit-manage/references/content-standards.md` and `jit-planning-lead/references/content-standards.md`) are deleted in the same change, with no stub or pointer file left in their place.\n- [hard] REQ-03: Every known consumer reference is repointed to a direct, skill-base-relative path to the canonical doc (`../../../docs/reference/jit-content-standards.md` from a skill's root, one `../` deeper from a `references/` file): `jit-execution-lead/references/doc-agent-prompt.md`, `jit-execution-lead/references/architect-agent-prompt.md`, `jit-breakdown/references/analysis-prompt.md`, `jit-breakdown/SKILL.md`, `jit-manage/SKILL.md`, `jit-manage/references/design-doc-template.md`, and `jit-planning-lead/SKILL.md`.\n- [hard] REQ-04: The skill-base-relative reference resolves correctly even when a skill is entered through its `~/.claude/skills` symlink, since every jit skill there is a per-skill symlink into this repository's `.claude/skills`.\n\n## Notes\n\nLand the move, the deletions, and every reference update together — an intermediate state with the doc moved but references unfixed (or the duplicates still present) recreates the scattered-copies problem this item exists to close.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "f59d1b6b-02e1-492d-afad-425a432154fc"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:jit-project-lead",
+    "story:content-standards-canonical",
+    "satisfies:REQ-06",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T22:08:58.178681413Z",
+  "updated_at": "2026-07-01T22:28:42.573401866Z"
+}

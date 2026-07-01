@@ -1,0 +1,177 @@
+# Breakdown spec for story 304f6d94
+
+## Story description (authoritative for this story)
+
+Drives a strategic-tier container's sub-strategic children by grouping them into topological waves and dispatching the renamed execution lead as a subagent for each, running a cross-container coherence review before accepting any container as complete.
+
+## Background
+
+`jit-execution-lead` already computes wave order by hand-layering an epic's children by dependency depth, and holds a multi-tier review protocol before accepting a worker's output, including a holistic cross-issue coherence review. jit-project-lead needs the one-tier-up analogue of both: waves over sub-strategic containers instead of issues, and a coherence review across containers instead of across issues within one container. No topological/wave CLI primitive exists in jit itself — the layering is computed by the skill, the same way `jit-execution-lead` already does it.
+
+## Success Criteria
+
+- [hard] REQ-01: Sub-strategic containers under the strategic-tier container are grouped into waves computed from `jit graph deps <container-id>`, ordered by dependency depth.
+- [hard] REQ-02: Each sub-strategic container in a wave is driven by dispatching `jit-execution-lead` as a subagent, reusing its existing canonical dispatch scripts without forking or reimplementing them.
+- [hard] REQ-03: Before accepting a dispatched container as complete, a cross-container coherence review runs, checking naming, style, and interface consistency across containers — the one-tier-up analogue of the existing per-issue holistic coherence review.
+
+## Notes
+
+Skill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.
+
+This item dispatches the existing `jit-execution-lead` unmodified aside from its escalation-target change delivered separately; it must never re-implement epic-level breakdown or execution.
+
+## Parent-plan decomposition sketch (relevant group)
+
+### Group D: Dispatch and escalation composition — covers REQ-04, REQ-05
+- **Sub-strategic dispatch in topo waves with coherence review**  `type: story`  `satisfies: REQ-04`  `depends-on: jit-project-lead skeleton with config-derived tiers`
+  Outcome: mode 1 layers sub-strategic containers into waves from `jit graph deps`, dispatches
+  jit-execution-lead per container (reusing its canonical scripts), and runs a cross-container
+  coherence review before accepting each.
+  Own criteria: `[hard] REQ-D1: waves computed from the dependency graph; each container driven
+  by a dispatched jit-execution-lead; coherence review runs before acceptance.`
+  Blast radius: new skill references only; jit-execution-lead scripts unmodified.
+- **Context-aware escalation target in jit-execution-lead**  `type: task`  `satisfies: REQ-05`  `depends-on: —`
+  Outcome: jit-execution-lead escalates to "the invoker" (human standalone, parent lead when
+  nested); standalone behavior unchanged.
+  Own criteria: `[hard] REQ-D2: escalation target is invoker-aware; standalone runs still
+  escalate to the human.`
+  Blast radius: `escalation-policy.md` + SKILL wording sites in jit-execution-lead.
+- **Parent-escalation policy in jit-project-lead**  `type: task`  `satisfies: REQ-05`  `depends-on: jit-project-lead skeleton with config-derived tiers, Context-aware escalation target in jit-execution-lead`
+  Outcome: a policy resolves subordinate escalations against the vision/decision log and
+  escalates to the human only for vision conflicts, cross-strategic-container dependencies, or
+  project-wide infrastructure changes.
+  Own criteria: `[hard] REQ-D3: subordinate escalations resolve from the vision unless they
+  match one of the three human-only cases.`
+  Blast radius: new skill references only.
+
+
+## Parent-plan technical grounding (§2, for citations)
+
+## 2. Technical soundness and architectural fit
+
+- **Approach:** A skills-only addition (markdown + shell), one strategic tier above
+  jit-execution-lead. It reuses existing CLI-exposed primitives and existing skill
+  protocols; it reaches into no `crates/jit` domain/storage/graph code. It is compositional:
+  jit-project-lead dispatches jit-execution-lead as a subagent, never re-implementing epic
+  execution (Non-goals).
+
+- **Reuses / integrates with:**
+  - Tier derivation: `strategic_types` at `.jit/config.toml:31` (consumed by `jit query
+    strategic`); breakable-container types from `applies_to` in `.jit/templates.toml:12`;
+    `jit config show-hierarchy --json` for the type→level map; `[type_hierarchy]` at
+    `.jit/config.toml:24-31`. Divergent ruleset exercised: `docs/examples/research/config.toml:34`
+    (`strategic_types = ["goal"]`) with `docs/examples/research/templates.toml:18`
+    (`applies_to = ["goal"]`).
+  - Dispatch: `.claude/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and
+    `.../scripts/check-leak-into-main.sh`, documented canonical-copy-only in
+    `references/worktree-dispatch-protocol.md` (subagent invokes them; no fork).
+  - Waves: `jit graph deps <id>` hand-layered per jit-execution-lead `SKILL.md:146-172`.
+  - Coherence review: `references/lead-review-protocol.md:92` (Tier 3), `:57`
+    (stale-forward-reference sweep), a one-tier-up analogue.
+  - Escalation: single locus `references/escalation-policy.md:14` plus SKILL wording sites.
+  - Artifacts: `jit doc add/list/show/history` for linking; progress shape from
+    `dev/active/7095769d-progress.json`; documentation config at `.jit/config.toml:9-14`.
+  - Cold-start: jit-planning-lead Step 2 interview + Step 5 recursion; milestone containers
+    fall back to jit-breakdown's plain-breakdown path (`jit-breakdown/SKILL.md:105-109`)
+    since `.jit/templates.toml:12` binds the only template to `["epic"]`.
+  - Standards: canonical-ish `jit-manage/references/content-standards.md` (168 lines),
+    referenced by `jit-execution-lead/references/doc-agent-prompt.md:42`,
+    `architect-agent-prompt.md:37`, `jit-breakdown/references/analysis-prompt.md:106`;
+    byte-identical duplicate at `jit-planning-lead/references/content-standards.md`.
+    Canonical home after promotion: `docs/reference/jit-content-standards.md`.
+    Cross-project reachability: every jit entry in `~/.claude/skills` is a per-skill
+    symlink into this repo's `.claude/skills` (verified `ls -la ~/.claude/skills`), so a
+    skill file's physical location after symlink resolution is
+    `<this-repo>/.claude/skills/<skill>/...`, and a skill-base-relative traversal
+    (`../../../docs/reference/jit-content-standards.md` from the skill dir, one level
+    deeper from `references/` files) resolves inside this repo even when the skill is
+    entered from another project (verified:
+    `realpath ~/.claude/skills/jit-execution-lead/../../../docs/reference` →
+    `/home/vkaskivuo/Projects/just-in-time/docs/reference`).
+
+- **Grounding (from investigation), classified:**
+  - Rename → **partially already-done**: dirs/symlinks/most refs done (751da7f5); 9 residual
+    live hits remain (jit-execution-lead `SKILL.md:14` `# Project Lead`; jit-planning-lead
+    `SKILL.md:9` `# JIT Plan` and `:11` "a complete jit plan"; both scripts line 2
+    `# Project-lead utility:`; `dev/active/eed6750c-handoff.md:1,7,44,48`, of which line 48
+    `.claude/skills/jit-plan/` is the operationally load-bearing pointer).
+  - Eval-pass → **invalid-as-stated (unverifiable today)**: jit-execution-lead
+    `evals/evals.json` has 3 scenarios but no runner in-repo; jit-planning-lead has no
+    `evals/`. Plan makes it verifiable.
+  - Config-derived tiers (REQ-01), four modes (REQ-02), durable artifacts (REQ-03),
+    dispatch (REQ-04), escalation (REQ-05), canonical standards (REQ-06) →
+    **valid-and-open**, primitives cited above exist.
+  - Domain-agnosticism: engine hardcodes no domain type (`.jit/templates.toml` header
+    comment; project-declared `type_hierarchy`). The divergent ruleset the derivation must
+    handle is the in-repo research example: `docs/examples/research/config.toml:34` declares
+    a single strategic type (`goal`) that is itself the breakable container
+    (`docs/examples/research/templates.toml:18`), so no second strategic tier exists to
+    derive. `../gf2` uses the same `milestone`/`epic` pair as this repo and adds no third
+    shape.
+  - Layer boundary: everything needed is CLI-exposed; skills-only change, consistent with
+    CLAUDE.md layering.
+
+
+## Parent-plan decisions
+
+## Decisions
+
+First-class log, consumed by review and breakdown. Provisional entries flagged.
+
+- **D1 — Rename target for the epic lead:** chosen **`jit-execution-lead`** (RESOLVED
+  2026-07-02 in the container). Rejected: `jit-task-lead` (collides with the `task` tier),
+  `jit-epic-lead` (hardcodes this repo's sub-strategic type), `jit-delivery-lead` /
+  `jit-initiative-lead` / `jit-outcome-lead` (viable but less precise about the execution
+  function). `jit-plan` → `jit-planning-lead`.
+- **D2 — `-lead` suffix reserved for autonomous standing roles:** chosen. Workflow skills
+  (`jit-manage`, `jit-breakdown`, `jit-parallel`, `jit-migrate`) stay un-suffixed.
+- **D3 — Canonical standards home (final):** chosen
+  **`docs/reference/jit-content-standards.md`** (versioned, permanent per
+  `permanent_paths = ["docs/"]`, in the existing `docs/reference/` Diataxis area), consumed
+  by both leads and the sweep mode via direct skill-base-relative path references
+  (`../../../docs/reference/jit-content-standards.md` from a skill dir, one level deeper from
+  `references/` files); both existing copies are removed in the same change, direct
+  references rather than pointer stubs (stubs recreate the multi-file indirection REQ-06
+  removes and can drift). Reachability holds cross-project because every `~/.claude/skills`
+  jit entry is a per-skill symlink into this repo's `.claude/skills`; verified resolution
+  argument in §2. Rejected: keep the canonical copy inside jit-manage's `references/`
+  (couples the project-wide SSOT to one skill's directory and leaves the duplicate problem);
+  synced copies (violates "single canonical doc"); leave the byte-identical duplicate (the
+  scattered state REQ-06 targets).
+- **D4 — Vision/charter storage:** chosen **`permanent_paths = ["docs/"]`** (never
+  auto-archived). Rejected: a `managed_paths` location under `dev/active` (would be archived by
+  `jit doc archive` on issue completion, wrong for a never-terminal milestone vision); adding a
+  new `[documentation.categories]` entry (larger config change, out of proportion to need).
+- **D5 — Eval verifiability scope:** chosen **a thin documented run-and-record procedure plus
+  minimal machinery** to make "pass their evals" checkable. Rejected: build a general eval
+  framework (scope creep beyond REQ-07); leave evals unrunnable (REQ-07 stays unverifiable).
+- **D6 — Re-home the eed6750c dependency (provisional; reviewer must see):** chosen **move the
+  edge to the mode-2/cold-start item and remove P→eed6750c** at breakdown. Rationale: the
+  dependency's semantic content is "modes 2/3 consume jit-planning-lead". P's deliverable is
+  this plan document, which does not require jit-planning-lead to exist; mode 2 does, so the
+  edge belongs on the mode-2 item. eed6750c is InProgress with its code-review gate never run
+  and is not closeable within this epic. Rejected: drive eed6750c to Done inside this epic
+  (out of scope per Non-goals); leave P blocked on eed6750c (blocks a deliverable that does
+  not consume the blocker).
+- **D7 — Compositional design:** chosen. jit-project-lead dispatches jit-execution-lead as a
+  subagent per sub-strategic container in topological waves; it never re-implements epic
+  execution. Rejected: re-implementing epic breakdown/execution at the new tier (violates
+  Non-goals and duplicates the canonical dispatch scripts).
+- **D8 — Skill prose style:** chosen the **cc-sdd / superpowers register** for new and
+  modified skill files: terse imperative voice, structured sections with explicit success
+  criteria and safety/fallback paths, explicit stop-and-escalate conditions, bounded review
+  loops, red-flag lists, rules split into `references/` read on demand, no filler. Exemplars
+  every child issue's author consults: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`;
+  `../jit-research/superpowers/skills/writing-plans/SKILL.md`;
+  `../jit-research/superpowers/skills/executing-plans/SKILL.md`.
+- **D9 — Strategic-tier bracketing deferred:** whether to add `milestone` to a template's
+  `applies_to` (`.jit/templates.toml:12` binds only `["epic"]`) is an OPEN question explicitly
+  out of scope for this epic. Mode 2 uses jit-breakdown's plain-breakdown fallback
+  (`jit-breakdown/SKILL.md:105-109`) for milestone containers. No work planned for bracketing.
+
+- **Assumptions:** (a) `strategic_types` lists entries most-strategic first (holds in both
+  observed rulesets) and the breakable types in `applies_to` sit at or below the anchor's
+  level; risk: a ruleset violating either yields an ambiguous anchor/boundary split, and the
+  skill must then stop and ask rather than guess (the fallback path in the §1 REQ-01 rule).
+  (b) The milestone progress file mirrors `dev/active/7095769d-progress.json` one tier up
+  (per-epic rows); risk: milestone-specific fields surface during mode 1; amendable in-loop.

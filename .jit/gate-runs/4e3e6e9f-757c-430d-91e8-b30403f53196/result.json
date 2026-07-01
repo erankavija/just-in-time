@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4e3e6e9f-757c-430d-91e8-b30403f53196",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "f59d1b6b-02e1-492d-afad-425a432154fc",
+  "commit": "60447700bcc380af04bcd9f1d48244353f72c645",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-01T22:26:10.713404687Z",
+  "completed_at": "2026-07-01T22:28:24.909507731Z",
+  "duration_ms": 134196,
+  "exit_code": 0,
+  "stdout": "**Content Standards**\n\nNo blocking content-standard defects found. Reviewed issues have `## Success Criteria`, verifiable `[hard] REQ-*` outcomes, clean titles, standalone-enough descriptions, and correct kebab slug labels on `type:story` issues such as `story:mode-routing`, `story:project-lead-skeleton`, and `story:standards-sweep-mode`. Task issues correctly omit story slug labels.\n\n**Coverage vs Design**\n\n| Design item | Issue(s) | Matches? |\n|---|---:|---|\n| Plan §3 Group A1: Sweep residual pre-rename references, `type: task` | `c6325c5b` | Yes |\n| Plan §3 Group A2: Runnable eval verification | `c23dfe71`, `a5b04c9f`, `41aa1b75`, `6662f738` | Yes |\n| Plan §3 Group B1: Promote content standards | `faed8ffa` | Yes |\n| Plan §3 Group C1: jit-project-lead skeleton with config-derived tiers | `e8b1cee3`, `87c8ba2d`, `82e04ab0`, `02a2bbb9` | Yes |\n| Plan §3 Group C2: Four-mode front door | `6c5f70ad` | Yes |\n| Plan §3 Group C3: Durable artifacts | `eff48a6e` | Yes |\n| Plan §3 Group D1: Dispatch waves + coherence | `304f6d94`, `28731a53`, `e7d41080`, `7a9eb806` | Yes |\n| Plan §3 Group D2: Context-aware escalation target, `type: task` | `b46e13d9` | Yes |\n| Plan §3 Group D3: Parent-escalation policy, `type: task` | `634b2382` | Yes |\n| Plan §3 Group E1: Standards-sweep mode | `3c192f5e`, `66aeee5f`, `0b7e864d`, `206bd960` | Yes |\n\n**Dependency DAG Correctness**\n\nNo blocking DAG defects found.\n\nPrior `6c5f70ad` over-constraint is fixed: it now depends on `eed6750c` and `e8b1cee3`, matching plan §3 and D6.\n\nPrior `634b2382` defect is fixed: it is now `type:task` and depends on `e8b1cee3` plus `b46e13d9`, matching plan §3 Group D.\n\nBlank-workspace roots are acceptable: `c6325c5b`, `faed8ffa`, and `b46e13d9` can begin without sibling-created project structure.\n\n**Structural Integrity**\n\nNo blocking structural defects found. The larger work is decomposed into story → task layers where appropriate, the container spine remains intact under `f2532a2d`, and I found no isolated or dangling breakdown-created issues.\n\n**Prior Review Feedback**\n\nThe most recent failed run’s findings were addressed:\n\n1. `634b2382` is no longer `type:story`; current labels include `type:task` and no `story:parent-escalation-policy`.\n2. `634b2382` no longer depends on `eff48a6e`; current dependencies are `e8b1cee3` and `b46e13d9`.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

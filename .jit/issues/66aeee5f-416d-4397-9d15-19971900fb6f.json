@@ -1,0 +1,25 @@
+{
+  "id": "66aeee5f-416d-4397-9d15-19971900fb6f",
+  "title": "Content-standards violation scanner and classifier",
+  "description": "Scans every project issue and in-scope document against the canonical content-standards rules and classifies each violation found as mechanically fixable or judgment-requiring.\n\n## Background\n\nThe canonical rules live in `docs/reference/jit-content-standards.md`: required issue-description structure (summary, `## Background`, `## Success Criteria`, optional `## Notes`), `[hard]`/`[aspirational]` `REQ-NN` markers on every criterion, clean titles free of embedded ids or ordinals, and standalone-readability (no undefined context, no reliance on a sibling issue). Some violations follow one fixed, unambiguous correction — an unmarked criterion, an embedded id in a title, a missing `## Success Criteria` heading — and are mechanical. Others need a reader's judgment, such as whether a description is actually understandable without outside context, and cannot be corrected by rule.\n\n## Success Criteria\n\n- [hard] REQ-01: A scan pass evaluates the title and description of every issue in the project's issue store, every markdown document under `docs/`, and every live document under `dev/active/` (per the documentation lifecycle in `.jit/config.toml`'s `[documentation]` section), against every rule in `docs/reference/jit-content-standards.md`.\n- [hard] REQ-02: Each finding records the offending issue or document, the specific rule violated, and a classification of `mechanical` or `judgment`.\n- [hard] REQ-03: The classification covers, at minimum, these mechanical cases: an unmarked or malformed `[hard]`/`[aspirational]` `REQ-NN` criterion, an embedded id or ordinal in a title, and a missing `## Success Criteria` heading; and this judgment case: whether a description reads as standalone without outside context.\n- [hard] REQ-04: Running the scan twice against an unchanged project produces identical findings.\n\n## Notes\n\nArchived documents (`dev/archive/`, `dev/sessions/`, `dev/studies/`, and `dev/active/` documents whose owning issue is Done) are historical record and out of scope for this scan.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-project-lead",
+    "story:standards-sweep-mode",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T22:19:45.823122684Z",
+  "updated_at": "2026-07-01T22:19:46.080538591Z"
+}

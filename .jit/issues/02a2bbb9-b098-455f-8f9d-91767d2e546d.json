@@ -1,0 +1,26 @@
+{
+  "id": "02a2bbb9-b098-455f-8f9d-91767d2e546d",
+  "title": "Verify jit-project-lead skeleton activation and evals",
+  "description": "Confirm the jit-project-lead skeleton activates correctly from its own description and passes scenario evals scoped to the skeleton's shell and tier-derivation behavior, using the eval adjudication method already established for the other lead skills.\n\n## Background\n\n`jit-execution-lead` and `jit-planning-lead` each carry a scenario-eval suite and an adjudication method for judging trigger accuracy and pass/fail; that method is assumed already in place ahead of this task. Since this story delivers only the orchestrator shell and tier derivation (no mode-routing block or mode bodies), the evals in scope here cover activation and derivation only: whether a representative request activates jit-project-lead, and whether the tier derivation produces the correct steward anchor and delegation boundary for this repository's ruleset and for the collapsed `docs/examples/research` ruleset.\n\n## Success Criteria\n\n- [hard] REQ-01: A trigger-eval check confirms jit-project-lead activates from its `SKILL.md` `description` field for representative project-lead-level requests, and does not spuriously activate for requests scoped to `jit-execution-lead` or `jit-planning-lead`.\n- [hard] REQ-02: An eval scenario file for jit-project-lead exists (mirroring the shape of `.claude/skills/jit-execution-lead/evals/evals.json`) with scenarios covering: activation, tier derivation against this repository's config, tier derivation against `docs/examples/research/config.toml`, and the stop-and-ask fallback path.\n- [hard] REQ-03: Running the established eval procedure against jit-project-lead's scenario file records a pass for every scenario in scope.\n\n## Notes\n\nThis task exercises the skeleton only; scenarios requiring the mode-routing block or mode bodies belong to follow-up stories and are out of scope here.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450",
+    "82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3"
+  ],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-project-lead",
+    "story:project-lead-skeleton",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T22:19:45.521406995Z",
+  "updated_at": "2026-07-01T22:19:46.048983668Z"
+}
