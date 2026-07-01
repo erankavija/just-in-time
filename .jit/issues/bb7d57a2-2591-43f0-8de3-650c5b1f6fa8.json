@@ -1,0 +1,28 @@
+{
+  "id": "bb7d57a2-2591-43f0-8de3-650c5b1f6fa8",
+  "title": "Gate as an addressable kind over migrated gates.toml",
+  "description": "Migrate gate storage from `gates.json` to a new `gates.toml` store, mirroring the existing rule-set store's pattern of atomic writes and being the sole source of truth, with full schema parity for every `Gate`/`GateChecker` field (key, title, description, stage, mode, checker, priority, and any prompt/env fields). Declare `gate` as a registry-first addressable kind over the new store, with the key as the id field and description as the text field, so gates resolve at `@/gate/<key>`. Sweep every consumer and test that reads the literal `gates.json` filename, including CLI init output, gate-update tests, invariant-check tests, template-apply tests, snapshot export, and the web server's file-relevance watcher, so nothing still depends on the JSON file after migration.\n\nTOML has no native representation for a JSON null; guard the `Gate.reserved` free-form map against serializing a null value when writing to TOML. Today's live data holds only empty objects, so this is a forward-looking guard rather than a live break.\n\n## Success Criteria\n\n- [hard] REQ-01: a `gates.toml` store, mirroring the existing rule-set store's atomic-write pattern, holds all `Gate`/`GateChecker` fields with parity to the prior JSON schema; gate operations (create, update, list) run over it.\n- [hard] REQ-02: `gate` is a registry-first addressable kind; `@/gate/<key>` resolves to the gate.\n- [hard] REQ-03: no consumer or test reads the literal `gates.json` filename; TOML serialization of `Gate.reserved` is guarded against a JSON null value.\n\nBlast radius: the gate storage module (a new store beside the existing rule-set store); the `Gate`/`GateChecker` domain types; CLI init fixtures/tests, gate-update tests, invariant-check CLI tests, template-apply tests, snapshot export, the web server's gate-file relevance watcher and its test, and stale doc comments referencing `gates.json` by name.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0efbc594-cad7-4afe-9f99-e888a12c6bc1"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "satisfies:REQ-04",
+    "story:gate-addressable-kind"
+  ],
+  "created_at": "2026-07-01T23:19:51.086829876Z",
+  "updated_at": "2026-07-01T23:21:44.133368731Z"
+}

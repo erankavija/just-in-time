@@ -1,0 +1,28 @@
+{
+  "id": "71ebd1e8-38b2-40e1-8097-183907fc1678",
+  "title": "Rule as an addressable kind with origin lifted out of the id",
+  "description": "Declare `rule` as a registry-first addressable kind sourced from `rules.toml` via the config toml source descriptor, and split each rule's identity into two fields: a clean, colon-free self-id and a separate `origin` field (for example `default` or `bracket`) that today is embedded directly in the id. Rules currently carry names such as `default:namespace-unique:resolution`, with colons baked into the identifier itself, which conflicts with reserving the colon exclusively for the label `namespace:value` separator. The `namespace-unique:{param}` family of rule names becomes a colon-free slug (for example `namespace-unique-resolution`).\n\n## Success Criteria\n\n- [hard] REQ-01: `rule` is a registry-first kind over `rules.toml` via the toml source descriptor; `@/rule/<self-id>` resolves to the rule.\n- [hard] REQ-02: rule self-ids carry no colon; origin (`default`/`bracket`) is stored as a separate schema field, and the `namespace-unique:{param}` family uses a colon-free slug.\n- [hard] REQ-03: the fixed default-ruleset contract (rule-name construction and its pinned-string tests) is updated consistently and stays green.\n\nBlast radius: the `rules.toml` schema and its seven seed rules; every site that constructs or consumes a `default:`-prefixed rule name literal, including the pinned-string contract tests that assert exact rule-name values.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0efbc594-cad7-4afe-9f99-e888a12c6bc1"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "satisfies:REQ-03",
+    "story:rule-addressable-kind"
+  ],
+  "created_at": "2026-07-01T23:19:51.065614361Z",
+  "updated_at": "2026-07-01T23:21:44.123809704Z"
+}

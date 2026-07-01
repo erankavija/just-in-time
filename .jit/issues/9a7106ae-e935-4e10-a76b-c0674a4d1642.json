@@ -1,0 +1,28 @@
+{
+  "id": "9a7106ae-e935-4e10-a76b-c0674a4d1642",
+  "title": "Multi-jit address form with project identity and local-only resolution",
+  "description": "Add a canonical project-name field to jit's project configuration, seeded by `jit init` (defaulting to a slugified form of the repository directory name) and validated on write against a `[a-z][a-z0-9-]*` pattern. Extend address parsing so a bare `@` remains the local-project shorthand, and `@<name>` where `<name>` matches the declared local project name also resolves locally. An address referencing any other project name is parse-valid but returns a clear, typed not-resolvable error rather than attempting any network or cross-repository lookup. No federation, project registry, or actual remote resolution is built as part of this item.\n\n## Success Criteria\n\n- [hard] REQ-01: a canonical project-name field is added to project configuration and seeded by `jit init`; bare `@` is the local shorthand and `@<declared-name>` also resolves locally.\n- [hard] REQ-02: an `@<other-project>` reference is parse-valid and returns a clear not-resolvable error, with no federation or remote-resolution behavior implemented.\n- [hard] REQ-03: the project-name field is validated against `[a-z][a-z0-9-]*` on write.\n\nBlast radius: a new project-identity configuration field and its `jit init` seeding and write-time validation; the scope-parsing extension for the `@<project>` address form.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "37506c12-ecb2-45be-bb85-e99d92e52855"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:story",
+    "epic:addressing-v2",
+    "milestone:v1.0",
+    "satisfies:REQ-09",
+    "story:multi-jit-address-form"
+  ],
+  "created_at": "2026-07-01T23:19:51.187363359Z",
+  "updated_at": "2026-07-01T23:21:44.151844644Z"
+}

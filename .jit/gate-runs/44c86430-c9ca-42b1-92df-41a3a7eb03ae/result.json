@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "44c86430-c9ca-42b1-92df-41a3a7eb03ae",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "923e42fb-42fb-4457-acff-b4891480c778",
+  "commit": "fc8e9ba55e7fa95ac40b516ab5a279a58db3c844",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-01T23:21:44.174065050Z",
+  "completed_at": "2026-07-01T23:22:59.837238731Z",
+  "duration_ms": 75663,
+  "exit_code": 0,
+  "stdout": "**Content Standards**\n\nNo blocking content defects found. The prior failed finding is addressed: all six `type:story` issues now carry their own kebab-slug `story:*` label:\n\n- `37506c12`: `story:addressing-core-parser-resolver`\n- `0efbc594`: `story:label-value-grammar`\n- `71ebd1e8`: `story:rule-addressable-kind`\n- `bb7d57a2`: `story:gate-addressable-kind`\n- `7f22d6cf`: `story:uniform-readdressing-migration`\n- `9a7106ae`: `story:multi-jit-address-form`\n\nTitles are clean, issue descriptions are self-contained, and every reviewed work issue has a verifiable `## Success Criteria` section with `[hard] REQ-NN` criteria.\n\n**Coverage Vs Design**\n\n| Design item | Issue | Matches? |\n|---|---:|---|\n| Plan §3 Group A: Kind-segmented scope-aware address parser and resolver | `37506c12` | Yes |\n| Plan §3 Group A: Label-value grammar widening and re-split-site audit | `0efbc594` | Yes |\n| Plan §3 Group B: Rule as an addressable kind with origin lifted out of the id | `71ebd1e8` | Yes |\n| Plan §3 Group B: Gate as an addressable kind over migrated gates.toml | `bb7d57a2` | Yes |\n| Plan §3 Group C: Enforces link resolution for rule and gate items | `d30695e4` | Yes |\n| Plan §3 Group C: Rebind invariant enforced-by bindings to addressable items | `10db7a00` | Yes |\n| Plan §3 Group D: Rules and gates reference projection | `ebb6ad45` | Yes |\n| Plan §3 Group D: Uniform re-addressing of all kinds with repo data and doc migration | `7f22d6cf` | Yes |\n| Plan §3 Group E: Multi-jit address form with project identity and local-only resolution | `9a7106ae` | Yes |\n\nNo missing, extra, mis-scoped, wrongly merged, or wrongly split work item found against approved plan §3.\n\n**Dependency DAG Correctness**\n\nThe implemented dependency reachability matches approved plan §3:\n\n- `0efbc594` depends on `37506c12`.\n- `71ebd1e8` and `bb7d57a2` depend on `0efbc594`, giving transitive reachability to `37506c12`.\n- `d30695e4`, `10db7a00`, and `ebb6ad45` depend on both `71ebd1e8` and `bb7d57a2`.\n- `7f22d6cf` depends on `10db7a00`, matching the plan’s migration-after-rebind ordering.\n- `9a7106ae` depends on `37506c12`.\n\nBlank-workspace reachability is acceptable: the only root work issue is `37506c12`, and it can begin from a fresh workspace because it replaces parser/resolver behavior without relying on sibling-created files or stores.\n\nNo missing prerequisite or over-constraint found.\n\n**Structural Integrity**\n\nThe containment spine is intact: container `2821e177` brackets through breakdown `923e42fb`, with planning child `0b611ccf`, and all nine work items are reachable in the container dependency subtree. No isolated or dangling issue found. The story/task split matches approved plan §3, where larger substrate items are stories and narrower wiring/projection/rebind items are tasks.\n\n**Prior Review Feedback**\n\nThe most recent `breakdown-review` run failed because story issues lacked `story:*` kebab-slug labels. That feedback has been addressed on `37506c12`, `0efbc594`, `71ebd1e8`, `bb7d57a2`, `7f22d6cf`, and `9a7106ae`.\n\n**Findings**\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
