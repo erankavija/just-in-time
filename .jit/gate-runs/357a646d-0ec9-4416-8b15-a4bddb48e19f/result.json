@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "357a646d-0ec9-4416-8b15-a4bddb48e19f",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "8f5de6bc-a563-424a-8c13-746948680418",
+  "commit": "751da7f5ac58c7fa125cf0289119a66e0a4bd6f3",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-01T21:55:45.493978771Z",
+  "completed_at": "2026-07-01T21:57:02.773553377Z",
+  "duration_ms": 77279,
+  "exit_code": 0,
+  "stdout": "**Plan Document Present And Linked**\n\nThe plan exists at `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` and is linked in `issue.documents`. The issue description explicitly names that same location, so this area passes.\n\n**Completeness Against Criteria**\n\nAll seven `[hard]` criteria from `.jit/issues/f2532a2d-138d-46bf-9547-e1ea517f0170.json:4` are addressed in the plan’s §1 table and §3 coverage map. The prior REQ-01 gap is fixed: tier derivation now handles the repo’s two-tier `milestone`/`epic` setup from `.jit/config.toml:24-31` and the collapsed research `goal` setup from `docs/examples/research/config.toml:24-34` plus `docs/examples/research/templates.toml:15-18`.\n\n**Technical Soundness And Architectural Fit**\n\nThe plan fits the current architecture. It keeps implementation in skills and skill references, reuses `.jit/config.toml`, `.jit/templates.toml`, existing `jit graph deps`, `jit doc`, and existing lead protocols. The canonical standards location is now concrete: `docs/reference/jit-content-standards.md` in plan lines 17 and 255-267, replacing the unresolved location from the prior review. The current duplicate standards files exist at `.claude/skills/jit-manage/references/content-standards.md` and `.claude/skills/jit-planning-lead/references/content-standards.md`, so the migration target and consumer list are grounded.\n\n**Decomposition And Dependencies**\n\nThe breakdown in plan §3 is coherent and ordered. Foundational rename/eval work and standards promotion precede the new skill skeleton; routing, artifacts, dispatch, escalation, and sweep mode build on that skeleton. The `eed6750c` dependency is correctly scoped to modes 2/3 rather than blocking the whole planning node, matching the parent issue’s non-goal that `jit-planning-lead` is consumed when available rather than built here.\n\n**Risks And Actionability**\n\nMaterial risks are surfaced with decisions or mitigations in plan §4. The previously blocking standards reachability question is resolved in D3 with a single physical doc and a concrete skill-relative traversal. The tier-derivation risk is explicitly handled with observed rulesets and fallback behavior. The tasks are executable without re-deriving the design.\n\n**Prior Review Feedback**\n\nThe most recent failed review raised two blockers. Both are addressed: REQ-01 now covers the research single-strategic-type case, and REQ-06 now has a final canonical standards home with a reachability argument.\n\n1. No blocking findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
