@@ -10,9 +10,21 @@
     "6662f738-cc2b-467a-9de3-01629b7b36d0"
   ],
   "gates_required": [
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T23:14:59.521158745Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T23:16:24.681448161Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -112,5 +124,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.150488642Z",
-  "updated_at": "2026-07-02T23:14:55.087744801Z"
+  "updated_at": "2026-07-02T23:17:48.776331033Z"
 }

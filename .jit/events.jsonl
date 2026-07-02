@@ -4755,3 +4755,6 @@
 {"type":"issue_state_changed","id":"11932fae-38c0-4710-9f02-07f0dbf1230c","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:23.683584564Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"01fb7982-45e3-4c59-bbf8-02cce749de6d","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:23.686551137Z","assignee":"agent:claude"}
 {"type":"issue_updated","id":"8bc4f8b9-94a0-43f7-b647-4653b8021ed7","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:55.087971241Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_added","id":"e282e1be-6be2-4ccb-b191-b642c92191a9","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:59.513627269Z","gate_key":"cargo-ci"}
+{"type":"gate_passed","id":"b7e328ae-5ae4-4e36-82ea-9242c535bf4e","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:16:21.067222813Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"bdc5d923-957d-441d-8ecd-6f87c160d960","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:17:48.776641983Z","gate_key":"code-review","updated_by":"auto:executor"}

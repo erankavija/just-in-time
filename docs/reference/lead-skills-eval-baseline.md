@@ -15,7 +15,7 @@ run's self-report).
 
 | Skill | Evals | Runner + verdicts | Result |
 |---|---|---|---|
-| `jit-execution-lead` | [`evals/evals.json`](../../.claude/skills/jit-execution-lead/evals/evals.json) — `sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic` | [`evals/results.md`](../../.claude/skills/jit-execution-lead/evals/results.md) + transcripts | 3/3 PASS |
+| `jit-execution-lead` | [`evals/evals.json`](../../.claude/skills/jit-execution-lead/evals/evals.json) — `sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`, `parent-invoked-escalation` | [`evals/results.md`](../../.claude/skills/jit-execution-lead/evals/results.md) + transcripts | 4/4 PASS |
 | `jit-planning-lead` | [`evals/evals.json`](../../.claude/skills/jit-planning-lead/evals/evals.json) — `research-and-plan`, `plan-from-existing`, `plan-from-import` (one per entry path) | [`evals/results.md`](../../.claude/skills/jit-planning-lead/evals/results.md) + transcripts | 3/3 PASS |
 
 `jit-planning-lead`'s `plan-from-import` verdict is PASS with a recorded finding:
@@ -37,6 +37,6 @@ Method: the skill-creator plugin's trigger-eval runner over each skill's
 ## Success-criteria map (issue `c23dfe71`)
 
 - REQ-01 (adjudication method written down) → [`skill-eval-adjudication.md`](skill-eval-adjudication.md).
-- REQ-02 (`jit-execution-lead` scenario evals run + recorded) → its `evals/results.md`, 3/3 PASS.
+- REQ-02 (`jit-execution-lead` scenario evals run + recorded) → its `evals/results.md`, 4/4 PASS across `sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`, and `parent-invoked-escalation` (context-aware escalation target).
 - REQ-03 (`jit-planning-lead` gains `evals/`, run + recorded) → its `evals/results.md`, 3/3 PASS across the three entry paths.
 - REQ-04 (both skills gain a trigger check + recorded passing results) → both `trigger_eval_results.json`, 17/17 each.

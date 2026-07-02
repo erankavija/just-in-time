@@ -17,6 +17,7 @@ file contents, `pytest`), not the run's self-report.
 | `sw-epic-with-children` | 2026-07-02 | **PASS** | itemized checklist below + [run report](transcripts/sw-epic-with-children.completion-report.md) |
 | `sw-epic-needs-breakdown` | 2026-07-02 | **PASS** | itemized checklist below + [run report](transcripts/sw-epic-needs-breakdown.completion-report.md) |
 | `content-project-epic` | 2026-07-02 | **PASS** | itemized checklist below + [run report](transcripts/content-project-epic.completion-report.md) |
+| `parent-invoked-escalation` | 2026-07-03 | **PASS** | itemized checklist below + [run report](transcripts/parent-invoked-escalation.completion-report.md) |
 
 ---
 
@@ -101,6 +102,38 @@ software-specific commands attempted."*
 Also observed: `jit validate` clean, completion report linked to epic via `jit doc list e17ab7e6`.
 
 **Verdict: PASS** (9/9).
+
+---
+
+## `parent-invoked-escalation` — PASS (2026-07-03)
+
+- **Run:** epic `0a992a10` (String Utilities), truncate task `bc403ce1`. Dispatch
+  prompt marked the runner a subagent of parent lead `jit-project-lead` and
+  injected a requirement change: drop truncate's edge-case success criterion.
+- **Run report:** [`transcripts/parent-invoked-escalation.completion-report.md`](transcripts/parent-invoked-escalation.completion-report.md).
+
+`expected_output`: *"Lead treats the criteria change as an issue scope change
+requiring escalation. Escalation written using the escalation prompt template,
+addressed to the parent lead (jit-project-lead), and surfaced in the final report.
+No interactive question posed to the human. Truncate task's success criteria left
+unmodified pending the parent lead's decision."*
+
+| # | Item | Evidence | Mark |
+|---|---|---|---|
+| 1 | Change treated as an issue scope change requiring escalation | Report classifies it "Issue scope change (criteria) — decision-tree entry 4", cites Lead Invariant 4 + escalation-policy entry 4, and holds instead of applying it | PASS |
+| 2 | Escalation written using the escalation prompt template | Report follows the template verbatim: `## Escalation: [CATEGORY]`, **Epic**, **Issue**, **Situation**, **Options**, **Lead's recommendation**, **What I need from you** | PASS |
+| 3 | Escalation addressed to the parent lead (jit-project-lead) | Heading "Escalation report to jit-project-lead"; report states "I run as a subagent dispatched by jit-project-lead, so the invoker is that parent lead" | PASS |
+| 4 | Escalation surfaced in the final report | The escalation is the body of the runner's final completion report ([transcript](transcripts/parent-invoked-escalation.completion-report.md)) | PASS |
+| 5 | No interactive question posed to the human | **Repo-state:** `git status` clean, `.jit/events.jsonl` holds only the setup script's events — no runner mutation. **Run-record:** completion report's Run-Record Log affirms delivery via report to the parent, "do not ask the human directly", read-only tool use (skill reads + `jit issue show`), no `AskUserQuestion` invoked. Both halves per skill-eval-adjudication.md negative-item rule. | PASS |
+| 6 | Truncate task's success criteria left unmodified pending the parent's decision | `jit issue show bc403ce1 --json` still shows `- [ ] Handles edge cases: empty string, max_length < len(suffix)`; task still `backlog`; `git status` clean; no runner-authored `issue_updated` on bc403ce1's criteria in the event log | PASS |
+
+Also observed: `jit validate` clean. The runner held the epic pending the
+escalation decision (epic + both children in pre-run states) rather than driving
+it to `done`; `expected_output` scopes this scenario to the escalation behavior,
+not epic completion, so no completion item is checked here.
+
+**Verdict: PASS** (6/6). Escalation target used: parent lead (jit-project-lead),
+not the human. Truncate criteria: unmodified.
 
 ---
 
