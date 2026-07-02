@@ -4671,3 +4671,4 @@
 {"type":"issue_updated","id":"8a955afd-0ad5-4808-9985-283d87e715fd","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.529817768Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"31b6059a-a6ea-4e53-be20-69bd65d581d0","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.537548563Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"gate_failed","id":"53c5bc67-6739-4922-b431-88d5ef155b8b","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:36:11.931970516Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"22b0145e-8ce8-4105-894f-8dc9f37de92e","issue_id":"a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450","timestamp":"2026-07-02T12:33:05.420493890Z","updated_by":"doc-add","fields":["documents"]}
