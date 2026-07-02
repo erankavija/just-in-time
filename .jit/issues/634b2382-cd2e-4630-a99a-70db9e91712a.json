@@ -2,7 +2,7 @@
   "id": "634b2382-cd2e-4630-a99a-70db9e91712a",
   "title": "Parent-escalation policy for jit-project-lead",
   "description": "Adds the policy jit-project-lead uses to resolve escalations it receives from a dispatched execution lead: most are resolved directly against the vision and decision log; only vision-level conflicts, cross-strategic-container dependencies, or project-wide infrastructure changes go to the human.\n\n## Background\n\nOnce a dispatched execution lead can escalate to its invoking project lead instead of always escalating to the human, jit-project-lead needs its own decision tree for what to do with what it receives: resolve most escalations itself from the vision and decision log, and reserve human involvement for cases that are genuinely bigger than any single sub-strategic container.\n\n## Success Criteria\n\n- [hard] REQ-01: A policy document enumerates the escalation cases jit-project-lead resolves itself against the vision/decision log (recording the resolution as a new decision-log entry), versus the cases it forwards to the human.\n- [hard] REQ-02: Exactly three case categories forward to the human: vision-level conflicts, cross-strategic-container dependencies, and project-wide infrastructure changes. Every other subordinate escalation is resolved from the vision without human involvement.\n- [hard] REQ-03: A resolved escalation is recorded in the vision/charter's decision log with the option chosen and the reasoning.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "type:task"
   ],
   "created_at": "2026-07-01T22:08:58.353738020Z",
-  "updated_at": "2026-07-01T22:26:05.237884566Z"
+  "updated_at": "2026-07-02T23:45:10.813866444Z"
 }

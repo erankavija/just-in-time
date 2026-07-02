@@ -2,7 +2,7 @@
   "id": "304f6d94-f6db-40e8-9467-61d0d3bf6119",
   "title": "Sub-strategic dispatch in topological waves with coherence review",
   "description": "Drives a strategic-tier container's sub-strategic children by grouping them into topological waves and dispatching the renamed execution lead as a subagent for each, running a cross-container coherence review before accepting any container as complete.\n\n## Background\n\n`jit-execution-lead` already computes wave order by hand-layering an epic's children by dependency depth, and holds a multi-tier review protocol before accepting a worker's output, including a holistic cross-issue coherence review. jit-project-lead needs the one-tier-up analogue of both: waves over sub-strategic containers instead of issues, and a coherence review across containers instead of across issues within one container. No topological/wave CLI primitive exists in jit itself — the layering is computed by the skill, the same way `jit-execution-lead` already does it.\n\n## Success Criteria\n\n- [hard] REQ-01: Sub-strategic containers under the strategic-tier container are grouped into waves computed from `jit graph deps <container-id>`, ordered by dependency depth.\n- [hard] REQ-02: Each sub-strategic container in a wave is driven by dispatching `jit-execution-lead` as a subagent, reusing its existing canonical dispatch scripts without forking or reimplementing them.\n- [hard] REQ-03: Before accepting a dispatched container as complete, a cross-container coherence review runs, checking naming, style, and interface consistency across containers — the one-tier-up analogue of the existing per-issue holistic coherence review.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\nThis item dispatches the existing `jit-execution-lead` unmodified aside from its escalation-target change delivered separately; it must never re-implement epic-level breakdown or execution.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -31,5 +31,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.294792137Z",
-  "updated_at": "2026-07-01T22:20:18.306866506Z"
+  "updated_at": "2026-07-02T23:45:10.742829532Z"
 }

@@ -2,7 +2,7 @@
   "id": "eff48a6e-1fa4-4958-8afc-1eda360ffcb8",
   "title": "Durable vision/charter and resumable progress artifacts",
   "description": "Gives jit-project-lead a durable vision/charter document — the project vision plus a first-class decision log of chosen and rejected options with reasons — and a resumable project-level progress file, both of which survive across sessions.\n\n## Background\n\nThe vision/charter must outlive any single work item's completion, so it lands under a `permanent_paths` location (never auto-archived) read from the project's documentation config (`permanent_paths = [\"docs/\"]` in this repo's `.jit/config.toml`). The progress file is operational state meaningful only while the top-level strategic container is active, so it lives under `dev/active/<strategic-container-short-id>-progress.json`, a one-tier-up analogue of the per-epic progress file `jit-execution-lead` already produces, with per-sub-strategic-container rows instead of per-issue rows.\n\n## Success Criteria\n\n- [hard] REQ-01: A vision/charter document exists at a location read from the project's documentation config, containing the vision and a decision log entry for every consequential decision recording what was chosen, what was rejected, and why.\n- [hard] REQ-02: A project-level progress file exists at `dev/active/<strategic-container-short-id>-progress.json`, tracking per-sub-strategic-container status analogous to the per-issue rows in `jit-execution-lead`'s progress file.\n- [hard] REQ-03: Both artifacts are linked to the strategic container via `jit doc`.\n- [hard] REQ-04: Re-invoking jit-project-lead on the same strategic container reads back both the vision/charter and the progress state and resumes without losing prior decisions or progress.\n\n## Notes\n\nVision/charter placement in `docs/` (not `dev/active`) is deliberate: a milestone-level vision has no natural end-of-life, so it must not be subject to archival on container completion. The progress file, by contrast, is fine to archive when the container completes — its `dev/active` location is intentional, not an oversight.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -22,5 +22,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.266777257Z",
-  "updated_at": "2026-07-01T22:20:18.297340779Z"
+  "updated_at": "2026-07-02T23:45:11.049145815Z"
 }
