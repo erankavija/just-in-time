@@ -142,7 +142,8 @@ function emit(rule, cls, ln, detail) {
     gsub(/\t/, " ", detail)
     printf "%s\t%s\t%s\t%s\t%s\t%s\n", tk, target, rule, cls, ln, detail
 }
-BEGIN { fence = 0; mfence = 0; in_sc = 0; sc_seen = 0; first_seen = 0 }
+BEGIN { fence = 0; mfence = 0; in_sc = 0; sc_seen = 0; first_seen = 0
+        summary_prose = 0; first_heading = 0; bg_seen = 0; pre_sc = 0 }
 {
     line = $0
     ln = NR
@@ -166,6 +167,25 @@ BEGIN { fence = 0; mfence = 0; in_sc = 0; sc_seen = 0; first_seen = 0 }
         if (tk == "issue") {
             if (line ~ /^#[[:space:]]/)   emit("STD-HEADING-H1", "mechanical", ln, line)
             if (line ~ /^#{4,}[[:space:]]/) emit("STD-HEADING-DEEP", "mechanical", ln, line)
+        }
+        # Required-structure tracking (evaluated in END): a leading summary
+        # must precede the first heading, and non-trivial issues carry a
+        # `## Background`. A blank/heading line is neither summary nor context
+        # prose; bullets are excluded from the context count.
+        if (tk == "issue") {
+            _blank = (line ~ /^[[:space:]]*$/)
+            _head  = (line ~ /^#/)
+            if (!first_heading && _head) first_heading = 1
+            if (!first_heading && !_blank && !_head) summary_prose = 1
+            if (_head) {
+                bh = tolower(line); sub(/^#+[[:space:]]*/, "", bh); sub(/[[:space:]]+$/, "", bh)
+                if (bh == "background") bg_seen = 1
+            }
+            # Context prose preceding the Success Criteria section. A large
+            # such region without a `## Background` heading is the
+            # non-trivial-issue signal that context was left unstructured.
+            if (!sc_seen && !_blank && !_head && line !~ /^[[:space:]]*[-*+][[:space:]]/)
+                pre_sc++
         }
         # Anti-pattern sections that duplicate the DAG (issue descriptions only;
         # standalone documents may legitimately carry such headings).
@@ -279,6 +299,12 @@ BEGIN { fence = 0; mfence = 0; in_sc = 0; sc_seen = 0; first_seen = 0 }
 END {
     if (tk == "issue" && !sc_seen)
         emit("STD-SC-MISSING", "mechanical", 0, "issue has no Success Criteria heading")
+    # Required structure: summary line before the first heading; `## Background`
+    # for non-trivial issues (a substantial pre-criteria context region).
+    if (tk == "issue" && !summary_prose)
+        emit("STD-STRUCT-SUMMARY", "judgment", 0, "no summary line precedes the first heading")
+    if (tk == "issue" && !bg_seen && pre_sc > 4)
+        emit("STD-STRUCT-BACKGROUND", "judgment", 0, "non-trivial issue has no ## Background section")
 }
 AWK
 

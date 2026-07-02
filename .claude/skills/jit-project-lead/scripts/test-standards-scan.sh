@@ -76,6 +76,17 @@ BADTITLE="$(mk "abc1234/S0: embedded id title" "A description with no success cr
 # 5. Bare-pronoun opening -> STANDALONE (judgment).
 STANDALONE="$(mk "Depends on outer context" $'It cannot be understood without the parent spec.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the completed result.' --force)"
 
+# 6. Missing leading summary (description opens with a heading) -> STRUCT-SUMMARY.
+NOSUMMARY="$(mk "No summary issue" $'## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
+# 7. Non-trivial issue with a substantial pre-criteria context region but no
+#    `## Background` heading -> STRUCT-BACKGROUND. Six context prose lines.
+NOBG="$(mk "Unstructured context issue" $'A summary sentence.\n\nThe subsystem has a long history.\nSeveral components interact in non-obvious ways.\nThe prior implementation had performance issues.\nA redesign was proposed in an earlier quarter.\nThat redesign informs the current approach here.\nOne more line of loose context to cross the bar.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
+# 8. Non-trivial issue that DOES structure its context under `## Background`
+#    -> no STRUCT-BACKGROUND even though the region is long.
+HASBG="$(mk "Structured context issue" $'A summary sentence.\n\n## Background\n\nThe subsystem has a long history.\nSeveral components interact in non-obvious ways.\nThe prior implementation had performance issues.\nA redesign was proposed in an earlier quarter.\nThat redesign informs the current approach here.\nOne more line of loose context to cross the bar.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
 # --- Documents ------------------------------------------------------------
 # In-scope docs/ file with math violations (display a/b + bare var outside math).
 mkdir -p "$FIX/docs"
@@ -166,6 +177,13 @@ assert_present "missing Success Criteria -> SC-MISSING"        STD-SC-MISSING "$
 
 # Judgment: standalone bare-pronoun opening.
 assert_present "bare-pronoun opening -> STANDALONE"            STD-STANDALONE "$STANDALONE" "It cannot be understood"
+
+# Required-structure rules (required-structure coverage; finding 66aeee5f).
+assert_present "no leading summary -> STRUCT-SUMMARY"          STD-STRUCT-SUMMARY "$NOSUMMARY"
+assert_absent  "summary present -> no STRUCT-SUMMARY"          STD-STRUCT-SUMMARY "$GOOD"
+assert_present "non-trivial, no Background -> STRUCT-BACKGROUND" STD-STRUCT-BACKGROUND "$NOBG"
+assert_absent  "Background present -> no STRUCT-BACKGROUND"    STD-STRUCT-BACKGROUND "$HASBG"
+assert_absent  "trivial leaf -> no STRUCT-BACKGROUND"         STD-STRUCT-BACKGROUND "$GOOD"
 
 # Math rules the scanner must evaluate.
 assert_present "a/b in display math -> MATH-SLASH-FRAC"        STD-MATH-SLASH-FRAC "docs/math.md" "a/b"

@@ -79,6 +79,8 @@ run against documents.
 
 | Rule | Class | Trigger |
 |---|---|---|
+| STD-STRUCT-SUMMARY | judgment | no summary line precedes the first heading (the required 1–2 sentence opening summary is missing) |
+| STD-STRUCT-BACKGROUND | judgment | a non-trivial issue (a substantial context region before Success Criteria) carries no `## Background` heading; simple leaf tasks are exempt |
 | STD-SC-MISSING | mechanical | no Success Criteria heading (case-tolerant; accepts Acceptance Criteria / Definition of Done / bare Criteria) |
 | STD-CRIT-UNMARKED | mechanical | a section bullet with no `[hard]`/`[aspirational]` marker (checkbox stripped first) |
 | STD-CRIT-REQID | mechanical | marker present but the id is not a well-formed `REQ-NN:` — that is `REQ-` + exactly two digits + colon. Wrong digit count (`REQ-1`, `REQ-123`), a missing colon, or a missing/misspelled `REQ` token all trigger it |
@@ -121,6 +123,8 @@ unevaluated.
 
 | Canonical rule (section → statement) | Check | Class |
 |---|---|---|
+| Issue Descriptions → Required structure: leading 1–2 sentence summary | STD-STRUCT-SUMMARY | judgment |
+| Issue Descriptions → Required structure: `## Background` for non-trivial issues (omit for simple leaf tasks) | STD-STRUCT-BACKGROUND | judgment |
 | Issue Descriptions → `## Success Criteria` mandatory | STD-SC-MISSING | mechanical |
 | Issue Descriptions → criteria are verifiable outcomes, not actions | STD-CRIT-ACTION | judgment |
 | Issue Descriptions → every criterion prefixed `[hard]`/`[aspirational]` + `REQ-NN`; none unmarked | STD-CRIT-UNMARKED, STD-CRIT-REQID | mechanical |
