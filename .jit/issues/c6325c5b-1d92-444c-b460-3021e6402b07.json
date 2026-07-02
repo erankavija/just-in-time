@@ -2,9 +2,9 @@
   "id": "c6325c5b-1d92-444c-b460-3021e6402b07",
   "title": "Sweep residual pre-rename references",
   "description": "Corrects the last mentions of the pre-rename names (\"Project Lead\" / `project-lead`, \"JIT Plan\" / `jit-plan`) left behind after the bulk rename to `jit-execution-lead` and `jit-planning-lead`, so no live document points at a name that no longer exists.\n\n## Background\n\nA prior change renamed the `project-lead` skill to `jit-execution-lead` and the `jit-plan` skill to `jit-planning-lead`, moving directories, symlinks, and most cross-references. Nine live mentions of the old names remain: the `jit-execution-lead` `SKILL.md` H1 heading (`# Project Lead`), the `jit-planning-lead` `SKILL.md` H1 heading (`# JIT Plan`) and its opening line (\"a complete jit plan\"), a `# Project-lead utility:` header comment atop each of the two dispatch scripts, and four mentions inside `dev/active/eed6750c-handoff.md` (its title, a skill-name mention, an untested-triggering note, and a pointer to `.claude/skills/jit-plan/` — the operationally load-bearing one, since it is the only surviving path reference to the old directory).\n\n## Success Criteria\n\n- [hard] REQ-01: A case-insensitive grep for `(^|[^-])project[- ]lead|jit[- ]plan\\b` over `.claude/skills/`, `scripts/`, and `dev/active/` documents attached to a non-Done issue returns zero hits, without matching `jit-execution-lead`, `jit-planning-lead`, or `jit-project-lead`.\n- [hard] REQ-02: The nine known hits are corrected in place: `jit-execution-lead/SKILL.md`'s H1, `jit-planning-lead/SKILL.md`'s H1 and opening line, both dispatch scripts' header comment, and all four mentions in `dev/active/eed6750c-handoff.md` (including its `.claude/skills/jit-plan/` path pointer, updated to `.claude/skills/jit-planning-lead/`).\n- [hard] REQ-03: `dev/active/` documents whose owning issue is already Done are left untouched — the change touches only the four files named above.\n\n## Notes\n\nDo not touch `dev/active/` plan docs, completion reports, or showcases attached to a Done issue (for example the 2e926e39, 9ac9fdac, and 2fbd2a82 records, and `planning-bracket-design.md` / `planning-bracket-showcase/`) — those are historical record, exempt by the same principle as `dev/sessions/`, `dev/studies/`, `dev/archive/`, and `.jit/`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "f59d1b6b-02e1-492d-afad-425a432154fc"
   ],
@@ -21,5 +21,5 @@
     "type:task"
   ],
   "created_at": "2026-07-01T22:08:58.121461081Z",
-  "updated_at": "2026-07-01T22:28:42.517040635Z"
+  "updated_at": "2026-07-02T07:01:32.346574501Z"
 }

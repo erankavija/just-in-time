@@ -4592,3 +4592,5 @@
 {"type":"issue_updated","id":"559a6344-a6bd-4b58-ac71-423d2ce60304","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-01T23:59:55.331350745Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"dce3651b-641b-4ad8-a6bf-353738fcbda7","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-01T23:59:55.346459236Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"b78b1997-d1bb-46eb-9ca4-b78ad916181a","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-01T23:59:55.362584028Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"70d6aa05-3ab3-4147-9886-d839cf24450a","issue_id":"c6325c5b-1d92-444c-b460-3021e6402b07","timestamp":"2026-07-02T07:01:32.346526081Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"75033b90-e2da-4087-8c13-6de4610577d0","issue_id":"c6325c5b-1d92-444c-b460-3021e6402b07","timestamp":"2026-07-02T07:01:32.349485683Z","assignee":"agent:claude"}
