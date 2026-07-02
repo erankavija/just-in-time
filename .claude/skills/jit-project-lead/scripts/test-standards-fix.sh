@@ -114,6 +114,18 @@ EXHAUST_DESC="A summary line.
 ${EXHAUST_SC}- An unmarked criterion that needs a fresh id but none is free."
 EXHAUST="$(mk "Exhausted req ids issue" "$EXHAUST_DESC" --force)"
 
+# 12. LEADING position-code title (`S0/W1: ...`). The scanner flags it mechanical
+#     (branch is `^`-anchored); the fixer strips the leading position code, so it
+#     must be gone after the re-scan and the title cleaned.
+LEADPOS="$(mk "S0/W1: build the worker pool" $'A summary line.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
+# 13. MID-title position code (`Build S0/W1: worker`). NOT a leading prefix, so
+#     the scanner never flags it and the fixer never touches it — the title must
+#     survive byte-for-byte (scanner/fixer contract: nothing flagged, nothing
+#     changed, nothing left to re-flag).
+MIDPOS="$(mk "Build S0/W1: worker" $'A summary line.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+MIDPOS_TITLE_BEFORE="$(cd "$FIX" && jit issue show "$MIDPOS" --field title 2>/dev/null)"
+
 # Documents: judgment-only math violations -> must be left byte-identical.
 mkdir -p "$FIX/docs"
 cat > "$FIX/docs/math.md" <<'MD'
@@ -180,6 +192,9 @@ assert_scan_absent  "REQ-02: UNMARKED gone after"             STD-CRIT-UNMARKED 
 assert_scan_absent  "REQ-02: TITLE-EMBEDDED-ID gone after"    STD-TITLE-EMBEDDED-ID "$BADTITLE" "$AFTER"
 assert_scan_present "sanity: hex+slash title flagged before"  STD-TITLE-EMBEDDED-ID "$HEXSLASH" "$BEFORE"
 assert_scan_absent  "REQ-02: hex+slash TITLE gone after"      STD-TITLE-EMBEDDED-ID "$HEXSLASH" "$AFTER"
+assert_scan_present "sanity: leading position-code flagged before" STD-TITLE-EMBEDDED-ID "$LEADPOS" "$BEFORE"
+assert_scan_absent  "REQ-02: leading position-code TITLE gone after" STD-TITLE-EMBEDDED-ID "$LEADPOS" "$AFTER"
+assert_scan_absent  "mid-title position code never flagged"   STD-TITLE-EMBEDDED-ID "$MIDPOS" "$BEFORE"
 assert_scan_absent  "REQ-02: SC-MISSING gone after"           STD-SC-MISSING "$BADTITLE" "$AFTER"
 assert_scan_absent  "REQ-02: HEADING-H1 gone after"           STD-HEADING-H1 "$HEADINGS" "$AFTER"
 assert_scan_absent  "REQ-02: HEADING-DEEP gone after"         STD-HEADING-DEEP "$HEADINGS" "$AFTER"
@@ -208,6 +223,8 @@ if [[ "$(report_count STD-LABEL-SLUG "$LABEL" skipped)" -eq 0 ]]; then pass "REQ
 # Title actually cleaned.
 if [[ "$(cd "$FIX" && jit issue show "$BADTITLE" --field title)" == "embedded id title" ]]; then pass "title stripped to clean form"; else fail "title not cleaned: $(cd "$FIX" && jit issue show "$BADTITLE" --field title)"; fi
 if [[ "$(cd "$FIX" && jit issue show "$HEXSLASH" --field title)" == "foo" ]]; then pass "hex+slash title stripped to clean form"; else fail "hex+slash title not cleaned: $(cd "$FIX" && jit issue show "$HEXSLASH" --field title)"; fi
+if [[ "$(cd "$FIX" && jit issue show "$LEADPOS" --field title)" == "build the worker pool" ]]; then pass "leading position-code title stripped to clean form"; else fail "leading position-code title not cleaned: $(cd "$FIX" && jit issue show "$LEADPOS" --field title)"; fi
+if [[ "$(cd "$FIX" && jit issue show "$MIDPOS" --field title)" == "$MIDPOS_TITLE_BEFORE" ]]; then pass "REQ-03: mid-title position-code title left unchanged"; else fail "mid-title position-code title was altered: $(cd "$FIX" && jit issue show "$MIDPOS" --field title)"; fi
 
 # REQ-03: clean issue untouched (byte-identical description).
 if [[ "$(desc_of "$GOOD")" == "$GOOD_DESC_BEFORE" ]]; then pass "REQ-03: clean issue left unchanged"; else fail "REQ-03: clean issue description changed"; fi

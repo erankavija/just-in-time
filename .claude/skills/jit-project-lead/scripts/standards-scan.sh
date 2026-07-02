@@ -326,7 +326,7 @@ while IFS= read -r obj; do
         || [[ "$title" =~ \(jit:[0-9a-f]+\) ]] \
         || [[ "$title" =~ ^[A-Za-z]+\([^\)]*\): ]] \
         || [[ "$title" =~ ^[0-9]+[.\):][[:space:]] ]] \
-        || [[ "$title" =~ [A-Za-z][0-9]+/[A-Za-z]?[0-9]*: ]]; then
+        || [[ "$title" =~ ^[A-Za-z][0-9]+/[A-Za-z]?[0-9]*: ]]; then
         emit issue "$sid" STD-TITLE-EMBEDDED-ID mechanical 0 "$title"
     fi
     # Title: escaped angle brackets need rewording (judgment).
