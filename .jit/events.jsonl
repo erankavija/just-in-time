@@ -4667,3 +4667,6 @@
 {"type":"gate_passed","id":"850a0d37-c059-45a8-8b8c-e6b3559c4cc3","issue_id":"82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3","timestamp":"2026-07-02T12:21:07.578349002Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"8e46fc8a-090f-4ad2-a785-c4c04687a423","issue_id":"82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3","timestamp":"2026-07-02T12:21:51.702220008Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"64681017-b7e0-4023-80dd-d91c56a5b2c0","issue_id":"82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3","timestamp":"2026-07-02T12:21:51.702245858Z"}
+{"type":"issue_updated","id":"67317c5a-3803-439c-b5bd-96a96e5f287a","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.521832172Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"8a955afd-0ad5-4808-9985-283d87e715fd","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.529817768Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"31b6059a-a6ea-4e53-be20-69bd65d581d0","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.537548563Z","updated_by":"doc-add","fields":["documents"]}
