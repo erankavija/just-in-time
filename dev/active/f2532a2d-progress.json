@@ -239,5 +239,8 @@
     "66aeee5f": 3,
     "6662f738": 2
   },
-  "started_at": "2026-07-02T00:00:00Z"
+  "started_at": "2026-07-02T00:00:00Z",
+  "reviewed": {
+    "e7d41080": "PASS (all 6 tiers pending gate); merge deferred until 02a2bbb9 eval run completes (keep jit-project-lead frozen on main). Committed worktree 4b32c2a4+16593f3a. Known composition note: execution-lead dispatched into a worktree cannot itself run dispatch-worker-worktree.sh (requires main) - pre-existing nesting limit, surfaced not solved (REQ-03 boundary)."
+  }
 }
