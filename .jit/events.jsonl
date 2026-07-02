@@ -4607,3 +4607,11 @@
 {"type":"issue_created","id":"b9c145e5-08e4-4d7f-bf57-e80a12970165","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:30.655993710Z","title":"jit doc add/remove append no event (violates INV-EVENT-LOG)","priority":"high"}
 {"type":"issue_state_changed","id":"c937b5a2-88c6-485e-924d-542dc26e3fa7","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:41.070473694Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"dc21a4c2-b6ac-4198-89be-561f2622d5d5","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:41.073441366Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"0f6edf3c-79eb-4629-9294-b021f48151e7","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:43:29.851914991Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"fd7cbcf9-74d7-492a-8dc5-7c78559ef305","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:44:20.268413473Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"2e8fa130-817b-40ba-a4da-65b9c535f50a","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:44:40.241673867Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_passed","id":"0e32db72-7558-4c17-a63c-16249664d640","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:45:36.219981453Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"06489bcb-c9bc-4daa-877f-01337bdd1e42","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:46:47.925707205Z","updated_by":"doc-remove","fields":["documents"]}
+{"type":"issue_updated","id":"50baa67e-4ff8-459d-801a-2c33459872f7","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:46:47.932930491Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_state_changed","id":"7db72e55-e6f6-43a3-98b2-de49f0485f41","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:46:58.308840726Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"67fc17b9-592e-4bdb-81a1-dbb1882471e9","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:46:58.308862006Z"}
