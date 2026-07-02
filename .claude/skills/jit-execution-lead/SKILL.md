@@ -24,10 +24,10 @@ This skill composes three existing skills. Read them when referenced — do not 
 
 All 8 invariants from jit-manage are inherited and apply without modification. In addition:
 
-1. **Autonomy by default.** Handle all decisions except those in `references/escalation-policy.md`. Do not ask the user for routine confirmations — act, then report.
+1. **Autonomy by default.** Handle all decisions except those in `references/escalation-policy.md`. Do not ask the invoker for routine confirmations — act, then report.
 2. **Quality is non-negotiable.** Every sub-agent's output is reviewed before acceptance. Unpassed gates, unmet criteria, or coherence failures trigger rework. No exceptions.
-3. **Gates are inviolable.** Never remove, bypass, or work around quality gates to unblock state transitions. If a gate fails, the only options are: fix the code to pass it, or escalate to the user. Removing a gate, changing a gate from auto to manual, or any other workaround is strictly forbidden — even when the failure appears to be a false positive.
-4. **Issue scope changes require escalation.** Modifying an issue's gates, success criteria, description, or any other scope-defining attribute always requires explicit user approval. This applies even when the change seems minor or obviously correct.
+3. **Gates are inviolable.** Never remove, bypass, or work around quality gates to unblock state transitions. If a gate fails, the only options are: fix the code to pass it, or escalate to the invoker. Removing a gate, changing a gate from auto to manual, or any other workaround is strictly forbidden — even when the failure appears to be a false positive.
+4. **Issue scope changes require escalation.** Modifying an issue's gates, success criteria, description, or any other scope-defining attribute always requires the invoker's explicit approval. This applies even when the change seems minor or obviously correct.
 5. **Wave discipline.** Work is dispatched in topological waves. A wave must complete (all issues done or rejected) before the next begins.
 6. **Single epic scope.** Drive exactly one epic to completion, then stop. Do not pick up additional work.
 7. **Rework before escalation.** Failed work is retried with specific feedback up to MAX_REWORK_ATTEMPTS (see `references/escalation-policy.md`) before escalating.
@@ -131,7 +131,7 @@ A breakable container `C` (the epic) is bracketed by a planning node `P` and a b
 
 Delegate to jit-breakdown (read `.claude/skills/jit-breakdown/SKILL.md`, follow Steps 1–7) with these modifications:
 
-- **Self-approve the breakdown.** Do not present the plan for user confirmation. The lead reviews it autonomously. Only escalate if the proposed children include stories or higher-level types — that implies scope the user should approve (per `references/escalation-policy.md`).
+- **Self-approve the breakdown.** Do not present the plan for the invoker's confirmation. The lead reviews it autonomously. Only escalate if the proposed children include stories or higher-level types — that implies scope the invoker should approve (per `references/escalation-policy.md`).
 
 - **Use the epic's design doc as the spec.** If a design doc was created in Section 2, pass its path to the breakdown analysis agent.
 
@@ -159,7 +159,7 @@ Convert the epic's children into ordered execution waves.
 
    Every such question that blocks an implementation issue must become a **resolved prerequisite before the dependent issue is dispatched**:
    - If the lead can make the decision under `references/escalation-policy.md` (routine implementation choice), create a small `decision` task whose output is a JIT doc (or a note in the parent issue's description) recording the chosen value and the reasoning, then wire the dependent issue to depend on it.
-   - If the decision has architectural impact, multiple plausible options, or affects shared infrastructure, escalate to the user via `AskUserQuestion` per `references/escalation-policy.md` entry 6. Do not pick the option yourself.
+   - If the decision has architectural impact, multiple plausible options, or affects shared infrastructure, escalate to the invoker per `references/escalation-policy.md` entry 6 (via `AskUserQuestion` when the invoker is the human). Do not pick the option yourself.
 
    Implementation issues are **not dispatched** until their upstream decisions are `done`. Dispatching a story that embeds an unresolved question forces the worker to guess; their guess will differ from what the reviewer expects and burns at least one review cycle resolving the decision rather than writing code. This is a hard blocker, not a soft recommendation.
 
@@ -291,13 +291,13 @@ When a sub-agent's output fails review:
    - When the rework agent completes, return to Section 7 for re-review.
 
 3. **If MAX_REWORK_ATTEMPTS exceeded:** Escalate per `references/escalation-policy.md`.
-   - Present to the user: the original issue, review failures from each attempt, current code state.
+   - Present to the invoker: the original issue, review failures from each attempt, current code state.
    - Offer options: provide guidance (resets counter), take over manually, or reject the issue.
    - If rejected: `jit issue update <id> --state rejected --reason "<reason>"`. Continue to next issue.
 
 ## Section 9: Escalation
 
-Before any decision that might need escalation, consult `references/escalation-policy.md`.
+Before any decision that might need escalation, consult `references/escalation-policy.md`. Escalations target **the invoker** as defined there: the human when the lead runs standalone, the parent lead (e.g. jit-project-lead) when the lead runs as a dispatched subagent.
 
 The decision tree is defined there. In summary — escalate ONLY for:
 1. Creating stories or higher-level types
@@ -308,13 +308,13 @@ The decision tree is defined there. In summary — escalate ONLY for:
 6. Blockers outside the epic's scope
 7. Changes to shared infrastructure
 
-When escalating, use the escalation prompt template from the policy. Be concise — the user's time is the scarcest resource.
+When escalating, use the escalation prompt template from the policy. Be concise — the invoker's time is the scarcest resource.
 
 Everything else is handled autonomously.
 
 ## Section 9b: Session Handoff (when the epic is not yet complete)
 
-If the session ends without completing the epic (budget exhausted, wave still in progress, waiting for user input on an escalation, or a graceful stop mid-wave):
+If the session ends without completing the epic (budget exhausted, wave still in progress, waiting for the invoker's input on an escalation, or a graceful stop mid-wave):
 
 1. **Write a session handoff.** Follow `references/handoff-template.md` verbatim. Save to `dev/active/<epic-short-id>-handoff-<N>.md` where `<N>` is 1 more than the highest existing handoff index for this epic (or omit `-<N>` for the first handoff). Do not overwrite a prior handoff.
 

@@ -1,5 +1,13 @@
 # Escalation Policy
 
+## The Invoker
+
+Every escalation targets **the invoker** — the party that invoked this execution lead. When the lead runs standalone, the invoker is the human. When the lead runs as a subagent dispatched by a parent lead (e.g. jit-project-lead), the invoker is that parent lead.
+
+**Determination rule:** if the dispatch prompt identifies a parent lead to report escalations to, that parent is the invoker. Otherwise the invoker is the human, so a standalone run escalates to the human exactly as before.
+
+**Delivery:** standalone, raise the escalation interactively with the human (e.g. via `AskUserQuestion`). As a subagent, address the escalation prompt template to the parent lead and surface it in the final report; the parent decides whether to resolve it or raise it onward to the human.
+
 ## Constants
 
 | Setting | Value | Rationale |
@@ -11,28 +19,28 @@
 
 Before every non-trivial decision, run through this tree:
 
-### ESCALATE — these require the invoking user's input
+### ESCALATE — these require the invoker's input
 
 1. **Scope expansion: creating a story or higher-level type**
    The lead can autonomously create tasks and bugs (leaf work items). Creating stories or above implies cross-cutting scope that was not part of the original epic definition.
 
 2. **Cross-epic dependency discovered**
-   If completing this epic requires work tracked under a different epic, the lead cannot unilaterally modify another epic's scope. Surface the dependency and let the user decide how to handle it.
+   If completing this epic requires work tracked under a different epic, the lead cannot unilaterally modify another epic's scope. Surface the dependency and let the invoker decide how to handle it.
 
 3. **Epic success criteria need modification**
-   The success criteria define the contract with whoever assigned the epic. Changing them changes the deliverable. The user must approve.
+   The success criteria define the contract with whoever assigned the epic. Changing them changes the deliverable. The invoker must approve.
 
 4. **Any issue scope change (gates, criteria, description)**
-   Modifying an issue's quality gates, success criteria, description, or other scope-defining attributes is a scope change. This includes removing gates, changing gate modes, or weakening criteria. Always escalate — even when the change appears to be a false positive or out-of-scope judgment by an automated reviewer. Present the gate failure, your analysis of why it may be incorrect, and let the user decide.
+   Modifying an issue's quality gates, success criteria, description, or other scope-defining attributes is a scope change. This includes removing gates, changing gate modes, or weakening criteria. Always escalate — even when the change appears to be a false positive or out-of-scope judgment by an automated reviewer. Present the gate failure, your analysis of why it may be incorrect, and let the invoker decide.
 
 5. **Rework exceeded MAX_REWORK_ATTEMPTS**
-   Repeated failure after specific feedback suggests the requirements are ambiguous, the task is harder than scoped, or there's a systemic issue. Present the full history and let the user decide: provide guidance, take over, or reject.
+   Repeated failure after specific feedback suggests the requirements are ambiguous, the task is harder than scoped, or there's a systemic issue. Present the full history and let the invoker decide: provide guidance, take over, or reject.
 
 5a. **Same root-cause finding repeated MAX_SAME_FINDING_REPEATS times**
    Independent of the overall rework counter, if the reviewer flags the **same underlying finding** (not just the same issue) three times, escalate even if MAX_REWORK_ATTEMPTS has not been hit. The worker is not making progress against that specific class of problem and continuing to dispatch costs cycles without learning. Example: three successive reviews all cite "verification harness attaches to a test-copied helper, not the production API path" — after the third, escalate rather than dispatching a fourth. Determining "same root-cause finding" requires judgement: ignore surface wording, compare the underlying defect class.
 
 6. **Architectural decision with significant trade-offs**
-   When multiple valid approaches exist and the choice has lasting consequences (data model shape, public API surface, integration patterns), the user should make the call. Routine implementation choices (internal data structures, local algorithms) are fine to make autonomously.
+   When multiple valid approaches exist and the choice has lasting consequences (data model shape, public API surface, integration patterns), the invoker should make the call. Routine implementation choices (internal data structures, local algorithms) are fine to make autonomously.
 
 7. **Blocker outside this epic's scope**
    Infrastructure issues, permissions, access to external systems, or dependencies on work owned by others. The lead cannot resolve these alone.
@@ -53,7 +61,7 @@ Before every non-trivial decision, run through this tree:
 
 ## Escalation Prompt Template
 
-When escalating, present to the user:
+When escalating, present to the invoker:
 
 ```
 ## Escalation: [CATEGORY from decision tree]
@@ -75,4 +83,4 @@ When escalating, present to the user:
 [Specific decision or action needed to unblock]
 ```
 
-Keep escalations concise. The user's time is the scarcest resource.
+Keep escalations concise. The invoker's time is the scarcest resource.
