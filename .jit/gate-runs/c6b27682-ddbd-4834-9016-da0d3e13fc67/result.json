@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c6b27682-ddbd-4834-9016-da0d3e13fc67",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c23dfe71-94f1-4f8e-a9f4-e371ce65c70f",
+  "commit": "3bdc29739f1e204fa9e62c13a4d99f3c8ac0b455",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T23:25:22.012597306Z",
+  "completed_at": "2026-07-02T23:26:56.438469960Z",
+  "duration_ms": 94425,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 met: [docs/reference/skill-eval-adjudication.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/skill-eval-adjudication.md:17) documents checklist conversion, evidence requirements, runner options, and verdict recording.\n\nREQ-02 met: [`.claude/skills/jit-execution-lead/evals/evals.json`](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/evals/evals.json:5) has four scenarios, including `parent-invoked-escalation`; [results.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/evals/results.md:15) records all four as PASS, and the rollup reports 4/4 PASS at [docs/reference/lead-skills-eval-baseline.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/lead-skills-eval-baseline.md:18).\n\nREQ-03 met: [`.claude/skills/jit-planning-lead/evals/evals.json`](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-planning-lead/evals/evals.json:5) defines three entry-path scenarios; [results.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-planning-lead/evals/results.md:32) records 3/3 PASS.\n\nREQ-04 met: both trigger evals exist and results record 17/17 passing checks: [execution results](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/trigger_eval_results.json:145), [planning results](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-planning-lead/trigger_eval_results.json:145).\n\n**Architecture**\n\nNo Rust/domain/storage/command/CLI boundary changes. The reviewed surface is documentation, skill eval data, transcripts, and jit metadata.\n\n**Functional Paradigm**\n\nNo Rust implementation changes to review.\n\n**Correctness And Invariants**\n\nNo file-write, event-log, gate-transition, assignee, label, or PID-safety code changes found. The prior unadjudicated fourth execution-lead scenario is now recorded at [results.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/evals/results.md:108).\n\n**Safety**\n\nNo unsafe Rust changes. Workspace crates retain `#![deny(unsafe_code)]`.\n\n**Testing**\n\nUsed provided gate evidence: `cargo-ci` passed on 2026-07-02T23:23:57Z; per instruction, I did not rerun cargo tests. I ran `./scripts/jit-validate.sh`; it passed with 3 orphan-label warnings, which are allowed by the prompt.\n\n**Error Handling**\n\nNo fallible Rust code changes.\n\n**CLI Contract**\n\nNo CLI command changes.\n\n**Documentation**\n\nThe baseline rollup now matches the execution-lead eval count and cites 4/4 PASS at [docs/reference/lead-skills-eval-baseline.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/lead-skills-eval-baseline.md:18). The planning eval caveat is recorded and tracked separately at [docs/reference/lead-skills-eval-baseline.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/lead-skills-eval-baseline.md:21).\n\n**Issue Management**\n\nDependencies are complete: `41aa1b75` and `6662f738` are both `done`. `jit-validate` passed with allowed warnings.\n\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

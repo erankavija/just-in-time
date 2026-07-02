@@ -2,7 +2,7 @@
   "id": "c23dfe71-94f1-4f8e-a9f4-e371ce65c70f",
   "title": "Runnable eval verification for the lead skills",
   "description": "Makes \"the renamed skills pass their evals\" a checkable claim rather than an aspiration: defines how a scenario eval is adjudicated, runs it once per renamed skill to record a passing baseline, and adds an activation (trigger) check for each.\n\n## Background\n\n`jit-execution-lead` ships three scenario evals (`evals/evals.json`) that grade free-text `expected_output` against actual agent behavior, but no runner exists in-repo to execute and adjudicate them. `jit-planning-lead` (formerly `jit-plan`) has no `evals/` directory at all. Neither skill's activation-from-description has ever been checked with a trigger eval.\n\n## Success Criteria\n\n- [hard] REQ-01: A documented adjudication method exists for scenario evals — either an LLM-judge procedure that grades a recorded transcript against the `expected_output` rubric and records a verdict, or each eval's `expected_output` converted into an assertable checklist. The method is written down, not performed once from memory.\n- [hard] REQ-02: `jit-execution-lead`'s three existing scenario evals (`evals/evals.json`) are run under the adjudication method and the passing verdicts are recorded.\n- [hard] REQ-03: `jit-planning-lead` gains an equivalent `evals/` directory with scenario evals covering its documented entry paths, run under the same adjudication method with recorded passing verdicts.\n- [hard] REQ-04: Both renamed skills gain an activation (trigger) check — a `trigger_eval.json` consumed by the skill-creator plugin's trigger-eval runner, or a documented equivalent — with recorded passing results confirming each skill activates from its own description.\n\n## Notes\n\nScope this to a thin, documented run-and-record procedure plus the minimal machinery each check needs — not a reusable eval framework. A general framework is explicit scope creep past what \"pass their evals\" requires.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -17,12 +17,12 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:14:59.521158745Z"
+      "updated_at": "2026-07-02T23:23:57.570462681Z"
     },
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T23:16:24.681448161Z"
+      "updated_at": "2026-07-02T23:25:22.012597306Z"
     }
   },
   "context": {},
@@ -124,5 +124,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.150488642Z",
-  "updated_at": "2026-07-02T23:17:48.776331033Z"
+  "updated_at": "2026-07-02T23:27:11.798918170Z"
 }
