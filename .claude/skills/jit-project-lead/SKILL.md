@@ -83,14 +83,15 @@ Stop immediately and report to the invoker when:
 - `.jit/` is absent from the repository root. Suggest `jit init` or the
   jit-migrate skill.
 - `.jit/config.toml` is missing or unreadable (no configuration to read).
-- Tier derivation reports irrecoverable ambiguity: a genuine level tie among
-  candidate anchor types, no usable type hierarchy, or a violated
-  ordering/boundary assumption (see `references/tier-derivation.md`). A missing
-  `.jit/templates.toml` or an empty `strategic_types` does **not** stop here; it
-  routes into the tier-derivation fallback, which reads the type-to-level map
-  from `jit config show-hierarchy --json` and stops only when that map cannot
-  resolve the tiers. The stop report states what input was missing and what the
-  fallback found.
+- Tier derivation stops (see `references/tier-derivation.md`). A missing
+  `.jit/templates.toml` or an empty `strategic_types` first routes into the
+  tier-derivation fallback, which reads the type-to-level map from
+  `jit config show-hierarchy --json` and recovers candidate tiers — then stops
+  and reports the recovered proposal for the invoker to confirm; recovered
+  tiers are never applied unconfirmed. Irrecoverable ambiguity (a genuine level
+  tie among candidate anchors, no usable type hierarchy, or a violated
+  ordering/boundary assumption) stops with no proposal. Either way the stop
+  report states what input was missing and what the fallback found.
 - The canonical content standards doc is unreadable at its skill-base-relative
   path.
 - `jit recover` fails.

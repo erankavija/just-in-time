@@ -66,9 +66,11 @@ breaks an assumption the derivation depends on; stop and ask rather than guess.
 ## Fallback
 
 Reached when `.jit/templates.toml` is missing (BOUNDARY SET has no source) or
-STRATEGIC LIST is empty. Do not stop here: recover the missing output from the
-LEVEL MAP, keeping whichever primary input is present authoritative. Stop only
-when the LEVEL MAP itself cannot resolve the tiers.
+STRATEGIC LIST is empty. The fallback always ends in a stop: it gathers the
+LEVEL MAP and recovers candidate tiers first, so the stop report proposes
+something concrete instead of a bare "config missing" — but recovered tiers are
+a **proposal for the invoker to confirm, never an applied result**. Keep
+whichever primary input is present authoritative when recovering the other.
 
 1. **Read the LEVEL MAP** from `jit config show-hierarchy --json` (drop the
    `message` key). If it is empty or the command fails, there is no usable
@@ -87,15 +89,31 @@ when the LEVEL MAP itself cannot resolve the tiers.
      at the next distinct level below the anchor, or the anchor itself when no
      lower level exists (a collapsed shape).
 4. **Run the assumption checks** on the recovered ANCHOR TYPE and BOUNDARY SET,
-   exactly as the primary path does. A violation stops derivation.
-5. **Apply and emit** the recovered ANCHOR TYPE, BOUNDARY SET, and SHAPE, and
-   record that they came from the numeric-level fallback so downstream reports
-   note the recovered (not config-declared) source.
+   exactly as the primary path does. A violation stops derivation with no
+   proposal.
+5. **Report and stop for confirmation.** Present the recovered ANCHOR TYPE,
+   BOUNDARY SET, and SHAPE to the invoker as a proposal: state which input was
+   missing, what `show-hierarchy` returned, and how each output was recovered.
+   Do not apply the proposal or proceed past derivation until the invoker
+   confirms it. On confirmation, emit the confirmed values and record that they
+   came from the numeric-level fallback so downstream reports note the
+   recovered (not config-declared) source.
 
 ## Stop and ask
 
-Stop and report to the invoker, without guessing an anchor or boundary, only
-when the derivation is irrecoverably ambiguous:
+Only the primary path (both config inputs present, assumption checks passing)
+emits tiers without the invoker. Every other outcome stops and reports. Two
+stop flavors:
+
+**Stop with a proposal** — the fallback recovered candidate tiers from the
+LEVEL MAP. Report the missing input, what `show-hierarchy` returned, and the
+recovered ANCHOR TYPE / BOUNDARY SET / SHAPE; wait for the invoker to confirm
+before applying them. A missing `.jit/templates.toml` or an empty STRATEGIC
+LIST always lands here (or below, if recovery also fails): route it through
+**Fallback** first so the stop report is informative, never stop bare on the
+missing input alone, and never apply the recovered tiers unconfirmed.
+
+**Stop with no proposal** — the derivation is irrecoverably ambiguous:
 
 - The LEVEL MAP is empty or `jit config show-hierarchy --json` fails (no usable
   hierarchy) — reached via the fallback.
@@ -104,20 +122,18 @@ when the derivation is irrecoverably ambiguous:
 - Assumption check A fails (STRATEGIC LIST not ordered most-strategic first).
 - Assumption check B fails (a boundary type is more strategic than the anchor).
 
-A missing `.jit/templates.toml` or an empty STRATEGIC LIST is **not** on its own
-a stop condition: route it through **Fallback** first, and stop only if the
-fallback above hits one of these. Every stop report states which input was
-missing (if any) and what the fallback found before it gave up.
+Every stop report states which input was missing (if any) and what the fallback
+found before it stopped.
 
 ## Red flags
 
 - Writing a domain type name (any concrete `type_hierarchy` type) into a rule
   above. Rules are placeholder-only; type names live in config and in the
   verification block below.
-- Stopping the moment a config input is missing instead of routing it through
-  the fallback first.
-- Applying a fallback result while a genuine level tie or unusable hierarchy
-  leaves the anchor undetermined.
+- Stopping bare the moment a config input is missing instead of routing it
+  through the fallback first, so the stop report carries no recovered context.
+- Applying a fallback-recovered anchor or boundary without the invoker's
+  confirmation — the fallback proposes, the invoker decides.
 - Skipping the assumption checks because the two observed rulesets happen to
   pass them.
 - Treating the `message` key from `show-hierarchy --json` as a type.
