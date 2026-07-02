@@ -100,10 +100,23 @@ def run_single_query(
     try:
         commands_dir.mkdir(parents=True, exist_ok=True)
         indented = "\n  ".join(description.split("\n"))
-        command_file.write_text(
+        content = (
             f"---\ndescription: |\n  {indented}\n---\n\n"
             f"# {proxy_name}\n\nThis command handles: {description}\n"
         )
+        fd, tmp = tempfile.mkstemp(
+            dir=commands_dir, prefix=command_file.name + ".", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+            os.replace(tmp, command_file)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
         cmd = [
             "claude",
