@@ -77,8 +77,27 @@ claude -p "<prompt with REPO_PATH and epic ID substituted>" \
 reach the project's production `.jit/`. Any equivalent runner is acceptable provided it
 (a) gives the agent a fresh context, (b) points it at the production skill files named in
 the prompt, (c) lets it act without per-step human confirmation, and (d) preserves a
-transcript. When the raw `bypassPermissions` subprocess is unavailable, a harness-governed
+run-record. When the raw `bypassPermissions` subprocess is unavailable, a harness-governed
 sub-agent given the same prompt is an equivalent runner; record which runner was used.
+
+The run-record differs by runner, and the negative command-attempt items in step 3
+constrain what it must contain:
+
+- **Raw-transcript runner** — the run-record is `transcript.jsonl`. It carries the full
+  command/tool-invocation history inherently, so negative items are checkable directly
+  against it.
+- **Equivalent sub-agent runner** — the run-record is the completion report it produces.
+  A completion report summarizes outcomes and need not be a raw transcript, so it does
+  **not** carry an invocation history on its own. Therefore, when a scenario has any
+  negative command-attempt item, the equivalent runner's completion report MUST include a
+  **command / gate-invocation log**: the gates the run defined and executed, and an
+  explicit affirmation when no build/test-runner command was invoked, each traceable to
+  the run repo's gate registry (`.jit/gates.json`) and event log (`.jit/events.jsonl`).
+  These are the run's own on-disk records, not the report's self-report, so a later reader
+  reproduces the check by inspecting (or re-deriving) them. A scenario with no negative
+  items needs no such log. If a scenario has a negative item and no invocation log can be
+  substantiated for it, the run is ungradeable on that item and must be re-run under the
+  raw-transcript path.
 
 ### 3. Convert `expected_output` into a checklist
 
@@ -91,9 +110,14 @@ must be a single observable outcome with a stated evidence source. Rules:
   contents, a gate status, or a specific passage of the transcript.
 - **Prefer repo-state evidence over transcript evidence.** Check a file or a `jit` state
   before falling back to "the transcript shows the agent did X".
-- **Keep negative items checkable.** "No software-specific commands attempted" (a content
-  scenario) is checked as: the working tree contains no code/test scaffolding and the
-  transcript shows no build/test-runner invocation.
+- **Keep negative items checkable, against the run-record's action log.** "No
+  software-specific commands attempted" (a content scenario) is checked as: the working
+  tree contains no code/test scaffolding **and** the run-record shows no build/test-runner
+  invocation. Both halves are required. Repo-state alone never satisfies a negative
+  command-attempt item, because absence of code proves nothing about what was attempted.
+  The second half is read from whichever run-record the runner preserved (step 2): the raw
+  transcript for the raw-transcript path, or the equivalent runner's command / gate-invocation
+  log for the equivalent-runner path.
 - Do not add requirements the `expected_output` does not state, and do not drop any it
   does. The checklist is a faithful decomposition, not a re-specification.
 
