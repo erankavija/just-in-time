@@ -13,7 +13,85 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": ".claude/skills/jit-planning-lead/evals/results.md",
+      "commit": null,
+      "label": "Eval Results (graded baseline)",
+      "doc_type": "notes",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../../../../docs/reference/skill-eval-adjudication.md",
+          "resolved_path": "docs/reference/skill-eval-adjudication.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "67fdbe5a6ccc3cd05fe0e061574f2f3a9b7e96daaf0c18371796b92d674b86d9",
+          "is_shared": false
+        },
+        {
+          "original_path": "evals.json",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/evals.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "ca6507b08cfddbdbea09e2ac31d827f6864135542afc71ac8c47a14216f9a016",
+          "is_shared": false
+        },
+        {
+          "original_path": "setup-test-repo.sh",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/setup-test-repo.sh",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "33b1949a09e7be904507c7d9e4e0dc07b9005eb137356e005e78f8a711f97c0d",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/research-and-plan.completion-report.md",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "c52506669b0cd222dad600d1a128ed09b489325cb90d401255d9d6ded9ed8d67",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/plan-from-existing.completion-report.md",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "b551c2fbc4ce7f8edeff4fdd0b7d0bb556b96fbac6dea5e377f6792a24ce38fe",
+          "is_shared": false
+        }
+      ]
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/evals/evals.json",
+      "commit": null,
+      "label": "Eval Scenarios (three entry paths)",
+      "doc_type": "notes",
+      "format": "markdown"
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/evals/setup-test-repo.sh",
+      "commit": null,
+      "label": "Eval Setup Script",
+      "doc_type": "notes",
+      "format": "markdown"
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/evals/transcripts/research-and-plan.completion-report.md",
+      "commit": null,
+      "label": "Run report: research-and-plan",
+      "doc_type": "notes",
+      "format": "markdown"
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/evals/transcripts/plan-from-existing.completion-report.md",
+      "commit": null,
+      "label": "Run report: plan-from-existing",
+      "doc_type": "notes",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:jit-project-lead",
@@ -21,5 +99,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.339047952Z",
-  "updated_at": "2026-07-02T20:49:27.934173183Z"
+  "updated_at": "2026-07-02T22:01:59.038170662Z"
 }
