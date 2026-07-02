@@ -65,47 +65,59 @@ breaks an assumption the derivation depends on; stop and ask rather than guess.
 
 ## Fallback
 
-Reached when `.jit/templates.toml` is missing or STRATEGIC LIST is empty. The
-primary source of an output is gone, so the derivation cannot proceed
-automatically; it must consult the LEVEL MAP and surface a proposal for
-confirmation instead of applying one silently.
+Reached when `.jit/templates.toml` is missing (BOUNDARY SET has no source) or
+STRATEGIC LIST is empty. Do not stop here: recover the missing output from the
+LEVEL MAP, keeping whichever primary input is present authoritative. Stop only
+when the LEVEL MAP itself cannot resolve the tiers.
 
 1. **Read the LEVEL MAP** from `jit config show-hierarchy --json` (drop the
-   `message` key). If it is empty or the command fails, there is nothing to
-   derive from. **Stop and ask.**
-2. **Find the candidate anchor(s)** — the type(s) at the minimum level.
-   - More than one type shares the minimum level: a genuine level tie among
-     candidate anchors. **Stop and ask.**
-   - Exactly one: that is the proposed anchor.
-3. **Propose a boundary** — the type(s) at the next distinct level below the
-   proposed anchor, or the anchor itself when no lower level exists (a collapsed
-   shape).
-4. **Do not apply the proposal.** Report the LEVEL-MAP-derived anchor and
-   boundary as an unconfirmed proposal and **stop and ask** the invoker to
-   confirm, because numeric levels record where a type sits, not which types are
-   strategic anchors or breakable containers. A missing `strategic_types` or a
-   missing template declaration is a configuration gap the human resolves.
+   `message` key). If it is empty or the command fails, there is no usable
+   hierarchy to derive from. **Stop and ask** (report that the input was missing
+   and the hierarchy was unusable).
+2. **Recover the anchor.**
+   - STRATEGIC LIST is present: ANCHOR TYPE = its first entry.
+   - STRATEGIC LIST is empty: ANCHOR TYPE = the unique type at the minimum
+     level. If two or more types share the minimum level, that is a genuine
+     level tie among candidate anchors. **Stop and ask** (report the tie and the
+     tied types).
+3. **Recover the boundary.**
+   - BOUNDARY SET is present (templates existed; only STRATEGIC LIST was empty):
+     keep it.
+   - BOUNDARY SET has no source (templates missing): BOUNDARY SET = the type(s)
+     at the next distinct level below the anchor, or the anchor itself when no
+     lower level exists (a collapsed shape).
+4. **Run the assumption checks** on the recovered ANCHOR TYPE and BOUNDARY SET,
+   exactly as the primary path does. A violation stops derivation.
+5. **Apply and emit** the recovered ANCHOR TYPE, BOUNDARY SET, and SHAPE, and
+   record that they came from the numeric-level fallback so downstream reports
+   note the recovered (not config-declared) source.
 
 ## Stop and ask
 
-Stop and report to the invoker, without guessing an anchor or boundary, when:
+Stop and report to the invoker, without guessing an anchor or boundary, only
+when the derivation is irrecoverably ambiguous:
 
-- `.jit/templates.toml` is missing or BOUNDARY SET is empty.
-- STRATEGIC LIST is empty.
-- The LEVEL MAP is empty or `jit config show-hierarchy --json` fails.
-- Two or more types tie at the minimum level in the fallback (no unique anchor).
+- The LEVEL MAP is empty or `jit config show-hierarchy --json` fails (no usable
+  hierarchy) — reached via the fallback.
+- Two or more types tie at the minimum level with no STRATEGIC LIST to break the
+  tie (no unique anchor) — reached via the fallback.
 - Assumption check A fails (STRATEGIC LIST not ordered most-strategic first).
 - Assumption check B fails (a boundary type is more strategic than the anchor).
 
-The report states which condition fired and, where the fallback ran, the
-LEVEL-MAP-derived proposal awaiting confirmation.
+A missing `.jit/templates.toml` or an empty STRATEGIC LIST is **not** on its own
+a stop condition: route it through **Fallback** first, and stop only if the
+fallback above hits one of these. Every stop report states which input was
+missing (if any) and what the fallback found before it gave up.
 
 ## Red flags
 
 - Writing a domain type name (any concrete `type_hierarchy` type) into a rule
   above. Rules are placeholder-only; type names live in config and in the
   verification block below.
-- Applying the fallback proposal without invoker confirmation.
+- Stopping the moment a config input is missing instead of routing it through
+  the fallback first.
+- Applying a fallback result while a genuine level tie or unusable hierarchy
+  leaves the anchor undetermined.
 - Skipping the assumption checks because the two observed rulesets happen to
   pass them.
 - Treating the `message` key from `show-hierarchy --json` as a type.
