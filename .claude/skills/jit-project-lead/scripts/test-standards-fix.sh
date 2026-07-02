@@ -6,13 +6,14 @@
 # runs the scanner to produce findings, runs the fixer, then re-scans and
 # checks the four success criteria:
 #
-#   REQ-01  every mechanical finding (except the explicitly excluded
-#           STD-LABEL-SLUG) is corrected — the re-scan reports no fixable
-#           mechanical finding left.
+#   REQ-01  every fixable mechanical finding is corrected — the re-scan reports
+#           none left, except a criterion the fixer genuinely cannot fix (all
+#           REQ-NN ids reserved), which is reported skipped.
 #   REQ-02  the re-scan no longer reports any of the fixed findings.
-#   REQ-03  judgment findings, clean issues, the excluded label, and in-scope
-#           documents are left byte-for-byte unchanged.
-#   REQ-04  the fixer reports the issue and rule for every correction.
+#   REQ-03  judgment findings (STD-LABEL-SLUG among them), clean issues, the
+#           8-hex label, and in-scope documents are left byte-for-byte unchanged.
+#   REQ-04  the fixer reports the issue and rule for every correction, and a
+#           skip for any finding it could not fix.
 #
 #   plus determinism/idempotence: a second fixer run applies nothing.
 #
@@ -94,6 +95,25 @@ JUDGE="$(mk "Standalone readability issue" $'It cannot be understood without the
 #    finding (the bare-pronoun opening line stays; only the criterion changes).
 COMBO="$(mk "Mixed mechanical and judgment issue" $'It opens with a bare pronoun on purpose.\n\n## Success Criteria\n\n- Returns the value with no criticality marker at all.' --force)"
 
+# 10. Embedded-id title as a hex prefix + bare slash, NO colon (`abc1234/foo`).
+#     The scanner flags `^[0-9a-fA-F]{6,}[/:]`; the fixer must strip it too, or
+#     the finding survives the re-scan (finding 2).
+HEXSLASH="$(mk "abc1234/foo" $'A summary line.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
+# 11. Exhausted REQ-NN ids: 99 well-formed criteria reserve 01-99, so the one
+#     unmarked criterion has no free id. The fixer must leave it unchanged AND
+#     report it skipped, not silently drop it (finding 3, REQ-04).
+EXHAUST_SC=""
+for i in $(seq 1 99); do
+    EXHAUST_SC+="$(printf -- '- [hard] REQ-%02d: Returns result %d for a valid input.\n' "$i" "$i")"$'\n'
+done
+EXHAUST_DESC="A summary line.
+
+## Success Criteria
+
+${EXHAUST_SC}- An unmarked criterion that needs a fresh id but none is free."
+EXHAUST="$(mk "Exhausted req ids issue" "$EXHAUST_DESC" --force)"
+
 # Documents: judgment-only math violations -> must be left byte-identical.
 mkdir -p "$FIX/docs"
 cat > "$FIX/docs/math.md" <<'MD'
@@ -145,9 +165,12 @@ assert_report() { # desc RULE TARGET ACTION [min]
 # --- Assertions -----------------------------------------------------------
 if [[ "$FIX_RC" -eq 0 ]]; then pass "fixer exits 0"; else fail "fixer exit code ($FIX_RC)"; fi
 
-# REQ-01 / REQ-02: no fixable mechanical finding survives (LABEL-SLUG excluded).
-LEFT="$(jq -c 'select(.classification=="mechanical" and .rule!="STD-LABEL-SLUG")' "$AFTER" 2>/dev/null | wc -l | tr -d ' ')"
-if [[ "$LEFT" -eq 0 ]]; then pass "REQ-01/02: no fixable mechanical finding remains after fixer"; else fail "REQ-01/02: $LEFT fixable mechanical findings remain: $(jq -c 'select(.classification=="mechanical" and .rule!="STD-LABEL-SLUG")' "$AFTER")"; fi
+# REQ-01 / REQ-02: no *fixable* mechanical finding survives. STD-LABEL-SLUG is
+# now judgment (a human chooses the bucket slug), so it never counts as
+# mechanical. The exhausted-id issue's criterion is genuinely unfixable (all
+# REQ-NN reserved) and is excluded here — its skip is asserted separately below.
+LEFT="$(jq -c --arg e "$EXHAUST" 'select(.classification=="mechanical" and .target!=$e)' "$AFTER" 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "$LEFT" -eq 0 ]]; then pass "REQ-01/02: no fixable mechanical finding remains after fixer"; else fail "REQ-01/02: $LEFT fixable mechanical findings remain: $(jq -c --arg e "$EXHAUST" 'select(.classification=="mechanical" and .target!=$e)' "$AFTER")"; fi
 
 # REQ-02: each specific fixed finding is gone.
 assert_scan_present "sanity: REQID present before"            STD-CRIT-REQID "$MALF" "$BEFORE"
@@ -155,6 +178,8 @@ assert_scan_absent  "REQ-02: REQID gone after"                STD-CRIT-REQID "$M
 assert_scan_absent  "REQ-02: no new UNMARKED on fixed MALF"   STD-CRIT-UNMARKED "$MALF" "$AFTER"
 assert_scan_absent  "REQ-02: UNMARKED gone after"             STD-CRIT-UNMARKED "$UNMARK" "$AFTER"
 assert_scan_absent  "REQ-02: TITLE-EMBEDDED-ID gone after"    STD-TITLE-EMBEDDED-ID "$BADTITLE" "$AFTER"
+assert_scan_present "sanity: hex+slash title flagged before"  STD-TITLE-EMBEDDED-ID "$HEXSLASH" "$BEFORE"
+assert_scan_absent  "REQ-02: hex+slash TITLE gone after"      STD-TITLE-EMBEDDED-ID "$HEXSLASH" "$AFTER"
 assert_scan_absent  "REQ-02: SC-MISSING gone after"           STD-SC-MISSING "$BADTITLE" "$AFTER"
 assert_scan_absent  "REQ-02: HEADING-H1 gone after"           STD-HEADING-H1 "$HEADINGS" "$AFTER"
 assert_scan_absent  "REQ-02: HEADING-DEEP gone after"         STD-HEADING-DEEP "$HEADINGS" "$AFTER"
@@ -171,10 +196,18 @@ assert_report "REQ-04: records SC-MISSING fix"        STD-SC-MISSING "$BADTITLE"
 assert_report "REQ-04: records HEADING-H1 fix"        STD-HEADING-H1 "$HEADINGS" applied
 assert_report "REQ-04: records HEADING-DEEP fix"      STD-HEADING-DEEP "$HEADINGS" applied
 assert_report "REQ-04: records ANTIPATTERN fix"       STD-ANTIPATTERN-SECTION "$ANTI" applied
-assert_report "REQ-04: records LABEL-SLUG exclusion"  STD-LABEL-SLUG "$LABEL" skipped
+
+# Finding 3 / REQ-04: the exhausted-id criterion cannot be fixed (no free
+# REQ-NN), so it is left unchanged AND reported skipped — never silently dropped.
+assert_report      "REQ-04: records exhausted-id skip"        STD-CRIT-UNMARKED "$EXHAUST" skipped
+assert_scan_present "exhausted-id criterion stays unmarked"   STD-CRIT-UNMARKED "$EXHAUST" "$AFTER"
+
+# STD-LABEL-SLUG is now a judgment finding: the fixer never records it at all.
+if [[ "$(report_count STD-LABEL-SLUG "$LABEL" skipped)" -eq 0 ]]; then pass "REQ-03: judgment LABEL-SLUG not recorded by fixer"; else fail "LABEL-SLUG still recorded as a fixer action"; fi
 
 # Title actually cleaned.
 if [[ "$(cd "$FIX" && jit issue show "$BADTITLE" --field title)" == "embedded id title" ]]; then pass "title stripped to clean form"; else fail "title not cleaned: $(cd "$FIX" && jit issue show "$BADTITLE" --field title)"; fi
+if [[ "$(cd "$FIX" && jit issue show "$HEXSLASH" --field title)" == "foo" ]]; then pass "hex+slash title stripped to clean form"; else fail "hex+slash title not cleaned: $(cd "$FIX" && jit issue show "$HEXSLASH" --field title)"; fi
 
 # REQ-03: clean issue untouched (byte-identical description).
 if [[ "$(desc_of "$GOOD")" == "$GOOD_DESC_BEFORE" ]]; then pass "REQ-03: clean issue left unchanged"; else fail "REQ-03: clean issue description changed"; fi
@@ -190,8 +223,8 @@ assert_scan_absent  "REQ-03: mixed UNMARKED corrected"        STD-CRIT-UNMARKED 
 assert_scan_present "REQ-03: mixed STANDALONE untouched"      STD-STANDALONE "$COMBO" "$AFTER"
 if desc_of "$COMBO" | grep -q "^It opens with a bare pronoun on purpose\.$"; then pass "REQ-03: mixed judgment line preserved verbatim"; else fail "mixed judgment opening line was altered"; fi
 
-# REQ-03: excluded label unchanged on the issue.
-if [[ "$(labels_of "$LABEL")" == "$LABEL_LABELS_BEFORE" ]] && labels_of "$LABEL" | grep -q "epic:abc12345"; then pass "REQ-03: excluded 8-hex label left unchanged"; else fail "excluded label was modified: $(labels_of "$LABEL")"; fi
+# REQ-03: judgment 8-hex label unchanged on the issue.
+if [[ "$(labels_of "$LABEL")" == "$LABEL_LABELS_BEFORE" ]] && labels_of "$LABEL" | grep -q "epic:abc12345"; then pass "REQ-03: judgment 8-hex label left unchanged"; else fail "judgment label was modified: $(labels_of "$LABEL")"; fi
 
 # REQ-03: in-scope document left byte-identical (all its findings are judgment).
 if [[ "$(sha256sum "$FIX/docs/math.md" | cut -d' ' -f1)" == "$DOC_SHA_BEFORE" ]]; then pass "REQ-03: judgment-only document left byte-identical"; else fail "document was modified"; fi
