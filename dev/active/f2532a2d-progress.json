@@ -151,7 +151,7 @@
           "short_id": "7a9eb806",
           "title": "Run cross-container coherence review before accepting a container as complete",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e8b1cee3",
