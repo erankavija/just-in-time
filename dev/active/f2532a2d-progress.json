@@ -12,7 +12,8 @@
     "Session 2026-07-02 (resume 2, Opus): 66aeee5f rework-3 lead take-over (invoker-approved) added STD-STRUCT-SUMMARY/BACKGROUND checks -> code-review passed -> done. a5b04c9f merged, then failed own code-review gate (negative-item transcript-evidence gap, valid) -> rework-1 dispatched (Opus, worktree). 6662f738 description landed to main (symlink trap: eval reads main's live SKILL.md, not worktree) -> eval worker running runs_per_query=5 (Opus, in main).",
     "Wave 2 CLOSED: a5b04c9f (rework-1 Route A negative-item evidence) + 6662f738 (rework-2 atomic writes in run_trigger_eval.py both line 103 & 382) code-review passed, done. Shared-file lesson: code-review gate reviews whole-tree state, so a5b04c9f's gate flagged 6662f738's runner atomic-write bug; a5b04c9f could only pass after 6662f738's fix merged. True remaining DAG (dep-readiness, not the original wave grouping): READY={41aa1b75,0b7e864d,e7d41080,02a2bbb9}; then c23dfe71<-41aa1b75, 206bd960<-0b7e864d, 7a9eb806<-e7d41080; then e8b1cee3<-c23dfe71+02a2bbb9 (linchpin); then eff48a6e/634b2382/304f6d94/3c192f5e/6c5f70ad<-e8b1cee3 (+6c5f70ad ext dep eed6750c).",
     "Wave-3 batch dispatched (4 parallel Opus, worktrees @ main 2ebf6402): 41aa1b75 (planning-lead scenario evals), 0b7e864d (mechanical auto-fixer, fixture-tested, no live-repo mutation), e7d41080 (per-container dispatch prose, must NOT touch frontmatter description), 02a2bbb9 (project-lead skeleton trigger+scenario evals @ runs_per_query=5). Disjoint files. Run check-leak-into-main.sh after wave completes.",
-    "INVOKER-DIRECTED PROCESS (2026-07-03): code-review reviewers run cargo-ci inconsistently and hit PRE-EXISTING parallel-run test flakiness (5 tests: serve.rs port-bind + issue.rs claim prechecks; pass in isolation; full suite green for lead: 2836 passed 0 failed). Fix: for every remaining issue, ADD the cargo-ci gate and RUN it BEFORE code-review, so a passed cargo-ci sits in run_history and the reviewer trusts it instead of running its own flaky copy. Adding gates to child issues is lead-autonomous. Applied to 02a2bbb9 -> both gates green -> done."
+    "INVOKER-DIRECTED PROCESS (2026-07-03): code-review reviewers run cargo-ci inconsistently and hit PRE-EXISTING parallel-run test flakiness (5 tests: serve.rs port-bind + issue.rs claim prechecks; pass in isolation; full suite green for lead: 2836 passed 0 failed). Fix: for every remaining issue, ADD the cargo-ci gate and RUN it BEFORE code-review, so a passed cargo-ci sits in run_history and the reviewer trusts it instead of running its own flaky copy. Adding gates to child issues is lead-autonomous. Applied to 02a2bbb9 -> both gates green -> done.",
+    "SESSION 3 END (2026-07-03): handoff written dev/active/f2532a2d-handoff.md. Wave 2 CLOSED (a5b04c9f,6662f738 done). Wave-3 batch: e7d41080 done, 02a2bbb9 done, 0b7e864d in_progress (rework-1 merged, code-review FAIL residual title mismatch, rework-2 deferred per invoker 'no more rework this session'), 41aa1b75 interrupted (WIP preserved branch a4cf8dc7, needs results.md + grading). 7a9eb806 now READY (e7d41080 done). Process in force: add+run cargo-ci gate BEFORE code-review (flaky parallel tests). Leak check clean."
   ],
   "waves": [
     {
@@ -97,7 +98,7 @@
           "short_id": "41aa1b75",
           "title": "Add jit-planning-lead scenario evals for its entry paths",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "interrupted-wip-preserved-branch-a4cf8dc7"
         }
       ]
     },
@@ -109,7 +110,7 @@
           "short_id": "0b7e864d",
           "title": "Mechanical violation auto-fixer for content-standards sweep",
           "classification": "implementation",
-          "status": "rework-1-dispatched"
+          "status": "rework-1-merged-code-review-FAIL-needs-rework-2"
         },
         {
           "id": "e7d41080",
@@ -243,8 +244,9 @@
   },
   "started_at": "2026-07-02T00:00:00Z",
   "reviewed": {
-    "e7d41080": "PASS (all 6 tiers pending gate); merge deferred until 02a2bbb9 eval run completes (keep jit-project-lead frozen on main). Committed worktree 4b32c2a4+16593f3a. Known composition note: execution-lead dispatched into a worktree cannot itself run dispatch-worker-worktree.sh (requires main) - pre-existing nesting limit, surfaced not solved (REQ-03 boundary).",
+    "e7d41080": "PASS -> done",
     "02a2bbb9": "PASS: trigger 17/17 failed:0, 4 scenarios PASS (activation, tier-derivation this-repo + research, fallback). SKILL.md untouched. done.",
-    "0b7e864d": "FAIL rework-1: (1) STD-LABEL-SLUG mechanical-but-unfixable -> reclassify to judgment in scanner (REQ-01 literal); (2) title-strip regex narrower than scanner detection (abc1234/foo survives, REQ-02); (3) REQ-04 silent skip when REQ-ids exhausted. cargo-ci evidence process WORKED (reviewer trusted it, didn't rerun tests)."
-  }
+    "0b7e864d": "rework-1 FAIL: residual title scanner/fixer mismatch (mid-title S0/W1 flagged unanchored @ standards-scan.sh:329 but fixer strips leading-only). rework-2 DEFERRED per invoker. Fix: anchor scanner position-code pattern to ^."
+  },
+  "last_session": 3
 }
