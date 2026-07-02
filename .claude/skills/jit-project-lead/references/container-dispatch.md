@@ -85,7 +85,7 @@ path.
      rules that forbid absolute `/home/...` paths leaking into `main`). For a
      solo container dispatched without a worktree (step 2), omit the header.
    - **Body:** instruct the lead to drive this container to completion end to
-     end — the container id is its epic-level target; it runs its own
+     end — the container id is the lead's end-to-end target; it runs its own
      execution-lead flow (breakdown, wave planning, worker dispatch, review,
      gate enforcement, completion) against that container. Do not restate or
      pre-empt any of those steps.
