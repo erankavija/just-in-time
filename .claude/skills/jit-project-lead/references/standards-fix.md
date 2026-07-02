@@ -4,7 +4,7 @@ Applies safe, rule-based corrections to every **mechanical** finding emitted by
 the standards scan (`references/standards-scan.md`). The fixer consumes the
 scanner's JSONL, and for each `mechanical` finding whose rule has a single
 unambiguous correction it rewrites the source issue so the flagged violation no
-longer holds. Every `judgment` finding, every excluded rule, and every
+longer holds. Every `judgment` finding (STD-LABEL-SLUG among them) and every
 issue/document with no mechanical finding is left byte-for-byte unchanged.
 
 Runner: `scripts/standards-fix.sh [<project-root>]` (this skill's `scripts/`).
@@ -48,20 +48,22 @@ rule block the mechanical correction. The bypass is logged by jit.
 
 ## What gets corrected
 
-Each row is a mechanical rule the scanner emits. A rule is **applied** when a
-single unambiguous correction exists, or **excluded** when it does not (the
-finding is then reported with `action: "skipped"` and left unchanged).
+Each row is a mechanical rule the scanner emits, with the single unambiguous
+correction the fixer applies. A criterion fix can, in the pathological
+all-ids-reserved case, be reported `skipped` instead of applied (see *Fresh
+`REQ-NN` id allocation*). STD-LABEL-SLUG is not listed here: it is a `judgment`
+finding (a bucket slug cannot be derived from a hash), so the fixer never sees
+it — it flows through untouched like every other judgment finding.
 
 | Rule | Class | Correction |
 |---|---|---|
 | STD-CRIT-UNMARKED | applied | Insert a `[hard]` marker and a fresh `REQ-NN` id before the criterion text. `[hard]` is the standard's default for an unmarked item (see the content standards). The bullet prefix (`- ` and an optional `[ ]`/`[x]` checkbox) is preserved. |
 | STD-CRIT-REQID | applied | Keep the existing `[hard]`/`[aspirational]` marker; replace the malformed id with a fresh well-formed `REQ-NN:`. The criterion statement is preserved verbatim. |
-| STD-TITLE-EMBEDDED-ID | applied | Strip a leading conventional-commit prefix (`feat(scope): `), an embedded short-id/position-code/ordinal prefix (`abc1234/S0: `, `S0/W1: `, `1. `), and any `(jit:<hex>)` token — exactly the shapes the scanner flags. If stripping would leave an empty title, the title is left unchanged and the finding is reported skipped. |
+| STD-TITLE-EMBEDDED-ID | applied | Strip a leading conventional-commit prefix (`feat(scope): `), an embedded short-id/position-code/ordinal prefix (`abc1234/S0: `, `abc1234/foo`, `abc1234: `, `S0/W1: `, `1. `), and any `(jit:<hex>)` token — every shape the scanner flags, including a hex prefix followed by a bare `/` with no colon. If stripping would leave an empty title, the title is left unchanged and the finding is reported skipped. |
 | STD-SC-MISSING | applied | Append a `## Success Criteria` heading at the end of the description. (An issue with no Success Criteria section also has no criteria, so this never collides with a criterion fix.) |
 | STD-HEADING-H1 | applied | Promote the `#` heading to `##`. |
 | STD-HEADING-DEEP | applied | Clamp a heading deeper than `###` back to `###`. |
 | STD-ANTIPATTERN-SECTION | applied | Remove the DAG-duplicating section: the `## Depends on` / `## Dependencies` / `## Children` heading and its body, up to (not including) the next heading or end of description. The DAG is canonical, so the section carries no content worth keeping. |
-| STD-LABEL-SLUG | **excluded** | No single safe correction. The offending value is an 8-hex short id; a meaningful `epic:`/`story:`/`milestone:` kebab slug names the strategic bucket and cannot be derived from a hash. Renaming needs a human-chosen slug, so the fixer never edits the label. |
 
 ### Fresh `REQ-NN` id allocation
 
@@ -91,8 +93,9 @@ A correction is a pure function of the findings and the current content: no
 timestamp, hostname, or random value enters it, and ids are allocated in line
 order. Running the fixer a second time produces no further change — the scanner
 reports no finding on an already-fixed item, so nothing is selected. The only
-records a repeat run emits are the `skipped` records for excluded rules
-(e.g. STD-LABEL-SLUG), which never mutate anything.
+records a repeat run emits are the `skipped` records for genuinely unfixable
+findings (a criterion whose issue has every `REQ-NN` id reserved), which never
+mutate anything.
 
 ## Output schema
 
@@ -125,17 +128,20 @@ documents), runs the scanner to produce findings, runs the fixer, then
 re-scans and asserts:
 
 - **REQ-01/02** — no fixable mechanical finding survives the fixer (every one is
-  gone from the re-scan; STD-LABEL-SLUG is the only mechanical rule allowed to
-  remain, by exclusion), covering each rule: the malformed-`REQ-NN` variants,
-  an unmarked criterion, an embedded-id title, a missing Success Criteria
-  heading, an H1 and a too-deep heading, and an anti-pattern section;
+  gone from the re-scan), covering each rule: the malformed-`REQ-NN` variants,
+  an unmarked criterion, an embedded-id title (including a hex+`/` prefix with no
+  colon, `abc1234/foo`), a missing Success Criteria heading, an H1 and a
+  too-deep heading, and an anti-pattern section. The only mechanical finding
+  allowed to remain is one the fixer genuinely cannot correct (a criterion whose
+  issue has every `REQ-NN` id reserved), which is reported skipped;
 - a well-formed `REQ-NN` criterion in a partially-malformed issue is preserved
   verbatim (its number stays reserved, never reused);
 - **REQ-03** — a clean issue, a judgment-only issue, a mixed issue's judgment
-  line, the excluded 8-hex label, and a judgment-only `docs/` document are all
+  line, the judgment 8-hex label, and a judgment-only `docs/` document are all
   left byte-identical, while the mixed issue's mechanical criterion is fixed;
 - **REQ-04** — the fixer's report records the issue and rule for every
-  correction, and the exclusion for STD-LABEL-SLUG;
+  correction, and the skip for a criterion whose issue has all `REQ-NN` ids
+  reserved;
 - idempotence — a second fixer run applies no correction.
 
 Run it directly; it needs `jit`, `jq`, and `gawk` on PATH:

@@ -98,7 +98,8 @@ scanner="$script_dir/standards-scan.sh"
 findings="$(mktemp)"
 mech="$(mktemp)"
 recfile="$(mktemp)"
-trap 'rm -f "$findings" "$mech" "$recfile"' EXIT
+skipfile="$(mktemp)"
+trap 'rm -f "$findings" "$mech" "$recfile" "$skipfile"' EXIT
 
 if [[ -n "$findings_file" ]]; then
     cat "$findings_file" > "$findings"
@@ -124,12 +125,19 @@ jq -c 'select(.classification == "mechanical")' "$findings" > "$mech" 2> /dev/nu
 #   DIRECTIVES — "RULE|LINE;RULE|LINE;..." for body rules on this issue
 #   SC_MISSING — 1 to append a `## Success Criteria` heading, else 0
 #   RECFILE — path; one "rule<TAB>line<TAB>detail" record per applied fix
+#   SKIPFILE — path; one "rule<TAB>line<TAB>detail" record per criterion the
+#              fixer left unchanged because it could not be corrected (the
+#              pathological all-REQ-NN-ids-reserved case)
 #   stdout  — the corrected description body
 read -r -d '' AWK_FIX <<'AWK' || true
 function fmt(n) { return sprintf("REQ-%02d", n) }
 function record(rule, ln, detail) {
     gsub(/\t/, " ", detail)
     printf "%s\t%s\t%s\n", rule, ln, detail >> RECFILE
+}
+function record_skip(rule, ln, detail) {
+    gsub(/\t/, " ", detail)
+    printf "%s\t%s\t%s\n", rule, ln, detail >> SKIPFILE
 }
 # Split a criterion line into its bullet prefix ("- " plus an optional
 # GitHub checkbox) and the remaining criterion text. Mirrors the scanner's
@@ -224,7 +232,7 @@ END {
         }
         if (rl ~ /STD-CRIT-UNMARKED/) {
             if (assign[i] == -1) {
-                record_skip_unmarked = 1
+                record_skip("STD-CRIT-UNMARKED", i, "no free REQ-NN id (01-99 all reserved); criterion left unchanged")
             } else {
                 split_bullet(l, parts)
                 l = parts[1] "[hard] " fmt(assign[i]) ": " parts[2]
@@ -233,7 +241,7 @@ END {
         }
         if (rl ~ /STD-CRIT-REQID/) {
             if (assign[i] == -1) {
-                record_skip_reqid = 1
+                record_skip("STD-CRIT-REQID", i, "no free REQ-NN id (01-99 all reserved); criterion left unchanged")
             } else {
                 split_bullet(l, parts)
                 marker = "hard"
@@ -270,7 +278,15 @@ strip_title() {
             changed = 0
             if (match(t, /^[A-Za-z]+\([^)]*\):[[:space:]]*/)) { t = substr(t, RSTART + RLENGTH); changed = 1 }
             if (match(t, /[[:space:]]*\(jit:[0-9a-f]+\)/))     { t = substr(t, 1, RSTART - 1) substr(t, RSTART + RLENGTH); changed = 1 }
+            # Hex short-id prefix with a colon terminator (optionally a
+            # `/segment` before it): `abc1234:`, `abc1234/S0:` -> strip through
+            # the colon. Checked before the bare-slash form so `abc1234/S0: x`
+            # loses the whole `abc1234/S0: `, not just `abc1234/`.
             if (match(t, /^[0-9a-fA-F]{6,}(\/[^:[:space:]]*)?:[[:space:]]*/)) { t = substr(t, RSTART + RLENGTH); changed = 1 }
+            # Hex short-id prefix followed by a slash but no colon (`abc1234/foo`)
+            # — the scanner flags `^[0-9a-fA-F]{6,}[/:]`, so this shape must also
+            # be stripped or the finding survives the re-scan.
+            if (match(t, /^[0-9a-fA-F]{6,}\//))               { t = substr(t, RSTART + RLENGTH); changed = 1 }
             if (match(t, /^[A-Za-z][0-9]+\/[A-Za-z]?[0-9]*:[[:space:]]*/))    { t = substr(t, RSTART + RLENGTH); changed = 1 }
             if (match(t, /^[0-9]+[.):][[:space:]]+/))          { t = substr(t, RSTART + RLENGTH); changed = 1 }
         }
@@ -296,13 +312,9 @@ while IFS= read -r sid; do
     [[ -z "$sid" ]] && continue
     obj="$(jq -c --arg t "$sid" 'select(.target_kind == "issue" and .target == $t)' "$mech")"
 
-    # Whole-item: strategic label slug — excluded (no single safe correction).
-    while IFS= read -r lbl; do
-        [[ -z "$lbl" ]] && continue
-        emit_record issue "$sid" STD-LABEL-SLUG 0 skipped \
-            "no safe correction: an 8-hex short id yields no meaningful kebab slug; needs a human-chosen name"
-        fixes_skipped=$((fixes_skipped + 1))
-    done < <(printf '%s\n' "$obj" | jq -r 'select(.rule == "STD-LABEL-SLUG") | .detail')
+    # STD-LABEL-SLUG is a judgment finding (an 8-hex short id yields no
+    # meaningful kebab slug, so a human chooses the bucket name); the mechanical
+    # filter above already dropped it, so the fixer never sees or touches it.
 
     # Whole-item: embedded-id title.
     has_title_finding=0
@@ -338,10 +350,12 @@ while IFS= read -r sid; do
     new_desc=""
     change_desc=0
     : > "$recfile"
+    : > "$skipfile"
     if [[ -n "$directives" || "$sc_missing" -eq 1 ]]; then
         cur_desc="$(cd "$root" && jit issue show "$sid" --field description 2> /dev/null)"
         new_desc="$(printf '%s' "$cur_desc" | gawk \
-            -v DIRECTIVES="$directives" -v SC_MISSING="$sc_missing" -v RECFILE="$recfile" "$AWK_FIX")"
+            -v DIRECTIVES="$directives" -v SC_MISSING="$sc_missing" \
+            -v RECFILE="$recfile" -v SKIPFILE="$skipfile" "$AWK_FIX")"
         [[ "$new_desc" != "$cur_desc" ]] && change_desc=1
     fi
 
@@ -366,6 +380,14 @@ while IFS= read -r sid; do
         emit_record issue "$sid" "$rrule" "$rline" "$(action_word)" "$rdetail"
         fixes_applied=$((fixes_applied + 1))
     done < "$recfile"
+
+    # Skips: a mechanical correction that could not be applied (e.g. no free
+    # REQ-NN id). Reported so nothing is silently left unfixed (REQ-04).
+    while IFS=$'\t' read -r srule sline sdetail; do
+        [[ -z "$srule" ]] && continue
+        emit_record issue "$sid" "$srule" "$sline" skipped "$sdetail"
+        fixes_skipped=$((fixes_skipped + 1))
+    done < "$skipfile"
 done < <(jq -r 'select(.target_kind == "issue") | .target' "$mech" | LC_ALL=C sort -u)
 
 # --- Document pass --------------------------------------------------------

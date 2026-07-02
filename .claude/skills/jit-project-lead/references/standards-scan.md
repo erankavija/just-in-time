@@ -73,7 +73,7 @@ run against documents.
 |---|---|---|---|
 | STD-TITLE-EMBEDDED-ID | title | mechanical | leading short-id/ordinal, `feat(...):` prefix, or `(jit:…)` |
 | STD-TITLE-ANGLE | title | judgment | `&lt;`/`&gt;`/`<`/`>` present; reword needed |
-| STD-LABEL-SLUG | labels | mechanical | `epic:`/`story:`/`milestone:` value is an 8-hex short id |
+| STD-LABEL-SLUG | labels | judgment | `epic:`/`story:`/`milestone:` value is an 8-hex short id (a meaningful bucket slug cannot be derived from a hash) |
 
 ### Issue description structure
 
@@ -138,7 +138,7 @@ unevaluated.
 | Anti-patterns → no tracker mechanics (commands, reviewer/gate naming) | STD-TRACKER-MECHANICS | judgment |
 | Issue Titles → no embedded id/ordinal/`feat(...)` prefix | STD-TITLE-EMBEDDED-ID | mechanical |
 | Issue Titles → reword `<`/`>` (stored escaped) | STD-TITLE-ANGLE | judgment |
-| Strategic Labels → kebab slug, never the 8-hex short id | STD-LABEL-SLUG | mechanical |
+| Strategic Labels → kebab slug, never the 8-hex short id | STD-LABEL-SLUG | judgment |
 | Diagrams → use Mermaid, no ASCII art | STD-ASCII-ART | judgment |
 | Mathematics → use LaTeX, no plain-text equations | STD-PLAINTEXT-MATH | judgment |
 | Mathematics → variable names in math mode (`$x$` not `x`, `$N_0$` not `N_0`) | STD-MATH-BARE-VAR | judgment |

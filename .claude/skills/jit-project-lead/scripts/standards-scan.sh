@@ -333,7 +333,9 @@ while IFS= read -r obj; do
     if [[ "$title" == *"&lt;"* || "$title" == *"&gt;"* || "$title" == *"<"* || "$title" == *">"* ]]; then
         emit issue "$sid" STD-TITLE-ANGLE judgment 0 "$title"
     fi
-    # Strategic labels must be kebab slugs, not the 8-hex short id (mechanical).
+    # Strategic labels must be kebab slugs, not the 8-hex short id (judgment).
+    # No mechanical correction exists: a meaningful bucket slug (e.g. user-auth)
+    # cannot be derived from a hash, so choosing one needs human judgment.
     while IFS= read -r lbl; do
         [[ -z "$lbl" ]] && continue
         ns="${lbl%%:*}"
@@ -341,7 +343,7 @@ while IFS= read -r obj; do
         case "$ns" in
             epic|story|milestone)
                 if [[ "$val" =~ ^[0-9a-f]{8}$ ]]; then
-                    emit issue "$sid" STD-LABEL-SLUG mechanical 0 "$lbl"
+                    emit issue "$sid" STD-LABEL-SLUG judgment 0 "$lbl"
                 fi
                 ;;
         esac
