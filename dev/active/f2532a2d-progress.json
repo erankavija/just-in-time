@@ -1,7 +1,7 @@
 {
   "epic_id": "f2532a2d-138d-46bf-9547-e1ea517f0170",
   "epic_short_id": "f2532a2d",
-  "current_wave": 2,
+  "current_wave": 3,
   "notes": [
     "Bracket already complete before this session: planning 8f5de6bc done (plan-review passed), breakdown f59d1b6b done (coverage-preview + breakdown-review passed). Plan doc: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md (decisions D1-D9).",
     "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
@@ -9,7 +9,8 @@
     "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it.",
     "Session 2026-07-02 (resume): wave-2/3 workers were cut mid-flight. WIP lead-preserved and rebased onto main; continuations dispatched (a5b04c9f Opus, 6662f738 Sonnet). 66aeee5f rework attempt 2 dispatched (Opus) in fresh worktree. 82e04ab0 rework exhausted -> escalated -> invoker approved lead take-over; lead fixed stop-and-ask fallback (11ab84bc), gate passed, done. c6325c5b REQ-03 amendment approved by invoker.",
     "6662f738 R1 verdict FAIL (REQ-04): planning-lead should-trigger rate 0.25, exec-lead 1 flaky query. Real description weakness (eed6750c handoff deferred triggering as untested; epic REQ-07 owns it). Rework 1: rewrite planning-lead frontmatter description ONLY (body owned by eed6750c), re-run both sets at runs_per_query=5, bar = failed:0 both categories both skills. Eval-set weakening forbidden.",
-    "Session 2026-07-02 (resume 2, Opus): 66aeee5f rework-3 lead take-over (invoker-approved) added STD-STRUCT-SUMMARY/BACKGROUND checks -> code-review passed -> done. a5b04c9f merged, then failed own code-review gate (negative-item transcript-evidence gap, valid) -> rework-1 dispatched (Opus, worktree). 6662f738 description landed to main (symlink trap: eval reads main's live SKILL.md, not worktree) -> eval worker running runs_per_query=5 (Opus, in main)."
+    "Session 2026-07-02 (resume 2, Opus): 66aeee5f rework-3 lead take-over (invoker-approved) added STD-STRUCT-SUMMARY/BACKGROUND checks -> code-review passed -> done. a5b04c9f merged, then failed own code-review gate (negative-item transcript-evidence gap, valid) -> rework-1 dispatched (Opus, worktree). 6662f738 description landed to main (symlink trap: eval reads main's live SKILL.md, not worktree) -> eval worker running runs_per_query=5 (Opus, in main).",
+    "Wave 2 CLOSED: a5b04c9f (rework-1 Route A negative-item evidence) + 6662f738 (rework-2 atomic writes in run_trigger_eval.py both line 103 & 382) code-review passed, done. Shared-file lesson: code-review gate reviews whole-tree state, so a5b04c9f's gate flagged 6662f738's runner atomic-write bug; a5b04c9f could only pass after 6662f738's fix merged. True remaining DAG (dep-readiness, not the original wave grouping): READY={41aa1b75,0b7e864d,e7d41080,02a2bbb9}; then c23dfe71<-41aa1b75, 206bd960<-0b7e864d, 7a9eb806<-e7d41080; then e8b1cee3<-c23dfe71+02a2bbb9 (linchpin); then eff48a6e/634b2382/304f6d94/3c192f5e/6c5f70ad<-e8b1cee3 (+6c5f70ad ext dep eed6750c)."
   ],
   "waves": [
     {
@@ -54,14 +55,14 @@
           "short_id": "a5b04c9f",
           "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
           "classification": "implementation",
-          "status": "continuation-dispatched"
+          "status": "done"
         },
         {
           "id": "6662f738",
           "short_id": "6662f738",
           "title": "Add activation trigger evals for both lead skills",
           "classification": "implementation",
-          "status": "rework-1-dispatched"
+          "status": "done"
         }
       ]
     },
@@ -235,7 +236,7 @@
     "87c8ba2d": 1,
     "82e04ab0": 2,
     "66aeee5f": 3,
-    "6662f738": 1
+    "6662f738": 2
   },
   "started_at": "2026-07-02T00:00:00Z"
 }
