@@ -11,23 +11,24 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:58:00.687413252Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-02T07:55:56.864136450Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T07:58:00.687413252Z"
     }
   },
   "context": {},
   "documents": [],
   "labels": [
     "component:cli",
-    "type:bug"
+    "type:bug",
+    "milestone:v1.0"
   ],
   "created_at": "2026-07-02T07:51:53.343433178Z",
-  "updated_at": "2026-07-02T07:59:20.707392140Z"
+  "updated_at": "2026-07-02T23:33:00.195545805Z"
 }

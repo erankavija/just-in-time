@@ -13,8 +13,10 @@
   "context": {},
   "documents": [],
   "labels": [
-    "type:enhancement"
+    "type:enhancement",
+    "milestone:v1.0",
+    "epic:addressing-v2"
   ],
   "created_at": "2026-07-01T23:32:09.651642553Z",
-  "updated_at": "2026-07-01T23:34:59.304078Z"
+  "updated_at": "2026-07-02T23:33:00.217461591Z"
 }
