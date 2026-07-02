@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "93b55d90-ad2b-4224-9668-ddd553996062",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "faed8ffa-8f94-43e2-8de5-735bd7525d28",
+  "commit": "38f9feed7581e02b6ae87c23e9913cd567ee1f01",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T08:03:58.297268617Z",
+  "completed_at": "2026-07-02T08:05:06.523312749Z",
+  "duration_ms": 68226,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met. `docs/reference/jit-content-standards.md` exists, `docs/` is permanent in `.jit/config.toml:14`, and the two old copies under `.claude/skills/jit-manage/references/` and `.claude/skills/jit-planning-lead/references/` are absent. All required consumers point directly to the canonical doc, including `.claude/skills/jit-breakdown/SKILL.md:400`, `.claude/skills/jit-breakdown/references/analysis-prompt.md:106`, `.claude/skills/jit-execution-lead/references/doc-agent-prompt.md:42`, `.claude/skills/jit-execution-lead/references/architect-agent-prompt.md:37`, `.claude/skills/jit-manage/SKILL.md:280`, `.claude/skills/jit-manage/references/design-doc-template.md:8`, and `.claude/skills/jit-planning-lead/SKILL.md:83`.\n\nI verified the same references through `~/.claude/skills/jit-*` symlinks; each resolves to `/home/vkaskivuo/Projects/just-in-time/docs/reference/jit-content-standards.md`.\n\n**Architecture And Separation Of Concerns**\n\nNo Rust architecture boundary is touched. The change is documentation, skill references, and JIT metadata only.\n\n**Functional Paradigm**\n\nNo executable Rust logic changed.\n\n**Correctness And Invariants**\n\nThe prior event-log issue is resolved. `.jit/issues/faed8ffa-8f94-43e2-8de5-735bd7525d28.json:30` lists the canonical document, and `.jit/events.jsonl` records matching `documents` updates via `doc-remove` and `doc-add`.\n\nNo atomic-write, gate-transition, assignee-format, label-format, or PID-safety issue is introduced.\n\n**Safety**\n\nNo Rust code changed, and no unsafe code was introduced.\n\n**Testing**\n\nI did not run cargo tests because the issue has a succeeded `cargo-ci` gate. The provided/latest gate artifact `.jit/gate-runs/a278212d-c8ac-4db8-9921-79db94751029/result.json:4-14` shows `cargo-ci` passed with fmt ok, clippy ok, and `2836 passed, 0 failed, 12 ignored`.\n\n`./scripts/jit-validate.sh` passed. It reported three allowed orphan-leaf label warnings for `8689e255`, `9067c337`, and `cd1da611`.\n\n**Error Handling**\n\nNo fallible Rust paths changed.\n\n**CLI Contract**\n\nNo CLI behavior changed, so no new `--json` contract issue is introduced.\n\n**Documentation**\n\nThe canonical document is indexed at `docs/index.md:52`, and all known consumers now reference it directly. Public Rust API documentation is not applicable.\n\n**Prior Review Feedback**\n\nThe prior missing `documents` event-log finding is resolved. The latest prior blocker about failed test evidence is resolved by the later successful issue-level `cargo-ci` gate at `.jit/gate-runs/a278212d-c8ac-4db8-9921-79db94751029/result.json:9-14`, after dependency `8689e255` was completed.\n\n**JIT Issue Management**\n\nAll listed dependencies are complete in the supplied issue context: `f59d1b6b`, `9067c337`, and `8689e255` are `done`. `./scripts/jit-validate.sh` passes with label warnings only.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
