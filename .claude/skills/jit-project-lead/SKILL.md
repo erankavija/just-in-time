@@ -4,10 +4,11 @@ description: >
   Strategic-tier steward that owns the project vision and drives the project's
   top-level strategic container by delegating each sub-strategic container to a
   dispatched jit-execution-lead. Use when asked to "steward the project", "own
-  the project vision", "drive the milestone", "run the whole project", "lead
-  the project across epics", or to resolve subordinate escalations against the
-  vision and enforce content standards project-wide. For driving a single
-  epic-level container, use jit-execution-lead.
+  the project vision", "drive the top-level container", "run the whole
+  project", "lead the project across its strategic containers", or to resolve
+  subordinate escalations against the vision and enforce content standards
+  project-wide. For driving a single sub-strategic container end to end, use
+  jit-execution-lead.
 ---
 
 # JIT Project Lead
@@ -46,7 +47,7 @@ Hold the extracted context in working memory for the whole session.
 
 ## Tier derivation (stub)
 
-Authored by the tier-derivation work in this epic. Its inputs are fixed here:
+Authored by follow-up tier-derivation work. Its inputs are fixed here:
 
 - **Steward anchor:** derived from `strategic_types` in `.jit/config.toml`.
 - **Delegation boundary:** the union of `applies_to` across `[[template]]`
@@ -61,7 +62,7 @@ Four invocation modes route from the opening request. The routing block and
 mode bodies are authored by the four-mode front-door work:
 
 1. Lead existing strategic work.
-2. Plan and execute a vague goal.
+2. Plan and execute a vague high-level objective.
 3. Steering discussion.
 4. Standards sweep.
 
