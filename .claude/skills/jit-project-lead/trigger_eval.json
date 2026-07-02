@@ -1,0 +1,20 @@
+[
+  {"query": "Steward the project and own its vision across every strategic container", "should_trigger": true},
+  {"query": "Own the project vision and drive the top-level strategic container to completion", "should_trigger": true},
+  {"query": "Drive the top-level container across all its sub-strategic containers, dispatching an execution lead for each", "should_trigger": true},
+  {"query": "Run the whole project — own the vision and delegate each strategic container to a lead", "should_trigger": true},
+  {"query": "Lead the project across its strategic containers and keep them coherent with the vision", "should_trigger": true},
+  {"query": "Resolve these subordinate escalations against the project vision and enforce content standards project-wide", "should_trigger": true},
+  {"query": "Be the standing steward one tier above the execution leads and own the project's top-level container", "should_trigger": true},
+  {"query": "Take ownership of the entire project's vision and steer every strategic container toward it", "should_trigger": true},
+
+  {"query": "Lead this epic to completion with a team of agents and enforce quality", "should_trigger": false},
+  {"query": "Drive this epic end-to-end, dispatch the workers, and handle rework", "should_trigger": false},
+  {"query": "Take charge of this epic and deliver it autonomously with holistic coherence review", "should_trigger": false},
+  {"query": "Plan this feature with jit before we start implementing", "should_trigger": false},
+  {"query": "Turn this rough idea into a fully planned, broken-down jit work tree ready to execute", "should_trigger": false},
+  {"query": "Break down this epic into child stories from its spec document", "should_trigger": false},
+  {"query": "What should I work on next in jit?", "should_trigger": false},
+  {"query": "Claim this task, plan it, and complete it once its gates pass", "should_trigger": false},
+  {"query": "Lead the quarterly planning meeting for my team tomorrow morning", "should_trigger": false}
+]

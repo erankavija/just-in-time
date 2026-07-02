@@ -1,0 +1,162 @@
+{
+  "skill_name": "jit-project-lead",
+  "description": "Strategic-tier steward that owns the project vision and drives the project's top-level strategic container by delegating each sub-strategic container to a dispatched jit-execution-lead. Use when asked to \"steward the project\", \"own the project vision\", \"drive the top-level container\", \"run the whole project\", \"lead the project across its strategic containers\", or to resolve subordinate escalations against the vision and enforce content standards project-wide. For driving a single sub-strategic container end to end, use jit-execution-lead.",
+  "method": "dev/eval/skill-triggers/run_trigger_eval.py (adapted skill-creator trigger-eval technique; base-name match instead of unique-proxy match, see README.md)",
+  "runs_per_query": 5,
+  "trigger_threshold": 0.5,
+  "results": [
+    {
+      "query": "Steward the project and own its vision across every strategic container",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Own the project vision and drive the top-level strategic container to completion",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Drive the top-level container across all its sub-strategic containers, dispatching an execution lead for each",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Run the whole project \u2014 own the vision and delegate each strategic container to a lead",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Lead the project across its strategic containers and keep them coherent with the vision",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Resolve these subordinate escalations against the project vision and enforce content standards project-wide",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Be the standing steward one tier above the execution leads and own the project's top-level container",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Take ownership of the entire project's vision and steer every strategic container toward it",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Lead this epic to completion with a team of agents and enforce quality",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Drive this epic end-to-end, dispatch the workers, and handle rework",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Take charge of this epic and deliver it autonomously with holistic coherence review",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Plan this feature with jit before we start implementing",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Turn this rough idea into a fully planned, broken-down jit work tree ready to execute",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Break down this epic into child stories from its spec document",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "What should I work on next in jit?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Claim this task, plan it, and complete it once its gates pass",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Lead the quarterly planning meeting for my team tomorrow morning",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 5,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "should_trigger": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "pass_rate": 1.0
+    },
+    "should_not_trigger": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "pass_rate": 1.0
+    }
+  }
+}
