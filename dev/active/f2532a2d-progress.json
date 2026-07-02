@@ -25,14 +25,14 @@
           "short_id": "b46e13d9",
           "title": "Context-aware escalation target for jit-execution-lead",
           "classification": "documentation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "faed8ffa",
           "short_id": "faed8ffa",
           "title": "Promote content standards to a canonical doc",
           "classification": "documentation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -196,7 +196,20 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "9067c337",
+      "title": "jit doc add/remove append no event (violates INV-EVENT-LOG)",
+      "reason": "blocks faed8ffa code-review gate (doc link without event)",
+      "slotted": "wave 1 (immediate, blocking)"
+    },
+    {
+      "short_id": "8689e255",
+      "title": "Flaky test-binary spawn: use CARGO_BIN_EXE_jit",
+      "reason": "flaky NotFound spawn cited by faed8ffa reviews; fixed and done",
+      "slotted": "wave 1 (immediate, blocking)"
+    }
+  ],
   "escalations": [
     {
       "issue": "c6325c5b",
@@ -206,6 +219,9 @@
       "gate_run": "code-review failed 2026-07-02"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "b46e13d9": 1,
+    "faed8ffa-gate-reruns": 4
+  },
   "started_at": "2026-07-02T00:00:00Z"
 }
