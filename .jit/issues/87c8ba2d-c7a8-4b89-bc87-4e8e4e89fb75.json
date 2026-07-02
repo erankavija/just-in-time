@@ -2,9 +2,9 @@
   "id": "87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75",
   "title": "Scaffold jit-project-lead skill shell",
   "description": "Create the `.claude/skills/jit-project-lead/` skill directory with a thin `SKILL.md` orchestrator shell and a `references/` subdirectory, and register it for cross-project reachability via a symlink under `~/.claude/skills`.\n\n## Background\n\njit-project-lead is a new strategic-tier skill sitting one level above `jit-execution-lead`, which already ships as a symlinked skill at `~/.claude/skills/jit-execution-lead` pointing into this repo's `.claude/skills/jit-execution-lead`. The new skill follows the same pattern: `SKILL.md` stays a thin router with detailed rules pushed into `references/` files read on demand. Mode-routing logic and mode bodies are explicitly out of scope for this shell (they arrive in follow-up work); this task establishes only the file layout, the skill's activation surface (its YAML frontmatter `description`), and the pre-flight steps that run before any tier derivation or mode dispatch.\n\n## Success Criteria\n\n- [hard] REQ-01: `.claude/skills/jit-project-lead/SKILL.md` exists, stays under 500 lines (roughly 5k tokens), and contains a pre-flight section plus routing stubs for tier derivation and mode dispatch, with no mode-routing block or mode-body content authored.\n- [hard] REQ-02: `.claude/skills/jit-project-lead/references/` exists as a directory ready to hold detail-rule files, consistent with the split used by `.claude/skills/jit-execution-lead/references/`.\n- [hard] REQ-03: `~/.claude/skills/jit-project-lead` is a symlink to `.claude/skills/jit-project-lead` in this repository, matching the existing per-skill symlink pattern (verifiable with `ls -la ~/.claude/skills`).\n- [hard] REQ-04: The `description` field in `SKILL.md`'s frontmatter states a clear activation trigger for the skill, following the same convention as `.claude/skills/jit-execution-lead/SKILL.md` and `.claude/skills/jit-planning-lead/SKILL.md`.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register: terse imperative voice, explicit success criteria and safety/fallback paths, explicit stop-and-escalate conditions, red-flag lists over prose warnings, detail rules pushed to `references/`, no filler. Consult `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, and `../jit-research/superpowers/skills/executing-plans/SKILL.md` as exemplars. Where the shell talks about the project's strategic or sub-strategic types, use placeholders such as \"strategic tier\" / \"sub-strategic tier\" rather than literal type names like `milestone`, `epic`, or `goal`.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "faed8ffa-8f94-43e2-8de5-735bd7525d28"
   ],
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.457843399Z",
-  "updated_at": "2026-07-02T08:05:40.638515997Z"
+  "updated_at": "2026-07-02T08:07:28.526938301Z"
 }

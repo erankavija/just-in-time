@@ -4632,3 +4632,5 @@
 {"type":"issue_state_changed","id":"40a61bfa-5cd9-4fa7-84e2-ab15c712fe21","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T08:05:40.266511887Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"c3ed64cb-d10a-4612-8c40-560fdb2677ac","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T08:05:40.266534037Z"}
 {"type":"issue_state_changed","id":"d0436774-e7f6-4bb1-8d68-1a306bb4c0a0","issue_id":"87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75","timestamp":"2026-07-02T08:05:40.638698897Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"e6e8e812-add5-4ff1-bc03-29d637a7bb52","issue_id":"87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75","timestamp":"2026-07-02T08:07:28.526887211Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"d8d93c20-6459-4e6d-8b24-05356ecd71a5","issue_id":"87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75","timestamp":"2026-07-02T08:07:28.529758183Z","assignee":"agent:claude"}
