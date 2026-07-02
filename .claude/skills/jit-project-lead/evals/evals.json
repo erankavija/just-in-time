@@ -1,0 +1,39 @@
+{
+  "skill_name": "jit-project-lead",
+  "setup_script": "evals/setup-test-repo.sh",
+  "notes": "Scope is the SKELETON: activation + config-derived tier derivation only. The mode-routing block and mode bodies are out of scope (later stories own them), so no scenario here exercises them — every scenario runs to the skeleton's mode-dispatch stub, which completes pre-flight, derives tiers, reports that mode routing is pending, and stops. Each eval requires a fresh test repo created by setup-test-repo.sh, which the sub-agent must be pointed at (cwd = that repo). The jit binary is at /home/vkaskivuo/.cargo/bin/jit. The skill files are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/; the skill reads the canonical content standards from the jit repo through the ~/.claude/skills symlink, so the test repo need not carry it. MCP disabled to avoid contaminating production .jit. Expected tier outputs are grounded in the skeleton's derivation contract (references/tier-derivation.md worked verification): steward anchor = first strategic_types entry; delegation boundary = union of applies_to across templates.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "activation-and-preflight",
+      "prompt": "You are a project steward. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md and follow it to steward this project. Run the skill exactly as written and report what it does. In your final report, state each pre-flight step you performed and its result, the tier-derivation outputs, and where and why the skill stopped.",
+      "setup_scenario": "two-tier",
+      "expected_output": "The jit-project-lead skill activates and executes its pre-flight in order: confirms .jit/ exists, runs `jit recover`, reads .jit/config.toml (type hierarchy and strategic_types), reads .jit/templates.toml (the applies_to lists), and reads the canonical content-standards doc. It then performs tier derivation once and, reaching the mode-dispatch stub, reports that mode routing is pending and stops without authoring any mode behavior. No .jit/ issue state is created or mutated (only `jit recover`'s lock cleanup is permitted).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "tier-derivation-two-tier",
+      "prompt": "You are a project steward. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md and follow it to steward this project. Execute pre-flight and tier derivation as written. In your final report, state the derived steward anchor, delegation boundary, and shape, cite the config/template inputs each came from, and report where the skill stopped.",
+      "setup_scenario": "two-tier",
+      "expected_output": "Tier derivation against this repo's ruleset yields steward anchor = milestone (the first entry of strategic_types in .jit/config.toml), delegation boundary = {epic} (the union of applies_to across the .jit/templates.toml [[template]] entries), and shape = two tier (two strategic entries and the anchor is not itself a boundary type). Assumption checks A (strategic order) and B (boundary at or below anchor) pass. The run reports these derived tiers and stops at the mode-dispatch stub.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "tier-derivation-collapsed",
+      "prompt": "You are a project steward. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md and follow it to steward this project. Execute pre-flight and tier derivation as written. In your final report, state the derived steward anchor, delegation boundary, and shape, cite the config/template inputs each came from, and report where the skill stopped.",
+      "setup_scenario": "collapsed",
+      "expected_output": "Tier derivation against the research example ruleset yields steward anchor = goal (the sole entry of strategic_types in .jit/config.toml), delegation boundary = {goal} (the union of applies_to across .jit/templates.toml), and shape = collapsed single tier (exactly one strategic entry that is itself a member of the boundary set). Assumption checks A and B pass. The run reports these derived tiers and stops at the mode-dispatch stub.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "fallback-stop-and-ask",
+      "prompt": "You are a project steward. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-project-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md and follow it to steward this project. Execute pre-flight and tier derivation as written. In your final report, state whether derivation took the primary path or the fallback, what inputs were missing, the recovered proposal if any, and exactly where and why the skill stopped and what (if anything) it applied.",
+      "setup_scenario": "fallback",
+      "expected_output": "With .jit/templates.toml absent, tier derivation routes to the numeric-level fallback rather than the primary path. The run reads the level map from `jit config show-hierarchy --json`, recovers a candidate proposal (anchor = milestone from strategic_types; boundary = {epic}, the type at the next distinct level below the anchor), and then STOPS and asks the invoker to confirm, explicitly naming .jit/templates.toml as the missing input and reporting what show-hierarchy returned. It does NOT apply the recovered tiers unconfirmed and does not proceed past derivation: no .jit/ issue state is created or mutated and the config/templates are left as-is.",
+      "files": []
+    }
+  ]
+}
