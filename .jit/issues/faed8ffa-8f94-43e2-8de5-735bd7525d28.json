@@ -11,9 +11,23 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T07:29:47.019703327Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/reference/jit-content-standards.md",
+      "commit": null,
+      "label": "Canonical jit content standards",
+      "doc_type": "reference",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:story",
     "epic:jit-project-lead",
@@ -22,5 +36,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.178681413Z",
-  "updated_at": "2026-07-02T07:23:48.633925357Z"
+  "updated_at": "2026-07-02T07:32:21.040061447Z"
 }

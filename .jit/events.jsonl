@@ -4603,3 +4603,7 @@
 {"type":"issue_completed","id":"044e8e2f-ce3b-46fb-a4cd-dd01d7115dd8","issue_id":"b46e13d9-797a-4747-90de-0843d5f651be","timestamp":"2026-07-02T07:23:47.973969687Z"}
 {"type":"issue_state_changed","id":"6b17929a-6dbf-4f49-a828-7404841c71da","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:23:48.633874347Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"2c61e4c0-bbf1-4168-b220-f38bf400bc1e","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:23:48.634045997Z","assignee":"agent:claude"}
+{"type":"gate_failed","id":"eb04ac72-7349-4152-bfff-115f4013efd2","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:32:21.040262937Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"b9c145e5-08e4-4d7f-bf57-e80a12970165","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:30.655993710Z","title":"jit doc add/remove append no event (violates INV-EVENT-LOG)","priority":"high"}
+{"type":"issue_state_changed","id":"c937b5a2-88c6-485e-924d-542dc26e3fa7","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:41.070473694Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"dc21a4c2-b6ac-4198-89be-561f2622d5d5","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:34:41.073441366Z","assignee":"agent:claude"}

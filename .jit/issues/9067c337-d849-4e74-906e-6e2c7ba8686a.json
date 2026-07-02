@@ -1,0 +1,22 @@
+{
+  "id": "9067c337-d849-4e74-906e-6e2c7ba8686a",
+  "title": "jit doc add/remove append no event (violates INV-EVENT-LOG)",
+  "description": "`jit doc add` and `jit doc remove` mutate an issue's `documents` field and save it without appending any event to `events.jsonl`. Every other issue mutation path (`issue update`, `bulk_update`, dependency commands, template apply) appends an `issue_updated` event with the changed fields. This violates INV-EVENT-LOG (every state change appends an event).\n\nDiscovered by the code-review gate on faed8ffa, which flagged a documents entry in the issue file with no matching event.\n\n## Success Criteria\n\n- [hard] REQ-01: `add_document_reference` and `remove_document_reference` (crates/jit/src/commands/document.rs) append an `issue_updated` event with `fields: [\"documents\"]` after saving the issue, mirroring the `issue.rs`/`bulk_update.rs` pattern.\n- [hard] REQ-02: Tests cover both paths: after `jit doc add` and after `jit doc remove`, the last event in the log is `issue_updated` for that issue with `fields` containing `documents` (TestHarness-level tests).\n- [hard] REQ-03: cargo fmt, clippy (zero warnings), and the full test suite pass.",
+  "state": "in_progress",
+  "priority": "high",
+  "assignee": "agent:claude",
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "component:cli",
+    "type:bug"
+  ],
+  "created_at": "2026-07-02T07:34:30.654083549Z",
+  "updated_at": "2026-07-02T07:34:41.070527984Z"
+}
