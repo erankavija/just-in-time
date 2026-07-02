@@ -63,6 +63,27 @@ missing, and the stop-and-ask conditions. Do not derive tiers inline here or
 hardcode a type name; the reference and the live config are the only sources.
 If the reference says stop and ask, stop (see Stop and escalate).
 
+## Sub-strategic dispatch
+
+Once the strategic container's sub-strategic children are layered into
+dependency-ordered waves (`references/wave-layering.md`), drive them one wave at
+a time by dispatching a `jit-execution-lead` subagent per container in the
+current wave. Read `references/container-dispatch.md` **in full** and follow it;
+it is the one-tier-up analogue of how an execution lead dispatches its issue
+workers — the steward dispatches a lead the same way, reusing the execution
+lead's own worktree-isolation and leak-detection scripts unmodified one tier up.
+
+In summary: each container id in the wave is handed to one execution lead as its
+end-to-end target; a wave of two or more containers is isolated by invoking
+`../jit-execution-lead/scripts/dispatch-worker-worktree.sh` verbatim (worktrees
+anchored to `main` HEAD, no Agent `isolation` parameter) and reconciled after
+completion by `../jit-execution-lead/scripts/check-leak-into-main.sh`, per
+`../jit-execution-lead/references/worktree-dispatch-protocol.md`. The steward
+does not break a container down, plan its internal waves, or run its issues —
+the dispatched lead owns all of that. The steward gathers each container's own
+gate and success-criteria result; the coherence check spanning containers is a
+separate concern. A wave completes before the next begins.
+
 ## Mode dispatch (stub)
 
 Four invocation modes route from the opening request. The routing block and
@@ -95,6 +116,11 @@ Stop immediately and report to the invoker when:
 - The canonical content standards doc is unreadable at its skill-base-relative
   path.
 - `jit recover` fails.
+- Sub-strategic dispatch stops (see `references/container-dispatch.md`): a
+  corrupt or drifted wave list, a `main` that cannot be made clean for the
+  dispatch script, a dispatch pre-flight or leak-check failure, an unresolvable
+  lead escalation, or a prior wave's results that cannot be landed on `main`
+  before a dependent wave.
 
 ## Red flags
 
