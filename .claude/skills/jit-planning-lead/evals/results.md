@@ -24,8 +24,8 @@ the main repo). Verdicts below were scored by inspecting the final repo state
 
 Because each scenario carries a negative command-attempt item ("no implementation code
 written"), the equivalent-runner path requires a **command / gate-invocation log** in each
-run's completion report; both graded runs include one, and each claim in it is corroborated
-below against the run repo's own `.jit/gates.json`, `.jit/events.jsonl`, and
+run's completion report; all three graded runs include one, and each claim in it is
+corroborated below against the run repo's own `.jit/gates.json`, `.jit/events.jsonl`, and
 `.jit/gate-runs/` (repo-state), so the negative item is checked against the action log, not
 just the final tree.
 
@@ -33,14 +33,23 @@ just the final tree.
 |---|---|---|---|
 | `research-and-plan` | 2026-07-03 | **PASS** | itemized checklist below + [run report](transcripts/research-and-plan.completion-report.md) |
 | `plan-from-existing` | 2026-07-03 | **PASS** | itemized checklist below + [run report](transcripts/plan-from-existing.completion-report.md) |
-| `plan-from-import` | — | **NOT YET RUN** | scenario + setup defined; repo builds and validates clean; run deferred (see note) |
+| `plan-from-import` | 2026-07-03 | **PASS** (8/8, with finding) | itemized checklist below + [run report](transcripts/plan-from-import.completion-report.md) |
 
-> **Note on `plan-from-import`.** The scenario is fully defined in `evals.json`, and its
-> `setup-test-repo.sh` case builds a clean, `jit validate`-passing repo (verified). Its run
-> was deferred and it therefore has **no** adjudicated verdict yet — this is recorded
-> honestly rather than massaged into a pass. To complete the baseline, run it under the same
-> procedure (see "Reproducing / completing a verdict" below) and score it against the
-> `expected_output` decomposition the way the two scenarios below are scored.
+> **Finding on `plan-from-import`.** The run passed every `expected_output` item, but it
+> wrote the container's success criteria in GitHub-checkbox form (`- [ ] [hard] REQ-NN …`)
+> instead of the skill-prescribed `- [hard] REQ-NN: …` (see
+> `jit-planning-lead/references/plan-doc-template.md`: *"Never bare, never mixed markers"*).
+> Because the `[hard]` marker is matched only at the **start** of a projected list item
+> (`crates/jit/src/validation/graph.rs`), the leading `[ ]` checkbox hides every criterion
+> from both the item projector (`jit item list` → **0 items**) and the `label-coverage`
+> rule. The **coverage-preview gate therefore passed vacuously**: it verified nothing. Real
+> coverage is nonetheless complete — the four stories carry `satisfies:` labels covering all
+> six REQs (checklist item 5, verified by direct label inspection, independent of the
+> parser). Proven non-destructively on a throwaway copy of the run repo: reformatting the
+> criteria to `- [hard] REQ-NN` makes `jit item list` report all 6 and gives the gate teeth
+> (stripping one `satisfies:` label then fails scope validation naming the uncovered REQ).
+> This is a genuine weakness surfaced by the eval; the eval itself (this issue) only adds the
+> scenario, so fixing the skill's criteria-format discipline is a separate decision.
 
 ---
 
@@ -117,6 +126,48 @@ Also observed: container `7af9ff75` remains `backlog` with `repo-validate` pendi
 for planning-only.
 
 **Verdict: PASS** (8/8).
+
+---
+
+## `plan-from-import` — PASS (2026-07-03)
+
+- **Run:** external note `notes/ttl-cache-design.md` imported into container `b3d778c0`
+  (`type:epic`, `epic:ttl-cache`, 6 `[hard]` criteria REQ-01..REQ-06); plan node `f48d19ff`;
+  breakdown node `a6785c53`; impl children `ad923f75` (satisfies REQ-01,02,06), `9a40fcdb`
+  (REQ-03), `7226b03e` (REQ-04), `ce8f4de6` (REQ-05).
+- **Run report:** [`transcripts/plan-from-import.completion-report.md`](transcripts/plan-from-import.completion-report.md).
+
+`expected_output`: *"The external design note notes/ttl-cache-design.md is reconciled into a
+container issue (type:epic) whose `## Success Criteria` section holds `[hard] REQ-NN` criteria
+derived from the note's stated requirements (TTL expiry-as-miss, max-size LRU eviction,
+get_or_compute, hit/miss statistics). The plan bracket is scaffolded on the container via
+`jit apply plan` (planning node P and breakdown node B on the C -> B -> P spine). A plan
+document exists at P's plan-doc path (dev/active/<container-short-id>-plan.md), is linked to P,
+and P is done with its plan-review gate passed; the plan (or a linked planning artifact)
+references the imported note as its external knowledge source. The breakdown created impl
+children that are non-breakable leaves and together carry a `satisfies:REQ-NN` label for every
+`[hard]` criterion of the container; B's coverage-preview and breakdown-review gates passed and
+B is done. No implementation code for the cache was written (planning and breakdown only). `jit
+validate` passes on the final repo."*
+
+| # | Item | Evidence | Mark |
+|---|---|---|---|
+| 1 | Note reconciled into a container (`type:epic`) whose `## Success Criteria` holds `[hard] REQ-NN` derived from the note (expiry-as-miss, LRU eviction, get_or_compute, hit/miss stats) | `b3d778c0` is `type:epic`; its `## Success Criteria` holds 6 `[hard] REQ-01..06` lines covering all four named note requirements (REQ-02 expiry-as-miss, REQ-03 max-size LRU, REQ-04 `get_or_compute`, REQ-05 hit/miss counts) plus REQ-01 store/retrieve and REQ-06 per-entry TTL; note linked as a document. Format caveat: written as `- [ ] [hard] REQ-NN …` (checkbox), non-canonical — see finding | PASS |
+| 2 | Plan bracket scaffolded via `jit apply plan` (P + B on `C → B → P`) | `f48d19ff` `type:planning`, `a6785c53` `type:breakdown` (`brackets:b3d778c0`); spine present; `jit validate` acyclic | PASS |
+| 3 | Plan doc at P's plan-doc path, linked to P; P `done` with `plan-review` passed | `dev/active/b3d778c0-plan.md` exists; `jit doc list f48d19ff` → `dev/active/b3d778c0-plan.md [HEAD] <design>`; `jit issue show f48d19ff` → state `done`; `plan-review` status `passed` + `gate_passed` event; INV-GATE-SEMANTICS | PASS |
+| 4 | The plan (or a linked artifact) references the imported note as external knowledge source | `dev/active/b3d778c0-plan.md` cites `notes/ttl-cache-design.md` in its header and §1 (whole-second granularity, per-entry-overrides-default, single-threaded scope), plus a linked grounding study `dev/studies/ttl-cache-investigation.md` | PASS |
+| 5 | Impl children are non-breakable leaves covering every `[hard]` via `satisfies` | 4 children all `type:story`; `story` is in no `.jit/templates.toml` template's `applies_to` (only `epic` is breakable) → frontier empty; `satisfies:` union = REQ-01..06 = full criterion set (verified by direct label inspection, independent of the parser) | PASS |
+| 6 | B's `coverage-preview` and `breakdown-review` passed and B is `done` | `jit issue show a6785c53` → state `done`; `coverage-preview` status `passed` (`.jit/gate-runs/…/result.json` exit 0, `auto:executor`), `breakdown-review` status `passed` (attested; `gate_passed` event). **Caveat:** the `coverage-preview` pass is **vacuous** — the checkbox criteria format hides all 6 REQs from the `label-coverage` rule (proven on a throwaway copy: stripping a `satisfies:` label still validates clean; reformatting to `- [hard] REQ-NN` then fails naming the uncovered REQ). Real coverage holds via item 5. See finding | PASS |
+| 7 | No implementation code written (negative — both halves) | **Repo-state:** working tree holds only seed `src/__init__.py` (28 bytes) and empty `tests/__init__.py`; no cache module. **Run-record command log:** the only auto gate-run is 1× `coverage-preview` (`jit validate --scope`); no `pytest`/`cargo`/`npm` in any run; the `tests` gate never executed (children `backlog`/`ready`); report's Command/Gate-Invocation Log affirms no build/test runner invoked | PASS |
+| 8 | `jit validate` passes on the final repo | `jit validate` → `✓ Repository validation passed` | PASS |
+
+Also observed: exactly one epic exists (`b3d778c0`), still `backlog` with `repo-validate`
+pending — correct for planning-only. The run report's claim that coverage-preview credited
+"all 6 REQ" is a self-report inaccuracy (it credited none); graded against repo-state per the
+method, the gate passed vacuously, which is why item 6 carries the caveat and the finding is
+recorded above.
+
+**Verdict: PASS** (8/8), with the recorded finding on the vacuous `coverage-preview` gate.
 
 ---
 
