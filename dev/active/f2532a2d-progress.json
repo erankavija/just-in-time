@@ -159,7 +159,7 @@
           "short_id": "e8b1cee3",
           "title": "jit-project-lead skeleton with config-derived tiers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress-verify-and-close (skeleton SKILL.md + all references already exist & 02a2bbb9-verified; REQ-01..05 all backed; lead reworded one 'epic-level' domain-leak in container-dispatch.md for REQ-02; NEEDS: add+run cargo-ci, run code-review, mark done)"
         }
       ]
     },
@@ -250,9 +250,11 @@
   "reviewed": {
     "e7d41080": "PASS -> done",
     "02a2bbb9": "PASS: trigger 17/17 failed:0, 4 scenarios PASS (activation, tier-derivation this-repo + research, fallback). SKILL.md untouched. done.",
+    "c23dfe71": "PASS -> done (rework-1). REQ-01..04 rollup: adjudication doc (a5b04c9f) + exec-lead 4/4 scenarios + planning-lead 3/3 + triggers 17/17 both. Authored docs/reference/lead-skills-eval-baseline.md as the checkable-claim rollup. code-review FAIL round 1: exec-lead evals.json had a 4th scenario 'parent-invoked-escalation' unrun -> ran+graded it PASS 6/6 (validates b46e13d9 context-aware escalation-to-parent), recorded, baseline -> 4/4. Re-run PASS.",
+    "e8b1cee3": "IN PROGRESS verify-and-close. Skeleton SKILL.md (134 lines <500) + references all exist and 02a2bbb9 already verified activation(17/17)+4 scenarios PASS. REQ-01 thin orchestrator OK; REQ-02 config-derived control-flow, type literals only in required examples + prose citations -> lead reworded the one 'epic-level target' domain-leak in container-dispatch.md to 'end-to-end target'; REQ-03/04/05 backed. NEXT: add+run cargo-ci, run code-review, mark done.",
     "41aa1b75": "PASS -> done. 3rd scenario plan-from-import run+graded PASS 8/8 (with finding). All 3 entry-path scenarios recorded in jit-planning-lead/evals/results.md. FINDING: coverage-preview passed vacuously (checkbox-prefixed criteria hidden from [hard] parser) -> filed standalone bug 16402e14 (type:bug, milestone:v1.0, dep-edge to 9db27a3a). First code-review FAILED only on transient isolation of 16402e14 (Trap #7); after wiring bug to graph, re-run PASSED. cargo-ci+code-review green.",
     "0b7e864d": "rework-2 PASS -> done. Anchored scanner:329 to ^ (lockstep with fixer). Worker audited all 4 other position/prefix branches: each has matching fixer strip, no residual gap. Harnesses 28+41 green (fixtures cover mid-title-not-flagged + leading-flagged-and-corrected). cargo-ci+code-review both passed.",
     "7a9eb806": "PASS: references/coherence-review.md (267 lines), tiers C1/C2/C3, PASS/FAIL verdict + stale-forward sweep + no-argue stop condition, cc-sdd register. REQ-01..04 met. Tier-3 coherence: consistent with e7d41080 container-dispatch.md which defers cross-container coherence to this story. SKILL.md untouched (wiring is 304f6d94). cargo-ci running then code-review."
   },
-  "last_session": 3
+  "last_session": 4
 }
