@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "ddaa02b5-f601-4bd6-b930-c8f31df12a86",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "41aa1b75-3dba-4836-a3e2-78794a892914",
+  "commit": "2eff10a79b045522a092b02dc989a3e78bdef666",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T23:07:58.783206364Z",
+  "completed_at": "2026-07-02T23:09:15.160958774Z",
+  "duration_ms": 76377,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are substantively met in the eval artifacts. `.claude/skills/jit-planning-lead/evals/evals.json:7-30` defines one scenario for each documented entry path with prompt, setup scenario, and expected output. `.claude/skills/jit-planning-lead/evals/setup-test-repo.sh:95-155` supports all three setup scenarios. `.claude/skills/jit-planning-lead/evals/results.md:32-36` records PASS verdicts for all three, and `:76-162` contains itemized checklist evidence.\n\n**Architecture And Separation**\n\nPass. The reviewed changes are skill/eval artifacts and JIT metadata, not Rust domain/storage/commands/CLI/output implementation. I found no boundary violation.\n\n**Functional Paradigm**\n\nPass. No production Rust implementation was introduced.\n\n**Correctness And Invariants**\n\nBlocking issue under repository integrity: current JIT state contains an isolated issue, so the repository-local issue graph invariant is broken. This is observable in `.jit/issues/16402e14-d7cc-4f40-b4a3-1b372979be67.json:8`, where `dependencies` is empty, and `.jit/index.json:439`, where the issue is present in the active index.\n\n**Safety**\n\nPass. No unsafe Rust code was introduced in the reviewed artifact set.\n\n**Testing**\n\nCargo CI is recorded as passed on this issue in `.jit/issues/41aa1b75-3dba-4836-a3e2-78794a892914.json:16-19`, so I did not rerun cargo tests per instruction. I did run `./scripts/jit-validate.sh`; it failed with exit code 4 due to the isolated issue `16402e14`. Label warnings were also emitted, but the integrity error is blocking.\n\n**Error Handling**\n\nPass. No new Rust fallible operations or error types were introduced.\n\n**CLI Contract**\n\nPass. No CLI command surface changed.\n\n**Documentation**\n\nPass. The new eval baseline is documented in `.claude/skills/jit-planning-lead/evals/results.md:1-30`, including the adjudication method and runner/evidence model.\n\n**Prior Review Feedback**\n\nNo prior run history was provided, so there were no prior review findings to verify.\n\n**Jit Issue Management**\n\nFail. The prerequisite issue is done in `.jit/issues/a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450.json:5`, and this issue correctly depends on it in `.jit/issues/41aa1b75-3dba-4836-a3e2-78794a892914.json:8-10`. However, `./scripts/jit-validate.sh` does not pass because of the isolated issue described above.\n\n1. Blocking: `./scripts/jit-validate.sh` fails with an integrity error because issue `16402e14` is isolated. The issue exists in `.jit/issues/16402e14-d7cc-4f40-b4a3-1b372979be67.json:2-5`, has no dependencies in `.jit/issues/16402e14-d7cc-4f40-b4a3-1b372979be67.json:8`, and is present in the active index at `.jit/index.json:439`. The review instructions require `./scripts/jit-validate.sh` to pass, with only label warnings allowed.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2348 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f2516-cd01-7190-a13e-5662387a75b4\n--------\nuser\n--- 2335 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
