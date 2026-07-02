@@ -7,7 +7,7 @@
     "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
     "6c5f70ad (wave 6) depends on eed6750c (jit-planning-lead, in_progress, OUTSIDE this epic, per plan D6). If eed6750c is not done when wave 6 starts, escalate per policy entry 7.",
     "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it.",
-    "Waves restructured 2026-07-02: original wave-2/3 boundary dissolved. In flight in parallel worktrees: 82e04ab0, 66aeee5f, 28731a53 (jit-project-lead files, anchored 9e45580e) and a5b04c9f, 6662f738 (eval files, anchored 52c95e52). c6325c5b REQ-03 amended autonomously after 3 unanswered escalations; flagged for user review."
+    "Session 2026-07-02 (resume): wave-2/3 workers were cut mid-flight. WIP lead-preserved and rebased onto main; continuations dispatched (a5b04c9f Opus, 6662f738 Sonnet). 66aeee5f rework attempt 2 dispatched (Opus) in fresh worktree. 82e04ab0 rework exhausted -> escalated -> invoker approved lead take-over; lead fixed stop-and-ask fallback (11ab84bc), gate passed, done. c6325c5b REQ-03 amendment approved by invoker."
   ],
   "waves": [
     {
@@ -52,14 +52,14 @@
           "short_id": "a5b04c9f",
           "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "continuation-dispatched"
         },
         {
           "id": "6662f738",
           "short_id": "6662f738",
           "title": "Add activation trigger evals for both lead skills",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "continuation-dispatched"
         }
       ]
     },
@@ -71,21 +71,21 @@
           "short_id": "66aeee5f",
           "title": "Content-standards violation scanner and classifier",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "rework-2-dispatched"
         },
         {
           "id": "82e04ab0",
           "short_id": "82e04ab0",
           "title": "Derive strategic tiers from project configuration",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "28731a53",
           "short_id": "28731a53",
           "title": "Layer sub-strategic containers into dependency-ordered waves",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "41aa1b75",
@@ -215,10 +215,16 @@
     {
       "issue": "c6325c5b",
       "category": "criteria-conflict (escalation policy entry 4)",
-      "status": "resolved-autonomously",
+      "status": "resolved-approved-by-invoker-2026-07-02",
       "summary": "REQ-01 (zero old-name hits over live scope incl. non-Done dev/active docs) and REQ-03 (touch only the named files) are jointly unsatisfiable: four backlog-attached breakdown specs quoted old names verbatim. Worker fixed them; code-review gate FAILED on literal REQ-03. Lead recommends amending REQ-03 to its intent (Done-attached records untouched). AskUserQuestion timed out; re-ask before closing wave 1.",
       "gate_run": "code-review failed 2026-07-02",
       "resolution": "After 3 unanswered AskUserQuestion attempts, amended REQ-03 to its plan-stated intent (Done-attached records untouched; live-scope docs corrected). REQ-01 is verbatim the approved plan's acceptance check; plan is the authoritative contract. FLAG FOR USER REVIEW in completion report."
+    },
+    {
+      "issue": "82e04ab0",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS (policy entry 5)",
+      "status": "resolved-approved-by-invoker-2026-07-02",
+      "summary": "3 failed code-review rounds on the tier-derivation fallback (R1 stopped before fallback ran, REQ-04; R2 auto-applied recovered tiers, REQ-03). Invoker approved lead take-over; lead rewrote fallback to gather-then-stop-for-confirmation (commit 11ab84bc); gate passed; issue done."
     }
   ],
   "rework_counts": {
@@ -226,7 +232,7 @@
     "faed8ffa-gate-reruns": 4,
     "87c8ba2d": 1,
     "82e04ab0": 2,
-    "66aeee5f": 1
+    "66aeee5f": 2
   },
   "started_at": "2026-07-02T00:00:00Z"
 }
