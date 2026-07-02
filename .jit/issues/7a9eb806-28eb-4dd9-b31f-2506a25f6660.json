@@ -2,7 +2,7 @@
   "id": "7a9eb806-28eb-4dd9-b31f-2506a25f6660",
   "title": "Run cross-container coherence review before accepting a container as complete",
   "description": "Runs a coherence review across sub-strategic containers before accepting any single one of them as complete, checking naming, style, and interface consistency at the strategic tier — the one-tier-up analogue of the per-issue holistic coherence review `jit-execution-lead` already runs on its own workers.\n\n## Background\n\n`jit-execution-lead`'s Tier 3 holistic coherence review (`references/lead-review-protocol.md`) checks cross-issue naming, style, and interface consistency before accepting a dispatched worker's output, and its Tier 2.5 stale-narrative sweep greps for forward-looking references left stale by newly landed work. The equivalent is needed one tier up: cross-container naming, style, and interface consistency, plus a stale-forward-reference sweep across container-level artifacts (design docs, plan docs, completion reports), before accepting a whole container — not a single issue — as done.\n\n## Success Criteria\n\n- [hard] REQ-01: Before a sub-strategic container is marked complete, a review compares its naming, conventions, and produced interfaces (APIs, data structures, shared documents) against every other sub-strategic container already accepted under the same strategic-tier parent, and records a PASS/FAIL verdict with specific findings.\n- [hard] REQ-02: The review includes a sweep for stale forward-looking references (for example \"planned\", \"future work\", \"once X lands\") left in documentation or artifacts by containers that have since completed, analogous to the stale-narrative sweep `jit-execution-lead` runs per issue.\n- [hard] REQ-03: A FAIL verdict blocks acceptance of the container as complete until every finding is resolved; the review never silently downgrades a FAIL to a pass.\n- [hard] REQ-04: The review protocol is documented as skill prose (a `references/` file analogous to `references/lead-review-protocol.md`) in the cc-sdd/superpowers register — terse imperative voice, explicit tiers and verdict format — following the exemplars at `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, and `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\n## Notes\n\nReviews containers that have already been dispatched and report completion; does not itself dispatch or drive execution of any container.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.713639935Z",
-  "updated_at": "2026-07-01T22:19:45.775181999Z"
+  "updated_at": "2026-07-02T21:09:01.243874776Z"
 }
