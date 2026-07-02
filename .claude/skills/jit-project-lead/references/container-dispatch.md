@@ -34,9 +34,11 @@ steward hands over the container id and lets the lead run.
   predecessor's work would dispatch onto a stale base (the TRAP 1 failure in
   `../../jit-execution-lead/references/worktree-dispatch-protocol.md`). Landing and
   reconciling each completed container branch onto `main` — including merges of
-  the append-only `.jit/` logs — and the coherence check spanning containers are
-  owned by the integration/coherence story; this reference requires that
-  boundary reached before it dispatches, and does not define its mechanics.
+  the append-only `.jit/` logs — is owned by the integration story; this
+  reference requires that boundary reached before it dispatches, and does not
+  define its mechanics. The cross-container coherence review that spans the
+  wave's accepted containers is defined in `references/coherence-review.md` and
+  runs at the step-8 → step-9 seam below.
 
 ## Procedure
 
@@ -127,12 +129,17 @@ path.
    Record the per-container result in the progress file. A container that
    finished without its own gates passing or criteria met is not accepted — send
    it back to its lead (rework) or escalate; do not advance the wave over it.
-   The coherence check spanning multiple containers is a separate story and is
-   not run here.
+   The coherence check spanning multiple containers does not run inline inside
+   one container's acceptance; it runs across the wave's accepted containers
+   between this step and step 9, per `references/coherence-review.md`.
 
-9. **Advance.** When every container in `W` is accepted, cross the wave boundary
-   (predecessor results onto `main`, per Preconditions — owned by the
-   integration/coherence story), set `current_wave += 1`, commit the progress
+9. **Advance.** Before advancing, run the cross-container coherence review over
+   every container accepted in `W` this wave, per
+   `references/coherence-review.md`; a FAIL blocks acceptance and the wave does
+   not advance until every finding is resolved and the review re-runs to PASS.
+   When every container in `W` is accepted and the coherence review passes, cross
+   the wave boundary (predecessor results onto `main`, per Preconditions — owned
+   by the integration story), set `current_wave += 1`, commit the progress
    file, and repeat from step 1 for the next wave. When no wave remains, the
    steward's sub-strategic delegation for this strategic container is complete.
 
@@ -185,5 +192,7 @@ Stop and report to the invoker (the human when the steward runs standalone) when
   base.
 - Accepting a container whose own gates did not pass or whose `[hard]` criteria
   are unmet. Per-container acceptance is a hard gate on advancing the wave.
-- Running the cross-container coherence check here. It is a separate story;
-  gathering each container's own result is the only cross-lead step in scope.
+- Folding the cross-container coherence check into step 8 (one container's own
+  acceptance). The review is real and required, but it runs across the wave's
+  accepted containers between step 8 and step 9, per
+  `references/coherence-review.md` — not inside a single container's gate check.

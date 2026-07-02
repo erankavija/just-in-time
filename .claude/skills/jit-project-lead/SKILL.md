@@ -81,8 +81,10 @@ completion by `../jit-execution-lead/scripts/check-leak-into-main.sh`, per
 `../jit-execution-lead/references/worktree-dispatch-protocol.md`. The steward
 does not break a container down, plan its internal waves, or run its issues —
 the dispatched lead owns all of that. The steward gathers each container's own
-gate and success-criteria result; the coherence check spanning containers is a
-separate concern. A wave completes before the next begins.
+gate and success-criteria result, then — before advancing the wave — runs the
+cross-container coherence review over the wave's accepted containers per
+`references/coherence-review.md`; a FAIL blocks acceptance until every finding is
+resolved. A wave completes before the next begins.
 
 ## Mode dispatch (stub)
 
