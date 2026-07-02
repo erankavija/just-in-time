@@ -4601,3 +4601,5 @@
 {"type":"gate_passed","id":"06402142-1d05-4a1e-8edc-b567b580f31e","issue_id":"b46e13d9-797a-4747-90de-0843d5f651be","timestamp":"2026-07-02T07:23:10.921009463Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"b26ef9a5-2090-469a-b435-ba715035764d","issue_id":"b46e13d9-797a-4747-90de-0843d5f651be","timestamp":"2026-07-02T07:23:47.973945767Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"044e8e2f-ce3b-46fb-a4cd-dd01d7115dd8","issue_id":"b46e13d9-797a-4747-90de-0843d5f651be","timestamp":"2026-07-02T07:23:47.973969687Z"}
+{"type":"issue_state_changed","id":"6b17929a-6dbf-4f49-a828-7404841c71da","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:23:48.633874347Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"2c61e4c0-bbf1-4168-b220-f38bf400bc1e","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:23:48.634045997Z","assignee":"agent:claude"}
