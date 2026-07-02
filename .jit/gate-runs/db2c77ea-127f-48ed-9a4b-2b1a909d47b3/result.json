@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "db2c77ea-127f-48ed-9a4b-2b1a909d47b3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3",
+  "commit": "11ab84bc166678f18ac5c46e4191572726d8df48",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T12:20:14.796827431Z",
+  "completed_at": "2026-07-02T12:21:07.577964082Z",
+  "duration_ms": 52781,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nPass. The current reference logic satisfies REQ-01 and REQ-02 via the worked traces in `.claude/skills/jit-project-lead/references/tier-derivation.md:149` and `.claude/skills/jit-project-lead/references/tier-derivation.md:163`.\n\nREQ-03 and REQ-04 are now aligned: missing `.jit/templates.toml` or empty `strategic_types` routes to fallback, reads `jit config show-hierarchy --json`, recovers only a proposal, and stops for confirmation in `.claude/skills/jit-project-lead/references/tier-derivation.md:66`. `SKILL.md` mirrors that behavior at `.claude/skills/jit-project-lead/SKILL.md:86`.\n\nREQ-05 is satisfied in the control-flow sections; concrete type names appear only in the worked verification data block at `.claude/skills/jit-project-lead/references/tier-derivation.md:143`. REQ-06 is satisfied: `SKILL.md` is 105 lines.\n\n## Architecture And Separation Of Concerns\n\nPass in scope. The change is confined to `.claude/skills/jit-project-lead/` prose/reference instructions and does not alter Rust domain, storage, command, CLI, or output boundaries.\n\n## Functional Paradigm\n\nPass in scope. No Rust implementation was added. The skill procedure is declarative guidance, not production control flow.\n\n## Correctness And Invariants\n\nNo Rust state-changing code was introduced. Atomic writes, event logging, gate semantics, assignee/label parsing, PID safety, and unsafe-code policy are not touched.\n\n## Safety\n\nPass. No unsafe Rust code was introduced.\n\n## Testing\n\nI did not run cargo tests. The supplied run history contains failed `code-review` gates, not test or lint failures. I ran `./scripts/jit-validate.sh`; it passed with three allowed orphan-leaf label warnings.\n\n## Error Handling\n\nPass in scope. The missing/ambiguous config path now reports the missing input, fallback hierarchy result, and whether recovery produced a proposal or no proposal in `.claude/skills/jit-project-lead/references/tier-derivation.md:102`.\n\n## CLI Contract\n\nPass in scope. No CLI command surface changed.\n\n## Documentation\n\nPass. The public skill instructions now match the reference behavior: `SKILL.md` delegates derivation to the reference at `.claude/skills/jit-project-lead/SKILL.md:50` and documents fallback stop behavior at `.claude/skills/jit-project-lead/SKILL.md:86`.\n\n## Prior Review Feedback\n\nResolved. The most recent failed review said fallback-derived tiers were being applied instead of stopping. The current reference says fallback “always ends in a stop” and recovered tiers are “never an applied result” at `.claude/skills/jit-project-lead/references/tier-derivation.md:68`, with confirmation required before proceeding at `.claude/skills/jit-project-lead/references/tier-derivation.md:94`.\n\n## Jit Issue Management\n\n`./scripts/jit-validate.sh` passed with allowed label warnings. The dependency `87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75` is marked `done` with its required `code-review` gate passed in `.jit/issues/87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75.json:5`.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
