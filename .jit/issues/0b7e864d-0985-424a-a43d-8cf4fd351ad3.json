@@ -13,7 +13,22 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": ".claude/skills/jit-project-lead/scripts/standards-fix.sh",
+      "commit": null,
+      "label": "Mechanical content-standards auto-fixer",
+      "doc_type": "implementation",
+      "format": "markdown"
+    },
+    {
+      "path": ".claude/skills/jit-project-lead/references/standards-fix.md",
+      "commit": null,
+      "label": "Auto-fixer contract and rule->correction mapping",
+      "doc_type": "reference",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:jit-project-lead",
@@ -21,5 +36,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.853900227Z",
-  "updated_at": "2026-07-02T20:49:27.954177858Z"
+  "updated_at": "2026-07-02T21:07:06.185844728Z"
 }
