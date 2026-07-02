@@ -2,7 +2,7 @@
   "id": "6662f738-cc2b-467a-9de3-01629b7b36d0",
   "title": "Add activation trigger evals for both lead skills",
   "description": "Give jit-execution-lead and jit-planning-lead a trigger eval each, so their activation from the skill's own frontmatter description is checked rather than assumed.\n\n## Background\n\nNeither jit-execution-lead's nor jit-planning-lead's activation-from-description has ever been checked against should-trigger and should-not-trigger phrasings. Both skills currently rely on their frontmatter `description` field working correctly by inspection alone.\n\n## Success Criteria\n\n- [hard] REQ-01: `.claude/skills/jit-execution-lead/trigger_eval.json` contains a set of should-trigger and should-not-trigger query/label pairs exercising the skill's frontmatter description, including near-miss should-not-trigger cases that share vocabulary with the skill but need a different tool.\n- [hard] REQ-02: `.claude/skills/jit-planning-lead/trigger_eval.json` contains an equivalent set of should-trigger and should-not-trigger query/label pairs for that skill's frontmatter description.\n- [hard] REQ-03: Both trigger-eval sets have been run against their skill's live description, either with the skill-creator plugin's trigger-eval runner (`run_eval.py --eval-set <path> --skill-path <path>`) or a documented equivalent procedure.\n- [hard] REQ-04: `.claude/skills/jit-execution-lead/trigger_eval_results.json` and `.claude/skills/jit-planning-lead/trigger_eval_results.json` record a passing trigger rate for each skill's should-trigger and should-not-trigger queries.\n\n## Notes\n\nA trigger check tests whether the skill activates from its own description text; it exercises no scenario behavior and needs no other eval machinery in place first.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.368595004Z",
-  "updated_at": "2026-07-01T22:19:46.016152925Z"
+  "updated_at": "2026-07-02T08:23:44.282468307Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b2324fe1-b9cc-4556-b33b-d2bceb4e98b8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c6325c5b-1d92-444c-b460-3021e6402b07",
+  "commit": "b36af0599ace104e4e39c0b997f1b1c2ee21d2ec",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T08:20:58.566698453Z",
+  "completed_at": "2026-07-02T08:23:24.017347921Z",
+  "duration_ms": 145450,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01: Pass. Live-scope old-name grep is clean after excluding Done-owned historical docs and the valid `jit-project-lead` skill name explicitly excluded by the requirement.  \nREQ-02: Pass. The nine named hits were corrected in place, including [SKILL.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/SKILL.md:14), [SKILL.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-planning-lead/SKILL.md:9), both dispatch script headers, and [eed6750c-handoff.md](/home/vkaskivuo/Projects/just-in-time/dev/active/eed6750c-handoff.md:1).  \nREQ-03: Pass under the current issue text. The prior review’s scope objection no longer applies because live non-Done `dev/active` docs are now explicitly in scope.\n\n**Architecture / Functional / Correctness / Safety**\n\nNo Rust code changed for this issue’s sweep. No domain/storage/command/CLI boundary impact, no unsafe code, and no state-machine, file-write, PID, label, assignee, or gate-semantic changes introduced by the sweep.\n\n**Testing / Validation**\n\n`./scripts/jit-validate.sh` passes with three allowed label warnings. The recorded prior `code-review` failure was reviewed against the updated issue text and is addressed.\n\n**Error Handling / CLI / Documentation**\n\nNo library error handling or CLI contract changes. Documentation and skill references are consistent with the renamed skill paths.\n\n**Jit Issue Management**\n\nDependency `f59d1b6b` is Done. Event logging includes the issue-description update in `.jit/events.jsonl`.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
