@@ -1,12 +1,13 @@
 {
   "epic_id": "f2532a2d-138d-46bf-9547-e1ea517f0170",
   "epic_short_id": "f2532a2d",
-  "current_wave": 1,
+  "current_wave": 2,
   "notes": [
     "Bracket already complete before this session: planning 8f5de6bc done (plan-review passed), breakdown f59d1b6b done (coverage-preview + breakdown-review passed). Plan doc: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md (decisions D1-D9).",
     "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
     "6c5f70ad (wave 6) depends on eed6750c (jit-planning-lead, in_progress, OUTSIDE this epic, per plan D6). If eed6750c is not done when wave 6 starts, escalate per policy entry 7.",
-    "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it."
+    "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it.",
+    "Waves restructured 2026-07-02: original wave-2/3 boundary dissolved. In flight in parallel worktrees: 82e04ab0, 66aeee5f, 28731a53 (jit-project-lead files, anchored 9e45580e) and a5b04c9f, 6662f738 (eval files, anchored 52c95e52). c6325c5b REQ-03 amended autonomously after 3 unanswered escalations; flagged for user review."
   ],
   "waves": [
     {
@@ -18,7 +19,7 @@
           "short_id": "c6325c5b",
           "title": "Sweep residual pre-rename references",
           "classification": "documentation",
-          "status": "blocked-escalation"
+          "status": "done"
         },
         {
           "id": "b46e13d9",
@@ -44,21 +45,21 @@
           "short_id": "87c8ba2d",
           "title": "Scaffold jit-project-lead skill shell",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "a5b04c9f",
           "short_id": "a5b04c9f",
           "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "6662f738",
           "short_id": "6662f738",
           "title": "Add activation trigger evals for both lead skills",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -70,21 +71,21 @@
           "short_id": "66aeee5f",
           "title": "Content-standards violation scanner and classifier",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "82e04ab0",
           "short_id": "82e04ab0",
           "title": "Derive strategic tiers from project configuration",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "28731a53",
           "short_id": "28731a53",
           "title": "Layer sub-strategic containers into dependency-ordered waves",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "41aa1b75",
