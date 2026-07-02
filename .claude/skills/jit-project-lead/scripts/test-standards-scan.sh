@@ -87,6 +87,17 @@ NOBG="$(mk "Unstructured context issue" $'A summary sentence.\n\nThe subsystem h
 #    -> no STRUCT-BACKGROUND even though the region is long.
 HASBG="$(mk "Structured context issue" $'A summary sentence.\n\n## Background\n\nThe subsystem has a long history.\nSeveral components interact in non-obvious ways.\nThe prior implementation had performance issues.\nA redesign was proposed in an earlier quarter.\nThat redesign informs the current approach here.\nOne more line of loose context to cross the bar.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
 
+# 9. LEADING position code (`S0/W1: ...`) -> TITLE-EMBEDDED-ID (mechanical). The
+#    scanner's position-code branch is `^`-anchored, in lockstep with the fixer,
+#    which strips only a leading position code.
+LEADPOS="$(mk "S0/W1: build the worker pool" $'A summary line.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
+# 10. MID-title position code (`Build S0/W1: worker`) -> NOT flagged. Per the
+#     standard, STD-TITLE-EMBEDDED-ID is a *leading* short-id/ordinal/prefix; a
+#     mid-title `S0/W1` is not that rule and the fixer cannot deterministically
+#     strip it, so the scanner must not classify it mechanical.
+MIDPOS="$(mk "Build S0/W1: worker" $'A summary line.\n\n## Success Criteria\n\n- [hard] REQ-01: Returns the value for a valid input.' --force)"
+
 # --- Documents ------------------------------------------------------------
 # In-scope docs/ file with math violations (display a/b + bare var outside math).
 mkdir -p "$FIX/docs"
@@ -174,6 +185,10 @@ if [[ "$(target_count "$GOOD")" -eq 0 ]]; then pass "clean issue (well-formed RE
 assert_present "unmarked criterion -> UNMARKED"                STD-CRIT-UNMARKED "$UNMARK"
 assert_present "embedded-id title -> TITLE-EMBEDDED-ID"        STD-TITLE-EMBEDDED-ID "$BADTITLE"
 assert_present "missing Success Criteria -> SC-MISSING"        STD-SC-MISSING "$BADTITLE"
+# Position-code title branch is `^`-anchored (lockstep with the fixer's strip).
+assert_present "leading position code -> TITLE-EMBEDDED-ID"    STD-TITLE-EMBEDDED-ID "$LEADPOS"
+assert_absent  "mid-title position code NOT flagged"          STD-TITLE-EMBEDDED-ID "$MIDPOS"
+if [[ "$(target_count "$MIDPOS")" -eq 0 ]]; then pass "mid-title position-code issue has zero findings"; else fail "mid-title position-code issue has $(target_count "$MIDPOS") findings: $(jq -c --arg t "$MIDPOS" 'select(.target==$t)' "$FINDINGS")"; fi
 
 # Judgment: standalone bare-pronoun opening.
 assert_present "bare-pronoun opening -> STANDALONE"            STD-STANDALONE "$STANDALONE" "It cannot be understood"
