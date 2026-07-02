@@ -74,6 +74,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue.documents.push(doc_ref.clone());
         self.storage.save_issue(issue)?;
 
+        // Log the mutation (after the save), mirroring `issue.rs`/`bulk_update.rs`
+        // so every `documents` change is captured in the event log (INV-EVENT-LOG).
+        let event = crate::domain::Event::new_issue_updated(
+            full_id.clone(),
+            "doc-add".to_string(),
+            vec!["documents".to_string()],
+        );
+        self.storage.append_event(&event)?;
+
         Ok((
             DocumentAddResult {
                 issue_id: full_id,
@@ -120,6 +129,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         self.storage.save_issue(issue)?;
+
+        // Log the mutation (after the save), mirroring `issue.rs`/`bulk_update.rs`
+        // so every `documents` change is captured in the event log (INV-EVENT-LOG).
+        let event = crate::domain::Event::new_issue_updated(
+            full_id.clone(),
+            "doc-remove".to_string(),
+            vec!["documents".to_string()],
+        );
+        self.storage.append_event(&event)?;
 
         Ok(DocumentRemoveResult {
             issue_id: full_id,
