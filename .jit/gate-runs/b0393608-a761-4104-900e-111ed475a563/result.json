@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b0393608-a761-4104-900e-111ed475a563",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0b7e864d-0985-424a-a43d-8cf4fd351ad3",
+  "commit": "ed45fec9476d69162cb2b0527c12aa230fb4bba1",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T22:42:28.752269462Z",
+  "completed_at": "2026-07-02T22:43:33.297287908Z",
+  "duration_ms": 64545,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01/REQ-02 are met for the reviewed change. The prior scanner/fixer mismatch is resolved: `STD-TITLE-EMBEDDED-ID` now only flags leading position-code prefixes at [.claude/skills/jit-project-lead/scripts/standards-scan.sh](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/scripts/standards-scan.sh:325), matching the fixer’s leading-only strip at [.claude/skills/jit-project-lead/scripts/standards-fix.sh](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/scripts/standards-fix.sh:290).\n\nREQ-03/REQ-04 remain covered by the existing fixer behavior and reports; no new judgment-finding mutation path was added.\n\n**Architecture and Separation of Concerns**\n\nNo Rust domain/storage/command/CLI/output boundary changes. The change is limited to skill shell tooling and tests under `.claude/skills/jit-project-lead`.\n\n**Functional Paradigm**\n\nNo blocking concern. The shell implementation is imperative, which is appropriate for CLI orchestration and fixture setup.\n\n**Correctness and Invariants**\n\nNo atomic-write, event-log, gate-transition, assignee/label parsing, or PID-safety behavior is changed. No new repository persistence path was introduced.\n\n**Safety**\n\nNo Rust code was changed; no unsafe code introduced.\n\n**Testing and Validation**\n\nUsed the provided succeeded cargo-ci gate for current commit `ed45fec9476d69162cb2b0527c12aa230fb4bba1`: fmt ok, clippy ok, `2836 passed, 0 failed, 12 ignored` in `.jit/gate-runs/7760e311-112d-4199-9bd1-99175640fc50/result.json`. I did not rerun cargo tests.\n\nI ran `./scripts/jit-validate.sh`; it passed with 3 allowed orphan-leaf warnings.\n\nRegression coverage was added for leading vs mid-title position codes in [.claude/skills/jit-project-lead/scripts/test-standards-scan.sh](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/scripts/test-standards-scan.sh:90) and [.claude/skills/jit-project-lead/scripts/test-standards-fix.sh](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/scripts/test-standards-fix.sh:117).\n\n**Error Handling**\n\nNo new fallible Rust API or library error handling path was added. Existing shell skip/report behavior is unchanged.\n\n**CLI Contract**\n\nNo `jit` CLI command surface changed, so the `--json` contract is unaffected.\n\n**Documentation**\n\nNo public Rust API was added or changed. Existing scanner/fixer reference behavior is consistent with the leading-prefix interpretation.\n\n**Prior Review Feedback**\n\nResolved. The most recent blocking item cited an unanchored scanner pattern for mid-title `S0/W1:`. The scanner is now anchored at [.claude/skills/jit-project-lead/scripts/standards-scan.sh](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/scripts/standards-scan.sh:329), and tests assert mid-title position codes are not flagged.\n\n**Jit Issue Management**\n\nThe prerequisite issue `66aeee5f` is marked done in the provided context. `jit-validate` passed; label/orphan warnings are allowed by the review instructions.\n\n**Findings**\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -2,7 +2,7 @@
   "id": "206bd960-6531-4aa0-a73a-1d525f4604ee",
   "title": "Standards-sweep mode workflow and report",
   "description": "Adds jit-project-lead's fourth mode: an end-to-end sweep that scans the project against the canonical content-standards rules, applies mechanical fixes, and reports the auto-fixed items and the judgment items separately for review.\n\n## Background\n\njit-project-lead's skeleton and first three modes already exist. This mode composes a scan of every project issue and document against the canonical rules in `docs/reference/jit-content-standards.md`, classifying each violation as mechanical or judgment, applying the mechanical fixes, and producing one report of the result. The mode's prose follows the same register as the project's other lead skills: terse imperative voice, explicit success criteria, explicit stop-and-escalate conditions, no filler. Exemplars for this register: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit-project-lead`'s `SKILL.md` documents a fourth mode that runs the scan, applies the mechanical fixes, and produces one combined report.\n- [hard] REQ-02: The report lists every auto-fixed violation (issue or document, rule, correction applied) and, in a visibly separate section, every judgment violation left open (issue or document, rule, why it needs a decision); the two lists never intermix.\n- [hard] REQ-03: The mode's documentation is written in the cc-sdd/superpowers register: terse imperative voice, explicit success criteria, explicit stop-and-escalate conditions, no filler prose.\n- [hard] REQ-04: A reader of the mode's documentation alone, with no other context, understands when to invoke the mode, what it changes automatically, and what it leaves for a human or lead to decide.\n\n## Notes\n\nConsult the register exemplars above for voice and structure only; do not copy their content.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.884044569Z",
-  "updated_at": "2026-07-01T22:19:45.944914033Z"
+  "updated_at": "2026-07-02T22:43:56.370996166Z"
 }
