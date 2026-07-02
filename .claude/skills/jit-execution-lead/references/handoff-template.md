@@ -19,7 +19,7 @@ Use exactly the sections below, in this order. Do not skip sections — if a sec
 - Wave in progress: [wave N of M]
 - Children summary: [X done, Y in_progress, Z backlog/ready, W rejected]
 - Active claims: [list any issues currently claimed, with agent IDs and claim age]
-- Open escalations: [list any escalations still awaiting user input]
+- Open escalations: [list any escalations still awaiting invoker input]
 - Progress file: `dev/active/[SHORT_ID]-progress.json` (reflects the above)
 
 ## What just happened
@@ -37,7 +37,7 @@ Do NOT write prose narrative; write dense bullets. The next lead reads this to r
 The specific next actions in order of priority. Each bullet must be actionable by the reader without further investigation.
 
 - [ ] Resume wave [N]: dispatch issues [list] per the wave plan in the progress file.
-- [ ] Check the escalation on `[SHORT_ID]` — user response may have arrived in [link/chat].
+- [ ] Check the escalation on `[SHORT_ID]` — the invoker's response may have arrived in [link/chat/parent-lead reply].
 - [ ] Re-review `[SHORT_ID]` after rework (attempt [N]).
 
 ## Traps — do not repeat these
@@ -54,9 +54,9 @@ Each trap should state: (a) the wrong approach, (b) the evidence it's wrong (fil
 
 If no traps were identified this session, write: "None identified this session. Re-read prior handoffs' trap sections before dispatching." Traps from earlier handoffs remain in force until explicitly resolved.
 
-## Open questions needing user input
+## Open questions needing invoker input
 
-List every question that blocks further progress and requires the user's decision. One bullet per question; include a recommendation if you have one.
+List every question that blocks further progress and requires the invoker's decision (the human standalone, the parent lead when dispatched — see `escalation-policy.md`). One bullet per question; include a recommendation if you have one.
 
 - Question: [exact question]
   - Context: [one-sentence summary]

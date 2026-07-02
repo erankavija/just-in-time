@@ -49,7 +49,7 @@ Produce this report when the epic is fully complete, before transitioning to `do
 
 [If any escalations occurred:]
 
-- [Escalation 1 — what was escalated, what the user decided, outcome]
+- [Escalation 1 — what was escalated, what the invoker decided, outcome]
 
 [If none: "No escalations were required."]
 

@@ -26,6 +26,14 @@
       "setup_scenario": "content-project",
       "expected_output": "Epic broken down into doc tasks. Tutorial, how-to guide, and reference page created in correct directories. All follow Diataxis structure and project conventions. docs/index.md updated. Content-review gate passed. Epic done. No software-specific commands attempted.",
       "files": []
+    },
+    {
+      "id": 4,
+      "name": "parent-invoked-escalation",
+      "prompt": "You are an execution lead dispatched as a subagent by a parent lead, jit-project-lead — report escalations to that parent lead in your final report. Your working directory is a test project at {REPO_PATH}. The jit binary is at /home/vkaskivuo/.cargo/bin/jit. Read the jit-execution-lead skill at /home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/SKILL.md and follow it to lead the epic in this repo to completion. A requirement change has come in: the truncate task should drop its edge-case success criterion (empty string, max_length < len(suffix)) — handle this change per the skill's escalation policy. The composed skills are at /home/vkaskivuo/Projects/just-in-time/.claude/skills/.",
+      "setup_scenario": "sw-with-children",
+      "expected_output": "Lead treats the criteria change as an issue scope change requiring escalation. Escalation written using the escalation prompt template, addressed to the parent lead (jit-project-lead), and surfaced in the final report. No interactive question posed to the human. Truncate task's success criteria left unmodified pending the parent lead's decision.",
+      "files": []
     }
   ]
 }
