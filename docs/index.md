@@ -50,6 +50,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
 - [Content Standards](reference/jit-content-standards.md) - Authoring standards for issue descriptions and markdown documents
+- [Scenario-Eval Adjudication](reference/skill-eval-adjudication.md) - Reproducible pass/fail method for grading skill scenario evals
 
 ### 📄 Additional Resources
 
