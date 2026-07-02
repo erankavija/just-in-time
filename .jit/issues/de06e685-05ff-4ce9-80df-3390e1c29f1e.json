@@ -1,0 +1,22 @@
+{
+  "id": "de06e685-05ff-4ce9-80df-3390e1c29f1e",
+  "title": "Make cross-sibling coherence review mandatory for multi-story recursion",
+  "description": "In jit-planning-lead Step 5.3, the cross-sibling coherence pass is framed as skippable for \"a single child or trivially independent leaves\". The recursion step (5.5) then breaks each story down through an independently dispatched analysis agent, and story-level recursion carries no quality gate of its own (stories are not bracketed, so there is no breakdown-review on the task fan-out). During the 2821e177 run, the optional task-level coherence pass over 18 tasks from six independent authors found three genuine cross-story contract breaks: an audit task written against a function a sibling story deletes, two stories minting conflicting `Scope` enum variants for the same concept, and an acceptance grep claiming a legacy class it cannot detect. Skipping the pass would have shipped all three to execution.\n\nIndependent authorship is the risk condition, not sibling count alone: two or more sibling containers broken down by separate agents in one level is precisely where contract drift arises, and it is also the only review point those tasks get. Amend `.claude/skills/jit-planning-lead/SKILL.md` Step 5 so the coherence pass over the produced leaves is mandatory whenever a recursion level fans out more than one container through separate analysis dispatches, keeping the skip only for a single container or a level whose children were authored in one dispatch.\n\n## Success Criteria\n\n- [hard] REQ-01: Step 5 states the coherence pass is mandatory when a level breaks down two or more sibling containers via independent analysis dispatches, and says why (independently authored task sets receive no gate of their own).\n- [hard] REQ-02: the skip condition is narrowed to a single recursed container or a level authored in one dispatch.\n- [hard] REQ-03: the coherence-dispatch guidance tells the reviewer to check consumed-vs-promised contracts across story boundaries (names, shapes, deletions) and to return fixes as criterion or description rewords consistent with the approved plan.\n",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:skill-suite-maintenance",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-01T23:59:55.280158318Z",
+  "updated_at": "2026-07-01T23:59:55.281565909Z"
+}
