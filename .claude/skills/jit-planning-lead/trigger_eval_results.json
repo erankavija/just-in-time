@@ -1,0 +1,162 @@
+{
+  "skill_name": "jit-planning-lead",
+  "description": "Turn a vague request, idea, article, or rough epic into a fully planned and broken-down work tree, ready to execute. Use when asked to plan with jit.",
+  "method": "dev/eval/skill-triggers/run_trigger_eval.py (adapted skill-creator trigger-eval technique; base-name match instead of unique-proxy match, see README.md)",
+  "runs_per_query": 3,
+  "trigger_threshold": 0.5,
+  "results": [
+    {
+      "query": "Turn this article into a jit plan with a full breakdown ready for implementation",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "I have a rough idea for a feature \u2014 plan it out with jit into a ready-to-execute work tree",
+      "should_trigger": true,
+      "trigger_rate": 0.3333333333333333,
+      "triggers": 1,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "Plan this feature with jit",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "Take this vague request and produce a fully planned, broken-down jit work tree",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "Help me plan this rough epic in jit before we start any implementation",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 3,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "I want to go from a half-formed idea to a complete jit plan that's ready to execute",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 3,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Scope and plan this initiative with jit so the whole work tree is ready to hand off",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "Here's a loose problem statement \u2014 plan and break it into child jit issues for me",
+      "should_trigger": true,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": false
+    },
+    {
+      "query": "Lead this epic to completion with a team of agents and enforce quality",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Drive this epic end-to-end, dispatch the workers, and handle rework",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "What should I work on next in jit?",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Break down this existing jit issue into child tasks from its spec document",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Show me the jit project status and the blocked issues",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Claim and complete this jit task once its gates pass",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Steward the whole project and drive its top-level strategic container",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Migrate our ROADMAP.md and TODO list into jit",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    },
+    {
+      "query": "Plan the agenda for tomorrow's team offsite",
+      "should_trigger": false,
+      "trigger_rate": 0.0,
+      "triggers": 0,
+      "runs": 3,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "passed": 11,
+    "failed": 6,
+    "should_trigger": {
+      "total": 8,
+      "passed": 2,
+      "failed": 6,
+      "pass_rate": 0.25
+    },
+    "should_not_trigger": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "pass_rate": 1.0
+    }
+  }
+}

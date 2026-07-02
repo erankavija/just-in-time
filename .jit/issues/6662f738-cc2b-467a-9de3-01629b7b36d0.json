@@ -13,7 +13,46 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": ".claude/skills/jit-execution-lead/trigger_eval.json",
+      "commit": null,
+      "label": "jit-execution-lead trigger eval queries",
+      "doc_type": "reference"
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/trigger_eval.json",
+      "commit": null,
+      "label": "jit-planning-lead trigger eval queries",
+      "doc_type": "reference"
+    },
+    {
+      "path": ".claude/skills/jit-execution-lead/trigger_eval_results.json",
+      "commit": null,
+      "label": "jit-execution-lead trigger eval results (16/17 pass, should-trigger 7/8, should-not-trigger 9/9)",
+      "doc_type": "experiment"
+    },
+    {
+      "path": ".claude/skills/jit-planning-lead/trigger_eval_results.json",
+      "commit": null,
+      "label": "jit-planning-lead trigger eval results (11/17 pass, should-trigger 2/8, should-not-trigger 9/9 -- description undertriggers)",
+      "doc_type": "experiment"
+    },
+    {
+      "path": "dev/eval/skill-triggers/run_trigger_eval.py",
+      "commit": null,
+      "label": "Adapted trigger-eval runner (fixes self-hosted-skill shadowing confound)",
+      "doc_type": "implementation",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/eval/skill-triggers/README.md",
+      "commit": null,
+      "label": "Trigger eval runner rationale and usage",
+      "doc_type": "documentation",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:jit-project-lead",
@@ -21,5 +60,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.368595004Z",
-  "updated_at": "2026-07-02T08:24:45.528977064Z"
+  "updated_at": "2026-07-02T12:27:32.621091166Z"
 }
