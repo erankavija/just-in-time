@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "bfe77aa5-656e-43fe-b0f9-5060de43d7ca",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "82e04ab0-aeab-40e0-bbb5-6ce2abcac3b3",
+  "commit": "e090d43e0cabdbae312b695495f953402052c20b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T08:26:46.583782792Z",
+  "completed_at": "2026-07-02T08:28:09.696270360Z",
+  "duration_ms": 83112,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nFail. REQ-01, REQ-02, REQ-05, and REQ-06 are covered by the reference logic and line budget. However REQ-04 is not met because the top-level skill still instructs an immediate stop before the fallback can run.\n\n**Architecture And Separation Of Concerns**\n\nPass. The change is confined to `.claude/skills/jit-project-lead/` prose and does not alter Rust domain, storage, command, CLI, or output boundaries.\n\n**Functional Paradigm**\n\nPass in scope. This is procedural skill guidance, not production Rust. No imperative Rust logic was introduced.\n\n**Correctness And Invariants**\n\nNo Rust state-changing code was introduced. Atomic writes, event logging, gate semantics, assignee/label parsing, and PID safety are not touched by this change.\n\n**Safety**\n\nPass. No Rust code or unsafe code was introduced.\n\n**Testing**\n\n`./scripts/jit-validate.sh` passed with only allowed label warnings. `run_history` is empty and there is no succeeded `cargo-ci` evidence in the supplied context; I did not rely on a cargo-ci gate.\n\n**Error Handling**\n\nFail via the same fallback issue: the documented error path reports missing config immediately instead of gathering the required fallback context first.\n\n**CLI Contract**\n\nPass in scope. No CLI command surface was changed.\n\n**Documentation**\n\nFail. The public skill instructions contradict the reference fallback behavior.\n\n**Jit Issue Management**\n\n`./scripts/jit-validate.sh` passes with warnings only. The listed dependency `87c8ba2d` is done in the supplied issue context.\n\n1. `.claude/skills/jit-project-lead/SKILL.md:81-87` says to “Stop immediately” when `.jit/config.toml` declares no `strategic_types` or `.jit/templates.toml` is missing/unreadable. That prevents the required fallback in `.claude/skills/jit-project-lead/references/tier-derivation.md:66-87` from running `jit config show-hierarchy --json` before giving up. This violates REQ-04, and also makes the stop path less informative than REQ-03 requires for missing/ambiguous configuration.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5428 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f21f0-0840-7622-8324-17966a19421d\n--------\nuser\n--- 5415 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
