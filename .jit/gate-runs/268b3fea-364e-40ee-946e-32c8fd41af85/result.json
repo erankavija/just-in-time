@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "268b3fea-364e-40ee-946e-32c8fd41af85",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8689e255-1566-460f-931d-7a01c6be1120",
+  "commit": "178b997054b2f210c46ab4b4a576f57eeeafcb0a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T07:58:00.687413252Z",
+  "completed_at": "2026-07-02T07:59:10.314680593Z",
+  "duration_ms": 69627,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 met: [query_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/query_tests.rs:4) uses `env!(\"CARGO_BIN_EXE_jit\")`, and [validation_lease_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/validation_lease_tests.rs:14) wraps the same Cargo-provided binary path in `PathBuf`.\nNo `current_exe()` usage remains under `crates/jit/tests/`.\n\nREQ-02 met by provided gate evidence: [.jit/gate-runs/4fcb5e76-1eeb-4cf3-8417-f03474abe4e5/result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/4fcb5e76-1eeb-4cf3-8417-f03474abe4e5/result.json:9) records `cargo-ci` passed, with fmt, clippy, and `2836 passed, 0 failed, 12 ignored` at line 14. I did not rerun tests because the issue has a succeeded `cargo-ci` gate.\n\n**Architecture / Separation**\nChanges are limited to integration tests. No domain, storage, commands, CLI, or output boundary changes.\n\n**Functional Paradigm**\nNo new production logic. The test helper simplification removes path mutation and is straightforward.\n\n**Correctness / Invariants**\nNo file writes, event logging, gate transitions, assignee/label parsing, or PID behavior changed.\n\n**Safety**\nNo unsafe code introduced.\n\n**Testing**\nThe change directly fixes the flaky test binary lookup in the affected integration tests. Existing gate evidence is passing.\n\n**Error Handling**\nNo production fallible paths changed. Test-only `unwrap()` usage is existing and allowed by the stated rule.\n\n**CLI Contract**\nNo CLI command behavior changed.\n\n**Documentation**\nNo public APIs changed.\n\n**Jit Issue Management**\nIssue dependencies are empty. Current `cargo-ci` evidence is passing.\n\n1. No findings.\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
