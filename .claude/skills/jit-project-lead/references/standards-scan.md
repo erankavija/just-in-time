@@ -73,7 +73,7 @@ run against documents.
 |---|---|---|---|
 | STD-TITLE-EMBEDDED-ID | title | mechanical | leading short-id/ordinal, `feat(...):` prefix, or `(jit:…)` |
 | STD-TITLE-ANGLE | title | judgment | `&lt;`/`&gt;`/`<`/`>` present; reword needed |
-| STD-LABEL-SLUG | labels | judgment | `epic:`/`story:`/`milestone:` value is an 8-hex short id (a meaningful bucket slug cannot be derived from a hash) |
+| STD-LABEL-SLUG | labels | judgment | a strategic membership label (namespace drawn from config `[type_hierarchy.label_associations]`, e.g. `epic:`/`story:`/`milestone:` in this repo) has an 8-hex short id for its value (a meaningful bucket slug cannot be derived from a hash) |
 
 ### Issue description structure
 

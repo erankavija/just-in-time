@@ -85,6 +85,25 @@ dev_root="$(gawk -F'"' '/^[[:space:]]*development_root[[:space:]]*=/ { print $2;
 [[ -z "$dev_root" ]] && dev_root="dev"
 active_dir="$root/$dev_root/active"
 
+# --- Strategic membership-label namespaces (project-agnostic) --------------
+# STD-LABEL-SLUG checks the strategic membership labels. Their namespaces are
+# the values under [type_hierarchy.label_associations] in config — derived
+# here, never hardcoded, so the rule tracks whatever tiers a project declares.
+# A project with no associations declared simply has no strategic labels to
+# slug-check and the rule never fires.
+declare -A strategic_ns
+if [[ -f "$config" ]]; then
+    while IFS= read -r nsval; do
+        [[ -n "$nsval" ]] && strategic_ns["$nsval"]=1
+    done < <(gawk '
+        /^[[:space:]]*\[/ { in_sec = (index($0, "[type_hierarchy.label_associations]") > 0) }
+        in_sec && /=/ {
+            if (match($0, /"[^"]*"/)) {
+                print substr($0, RSTART + 1, RLENGTH - 2)
+            }
+        }' "$config")
+fi
+
 # --- Load every issue through the jit CLI (sanctioned storage path) --------
 # `jit issue list --full --json` returns each issue's title, description,
 # labels, state, and linked documents in a single call. We never parse
@@ -340,13 +359,9 @@ while IFS= read -r obj; do
         [[ -z "$lbl" ]] && continue
         ns="${lbl%%:*}"
         val="${lbl#*:}"
-        case "$ns" in
-            epic|story|milestone)
-                if [[ "$val" =~ ^[0-9a-f]{8}$ ]]; then
-                    emit issue "$sid" STD-LABEL-SLUG judgment 0 "$lbl"
-                fi
-                ;;
-        esac
+        if [[ -n "${strategic_ns[$ns]:-}" ]] && [[ "$val" =~ ^[0-9a-f]{8}$ ]]; then
+            emit issue "$sid" STD-LABEL-SLUG judgment 0 "$lbl"
+        fi
     done < <(printf '%s' "$obj" | jq -r '(.labels // [])[]')
 
     scan_body issue "$sid" "$sid" "$desc"
