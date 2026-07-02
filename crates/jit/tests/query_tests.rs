@@ -5,17 +5,6 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-#[allow(dead_code)]
-fn jit_binary_old() -> String {
-    let mut path = std::env::current_exe().unwrap();
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.push("jit");
-    path.to_str().unwrap().to_string()
-}
-
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let jit = jit_binary();

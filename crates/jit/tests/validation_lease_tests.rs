@@ -12,11 +12,7 @@ use ulid::Ulid;
 
 /// Get path to jit binary
 fn jit_binary() -> PathBuf {
-    let mut path = std::env::current_exe().unwrap();
-    path.pop(); // Remove test binary name
-    path.pop(); // Remove 'deps'
-    path.push("jit");
-    path
+    PathBuf::from(env!("CARGO_BIN_EXE_jit"))
 }
 
 /// Setup a git repository with jit initialized
