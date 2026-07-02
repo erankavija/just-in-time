@@ -100,10 +100,23 @@ def run_single_query(
     try:
         commands_dir.mkdir(parents=True, exist_ok=True)
         indented = "\n  ".join(description.split("\n"))
-        command_file.write_text(
+        content = (
             f"---\ndescription: |\n  {indented}\n---\n\n"
             f"# {proxy_name}\n\nThis command handles: {description}\n"
         )
+        fd, tmp = tempfile.mkstemp(
+            dir=commands_dir, prefix=command_file.name + ".", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+            os.replace(tmp, command_file)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
         cmd = [
             "claude",
@@ -379,7 +392,21 @@ def main():
                 file=sys.stderr,
             )
 
-    Path(args.out).write_text(json.dumps(output, indent=2) + "\n")
+    out_path = Path(args.out)
+    out_dir = out_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=out_path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(output, indent=2) + "\n")
+        os.replace(tmp, out_path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
     print(json.dumps(output["summary"], indent=2))
 
 
