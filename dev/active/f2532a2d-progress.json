@@ -14,6 +14,7 @@
     "Wave-3 batch dispatched (4 parallel Opus, worktrees @ main 2ebf6402): 41aa1b75 (planning-lead scenario evals), 0b7e864d (mechanical auto-fixer, fixture-tested, no live-repo mutation), e7d41080 (per-container dispatch prose, must NOT touch frontmatter description), 02a2bbb9 (project-lead skeleton trigger+scenario evals @ runs_per_query=5). Disjoint files. Run check-leak-into-main.sh after wave completes.",
     "INVOKER-DIRECTED PROCESS (2026-07-03): code-review reviewers run cargo-ci inconsistently and hit PRE-EXISTING parallel-run test flakiness (5 tests: serve.rs port-bind + issue.rs claim prechecks; pass in isolation; full suite green for lead: 2836 passed 0 failed). Fix: for every remaining issue, ADD the cargo-ci gate and RUN it BEFORE code-review, so a passed cargo-ci sits in run_history and the reviewer trusts it instead of running its own flaky copy. Adding gates to child issues is lead-autonomous. Applied to 02a2bbb9 -> both gates green -> done.",
     "SESSION 3 END (2026-07-03): handoff written dev/active/f2532a2d-handoff.md. Wave 2 CLOSED (a5b04c9f,6662f738 done). Wave-3 batch: e7d41080 done, 02a2bbb9 done, 0b7e864d in_progress (rework-1 merged, code-review FAIL residual title mismatch, rework-2 deferred per invoker 'no more rework this session'), 41aa1b75 interrupted (WIP preserved branch a4cf8dc7, needs results.md + grading). 7a9eb806 now READY (e7d41080 done). Process in force: add+run cargo-ci gate BEFORE code-review (flaky parallel tests). Leak check clean.",
+    "TRAP #7 (session 4): Filing a NEW standalone issue with zero dependency edges makes jit-validate.sh FAIL with exit 4 ('isolated issue') — an integrity ERROR, not just the orphan-leaf WARNING. code-review reviews whole-tree + runs jit-validate, so an isolated issue fails EVERY concurrently-gating issue's code-review (hit on 41aa1b75 right after filing bug 16402e14). FIX: immediately connect any new standalone issue to the graph with a dep edge (e.g. `jit dep add <milestone> <bug>` so the milestone depends on it) AND add a parent-association label (milestone:v1.0) to clear the orphan-leaf warning too. A membership label ALONE does not fix isolation — an EDGE is required. The 3 pre-existing orphan bugs only WARN because they have edges (something depends on them).",
     "SESSION 4 START (2026-07-03, drive-to-completion): invoker note '2/3 evals done in 41aa1b75'. Confirmed: 41aa1b75 worktree has research-and-plan+plan-from-existing graded PASS, plan-from-import NOT YET RUN. Dispatched 3 disjoint-file workers in parallel: (1) eval-41aa1b75 resume worktree agent-41aa1b75 (rebased onto main) run+grade 3rd scenario plan-from-import + finalize results.md; (2) rework-0b7e864d fresh worktree anchor scanner line 329 to ^ (Trap #4, ONLY remaining finding, attempt 2/2); (3) doc-7a9eb806 references/coherence-review.md ONLY (no SKILL.md; 304f6d94 owns wiring). SKILL.md-body issues (e8b1cee3 linchpin, 304f6d94, 3c192f5e, 6c5f70ad, eff48a6e, 634b2382) will be SERIALIZED on jit-project-lead/SKILL.md after e8b1cee3 lands. Critical path: 41aa1b75->c23dfe71->e8b1cee3->final-wave."
   ],
   "waves": [
@@ -99,7 +100,7 @@
           "short_id": "41aa1b75",
           "title": "Add jit-planning-lead scenario evals for its entry paths",
           "classification": "implementation",
-          "status": "interrupted-wip-preserved-branch-a4cf8dc7"
+          "status": "done"
         }
       ]
     },
@@ -248,6 +249,7 @@
   "reviewed": {
     "e7d41080": "PASS -> done",
     "02a2bbb9": "PASS: trigger 17/17 failed:0, 4 scenarios PASS (activation, tier-derivation this-repo + research, fallback). SKILL.md untouched. done.",
+    "41aa1b75": "PASS -> done. 3rd scenario plan-from-import run+graded PASS 8/8 (with finding). All 3 entry-path scenarios recorded in jit-planning-lead/evals/results.md. FINDING: coverage-preview passed vacuously (checkbox-prefixed criteria hidden from [hard] parser) -> filed standalone bug 16402e14 (type:bug, milestone:v1.0, dep-edge to 9db27a3a). First code-review FAILED only on transient isolation of 16402e14 (Trap #7); after wiring bug to graph, re-run PASSED. cargo-ci+code-review green.",
     "0b7e864d": "rework-2 PASS -> done. Anchored scanner:329 to ^ (lockstep with fixer). Worker audited all 4 other position/prefix branches: each has matching fixer strip, no residual gap. Harnesses 28+41 green (fixtures cover mid-title-not-flagged + leading-flagged-and-corrected). cargo-ci+code-review both passed.",
     "7a9eb806": "PASS: references/coherence-review.md (267 lines), tiers C1/C2/C3, PASS/FAIL verdict + stale-forward sweep + no-argue stop condition, cc-sdd register. REQ-01..04 met. Tier-3 coherence: consistent with e7d41080 container-dispatch.md which defers cross-container coherence to this story. SKILL.md untouched (wiring is 304f6d94). cargo-ci running then code-review."
   },
