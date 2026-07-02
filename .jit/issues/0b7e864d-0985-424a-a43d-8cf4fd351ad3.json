@@ -13,15 +13,15 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T21:30:41.138533218Z"
-    },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T21:32:42.358819477Z"
+      "updated_at": "2026-07-02T21:50:21.165805906Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-02T21:46:49.621970816Z"
     }
   },
   "context": {},
@@ -48,5 +48,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.853900227Z",
-  "updated_at": "2026-07-02T21:34:37.834718248Z"
+  "updated_at": "2026-07-02T21:52:17.157303012Z"
 }
