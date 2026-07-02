@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Project-lead utility: create per-issue worktrees anchored to current
+# jit-execution-lead utility: create per-issue worktrees anchored to current
 # main HEAD and snapshot main's working tree so post-dispatch leak
 # checks can detect files a worker accidentally writes into main
 # instead of its own worktree.

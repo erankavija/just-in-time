@@ -1,10 +1,10 @@
-# Handoff: jit-plan skill (eed6750c)
+# Handoff: jit-planning-lead skill (eed6750c)
 
 **State:** skill authored, dogfooded once (reconcile path), post-dogfood fixes folded in.
 `eed6750c` is **in-progress / claimed** (`agent:claude`) — **not gated, not done**.
 
 ## Done
-- `jit-plan` skill: `SKILL.md` orchestrator (265 lines / ~3.9k tok, under the REQ-04 budget)
+- `jit-planning-lead` skill: `SKILL.md` orchestrator (265 lines / ~3.9k tok, under the REQ-04 budget)
   + six `references/`. Initial skill in commit `23dd0ba`.
 - Self-reviewed vs REQ-01..06 (all covered; REQ-06 = no existing skill modified).
 - Dogfooded in unprimed session `a7c51c9d` on epic `25064508`: **plan-review PASSED first
@@ -41,11 +41,11 @@
 - Promote `content-standards.md` to a neutral shared SSOT (would modify jit-manage; REQ-06
   forbids it here).
 - Fix 3 (express a foundation-reuse prerequisite as a dependency on `P`) — skipped by owner.
-- Autonomous description-match triggering is untested (the dogfood used the `/jit-plan`
+- Autonomous description-match triggering is untested (the dogfood used the `/jit-planning-lead`
   slash command).
 
 ## Pointers
-- Skill: `.claude/skills/jit-plan/`.
+- Skill: `.claude/skills/jit-planning-lead/`.
 - Authoring + dogfood record: `dev/sessions/session-20260625-planning-skill-authoring.md`.
 - Dogfood plan artifact: `dev/active/25064508-d563-4073-a970-296607a01adc-plan.md`.
 - Dogfood transcript: `~/.claude/projects/-home-vkaskivuo-Projects-just-in-time/a7c51c9d-*.jsonl`.

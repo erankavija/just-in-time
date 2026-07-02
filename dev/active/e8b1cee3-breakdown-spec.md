@@ -102,10 +102,10 @@ The skeleton delivers the orchestrator shell (pre-flight, tier derivation, refer
 
 - **Grounding (from investigation), classified:**
   - Rename → **partially already-done**: dirs/symlinks/most refs done (751da7f5); 9 residual
-    live hits remain (jit-execution-lead `SKILL.md:14` `# Project Lead`; jit-planning-lead
-    `SKILL.md:9` `# JIT Plan` and `:11` "a complete jit plan"; both scripts line 2
-    `# Project-lead utility:`; `dev/active/eed6750c-handoff.md:1,7,44,48`, of which line 48
-    `.claude/skills/jit-plan/` is the operationally load-bearing pointer).
+    live hits remained (jit-execution-lead `SKILL.md:14` H1; jit-planning-lead `SKILL.md:9`
+    H1 and `:11` opening line; both scripts' line-2 header comment;
+    `dev/active/eed6750c-handoff.md:1,7,44,48`, of which line 48's pre-rename skill-directory
+    path was the operationally load-bearing pointer); swept in c6325c5b.
   - Eval-pass → **invalid-as-stated (unverifiable today)**: jit-execution-lead
     `evals/evals.json` has 3 scenarios but no runner in-repo; jit-planning-lead has no
     `evals/`. Plan makes it verifiable.
@@ -133,7 +133,7 @@ First-class log, consumed by review and breakdown. Provisional entries flagged.
   2026-07-02 in the container). Rejected: `jit-task-lead` (collides with the `task` tier),
   `jit-epic-lead` (hardcodes this repo's sub-strategic type), `jit-delivery-lead` /
   `jit-initiative-lead` / `jit-outcome-lead` (viable but less precise about the execution
-  function). `jit-plan` → `jit-planning-lead`.
+  function). The planning skill was correspondingly renamed `jit-planning-lead`.
 - **D2 — `-lead` suffix reserved for autonomous standing roles:** chosen. Workflow skills
   (`jit-manage`, `jit-breakdown`, `jit-parallel`, `jit-migrate`) stay un-suffixed.
 - **D3 — Canonical standards home (final):** chosen

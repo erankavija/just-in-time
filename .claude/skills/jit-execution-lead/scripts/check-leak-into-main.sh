@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Project-lead utility: after parallel worktree-dispatch agents
+# jit-execution-lead utility: after parallel worktree-dispatch agents
 # complete, verify main's working tree contains nothing that wasn't
 # there at dispatch time. Files written by workers should live in
 # their worktrees, not in main.

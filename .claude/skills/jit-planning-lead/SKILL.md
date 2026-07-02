@@ -6,9 +6,9 @@ description: >
   plan with jit.
 ---
 
-# JIT Plan
+# JIT Planning Lead
 
-Lead planning from various initial states to a complete jit plan + breakdown.
+Lead planning from various initial states to a complete plan + breakdown.
 The outcome of your work is the full and self-contained jit issue structure for
 the work that is ready for implementation.
 
