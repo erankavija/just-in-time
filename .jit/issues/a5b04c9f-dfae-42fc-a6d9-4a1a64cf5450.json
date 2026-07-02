@@ -2,9 +2,9 @@
   "id": "a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450",
   "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
   "description": "Establish a documented, reproducible method for grading a scenario-eval run against its `expected_output` rubric, then apply it to jit-execution-lead's three existing scenarios to produce a recorded passing baseline.\n\n## Background\n\njit-execution-lead ships `.claude/skills/jit-execution-lead/evals/evals.json` with three scenarios (`sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`), each carrying a free-text `expected_output` description. Nothing in the repository currently turns a scenario run into a pass or fail verdict; grading has only happened informally, from memory.\n\n## Success Criteria\n\n- [hard] REQ-01: `docs/reference/skill-eval-adjudication.md` documents a reproducible adjudication method for scenario evals: either (a) an LLM-judge procedure that grades a recorded agent transcript against an eval's `expected_output` rubric and emits a verdict, or (b) a procedure for converting an eval's `expected_output` into an itemized, independently checkable checklist scored item by item. The document states the required inputs, the grading steps, and the verdict format in enough detail that someone other than the author can reproduce a verdict from it.\n- [hard] REQ-02: Each of the three scenarios in `.claude/skills/jit-execution-lead/evals/evals.json` (`sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`) has been run at least once and graded under the REQ-01 method.\n- [hard] REQ-03: `.claude/skills/jit-execution-lead/evals/results.md` records, for each of the three scenarios, a pass verdict, the date the run was produced, and either the transcript location or the completed checklist backing the verdict.\n\n## Notes\n\nSize the method to three scenarios: a thin run-and-record procedure, not a general eval framework.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "c6325c5b-1d92-444c-b460-3021e6402b07"
   ],
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.307671849Z",
-  "updated_at": "2026-07-02T08:23:44.420857088Z"
+  "updated_at": "2026-07-02T08:24:45.510151310Z"
 }
