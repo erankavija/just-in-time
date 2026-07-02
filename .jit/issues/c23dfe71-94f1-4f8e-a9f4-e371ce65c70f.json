@@ -21,6 +21,87 @@
       "label": null,
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "docs/reference/lead-skills-eval-baseline.md",
+      "commit": null,
+      "label": "Lead-skills eval baseline (REQ-01..04 verification rollup)",
+      "doc_type": "reference",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../../.claude/skills/jit-planning-lead/evals/evals.json",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/evals.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "ca6507b08cfddbdbea09e2ac31d827f6864135542afc71ac8c47a14216f9a016",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-execution-lead/trigger_eval_results.json",
+          "resolved_path": ".claude/skills/jit-execution-lead/trigger_eval_results.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "8ce9ec8fc1ea4f1b131149606f78d52a3a313a8f4a44f416566b96ed329c4f3b",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-planning-lead/trigger_eval.json",
+          "resolved_path": ".claude/skills/jit-planning-lead/trigger_eval.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "6274021a72cc216e169d5c73386e149179ca37698db472405ea10db61ac775a1",
+          "is_shared": false
+        },
+        {
+          "original_path": "skill-eval-adjudication.md",
+          "resolved_path": "docs/reference/skill-eval-adjudication.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "67fdbe5a6ccc3cd05fe0e061574f2f3a9b7e96daaf0c18371796b92d674b86d9",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-execution-lead/evals/results.md",
+          "resolved_path": ".claude/skills/jit-execution-lead/evals/results.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "426f87640c2ebc63aa623bc731b6bc91bcc69e03787b90a6685365a98b51c8c2",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-planning-lead/trigger_eval_results.json",
+          "resolved_path": ".claude/skills/jit-planning-lead/trigger_eval_results.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "c0ae38c61761a005e7546342aa82c04eec6b77c581271b1b8eee6300fc231229",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-planning-lead/evals/results.md",
+          "resolved_path": ".claude/skills/jit-planning-lead/evals/results.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "f915381c1d7d584de8ec3125c7407f408d9f71b92727607d3f211baf6fb4c448",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-execution-lead/trigger_eval.json",
+          "resolved_path": ".claude/skills/jit-execution-lead/trigger_eval.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "614ae364b339544bfa45b067fd2f2ac1affd421aaade05ac5defd46d8e1639e9",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../.claude/skills/jit-execution-lead/evals/evals.json",
+          "resolved_path": ".claude/skills/jit-execution-lead/evals/evals.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "f13934f527ddf8614a94f5c86f3e8694c7848a83996208be37ecd0d877602d1a",
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -31,5 +112,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.150488642Z",
-  "updated_at": "2026-07-02T23:14:23.683658944Z"
+  "updated_at": "2026-07-02T23:14:55.087744801Z"
 }

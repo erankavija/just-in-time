@@ -4754,3 +4754,4 @@
 {"type":"issue_state_changed","id":"bc94cbce-3251-47d9-b816-747f23e74bce","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:13:02.497887588Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"11932fae-38c0-4710-9f02-07f0dbf1230c","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:23.683584564Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"01fb7982-45e3-4c59-bbf8-02cce749de6d","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:23.686551137Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"8bc4f8b9-94a0-43f7-b647-4653b8021ed7","issue_id":"c23dfe71-94f1-4f8e-a9f4-e371ce65c70f","timestamp":"2026-07-02T23:14:55.087971241Z","updated_by":"doc-add","fields":["documents"]}
