@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "388850a6-f1bb-46fc-ba8d-e01bdc8069e1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6662f738-cc2b-467a-9de3-01629b7b36d0",
+  "commit": "5d281e65f147ba68d0324c01a5ba0835c3a27d59",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T20:35:33.829050322Z",
+  "completed_at": "2026-07-02T20:37:31.703700357Z",
+  "duration_ms": 117874,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are satisfied. Both eval sets include should-trigger and near-miss should-not-trigger cases, and both result files now record 17/17 passing with 8/8 should-trigger and 9/9 should-not-trigger.\n\n**Architecture And Separation**\n\nNo Rust domain/storage/commands/CLI boundaries are touched. Changes are limited to skill docs/eval artifacts and a dev eval runner.\n\n**Functional Paradigm**\n\nNo blocking concern. The imperative style in `dev/eval/skill-triggers/run_trigger_eval.py` is reasonable for subprocess orchestration.\n\n**Correctness And Invariants**\n\nFail. The new runner writes persisted result JSON directly instead of using the required temp-file plus rename pattern.\n\n**Safety**\n\nNo unsafe Rust or PID-handling code introduced.\n\n**Testing**\n\n`./scripts/jit-validate.sh` passed with 3 allowed orphan-label warnings. No succeeded cargo-ci gate or run_history was provided for this issue.\n\n**Error Handling**\n\nNo blocking issue beyond the atomic-write invariant.\n\n**CLI Contract**\n\nNo `jit` CLI command surface changed.\n\n**Documentation**\n\nThe runner rationale and usage are documented in `dev/eval/skill-triggers/README.md`.\n\n**Prior Review Feedback**\n\nNo prior run_history entries were provided. The stale issue document labels still mention older failed eval rates, but the checked-in result files now show passing rates.\n\n**JIT Issue Management**\n\nDependency `c6325c5b` is done and has a passed code-review gate. `./scripts/jit-validate.sh` passes with allowed warnings.\n\n1. `dev/eval/skill-triggers/run_trigger_eval.py:382` writes `--out` results with `Path(args.out).write_text(...)`, which can leave a truncated or partial `trigger_eval_results.json` if interrupted. Repository invariants require all file writes to use temp-file plus rename; this runner should write beside the target and atomically replace it.\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6931 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f248b-41d4-7ef3-aba9-d3a64fb8caa8\n--------\nuser\n--- 6918 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
