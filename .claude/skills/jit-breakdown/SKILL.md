@@ -397,7 +397,8 @@ leaves. Keep depth proportional to size — do not force a story level onto smal
    - Offer to remove offending edges with `jit dep rm` and re-validate.
 
 2. **Content lint — verify every created issue (all levels) meets the standards**
-   (`jit-manage/references/content-standards.md`). Via `jit issue show <id> --json`:
+   (`../../../docs/reference/jit-content-standards.md` relative to this skill's root).
+   Via `jit issue show <id> --json`:
    - **Success Criteria present** — the description has a `## Success Criteria` section
      (or an accepted equivalent). Missing → fix the description before finishing.
    - **Clean title** — no embedded metadata: reject ordinals (`T1`, `S0:`),

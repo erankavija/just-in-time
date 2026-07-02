@@ -39,7 +39,7 @@ You are working as a technical writer on a team delivering an epic. Your task is
    - If updating existing docs, read the current version first.
    - Read any linked design docs or research findings.
 
-3. **Write the documentation.** Follow the project's conventions exactly and apply `.claude/skills/jit-manage/references/content-standards.md` for cross-cutting formatting: Mermaid for diagrams, LaTeX for mathematical notation. The documentation should:
+3. **Write the documentation.** Follow the project's conventions exactly and apply the jit content standards (`../../../../docs/reference/jit-content-standards.md` relative to this prompt file) for cross-cutting formatting: Mermaid for diagrams, LaTeX for mathematical notation. The documentation should:
    - Be accurate — reflect what actually exists, not what was planned
    - Be self-contained — a reader should not need to read the source code to understand the docs
    - Follow the existing structure and voice — new docs should feel like they belong

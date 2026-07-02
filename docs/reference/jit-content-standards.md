@@ -1,7 +1,10 @@
-# Content Standards
+# JIT Content Standards
 
-Apply these standards whenever writing **issue descriptions** or **markdown documents**
-(design docs, research findings, documentation, completion reports).
+> **Diátaxis Type:** Reference
+
+Canonical standards for content written into or alongside the jit tracker. Apply them
+whenever writing **issue descriptions** or **markdown documents** (design docs, research
+findings, documentation, completion reports).
 
 ---
 
@@ -36,7 +39,8 @@ where the title is fully self-explanatory.]
 - `## Success Criteria` is **mandatory** on every issue. Items must be verifiable — prefer
   outcomes ("function returns X for input Y") over actions ("implement X").
 - **Criticality markers.** Where the project distinguishes criterion maturity (the
-  planning-bracket / coverage model — see `issue-extraction-prompt.md`), prefix **every**
+  planning-bracket / coverage model — see
+  `.claude/skills/jit-manage/references/issue-extraction-prompt.md`), prefix **every**
   criterion with `[hard]` or `[aspirational]` and a stable `REQ-N` id. **Default to
   `[hard]`.** Never leave a criterion unmarked or mix marked and unmarked items in one
   issue. `[hard]` criteria must be covered by a child and fail review if unmet;

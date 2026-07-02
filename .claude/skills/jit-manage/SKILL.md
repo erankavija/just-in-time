@@ -276,7 +276,8 @@ Create issues with proper DAG wiring, labels, and success criteria.
 1. Gather from the user:
    - **Title** — concise, action-oriented; no metadata prefix (no `<id>/Tn:`,
      no `feat(jit:abc):`). See content-standards "Issue Titles".
-   - **Description** — follow `.claude/skills/jit-manage/references/content-standards.md`:
+   - **Description** — follow the jit content standards
+     (`../../../docs/reference/jit-content-standards.md` relative to this skill's root):
      standalone markdown document, `## Success Criteria` with verifiable items,
      Mermaid for diagrams, LaTeX for math. **Use the template verbatim. Do NOT
      pattern-match against existing repo issues — content-standards is canonical

@@ -4,7 +4,8 @@ Use this template when creating design or implementation plan documents
 in Workflow B3. Fill in the bracketed fields. Remove sections that do not
 apply to the issue at hand.
 
-**Formatting:** Follow `.claude/skills/jit-manage/references/content-standards.md`.
+**Formatting:** Follow the jit content standards
+(`../../../../docs/reference/jit-content-standards.md` relative to this template file).
 Use Mermaid (` ```mermaid `) for all diagrams. Use LaTeX (`$...$` inline, `$$...$$`
 display) for all mathematical notation — never plaintext equations.
 

@@ -49,6 +49,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Claim System](reference/claim.md) - Leases and coordination
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
+- [Content Standards](reference/jit-content-standards.md) - Authoring standards for issue descriptions and markdown documents
 
 ### 📄 Additional Resources
 

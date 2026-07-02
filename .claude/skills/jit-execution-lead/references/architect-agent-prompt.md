@@ -34,7 +34,7 @@ You are working as the architect on a team delivering an epic. Your task is to p
    - What other issues in the epic depend on this design
    - What project conventions constrain the approach
 
-3. **Produce a design document.** Write a concrete, actionable design that an implementation agent can follow without ambiguity. Follow `.claude/skills/jit-manage/references/content-standards.md` for formatting: use Mermaid for all diagrams (module structure, data flow, state machines — no ASCII art), and LaTeX (`$...$` inline, `$$...$$` display) for all mathematical notation. The design should include:
+3. **Produce a design document.** Write a concrete, actionable design that an implementation agent can follow without ambiguity. Follow the jit content standards (`../../../../docs/reference/jit-content-standards.md` relative to this prompt file) for formatting: use Mermaid for all diagrams (module structure, data flow, state machines — no ASCII art), and LaTeX (`$...$` inline, `$$...$$` display) for all mathematical notation. The design should include:
    - **Problem statement** — What this solves and why
    - **Design** — The approach, with enough detail that implementation decisions are clear. Reference existing patterns in the project where applicable.
    - **Key decisions** — Trade-offs considered, what was chosen and why

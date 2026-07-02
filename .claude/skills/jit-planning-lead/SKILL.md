@@ -80,7 +80,7 @@ JIT planning is done when:
 
 1. **If the container does not exist, create it.** `jit issue create` with the breakable
    `type:` that best fits the work scope unless already specified. The issue description must follow the jit
-   content standards [references/content-standards.md](references/content-standards.md). The `Success Criteria` section holds
+   content standards [../../../docs/reference/jit-content-standards.md](../../../docs/reference/jit-content-standards.md). The `Success Criteria` section holds
    all the criteria for the work to be complete that were extracted previously.
 2. **If the container already exists, reconcile it first**: verify each
    criterion against the live system, **sweep prior study/decision docs first** (a known
