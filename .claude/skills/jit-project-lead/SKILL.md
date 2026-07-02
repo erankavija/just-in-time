@@ -45,16 +45,23 @@ Run these steps before any tier derivation or mode dispatch, in order:
 
 Hold the extracted context in working memory for the whole session.
 
-## Tier derivation (stub)
+## Tier derivation
 
-Authored by follow-up tier-derivation work. Its inputs are fixed here:
+Read `references/tier-derivation.md` **in full** and execute it once, right
+after pre-flight. It turns the pre-flight inputs into two outputs held for the
+whole session:
 
-- **Steward anchor:** derived from `strategic_types` in `.jit/config.toml`.
-- **Delegation boundary:** the union of `applies_to` across `[[template]]`
-  entries in `.jit/templates.toml`.
+- **Steward anchor** — the most-strategic container type, the first entry of
+  `strategic_types` in `.jit/config.toml`.
+- **Delegation boundary** — the breakable container types dispatched to an
+  execution lead, the union of `applies_to` across `[[template]]` entries in
+  `.jit/templates.toml`.
 
-Until that work lands, complete pre-flight, report that tier derivation is
-pending, and stop.
+The reference covers all three shapes (collapsed single tier, two tier, many
+tier), the assumption checks, the numeric-level fallback when a config input is
+missing, and the stop-and-ask conditions. Do not derive tiers inline here or
+hardcode a type name; the reference and the live config are the only sources.
+If the reference says stop and ask, stop (see Stop and escalate).
 
 ## Mode dispatch (stub)
 
@@ -78,6 +85,10 @@ Stop immediately and report to the invoker when:
 - `.jit/config.toml` is missing, unreadable, or declares no
   `strategic_types`.
 - `.jit/templates.toml` is missing or unreadable.
+- Tier derivation reaches a stop-and-ask condition: a genuine level tie among
+  candidate anchors, a violated ordering/boundary assumption, or a missing
+  config input the numeric-level fallback cannot resolve (see
+  `references/tier-derivation.md`).
 - The canonical content standards doc is unreadable at its skill-base-relative
   path.
 - `jit recover` fails.
