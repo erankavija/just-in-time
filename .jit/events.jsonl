@@ -4670,3 +4670,4 @@
 {"type":"issue_updated","id":"67317c5a-3803-439c-b5bd-96a96e5f287a","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.521832172Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"8a955afd-0ad5-4808-9985-283d87e715fd","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.529817768Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"31b6059a-a6ea-4e53-be20-69bd65d581d0","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:30:51.537548563Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_failed","id":"53c5bc67-6739-4922-b431-88d5ef155b8b","issue_id":"66aeee5f-416d-4397-9d15-19971900fb6f","timestamp":"2026-07-02T12:36:11.931970516Z","gate_key":"code-review","updated_by":"auto:executor"}
