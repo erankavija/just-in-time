@@ -7,7 +7,8 @@
     "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
     "6c5f70ad (wave 6) depends on eed6750c (jit-planning-lead, in_progress, OUTSIDE this epic, per plan D6). If eed6750c is not done when wave 6 starts, escalate per policy entry 7.",
     "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it.",
-    "Session 2026-07-02 (resume): wave-2/3 workers were cut mid-flight. WIP lead-preserved and rebased onto main; continuations dispatched (a5b04c9f Opus, 6662f738 Sonnet). 66aeee5f rework attempt 2 dispatched (Opus) in fresh worktree. 82e04ab0 rework exhausted -> escalated -> invoker approved lead take-over; lead fixed stop-and-ask fallback (11ab84bc), gate passed, done. c6325c5b REQ-03 amendment approved by invoker."
+    "Session 2026-07-02 (resume): wave-2/3 workers were cut mid-flight. WIP lead-preserved and rebased onto main; continuations dispatched (a5b04c9f Opus, 6662f738 Sonnet). 66aeee5f rework attempt 2 dispatched (Opus) in fresh worktree. 82e04ab0 rework exhausted -> escalated -> invoker approved lead take-over; lead fixed stop-and-ask fallback (11ab84bc), gate passed, done. c6325c5b REQ-03 amendment approved by invoker.",
+    "6662f738 R1 verdict FAIL (REQ-04): planning-lead should-trigger rate 0.25, exec-lead 1 flaky query. Real description weakness (eed6750c handoff deferred triggering as untested; epic REQ-07 owns it). Rework 1: rewrite planning-lead frontmatter description ONLY (body owned by eed6750c), re-run both sets at runs_per_query=5, bar = failed:0 both categories both skills. Eval-set weakening forbidden."
   ],
   "waves": [
     {
@@ -59,7 +60,7 @@
           "short_id": "6662f738",
           "title": "Add activation trigger evals for both lead skills",
           "classification": "implementation",
-          "status": "continuation-dispatched"
+          "status": "rework-1-dispatched"
         }
       ]
     },
@@ -232,7 +233,8 @@
     "faed8ffa-gate-reruns": 4,
     "87c8ba2d": 1,
     "82e04ab0": 2,
-    "66aeee5f": 2
+    "66aeee5f": 2,
+    "6662f738": 1
   },
   "started_at": "2026-07-02T00:00:00Z"
 }
