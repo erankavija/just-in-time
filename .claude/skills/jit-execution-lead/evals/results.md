@@ -96,7 +96,7 @@ software-specific commands attempted."*
 | 6 | `docs/index.md` updated with links | index links to all three new pages (index.md:7,11,15) | PASS |
 | 7 | Content-review gate passed | `content-review` = `passed` on epic and all 4 children | PASS |
 | 8 | Epic transitioned to `done` | `jit issue show e17ab7e6` → state `done` | PASS |
-| 9 | No software-specific commands attempted | working tree holds no code/test scaffolding (`find` for `*.py`/`package.json`/`Cargo.toml`/`pytest.ini` → none); output is Markdown only | PASS |
+| 9 | No software-specific commands attempted | **Repo-state:** working tree holds no code/test scaffolding (`find` for `*.py`/`package.json`/`Cargo.toml`/`pytest.ini` → none); every git-tracked file is Markdown or `.jit/` state. **Run-record command log:** the run defined only the manual `content-review` gate (`.jit/gates.json`), the event log shows 5 manual `gate_passed` events and zero automated gate runs (no `.jit/gate-runs/`), so no build/test-runner was invoked (see the [run report's Command / Gate-Invocation Log](transcripts/content-project-epic.completion-report.md)). Both halves per skill-eval-adjudication.md negative-item rule. | PASS |
 
 Also observed: `jit validate` clean, completion report linked to epic via `jit doc list e17ab7e6`.
 

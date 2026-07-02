@@ -50,6 +50,29 @@ No escalations were required.
 
 No additional issues were discovered.
 
+### Command / Gate-Invocation Log
+
+Recorded so the negative expected-output item "No software-specific commands attempted" is
+checkable against this run's action log, not just its final tree (per the equivalent-runner
+requirement in `docs/reference/skill-eval-adjudication.md` step 2). Every claim below is
+traceable to the run repo's own on-disk records under `.jit/`:
+
+- **Gates defined by the run:** exactly one, `content-review` (`.jit/gates.json`, `mode:
+  manual`, no `command`). No `tests` or any other automated gate was ever defined.
+- **Gate executions:** the event log (`.jit/events.jsonl`) records 5 `gate_passed` events
+  (the epic + its 4 children), all for the manual `content-review` gate. There are zero
+  automated gate runs and no `.jit/gate-runs/` directory exists, so no gate ever shelled out
+  to a build or test runner.
+- **No build/test-runner command was invoked.** The only mechanism these evals use to invoke
+  a build/test runner is an automated `tests`-style gate (as in the two `sw-*` scenarios);
+  this run defined none and ran none. Consistent with that, the run produced no code or test
+  scaffolding: every git-tracked file is Markdown documentation or `.jit/` state (no `*.py`,
+  `package.json`, `Cargo.toml`, `pytest.ini`, `pyproject.toml`, `requirements*.txt`,
+  `Makefile`, or `tsconfig.json`).
+- **Tools/commands used:** `jit` CLI (issue lifecycle, `gate pass`, `doc add`), `git`
+  (commits by the lead), and Markdown file writes by the writer sub-agents. No compiler,
+  package manager, or test runner.
+
 ### Holistic Quality Notes
 
 - Cross-document consistency is strong: config keys (`parallelism`, `retries`, `timeout`, `on_failure`, `log_level`, `log_dir`, `color`, `name`, `version`, `steps`), the `nexus.yaml` filename, the four CLI subcommands, and the `.nexus/logs` default are named identically across the reference, how-to, and tutorial. The tutorial's starter config reproduces the content-plan's canonical config verbatim.
