@@ -2,9 +2,9 @@
   "id": "41aa1b75-3dba-4836-a3e2-78794a892914",
   "title": "Add jit-planning-lead scenario evals for its entry paths",
   "description": "Give jit-planning-lead its own `evals/` directory with scenario evals covering each of its documented entry paths, run and graded under the same adjudication method used for jit-execution-lead's evals.\n\n## Background\n\njit-planning-lead has no `evals/` directory. Its SKILL.md documents three entry paths for starting a planning session: research-and-plan (only a vague idea to refine), plan-from-existing (a container already has success criteria to seed a plan from), and plan-from-import (an external planning document to reconcile). None of these paths has ever been exercised by a scenario eval.\n\n## Success Criteria\n\n- [hard] REQ-01: `.claude/skills/jit-planning-lead/evals/evals.json` defines at least one scenario eval for each of the three entry paths (research-and-plan, plan-from-existing, plan-from-import), each with a prompt, a setup scenario, and an `expected_output` rubric grounded in what that entry path actually produces, following the same schema as jit-execution-lead's `evals/evals.json`.\n- [hard] REQ-02: `.claude/skills/jit-planning-lead/evals/` contains the setup script(s) needed to stand up a fresh test repository for each scenario before it runs.\n- [hard] REQ-03: Every scenario defined in `.claude/skills/jit-planning-lead/evals/evals.json` has been run at least once and graded using the documented scenario-eval adjudication method.\n- [hard] REQ-04: `.claude/skills/jit-planning-lead/evals/results.md` records a passing verdict for every scenario, with the transcript location or completed checklist backing each verdict.\n\n## Notes\n\nGround each scenario's `expected_output` in what the entry path's SKILL.md step actually produces (a container issue with criteria, a completed plan and breakdown, or a reconciled import) rather than paraphrasing the request that triggers it.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450"
   ],
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.339047952Z",
-  "updated_at": "2026-07-02T20:46:17.781147868Z"
+  "updated_at": "2026-07-02T20:49:27.934173183Z"
 }

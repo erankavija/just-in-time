@@ -2,9 +2,9 @@
   "id": "e7d41080-e884-46b9-b5e2-b147f2c14df8",
   "title": "Dispatch jit-execution-lead per container reusing canonical dispatch scripts",
   "description": "Drives each sub-strategic container in a wave by invoking `jit-execution-lead` as a dispatched subagent, reusing its existing canonical dispatch machinery unmodified rather than forking or reimplementing epic-level execution.\n\n## Background\n\n`jit-execution-lead` already owns the canonical worktree dispatch protocol for parallel sub-agent workers: `scripts/dispatch-worker-worktree.sh` creates SHA-verified worktrees anchored to current `main` HEAD, and `scripts/check-leak-into-main.sh` detects worker file leakage into main after completion (documented in `references/worktree-dispatch-protocol.md`). This work reuses that same machinery one tier up: instead of dispatching issue-level workers, it dispatches `jit-execution-lead` itself as the subagent, once per sub-strategic container in the current wave.\n\n## Success Criteria\n\n- [hard] REQ-01: Given an ordered list of waves (each wave a list of sub-strategic container ids, earlier waves containing no dependency on later ones), a `jit-execution-lead` subagent is dispatched once per container in the current wave, with that container's id as its target and instructions to drive it to completion end to end.\n- [hard] REQ-02: When two or more containers in the same wave are dispatched concurrently, the dispatch reuses `.claude/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and `.claude/skills/jit-execution-lead/scripts/check-leak-into-main.sh` verbatim (invoked, never copied or forked) for worktree isolation and post-dispatch leak detection, per `references/worktree-dispatch-protocol.md`.\n- [hard] REQ-03: The dispatch logic contains no re-implementation of epic breakdown, wave planning, or execution steps that `jit-execution-lead` already performs internally for its own container.\n- [hard] REQ-04: The dispatch logic is documented as skill prose in the cc-sdd/superpowers register — terse imperative voice, explicit stop-and-escalate conditions — following the exemplars at `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, and `../jit-research/superpowers/skills/executing-plans/SKILL.md`.\n\n## Notes\n\nGathering a dispatched container's own gate and success-criteria results is in scope; a coherence check spanning multiple containers before final acceptance is out of scope here.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "28731a53-fd4e-4fe6-b3c6-a8f680db7e2d"
   ],
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.682868252Z",
-  "updated_at": "2026-07-02T08:30:51.496751787Z"
+  "updated_at": "2026-07-02T20:49:27.972888021Z"
 }

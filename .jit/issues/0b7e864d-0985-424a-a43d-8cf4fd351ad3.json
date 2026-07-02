@@ -2,9 +2,9 @@
   "id": "0b7e864d-0985-424a-a43d-8cf4fd351ad3",
   "title": "Mechanical violation auto-fixer for content-standards sweep",
   "description": "Applies safe, rule-based corrections to every content-standards violation classified as mechanical, and confirms each fix actually resolves the flagged violation.\n\n## Background\n\nA prior scan enumerates every content-standards violation across the project's issues and documents and classifies each as mechanical or judgment, per the rules in `docs/reference/jit-content-standards.md`. Mechanical violations follow a single unambiguous correction: inserting a missing `[hard]`/`[aspirational]` marker with a fresh `REQ-N` id, stripping an embedded id or ordinal from a title, or inserting a missing `## Success Criteria` heading. These are safe to apply without a human decision. Judgment violations are never touched here.\n\n## Success Criteria\n\n- [hard] REQ-01: For every finding classified as `mechanical`, the fixer applies the correction to the source issue or document.\n- [hard] REQ-02: Re-scanning the project after the fixer runs no longer reports any of the fixed findings as violations.\n- [hard] REQ-03: The fixer makes no change to any finding classified as `judgment`, and makes no change to any issue or document with zero mechanical findings.\n- [hard] REQ-04: For each fix applied, the fixer records the issue or document changed and the rule it corrected.\n\n## Notes\n\nA correction changes only the content the rule targets; it leaves every other part of the issue or document (other sections, unrelated criteria) unchanged.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "66aeee5f-416d-4397-9d15-19971900fb6f"
   ],
@@ -21,5 +21,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.853900227Z",
-  "updated_at": "2026-07-02T20:32:46.535996130Z"
+  "updated_at": "2026-07-02T20:49:27.954177858Z"
 }
