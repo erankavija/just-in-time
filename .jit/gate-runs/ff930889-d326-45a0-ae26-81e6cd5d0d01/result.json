@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "ff930889-d326-45a0-ae26-81e6cd5d0d01",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "87c8ba2d-c7a8-4b89-bc87-4e8e4e89fb75",
+  "commit": "87f127c56110e09b3a5f3dc4b2a758c55ab4b9df",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T08:10:48.150714273Z",
+  "completed_at": "2026-07-02T08:12:06.505687301Z",
+  "duration_ms": 78354,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, REQ-03, and REQ-04 are mostly implemented: [`.claude/skills/jit-project-lead/SKILL.md`](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md:1) exists, is 90 lines, includes pre-flight plus tier/mode stubs, and the symlink resolves to the repo skill directory. The `references/` directory exists with `.gitkeep`.\n\nBlocking issue: the issue notes explicitly require placeholders like “strategic tier” / “sub-strategic tier” instead of literal type names like `milestone`, `epic`, or `goal`. The new shell still uses those literal examples in activation/routing text at lines 7, 8, 10, 49, and 64.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there is no prior review feedback to verify.\n\n**Architecture And Separation**\n\nNo Rust architecture boundary changes were made. The change is limited to Claude skill files under `.claude/skills/`.\n\n**Functional Paradigm**\n\nNo Rust implementation changes were made.\n\n**Correctness And Invariants**\n\nNo persistence, event logging, gate transition, assignee/label parsing, or PID-handling code was changed. No unsafe code was introduced.\n\n**Testing And Validation**\n\n`./scripts/jit-validate.sh` passes. It reports three orphan-leaf warnings, which are allowed by the review instructions. The dependency issue `faed8ffa` is `done` and has passed `cargo-ci` and `code-review` gates.\n\n**Error Handling**\n\nNo Rust error-handling code was changed.\n\n**CLI Contract**\n\nNo CLI command code was changed.\n\n**Documentation**\n\nThe new public-facing skill prose is the reviewed artifact. It introduces the blocking terminology mismatch noted above.\n\n**Findings**\n\n1. [`.claude/skills/jit-project-lead/SKILL.md`](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-project-lead/SKILL.md:7) violates the issue note requiring placeholder tier language instead of literal type names. The file uses `milestone`, `epics`, `epic-level`, `epic`, and `goal` at lines 7, 8, 10, 49, and 64, despite the issue explicitly saying to use placeholders such as “strategic tier” / “sub-strategic tier” rather than literal type names like `milestone`, `epic`, or `goal`.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 569 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f21e1-6901-73b2-bfe6-b0a50efd60ea\n--------\nuser\n--- 556 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

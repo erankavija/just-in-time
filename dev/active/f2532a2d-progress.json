@@ -221,7 +221,8 @@
   ],
   "rework_counts": {
     "b46e13d9": 1,
-    "faed8ffa-gate-reruns": 4
+    "faed8ffa-gate-reruns": 4,
+    "87c8ba2d": 1
   },
   "started_at": "2026-07-02T00:00:00Z"
 }
