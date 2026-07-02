@@ -4742,3 +4742,6 @@
 {"type":"issue_updated","id":"5825f0b5-c383-466d-be2f-7aba78801cd8","issue_id":"41aa1b75-3dba-4836-a3e2-78794a892914","timestamp":"2026-07-02T22:01:59.023260921Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"72b5caf2-c90c-4954-b628-86855b547190","issue_id":"41aa1b75-3dba-4836-a3e2-78794a892914","timestamp":"2026-07-02T22:01:59.030616986Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"fad62c7b-66ff-48ae-8309-f2e339248786","issue_id":"41aa1b75-3dba-4836-a3e2-78794a892914","timestamp":"2026-07-02T22:01:59.038357412Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_added","id":"56c97290-4444-44d3-8b79-48f28ce71811","issue_id":"41aa1b75-3dba-4836-a3e2-78794a892914","timestamp":"2026-07-02T23:06:19.222078476Z","gate_key":"cargo-ci"}
+{"type":"gate_passed","id":"850b110b-7a34-4bf7-95b6-382fe45b8100","issue_id":"41aa1b75-3dba-4836-a3e2-78794a892914","timestamp":"2026-07-02T23:07:39.881692229Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"issue_created","id":"6948fec2-700a-4097-92fe-e2d7bd5231a8","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-02T23:07:41.826735734Z","title":"coverage-preview passes vacuously on checkbox-prefixed [hard] criteria","priority":"high"}
