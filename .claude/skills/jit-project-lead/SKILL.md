@@ -42,6 +42,14 @@ Run these steps before any tier derivation or mode dispatch, in order:
    skill's directory. The path resolves inside the jit repository even when
    the skill is entered from another project through the `~/.claude/skills`
    symlink.
+6. **Resume read-back.** As soon as the request identifies the strategic
+   container, resolve both durable-artifact paths from `[documentation]` config
+   and read them back (see Vision and progress): the vision/charter under the
+   permanent path and the progress file under the active path. A re-invocation
+   resumes from the recovered vision, decision log, and wave/container status —
+   never re-decides a logged decision or re-dispatches an accepted container. On
+   a first invocation neither exists yet; create them per that section before
+   dispatch.
 
 Hold the extracted context in working memory for the whole session.
 
@@ -62,6 +70,29 @@ tier), the assumption checks, the numeric-level fallback when a config input is
 missing, and the stop-and-ask conditions. Do not derive tiers inline here or
 hardcode a type name; the reference and the live config are the only sources.
 If the reference says stop and ask, stop (see Stop and escalate).
+
+## Vision and progress
+
+The steward owns two durable artifacts per strategic container, both linked to it
+via `jit doc` and both read back on re-invocation:
+
+- **Vision charter** (`references/vision-charter.md`) — the project vision plus a
+  decision log recording, for every consequential decision, what was chosen, what
+  was rejected, and why. It lands under the permanent documentation path (first
+  entry of `permanent_paths`) so it is never archived on container completion.
+  Instantiate `references/templates/vision-charter.md` on first invocation; on
+  resume, read every logged decision back and treat it as binding (append a new
+  `D-N` to supersede, never edit a landed entry).
+- **Progress artifact** (`references/progress-artifact.md`) — the resumable wave
+  plan with a per-sub-strategic-container status row, under
+  `<development_root>/active/`. It is the one-tier-up analogue of the execution
+  lead's per-epic `progress.json` (containers in place of issues) and feeds
+  `current_wave` to sub-strategic dispatch.
+
+Read each reference **in full** before creating or updating its artifact. Derive
+both locations from config; do not hardcode a directory. Link both to the
+strategic container with `jit doc add` (a doc link, not a lifecycle change).
+Resume reads both back per the Pre-flight resume step.
 
 ## Sub-strategic dispatch
 
