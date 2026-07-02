@@ -118,8 +118,9 @@ The scenario verdict is the conjunction of its items:
 - **FAIL** — one or more items are FAIL. List them.
 
 A verdict is complete only when it records: the scenario name, the run date, the runner
-used, the transcript location, the itemized checklist with each item's mark and evidence,
-and the overall PASS/FAIL.
+used, the run-record location (the transcript, or the run's completion report when the
+equivalent sub-agent runner is used), the itemized checklist with each item's mark and
+evidence, and the overall PASS/FAIL.
 
 ---
 
@@ -129,8 +130,8 @@ Record every adjudicated run in the skill's `evals/results.md`. For each scenari
 
 - Scenario `name` and the date the run was produced.
 - The overall verdict (**PASS** / **FAIL**).
-- The transcript location (path under `evals/transcripts/`) or the inlined completed
-  checklist backing the verdict.
+- The run-record location (a transcript or completion report under `evals/transcripts/`)
+  and the inlined completed checklist backing the verdict.
 - The itemized checklist with per-item marks and evidence pointers.
 
 `results.md` is the durable baseline: a later reader confirms the claim "this skill passes
