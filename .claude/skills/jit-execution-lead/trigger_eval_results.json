@@ -2,63 +2,71 @@
   "skill_name": "jit-execution-lead",
   "description": "Autonomous team leader that drives an epic to completion by breaking it down, delegating to AI sub-agents (engineers, researchers, architects), and enforcing quality with holistic coherence review. Use when asked to \"lead an epic\", \"drive this epic\", \"manage this epic end-to-end\", \"run this epic\", \"take charge of\", \"own this epic\", or \"deliver this epic\". Also use when handing off an epic for autonomous execution with quality enforcement, or when the user wants a team of agents to collaboratively complete a large work item. Do not use for individual task execution \u2014 use jit-manage for that.",
   "method": "dev/eval/skill-triggers/run_trigger_eval.py (adapted skill-creator trigger-eval technique; base-name match instead of unique-proxy match, see README.md)",
-  "runs_per_query": 3,
+  "runs_per_query": 5,
   "trigger_threshold": 0.5,
   "results": [
+    {
+      "query": "Lead this epic end-to-end: break it down, dispatch engineers and researchers, and enforce quality",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
     {
       "query": "Take charge of epic 6662f738 and drive it to completion with a team of agents",
       "should_trigger": true,
       "trigger_rate": 1.0,
-      "triggers": 3,
-      "runs": 3,
+      "triggers": 5,
+      "runs": 5,
       "pass": true
     },
     {
       "query": "Own this epic and deliver it autonomously with holistic coherence review",
       "should_trigger": true,
       "trigger_rate": 1.0,
-      "triggers": 3,
-      "runs": 3,
-      "pass": true
-    },
-    {
-      "query": "Lead this epic end-to-end: break it down, dispatch engineers and researchers, and enforce quality",
-      "should_trigger": true,
-      "trigger_rate": 0.6666666666666666,
-      "triggers": 2,
-      "runs": 3,
+      "triggers": 5,
+      "runs": 5,
       "pass": true
     },
     {
       "query": "Run this epic to Done \u2014 I want a team of sub-agents to collaboratively complete this large work item",
       "should_trigger": true,
-      "trigger_rate": 0.3333333333333333,
-      "triggers": 1,
-      "runs": 3,
-      "pass": false
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
     },
     {
       "query": "I'm handing off this epic for autonomous execution; keep quality high and only escalate when you must",
       "should_trigger": true,
       "trigger_rate": 1.0,
-      "triggers": 3,
-      "runs": 3,
+      "triggers": 5,
+      "runs": 5,
+      "pass": true
+    },
+    {
+      "query": "Drive the authentication epic to completion, orchestrating architects and engineers through review waves",
+      "should_trigger": true,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
       "pass": true
     },
     {
       "query": "Manage this epic end-to-end and handle whatever rework the coherence reviews surface",
       "should_trigger": true,
       "trigger_rate": 1.0,
-      "triggers": 3,
-      "runs": 3,
+      "triggers": 5,
+      "runs": 5,
       "pass": true
     },
     {
-      "query": "Drive the authentication epic to completion, orchestrating architects and engineers through review waves",
+      "query": "Deliver epic f2532a2d: decompose it, plan the execution waves, and dispatch the workers",
       "should_trigger": true,
-      "trigger_rate": 0.6666666666666666,
-      "triggers": 2,
-      "runs": 3,
+      "trigger_rate": 1.0,
+      "triggers": 5,
+      "runs": 5,
       "pass": true
     },
     {
@@ -66,15 +74,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
-      "pass": true
-    },
-    {
-      "query": "Deliver epic f2532a2d: decompose it, plan the execution waves, and dispatch the workers",
-      "should_trigger": true,
-      "trigger_rate": 1.0,
-      "triggers": 3,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -82,7 +82,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -90,7 +90,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -98,7 +98,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -106,7 +106,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -114,7 +114,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -122,7 +122,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -130,7 +130,7 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     },
     {
@@ -138,19 +138,19 @@
       "should_trigger": false,
       "trigger_rate": 0.0,
       "triggers": 0,
-      "runs": 3,
+      "runs": 5,
       "pass": true
     }
   ],
   "summary": {
     "total": 17,
-    "passed": 16,
-    "failed": 1,
+    "passed": 17,
+    "failed": 0,
     "should_trigger": {
       "total": 8,
-      "passed": 7,
-      "failed": 1,
-      "pass_rate": 0.875
+      "passed": 8,
+      "failed": 0,
+      "pass_rate": 1.0
     },
     "should_not_trigger": {
       "total": 9,
