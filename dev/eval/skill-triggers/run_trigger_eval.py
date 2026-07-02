@@ -379,7 +379,21 @@ def main():
                 file=sys.stderr,
             )
 
-    Path(args.out).write_text(json.dumps(output, indent=2) + "\n")
+    out_path = Path(args.out)
+    out_dir = out_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=out_path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(output, indent=2) + "\n")
+        os.replace(tmp, out_path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
     print(json.dumps(output["summary"], indent=2))
 
 
