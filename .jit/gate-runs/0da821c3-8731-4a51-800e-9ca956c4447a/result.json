@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0da821c3-8731-4a51-800e-9ca956c4447a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450",
+  "commit": "eecabaacf98aef4b478b3475154d2190e28f0fdc",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T20:15:48.289278835Z",
+  "completed_at": "2026-07-02T20:17:06.849491423Z",
+  "duration_ms": 78560,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 is met: [docs/reference/skill-eval-adjudication.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/skill-eval-adjudication.md:31) defines inputs, grading steps, checklist conversion, scoring, and verdict format.\n\nREQ-02/REQ-03 are not fully met because one recorded PASS is not backed by evidence required by the method.\n\n**Architecture / Functional / Rust Safety**\n\nNo Rust code changed. No domain/storage/command/CLI boundary concerns observed. No unsafe-code, error-handling, public API doc, or CLI contract impact.\n\n**Correctness And Invariants**\n\nIssue metadata update was logged in [.jit/events.jsonl](/home/vkaskivuo/Projects/just-in-time/.jit/events.jsonl:5). The issue remains `in_progress`, so gate transition semantics are not violated. Assignee and labels use the required formats.\n\n**Testing / Validation**\n\n`run_history` is empty, so there is no provided cargo-ci evidence. I did not run cargo tests. I ran `./scripts/jit-validate.sh`; it passed with three allowed orphan-label warnings.\n\n**Jit Issue Management**\n\nThe prerequisite issue listed in `issue.dependencies` is marked `done` in the provided context. `jit-validate` passed.\n\n**Findings**\n\n1. [`.claude/skills/jit-execution-lead/evals/results.md:99`](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-execution-lead/evals/results.md:99) marks the `content-project-epic` item “No software-specific commands attempted” as PASS using only final working-tree evidence. That does not satisfy the project’s own adjudication method, which says negative command-attempt items must be checked by both repo state and transcript evidence: [docs/reference/skill-eval-adjudication.md:94](/home/vkaskivuo/Projects/just-in-time/docs/reference/skill-eval-adjudication.md:94). The committed backing file for that scenario is only a completion report, and it does not show command history. Because this expected-output item leaves no reliable on-disk trace, the PASS verdict is not reproducible from the recorded evidence.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1543 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f2479-3008-7852-b012-6e12abd615ee\n--------\nuser\n--- 1530 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
