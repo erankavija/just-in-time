@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "1de10f41-e8cf-4482-8251-9db92df11ee9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7a9eb806-28eb-4dd9-b31f-2506a25f6660",
+  "commit": "3b29c7430f7b77111942cb5d8e44fadf8c927e36",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T22:47:10.116595564Z",
+  "completed_at": "2026-07-02T22:48:33.395772002Z",
+  "duration_ms": 83279,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-04 is partially met: `.claude/skills/jit-project-lead/references/coherence-review.md` exists and contains explicit C1/C2/C3 tiers, stale-reference sweep, FAIL blocking semantics, and verdict format. REQ-01 and REQ-03 are not fully met because the protocol is not wired into the skill’s normal flow.\n\n**Architecture / Separation**\nNo Rust architecture boundary violations observed. The change is documentation/skill prose only.\n\n**Functional / Correctness / Safety**\nNo Rust implementation changes, so iterator style, unsafe code, atomic writes, event logging, gate semantics, PID safety, and error handling are not materially affected.\n\n**Testing / Validation**\nI used the provided succeeded `cargo-ci` gate as primary evidence: `fmt ok`, `clippy ok`, `test: 2836 passed, 0 failed, 12 ignored`. I did not rerun cargo tests. I ran `./scripts/jit-validate.sh`; it passed with 3 allowed label warnings.\n\n**CLI Contract / Documentation**\nNo CLI contract changes. Documentation is present, but the skill entry point still does not invoke it.\n\n**Jit Dependencies**\nThe prerequisite issue `e7d41080-e884-46b9-b5e2-b147f2c14df8` is `done` with `code-review` passed.\n\n1. **Blocking:** `.claude/skills/jit-project-lead/SKILL.md:66` through `.claude/skills/jit-project-lead/SKILL.md:85` still instructs the steward to read only `references/container-dispatch.md` for sub-strategic dispatch and says “the coherence check spanning containers is a separate concern,” but it never tells the steward to read or run `references/coherence-review.md` before advancing a wave. This leaves the new protocol discoverable only by filename, not integrated into the actual skill workflow, so REQ-01 and REQ-03 are not enforced “before a sub-strategic container is marked complete.”\n2. **Blocking:** `.claude/skills/jit-project-lead/references/container-dispatch.md:186` through `.claude/skills/jit-project-lead/references/container-dispatch.md:189` still lists “Running the cross-container coherence check here” as a red flag and says gathering each container’s own result is the only cross-lead step in scope. That directly conflicts with the new protocol’s timing at `.claude/skills/jit-project-lead/references/coherence-review.md:24` through `.claude/skills/jit-project-lead/references/coherence-review.md:35`, where the review must run after per-container acceptance and before wave advance. The dispatch protocol should defer to the new coherence protocol at that boundary, not continue warning against running it.\n\nTotal findings: 2\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1857 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f2503-bed3-70a1-8a04-04da23cc696d\n--------\nuser\n--- 1844 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

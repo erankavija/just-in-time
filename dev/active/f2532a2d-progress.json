@@ -111,7 +111,7 @@
           "short_id": "0b7e864d",
           "title": "Mechanical violation auto-fixer for content-standards sweep",
           "classification": "implementation",
-          "status": "rework-1-merged-code-review-FAIL-needs-rework-2"
+          "status": "done"
         },
         {
           "id": "e7d41080",
@@ -241,13 +241,15 @@
     "82e04ab0": 2,
     "66aeee5f": 3,
     "6662f738": 2,
-    "0b7e864d": 1
+    "0b7e864d": 1,
+    "7a9eb806": 1
   },
   "started_at": "2026-07-02T00:00:00Z",
   "reviewed": {
     "e7d41080": "PASS -> done",
     "02a2bbb9": "PASS: trigger 17/17 failed:0, 4 scenarios PASS (activation, tier-derivation this-repo + research, fallback). SKILL.md untouched. done.",
-    "0b7e864d": "rework-1 FAIL: residual title scanner/fixer mismatch (mid-title S0/W1 flagged unanchored @ standards-scan.sh:329 but fixer strips leading-only). rework-2 DEFERRED per invoker. Fix: anchor scanner position-code pattern to ^."
+    "0b7e864d": "rework-2 PASS -> done. Anchored scanner:329 to ^ (lockstep with fixer). Worker audited all 4 other position/prefix branches: each has matching fixer strip, no residual gap. Harnesses 28+41 green (fixtures cover mid-title-not-flagged + leading-flagged-and-corrected). cargo-ci+code-review both passed.",
+    "7a9eb806": "PASS: references/coherence-review.md (267 lines), tiers C1/C2/C3, PASS/FAIL verdict + stale-forward sweep + no-argue stop condition, cc-sdd register. REQ-01..04 met. Tier-3 coherence: consistent with e7d41080 container-dispatch.md which defers cross-container coherence to this story. SKILL.md untouched (wiring is 304f6d94). cargo-ci running then code-review."
   },
   "last_session": 3
 }
