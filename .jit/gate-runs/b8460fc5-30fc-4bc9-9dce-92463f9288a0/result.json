@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "b8460fc5-30fc-4bc9-9dce-92463f9288a0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6662f738-cc2b-467a-9de3-01629b7b36d0",
+  "commit": "494383568d43e8187b0532b3800d4ccfd3869d35",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-02T20:43:28.819383583Z",
+  "completed_at": "2026-07-02T20:44:57.679723050Z",
+  "duration_ms": 88860,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 and REQ-02 are met. Both `.claude/skills/jit-execution-lead/trigger_eval.json:1` and `.claude/skills/jit-planning-lead/trigger_eval.json:1` contain 17 query/label pairs each: 8 should-trigger cases and 9 near-miss should-not-trigger cases.\n\nREQ-03 and REQ-04 are met. The result files record live-description eval output via `dev/eval/skill-triggers/run_trigger_eval.py`; both summaries show 17/17 passing, with 8/8 should-trigger and 9/9 should-not-trigger at `.claude/skills/jit-execution-lead/trigger_eval_results.json:145` and `.claude/skills/jit-planning-lead/trigger_eval_results.json:145`.\n\n**Architecture And Separation**\n\nNo Rust domain, storage, command, CLI, or output boundaries are touched. Changes are limited to skill eval artifacts and `dev/eval/skill-triggers/run_trigger_eval.py`.\n\n**Functional Paradigm**\n\nNo blocking concern. The imperative Python in `dev/eval/skill-triggers/run_trigger_eval.py` is appropriate for subprocess orchestration and stream parsing.\n\n**Correctness And Invariants**\n\nThe prior atomic-write issue is resolved. The temporary command file uses `tempfile.mkstemp` plus `os.replace` at `dev/eval/skill-triggers/run_trigger_eval.py:107`, and persisted result JSON uses the same pattern at `dev/eval/skill-triggers/run_trigger_eval.py:398`.\n\nNo event-log, gate-transition, assignee, label, or PID-safety behavior is changed.\n\n**Safety**\n\nNo Rust unsafe code is introduced. The Python runner uses `process.kill()` on a `Popen` handle at `dev/eval/skill-triggers/run_trigger_eval.py:223`, not raw OS PID signaling, so the `kill(-1, sig)` invariant is not implicated.\n\n**Testing**\n\nProvided run history showed the previous review failed only on direct result-file writing. That issue is now addressed. I ran `./scripts/jit-validate.sh`; it passed with the same three allowed orphan-label warnings.\n\nI did not run cargo tests; this change does not touch Rust code, and no succeeded cargo-ci gate was provided.\n\n**Error Handling**\n\nNo blocking issue found. The runner reports missing `SKILL.md` with path context at `dev/eval/skill-triggers/run_trigger_eval.py:353`, warns with exception context for failed query runs at `dev/eval/skill-triggers/run_trigger_eval.py:270`, and cleans temporary files on write failures at `dev/eval/skill-triggers/run_trigger_eval.py:114` and `dev/eval/skill-triggers/run_trigger_eval.py:403`.\n\n**CLI Contract**\n\nNo `jit` CLI command surface is changed, so the `--json` contract is unaffected.\n\n**Documentation**\n\n`dev/eval/skill-triggers/README.md:1` documents the adapted trigger-eval runner, why the stock skill-creator runner needed adjustment, usage, and output shape.\n\n**Prior Review Feedback**\n\nResolved. The previous finding cited `Path(args.out).write_text(...)`; the current runner no longer uses `write_text` for result persistence and writes atomically at `dev/eval/skill-triggers/run_trigger_eval.py:395`.\n\n**JIT Issue Management**\n\nThe listed dependency `c6325c5b` is marked done in the issue context. `./scripts/jit-validate.sh` passes; label warnings are allowed by the review instructions.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
