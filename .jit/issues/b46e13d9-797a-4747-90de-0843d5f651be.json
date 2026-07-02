@@ -2,9 +2,9 @@
   "id": "b46e13d9-797a-4747-90de-0843d5f651be",
   "title": "Context-aware escalation target for jit-execution-lead",
   "description": "Changes jit-execution-lead's escalation target from a hardcoded human to \"whoever invoked it\" — the human when run standalone, the parent lead when nested under jit-project-lead — without changing behavior for existing standalone use.\n\n## Background\n\njit-execution-lead's escalation policy currently always names the human as the target for every escalation case (scope expansion, cross-epic dependency, criteria changes, and others). Once jit-project-lead can dispatch jit-execution-lead as a subagent, an escalation from a nested execution lead should surface to the dispatching lead first, not skip straight to the human.\n\n## Success Criteria\n\n- [hard] REQ-01: Every escalation case in jit-execution-lead's escalation policy and matching SKILL.md wording names \"the invoker\" as the target rather than a hardcoded human.\n- [hard] REQ-02: When jit-execution-lead runs standalone (no parent lead invoked it), the invoker defaults to the human and escalation behavior is unchanged from today.\n- [hard] REQ-03: When jit-execution-lead runs as a subagent dispatched by a parent lead, escalations surface to that parent lead instead of the human.\n\n## Notes\n\nThis is the single change this epic makes to jit-execution-lead; everything else about it is reused unmodified.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "f59d1b6b-02e1-492d-afad-425a432154fc"
   ],
@@ -21,5 +21,5 @@
     "type:task"
   ],
   "created_at": "2026-07-01T22:08:58.323935218Z",
-  "updated_at": "2026-07-01T22:28:42.493703858Z"
+  "updated_at": "2026-07-02T07:12:04.896588706Z"
 }

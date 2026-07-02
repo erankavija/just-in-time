@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "3c595a08-488c-4f1c-a6ce-4344205d01ba",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c6325c5b-1d92-444c-b460-3021e6402b07",
+  "commit": "e58191cff8a1f29159649fcbb068cbf73effd32b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-02T07:08:04.235655373Z",
+  "completed_at": "2026-07-02T07:09:55.574441046Z",
+  "duration_ms": 111338,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01: Pass. The remaining grep hits are in Done/exempt historical documents. The known live references in skill files, scripts, and `eed6750c` were removed.\n\nREQ-02: Pass. The nine named hits were corrected in place.\n\nREQ-03: Fail. The commit touches additional `dev/active/` documents attached to Backlog issues, despite the requirement that the change touch only the named files.\n\n**Architecture / Separation**\n\nNo Rust code changed. No domain/storage/command/CLI boundary impact.\n\n**Functional Paradigm**\n\nNo Rust code changed.\n\n**Correctness / Invariants**\n\nNo state-machine, storage, gate, PID, label, or assignee logic changed.\n\n**Safety**\n\nNo unsafe code introduced.\n\n**Testing**\n\n`run_history` is empty. I did not run the full test suite. I ran `./scripts/jit-validate.sh`; it passed with one allowed label warning.\n\n**Error Handling / CLI / Documentation**\n\nNo library error handling or CLI contract changes. Documentation edits are the only relevant surface, and the scope violation below is blocking.\n\n**Jit Issue Management**\n\nPrerequisite dependency `f59d1b6b` is Done. `./scripts/jit-validate.sh` passed.\n\n**Findings**\n\n1. Blocking: REQ-03 is violated because commit `e58191cf` modifies four extra `dev/active/` documents attached to non-Done Backlog issues: [dev/active/304f6d94-breakdown-spec.md](/home/vkaskivuo/Projects/just-in-time/dev/active/304f6d94-breakdown-spec.md:93), [dev/active/3c192f5e-breakdown-spec.md](/home/vkaskivuo/Projects/just-in-time/dev/active/3c192f5e-breakdown-spec.md:102), [dev/active/c23dfe71-breakdown-spec.md](/home/vkaskivuo/Projects/just-in-time/dev/active/c23dfe71-breakdown-spec.md:6), and [dev/active/e8b1cee3-breakdown-spec.md](/home/vkaskivuo/Projects/just-in-time/dev/active/e8b1cee3-breakdown-spec.md:102). Each is attached to an issue whose state is `backlog`: [.jit/issues/304f6d94-f6db-40e8-9467-61d0d3bf6119.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/304f6d94-f6db-40e8-9467-61d0d3bf6119.json:5), [.jit/issues/3c192f5e-4537-42c3-90c7-3e758c919b27.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/3c192f5e-4537-42c3-90c7-3e758c919b27.json:5), [.jit/issues/c23dfe71-94f1-4f8e-a9f4-e371ce65c70f.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/c23dfe71-94f1-4f8e-a9f4-e371ce65c70f.json:5), and [.jit/issues/e8b1cee3-893c-4a5e-bd6b-e02a89a2d601.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/e8b1cee3-893c-4a5e-bd6b-e02a89a2d601.json:5). The issue explicitly scopes the change to the named files, so these extra edits fail acceptance even though they remove additional stale references.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1993 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f21a7-fd34-72e3-8742-70d2c64d52d8\n--------\nuser\n--- 1980 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

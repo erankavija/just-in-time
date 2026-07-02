@@ -1,0 +1,211 @@
+{
+  "epic_id": "f2532a2d-138d-46bf-9547-e1ea517f0170",
+  "epic_short_id": "f2532a2d",
+  "current_wave": 1,
+  "notes": [
+    "Bracket already complete before this session: planning 8f5de6bc done (plan-review passed), breakdown f59d1b6b done (coverage-preview + breakdown-review passed). Plan doc: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md (decisions D1-D9).",
+    "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
+    "6c5f70ad (wave 6) depends on eed6750c (jit-planning-lead, in_progress, OUTSIDE this epic, per plan D6). If eed6750c is not done when wave 6 starts, escalate per policy entry 7.",
+    "Plan D9: strategic-tier bracketing is an explicitly out-of-scope open question; no child depends on it."
+  ],
+  "waves": [
+    {
+      "wave_number": 1,
+      "dispatch_mode": "serial (file overlap on jit-execution-lead/SKILL.md, jit-planning-lead/SKILL.md)",
+      "issues": [
+        {
+          "id": "c6325c5b",
+          "short_id": "c6325c5b",
+          "title": "Sweep residual pre-rename references",
+          "classification": "documentation",
+          "status": "blocked-escalation"
+        },
+        {
+          "id": "b46e13d9",
+          "short_id": "b46e13d9",
+          "title": "Context-aware escalation target for jit-execution-lead",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "faed8ffa",
+          "short_id": "faed8ffa",
+          "title": "Promote content standards to a canonical doc",
+          "classification": "documentation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "87c8ba2d",
+          "short_id": "87c8ba2d",
+          "title": "Scaffold jit-project-lead skill shell",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "a5b04c9f",
+          "short_id": "a5b04c9f",
+          "title": "Define scenario-eval adjudication method and verify jit-execution-lead evals",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6662f738",
+          "short_id": "6662f738",
+          "title": "Add activation trigger evals for both lead skills",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "66aeee5f",
+          "short_id": "66aeee5f",
+          "title": "Content-standards violation scanner and classifier",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "82e04ab0",
+          "short_id": "82e04ab0",
+          "title": "Derive strategic tiers from project configuration",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "28731a53",
+          "short_id": "28731a53",
+          "title": "Layer sub-strategic containers into dependency-ordered waves",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "41aa1b75",
+          "short_id": "41aa1b75",
+          "title": "Add jit-planning-lead scenario evals for its entry paths",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "0b7e864d",
+          "short_id": "0b7e864d",
+          "title": "Mechanical violation auto-fixer for content-standards sweep",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e7d41080",
+          "short_id": "e7d41080",
+          "title": "Dispatch jit-execution-lead per container reusing canonical dispatch scripts",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "02a2bbb9",
+          "short_id": "02a2bbb9",
+          "title": "Verify jit-project-lead skeleton activation and evals",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "c23dfe71",
+          "short_id": "c23dfe71",
+          "title": "Runnable eval verification for the lead skills",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "206bd960",
+          "short_id": "206bd960",
+          "title": "Standards-sweep mode workflow and report",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7a9eb806",
+          "short_id": "7a9eb806",
+          "title": "Run cross-container coherence review before accepting a container as complete",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "e8b1cee3",
+          "short_id": "e8b1cee3",
+          "title": "jit-project-lead skeleton with config-derived tiers",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "eff48a6e",
+          "short_id": "eff48a6e",
+          "title": "Durable vision/charter and resumable progress artifacts",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "634b2382",
+          "short_id": "634b2382",
+          "title": "Parent-escalation policy for jit-project-lead",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "304f6d94",
+          "short_id": "304f6d94",
+          "title": "Sub-strategic dispatch in topological waves with coherence review",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "3c192f5e",
+          "short_id": "3c192f5e",
+          "title": "Project-wide content-standards sweep mode",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6c5f70ad",
+          "short_id": "6c5f70ad",
+          "title": "Four-mode front door with request routing",
+          "classification": "implementation",
+          "status": "pending",
+          "external_dep": "eed6750c"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [
+    {
+      "issue": "c6325c5b",
+      "category": "criteria-conflict (escalation policy entry 4)",
+      "status": "awaiting-user",
+      "summary": "REQ-01 (zero old-name hits over live scope incl. non-Done dev/active docs) and REQ-03 (touch only the named files) are jointly unsatisfiable: four backlog-attached breakdown specs quoted old names verbatim. Worker fixed them; code-review gate FAILED on literal REQ-03. Lead recommends amending REQ-03 to its intent (Done-attached records untouched). AskUserQuestion timed out; re-ask before closing wave 1.",
+      "gate_run": "code-review failed 2026-07-02"
+    }
+  ],
+  "rework_counts": {},
+  "started_at": "2026-07-02T00:00:00Z"
+}
