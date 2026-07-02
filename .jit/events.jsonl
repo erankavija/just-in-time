@@ -4615,3 +4615,9 @@
 {"type":"issue_updated","id":"50baa67e-4ff8-459d-801a-2c33459872f7","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:46:47.932930491Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_state_changed","id":"7db72e55-e6f6-43a3-98b2-de49f0485f41","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:46:58.308840726Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"67fc17b9-592e-4bdb-81a1-dbb1882471e9","issue_id":"9067c337-d849-4e74-906e-6e2c7ba8686a","timestamp":"2026-07-02T07:46:58.308862006Z"}
+{"type":"gate_failed","id":"3d371f82-82a2-4ba4-bc8f-ff1e0dc81cbb","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:48:02.590626670Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"3144fb81-904c-4914-950a-71190c8b8ca8","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:49:52.079061907Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"25aff786-7084-41bc-87a1-381de1a818db","issue_id":"8689e255-1566-460f-931d-7a01c6be1120","timestamp":"2026-07-02T07:51:53.345087679Z","title":"Flaky test-binary spawn: use CARGO_BIN_EXE_jit instead of current_exe-derived path","priority":"normal"}
+{"type":"issue_updated","id":"745b337a-c320-44c3-b99e-f1f8c150f550","issue_id":"faed8ffa-8f94-43e2-8de5-735bd7525d28","timestamp":"2026-07-02T07:52:03.075799755Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"b3a473f8-1db4-4d5c-80f0-009d61da4444","issue_id":"8689e255-1566-460f-931d-7a01c6be1120","timestamp":"2026-07-02T07:52:03.091869187Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"9a966c6a-fef2-4045-968c-b075e63109d7","issue_id":"8689e255-1566-460f-931d-7a01c6be1120","timestamp":"2026-07-02T07:52:03.092056857Z","assignee":"agent:claude"}

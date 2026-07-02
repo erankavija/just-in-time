@@ -6,8 +6,9 @@
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
+    "f59d1b6b-02e1-492d-afad-425a432154fc",
     "9067c337-d849-4e74-906e-6e2c7ba8686a",
-    "f59d1b6b-02e1-492d-afad-425a432154fc"
+    "8689e255-1566-460f-931d-7a01c6be1120"
   ],
   "gates_required": [
     "code-review"
@@ -16,7 +17,7 @@
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:29:47.019703327Z"
+      "updated_at": "2026-07-02T07:48:40.031716466Z"
     }
   },
   "context": {},
@@ -37,5 +38,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.178681413Z",
-  "updated_at": "2026-07-02T07:46:47.932747431Z"
+  "updated_at": "2026-07-02T07:52:03.075619365Z"
 }
