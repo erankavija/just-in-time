@@ -1,0 +1,20 @@
+[
+  {"query": "Plan this feature with jit", "should_trigger": true},
+  {"query": "I have a rough idea for a feature — plan it out with jit into a ready-to-execute work tree", "should_trigger": true},
+  {"query": "Turn this article into a jit plan with a full breakdown ready for implementation", "should_trigger": true},
+  {"query": "Take this vague request and produce a fully planned, broken-down jit work tree", "should_trigger": true},
+  {"query": "Help me plan this rough epic in jit before we start any implementation", "should_trigger": true},
+  {"query": "I want to go from a half-formed idea to a complete jit plan that's ready to execute", "should_trigger": true},
+  {"query": "Scope and plan this initiative with jit so the whole work tree is ready to hand off", "should_trigger": true},
+  {"query": "Here's a loose problem statement — plan and break it into child jit issues for me", "should_trigger": true},
+
+  {"query": "Lead this epic to completion with a team of agents and enforce quality", "should_trigger": false},
+  {"query": "Drive this epic end-to-end, dispatch the workers, and handle rework", "should_trigger": false},
+  {"query": "Break down this existing jit issue into child tasks from its spec document", "should_trigger": false},
+  {"query": "What should I work on next in jit?", "should_trigger": false},
+  {"query": "Claim and complete this jit task once its gates pass", "should_trigger": false},
+  {"query": "Show me the jit project status and the blocked issues", "should_trigger": false},
+  {"query": "Steward the whole project and drive its top-level strategic container", "should_trigger": false},
+  {"query": "Migrate our ROADMAP.md and TODO list into jit", "should_trigger": false},
+  {"query": "Plan the agenda for tomorrow's team offsite", "should_trigger": false}
+]

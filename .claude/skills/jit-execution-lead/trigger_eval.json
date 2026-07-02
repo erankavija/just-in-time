@@ -1,0 +1,20 @@
+[
+  {"query": "Take charge of epic 6662f738 and drive it to completion with a team of agents", "should_trigger": true},
+  {"query": "Lead this epic end-to-end: break it down, dispatch engineers and researchers, and enforce quality", "should_trigger": true},
+  {"query": "Own this epic and deliver it autonomously with holistic coherence review", "should_trigger": true},
+  {"query": "Run this epic to Done — I want a team of sub-agents to collaboratively complete this large work item", "should_trigger": true},
+  {"query": "I'm handing off this epic for autonomous execution; keep quality high and only escalate when you must", "should_trigger": true},
+  {"query": "Drive the authentication epic to completion, orchestrating architects and engineers through review waves", "should_trigger": true},
+  {"query": "Manage this epic end-to-end and handle whatever rework the coherence reviews surface", "should_trigger": true},
+  {"query": "Deliver epic f2532a2d: decompose it, plan the execution waves, and dispatch the workers", "should_trigger": true},
+
+  {"query": "Break down this epic into stories", "should_trigger": false},
+  {"query": "Decompose this story into child tasks with dependency edges from its spec", "should_trigger": false},
+  {"query": "What should I work on next?", "should_trigger": false},
+  {"query": "Claim issue 6662f738, plan it, and complete it once its gates pass", "should_trigger": false},
+  {"query": "Show me the project status and what's currently blocked", "should_trigger": false},
+  {"query": "Plan this feature with jit before we start implementing", "should_trigger": false},
+  {"query": "Steward the whole project and own its vision across every strategic container", "should_trigger": false},
+  {"query": "Implement these three independent issues in parallel with sub-agents", "should_trigger": false},
+  {"query": "Lead the sprint planning meeting for my team tomorrow morning", "should_trigger": false}
+]
