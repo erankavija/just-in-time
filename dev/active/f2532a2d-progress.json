@@ -133,7 +133,7 @@
           "short_id": "c23dfe71",
           "title": "Runnable eval verification for the lead skills",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress-rework1-4th-scenario (REQ-01..04 backed by a5b04c9f+41aa1b75+6662f738; authored baseline rollup doc; code-review FAIL: exec-lead evals.json has a 4th scenario parent-invoked-escalation unrun -> running+recording it, updating baseline to 4/4)"
         }
       ]
     },
@@ -243,7 +243,8 @@
     "66aeee5f": 3,
     "6662f738": 2,
     "0b7e864d": 1,
-    "7a9eb806": 1
+    "7a9eb806": 1,
+    "c23dfe71": 1
   },
   "started_at": "2026-07-02T00:00:00Z",
   "reviewed": {
