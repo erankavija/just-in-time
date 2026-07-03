@@ -66,16 +66,21 @@ makes the aggregate read command fail loudly when gates are not green.
   aliases. Singular `status` preserves the existing inspection flags
   (`--all`/`--limit`/`--status`/`--stdout`/`--stderr`/`--tail`/`--gate`) and
   remains non-strict.
-- [ ] REQ-04: subcommand help groups the gate verbs by whether they produce a
-  verdict (mutate: `evaluate`, `evaluate-all`, `fail`) or report state (read:
-  `list`, `show`, `status`, `status-all`), and states which verbs mutate.
+- [ ] REQ-04: `jit gate --help` presents, in its command description, an
+  explicit grouping of the gate verbs into "produce a verdict (mutate:
+  `evaluate`, `evaluate-all`, `fail`)" vs "report state (read-only: `list`,
+  `show`, `status`, `status-all`)", and states which verbs mutate. Note: clap 4.5
+  cannot insert heading rows into the subcommand `Commands:` list itself (no
+  upstream subcommand help-heading support), so the grouped description above the
+  flat list is the faithful maximum. Reworded from "groups the subcommand list"
+  to this achievable form on 2026-07-04.
 - [ ] REQ-05: stale references to the old verbs in **live** in-tree surfaces
   are swept — the never-run hint ("Use 'jit gate pass' to run it"), the `cli.rs`
   gate-taxonomy doc comments, the top-level usage example, and current product
   docs under `docs/` — now name `evaluate` / `status`. **Out of scope:**
-  historical/archived dev docs (`dev/archive`, `dev/sessions`, and prior plan
-  documents) and existing issue descriptions stored in `.jit/` are historical
-  records and are left as-authored.
+  all of `dev/` (active, archive, sessions, and prior plan documents) and
+  existing issue descriptions stored in `.jit/` are historical records and are
+  left as-authored.
 
 ## Design
 
@@ -165,8 +170,8 @@ milestone.
 5. Add CLI tests asserting the legacy aliases still resolve to the renamed
    commands (REQ-01, REQ-03).
 6. Sweep live references only: `cli.rs` help/doc comments, the never-run hint,
-   and current product docs under `docs/`. Historical/archived dev docs
-   (`dev/archive`, `dev/sessions`, prior plan documents) and existing `.jit/`
+   current product docs under `docs/`, and live scripts under `scripts/`. All of
+   `dev/` (active, archive, sessions, prior plan documents) and existing `.jit/`
    issue descriptions are historical records and are left untouched; skill files
    under `~/.claude` are out of the repo and out of scope.
 
