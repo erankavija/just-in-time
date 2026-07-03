@@ -1842,7 +1842,7 @@ stage = \"postcheck\"
         // scan `test_resolve_link_label_across_all_four_kinds` exercises above for
         // requirement/decision/risk/invariant — no new resolution code, just the
         // kind-config declaration. Kind-segmented addresses only (the kindless
-        // `@/<self-id>` legacy form is being removed in a sibling task).
+        // `@/<self-id>` form is a parse error, never a self-id match).
         let exec = registry_exec_with_rules_and_gates(ONE_RULE, TWO_GATES);
 
         let rule = exec
