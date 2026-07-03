@@ -1,7 +1,10 @@
 //! JSON file-based storage implementation.
 //!
-//! All data is stored as JSON files in a `.jit/` directory with atomic writes.
-//! The directory location can be overridden with the `JIT_DATA_DIR` environment variable.
+//! Issues, the index, and events are stored as JSON files in a `.jit/` directory
+//! with atomic writes; the gate registry is `.jit/gates.toml`, persisted through
+//! [`crate::storage::gate_store`] (see that module for the TOML-specific
+//! layout). The directory location can be overridden with the `JIT_DATA_DIR`
+//! environment variable.
 
 use crate::domain::{Event, Issue};
 use crate::storage::{
@@ -18,7 +21,7 @@ use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
-const GATES_FILE: &str = "gates.json";
+const GATES_FILE: &str = "gates.toml";
 const EVENTS_FILE: &str = "events.jsonl";
 const GATE_RUNS_DIR: &str = "gate-runs";
 const GATE_RUN_RESULT_FILE: &str = "result.json";
@@ -48,7 +51,10 @@ impl Default for Index {
 /// JSON file-based storage for issues, gates, and events.
 ///
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
-/// gate definitions in `.jit/gates.json`, and events in `.jit/events.jsonl`.
+/// events in `.jit/events.jsonl`, and gate definitions in `.jit/gates.toml` — a
+/// `[[gates]]` array-of-tables persisted through [`crate::storage::gate_store`]
+/// (the sole source of truth for the gate registry; TOML, not JSON, despite the
+/// module name, which reflects the issue/event storage this type otherwise owns).
 /// All file writes are atomic (write to temp file, then rename).
 ///
 /// File locking is used to prevent race conditions in concurrent access:
@@ -409,11 +415,11 @@ impl IssueStore for JsonFileStorage {
             self.write_json(&index_path, &index)?;
         }
 
-        // Create gates.json if it doesn't exist
+        // Create gates.toml if it doesn't exist
         let gates_path = self.root.join(GATES_FILE);
         if !gates_path.exists() {
             let registry = GateRegistry::default();
-            self.write_json(&gates_path, &registry)?;
+            crate::storage::gate_store::save_gate_registry(&self.root, &registry)?;
         }
 
         // Create events.jsonl if it doesn't exist
@@ -623,15 +629,13 @@ impl IssueStore for JsonFileStorage {
     fn load_gate_registry(&self) -> Result<GateRegistry> {
         let gates_lock_path = self.root.join(".gates.lock");
         let _lock = self.locker.lock_shared(&gates_lock_path)?;
-        let gates_path = self.root.join(GATES_FILE);
-        self.read_json(&gates_path)
+        crate::storage::gate_store::load_gate_registry(&self.root)
     }
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let gates_lock_path = self.root.join(".gates.lock");
         let _lock = self.locker.lock_exclusive(&gates_lock_path)?;
-        let gates_path = self.root.join(GATES_FILE);
-        self.write_json(&gates_path, registry)
+        crate::storage::gate_store::save_gate_registry(&self.root, registry)
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
