@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "fe759416-6248-47f8-82a3-54fc5d49c8b5",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "949cd9d0-8920-4feb-8f13-ff0e2eeca0ee",
+  "commit": "fabe011836ccf594e70cb6c098f7910b7dedecb4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-03T21:44:28.620400332Z",
+  "completed_at": "2026-07-03T21:47:19.670675185Z",
+  "duration_ms": 171049,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest storage::lock::tests::test_exclusive_lock_prevents_concurrent_writes ... FAILED\ntest result: FAILED. 1375 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.37s\n---- storage::lock::tests::test_exclusive_lock_prevents_concurrent_writes stdout ----\n\nthread 'storage::lock::tests::test_exclusive_lock_prevents_concurrent_writes' (2356352) panicked at crates/jit/src/storage/lock.rs:413:9:\nSecond thread should timeout waiting for lock\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
