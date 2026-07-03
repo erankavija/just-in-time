@@ -1,6 +1,6 @@
 # Project invariants for just-in-time, seeded from the "Domain Invariants"
 # section of CLAUDE.md. Each entry is a project-scoped addressable item at
-# `@/<id>`; link work to one with an `enforces:@/<id>` label.
+# `@/invariant/<id>`; link work to one with an `enforces:@/invariant/<id>` label.
 #
 # `kind`:
 #   enforced  — a rule/gate mechanically guards the property (named in enforced-by)

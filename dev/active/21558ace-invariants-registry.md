@@ -2,7 +2,7 @@
 
 Group C of epic 25064508 (REQ-05). Scope: the registry schema, the config-time
 loader, and typed errors only. Item-indexing / `jit item` wiring and the
-`@/<self-id>` projection are the NEXT issue (93480b00).
+`@/invariant/<self-id>` projection are the NEXT issue (93480b00).
 
 ## Schema
 
@@ -13,14 +13,14 @@ cannot. Each entry:
 
 ```toml
 [[invariants]]
-id = "INV-01"                                   # self-id; @/INV-01 is its qualified id
+id = "INV-01"                                   # self-id; @/invariant/INV-01 is its qualified id
 statement = "Every dependency edge stays acyclic."  # required
 kind = "enforced"                               # required: "enforced" | "advisory"
 enforced-by = "dag-no-cycles"                   # optional: rule name or gate key
 ```
 
-- `id` is the entry's SELF-ID. The project-scoped qualified id `@/<id>` is derived
-  from it by the downstream indexer (93480b00). Ids must be unique.
+- `id` is the entry's SELF-ID. The project-scoped qualified id `@/invariant/<id>`
+  is derived from it by the downstream indexer (93480b00). Ids must be unique.
 - `kind` is a typed enum (`InvariantKind`) deserialized via `#[serde(rename_all =
   "kebab-case")]` with no `Default`, so the field is required and an unknown token
   (`"mandatory"`, `"both"`, …) is a descriptive serde parse error listing the

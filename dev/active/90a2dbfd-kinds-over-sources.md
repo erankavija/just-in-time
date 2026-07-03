@@ -9,7 +9,7 @@
 
 The addressable-items engine shipped in epic `25064508` (done) introduced
 project-scoped addressable items: structured list entries projected to globally
-unique qualified ids (`<issue>/REQ-01`, `@/INV-01`) that work can reference via
+unique qualified ids (`<issue>/REQ-01`, `@/invariant/INV-01`) that work can reference via
 namespace-qualified labels (`satisfies:`, `per:`, `mitigates:`, `enforces:`).
 One project-scoped kind shipped: `invariant`, registry-first from
 `.jit/invariants.toml`.
@@ -69,9 +69,9 @@ already crossed the boundary for one; the rest are unfinished symmetry:
 
 | Issue-scoped (one issue) | Project-scoped (the repo) | Status |
 |---|---|---|
-| requirement (`<id>/REQ-01`) | invariant (`@/INV-01`) | shipped |
-| decision (`<id>/D-01`) | ADR / project decision (`@/D-05`) | proposed |
-| risk (`<id>/RISK-01`) | program risk (`@/RISK-01`) | proposed |
+| requirement (`<id>/REQ-01`) | invariant (`@/invariant/INV-01`) | shipped |
+| decision (`<id>/D-01`) | ADR / project decision (`@/decision/D-05`) | proposed |
+| risk (`<id>/RISK-01`) | program risk (`@/risk/RISK-01`) | proposed |
 
 Plus two **descriptive/structural** kinds that have no issue-scoped origin:
 
@@ -79,7 +79,7 @@ Plus two **descriptive/structural** kinds that have no issue-scoped origin:
   constant. A fourth semantic category beyond requirement (must HOLD), decision
   (was CHOSEN), risk (might THREATEN): definition (simply IS / MEANS).
   Definitions are the shared *referent* the other kinds point at, so an
-  invariant or requirement cites `@/DEF-assignee-format` instead of restating
+  invariant or requirement cites `@/definition/Assignee` instead of restating
   the grammar inline. Evidence of need: the assignee `{type}:{identifier}` and
   label `namespace:value` grammars are physically restated across 10+ code and
   doc files; `docs/reference/glossary.md` is the canonical prose home but is
@@ -114,7 +114,7 @@ graph TD
     KIND -->|registry-first| TOML["source = { toml, id-field, text-field, link-fields }"]
     MD --> IDX[index_project_sources]
     TOML --> IDX
-    IDX --> ITEMS["AddressableItem  @/&lt;self-id&gt;"]
+    IDX --> ITEMS["AddressableItem  @/&lt;kind&gt;/&lt;self-id&gt;"]
     INIT["jit init"] -.writes default.-> CFG
 ```
 
@@ -205,7 +205,7 @@ non-existent `dag-no-cycles` rule.
 - Integration test: a config-declared markdown-first project kind indexes items
   from an arbitrary `.md` (REQ-01).
 - Unit/integration test: a non-invariant kind backed by a custom `.toml` via the
-  field mapping yields `@/<self-id>` items (REQ-02).
+  field mapping yields `@/<kind>/<self-id>` items (REQ-02).
 - Regression: removing the reserved branch keeps `jit item list --kind invariant`
   working from `invariants.toml` (REQ-03).
 - `grep` assertion / test that no kind-name literal drives indexing; `jit init`

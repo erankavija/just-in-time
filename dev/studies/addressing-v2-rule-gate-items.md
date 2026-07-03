@@ -191,6 +191,14 @@ Example labels under the scheme:
 11. **Backward-compat window.** Whether old `@/INV-*` and `<issue>/REQ-*` addresses
     must keep resolving during migration, or it is a clean cut (owner leans clean /
     no-legacy; confirm).
+
+    **Resolved — D11 (clean cut, no shim):** settled in
+    `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md` ("D11 — Backward-compat
+    window (point 11)"). No compatibility window; the legacy kindless project form
+    `@/<self-id>` (e.g. `@/INV-01`) and colon-prefixed rule ids are retired outright.
+    `<issue>/REQ-*` is unaffected by this point: `<short-id>/<self-id>` remains valid
+    sugar for the canonical issue form (container REQ-01), so it was never in scope
+    for a compat window.
 12. **Scope of one effort.** Is this one epic, or a milestone spanning several epics
     (addressing core vs rule/gate vs re-address migration vs multi-jit)? Sequencing
     and gating.
