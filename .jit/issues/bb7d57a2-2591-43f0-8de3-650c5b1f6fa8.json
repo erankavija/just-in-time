@@ -14,7 +14,23 @@
     "code-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T14:10:39.193027622Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T14:10:38.959328132Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T14:02:28.384930798Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -33,5 +49,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:19:51.086829876Z",
-  "updated_at": "2026-07-03T14:02:19.523401834Z"
+  "updated_at": "2026-07-03T14:12:55.963849048Z"
 }
