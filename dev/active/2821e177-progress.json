@@ -7,55 +7,123 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "d6c3bff6-2333-4444-97b1-f43bb243e06c", "short_id": "d6c3bff6", "title": "Parse kind-segmented addresses into scope, kind, and self-id components", "classification": "implementation", "model": "sonnet", "status": "done"}
+        {
+          "id": "d6c3bff6-2333-4444-97b1-f43bb243e06c",
+          "short_id": "d6c3bff6",
+          "title": "Parse kind-segmented addresses into scope, kind, and self-id components",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "done"
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "5222aa47", "short_id": "5222aa47", "title": "Rescope per-scope self-id uniqueness to include kind", "classification": "implementation", "model": "sonnet", "status": "dispatched", "note": "serialized after d6c3bff6: both edit domain/item.rs"}
+        {
+          "id": "5222aa47",
+          "short_id": "5222aa47",
+          "title": "Rescope per-scope self-id uniqueness to include kind",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "dispatched",
+          "note": "serialized after d6c3bff6: both edit domain/item.rs"
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "0910a381", "short_id": "0910a381", "title": "Expand short-id/self-id sugar to a canonical issue address via kind inference", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "0910a381",
+          "short_id": "0910a381",
+          "title": "Expand short-id/self-id sugar to a canonical issue address via kind inference",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "f4b5e3f4", "short_id": "f4b5e3f4", "title": "Rewire item resolution to match on scope, kind, and self-id", "classification": "implementation", "model": "opus", "status": "pending"}
+        {
+          "id": "f4b5e3f4",
+          "short_id": "f4b5e3f4",
+          "title": "Rewire item resolution to match on scope, kind, and self-id",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "37506c12", "short_id": "37506c12", "title": "STORY CLOSE: Kind-segmented scope-aware address parser and resolver", "classification": "lead-verification", "model": "lead", "status": "pending"}
+        {
+          "id": "37506c12",
+          "short_id": "37506c12",
+          "title": "STORY CLOSE: Kind-segmented scope-aware address parser and resolver",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "0597febe", "short_id": "0597febe", "title": "Widen the label-value grammar to accept @-prefixed addresses", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "0597febe",
+          "short_id": "0597febe",
+          "title": "Widen the label-value grammar to accept @-prefixed addresses",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"id": "542f8b6d", "short_id": "542f8b6d", "title": "Keep the label-format regex and generated JSON Schema in lockstep", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "7a2bbe4f", "short_id": "7a2bbe4f", "title": "Audit label-value re-split sites against the widened grammar", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "7a2bbe4f serialized after 542f8b6d (dep edge)"}
+        {
+          "id": "542f8b6d",
+          "short_id": "542f8b6d",
+          "title": "Keep the label-format regex and generated JSON Schema in lockstep",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "7a2bbe4f",
+          "short_id": "7a2bbe4f",
+          "title": "Audit label-value re-split sites against the widened grammar",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "7a2bbe4f serialized after 542f8b6d (dep edge)"
+        }
       ]
     },
     {
       "wave_number": 8,
       "issues": [
-        {"id": "0efbc594", "short_id": "0efbc594", "title": "STORY CLOSE: Label-value grammar widening and re-split-site audit", "classification": "lead-verification", "model": "lead", "status": "pending", "note": "STOP after this per invocation scope"}
+        {
+          "id": "0efbc594",
+          "short_id": "0efbc594",
+          "title": "STORY CLOSE: Label-value grammar widening and re-split-site audit",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending",
+          "note": "STOP after this per invocation scope"
+        }
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "5222aa47": 1
+  },
   "started_at": "2026-07-03T00:00:00Z"
 }
