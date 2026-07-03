@@ -10,8 +10,9 @@
 use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
-    index_items, index_project_sources, load_toml_scope_items, resolve_item_kinds,
-    split_qualified_id, AddressableItem, ItemKind, ProjectSource, Scope,
+    expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
+    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
+    AddressableItem, ItemError, ItemKind, ProjectSource, PROJECT_SCOPE_SENTINEL,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -36,6 +37,32 @@ pub struct ItemShowResult {
     pub issue_full_id: Option<String>,
     /// Title of the owning issue, or `None` for a project-scoped item.
     pub issue_title: Option<String>,
+}
+
+/// An item address classified into the scope + kind + self-id `show_item` resolves
+/// against, after applying the sugar-expansion and kind-segmented grammars.
+///
+/// The `kind` is `Some` for every explicit-kind or sugar address (resolution
+/// filters by kind AND self-id) and `None` only for the legacy project form
+/// `@/<self-id>` (kind-agnostic, kept so a project item's derived `qualified_id`
+/// round-trips).
+enum ResolvedItemAddress {
+    /// A project-scope address: `@/<kind>/<self-id>` (kind `Some`) or the legacy
+    /// `@/<self-id>` (kind `None`).
+    Project {
+        kind: Option<String>,
+        self_id: String,
+    },
+    /// An issue-scope address: an explicit `@/issue/<short-id>/<kind>/<self-id>`
+    /// (kind `Some`), or the `<short-id>/<self-id>` sugar whose kind is `Some` when
+    /// the self-id's shape names exactly one issue-scoped kind and `None` when it is
+    /// pattern-ambiguous or matches no kind (deferring to actual-item matching,
+    /// which still errors on a genuine multi-item collision).
+    Issue {
+        issue_ref: String,
+        kind: Option<String>,
+        self_id: String,
+    },
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -267,15 +294,26 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map_err(|err| anyhow!("indexing project-scope items failed: {err}"))
     }
 
-    /// Resolve a qualified id `<scope>/<self-id>` to its addressable item.
+    /// Resolve an item address to its addressable item, filtering by kind AND
+    /// self-id (REQ-01, REQ-02).
     ///
-    /// The scope is `@` for the project scope, or any issue reference (full id,
-    /// short id, or unique prefix) resolved through the SAME issue-id resolver the
-    /// rest of the CLI uses — so `jit item show 56ab/REQ-01` works just like `jit
-    /// show 56ab`, and `jit item show @/INV-01` resolves the project-scoped item
-    /// (REQ-01, REQ-02). An input without a `/` is a usage error; an unresolvable
-    /// scope or an unknown self-id is a descriptive error rather than a silent miss
-    /// (an unresolvable qualified id is reported, never dropped).
+    /// Accepts the full address grammar:
+    /// - `@/<kind>/<self-id>` — a project-scope item of an explicit kind.
+    /// - `@/issue/<short-id>/<kind>/<self-id>` — an issue-scope item of an explicit
+    ///   kind; the issue reference is resolved through the SAME issue-id resolver the
+    ///   rest of the CLI uses (full id, short id, or unique prefix).
+    /// - `<short-id>/<self-id>` — sugar for an issue-scope item whose kind is
+    ///   inferred from the self-id's shape ([`expand_sugar_address`]).
+    /// - `@/<self-id>` — the legacy project form (kind-agnostic), kept so a project
+    ///   item's own derived `qualified_id` round-trips through `show_item`.
+    ///
+    /// Explicit-kind and sugar addresses filter candidates by BOTH kind and self-id,
+    /// so two same-scope same-self-id items of different kinds (e.g. a `rule` and a
+    /// `gate` both named `coverage-preview`) each resolve to their own distinct item,
+    /// never a silent first-match. A request for a kind that does not own the matched
+    /// self-id in that scope is a descriptive not-found error, never a fallback to a
+    /// different kind's item. An unresolvable scope or an unknown self-id is a
+    /// descriptive error rather than a silent miss.
     ///
     /// # Examples
     ///
@@ -289,23 +327,24 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
-        let (scope_segment, self_id) = split_qualified_id(qualified).ok_or_else(|| {
-            anyhow!("'{qualified}' is not a qualified id; expected <scope>/<self-id>")
-        })?;
-
-        match Scope::parse(scope_segment) {
+        match self.resolve_item_address(qualified)? {
             // Project scope: sourced from a config-declared file, no owning issue
-            // (REQ-01).
-            Scope::Project => {
+            // (REQ-01). An explicit kind filters by kind AND self-id; the legacy
+            // form filters by self-id alone.
+            ResolvedItemAddress::Project { kind, self_id } => {
                 let item = self
                     .project_items()?
                     .into_iter()
-                    .find(|i| i.self_id == self_id)
-                    .ok_or_else(|| {
-                        anyhow!(
+                    .find(|i| kind.as_deref().is_none_or(|k| i.kind == k) && i.self_id == self_id)
+                    .ok_or_else(|| match &kind {
+                        Some(k) => anyhow!(
+                            "project scope '@' declares no addressable item of kind '{k}' \
+                             with self-id '{self_id}'"
+                        ),
+                        None => anyhow!(
                             "project scope '@' declares no addressable item \
                              with self-id '{self_id}'"
-                        )
+                        ),
                     })?;
                 Ok(ItemShowResult {
                     item,
@@ -313,8 +352,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue_title: None,
                 })
             }
-            // Issue scope: resolve the issue, index its description (REQ-02).
-            Scope::Issue(issue_ref) => {
+            // Issue scope: resolve the issue, index its description, then filter by
+            // kind AND self-id (REQ-01, REQ-02).
+            ResolvedItemAddress::Issue {
+                issue_ref,
+                kind,
+                self_id,
+            } => {
                 let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
                     format!("cannot resolve issue scope '{issue_ref}' in '{qualified}'")
                 })?;
@@ -333,15 +377,41 @@ impl<S: IssueStore> CommandExecutor<S> {
                     format!("indexing items of issue {} failed", issue.short_id())
                 })?;
 
-                let item = items
+                // An explicit or unambiguously-inferred kind filters by kind AND
+                // self-id; an open kind (pattern-ambiguous sugar) filters by self-id
+                // alone and reports a genuine multi-kind collision rather than
+                // silently picking one.
+                let mut matched: Vec<AddressableItem> = items
                     .into_iter()
-                    .find(|i| i.self_id == self_id)
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "issue {} declares no addressable item with self-id '{self_id}'",
-                            issue.short_id()
-                        )
-                    })?;
+                    .filter(|i| kind.as_deref().is_none_or(|k| i.kind == k) && i.self_id == self_id)
+                    .collect();
+
+                let item = match matched.len() {
+                    1 => matched.remove(0),
+                    0 => {
+                        return Err(match &kind {
+                            Some(k) => anyhow!(
+                                "issue {} declares no addressable item of kind '{k}' \
+                                 with self-id '{self_id}'",
+                                issue.short_id()
+                            ),
+                            None => anyhow!(
+                                "issue {} declares no addressable item with self-id '{self_id}'",
+                                issue.short_id()
+                            ),
+                        });
+                    }
+                    _ => {
+                        let kinds_found: Vec<&str> =
+                            matched.iter().map(|i| i.kind.as_str()).collect();
+                        return Err(anyhow!(
+                            "self-id '{self_id}' in issue {} is ambiguous across kinds ({}); \
+                             use the explicit '@/issue/<short-id>/<kind>/<self-id>' address",
+                            issue.short_id(),
+                            kinds_found.join(", ")
+                        ));
+                    }
+                };
 
                 Ok(ItemShowResult {
                     item,
@@ -349,6 +419,84 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue_title: Some(issue.title),
                 })
             }
+        }
+    }
+
+    /// Classify an item address into the scope + kind + self-id `show_item`
+    /// resolves against, applying the sugar-expansion and kind-segmented grammars.
+    ///
+    /// A non-`@` input is the `<short-id>/<self-id>` sugar, whose kind is inferred
+    /// from the self-id's shape. An `@`-prefixed input is either an explicit
+    /// kind-segmented address or the legacy project form `@/<self-id>`.
+    fn resolve_item_address(&self, qualified: &str) -> Result<ResolvedItemAddress> {
+        // Sugar `<short-id>/<self-id>`: infer the kind from the self-id's shape
+        // against the issue-scoped kinds (project-scoped kinds have no sugar form).
+        if !qualified.starts_with(PROJECT_SCOPE_SENTINEL) {
+            let Some((issue_ref, self_id)) = qualified.split_once('/') else {
+                return Err(anyhow!(
+                    "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
+                ));
+            };
+            // A self-id whose shape names exactly one issue-scoped kind fixes the
+            // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
+            // unmatched self-id leaves the kind open and defers to actual-item
+            // matching, which still errors on a genuine multi-item collision rather
+            // than silently picking one.
+            let kinds = self.item_kinds()?;
+            let kind = match expand_sugar_address(qualified, &kinds) {
+                Ok(addr) => Some(addr.kind),
+                Err(ItemError::SugarKindNotFound { .. } | ItemError::SugarKindAmbiguous { .. }) => {
+                    None
+                }
+                Err(err) => {
+                    return Err(anyhow!("cannot resolve item address '{qualified}': {err}"))
+                }
+            };
+            return Ok(ResolvedItemAddress::Issue {
+                issue_ref: issue_ref.to_string(),
+                kind,
+                self_id: self_id.to_string(),
+            });
+        }
+
+        // An `@`-prefixed input is an explicit kind-segmented address, or the legacy
+        // project form the kind-segmented grammar does not cover.
+        match parse_kind_segmented_address(qualified) {
+            Ok(addr) => match addr.scope {
+                AddressScope::Project => Ok(ResolvedItemAddress::Project {
+                    kind: Some(addr.kind),
+                    self_id: addr.self_id,
+                }),
+                AddressScope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
+                    issue_ref,
+                    kind: Some(addr.kind),
+                    self_id: addr.self_id,
+                }),
+                // Named-project resolution is later work (task a1b6b3da): until it
+                // lands, a named-project address matches nothing rather than
+                // resolving to a local item or aborting a whole validate run.
+                AddressScope::NamedProject(name) => Err(anyhow!(
+                    "named-project address '{qualified}' references project '{name}', \
+                     whose resolution is not yet supported"
+                )),
+            },
+            // The one well-formed `@`-address the kind-segmented grammar does not
+            // cover is the legacy project form `@/<self-id>` (kind-agnostic), which
+            // project items still derive as their qualified_id; recognize exactly
+            // that and surface every other malformed `@`-address as the parser's
+            // own error.
+            Err(parse_err) => match qualified.split_once('/') {
+                Some((scope, self_id))
+                    if scope == PROJECT_SCOPE_SENTINEL && !self_id.is_empty() =>
+                {
+                    Ok(ResolvedItemAddress::Project {
+                        kind: None,
+                        self_id: self_id.to_string(),
+                    })
+                }
+                _ => Err(anyhow::Error::new(parse_err)
+                    .context(format!("cannot resolve item address '{qualified}'"))),
+            },
         }
     }
 
@@ -396,10 +544,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(None);
         }
 
-        // A generic qualified reference carries `<issue>/<self-id>`; the legacy
-        // unqualified `satisfies:REQ-01` shape has no scope and is left to the
+        // A generic qualified reference is any address-grammar form (explicit
+        // kind-segmented, legacy project, or `<short-id>/<self-id>` sugar); the
+        // legacy unqualified `satisfies:REQ-01` shape has no `/` and is left to the
         // existing rules.
-        if split_qualified_id(value).is_none() {
+        if !is_qualified_reference(value) {
             return Ok(None);
         }
 
@@ -630,6 +779,141 @@ source-of-truth = \"registry-first\"
         assert!(from_issue.item.text.contains("issue one"));
         assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
+    }
+
+    /// Build an executor declaring two project-scope markdown-first kinds
+    /// (`rule`, `gate`) that share a permissive id-pattern, each sourced from its
+    /// own markdown file, so both can mint the SAME self-id in the project scope.
+    fn two_project_kinds_exec(
+        rules_md: Option<&str>,
+        gates_md: Option<&str>,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[item_kinds.rule]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"[a-z][a-z-]*\"\n\
+             markers = []\n\
+             link-namespaces = [\"governs\"]\n\
+             scope = \"project\"\n\
+             source = \"rules.md\"\n\
+             source-of-truth = \"markdown-first\"\n\
+             \n\
+             [item_kinds.gate]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"[a-z][a-z-]*\"\n\
+             markers = []\n\
+             link-namespaces = [\"checks\"]\n\
+             scope = \"project\"\n\
+             source = \"gates.md\"\n\
+             source-of-truth = \"markdown-first\"\n",
+        )
+        .unwrap();
+        if let Some(md) = rules_md {
+            storage.add_repo_file("rules.md", md);
+        }
+        if let Some(md) = gates_md {
+            storage.add_repo_file("gates.md", md);
+        }
+        CommandExecutor::new(storage)
+    }
+
+    #[test]
+    fn test_show_item_explicit_kind_disambiguates_same_self_id() {
+        // REQ-01: a `rule` and a `gate` both self-id `coverage-preview` in the
+        // project scope each resolve to their OWN distinct item via the explicit
+        // `@/<kind>/<self-id>` address, never a silent first-match.
+        let exec = two_project_kinds_exec(
+            Some("## Success Criteria\n\n- coverage-preview: the rule form\n"),
+            Some("## Success Criteria\n\n- coverage-preview: the gate form\n"),
+        );
+
+        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
+        assert_eq!(rule.item.kind, "rule");
+        assert_eq!(rule.item.self_id, "coverage-preview");
+        assert!(rule.item.text.contains("rule form"));
+
+        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
+        assert_eq!(gate.item.kind, "gate");
+        assert_eq!(gate.item.self_id, "coverage-preview");
+        assert!(gate.item.text.contains("gate form"));
+
+        // Distinct items despite sharing a scope and self-id (they derive the same
+        // qualified id, so only the kind filter separates them).
+        assert_ne!(rule.item.text, gate.item.text);
+    }
+
+    #[test]
+    fn test_show_item_wrong_kind_is_not_found() {
+        // REQ-02: asking for a kind that does not own the matched self-id in that
+        // scope is a clear not-found error, never a silent fallback to the kind that
+        // DOES own it.
+        let exec = two_project_kinds_exec(
+            Some("## Success Criteria\n\n- only-rule: exists only as a rule\n"),
+            Some("## Success Criteria\n\n- other-gate: an unrelated gate\n"),
+        );
+
+        // The self-id `only-rule` belongs to `rule`, not `gate`.
+        let err = exec.show_item("@/gate/only-rule").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("no addressable item"), "message: {msg}");
+        assert!(msg.contains("gate"), "message: {msg}");
+
+        // Sanity: the correct kind DOES resolve it.
+        assert_eq!(
+            exec.show_item("@/rule/only-rule").unwrap().item.kind,
+            "rule"
+        );
+    }
+
+    #[test]
+    fn test_resolve_link_label_classifies_all_address_forms() {
+        // REQ-03: resolve_link_label treats every address form (explicit project,
+        // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference,
+        // and a bare self-id as unqualified.
+        let issue = Issue::new(
+            "A".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
+        );
+        let short = issue.short_id();
+        let exec = project_exec(
+            Some("## Success Criteria\n\n- GLOSS-01: a glossary entry\n"),
+            "\n[item_kinds.requirement]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"\n\
+             markers = [\"[hard]\"]\n\
+             link-namespaces = [\"satisfies\"]\n\
+             scope = \"issue\"\n\
+             source-of-truth = \"markdown-first\"\n",
+            vec![issue],
+        );
+
+        // Explicit project form `@/<kind>/<self-id>`.
+        let proj = exec
+            .resolve_link_label("defines:@/glossary/GLOSS-01")
+            .unwrap();
+        assert_eq!(proj.unwrap().item.self_id, "GLOSS-01");
+
+        // Explicit issue form `@/issue/<short>/<kind>/<self-id>`.
+        let issue_form = exec
+            .resolve_link_label(&format!("satisfies:@/issue/{short}/requirement/REQ-01"))
+            .unwrap();
+        assert_eq!(issue_form.unwrap().item.self_id, "REQ-01");
+
+        // `<short>/<self-id>` sugar form.
+        let sugar = exec
+            .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
+            .unwrap();
+        assert_eq!(sugar.unwrap().item.self_id, "REQ-01");
+
+        // A bare self-id is not a qualified reference (left to the legacy rules).
+        assert!(exec
+            .resolve_link_label("satisfies:REQ-01")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

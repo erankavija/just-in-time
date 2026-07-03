@@ -314,7 +314,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if !link_namespaces.contains(namespace) {
                     continue;
                 }
-                if crate::domain::item::split_qualified_id(value).is_none() {
+                if !crate::domain::item::is_qualified_reference(value) {
                     continue;
                 }
                 // Resolve through the single generic resolver; an `Err` means the
@@ -2222,6 +2222,39 @@ source-of-truth = \"registry-first\"
             findings.is_empty(),
             "resolvable links must produce no finding, got: {findings:?}"
         );
+    }
+
+    #[test]
+    fn test_dangling_link_findings_classifies_explicit_kind_forms() {
+        // REQ-03: the explicit `@/<kind>/<self-id>` and
+        // `@/issue/<short>/<kind>/<self-id>` forms are classified as qualified
+        // references — a resolvable one yields no finding.
+        let target =
+            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
+        let short = target.short_id();
+        let node = issue_with_labels(
+            "node",
+            "",
+            &[
+                "enforces:@/invariant/INV-01",
+                &format!("satisfies:@/issue/{short}/requirement/REQ-01"),
+            ],
+        );
+        let exec = dangling_exec(vec![target, node]);
+        let issues = exec.storage().list_issues().unwrap();
+        assert!(
+            exec.dangling_link_findings(&issues).unwrap().is_empty(),
+            "resolvable explicit-kind links must produce no finding"
+        );
+
+        // An unresolvable explicit form is still classified as qualified and
+        // reported as dangling, never silently ignored as unqualified.
+        let bad = issue_with_labels("bad", "", &["enforces:@/invariant/INV-99"]);
+        let exec = dangling_exec(vec![bad]);
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].finding.message.contains("INV-99"));
     }
 
     #[test]

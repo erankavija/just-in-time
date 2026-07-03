@@ -162,9 +162,8 @@ impl Scope {
 /// kind-segmented address recognizes a third scope token beyond [`Scope`]'s
 /// issue/project split — a named-project reference `@<name>` — and folding it
 /// into [`Scope`] would make every existing exhaustive `match` on [`Scope`]
-/// non-exhaustive. Wiring [`Scope`] itself to the third form (and migrating
-/// `split_qualified_id`'s callers to it) is later work; this parser is additive
-/// only.
+/// non-exhaustive. Wiring [`Scope`] itself to the third form is later work; this
+/// parser is additive only.
 ///
 /// [`AddressScope::NamedProject`] carries `<name>` purely STRUCTURALLY — it is
 /// not resolved against any declared project identity (a separate, later
@@ -206,10 +205,9 @@ pub struct KindSegmentedAddress {
 /// unvalidated against any kind registry (the caller matches them against its own
 /// configured kinds, keeping this domain function free of kind-name literals).
 /// The `<short-id>/<self-id>` sugar form and [`Scope`]'s own two-segment
-/// `<scope>/<self-id>` form ([`split_qualified_id`]) are untouched and
-/// unrelated — the sugar form is expanded to this same triple shape by
-/// [`expand_sugar_address`], which infers the kind segment this parser requires
-/// explicit.
+/// `<scope>/<self-id>` form are separate. The sugar form is expanded to this same
+/// triple shape by [`expand_sugar_address`], which infers the kind segment this
+/// parser requires explicit.
 ///
 /// Malformed input — a missing kind or self-id segment, an empty scope/kind/
 /// self-id segment, an unrecognized reserved segment where `issue` was expected,
@@ -334,7 +332,7 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 ///   naming every matching candidate kind — this function never silently picks
 ///   the first.
 ///
-/// `address` itself must split into two segments via [`split_qualified_id`]
+/// `address` itself must split into two `/`-separated segments
 /// (`<short-id>/<self-id>`); anything else is [`ItemError::InvalidAddress`].
 ///
 /// # Examples
@@ -360,8 +358,12 @@ pub fn expand_sugar_address(
     address: &str,
     kinds: &[ItemKind],
 ) -> Result<KindSegmentedAddress, ItemError> {
-    let (short_id, self_id) =
-        split_qualified_id(address).ok_or_else(|| ItemError::InvalidAddress {
+    // Split on the FIRST `/` (a self-id may itself contain slashes), matching the
+    // two-segment shape the sugar form requires; a value with no `/` is not a sugar
+    // address at all.
+    let (short_id, self_id) = address
+        .split_once('/')
+        .ok_or_else(|| ItemError::InvalidAddress {
             address: address.to_string(),
             reason: "sugar address must be '<short-id>/<self-id>'".to_string(),
         })?;
@@ -943,26 +945,33 @@ pub fn qualified_id(scope_prefix: &str, self_id: &str) -> String {
     format!("{scope_prefix}/{self_id}")
 }
 
-/// Split a qualified id `<scope>/<self-id>` into its two segments.
+/// Whether `value` is a qualified item reference under the address grammar,
+/// rather than a bare self-id.
 ///
-/// The scope is everything before the FIRST `/`; the self-id is the rest (so a
-/// self-id may itself contain slashes). The scope may be an issue short-id or the
-/// project sentinel `@` — parse it into a [`Scope`] with [`Scope::parse`].
-/// Returns `None` when the input carries no `/` separator (it is not a qualified
-/// id).
+/// Used to classify the value half of a `<namespace>:<value>` link label: a
+/// qualified value addresses a specific item and is resolved through
+/// [`expand_sugar_address`] / [`parse_kind_segmented_address`], whereas a bare
+/// self-id (`REQ-01`) is left to the legacy unqualified coverage rules.
+///
+/// Every address form carries at least one `/`: the explicit `@`-prefixed
+/// kind-segmented forms (`@/<kind>/<self-id>`,
+/// `@/issue/<short-id>/<kind>/<self-id>`), the legacy project form
+/// (`@/<self-id>`), and the `<short-id>/<self-id>` sugar. A bare self-id has no
+/// `/`. That single structural distinction is the qualified/unqualified boundary.
 ///
 /// # Examples
 ///
 /// ```
-/// use jit::domain::item::split_qualified_id;
+/// use jit::domain::item::is_qualified_reference;
 ///
-/// assert_eq!(split_qualified_id("56ab0224/REQ-01"), Some(("56ab0224", "REQ-01")));
-/// // The project scope splits the same way.
-/// assert_eq!(split_qualified_id("@/INV-01"), Some(("@", "INV-01")));
-/// assert_eq!(split_qualified_id("REQ-01"), None);
+/// assert!(is_qualified_reference("@/rule/coverage-preview"));
+/// assert!(is_qualified_reference("@/issue/56ab0224/rule/coverage-preview"));
+/// assert!(is_qualified_reference("56ab0224/REQ-01"));
+/// assert!(is_qualified_reference("@/INV-01"));
+/// assert!(!is_qualified_reference("REQ-01"));
 /// ```
-pub fn split_qualified_id(qualified: &str) -> Option<(&str, &str)> {
-    qualified.split_once('/')
+pub fn is_qualified_reference(value: &str) -> bool {
+    value.contains('/')
 }
 
 /// One addressable item projected from a scope's source.
@@ -1706,10 +1715,28 @@ mod tests {
     }
 
     #[test]
-    fn test_split_qualified_id_roundtrip() {
-        let q = qualified_id("56ab0224", "REQ-01");
-        assert_eq!(split_qualified_id(&q), Some(("56ab0224", "REQ-01")));
-        assert_eq!(split_qualified_id("bare"), None);
+    fn test_parse_kind_segmented_address_roundtrip() {
+        // The kind-segmented parser replaces the old two-segment `split_qualified_id`
+        // as the qualified-address parser: an explicit `@`-prefixed address round-trips
+        // into its (scope, kind, self-id) triple, and a bare self-id is rejected.
+        let addr = parse_kind_segmented_address("@/requirement/REQ-01").unwrap();
+        assert_eq!(addr.scope, AddressScope::Project);
+        assert_eq!(addr.kind, "requirement");
+        assert_eq!(addr.self_id, "REQ-01");
+
+        let issue_addr =
+            parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
+        assert_eq!(
+            issue_addr.scope,
+            AddressScope::Issue("56ab0224".to_string())
+        );
+        assert_eq!(issue_addr.self_id, "REQ-01");
+
+        assert!(parse_kind_segmented_address("bare").is_err());
+
+        // The qualified/unqualified boundary the link classifiers rely on.
+        assert!(is_qualified_reference("56ab0224/REQ-01"));
+        assert!(!is_qualified_reference("bare"));
     }
 
     #[test]

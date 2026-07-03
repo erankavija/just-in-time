@@ -87,7 +87,11 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
     };
-    match crate::domain::item::split_qualified_id(value) {
+    // The `satisfies:<scope>/<self-id>` coverage form is a two-segment split on
+    // scope + self-id and is deliberately kind-agnostic (binding decision D10): it
+    // credits on scope + self-id equality alone, so it splits directly here rather
+    // than routing through the kind-segmented address parser.
+    match value.split_once('/') {
         // Qualified `<scope>/<self-id>`: scope must match and self-id must equal id.
         Some((scope, self_id)) => scope == scope_short_id && self_id == id,
         // Unqualified `<id>`: legacy exact match.
