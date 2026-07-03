@@ -151,6 +151,157 @@ impl Scope {
     }
 }
 
+/// The scope half of a [`KindSegmentedAddress`], as recognized by
+/// [`parse_kind_segmented_address`].
+///
+/// This is a SEPARATE type from [`Scope`], not a variant added to it: a
+/// kind-segmented address recognizes a third scope token beyond [`Scope`]'s
+/// issue/project split — a named-project reference `@<name>` — and folding it
+/// into [`Scope`] would make every existing exhaustive `match` on [`Scope`]
+/// non-exhaustive. Wiring [`Scope`] itself to the third form (and migrating
+/// `split_qualified_id`'s callers to it) is later work; this parser is additive
+/// only.
+///
+/// [`AddressScope::NamedProject`] carries `<name>` purely STRUCTURALLY — it is
+/// not resolved against any declared project identity (a separate, later
+/// concern).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressScope {
+    /// The local project, addressed as bare `@`.
+    Project,
+    /// A named-project reference `@<name>`, carrying the unresolved name.
+    NamedProject(String),
+    /// An issue scope, carrying the issue short-id from `@/issue/<short-id>/...`.
+    Issue(String),
+}
+
+/// A kind-segmented address, parsed into its `(scope, kind, self-id)` components
+/// by [`parse_kind_segmented_address`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindSegmentedAddress {
+    /// The address's scope: the local project, a named project, or an issue.
+    pub scope: AddressScope,
+    /// The kind segment, carried verbatim — not validated against any kind
+    /// registry, since this parser is a pure structural split.
+    pub kind: String,
+    /// The self-id segment.
+    pub self_id: String,
+}
+
+/// Parse a kind-segmented address into its `(scope, kind, self-id)` components.
+///
+/// Recognizes exactly three explicit `@`-prefixed forms:
+/// - `@/<kind>/<self-id>` — the local-project form ([`AddressScope::Project`]).
+/// - `@<name>/<kind>/<self-id>` — a named-project form
+///   ([`AddressScope::NamedProject`]).
+/// - `@/issue/<short-id>/<kind>/<self-id>` — the issue-item form
+///   ([`AddressScope::Issue`]); `issue` is a reserved, built-in segment, never a
+///   kind name in any form.
+///
+/// This is a pure structural parse: `kind` and `self_id` are returned verbatim,
+/// unvalidated against any kind registry (the caller matches them against its own
+/// configured kinds, keeping this domain function free of kind-name literals).
+/// The `<short-id>/<self-id>` sugar form and [`Scope`]'s own two-segment
+/// `<scope>/<self-id>` form ([`split_qualified_id`]) are untouched and unrelated.
+///
+/// Malformed input — a missing kind or self-id segment, an empty scope/kind/
+/// self-id segment, an unrecognized reserved segment where `issue` was expected,
+/// or the wrong number of `/`-separated segments — is a typed
+/// [`ItemError::InvalidAddress`] naming the offending address and why it failed.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::item::{parse_kind_segmented_address, AddressScope};
+///
+/// let addr = parse_kind_segmented_address("@/requirement/REQ-01").unwrap();
+/// assert_eq!(addr.scope, AddressScope::Project);
+/// assert_eq!(addr.kind, "requirement");
+/// assert_eq!(addr.self_id, "REQ-01");
+///
+/// let addr = parse_kind_segmented_address("@acme/requirement/REQ-01").unwrap();
+/// assert_eq!(addr.scope, AddressScope::NamedProject("acme".to_string()));
+///
+/// let addr =
+///     parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
+/// assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+/// ```
+pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddress, ItemError> {
+    let invalid = |reason: String| ItemError::InvalidAddress {
+        address: address.to_string(),
+        reason,
+    };
+
+    let mut segments = address.split('/');
+    let scope_token = segments
+        .next()
+        .filter(|token| token.starts_with(PROJECT_SCOPE_SENTINEL))
+        .ok_or_else(|| invalid("address must start with the '@' scope sentinel".to_string()))?;
+    let project_name = &scope_token[PROJECT_SCOPE_SENTINEL.len()..];
+    let rest: Vec<&str> = segments.collect();
+
+    match rest.len() {
+        4 if rest[0] == KindScope::ISSUE_TOKEN => {
+            if !project_name.is_empty() {
+                return Err(invalid(
+                    "the issue-item form must use the bare '@' scope, not a named project"
+                        .to_string(),
+                ));
+            }
+            let (short_id, kind, self_id) = (rest[1], rest[2], rest[3]);
+            require_non_empty(short_id, "issue short-id", address)?;
+            require_non_empty(kind, "kind", address)?;
+            require_non_empty(self_id, "self-id", address)?;
+            Ok(KindSegmentedAddress {
+                scope: AddressScope::Issue(short_id.to_string()),
+                kind: kind.to_string(),
+                self_id: self_id.to_string(),
+            })
+        }
+        4 => Err(invalid(format!(
+            "expected the reserved segment '{}' after the scope, found '{}'",
+            KindScope::ISSUE_TOKEN,
+            rest[0]
+        ))),
+        2 if rest[0] == KindScope::ISSUE_TOKEN => Err(invalid(format!(
+            "'{}' is a reserved segment, not a kind name; use \
+             @/issue/<short-id>/<kind>/<self-id> for issue-scoped addresses",
+            KindScope::ISSUE_TOKEN
+        ))),
+        2 => {
+            let (kind, self_id) = (rest[0], rest[1]);
+            require_non_empty(kind, "kind", address)?;
+            require_non_empty(self_id, "self-id", address)?;
+            let scope = if project_name.is_empty() {
+                AddressScope::Project
+            } else {
+                AddressScope::NamedProject(project_name.to_string())
+            };
+            Ok(KindSegmentedAddress {
+                scope,
+                kind: kind.to_string(),
+                self_id: self_id.to_string(),
+            })
+        }
+        other => Err(invalid(format!(
+            "expected 2 segments (<kind>/<self-id>) or 4 segments \
+             (issue/<short-id>/<kind>/<self-id>) after the scope, found {other}"
+        ))),
+    }
+}
+
+/// Reject an empty address segment, naming it `label` in the error.
+fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), ItemError> {
+    if segment.is_empty() {
+        Err(ItemError::InvalidAddress {
+            address: address.to_string(),
+            reason: format!("the {label} segment is empty"),
+        })
+    } else {
+        Ok(())
+    }
+}
+
 /// The declared addressing scope of an item *kind* (as opposed to a resolved
 /// [`Scope`], which carries a concrete issue short-id).
 ///
@@ -351,6 +502,18 @@ pub enum ItemError {
         field: String,
         /// A short description of the type(s) the loader accepts.
         expected: String,
+    },
+    /// A kind-segmented address (`@/<kind>/<self-id>`, `@<name>/<kind>/<self-id>`,
+    /// or `@/issue/<short-id>/<kind>/<self-id>`) failed to parse: a missing kind
+    /// or self-id segment, an empty scope/kind/self-id segment, an unrecognized
+    /// reserved segment where `issue` was expected, or the wrong number of
+    /// `/`-separated segments.
+    #[error("address '{address}' is not a valid kind-segmented address: {reason}")]
+    InvalidAddress {
+        /// The raw address string that failed to parse.
+        address: String,
+        /// Human-readable description of why parsing failed.
+        reason: String,
     },
 }
 
@@ -2037,6 +2200,125 @@ enforced-by = \"tests\"
                 assert_eq!(kind, "invariant");
             }
             other => panic!("expected DuplicateSelfId, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_local_project_form() {
+        // REQ-01: `@/<kind>/<self-id>` parses into (Scope::Project, kind, self_id).
+        let addr = parse_kind_segmented_address("@/requirement/REQ-01").unwrap();
+        assert_eq!(addr.scope, AddressScope::Project);
+        assert_eq!(addr.kind, "requirement");
+        assert_eq!(addr.self_id, "REQ-01");
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_named_project_form() {
+        // REQ-01: `@<name>/<kind>/<self-id>` carries `<name>` structurally, with
+        // no resolution against any declared project identity.
+        let addr = parse_kind_segmented_address("@acme/requirement/REQ-01").unwrap();
+        assert_eq!(addr.scope, AddressScope::NamedProject("acme".to_string()));
+        assert_eq!(addr.kind, "requirement");
+        assert_eq!(addr.self_id, "REQ-01");
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_issue_form() {
+        // REQ-01: `@/issue/<short-id>/<kind>/<self-id>` parses into
+        // (Scope::Issue(short_id), kind, self_id); `issue` is a reserved segment.
+        let addr = parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.kind, "requirement");
+        assert_eq!(addr.self_id, "REQ-01");
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_missing_kind_segment_is_error() {
+        // REQ-02: an empty kind segment is a typed error naming the input.
+        let err = parse_kind_segmented_address("@//REQ-01").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@//REQ-01");
+                assert!(reason.contains("kind"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_missing_self_id_segment_is_error() {
+        // REQ-02: an empty self-id segment is a typed error naming the input.
+        let err = parse_kind_segmented_address("@/requirement/").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@/requirement/");
+                assert!(reason.contains("self-id"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_bad_reserved_segment_is_error() {
+        // REQ-02: a 4-segment form whose first segment isn't `issue` is rejected,
+        // naming the offending segment.
+        let err = parse_kind_segmented_address("@/task/56ab0224/requirement/REQ-01").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@/task/56ab0224/requirement/REQ-01");
+                assert!(reason.contains("issue"), "reason was: {reason}");
+                assert!(reason.contains("task"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_missing_scope_sentinel_is_error() {
+        // Not `@`-prefixed at all: still a typed error, not a panic.
+        let err = parse_kind_segmented_address("56ab0224/requirement/REQ-01").unwrap_err();
+        assert!(matches!(err, ItemError::InvalidAddress { .. }));
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_wrong_segment_count_is_error() {
+        // Too few segments (only a kind, no self-id at all) is rejected.
+        let err = parse_kind_segmented_address("@/requirement").unwrap_err();
+        assert!(matches!(err, ItemError::InvalidAddress { .. }));
+
+        // Too many segments (neither the 2- nor 4-segment shape) is rejected.
+        let err = parse_kind_segmented_address("@/a/b/c").unwrap_err();
+        assert!(matches!(err, ItemError::InvalidAddress { .. }));
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_issue_form_rejects_named_project_scope() {
+        // The issue-item form is defined only for the bare `@` scope.
+        let err =
+            parse_kind_segmented_address("@acme/issue/56ab0224/requirement/REQ-01").unwrap_err();
+        assert!(matches!(err, ItemError::InvalidAddress { .. }));
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_issue_reserved_word_rejected_as_kind_name() {
+        // `issue` is reserved and never a kind name, even in the 2-segment form.
+        let err = parse_kind_segmented_address("@/issue/REQ-01").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { reason, .. } => {
+                assert!(reason.contains("reserved"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_empty_issue_short_id_is_error() {
+        let err = parse_kind_segmented_address("@/issue//requirement/REQ-01").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { reason, .. } => {
+                assert!(reason.contains("short-id"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
         }
     }
 
