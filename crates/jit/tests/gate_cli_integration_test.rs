@@ -653,6 +653,80 @@ fn test_gate_remove() {
         .failure();
 }
 
+/// REQ-02 (jit:bb7d57a2), INV-EVENT-LOG: `jit gate define` appends a
+/// `gate_definition_created` event to the registry-scoped audit log, mirroring
+/// `gate_update_test.rs`'s `test_gate_update_appends_event` for
+/// `gate_definition_updated`.
+#[test]
+fn test_gate_define_appends_event() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "tests",
+            "--title",
+            "Tests",
+            "--description",
+            "Run tests",
+        ])
+        .assert()
+        .success();
+
+    let events_path = temp.path().join(".jit").join("events.jsonl");
+    let contents = fs::read_to_string(&events_path).unwrap();
+    let found = contents.lines().any(|line| {
+        let v: serde_json::Value = serde_json::from_str(line).unwrap();
+        v["type"] == "gate_definition_created" && v["gate_key"] == "tests"
+    });
+    assert!(
+        found,
+        "a gate_definition_created event for 'tests' must be logged"
+    );
+}
+
+/// REQ-02 (jit:bb7d57a2), INV-EVENT-LOG: `jit gate remove` appends a
+/// `gate_definition_removed` event to the registry-scoped audit log, mirroring
+/// `gate_update_test.rs`'s `test_gate_update_appends_event` for
+/// `gate_definition_updated`.
+#[test]
+fn test_gate_remove_appends_event() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "tests",
+            "--title",
+            "Tests",
+            "--description",
+            "Run tests",
+        ])
+        .assert()
+        .success();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "remove", "tests"])
+        .assert()
+        .success();
+
+    let events_path = temp.path().join(".jit").join("events.jsonl");
+    let contents = fs::read_to_string(&events_path).unwrap();
+    let found = contents.lines().any(|line| {
+        let v: serde_json::Value = serde_json::from_str(line).unwrap();
+        v["type"] == "gate_definition_removed" && v["gate_key"] == "tests"
+    });
+    assert!(
+        found,
+        "a gate_definition_removed event for 'tests' must be logged"
+    );
+}
+
 #[test]
 fn test_gate_check_single() {
     let temp = setup_repo();

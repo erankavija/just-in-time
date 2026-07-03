@@ -1330,6 +1330,32 @@ pub enum Event {
         /// Registry key of the gate that was updated
         gate_key: String,
     },
+    /// A gate definition was added to the registry (`jit gate define`).
+    ///
+    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// issue id because it mutates the shared gate registry rather than a
+    /// single issue.
+    GateDefinitionCreated {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Registry key of the gate that was created
+        gate_key: String,
+    },
+    /// A gate definition was removed from the registry (`jit gate remove`).
+    ///
+    /// Registry-scoped, like [`Event::GateDefinitionUpdated`]: it carries no
+    /// issue id because it mutates the shared gate registry rather than a
+    /// single issue.
+    GateDefinitionRemoved {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Registry key of the gate that was removed
+        gate_key: String,
+    },
 }
 
 impl Event {
@@ -1663,6 +1689,54 @@ impl Event {
         }
     }
 
+    /// Create a gate-definition-created event.
+    ///
+    /// Registry-scoped (issue-less, like
+    /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
+    /// records that `gate_key` was added to the gate registry via `jit gate
+    /// define`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_gate_definition_created("tests".to_string());
+    /// assert_eq!(event.get_type(), "gate_definition_created");
+    /// assert_eq!(event.get_issue_id(), "");
+    /// ```
+    pub fn new_gate_definition_created(gate_key: String) -> Self {
+        Event::GateDefinitionCreated {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            gate_key,
+        }
+    }
+
+    /// Create a gate-definition-removed event.
+    ///
+    /// Registry-scoped (issue-less, like
+    /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
+    /// records that `gate_key` was removed from the gate registry via `jit
+    /// gate remove`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_gate_definition_removed("tests".to_string());
+    /// assert_eq!(event.get_type(), "gate_definition_removed");
+    /// assert_eq!(event.get_issue_id(), "");
+    /// ```
+    pub fn new_gate_definition_removed(gate_key: String) -> Self {
+        Event::GateDefinitionRemoved {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            gate_key,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1683,6 +1757,8 @@ impl Event {
             Event::TransitionBlocked { issue_id, .. } => issue_id,
             Event::GraphRuleBypassed { issue_id, .. } => issue_id,
             Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
+            Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
+            Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
         }
     }
 
@@ -1706,6 +1782,8 @@ impl Event {
             Event::TransitionBlocked { .. } => "transition_blocked",
             Event::GraphRuleBypassed { .. } => "graph_rule_bypassed",
             Event::GateDefinitionUpdated { .. } => "gate_definition_updated",
+            Event::GateDefinitionCreated { .. } => "gate_definition_created",
+            Event::GateDefinitionRemoved { .. } => "gate_definition_removed",
         }
     }
 }

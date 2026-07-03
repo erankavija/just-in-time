@@ -748,7 +748,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             key.clone(),
             Gate {
                 version: 1,
-                key,
+                key: key.clone(),
                 title,
                 description,
                 stage,
@@ -766,6 +766,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         self.storage.save_gate_registry(&registry)?;
+
+        // INV-EVENT-LOG: registry-scoped audit entry for the definition create.
+        self.storage
+            .append_event(&Event::new_gate_definition_created(key))?;
+
         Ok(())
     }
 
@@ -774,7 +779,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `example_integration` is an optional usage snippet stored on the gate
     /// definition (surfaced by `jit gate show`). Returns an error if `key` is
     /// already registered, or if `mode` is [`GateMode::Auto`](crate::domain::GateMode)
-    /// without a `checker`.
+    /// without a `checker`. A `gate_definition_created` event is appended
+    /// (INV-EVENT-LOG), mirroring [`update_gate`](Self::update_gate)'s
+    /// `gate_definition_updated` event.
     ///
     /// # Examples
     ///
@@ -837,7 +844,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             key.clone(),
             Gate {
                 version: 1,
-                key,
+                key: key.clone(),
                 title,
                 description,
                 stage,
@@ -851,6 +858,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         self.storage.save_gate_registry(&registry)?;
+
+        // INV-EVENT-LOG: registry-scoped audit entry for the definition create.
+        self.storage
+            .append_event(&Event::new_gate_definition_created(key))?;
+
         Ok(())
     }
 
@@ -1075,6 +1087,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         registry.gates.remove(key);
         self.storage.save_gate_registry(&registry)?;
+
+        // INV-EVENT-LOG: registry-scoped audit entry for the definition removal.
+        self.storage
+            .append_event(&Event::new_gate_definition_removed(key.to_string()))?;
+
         Ok(())
     }
 
