@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "582c477b-8c9a-4b01-8b77-26a20a06c849",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d6c3bff6-2333-4444-97b1-f43bb243e06c",
+  "commit": "8e06e5f4d7a36c0f0f3fd62403f949c56bf3f976",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T08:26:10.400837919Z",
+  "completed_at": "2026-07-03T08:27:17.367384886Z",
+  "duration_ms": 66966,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 is met: [crates/jit/src/domain/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:229) adds a pure domain parser returning scope, kind, and self-id. Tests cover local project, named project, and issue forms at [line 2207](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2207), [line 2216](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2216), and [line 2226](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2226).\n\nREQ-02 is met: malformed inputs return `ItemError::InvalidAddress` with the offending address and reason at [line 511](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:511). Required missing-kind, missing-self-id, and bad-reserved-segment tests are present at [line 2236](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2236), [line 2249](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2249), and [line 2262](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2262).\n\nREQ-03 is met: `split_qualified_id` remains the same `split_once('/')` implementation at [line 841](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:841), and the four existing call sites still use it.\n\n**Architecture**\nThe change is contained to `domain/item.rs` in commit `8e06e5f4`; no storage, command, CLI, or output behavior is wired to the new parser. The parser is pure string parsing with no I/O.\n\n**Functional Paradigm**\nThe implementation is mostly expression-oriented. The small `match` over segment counts is appropriate for parser clarity; no problematic imperative state or side effects were introduced.\n\n**Correctness And Invariants**\nNo file writes, event logging, gates, assignees, labels, or PID handling are touched by this change. The parser explicitly does not treat `:` as a separator.\n\n**Safety**\nNo unsafe code was introduced in the reviewed change.\n\n**Testing**\nThe issue context reports `cargo-ci` passed on 2026-07-03T08:24:43Z, so I did not rerun tests per instruction. I ran `./scripts/jit-validate.sh`; it passed. `run_history` is empty, so there is no prior failed review feedback to verify.\n\n**Error Handling**\nThe new fallible parser returns `Result<_, ItemError>` and uses a typed `InvalidAddress` variant with contextual messages. No new library `unwrap()`/`expect()` usage was added outside tests/doc examples.\n\n**CLI Contract**\nNo CLI command behavior was changed, so the `--json` contract is unaffected.\n\n**Documentation**\nThe new public `AddressScope`, `KindSegmentedAddress`, `parse_kind_segmented_address`, and `InvalidAddress` API surfaces have doc comments. The public parser includes examples.\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The issue has no dependencies, so there is no prerequisite work to verify.\n\n1. No findings.\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

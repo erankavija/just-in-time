@@ -2,7 +2,7 @@
   "id": "d6c3bff6-2333-4444-97b1-f43bb243e06c",
   "title": "Parse kind-segmented addresses into scope, kind, and self-id components",
   "description": "jit's current qualified-id parser, `split_qualified_id` (`crates/jit/src/domain/item.rs:678-680`), only splits a value on the first `/` into a `(scope, self-id)` pair — there is no kind segment and no notion of a named-project scope token. This task adds a new, pure domain-layer parser (alongside `Scope` in `crates/jit/src/domain/item.rs`, following the existing `Scope::parse`/`prefix` pattern at lines 89-152) that recognizes the three address forms this work requires, splitting each into its `(scope, kind, self-id)` components:\n\n- `@/<kind>/<self-id>` — the local-project form (bare `@`, `Scope::Project`).\n- `@<name>/<kind>/<self-id>` — a named-project form. Parse `<name>` into a new scope variant (e.g. extend the `Scope` enum with a `NamedProject(String)` case) purely STRUCTURALLY: this task only recognizes and carries the name token, it does not attempt to resolve it against any declared project identity (that resolution is separate work, outside this item).\n- `@/issue/<short-id>/<kind>/<self-id>` — the issue-item form, where `issue` is a reserved literal segment (not a kind name), yielding `Scope::Issue(short_id)`.\n\nThis is additive: it does not remove or modify `split_qualified_id` or any of its four existing call sites (`commands/item.rs:292`, `commands/item.rs:402`, `commands/validate.rs:317`, `validation/graph.rs:90`) — those are migrated in a later change. A malformed address (missing kind segment, missing self-id, an unrecognized reserved segment where `issue` is expected, or extra/too-few `/`-separated segments) returns a clear typed error rather than `None`/a panic — extend `ItemError` (`domain/item.rs:245-355`) with a variant naming the offending input and why it failed to parse.\n\nThe colon `:` is not treated as a parser separator anywhere in this new code — it stays exclusively the label `namespace:value` delimiter; that is unaffected by this domain-layer change.\n\n## Success Criteria\n\n- [hard] REQ-01: a new pure parsing function/type in `crates/jit/src/domain/item.rs` parses `@/<kind>/<self-id>` into `(Scope::Project, kind, self_id)`, `@<name>/<kind>/<self-id>` into a named-project scope token carrying `<name>` plus `(kind, self_id)` (no resolution against any declared name), and `@/issue/<short-id>/<kind>/<self-id>` into `(Scope::Issue(short_id), kind, self_id)`; unit tests cover all three forms round-tripping into their component parts.\n- [hard] REQ-02: malformed input (no kind segment, no self-id segment, wrong reserved segment in place of `issue`, empty scope/kind/self-id segments) returns a typed `ItemError` variant identifying the bad input, verified by unit tests for at least: missing-kind, missing-self-id, and bad-reserved-segment cases.\n- [hard] REQ-03: `split_qualified_id` (`domain/item.rs:678-680`) and its four existing call sites (`commands/item.rs:292,402`, `commands/validate.rs:317`, `validation/graph.rs:90`) are left unmodified and their existing tests continue to pass unchanged — this task only adds the new parser, it does not wire any caller to it.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T08:24:43.224937497Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T08:26:10.400837919Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,5 +31,5 @@
     "story:addressing-core-parser-resolver"
   ],
   "created_at": "2026-07-01T23:41:53.804337465Z",
-  "updated_at": "2026-07-03T08:14:06.226850757Z"
+  "updated_at": "2026-07-03T08:27:32.577881236Z"
 }

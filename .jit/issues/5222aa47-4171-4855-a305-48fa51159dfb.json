@@ -2,9 +2,9 @@
   "id": "5222aa47-4171-4855-a305-48fa51159dfb",
   "title": "Rescope per-scope self-id uniqueness to include kind",
   "description": "Today, per-scope self-id uniqueness (`derive_scope_items`, `crates/jit/src/domain/item.rs:741-797`) is enforced across ALL kinds sharing one scope: the dedup `HashMap<String, String>` at line 776 keys purely on `self_id`, so two different kinds minting the same self-id in one scope (e.g. a `rule` and a `gate` both named `coverage-preview`) collide with `ItemError::DuplicateSelfId` — documented today as deliberate (\"kind is not part of the qualified id\", comment at line 746), but exactly the collision this work exists to remove.\n\nChange the uniqueness key to the pair `(self_id, kind)`: two candidates with the same self-id but DIFFERENT kinds in one scope now coexist as two distinct `AddressableItem`s; two candidates with the same self-id AND the same kind in one scope remain a `DuplicateSelfId` error (unchanged for the common case).\n\nTwo existing tests assert the OLD cross-kind-collision behavior and must be updated to assert the new coexistence behavior instead:\n- `test_index_items_cross_kind_self_id_collision_is_error` (`domain/item.rs:1475-1507`)\n- `test_derive_scope_items_cross_kind_duplicate_within_scope_is_error` (`domain/item.rs:2025-2040`)\n\nTwo doc comments become stale under this change and must be corrected in the same change:\n- `derive_scope_items`'s comment \"Uniqueness is keyed on the self-id alone (the kind is not part of the qualified id)\" (`domain/item.rs:746-750`).\n- `AddressableItem::qualified_id`'s \"Globally-unique qualified id `<scope>/<self-id>` (derived)\" doc (`domain/item.rs:690-691`): after this change the STRING `qualified_id` may coincide across two different-kind items sharing a scope and self-id (e.g. both mint `@/coverage-preview`); the field is no longer literally string-unique on its own — resolution disambiguates using the item's separate `kind` field alongside `self_id`, which downstream resolution work wires up. Update the doc to state this precisely rather than claim global string uniqueness.\n\nThis task is independent of address parsing/resolution — it only changes the per-scope index-derivation dedup key and does not touch `split_qualified_id` or any resolver call site.\n\n## Success Criteria\n\n- [hard] REQ-01: `derive_scope_items`'s dedup key is `(self_id, kind)`, not `self_id` alone; a unit test constructs two `RawScopeItem`s with the same self-id and different kinds in one scope and asserts BOTH items are returned (no error).\n- [hard] REQ-02: a unit test constructs two `RawScopeItem`s with the same self-id AND the same kind in one scope and asserts `ItemError::DuplicateSelfId` is still raised (same-kind collision behavior is unchanged).\n- [hard] REQ-03: `test_index_items_cross_kind_self_id_collision_is_error` (`domain/item.rs:1475-1507`) and `test_derive_scope_items_cross_kind_duplicate_within_scope_is_error` (`domain/item.rs:2025-2040`) are updated to assert coexistence instead of collision, and the two stale doc comments named above (`domain/item.rs:746-750`, `domain/item.rs:690-691`) are corrected to describe per-(scope, kind) uniqueness.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -20,5 +20,5 @@
     "story:addressing-core-parser-resolver"
   ],
   "created_at": "2026-07-01T23:41:53.824323529Z",
-  "updated_at": "2026-07-01T23:41:53.825685920Z"
+  "updated_at": "2026-07-03T08:27:32.971847283Z"
 }

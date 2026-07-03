@@ -2,18 +2,18 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Invoked to drive the epic ONLY until story 0efbc594 completes; stop and hand off after wave 8. Bracket P (0b611ccf) and B (923e42fb) already done; breakdown pre-exists.",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "d6c3bff6-2333-4444-97b1-f43bb243e06c", "short_id": "d6c3bff6", "title": "Parse kind-segmented addresses into scope, kind, and self-id components", "classification": "implementation", "model": "sonnet", "status": "dispatched"}
+        {"id": "d6c3bff6-2333-4444-97b1-f43bb243e06c", "short_id": "d6c3bff6", "title": "Parse kind-segmented addresses into scope, kind, and self-id components", "classification": "implementation", "model": "sonnet", "status": "done"}
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "5222aa47", "short_id": "5222aa47", "title": "Rescope per-scope self-id uniqueness to include kind", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "serialized after d6c3bff6: both edit domain/item.rs"}
+        {"id": "5222aa47", "short_id": "5222aa47", "title": "Rescope per-scope self-id uniqueness to include kind", "classification": "implementation", "model": "sonnet", "status": "dispatched", "note": "serialized after d6c3bff6: both edit domain/item.rs"}
       ]
     },
     {
