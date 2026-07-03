@@ -2,7 +2,7 @@
   "id": "7f22d6cf-e2d6-4103-b941-690f602734c1",
   "title": "Uniform re-addressing of all kinds with repo data and doc migration",
   "description": "Re-address the existing invariant, requirement, decision, risk, and definition kinds uniformly under the new `@[<project>]/<kind>/<self-id>` address scheme. Migrate this repository's own live data and documentation so no legacy-form address remains: the legacy forms are the old kindless project address (for example `@/INV-01`, with no kind segment) and colon-prefixed rule identifiers. The `<short-id>/<self-id>` sugar form (for example `56ab0224/REQ-01`) is not legacy and remains valid; it is excluded from the legacy-address scan.\n\nConfirm that bare `satisfies:REQ-NN` coverage-credit labels are unaffected by the address change: they are container-criterion credits, not qualified-id address links, and no qualified-form `satisfies:` label exists in live data.\n\n## Success Criteria\n\n- [hard] REQ-01: all existing kinds (invariant, requirement, decision, risk, definition) resolve under the uniform `@[<project>]/<kind>/<self-id>` scheme; bare `satisfies:REQ-NN` coverage labels are confirmed unchanged by the migration.\n- [hard] REQ-02: `jit validate` runs green after migration.\n- [hard] REQ-03: a tree-wide grep across source, `.jit/` data, docs, and test fixtures shows no legacy-form address (the old kindless project form such as `@/INV-*`, and colon-prefixed rule ids) remains; the `<short-id>/<self-id>` sugar form is confirmed valid and excluded from this grep.\n\nBlast radius: the four `invariants.toml` `enforced-by` bindings, already migrated as a prerequisite and verified green here; a documentation hygiene sweep of the design brief and prior investigation/completion-report docs that reference the old address forms; stale CLI help text and examples that show pre-migration address forms.\n\n## Scope extension (plan amendment D11-A, invoker-approved 2026-07-03)\n\nTask f4b5e3f4 (resolver rewire) retained an explicitly-commented legacy kind-agnostic resolution path: a kindless `@/<self-id>` address still resolves by self-id alone in `commands/item.rs` (`resolve_item_address`, `ResolvedItemAddress::Project { kind: None, .. }`), because `derive_scope_items` still mints kindless `<scope>/<self-id>` qualified-id strings that `jit item list` prints. This story removes that legacy resolution path in the same change that re-addresses the minted qualified ids, so list output and resolution flip together.\n\n- [hard] REQ-04: minted qualified ids carry the kind segment under the uniform scheme, the legacy kind-agnostic resolution path in `commands/item.rs` is removed (a kindless `@/<self-id>` input is a clear parse/not-found error, not a self-id-only match), and the tests that asserted kindless resolution are updated to the uniform scheme.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -32,5 +32,5 @@
     "story:uniform-readdressing-migration"
   ],
   "created_at": "2026-07-01T23:19:51.166972984Z",
-  "updated_at": "2026-07-03T09:43:45.391475277Z"
+  "updated_at": "2026-07-03T22:29:59.852536468Z"
 }

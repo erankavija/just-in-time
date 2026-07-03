@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Session 2: drive the epic to completion. Session-1 waves 1-8 (stories 37506c12, 0efbc594) done; see dev/active/2821e177-handoff.md. Bracket P (0b611ccf) and B (923e42fb) done.",
-  "current_wave": 14,
+  "current_wave": 15,
   "waves": [
     {
       "wave_number": 9,
@@ -188,7 +188,8 @@
           "title": "Confirm uniform re-addressing acceptance with green validate and tree-wide legacy grep",
           "classification": "research",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "DONE 2026-07-04 session 3. Evidence at dev/active/637764ef-acceptance-evidence.md (linked); 2 stray legacy examples fixed (.jit/config.toml + hierarchy_templates.rs); R1 FAIL led to invoker-approved amendment A-637764ef (exception classes extended); R2 PASS."
         }
       ]
     },
@@ -226,8 +227,8 @@
       "date": "2026-07-04",
       "issue": "637764ef",
       "category": "issue scope change (REQ-03 exception-list amendment)",
-      "summary": "code-review R1 FAIL: REQ-03's two named exception classes don't cover three surfaced hit categories (epic design brief historical text preserved per c01f66dd's own mandate; 7 historical issue descriptions in .jit/issues/*.json; the evidence file's own verbatim quotes). Literal compliance would contradict c01f66dd's approved instructions and rewrite done-issue history. AWAITING INVOKER: amend exception list (recommended) / fix everything literally / hybrid.",
-      "resolution": "PENDING"
+      "summary": "code-review R1 FAIL: REQ-03's two named exception classes didn't cover three surfaced hit categories (epic design brief historical text preserved per c01f66dd's own mandate; 7 historical issue descriptions in .jit/issues/*.json; the evidence file's own verbatim quotes). Invoker approved amending the exception list. Amendment A-637764ef applied to issue description + plan doc; review re-run.",
+      "resolution": "approved-amend-exception-list"
     },
     {
       "date": "2026-07-03",

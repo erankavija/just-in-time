@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "87e8f87e-daa4-437b-889f-d25836d1ce14",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "637764ef-534a-4ee5-a4ad-331f0f23fb62",
+  "commit": "7ad02e85c98b641db82c41ee5b2b3d2e327c2b5d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T22:28:25.522398964Z",
+  "completed_at": "2026-07-03T22:29:40.682529988Z",
+  "duration_ms": 75160,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 is satisfied by the captured `jit item show` / `list --kind` evidence and the bare/qualified `satisfies:` recount in [dev/active/637764ef-acceptance-evidence.md](/home/vkaskivuo/Projects/just-in-time/dev/active/637764ef-acceptance-evidence.md:9). REQ-02 is satisfied by the recorded clean `./scripts/jit-validate.sh` run at [dev/active/637764ef-acceptance-evidence.md](/home/vkaskivuo/Projects/just-in-time/dev/active/637764ef-acceptance-evidence.md:88).\n\nREQ-03 now passes under amendment A-637764ef. The current issue text explicitly extends the grep exception classes to include the design brief, this evidence file, and historical `.jit/issues/*.json` issue descriptions at [.jit/issues/637764ef-534a-4ee5-a4ad-331f0f23fb62.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/637764ef-534a-4ee5-a4ad-331f0f23fb62.json:4), backed by the invoker-approved amendment record in [dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md:487). The stale operative examples were fixed to `@/invariant/INV-01` in `.jit/config.toml:100` and `crates/jit/src/hierarchy_templates.rs:165`.\n\n**Architecture And Separation**\n\nNo Rust architecture boundary regression found. The substantive code-facing change is a string literal in `hierarchy_templates.rs`; no new file I/O, storage bypass, CLI parsing in commands, or domain impurity was introduced.\n\n**Functional Paradigm**\n\nNo implementation logic of concern was added.\n\n**Correctness And Invariants**\n\nNo new atomic-write, gate-transition, assignee/label-format, or PID-safety issue found. The latest issue-description mutation has a matching event log entry in [.jit/events.jsonl](/home/vkaskivuo/Projects/just-in-time/.jit/events.jsonl:5), so the event-log invariant is preserved.\n\n**Safety**\n\nNo unsafe code was introduced by this task.\n\n**Testing**\n\nUsed the provided succeeded `cargo-ci` gate as instructed; I did not rerun cargo tests. [.jit/gate-runs/2e6b7cff-38dc-41fe-ae5f-d3d4ff156e81/result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/2e6b7cff-38dc-41fe-ae5f-d3d4ff156e81/result.json:9) reports `fmt ok`, `clippy ok`, and `3001 passed, 0 failed, 12 ignored`.\n\n**Error Handling**\n\nNo fallible library code changed.\n\n**CLI Contract**\n\nNo command surface changed. The captured acceptance commands use `--json`.\n\n**Documentation**\n\nNo new public API requiring rustdoc examples was added. The evidence document records the archive scope decision at [dev/active/637764ef-acceptance-evidence.md](/home/vkaskivuo/Projects/just-in-time/dev/active/637764ef-acceptance-evidence.md:219).\n\n**Prior Review Feedback**\n\nThe prior failed finding is addressed. The issue contract was amended with invoker approval to include the previously disputed residual categories, and the current grep results fit that amended REQ-03 scope.\n\n**Jit Issue Management**\n\nDependencies `a8889340`, `c01f66dd`, and `182aa0d5` are all marked `done`. `./scripts/jit-validate.sh` is recorded clean in the evidence. Label warnings are not blocking.\n\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
