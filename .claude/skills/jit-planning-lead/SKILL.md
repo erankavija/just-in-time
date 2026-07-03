@@ -83,8 +83,10 @@ JIT planning is done when:
    shape changes across turns, keep eliciting; capture at the right altitude only after
    convergence, and let the owner set the tier.
 5. **Converge to criteria.** Confirmed outcomes become atomic `[hard] REQ-NN` lines (one
-   observable outcome each, explicit marker), in a `## Success Criteria`
-   section. **Floor:** at least one confirmed `[hard]` criterion before advancing.
+   observable outcome each, marker starting the bullet — never checkbox-prefixed `- [ ]`,
+   or coverage-preview reads zero criteria; see `references/interview-protocol.md`), in a
+   `## Success Criteria` section. **Floor:** at least one confirmed `[hard]` criterion
+   before advancing.
 
 ### Step 3: Container creation or reconciliation
 

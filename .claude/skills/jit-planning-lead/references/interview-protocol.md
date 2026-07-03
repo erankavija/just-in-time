@@ -71,7 +71,12 @@ over-promote a task to an epic or vice versa.
 Confirmed outcomes become **atomic success criteria**: one observable outcome each, a
 stable id (the ruleset's `id-pattern`, default `REQ-NN`), an explicit marker
 (`[hard]` default, `[aspirational]` otherwise — never bare, never mixed), in a
-`## Success Criteria` section.
+`## Success Criteria` section. Each line is `- [hard] REQ-NN: <outcome>`: the marker
+starts the bullet. Never prefix it with a GitHub checkbox (`- [ ]` / `- [x]`); the
+coverage/validation parser is anchored on a leading `[hard]`, so a checkbox-prefixed
+criterion is invisible to it and lets `coverage-preview` pass while checking nothing.
+When importing an external doc that lists criteria as checkboxes, strip the checkbox
+prefix as you canonicalize.
 
 **Floor (hard rule):** author no plan until at least **one owner-confirmed `[hard]`
 criterion** exists. Where intent stays underspecified:

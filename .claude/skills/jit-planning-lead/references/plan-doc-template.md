@@ -91,7 +91,10 @@ any whose premise later evidence undermines as **REOPEN**.
 
 - **Criteria shape** (container `## Success Criteria`, set during the interview, not here):
   one observable outcome per line, stable id, explicit marker —
-  `- [hard] REQ-01: <single verifiable outcome>`. Never bare, never mixed markers.
+  `- [hard] REQ-01: <single verifiable outcome>`. Never bare, never mixed markers, and
+  never a GitHub checkbox prefix (`- [ ]` / `- [x]`): the parser anchors on a leading
+  `[hard]`, so a checkbox-prefixed criterion reads as zero criteria and `coverage-preview`
+  passes vacuously. Strip any checkbox prefix when importing external criteria.
 - **Titles** carry no ordinals (`T1`, `S0:`), no `type:`/`feat(...)` prefixes, no parent
   IDs. Position lives in the DAG and labels (see [CONTENT_STANDARDS_PATH]).
 - **Descriptions state purpose only** — never how the tracker advances a node, the gate
