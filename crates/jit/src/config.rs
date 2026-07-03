@@ -92,6 +92,16 @@ pub struct VersionConfig {
 /// (`schema_version`/`all_ids`/`deleted_ids`) and is not meant to be hand-edited.
 /// Resolve a present value with
 /// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::JitConfig;
+///
+/// let config: JitConfig = toml::from_str("[project]\nname = \"just-in-time\"\n").unwrap();
+/// let project = config.project.unwrap();
+/// assert_eq!(project.name.unwrap().as_str(), "just-in-time");
+/// ```
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProjectConfig {
     /// The project's canonical name: the `@<project>` scope token in the
@@ -150,6 +160,15 @@ pub struct ProjectName(String);
 
 impl ProjectName {
     /// The validated project name as a string slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ProjectName;
+    ///
+    /// let name: ProjectName = "my-project".parse().unwrap();
+    /// assert_eq!(name.as_str(), "my-project");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
