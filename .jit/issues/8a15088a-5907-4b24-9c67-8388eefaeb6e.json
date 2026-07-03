@@ -1,0 +1,20 @@
+{
+  "id": "8a15088a-5907-4b24-9c67-8388eefaeb6e",
+  "title": "Claim is not idempotent over an existing same-assignee assignment",
+  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03, session 2).\n\n`jit issue claim <id> <assignee>` hard-fails with \"Issue is already assigned\" even when the existing assignee IS the claimant. The assign-then-claim sequence is exactly what the (already filed) container-stewardship workaround produces: a lead runs `jit issue assign <id> agent:claude` while dependencies are still open (claim would exit 4), and later — once deps complete — wants to promote that assignment into a real claim/in_progress. That promotion step rejects, and the operator falls back to `jit issue update --state in_progress`, which loses claim semantics (lease, claims.jsonl) — the same loss the assign workaround already suffered.\n\nThis is adjacent to, but distinct from, issue eff11282 (claim couples assignment to the in_progress transition on dependency-blocked containers): eff11282 is about claim at intake time; this is about claim being non-idempotent over an existing same-assignee assignment at promotion time.\n\nProposal: `jit issue claim` on an issue whose assignee equals the claimant proceeds (records the lease, transitions to in_progress if unblocked) instead of erroring; a DIFFERENT existing assignee keeps failing as today.\n\nAcceptance: assign X to issue I (deps open) -> complete deps -> claim I as X succeeds and I is in_progress with a live lease; claim I as Y (Y != X) still fails.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:cli",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-03T16:51:06.636583159Z",
+  "updated_at": "2026-07-03T16:51:06.638278480Z"
+}

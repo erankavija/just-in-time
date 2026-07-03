@@ -1,0 +1,20 @@
+{
+  "id": "7a50e021-0740-4f1b-a46b-caa5f41664e3",
+  "title": "jit dep add allows silently creating transitively redundant edges",
+  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03, session 2).\n\n`jit dep add` happily creates a transitively redundant edge, but `jit validate` treats transitive-reduction violations as ERRORS — the write succeeds now and the repo fails validation later, wherever the next validate happens to run. In this session, adding `a1b6b3da -> 3d9e9222` silently made the pre-existing `9a7106ae -> 3d9e9222` edge redundant; the violation surfaced inside an UNRELATED issue's code-review gate (which runs jit-validate.sh), costing that issue a review round and a re-run.\n\nThe asymmetry is the friction: acyclicity is enforced at write time (cycle detection runs before every dependency operation, INV-DAG-ACYCLIC), while the reduction property is enforced only at read/validate time.\n\nProposal (either satisfies the intent):\n1. `jit dep add` detects that the new edge makes an existing edge redundant (or is itself redundant) and reports which edge, failing unless `--reduce` is passed to drop the now-redundant edge in the same operation; or\n2. at minimum, `jit dep add` prints a warning naming the redundant edge so the operator can fix it before a distant validate fails.\n\nAcceptance: adding an edge that shadows an existing direct edge either fails with the offending pair named, auto-reduces under an explicit flag, or warns — a silent success followed by a later validate error is no longer possible.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:cli",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-03T16:51:06.586502402Z",
+  "updated_at": "2026-07-03T16:51:06.588199544Z"
+}

@@ -6,15 +6,19 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "4af511fd-bc58-4bea-beb9-3237876d8075",
-    "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
-    "eff11282-af65-4a82-b591-439a184dbc10",
     "b2f9f390-912f-45fe-920f-3f196948be25",
-    "82b8a519-d35a-4ebd-a3ac-82845729aa31",
     "df0b551f-c60e-4c6f-951c-5a796a1c5635",
-    "949cd9d0-8920-4feb-8f13-ff0e2eeca0ee",
     "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
-    "f847df3f-7730-4593-bb89-e847c4667584"
+    "7a50e021-0740-4f1b-a46b-caa5f41664e3",
+    "eff11282-af65-4a82-b591-439a184dbc10",
+    "f847df3f-7730-4593-bb89-e847c4667584",
+    "949cd9d0-8920-4feb-8f13-ff0e2eeca0ee",
+    "82b8a519-d35a-4ebd-a3ac-82845729aa31",
+    "03d54a9f-922c-40fd-864d-2796b08bfd35",
+    "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
+    "def64ac4-cb41-4b57-a9b3-572787f4074b",
+    "4af511fd-bc58-4bea-beb9-3237876d8075",
+    "8a15088a-5907-4b24-9c67-8388eefaeb6e"
   ],
   "gates_required": [],
   "gates_status": {},
@@ -26,5 +30,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-03T11:11:07.509597861Z"
+  "updated_at": "2026-07-03T16:51:18.957025228Z"
 }

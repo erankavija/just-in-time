@@ -1,0 +1,20 @@
+{
+  "id": "def64ac4-cb41-4b57-a9b3-572787f4074b",
+  "title": "Stale jit binary misreads newer repo data instead of failing fast on format mismatch",
+  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03, session 2).\n\nAn installed `jit` binary older than the repository's data produces opaque, misleading failures instead of a version-mismatch diagnosis. Two incidents in one session while dogfooding storage/validation changes:\n\n1. After the live repo migrated `gates.json` -> `gates.toml`, the stale PATH binary failed every command touching the registry with \"Failed to read file: .jit/gates.json\" (exit 4) — nothing hinted that the DATA had moved on and the BINARY was behind.\n2. After `invariants.toml` bindings moved to `@/rule/...`/`@/gate/...` addresses, the stale binary's string-matching drift check reported 4 phantom enforcement-drift findings on a perfectly green repo.\n\nBoth read as repo corruption or regressions; the fix each time was `cargo install --path crates/jit`. `index.json` already carries `schema_version`, but the gates-file relocation and the binding-format change did not bump anything a binary checks.\n\nProposal: a repo-format capability marker the binary verifies on startup — e.g. a `format` (or per-store schema) version in `index.json` or `config.toml` that is bumped whenever an on-disk layout or interpretation changes, with old binaries failing fast: \"this repository's data format (N) is newer than this jit binary supports (M); rebuild/upgrade jit\". Writing with a NEWER binary into an older-format repo may migrate or bump as today.\n\nAcceptance: running a deliberately outdated binary against a newer-format repo yields the explicit mismatch error (non-zero, single line, names both versions) instead of a file-read error or wrong validation verdicts.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:storage",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-03T16:51:06.609405819Z",
+  "updated_at": "2026-07-03T16:51:06.611049400Z"
+}
