@@ -15,6 +15,7 @@ pub mod claims_log;
 pub mod control_plane;
 pub mod errors;
 pub mod gate_runs;
+pub mod gate_store;
 pub mod heartbeat;
 pub mod json;
 pub mod lease;
