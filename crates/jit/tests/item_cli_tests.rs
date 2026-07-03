@@ -543,6 +543,80 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     assert_eq!(items[0]["kind"].as_str().unwrap(), "invariant");
 }
 
+#[test]
+fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
+    // REQ-02, REQ-03 (jit:42898915): the SHIPPED CLI addresses gates from
+    // `.jit/gates.toml` as `@/gate/<key>`, a project-scoped registry-first kind
+    // mirroring `invariant`/`rule`. `[item_kinds.gate]` is NOT part of the `jit
+    // init` scaffold (a freshly-scaffolded `.jit/gates.toml` starts empty, unlike
+    // `rules.toml`), so this test appends the declaration the way
+    // `test_item_custom_kind_from_config` does.
+    let temp = setup_test_repo();
+    let config_path = temp.path().join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
+    config.push_str(
+        "\n[item_kinds.gate]\n\
+         section = \"success_criteria\"\n\
+         id-pattern = \"[a-z][a-z0-9-]*\"\n\
+         markers = []\n\
+         link-namespaces = []\n\
+         scope = \"project\"\n\
+         source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", \
+         text-field = \"description\" }\n\
+         source-of-truth = \"registry-first\"\n",
+    );
+    std::fs::write(&config_path, config).unwrap();
+
+    std::fs::write(
+        temp.path().join(".jit").join("gates.toml"),
+        "[[gates]]\n\
+         key = \"cargo-ci\"\n\
+         title = \"Cargo CI\"\n\
+         description = \"Full Rust CI pipeline must pass.\"\n\
+         stage = \"postcheck\"\n",
+    )
+    .unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "gate", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "item list --kind gate failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    let item = &json["items"][0];
+    assert_eq!(item["kind"].as_str().unwrap(), "gate");
+    assert_eq!(item["self_id"].as_str().unwrap(), "cargo-ci");
+    assert_eq!(item["scope"].as_str().unwrap(), "@");
+    assert_eq!(
+        item["text"].as_str().unwrap(),
+        "Full Rust CI pipeline must pass."
+    );
+
+    // `jit item show @/gate/cargo-ci` resolves through the shipped binary too.
+    let output = Command::new(jit_binary())
+        .args(["item", "show", "@/gate/cargo-ci", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "item show @/gate/cargo-ci failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["item"]["kind"].as_str().unwrap(), "gate");
+    assert_eq!(
+        json["item"]["text"].as_str().unwrap(),
+        "Full Rust CI pipeline must pass."
+    );
+}
+
 /// Append a `config.toml` namespace registration so a link-namespace label
 /// (`satisfies`, `enforces`) passes the default namespace-registry check, leaving
 /// the dangling-item-link finding as the only validation error under test.

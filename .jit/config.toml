@@ -99,7 +99,8 @@ examples = ["satisfies:REQ-01"]
 # =============================================================================
 # Addressable structured items. The engine bakes in NO kinds; this table is the
 # sole source. `jit init` scaffolds the first five (requirement/decision/risk/
-# invariant/rule); this repo also dogfoods a `definition` kind over the glossary.
+# invariant/rule); this repo also dogfoods a `definition` kind over the glossary
+# and a `gate` kind over the gate registry.
 
 [item_kinds.requirement]
 section = "success_criteria"
@@ -145,6 +146,21 @@ markers = []
 link-namespaces = []
 scope = "project"
 source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }
+source-of-truth = "registry-first"
+
+# Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry); the
+# gate kind projects each entry's `key` as its self-id and its `description` as
+# its display text, addressed at `@/gate/<key>` (e.g. `@/gate/cargo-ci`). NOT
+# part of the `jit init` scaffold: a freshly-scaffolded `.jit/gates.toml` starts
+# empty (unlike `rules.toml`, which `jit init` seeds with default rules), so
+# there would be nothing to index out of the box.
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
 source-of-truth = "registry-first"
 
 # Dogfood: glossary terms (under `## Core Concepts`) as addressable definitions,

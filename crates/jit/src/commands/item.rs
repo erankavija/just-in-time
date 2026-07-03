@@ -1281,6 +1281,170 @@ enforce = true
         assert_eq!(shown.issue_title, None);
     }
 
+    /// A standalone `[item_kinds.gate]` declaration sourced from `.jit/gates.toml`
+    /// (jit:42898915), mirroring the live repo's config. Unlike [`CANONICAL_ITEM_KINDS`]
+    /// (the set `jit init` authors), `gate` is deliberately NOT part of that set: a
+    /// freshly-scaffolded `.jit/gates.toml` starts empty (`jit init` seeds no default
+    /// gates the way it seeds default rules), so there is nothing for the kind to
+    /// index out of the box. This mirrors [`policy_exec`]'s standalone-config pattern
+    /// rather than extending `CANONICAL_ITEM_KINDS`.
+    const GATE_ITEM_KIND: &str = "\
+[item_kinds.gate]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = []
+scope = \"project\"
+source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
+source-of-truth = \"registry-first\"
+";
+
+    /// Build an executor whose synthetic repo carries `.jit/gates.toml` with
+    /// `gates_toml` and a standalone `[item_kinds.gate]` declaration, exercising the
+    /// registry-first gate path the same way [`registry_exec_with_rules`] does for
+    /// rules.
+    fn registry_exec_with_gates(gates_toml: &str) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), GATE_ITEM_KIND).unwrap();
+        storage.add_repo_file(".jit/gates.toml", gates_toml);
+        CommandExecutor::new(storage)
+    }
+
+    /// Two gate registry entries shaped like real `.jit/gates.toml` rows well
+    /// enough to exercise the `gate` kind's toml projection: only `key` and
+    /// `description` matter here (`load_toml_scope_items` reads this as a generic
+    /// `toml::Table`, never through the gate engine's stricter checker schema).
+    const TWO_GATES: &str = "\
+[[gates]]
+key = \"cargo-ci\"
+title = \"Cargo CI (fmt + clippy + tests)\"
+description = \"Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass.\"
+stage = \"postcheck\"
+
+[[gates]]
+key = \"tests\"
+title = \"All Tests Pass\"
+description = \"Full test suite must pass\"
+stage = \"postcheck\"
+";
+
+    #[test]
+    fn test_list_items_kind_gate_returns_registry_entries() {
+        // REQ-03: `jit item list --kind gate` returns every gate in `.jit/gates.toml`
+        // as an addressable item, mirroring the existing invariant/rule behavior for
+        // other project-scoped registry-first kinds.
+        let exec = registry_exec_with_gates(TWO_GATES);
+        let result = exec.list_items(Some("gate")).unwrap();
+        assert_eq!(result.count, 2);
+        let qids: Vec<&str> = result
+            .items
+            .iter()
+            .map(|i| i.qualified_id.as_str())
+            .collect();
+        assert!(qids.contains(&"@/cargo-ci"));
+        assert!(qids.contains(&"@/tests"));
+        let cargo_ci = result
+            .items
+            .iter()
+            .find(|i| i.self_id == "cargo-ci")
+            .unwrap();
+        assert_eq!(cargo_ci.kind, "gate");
+        assert_eq!(cargo_ci.scope, "@");
+        assert_eq!(
+            cargo_ci.text,
+            "Full Rust CI pipeline: formatting check, zero-warning clippy, and the \
+             workspace test suite must all pass."
+        );
+    }
+
+    #[test]
+    fn test_show_item_resolves_gate_by_qualified_id() {
+        // REQ-02: `jit item show @/gate/<key>` resolves a configured gate's item,
+        // whose text is that gate's description. Uses the kind-segmented address
+        // (story 71ebd1e8 REQ-01), never the kindless `@/<key>` legacy form (task
+        // 182aa0d5 removes that resolution arm, and this test must still hold after
+        // it does).
+        let exec = registry_exec_with_gates(TWO_GATES);
+        let shown = exec.show_item("@/gate/cargo-ci").unwrap();
+        assert_eq!(shown.item.self_id, "cargo-ci");
+        // Minted qualified ids are still kindless (`@/<self-id>`) until 182aa0d5
+        // flips minting to include the kind segment — transitional, not the
+        // contract under test (that's the kind-segmented address above).
+        assert_eq!(shown.item.qualified_id, "@/cargo-ci");
+        assert_eq!(shown.item.kind, "gate");
+        assert_eq!(shown.item.scope, "@");
+        assert_eq!(
+            shown.item.text,
+            "Full Rust CI pipeline: formatting check, zero-warning clippy, and the \
+             workspace test suite must all pass."
+        );
+        // No owning issue for a project-scope item.
+        assert_eq!(shown.issue_full_id, None);
+        assert_eq!(shown.issue_title, None);
+    }
+
+    /// Build an executor whose synthetic repo declares BOTH the `rule` and `gate`
+    /// item kinds and carries both `.jit/rules.toml` and `.jit/gates.toml`,
+    /// exercising the cross-kind collision the two registries share in the live
+    /// repo: `coverage-preview` is BOTH a rule (`.jit/rules.toml`, origin `bracket`)
+    /// and a gate (`.jit/gates.toml`) (jit:42898915).
+    fn registry_exec_with_rules_and_gates(
+        rules_toml: &str,
+        gates_toml: &str,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config = format!("{CANONICAL_ITEM_KINDS}\n{GATE_ITEM_KIND}");
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        storage.add_repo_file(".jit/rules.toml", rules_toml);
+        storage.add_repo_file(".jit/gates.toml", gates_toml);
+        CommandExecutor::new(storage)
+    }
+
+    const COVERAGE_PREVIEW_GATE: &str = "\
+[[gates]]
+key = \"coverage-preview\"
+title = \"Coverage Preview\"
+description = \"Run scoped validation for the container resolved from the breakdown node's brackets label; blocks when a [hard] criterion is uncovered at plan time\"
+stage = \"postcheck\"
+";
+
+    #[test]
+    fn test_show_item_rule_and_gate_share_self_id_resolve_to_distinct_items() {
+        // Load-bearing cross-kind collision (jit:42898915): `coverage-preview` is
+        // BOTH a rule and a gate. Per-(scope, kind) uniqueness
+        // (`domain::item::derive_scope_items`) keeps them distinct even though both
+        // derive the same kindless qualified-id string `@/coverage-preview` until
+        // 182aa0d5 flips minting to include the kind segment. Each kind-segmented
+        // address must resolve to its OWN item, never a silent first-match or a
+        // spurious `DuplicateSelfId`.
+        let exec = registry_exec_with_rules_and_gates(ONE_RULE, COVERAGE_PREVIEW_GATE);
+
+        let rule = exec.show_item("@/rule/coverage-preview").unwrap();
+        assert_eq!(rule.item.kind, "rule");
+        assert_eq!(rule.item.self_id, "coverage-preview");
+        assert_eq!(rule.item.text, "coverage-preview");
+
+        let gate = exec.show_item("@/gate/coverage-preview").unwrap();
+        assert_eq!(gate.item.kind, "gate");
+        assert_eq!(gate.item.self_id, "coverage-preview");
+        assert_eq!(
+            gate.item.text,
+            "Run scoped validation for the container resolved from the breakdown \
+             node's brackets label; blocks when a [hard] criterion is uncovered at \
+             plan time"
+        );
+        assert_ne!(rule.item.text, gate.item.text);
+
+        // Both coexist in one unfiltered list with no DuplicateSelfId despite the
+        // shared self-id (they differ by kind).
+        let all = exec.list_items(None).unwrap();
+        assert_eq!(all.count, 2);
+    }
+
     #[test]
     fn test_search_items_finds_invariant_by_statement() {
         // The generic search path reaches registry-first invariants too.
