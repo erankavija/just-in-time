@@ -9,9 +9,16 @@
     "0b7e864d-0985-424a-a43d-8cf4fd351ad3"
   ],
   "gates_required": [
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-03T00:13:52.623009572Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -29,5 +36,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.884044569Z",
-  "updated_at": "2026-07-03T00:07:09.682626253Z"
+  "updated_at": "2026-07-03T00:13:52.623056422Z"
 }
