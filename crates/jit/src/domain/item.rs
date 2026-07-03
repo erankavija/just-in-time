@@ -206,7 +206,10 @@ pub struct KindSegmentedAddress {
 /// unvalidated against any kind registry (the caller matches them against its own
 /// configured kinds, keeping this domain function free of kind-name literals).
 /// The `<short-id>/<self-id>` sugar form and [`Scope`]'s own two-segment
-/// `<scope>/<self-id>` form ([`split_qualified_id`]) are untouched and unrelated.
+/// `<scope>/<self-id>` form ([`split_qualified_id`]) are untouched and
+/// unrelated — the sugar form is expanded to this same triple shape by
+/// [`expand_sugar_address`], which infers the kind segment this parser requires
+/// explicit.
 ///
 /// Malformed input — a missing kind or self-id segment, an empty scope/kind/
 /// self-id segment, an unrecognized reserved segment where `issue` was expected,
@@ -303,6 +306,90 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
         })
     } else {
         Ok(())
+    }
+}
+
+/// Expand a `<short-id>/<self-id>` sugar address into the canonical
+/// kind-segmented triple by inferring the kind from `self_id`'s shape.
+///
+/// The sugar form omits the kind segment [`parse_kind_segmented_address`]
+/// requires explicit; this recovers it by matching `self_id` against every
+/// ISSUE-scoped kind's `id-pattern` in `kinds` (the same `id_pattern.find`
+/// mechanism [`extract_raw_items`] uses to mint items). PROJECT-scoped kinds
+/// (`scope = "project"`, e.g. `invariant`, `definition`) are excluded from
+/// candidate matching regardless of whether their pattern would otherwise
+/// match: their self-ids are free-form slugs with no distinguishing shape, so
+/// they have no sugar form and always require the explicit
+/// `@/<kind>/<self-id>` address.
+///
+/// This is a pure function over its `kinds` parameter — like
+/// [`resolve_item_kinds`], it takes the kind registry as data rather than
+/// hardcoding any kind name, so no kind identity is baked into this module.
+///
+/// - Exactly one issue-scoped kind matches: expands to a
+///   [`KindSegmentedAddress`] with [`AddressScope::Issue`] carrying the
+///   address's short-id, that kind's name, and `self_id` verbatim.
+/// - No issue-scoped kind matches: [`ItemError::SugarKindNotFound`].
+/// - More than one issue-scoped kind matches: [`ItemError::SugarKindAmbiguous`],
+///   naming every matching candidate kind — this function never silently picks
+///   the first.
+///
+/// `address` itself must split into two segments via [`split_qualified_id`]
+/// (`<short-id>/<self-id>`); anything else is [`ItemError::InvalidAddress`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::ItemKindConfig;
+/// use jit::domain::item::{expand_sugar_address, AddressScope, ItemKind};
+///
+/// let decision = ItemKind::from_config(
+///     "decision",
+///     &ItemKindConfig {
+///         id_pattern: Some("D-[0-9]+".into()),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
+/// let addr = expand_sugar_address("56ab0224/D-1", &[decision]).unwrap();
+/// assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+/// assert_eq!(addr.kind, "decision");
+/// assert_eq!(addr.self_id, "D-1");
+/// ```
+pub fn expand_sugar_address(
+    address: &str,
+    kinds: &[ItemKind],
+) -> Result<KindSegmentedAddress, ItemError> {
+    let (short_id, self_id) =
+        split_qualified_id(address).ok_or_else(|| ItemError::InvalidAddress {
+            address: address.to_string(),
+            reason: "sugar address must be '<short-id>/<self-id>'".to_string(),
+        })?;
+
+    let candidates: Vec<&ItemKind> = kinds
+        .iter()
+        .filter(|kind| kind.kind_scope() == KindScope::Issue)
+        .filter(|kind| kind.id_pattern.find(self_id).is_some())
+        .collect();
+
+    match candidates.as_slice() {
+        [] => Err(ItemError::SugarKindNotFound {
+            address: address.to_string(),
+            self_id: self_id.to_string(),
+        }),
+        [only] => Ok(KindSegmentedAddress {
+            scope: AddressScope::Issue(short_id.to_string()),
+            kind: only.name().to_string(),
+            self_id: self_id.to_string(),
+        }),
+        _ => Err(ItemError::SugarKindAmbiguous {
+            address: address.to_string(),
+            self_id: self_id.to_string(),
+            candidates: candidates
+                .iter()
+                .map(|kind| kind.name().to_string())
+                .collect(),
+        }),
     }
 }
 
@@ -518,6 +605,38 @@ pub enum ItemError {
         address: String,
         /// Human-readable description of why parsing failed.
         reason: String,
+    },
+    /// A `<short-id>/<self-id>` sugar address's self-id matched NO issue-scoped
+    /// item kind's `id-pattern`, so [`expand_sugar_address`] cannot infer which
+    /// kind the address belongs to.
+    #[error(
+        "self-id '{self_id}' in sugar address '{address}' matches no issue-scoped \
+         item kind's id-pattern"
+    )]
+    SugarKindNotFound {
+        /// The full sugar address that failed to expand.
+        address: String,
+        /// The self-id segment that matched no issue-scoped kind.
+        self_id: String,
+    },
+    /// A `<short-id>/<self-id>` sugar address's self-id matched MORE THAN ONE
+    /// issue-scoped item kind's `id-pattern`, so [`expand_sugar_address`] cannot
+    /// pick a kind without guessing. Every matching candidate kind is named so
+    /// the caller can disambiguate — e.g. by using the explicit
+    /// `@/issue/<short-id>/<kind>/<self-id>` address instead.
+    #[error(
+        "self-id '{self_id}' in sugar address '{address}' matches more than one \
+         issue-scoped item kind's id-pattern: {}",
+        candidates.join(", ")
+    )]
+    SugarKindAmbiguous {
+        /// The full sugar address that failed to expand.
+        address: String,
+        /// The self-id segment that matched multiple issue-scoped kinds.
+        self_id: String,
+        /// Every issue-scoped kind name whose id-pattern matched, in
+        /// kind-list order.
+        candidates: Vec<String>,
     },
 }
 
@@ -2352,5 +2471,95 @@ enforced-by = \"tests\"
         assert_eq!(project_items[0].qualified_id, "@/REQ-01");
         assert!(issue_items[0].qualified_id.ends_with("/REQ-01"));
         assert!(!issue_items[0].qualified_id.starts_with('@'));
+    }
+
+    #[test]
+    fn test_expand_sugar_address_matches_decision_kind() {
+        // REQ-01: a self-id matching exactly one issue-scoped kind's id-pattern
+        // expands to that kind, with the address's short-id carried as
+        // AddressScope::Issue and self_id passed through verbatim.
+        let addr = expand_sugar_address("56ab0224/D-1", &[decision_kind(), risk_kind()]).unwrap();
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.kind, "decision");
+        assert_eq!(addr.self_id, "D-1");
+    }
+
+    #[test]
+    fn test_expand_sugar_address_matches_risk_kind() {
+        // REQ-01: a second, distinct issue-scoped kind resolves the same way.
+        let addr =
+            expand_sugar_address("56ab0224/RISK-1", &[decision_kind(), risk_kind()]).unwrap();
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.kind, "risk");
+        assert_eq!(addr.self_id, "RISK-1");
+    }
+
+    #[test]
+    fn test_expand_sugar_address_no_match_is_error() {
+        // REQ-02: a self-id matching no issue-scoped kind's id-pattern is a
+        // distinct typed error, not the ambiguous-match error.
+        let err =
+            expand_sugar_address("56ab0224/REQ-01", &[decision_kind(), risk_kind()]).unwrap_err();
+        match err {
+            ItemError::SugarKindNotFound { address, self_id } => {
+                assert_eq!(address, "56ab0224/REQ-01");
+                assert_eq!(self_id, "REQ-01");
+            }
+            other => panic!("expected SugarKindNotFound, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_expand_sugar_address_ambiguous_match_lists_all_candidates() {
+        // REQ-03: two ISSUE-scoped kinds with deliberately overlapping
+        // id-patterns both match "X-1"; the error names every matching
+        // candidate kind, not just the first.
+        let alpha = ItemKind::from_config(
+            "alpha",
+            &ItemKindConfig {
+                id_pattern: Some("X-[0-9]+".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let beta = ItemKind::from_config(
+            "beta",
+            &ItemKindConfig {
+                id_pattern: Some("[A-Z]-[0-9]+".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let err = expand_sugar_address("56ab0224/X-1", &[alpha, beta]).unwrap_err();
+        match err {
+            ItemError::SugarKindAmbiguous {
+                self_id,
+                candidates,
+                ..
+            } => {
+                assert_eq!(self_id, "X-1");
+                assert_eq!(candidates, vec!["alpha".to_string(), "beta".to_string()]);
+            }
+            other => panic!("expected SugarKindAmbiguous, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_expand_sugar_address_excludes_project_scoped_kind() {
+        // REQ-04: `invariant` is project-scoped and shares `requirement`'s exact
+        // id-pattern, but is excluded from candidate matching regardless of the
+        // pattern match — only the issue-scoped `requirement` kind is selected.
+        let addr =
+            expand_sugar_address("56ab0224/REQ-01", &[invariant_kind(), req_kind()]).unwrap();
+        assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
+        assert_eq!(addr.kind, "requirement");
+        assert_eq!(addr.self_id, "REQ-01");
+    }
+
+    #[test]
+    fn test_expand_sugar_address_missing_separator_is_invalid_address() {
+        // Not a two-segment sugar form at all: a typed error, not a panic.
+        let err = expand_sugar_address("REQ-01", &[req_kind()]).unwrap_err();
+        assert!(matches!(err, ItemError::InvalidAddress { .. }));
     }
 }
