@@ -11,7 +11,7 @@
         {"id": "87346f52", "short_id": "87346f52", "title": "Split rule origin out of self-id in the default rule contract", "classification": "implementation", "model": "sonnet", "status": "pending"},
         {"id": "f5d35048", "short_id": "f5d35048", "title": "Migrate gate registry storage to a gates.toml store", "classification": "implementation", "model": "sonnet", "status": "pending"},
         {"id": "3d9e9222", "short_id": "3d9e9222", "title": "Add canonical project-name field to project configuration", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "a1b6b3da", "short_id": "a1b6b3da", "title": "Bind the named-project scope token to local resolution or a not-resolvable error", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {"id": "a1b6b3da", "short_id": "a1b6b3da", "title": "Bind the named-project scope token to local resolution or a not-resolvable error", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "sub-wave 9b: amended (invoker-approved) to bind AddressScope::NamedProject + wire resolve_item_address arm; now depends on 3d9e9222; dispatch after 3d9e9222 merges"}
       ]
     },
     {
@@ -70,6 +70,13 @@
     {"id": "182aa0d5", "reason": "Story 7f22d6cf REQ-04 (amendment D11-A) had no implementing task; 637764ef explicitly adds no implementation. Task-level creation, lead autonomy."}
   ],
   "escalations": [
+    {
+      "date": "2026-07-03",
+      "issue": "a1b6b3da",
+      "category": "issue scope change (description/criteria amendment)",
+      "summary": "Task premise false: Scope::NamedProject never existed (accepted d6c3bff6 design keeps it on separate AddressScope type); resolve_item_address wiring was unowned. Invoker approved: rebind to AddressScope::NamedProject + own the commands/item.rs wiring in one task; dep a1b6b3da -> 3d9e9222 added. Plan amendment A-a1b6b3da.",
+      "resolution": "approved-rebind-and-wire-one-task"
+    },
     {
       "date": "2026-07-03",
       "issue": "f4b5e3f4",
