@@ -79,7 +79,8 @@
           "title": "Widen the label-value grammar to accept @-prefixed addresses",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "review-held-for-tree-consistency",
+          "note": "code complete (6e73e418), cargo-ci passed; code-review flagged the planned labels.rs/defaults.rs divergence \u2014 542f8b6d lands the lockstep, then 0597febe re-reviews on a consistent tree"
         }
       ]
     },
@@ -92,7 +93,7 @@
           "title": "Keep the label-format regex and generated JSON Schema in lockstep",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "7a2bbe4f",
