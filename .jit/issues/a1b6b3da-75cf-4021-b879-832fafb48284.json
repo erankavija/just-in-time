@@ -2,9 +2,9 @@
   "id": "a1b6b3da-75cf-4021-b879-832fafb48284",
   "title": "Bind the named-project scope token to local resolution or a not-resolvable error",
   "description": "Bind the addressing core's named-project scope token to project identity so a `@<project>` address distinguishes the local project (which resolves) from any other named project (which is syntactically valid but not resolvable locally), per this epic's REQ-09 and design decision D5. This item adds no path parsing of its own and builds no federation or remote lookup — only the local-vs-other resolution binding.\n\nBy the time this task runs, prerequisite addressing-core work has extended `Scope` (`crates/jit/src/domain/item.rs:89-152`) with a `Scope::NamedProject(String)` variant and taught the structural parser to produce it for any `@<name>` segment, without consulting any declared project identity. This task consumes that variant; it does not add a `Scope` variant of its own, does not modify the structural parse, and does not fold a local-name comparison into parse time.\n\nWhat to build, in `crates/jit/src/domain/item.rs`:\n- A resolution-facing pure function (or method on `Scope`) that takes the declared local project name as a plain `&str` (the caller supplies the already-loaded config value — this keeps the function pure domain code with no file I/O, per this project's layering rule that domain logic must be free of I/O) and binds the scope token:\n  - `Scope::Project` (bare `@`) resolves as the local project, unchanged from today.\n  - `Scope::NamedProject(name)` where `name` equals the supplied local project name resolves identically to `Scope::Project`.\n  - `Scope::NamedProject(name)` where `name` differs returns a clear not-resolvable error.\n- A new `ItemError` variant (`crates/jit/src/domain/item.rs:245-355` shows the existing `thiserror` enum pattern to follow), e.g. `ItemError::NotResolvable { project: String }`, with an `#[error(...)]` message that names the unresolvable project and states plainly that resolution is local-only and no federation or remote lookup was attempted.\n- `Scope::Issue` passes through the binding unchanged (issue scopes carry no project identity).\n\n## Success Criteria\n\n- [hard] REQ-01: unit tests in `domain/item.rs` prove that, given a supplied local project name (e.g. `\"acme\"`), the binding resolves both `Scope::Project` (bare `@`) and `Scope::NamedProject(\"acme\")` as the local project, consuming the structurally parsed scope token rather than re-parsing or re-implementing any `@`-prefix matching.\n- [hard] REQ-02: a unit test proves the binding maps `Scope::NamedProject(\"other-project\")` (local name `\"acme\"`) to `Err(ItemError::NotResolvable { project })`, with a `to_string()` message that contains `\"other-project\"` and states resolution is local-only with no network or remote attempt.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "37506c12-ecb2-45be-bb85-e99d92e52855"
   ],
@@ -22,5 +22,5 @@
     "story:multi-jit-address-form"
   ],
   "created_at": "2026-07-01T23:42:22.037667235Z",
-  "updated_at": "2026-07-03T10:04:58.967251471Z"
+  "updated_at": "2026-07-03T11:21:33.615334890Z"
 }
