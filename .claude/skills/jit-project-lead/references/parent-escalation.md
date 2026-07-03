@@ -122,17 +122,23 @@ and the same escalation returns. Resolve and record are one step.
 
 ## Stop and escalate
 
-Forward to the human (the steward's own invoker) when:
+The forward-to-human set is exactly the three categories above; nothing here adds
+a fourth. Two clarifications on the boundary, then the operational halts:
 
-- The escalation is a vision-level conflict, a cross-strategic-container
-  dependency, or a project-wide infrastructure change (the three categories
-  above).
-- The escalation cannot be classified from the vision and the decision log: the
-  charter is silent and the resolution would set project direction the human owns.
-  Do not guess a resolution the vision does not support.
+- An escalation the charter is silent on, whose resolution would set **new**
+  project direction rather than apply the existing vision, is a **vision-level
+  conflict** (category 1). Forward it as that category; do not guess a resolution
+  the vision does not support. This is not a separate forward category.
+- The other two categories bind the same way: a dependency reaching another
+  top-level strategic container, or a project-wide infrastructure change,
+  forwards; everything else the steward resolves.
+
+Operational halts are **not** subordinate-escalation forwards; they stop the
+steward on a tooling failure and are reported to the steward's own invoker:
+
 - The charter cannot be read or appended (unresolvable path, or a corrupt log per
   `vision-charter.md`'s stop conditions), so a resolution cannot be recorded. Stop
-  rather than resolve without recording.
+  and report the failure rather than resolve without recording.
 
 ## Red flags
 
