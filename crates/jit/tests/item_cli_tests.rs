@@ -547,25 +547,10 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
 fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
     // REQ-02, REQ-03 (jit:42898915): the SHIPPED CLI addresses gates from
     // `.jit/gates.toml` as `@/gate/<key>`, a project-scoped registry-first kind
-    // mirroring `invariant`/`rule`. `[item_kinds.gate]` is NOT part of the `jit
-    // init` scaffold (a freshly-scaffolded `.jit/gates.toml` starts empty, unlike
-    // `rules.toml`), so this test appends the declaration the way
-    // `test_item_custom_kind_from_config` does.
+    // mirroring `invariant`/`rule`. `[item_kinds.gate]` is part of the `jit init`
+    // scaffold (jit:bb7d57a2), so a default-initialized repo already declares it;
+    // this test only needs to seed a gate entry in `.jit/gates.toml`.
     let temp = setup_test_repo();
-    let config_path = temp.path().join(".jit").join("config.toml");
-    let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
-    config.push_str(
-        "\n[item_kinds.gate]\n\
-         section = \"success_criteria\"\n\
-         id-pattern = \"[a-z][a-z0-9-]*\"\n\
-         markers = []\n\
-         link-namespaces = []\n\
-         scope = \"project\"\n\
-         source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", \
-         text-field = \"description\" }\n\
-         source-of-truth = \"registry-first\"\n",
-    );
-    std::fs::write(&config_path, config).unwrap();
 
     std::fs::write(
         temp.path().join(".jit").join("gates.toml"),

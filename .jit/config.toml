@@ -98,9 +98,9 @@ examples = ["satisfies:REQ-01"]
 # ITEM KINDS
 # =============================================================================
 # Addressable structured items. The engine bakes in NO kinds; this table is the
-# sole source. `jit init` scaffolds the first five (requirement/decision/risk/
-# invariant/rule); this repo also dogfoods a `definition` kind over the glossary
-# and a `gate` kind over the gate registry.
+# sole source. `jit init` scaffolds the first six (requirement/decision/risk/
+# invariant/rule/gate); this repo also dogfoods a `definition` kind over the
+# glossary.
 
 [item_kinds.requirement]
 section = "success_criteria"
@@ -150,10 +150,11 @@ source-of-truth = "registry-first"
 
 # Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry); the
 # gate kind projects each entry's `key` as its self-id and its `description` as
-# its display text, addressed at `@/gate/<key>` (e.g. `@/gate/cargo-ci`). NOT
-# part of the `jit init` scaffold: a freshly-scaffolded `.jit/gates.toml` starts
-# empty (unlike `rules.toml`, which `jit init` seeds with default rules), so
-# there would be nothing to index out of the box.
+# its display text, addressed at `@/gate/<key>` (e.g. `@/gate/cargo-ci`). Part of
+# the `jit init` scaffold (jit:bb7d57a2); a freshly-scaffolded `.jit/gates.toml`
+# starts as an EMPTY registry (unlike `rules.toml`, which `jit init` also seeds
+# with default rules), so `jit item list --kind gate` returns nothing until a
+# gate is defined via `jit gate define`.
 [item_kinds.gate]
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"

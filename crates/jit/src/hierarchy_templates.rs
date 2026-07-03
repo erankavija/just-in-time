@@ -223,6 +223,22 @@ scope = "project"
 source = {{ toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }}
 source-of-truth = "registry-first"
 
+# Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry);
+# the gate kind projects each entry's `key` as its self-id and its
+# `description` as its display text, addressed at `@/gate/<key>`. A
+# freshly-scaffolded `.jit/gates.toml` starts as an EMPTY registry (unlike
+# `rules.toml`, which `jit init` also seeds with default rules), so `jit item
+# list --kind gate` returns nothing until a gate is defined via `jit gate
+# define`.
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = {{ toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }}
+source-of-truth = "registry-first"
+
 # =============================================================================
 # ADVANCED (uncomment to enable)
 # =============================================================================
@@ -527,6 +543,22 @@ link-namespaces = []
 scope = \"project\"
 source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
 source-of-truth = \"registry-first\"
+
+# Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry);
+# the gate kind projects each entry's `key` as its self-id and its
+# `description` as its display text, addressed at `@/gate/<key>`. A
+# freshly-scaffolded `.jit/gates.toml` starts as an EMPTY registry (unlike
+# `rules.toml`, which `jit init` also seeds with default rules), so `jit item
+# list --kind gate` returns nothing until a gate is defined via `jit gate
+# define`.
+[item_kinds.gate]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = []
+scope = \"project\"
+source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
+source-of-truth = \"registry-first\"
 ";
         assert!(
             toml.contains(expected_block),
@@ -538,7 +570,7 @@ source-of-truth = \"registry-first\"
     fn test_generated_config_item_kinds_resolve_with_no_built_ins() {
         // REQ-04: a repo whose ONLY config is the emitted one indexes kinds purely
         // from the table (the engine bakes in no defaults). Resolving the emitted
-        // table yields the five kinds in name order; resolving NO table yields none.
+        // table yields the six kinds in name order; resolving NO table yields none.
         use crate::domain::item::resolve_item_kinds;
         let toml = HierarchyTemplate::default().generate_config_toml();
         let cfg: crate::config::JitConfig =
@@ -548,7 +580,14 @@ source-of-truth = \"registry-first\"
         let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
         assert_eq!(
             names,
-            vec!["decision", "invariant", "requirement", "risk", "rule"]
+            vec![
+                "decision",
+                "gate",
+                "invariant",
+                "requirement",
+                "risk",
+                "rule"
+            ]
         );
         // With no table at all there are no kinds — proving the table, not a baked
         // default, is what makes these kinds index.

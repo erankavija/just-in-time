@@ -1,7 +1,8 @@
 //! Acceptance test for cross-substrate generality across four representative item
-//! kinds among those `jit init` scaffolds (JIT issue 72cdf315, REQ-04). A fifth
-//! scaffolded kind, `rule` (jit:cdc33a0f, registry-first over `.jit/rules.toml`),
-//! is covered by its own resolution test and is not this fixture's concern.
+//! kinds among those `jit init` scaffolds (JIT issue 72cdf315, REQ-04). Two more
+//! scaffolded kinds, `rule` (jit:cdc33a0f, registry-first over `.jit/rules.toml`)
+//! and `gate` (jit:bb7d57a2, registry-first over `.jit/gates.toml`), are each
+//! covered by their own resolution test and are not this fixture's concern.
 //!
 //! ## What this file proves
 //!
@@ -40,7 +41,7 @@ fn jit_binary() -> &'static str {
 }
 
 /// Bootstrap a default-initialized repo (whose `jit init`-emitted `[item_kinds]`
-/// table declares this fixture's four kinds, among five total) and return the
+/// table declares this fixture's four kinds, among six total) and return the
 /// temp dir so the caller owns the lifetime.
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
