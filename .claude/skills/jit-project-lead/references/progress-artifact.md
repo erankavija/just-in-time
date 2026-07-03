@@ -84,7 +84,11 @@ Fields:
   `[hard]` criteria are met, per container-dispatch step 8) →
   `done` (accepted **and** the wave's coherence review passed).
   Off-path values: `rework` (sent back to its lead) and `escalated` (raised to
-  the steward's invoker, unresolved).
+  the steward's invoker, unresolved). Terminal skip value: `rejected` (the
+  container was rejected upstream — e.g. a rejected sub-strategic child that
+  stays in the roster for a complete picture; carry a note stating why). A
+  `rejected` row is never dispatched and is skipped on resume exactly like
+  `done`.
 - **`containers[].wave`** — the row's wave number, redundant with its position
   for direct lookup.
 - **`coherence_review`** — per-wave cross-container review state
@@ -129,8 +133,8 @@ is re-run and no accepted container is re-dispatched:
 1. **Resolve the progress path** from config (active root + anchor short id).
 2. **If it exists, read it in full.** Recover `current_wave`, every container's
    `status`, each wave's `coherence_review`, and open `escalations`. Resume the
-   dispatch loop at `current_wave`, skipping containers already `done`/`accepted`
-   and re-dispatching only those `pending`/`rework`.
+   dispatch loop at `current_wave`, skipping containers already
+   `done`/`accepted`/`rejected` and re-dispatching only those `pending`/`rework`.
 3. **Reconcile against live jit state.** Children may have changed between
    sessions. Re-derive the wave list (`references/wave-layering.md`) and confirm
    the persisted `waves` still match the current DAG; if a child was added,
