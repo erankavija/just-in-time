@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T14:38:13.775456055Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T13:36:53.151317383Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T14:16:03.866846917Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "story:rule-addressable-kind"
   ],
   "created_at": "2026-07-01T23:42:21.611606715Z",
-  "updated_at": "2026-07-03T14:30:31.075476180Z"
+  "updated_at": "2026-07-03T14:40:49.464815998Z"
 }

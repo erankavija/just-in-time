@@ -28,7 +28,7 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T14:02:28.384930798Z"
+      "updated_at": "2026-07-03T14:40:49.490796767Z"
     }
   },
   "context": {},
@@ -49,5 +49,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:19:51.086829876Z",
-  "updated_at": "2026-07-03T14:12:55.963849048Z"
+  "updated_at": "2026-07-03T14:43:13.448880960Z"
 }
