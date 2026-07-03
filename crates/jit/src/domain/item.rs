@@ -211,8 +211,10 @@ pub struct KindSegmentedAddress {
 ///
 /// Malformed input — a missing kind or self-id segment, an empty scope/kind/
 /// self-id segment, an unrecognized reserved segment where `issue` was expected,
-/// or the wrong number of `/`-separated segments — is a typed
-/// [`ItemError::InvalidAddress`] naming the offending address and why it failed.
+/// the wrong number of `/`-separated segments, or a `:` anywhere in the address
+/// (the colon is reserved for the label `namespace:value` separator and never
+/// valid inside an address) — is a typed [`ItemError::InvalidAddress`] naming the
+/// offending address and why it failed.
 ///
 /// # Examples
 ///
@@ -236,6 +238,14 @@ pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddres
         address: address.to_string(),
         reason,
     };
+
+    if address.contains(':') {
+        return Err(invalid(
+            "the address contains a colon ':', which is reserved for the label \
+             'namespace:value' separator and is never valid inside an address"
+                .to_string(),
+        ));
+    }
 
     let mut segments = address.split('/');
     let scope_token = segments
@@ -333,7 +343,10 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 ///   the first.
 ///
 /// `address` itself must split into two `/`-separated segments
-/// (`<short-id>/<self-id>`); anything else is [`ItemError::InvalidAddress`].
+/// (`<short-id>/<self-id>`); anything else is [`ItemError::InvalidAddress`]. A `:`
+/// anywhere in `address` is also rejected as [`ItemError::InvalidAddress`]: the
+/// colon is reserved for the label `namespace:value` separator and never valid
+/// inside an address.
 ///
 /// # Examples
 ///
@@ -358,6 +371,15 @@ pub fn expand_sugar_address(
     address: &str,
     kinds: &[ItemKind],
 ) -> Result<KindSegmentedAddress, ItemError> {
+    if address.contains(':') {
+        return Err(ItemError::InvalidAddress {
+            address: address.to_string(),
+            reason: "the address contains a colon ':', which is reserved for the label \
+                     'namespace:value' separator and is never valid inside an address"
+                .to_string(),
+        });
+    }
+
     // Split on the FIRST `/` (a self-id may itself contain slashes), matching the
     // two-segment shape the sugar form requires; a value with no `/` is not a sugar
     // address at all.
@@ -2479,6 +2501,44 @@ enforced-by = \"tests\"
     }
 
     #[test]
+    fn test_parse_kind_segmented_address_colon_in_self_id_is_error() {
+        // The colon is reserved for the label `namespace:value` separator and is
+        // never valid inside an address, even carried inside a single component.
+        let err = parse_kind_segmented_address("@/rule/foo:bar").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@/rule/foo:bar");
+                assert!(reason.contains("colon"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_colon_in_project_name_is_error() {
+        let err = parse_kind_segmented_address("@bad:name/rule/x").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@bad:name/rule/x");
+                assert!(reason.contains("colon"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_kind_segmented_address_colon_in_issue_self_id_is_error() {
+        let err = parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ:01").unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "@/issue/56ab0224/requirement/REQ:01");
+                assert!(reason.contains("colon"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_same_self_id_distinct_across_scopes() {
         // REQ-04: the SAME self-id under two different scopes does not conflict and
         // yields two distinct qualified ids.
@@ -2588,5 +2648,19 @@ enforced-by = \"tests\"
         // Not a two-segment sugar form at all: a typed error, not a panic.
         let err = expand_sugar_address("REQ-01", &[req_kind()]).unwrap_err();
         assert!(matches!(err, ItemError::InvalidAddress { .. }));
+    }
+
+    #[test]
+    fn test_expand_sugar_address_colon_in_self_id_is_error() {
+        // The colon is reserved for the label `namespace:value` separator and is
+        // never valid inside an address.
+        let err = expand_sugar_address("56ab0224/REQ:01", &[req_kind()]).unwrap_err();
+        match err {
+            ItemError::InvalidAddress { address, reason } => {
+                assert_eq!(address, "56ab0224/REQ:01");
+                assert!(reason.contains("colon"), "reason was: {reason}");
+            }
+            other => panic!("expected InvalidAddress, got {other:?}"),
+        }
     }
 }

@@ -484,10 +484,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             // cover is the legacy project form `@/<self-id>` (kind-agnostic), which
             // project items still derive as their qualified_id; recognize exactly
             // that and surface every other malformed `@`-address as the parser's
-            // own error.
+            // own error. A colon anywhere (including in `self_id`) is never a valid
+            // address; excluding it here lets the parser's own InvalidAddress error
+            // surface below instead of this fallback silently treating a grammar
+            // violation as a legacy-form not-found.
             Err(parse_err) => match qualified.split_once('/') {
                 Some((scope, self_id))
-                    if scope == PROJECT_SCOPE_SENTINEL && !self_id.is_empty() =>
+                    if scope == PROJECT_SCOPE_SENTINEL
+                        && !self_id.is_empty()
+                        && !self_id.contains(':') =>
                 {
                     Ok(ResolvedItemAddress::Project {
                         kind: None,
@@ -1326,6 +1331,26 @@ kind = \"advisory\"
         let exec = executor_with(vec![]);
         let err = exec.show_item("REQ-01").unwrap_err();
         assert!(err.to_string().contains("not a qualified id"));
+    }
+
+    #[test]
+    fn test_show_item_colon_in_legacy_project_form_self_id_surfaces_parser_error() {
+        // A colon-carrying `@/<self-id>` must not fall through the legacy
+        // kind-agnostic project-form fallback into a generic not-found; the
+        // parser's own InvalidAddress rejection (colon is the label separator,
+        // never valid inside an address) must surface instead.
+        let exec = executor_with(vec![]);
+        let err = exec.show_item("@/rule/foo:bar").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("colon"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_show_item_colon_in_sugar_self_id_surfaces_parser_error() {
+        let exec = executor_with(vec![]);
+        let err = exec.show_item("56ab0224/REQ:01").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("colon"), "got: {msg}");
     }
 
     #[test]
