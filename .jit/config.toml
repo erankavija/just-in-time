@@ -94,6 +94,11 @@ description = "Coverage credit: on an impl child, names a container [hard] crite
 unique = false
 examples = ["satisfies:REQ-01"]
 
+[namespaces.enforces]
+description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces"
+unique = false
+examples = ["enforces:@/INV-01", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+
 # =============================================================================
 # ITEM KINDS
 # =============================================================================
@@ -143,7 +148,7 @@ source-of-truth = "registry-first"
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
 markers = []
-link-namespaces = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }
 source-of-truth = "registry-first"
@@ -159,7 +164,7 @@ source-of-truth = "registry-first"
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
 markers = []
-link-namespaces = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
 source-of-truth = "registry-first"

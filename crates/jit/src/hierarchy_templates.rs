@@ -159,6 +159,11 @@ description = "Reason for issue closure (used with rejected state)."
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate"]
 
+[namespaces.enforces]
+description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
+unique = false
+examples = ["enforces:@/INV-01", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+
 # =============================================================================
 # ITEM KINDS
 # =============================================================================
@@ -218,7 +223,7 @@ source-of-truth = "registry-first"
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
 markers = []
-link-namespaces = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = {{ toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }}
 source-of-truth = "registry-first"
@@ -234,7 +239,7 @@ source-of-truth = "registry-first"
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
 markers = []
-link-namespaces = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = {{ toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }}
 source-of-truth = "registry-first"
@@ -478,6 +483,21 @@ mod tests {
     }
 
     #[test]
+    fn test_generated_config_declares_enforces_namespace() {
+        // REQ-02 (jit:d30695e4): the `rule` and `gate` kinds declare `enforces` as
+        // a link-namespace (REQ-01), so an authored `enforces:` label would fail
+        // the namespace-registry rule unless the namespace itself is registered.
+        // `jit init`'s template must declare it, mirroring the live repo's
+        // `[namespaces.enforces]` entry.
+        let toml = HierarchyTemplate::default().generate_config_toml();
+        let cfg: crate::config::JitConfig =
+            ::toml::from_str(&toml).expect("generated template must parse");
+        let ns = cfg.namespaces.expect("namespaces block present");
+        let enforces_ns = ns.get("enforces").expect("enforces namespace declared");
+        assert!(!enforces_ns.unique);
+    }
+
+    #[test]
     fn test_generated_config_parses_as_valid_toml() {
         let toml = HierarchyTemplate::default().generate_config_toml();
         let cfg: crate::config::JitConfig =
@@ -539,7 +559,7 @@ source-of-truth = \"registry-first\"
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
 source-of-truth = \"registry-first\"
@@ -555,7 +575,7 @@ source-of-truth = \"registry-first\"
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
 source-of-truth = \"registry-first\"
