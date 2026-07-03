@@ -2,7 +2,7 @@
   "id": "3d9e9222-a759-4489-aec0-da77ff13d6ec",
   "title": "Add canonical project-name field to project configuration",
   "description": "Add a canonical, human-editable project identity to jit's repository configuration so a project can name itself for the addressing scheme's `@<project>` scope token (the multi-jit address form). Today `.jit/config.toml`'s `JitConfig` (crates/jit/src/config.rs:13-71) has no notion of project identity; `index.json` carries only machine metadata (`schema_version`/`all_ids`/`deleted_ids`) and is not the right home since it is not human-editable.\n\nWhat to build:\n- A new `[project]` table in `config.toml`'s schema: add `pub project: Option<ProjectConfig>` to `JitConfig` (crates/jit/src/config.rs:13-71), with `ProjectConfig { pub name: Option<ProjectName> }`.\n- A `ProjectName` newtype wrapping `String`, validated against the pattern `^[a-z][a-z0-9-]*$` via `FromStr` plus a custom `serde::Deserialize` impl that calls `.parse()` and maps the error with `serde::de::Error::custom` — the exact pattern already used for `WorktreeMode`/`EnforcementMode` (crates/jit/src/config.rs:1148-1166). This is how \"validated on write\" already works in this codebase: an invalid value is rejected when the TOML is parsed (on `JitConfig::load`), and surfaces through `jit config validate` (crates/jit/src/main.rs:4631-4728) as a repo-config error, exactly like the existing `test_get_enforcement_mode_invalid` contract (crates/jit/src/config_manager.rs:456-480).\n- A `ConfigManager::get_project_name()` / `project_name_from_config(&JitConfig)` pair of getters (crates/jit/src/config_manager.rs:96-159 shows the `get_enforcement_mode`/`enforcement_mode_from_config` pattern to mirror), returning the configured name or `None` when the `[project]` table or `name` key is absent.\n- `jit init` seeding: when `.jit/config.toml` does not already exist, the generated file must include a `[project]` table whose `name` defaults to a slugified form of the repository directory's basename. `jit init`'s config-writing path is `crates/jit/src/main.rs:1146-1153`, which writes `chosen.generate_config_toml()` (crates/jit/src/hierarchy_templates.rs:48); wire the `[project]` section in alongside (or into) that generated content. Write a new pure slug function distinct from the existing underscore-style `slugify_heading` (crates/jit/src/document/parser/mod.rs:94, which lowercases and joins words with `_`): lowercase the input, replace every run of characters outside `[a-z0-9]` with a single `-`, and trim leading/trailing `-`. If the result is empty or does not start with a lowercase letter (e.g. the directory basename starts with a digit), fall back to the fixed literal `project` so the seeded value always satisfies the pattern.\n- Re-running `jit init` on a repo that already has `.jit/config.toml` must NOT touch an existing `[project]` table — this already falls out of the existing idempotent \"config.toml only written when absent\" guard at main.rs:1146-1148.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit init` in a fresh repository (no pre-existing `.jit/config.toml`) writes a `[project]` table with `name = \"<slug>\"`, where `<slug>` is the slugified repository directory basename (or the fallback `project` literal per the rule above), and `JitConfig::load` parses it back into `config.project.as_ref().unwrap().name` as that same string.\n- [hard] REQ-02: an invalid `[project] name` value in `config.toml` (any string not matching `^[a-z][a-z0-9-]*$`, e.g. containing an uppercase letter, a leading digit, or a `_`) causes `JitConfig::load` to return an `Err` whose message names the offending value, and `jit config validate` reports it as a repo-config error (non-zero exit) — mirroring `test_get_enforcement_mode_invalid` (crates/jit/src/config_manager.rs:456-480).\n- [hard] REQ-03: `jit init` run a second time against a repo whose `config.toml` already declares `[project] name = \"existing-name\"` leaves that value unchanged.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T11:57:43.574399912Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T13:35:45.801775008Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T11:57:43.574399912Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "story:multi-jit-address-form"
   ],
   "created_at": "2026-07-01T23:42:22.018234681Z",
-  "updated_at": "2026-07-03T13:36:53.142543636Z"
+  "updated_at": "2026-07-03T13:59:05.082495231Z"
 }
