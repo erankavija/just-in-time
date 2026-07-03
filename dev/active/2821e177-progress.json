@@ -252,7 +252,5 @@
   "session_1_waves": "1-8 all done: d6c3bff6, 5222aa47, 0910a381, f4b5e3f4, 37506c12 (story), 0597febe, 542f8b6d, 7a2bbe4f, 0efbc594 (story)",
   "started_at": "2026-07-03T00:00:00Z",
   "session_1_complete": "2026-07-03: invocation scope (until 0efbc594) fulfilled; handoff at dev/active/2821e177-handoff.md",
-  "pending_microfixes": [
-    "commands/item.rs GATE_ITEM_KIND doc comment says gate deliberately NOT scaffolded — stale after bb7d57a2 rework; fix after a1b6b3da lands, before bb7d57a2 re-review"
-  ]
+  "pending_microfixes": []
 }

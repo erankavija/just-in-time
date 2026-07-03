@@ -589,8 +589,12 @@ mod tests {
     use super::*;
     use crate::storage::InMemoryStorage;
 
-    /// The complete `[item_kinds]` table `jit init` authors. The engine bakes in no
-    /// kinds, so helpers that exercise the canonical set write this to config (the
+    /// The five markdown/registry kinds from the `[item_kinds]` table `jit init`
+    /// authors. The scaffold also declares `gate` (jit:bb7d57a2), omitted here
+    /// because its registry-first source starts empty on a fresh init and these
+    /// synthetic-root tests have no gate registry to index — gate resolution is
+    /// exercised via [`GATE_ITEM_KIND`] below. The engine bakes in no kinds, so
+    /// helpers that exercise the canonical set write this to config (the
     /// established `InMemoryStorage` pattern: a real `config.toml` at the synthetic
     /// root, the only on-disk file config loading requires).
     const CANONICAL_ITEM_KINDS: &str = "\
@@ -1353,12 +1357,12 @@ enforce = true
     }
 
     /// A standalone `[item_kinds.gate]` declaration sourced from `.jit/gates.toml`
-    /// (jit:42898915), mirroring the live repo's config. Unlike [`CANONICAL_ITEM_KINDS`]
-    /// (the set `jit init` authors), `gate` is deliberately NOT part of that set: a
-    /// freshly-scaffolded `.jit/gates.toml` starts empty (`jit init` seeds no default
-    /// gates the way it seeds default rules), so there is nothing for the kind to
-    /// index out of the box. This mirrors [`policy_exec`]'s standalone-config pattern
-    /// rather than extending `CANONICAL_ITEM_KINDS`.
+    /// (jit:42898915), mirroring the live repo's config. `gate` IS part of the
+    /// `jit init` scaffold (jit:bb7d57a2), but stays out of [`CANONICAL_ITEM_KINDS`]
+    /// in these tests: a freshly-scaffolded `.jit/gates.toml` starts empty (`jit
+    /// init` seeds no default gates the way it seeds default rules), so canonical-set
+    /// tests would have nothing to index. This mirrors [`policy_exec`]'s
+    /// standalone-config pattern rather than extending `CANONICAL_ITEM_KINDS`.
     const GATE_ITEM_KIND: &str = "\
 [item_kinds.gate]
 section = \"success_criteria\"
