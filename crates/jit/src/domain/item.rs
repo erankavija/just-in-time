@@ -2,15 +2,18 @@
 //!
 //! An **addressable item** is a structured list entry in a declared section of an
 //! issue description that carries a *self-id* matched by an id-pattern. Its
-//! **qualified id** `<scope>/<self-id>` is globally unique and is *derived* from
-//! existing data (the resolved scope plus the parsed self-id) — nothing is
-//! persisted twice (REQ-02, REQ-03).
+//! **qualified id** `<scope>/<self-id>` is *derived* from existing data (the
+//! resolved scope plus the parsed self-id) — nothing is persisted twice (REQ-02,
+//! REQ-03). Two items of *different* kinds may derive the same qualified-id
+//! STRING when they share a scope and self-id (e.g. both mint
+//! `@/coverage-preview`); the item's separate `kind` field disambiguates them.
 //!
 //! A **scope** ([`Scope`]) is the first segment of a qualified id. It is either an
 //! issue short-id ([`Scope::Issue`]) or the project sentinel `@`
 //! ([`Scope::Project`], for items not tied to any single issue). Self-id
-//! uniqueness is enforced *per scope*: the same self-id may exist under two
-//! different scopes without conflict, but a self-id repeated within one scope is a
+//! uniqueness is enforced *per (scope, kind)*: the same self-id may exist under two
+//! different scopes, or under two different kinds within one scope, without
+//! conflict; a self-id repeated within one scope under the SAME kind is a
 //! [`ItemError::DuplicateSelfId`].
 //!
 //! An **item kind** ([`ItemKind`]) is the config-declared projection
@@ -38,7 +41,7 @@ use crate::config::{
 use crate::document::ContentParser;
 use crate::domain::{project, Issue};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 /// Default section slug scanned for items when a kind declares none.
@@ -404,12 +407,12 @@ pub enum ItemError {
         /// The underlying regex compilation error.
         source: regex::Error,
     },
-    /// Two addressable items in one scope share a self-id, so the qualified id
-    /// `<scope>/<self-id>` would not be unique within that scope (REQ-03). The
-    /// same self-id under a *different* scope is fine (REQ-04).
+    /// Two addressable items of the SAME kind in one scope share a self-id
+    /// (REQ-03). The same self-id under a *different* scope, or under a
+    /// *different* kind in the same scope, is fine (REQ-04).
     #[error(
         "scope {scope} declares self-id '{self_id}' more than once for kind '{kind}'; \
-         self-ids must be unique within a scope"
+         self-ids must be unique within a scope for a given kind"
     )]
     DuplicateSelfId {
         /// The scope whose items collide (issue short-id or `@` for project).
@@ -851,7 +854,11 @@ pub fn split_qualified_id(qualified: &str) -> Option<(&str, &str)> {
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,
-    /// Globally-unique qualified id `<scope>/<self-id>` (derived).
+    /// Qualified id `<scope>/<self-id>` (derived). Unique within its scope for a
+    /// given kind, but not globally unique as a string: two items of different
+    /// kinds sharing a scope and self-id derive the same qualified id (e.g. both
+    /// mint `@/coverage-preview`). Resolution disambiguates using this item's
+    /// separate `kind` field alongside `self_id`.
     pub qualified_id: String,
     /// The human-authored self-id, unique within its scope.
     pub self_id: String,
@@ -901,16 +908,17 @@ pub struct RawScopeItem {
     pub links: Vec<String>,
 }
 
-/// Enforce per-scope self-id uniqueness over raw candidates and derive their
-/// qualified ids `<scope>/<self-id>` (REQ-03, REQ-04, REQ-05).
+/// Enforce per-(scope, kind) self-id uniqueness over raw candidates and derive
+/// their qualified ids `<scope>/<self-id>` (REQ-03, REQ-04, REQ-05).
 ///
 /// This is the one code path that turns extracted candidates into addressable
 /// items, shared by [`index_items`] (issue scope) and [`index_markdown_items`]
-/// (any scope, including project). Uniqueness is keyed on the self-id alone (the kind is not part
-/// of the qualified id), so two kinds minting the same self-id in one scope is a
-/// [`ItemError::DuplicateSelfId`] naming the kind that first claimed it. The same
-/// self-id under a *different* scope is fine because each call is scoped to one
-/// [`Scope`] (REQ-04).
+/// (any scope, including project). Uniqueness is keyed on the pair `(self_id,
+/// kind)`: two DIFFERENT kinds minting the same self-id in one scope now coexist
+/// as distinct items (they derive the same qualified-id string, but their `kind`
+/// fields differ), while a self-id repeated under the SAME kind in one scope is a
+/// [`ItemError::DuplicateSelfId`]. The same self-id under a *different* scope is
+/// fine because each call is scoped to one [`Scope`] (REQ-04).
 ///
 /// # Examples
 ///
@@ -933,18 +941,17 @@ pub fn derive_scope_items(
 ) -> Result<Vec<AddressableItem>, ItemError> {
     let prefix = scope.prefix();
     let mut out = Vec::with_capacity(raw.len());
-    // Maps each claimed self-id to the kind that first claimed it, for a precise
-    // collision message. Scoped to this single scope, so the same self-id under a
-    // different scope never collides here (REQ-04).
-    let mut seen: HashMap<String, String> = HashMap::new();
+    // Tracks each claimed (self-id, kind) pair. Scoped to this single scope, so
+    // the same self-id under a different scope never collides here (REQ-04); the
+    // kind is part of the key, so two different kinds may claim the same self-id
+    // in this scope without colliding.
+    let mut seen: HashSet<(String, String)> = HashSet::new();
     for candidate in raw {
-        if let Some(prior_kind) = seen.insert(candidate.self_id.clone(), candidate.kind.clone()) {
+        if !seen.insert((candidate.self_id.clone(), candidate.kind.clone())) {
             return Err(ItemError::DuplicateSelfId {
                 scope: prefix.to_string(),
                 self_id: candidate.self_id,
-                // Name the kind that FIRST claimed the self-id so a cross-kind
-                // collision points at the original owner.
-                kind: prior_kind,
+                kind: candidate.kind,
             });
         }
         out.push(AddressableItem {
@@ -1636,10 +1643,10 @@ mod tests {
     }
 
     #[test]
-    fn test_index_items_cross_kind_self_id_collision_is_error() {
-        // REQ-02: two DIFFERENT kinds minting the same self-id would yield the
-        // same qualified id <issue>/REQ-01 (kind is not part of the qualified id),
-        // so uniqueness is enforced across ALL kinds within the issue.
+    fn test_index_items_cross_kind_same_self_id_coexists() {
+        // REQ-01: two DIFFERENT kinds minting the same self-id now coexist as two
+        // distinct items — uniqueness is keyed on (self_id, kind), not self_id
+        // alone, so this is no longer a collision.
         let other = ItemKind::from_config(
             "decision",
             &ItemKindConfig {
@@ -1656,17 +1663,15 @@ mod tests {
             "T".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
         );
-        // The marker-gated requirement kind claims REQ-01 first; the unmarked
-        // `decision` kind then re-claims it from the same line → collision.
-        let err = index_items(&issue, &[req_kind(), other], &MarkdownContentParser).unwrap_err();
-        match err {
-            ItemError::DuplicateSelfId { self_id, kind, .. } => {
-                assert_eq!(self_id, "REQ-01");
-                // The error names the kind that FIRST claimed the self-id.
-                assert_eq!(kind, "requirement");
-            }
-            other => panic!("expected DuplicateSelfId, got {other:?}"),
-        }
+        // The marker-gated requirement kind and the unmarked `decision` kind both
+        // claim REQ-01 from the same line; both are returned.
+        let items = index_items(&issue, &[req_kind(), other], &MarkdownContentParser).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.self_id == "REQ-01"));
+        let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
+        assert_eq!(kinds, HashSet::from(["requirement", "decision"]));
+        // They derive the same qualified-id string; only `kind` disambiguates.
+        assert_eq!(items[0].qualified_id, items[1].qualified_id);
     }
 
     #[test]
@@ -1918,14 +1923,15 @@ mod tests {
 
     #[test]
     fn test_index_project_sources_cross_substrate_duplicate_is_error() {
-        // A self-id shared by a markdown source and a registry candidate collides
-        // in the single project-scope dedup pass (REQ-03).
+        // A self-id shared by a markdown source and a registry candidate of the
+        // SAME kind collides in the single project-scope dedup pass (REQ-03):
+        // pooling across substrates does not bypass per-(scope, kind) uniqueness.
         let sources = vec![ProjectSource {
             kind: req_kind(),
             markdown: "## Success Criteria\n\n- [hard] INV-01: a\n".to_string(),
         }];
         let registry = vec![RawScopeItem {
-            kind: "invariant".to_string(),
+            kind: "requirement".to_string(),
             self_id: "INV-01".to_string(),
             text: "dup".to_string(),
             links: Vec::new(),
@@ -2186,21 +2192,20 @@ enforced-by = \"tests\"
     }
 
     #[test]
-    fn test_derive_scope_items_cross_kind_duplicate_within_scope_is_error() {
-        // REQ-03: the qualified id omits the kind, so two kinds minting the same
-        // self-id in one scope still collide; the error names the FIRST claimer.
-        let err = derive_scope_items(
+    fn test_derive_scope_items_cross_kind_same_self_id_coexists() {
+        // REQ-03: uniqueness is keyed on (self_id, kind), so two DIFFERENT kinds
+        // minting the same self-id in one scope coexist rather than colliding.
+        let items = derive_scope_items(
             &Scope::Project,
             vec![raw("invariant", "X-1"), raw("decision", "X-1")],
         )
-        .unwrap_err();
-        match err {
-            ItemError::DuplicateSelfId { kind, self_id, .. } => {
-                assert_eq!(self_id, "X-1");
-                assert_eq!(kind, "invariant");
-            }
-            other => panic!("expected DuplicateSelfId, got {other:?}"),
-        }
+        .unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().all(|item| item.self_id == "X-1"));
+        let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
+        assert_eq!(kinds, HashSet::from(["invariant", "decision"]));
+        // They derive the same qualified-id string; only `kind` disambiguates.
+        assert_eq!(items[0].qualified_id, items[1].qualified_id);
     }
 
     #[test]
