@@ -148,16 +148,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Compute the enforcement-drift between the invariant registry and the
     /// declared rules/gates, returning every drift finding.
     ///
-    /// Resolves the three inputs at this boundary — the invariant registry (from
-    /// the cached config), the loadable rule names (from
-    /// [`effective_rules`](crate::commands::CommandExecutor::effective_rules)),
-    /// and the known gate keys (from the gate registry) — and delegates to the
-    /// pure [`enforcement_drift`](crate::validation::drift::enforcement_drift)
-    /// core. This computes the SAME drift the built-in `jit validate` pass
+    /// Delegates to
+    /// [`compute_drift_findings`](crate::commands::CommandExecutor::compute_drift_findings),
+    /// the SAME tolerant drift computation the built-in `jit validate` pass
     /// ([`enforcement_drift_findings`](crate::commands::CommandExecutor::enforcement_drift_findings))
     /// reports — the sole declared-but-unenforced direction — and exits non-zero
-    /// on ANY drift. A genuine `rules.toml` load failure surfaces as an `Err`
-    /// rather than silently reporting no drift.
+    /// on ANY drift. A `.jit/rules.toml` (or gate registry) load failure is
+    /// tolerated, NOT propagated as an `Err`: it is resolved defensively to
+    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
+    /// so it surfaces as a declared-but-unenforced finding with
+    /// [`DriftFinding::unloadable`](crate::validation::drift::DriftFinding::unloadable)
+    /// set (REQ-01 "missing OR unloadable") rather than crashing the command.
     ///
     /// # Examples
     ///

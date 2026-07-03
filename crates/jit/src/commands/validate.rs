@@ -351,8 +351,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// When invariants ARE declared, drift is reported as unattributed
     /// [`GraphFinding`]s (drift pertains to the project's declarations, not a
-    /// single issue) via the pure
-    /// [`enforcement_drift`](crate::validation::drift::enforcement_drift) core. The
+    /// single issue) via
+    /// [`compute_drift_findings`](crate::commands::CommandExecutor::compute_drift_findings),
+    /// the SAME tolerant drift computation shared with
+    /// [`check_invariants`](crate::commands::CommandExecutor::check_invariants). The
     /// sole direction is **declared-but-unenforced** — an invariant whose
     /// `enforced-by` names a missing/unloadable rule or gate — emitted at
     /// [`Severity::Error`](crate::validation::rules::Severity::Error), so it FAILS
@@ -360,10 +362,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// gate is NOT drift (the enforced-but-undeclared direction was removed in
     /// REQ-05).
     ///
-    /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. The inputs
-    /// (rule names, gate keys, invariants) are resolved at this boundary; the
-    /// drift computation itself is pure. A genuine `rules.toml` load failure
-    /// surfaces as an `Err` rather than silently reporting no drift.
+    /// The rule name on every finding is [`ENFORCEMENT_DRIFT_RULE`]. A `rules.toml`
+    /// (or gate registry) load failure is tolerated, NOT propagated as an `Err`:
+    /// [`compute_drift_findings`](crate::commands::CommandExecutor::compute_drift_findings)
+    /// resolves it defensively to
+    /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
+    /// so it surfaces as a declared-but-unenforced finding rather than aborting
+    /// validation.
     ///
     /// # Examples
     ///

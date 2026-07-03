@@ -19,9 +19,9 @@
 //!   `@/gate/<key>` but no known gate carries `<key>`, or its enforcement SOURCE
 //!   (the rule set or gate registry) is UNLOADABLE (REQ-01 covers both). A
 //!   binding that is not one of those two recognized address forms at all — a
-//!   legacy bare name (`cargo-ci`), a colon-prefixed name
-//!   (`default:label-format`), a different item kind, or a non-project scope —
-//!   is likewise unresolved: D11 is a clean cut, with no bare-name fallback. The
+//!   legacy bare name (`cargo-ci`), a colon-prefixed name (`legacy:old-rule`), a
+//!   different item kind, or a non-project scope — is likewise unresolved: D11
+//!   is a clean cut, with no bare-name fallback. The
 //!   unloadable case is handled by [`enforcement_drift_tolerant`] / [`SourceState`].
 //!
 //! The reverse direction — a loadable rule or gate that NO invariant claims — is
@@ -443,13 +443,13 @@ mod tests {
         // when the post-colon segment names a real loaded rule.
         let r = reg(
             "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                     enforced-by = \"default:label-format\"\n",
+                     enforced-by = \"legacy:old-rule\"\n",
         );
-        let rules: BTreeSet<&str> = ["label-format"].into_iter().collect();
+        let rules: BTreeSet<&str> = ["old-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
         assert_eq!(findings.len(), 1, "{findings:?}");
-        assert_eq!(findings[0].subject, "default:label-format");
+        assert_eq!(findings[0].subject, "legacy:old-rule");
     }
 
     // --- tolerant (unloadable source) -------------------------------------
