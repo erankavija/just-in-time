@@ -2,7 +2,7 @@
   "id": "6c5f70ad-15fd-46ac-b888-38273adaf7fc",
   "title": "Four-mode front door with request routing",
   "description": "Adds the entry-point logic that classifies an opening request into one of jit-project-lead's four invocation modes and routes it to the right path, with mode 1 (lead existing strategic work) fully functional end to end.\n\n## Background\n\njit-project-lead supports four entry paths: (1) lead an already-existing strategic container, (2) plan-and-execute a vague high-level goal from a cold start, (3) hold a steering discussion (interactive vision/decision work, no workers dispatched), and (4) run a project-wide content-standards sweep. Modes 2 and 3 hand off to `jit-planning-lead` invoked at the strategic altitude (its interview step and its recursion step); mode 4 hands off to the standards-sweep mode.\n\n## Success Criteria\n\n- [hard] REQ-01: Given a representative opening request for each of the four modes, the skill routes to the correct mode.\n- [hard] REQ-02: Mode 1 (lead existing strategic work) resolves an existing strategic-tier container from the opening request and hands it to the sub-strategic dispatch protocol with the resolved container and invocation context supplied. Wave execution, coherence review, and charter/progress maintenance are outside the front door's scope.\n- [hard] REQ-03: Modes 2 and 3 route to `jit-planning-lead` invoked at the strategic altitude; mode 4 routes to the standards-sweep mode.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register (terse imperative voice, explicit stop-and-escalate conditions, rules in `references/` read on demand). Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.237368595Z",
-  "updated_at": "2026-07-01T22:23:25.346067916Z"
+  "updated_at": "2026-07-03T07:20:00.993449551Z"
 }
