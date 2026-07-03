@@ -2,7 +2,7 @@
   "id": "bb7d57a2-2591-43f0-8de3-650c5b1f6fa8",
   "title": "Gate as an addressable kind over migrated gates.toml",
   "description": "Migrate gate storage from `gates.json` to a new `gates.toml` store, mirroring the existing rule-set store's pattern of atomic writes and being the sole source of truth, with full schema parity for every `Gate`/`GateChecker` field (key, title, description, stage, mode, checker, priority, and any prompt/env fields). Declare `gate` as a registry-first addressable kind over the new store, with the key as the id field and description as the text field, so gates resolve at `@/gate/<key>`. Sweep every consumer and test that reads the literal `gates.json` filename, including CLI init output, gate-update tests, invariant-check tests, template-apply tests, snapshot export, and the web server's file-relevance watcher, so nothing still depends on the JSON file after migration.\n\nTOML has no native representation for a JSON null; guard the `Gate.reserved` free-form map against serializing a null value when writing to TOML. Today's live data holds only empty objects, so this is a forward-looking guard rather than a live break.\n\n## Success Criteria\n\n- [hard] REQ-01: a `gates.toml` store, mirroring the existing rule-set store's atomic-write pattern, holds all `Gate`/`GateChecker` fields with parity to the prior JSON schema; gate operations (create, update, list) run over it.\n- [hard] REQ-02: `gate` is a registry-first addressable kind; `@/gate/<key>` resolves to the gate.\n- [hard] REQ-03: no consumer or test reads the literal `gates.json` filename; TOML serialization of `Gate.reserved` is guarded against a JSON null value.\n\nBlast radius: the gate storage module (a new store beside the existing rule-set store); the `Gate`/`GateChecker` domain types; CLI init fixtures/tests, gate-update tests, invariant-check CLI tests, template-apply tests, snapshot export, the web server's gate-file relevance watcher and its test, and stale doc comments referencing `gates.json` by name.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -15,20 +15,20 @@
     "repo-validate"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T14:58:46.630379297Z"
-    },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T14:10:38.959328132Z"
     },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:45:04.711588342Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T14:40:49.490796767Z"
+      "updated_at": "2026-07-03T15:44:07.772463907Z"
     }
   },
   "context": {},
@@ -49,5 +49,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:19:51.086829876Z",
-  "updated_at": "2026-07-03T15:00:51.514514810Z"
+  "updated_at": "2026-07-03T15:47:48.495681491Z"
 }

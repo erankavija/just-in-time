@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "00c2491e-8117-46e1-b617-6507c221c595",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "87346f52-a2c4-4506-8819-9ff58c854595",
+  "commit": "bbb5eb912bb7bb23aaefe280e2b92354429c0943",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T15:08:25.765616261Z",
+  "completed_at": "2026-07-03T15:10:23.566322012Z",
+  "duration_ms": 117800,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-06 are satisfied. `.jit/rules.toml` has the requested colon-free `name` values with `origin` fields, `default_ruleset()` emits colon-free defaults with `origin = \"default\"`, origin round-trip coverage is present, the named consumers now match colon-free literals, and the forbidden literal grep returned no hits under `crates/` or `.jit/rules.toml`.\n\n**Prior Review Feedback**\n\nThe latest failed review finding is resolved: `RuleSet::from_toml_str` now rejects colon-bearing rule names via `RuleConfigError::InvalidRuleName`, with coverage in `test_colon_bearing_name_is_rejected`.\n\n**Architecture And Separation Of Concerns**\n\nNo boundary regression found. Domain/validation construction remains pure, serialization only renders content, and persistence stays in `storage/ruleset_store.rs` with atomic writes.\n\n**Functional Paradigm**\n\nNo blocking style issue found. The changes follow existing iterator and expression-oriented patterns where relevant.\n\n**Correctness And Invariants**\n\nNo new atomic-write, event logging, gate semantics, assignee/label format, PID-safety, or unsafe-code issue found. Rule names are now rejected if they contain `:` at load time.\n\n**Testing**\n\nI did not run `cargo test` or `cargo clippy` because the supplied issue context has a passed `cargo-ci` gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nThe new invalid-rule-name path returns a typed `thiserror` variant with contextual rule-name information. No `unwrap()`/`expect()` issue found outside tests in the reviewed surface.\n\n**CLI Contract**\n\nNo CLI command surface was changed in a way that affects `--json` support.\n\n**Documentation**\n\nThe requested in-crate prose updates are present, including the fixed default-ruleset contract and generated hierarchy template text.\n\n**Jit Issue Management**\n\nThe dependency `0efbc594` is marked `done` in the supplied issue context. Repository validation passed.\n\n**Findings**\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

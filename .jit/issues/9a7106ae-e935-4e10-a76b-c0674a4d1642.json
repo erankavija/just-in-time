@@ -2,9 +2,9 @@
   "id": "9a7106ae-e935-4e10-a76b-c0674a4d1642",
   "title": "Multi-jit address form with project identity and local-only resolution",
   "description": "Bind the structural named-project scope token to a real project identity. Add a canonical project-name field to jit's project configuration, seeded by `jit init` (defaulting to a slugified form of the repository directory name) and validated on write against a `[a-z][a-z0-9-]*` pattern. Resolution consumes the addressing core's structural scope-token parse and adds the identity binding: a bare `@` remains the local-project shorthand, and `@<name>` where `<name>` matches the declared local project name also resolves locally. An address referencing any other project name is parse-valid but returns a clear, typed not-resolvable error rather than attempting any network or cross-repository lookup. This item implements no path parsing of its own. No federation, project registry, or actual remote resolution is built as part of this item.\n\n## Success Criteria\n\n- [hard] REQ-01: a canonical project-name field is added to project configuration and seeded by `jit init`; bare `@` is the local shorthand and `@<declared-name>` also resolves locally, consuming the structural scope-token parse rather than re-implementing it.\n- [hard] REQ-02: an `@<other-project>` reference is parse-valid and returns a clear not-resolvable error, with no federation or remote-resolution behavior implemented.\n- [hard] REQ-03: the project-name field is validated against `[a-z][a-z0-9-]*` on write.\n\nBlast radius: a new project-identity configuration field and its `jit init` seeding and write-time validation; the resolution binding of the named-project scope token.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "a1b6b3da-75cf-4021-b879-832fafb48284"
   ],
@@ -13,7 +13,23 @@
     "code-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:18:26.759211839Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:38:48.569390830Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:37:49.821195540Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -32,5 +48,5 @@
     "story:multi-jit-address-form"
   ],
   "created_at": "2026-07-01T23:19:51.187363359Z",
-  "updated_at": "2026-07-03T15:07:59.264154759Z"
+  "updated_at": "2026-07-03T15:40:39.177998762Z"
 }

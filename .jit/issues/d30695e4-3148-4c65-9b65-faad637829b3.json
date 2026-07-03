@@ -2,7 +2,7 @@
   "id": "d30695e4-3148-4c65-9b65-faad637829b3",
   "title": "Enforces link resolution for rule and gate items",
   "description": "Declare `link-namespaces = [\"enforces\"]` on both the `rule` and `gate` item-kind configs, so an authored `enforces:@/rule/<self-id>` or `enforces:@/gate/<key>` label resolves to its target item through jit's existing generic link-resolution scan, the same mechanism that already resolves `satisfies:`, `per:`, and `mitigates:` links today. That generic scan iterates configured kinds and their declared link-namespaces with no kind name hardcoded, so no new resolution code is needed beyond the kind-config declaration once the deeper address form is available.\n\nAlso declare an `enforces` namespace in both jit's live project configuration and the `jit init` default configuration template for new repositories. The `enforces` namespace is not registered today, so an authored `enforces:` label would otherwise fail the namespace-registry validation rule even after everything else in this change lands.\n\n## Success Criteria\n\n- [hard] REQ-01: `rule` and `gate` kinds declare `link-namespaces = [\"enforces\"]`; an authored `enforces:` label resolves to its target item through the existing generic link-resolution scan.\n- [hard] REQ-02: `[namespaces.enforces]` is declared in the live project configuration and in the `jit init` default configuration template; an authored `enforces:` rule/gate link both resolves and passes the namespace-registry validation rule under `jit validate`.\n\nBlast radius: the `rule` and `gate` item-kind configuration entries; the live project's namespace registry declaration; the `jit init` default configuration template.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -23,5 +23,5 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-01T23:19:51.105903600Z",
-  "updated_at": "2026-07-01T23:19:51.304497744Z"
+  "updated_at": "2026-07-03T15:47:48.633821712Z"
 }

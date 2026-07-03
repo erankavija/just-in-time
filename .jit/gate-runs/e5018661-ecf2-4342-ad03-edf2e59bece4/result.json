@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e5018661-ecf2-4342-ad03-edf2e59bece4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71ebd1e8-38b2-40e1-8097-183907fc1678",
+  "commit": "a4ff82e2ee857b0d461b81f992c857714b91e43b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T15:41:37.740526157Z",
+  "completed_at": "2026-07-03T15:42:59.371717507Z",
+  "duration_ms": 81631,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 met: `.jit/config.toml:142` declares `rule` as registry-first over `.jit/rules.toml`, with the TOML descriptor at `.jit/config.toml:148`; `crates/jit/src/commands/item.rs:221` projects registry-first items through storage, and `crates/jit/src/commands/item.rs:1345` tests `@/rule/coverage-preview`.\n\nREQ-02 met: `.jit/rules.toml:8` through `.jit/rules.toml:79` uses colon-free rule names and separate `origin`; loader enforcement rejects colon-bearing rule names at `crates/jit/src/validation/rules.rs:1368`.\n\nREQ-03 met: `crates/jit/src/validation/defaults.rs:15` documents the fixed contract; `crates/jit/src/validation/defaults.rs:113` and `:160` construct colon-free names; `crates/jit/src/validation/serialize.rs:177` and `:178` serialize `name` and `origin` separately.\n\n**Prior Review Feedback**\n\nResolved. The prior blocker was `.expect()` in production code at `crates/jit/src/validation/serialize.rs`. It has been replaced by a non-panicking loop at `crates/jit/src/validation/serialize.rs:149`.\n\n**Jit Issue Management**\n\nDependencies `ae9dd95a` and `cdc33a0f` are marked done in the issue context. Provided gates show `cargo-ci` passed on `2026-07-03T15:40:39Z` and `repo-validate` passed on `2026-07-03T15:26:38Z`. I did not rerun tests because `cargo-ci` succeeded.\n\n**Architecture And Separation**\n\nPass. Domain TOML projection remains pure in `crates/jit/src/domain/item.rs:1486`; command orchestration reads through storage at `crates/jit/src/commands/item.rs:241`; serialization remains content-only at `crates/jit/src/validation/serialize.rs:85`.\n\n**Functional Paradigm**\n\nPass. The relevant projection path uses iterator collection at `crates/jit/src/domain/item.rs:1509`; the only imperative loop introduced for the prior finding is a bounded practical collision search in `crates/jit/src/validation/serialize.rs:149`, replacing a forbidden panic path.\n\n**Correctness And Invariants**\n\nPass. No new issue-state writes are involved in the rule-addressing path. Rule ids are colon-free, origin is separate, duplicate rule names are rejected at `crates/jit/src/validation/rules.rs:137`, and PID safety is unchanged.\n\n**Safety**\n\nPass. `#![deny(unsafe_code)]` remains enforced in `crates/jit/src/lib.rs:6` and `crates/jit/src/main.rs:14`; no unsafe code was found in the reviewed paths.\n\n**Testing**\n\nPass based on provided `cargo-ci` evidence. Relevant tests include `crates/jit/src/validation/rules.rs:2296`, `crates/jit/src/validation/rules.rs:2316`, `crates/jit/src/validation/serialize.rs:556`, and `crates/jit/src/commands/item.rs:1336`.\n\n**Error Handling**\n\nPass. The prior production `.expect()` was removed. New/changed production code in the reviewed rule serialization path returns normally without `unwrap()` or `expect()`.\n\n**CLI Contract**\n\nPass. No new CLI command was added. Existing item/config command JSON support is unchanged.\n\n**Documentation**\n\nPass. Public rule and serialization APIs have doc comments with examples, including `RuleSet` loading in `crates/jit/src/validation/rules.rs:31` and `serialize_ruleset` in `crates/jit/src/validation/serialize.rs:59`.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

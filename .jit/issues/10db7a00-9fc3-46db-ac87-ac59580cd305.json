@@ -2,7 +2,7 @@
   "id": "10db7a00-9fc3-46db-ac87-ac59580cd305",
   "title": "Rebind invariant enforced-by bindings to addressable items",
   "description": "Rebind the four `enforced-by` bindings in `invariants.toml` (three unique targets across four bindings) from their current form to the new `@/rule/<self-id>` or `@/gate/<key>` addressable-item form. Add a resolution check that runs over the seed invariant registry and fails if any `enforced-by` binding does not resolve to a real rule or gate item.\n\n## Success Criteria\n\n- [hard] REQ-01: all four `invariants.toml` `enforced-by` bindings are rebound to `@/rule/...` or `@/gate/...` addresses.\n- [hard] REQ-02: a resolution check over the seed invariant registry fails on any unresolved `enforced-by` binding.\n\nBlast radius: `invariants.toml`'s four `enforced-by` string values; the invariant-projection code path that reads and resolves the `enforced_by` field.",
-  "state": "backlog",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -21,9 +21,9 @@
       "updated_at": "2026-07-03T13:53:50.427396641Z"
     },
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T13:54:49.706737528Z"
+      "updated_at": "2026-07-03T15:11:48.408373588Z"
     },
     "repo-validate": {
       "status": "passed",
@@ -40,5 +40,5 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-07-01T23:19:51.125788164Z",
-  "updated_at": "2026-07-03T13:56:22.200897157Z"
+  "updated_at": "2026-07-03T15:13:22.408822402Z"
 }

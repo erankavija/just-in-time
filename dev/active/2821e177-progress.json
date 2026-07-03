@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Session 2: drive the epic to completion. Session-1 waves 1-8 (stories 37506c12, 0efbc594) done; see dev/active/2821e177-handoff.md. Bracket P (0b611ccf) and B (923e42fb) done.",
-  "current_wave": 9,
+  "current_wave": 12,
   "waves": [
     {
       "wave_number": 9,
@@ -14,7 +14,7 @@
           "title": "Split rule origin out of self-id in the default rule contract",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "landed-gates-deferred"
+          "status": "done"
         },
         {
           "id": "f5d35048",
@@ -22,7 +22,7 @@
           "title": "Migrate gate registry storage to a gates.toml store",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "landed-gates-deferred"
+          "status": "done"
         },
         {
           "id": "3d9e9222",
@@ -30,7 +30,7 @@
           "title": "Add canonical project-name field to project configuration",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "landed-cargo-ci-passed-review-deferred"
+          "status": "done"
         },
         {
           "id": "a1b6b3da",
@@ -38,7 +38,7 @@
           "title": "Bind the named-project scope token to local resolution or a not-resolvable error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatching-wave-10",
+          "status": "done",
           "note": "sub-wave 9b: amended (invoker-approved) to bind AddressScope::NamedProject + wire resolve_item_address arm; now depends on 3d9e9222; dispatch after 3d9e9222 merges"
         }
       ]
@@ -53,7 +53,7 @@
           "title": "Declare rule as a registry-first addressable kind over rules.toml",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "943abd0b",
@@ -61,7 +61,7 @@
           "title": "Sweep gates.json references to gates.toml",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "ae9dd95a",
@@ -69,7 +69,7 @@
           "title": "Update rule-naming documentation for the origin/id split",
           "classification": "documentation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "42898915",
@@ -77,7 +77,7 @@
           "title": "Register gate as an addressable item kind",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "done",
           "note": "sub-wave 10b, after cdc33a0f (config.toml conflict)"
         },
         {
@@ -86,7 +86,7 @@
           "title": "Rebind invariant enforced-by bindings to addressable items",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "done",
           "note": "pulled forward from wave 12 per amendment A-10db7a00"
         }
       ]
@@ -101,7 +101,8 @@
           "title": "STORY CLOSE: Multi-jit address form with project identity and local-only resolution",
           "classification": "lead-verification",
           "model": "lead",
-          "status": "pending"
+          "status": "rework-pending",
+          "note": "in_progress; cargo-ci+repo-validate passed; code-review FAIL R2: config persistence in main.rs violates command/storage boundary (config-set path + init seeding). Rework 2 = extract config-set into command layer; escalate init-scaffold part if reviewer insists. rework_counts at 1."
         },
         {
           "id": "71ebd1e8",
@@ -109,7 +110,7 @@
           "title": "STORY CLOSE: Rule as an addressable kind with origin lifted out of the id",
           "classification": "lead-verification",
           "model": "lead",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "bb7d57a2",
@@ -117,7 +118,7 @@
           "title": "STORY CLOSE: Gate as an addressable kind over migrated gates.toml",
           "classification": "lead-verification",
           "model": "lead",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -246,8 +247,10 @@
     "3d9e9222": 1,
     "cdc33a0f": 1,
     "10db7a00": 1,
-    "bb7d57a2": 1,
-    "87346f52": 2
+    "bb7d57a2": 2,
+    "87346f52": 2,
+    "9a7106ae": 1,
+    "71ebd1e8": 1
   },
   "session_1_waves": "1-8 all done: d6c3bff6, 5222aa47, 0910a381, f4b5e3f4, 37506c12 (story), 0597febe, 542f8b6d, 7a2bbe4f, 0efbc594 (story)",
   "started_at": "2026-07-03T00:00:00Z",

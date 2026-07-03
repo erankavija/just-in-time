@@ -2,7 +2,7 @@
   "id": "cdc33a0f-8edd-497f-b27d-a112edde9862",
   "title": "Declare rule as a registry-first addressable kind over rules.toml",
   "description": "With rule names in `.jit/rules.toml` colon-free, `rule` can be declared as a project-scope, registry-first item kind so each rule resolves at its `@/rule/<self-id>` address alongside the other kinds already declared under `[item_kinds]` (`.jit/config.toml:104-146`) — in particular the existing `[item_kinds.invariant]` entry, which is sourced from `.jit/invariants.toml` via the same generic `TomlSourceDescriptor` mechanism (`crates/jit/src/config.rs:589-608`, `crates/jit/src/domain/item.rs:1086-1139`, `load_toml_scope_items`/`project_toml_entry`).\n\nAdd `[item_kinds.rule]` to the live `.jit/config.toml`, mirroring the `invariant` kind's shape:\n```\n[item_kinds.rule]\nsection = \"success_criteria\"\nid-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"<chosen-field>\" }\nsource-of-truth = \"registry-first\"\n```\n`section`/`id-pattern`/`markers` are required by `validate_item_kinds` for every declared kind but are not enforced at index time for a registry-first project-scope kind (`domain/item.rs:1117-1122`), so any valid placeholder works. `rules.toml` entries have no natural free-text field (unlike `invariants.toml`'s `statement`); pick a pragmatic `text-field` source (e.g. reuse `name`, or add a short `description` column to each entry) — the choice is not prescribed, only that the projected item's text is non-empty.\n\nAdd the same `[item_kinds.rule]` block to the `jit init` scaffold template (`crates/jit/src/hierarchy_templates.rs`, alongside the existing `[item_kinds.invariant]` block around line 205) so newly-initialized repos get the `rule` kind out of the box, and extend the golden/resolution tests that pin that template's `[item_kinds]` table (`hierarchy_templates.rs:467-524`, `test_generated_config_emits_item_kinds_table_golden`, `test_generated_config_item_kinds_resolve_with_no_built_ins`) to include `rule` in the expected block and kind-name list.\n\nVerify resolution end to end: add a test analogous to `test_show_item_resolves_invariant_by_qualified_id` (`crates/jit/src/commands/item.rs:856`) but for the `rule` kind, resolving one of the migrated colon-free rule ids (e.g. `coverage-preview` or `label-format`) through the project's item-resolution path and asserting it returns that rule's projected item with a non-empty self-id and text.\n\n## Success Criteria\n- [hard] REQ-01: `.jit/config.toml` declares `[item_kinds.rule]` as a project-scope, registry-first kind sourced from `.jit/rules.toml`'s `rules` table via a `TomlSourceDescriptor`.\n- [hard] REQ-02: the `jit init` scaffold template (`hierarchy_templates.rs`) emits the same `[item_kinds.rule]` block, and its golden and kind-resolution tests are updated to include `rule`.\n- [hard] REQ-03: a test demonstrates the rule item kind's project-scope address for a migrated colon-free rule id (e.g. `coverage-preview`) resolves to that rule's projected item (non-empty self-id and text).\n- [hard] REQ-04: `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` are green.",
-  "state": "backlog",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:10:23.887099636Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T13:46:20.942334107Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T13:47:18.592336498Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "story:rule-addressable-kind"
   ],
   "created_at": "2026-07-01T23:42:21.630598819Z",
-  "updated_at": "2026-07-03T13:48:31.139431973Z"
+  "updated_at": "2026-07-03T15:11:48.149851860Z"
 }

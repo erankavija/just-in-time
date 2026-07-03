@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "7fe5d4f9-c8b5-489f-9575-4a0c602d83c0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cdc33a0f-8edd-497f-b27d-a112edde9862",
+  "commit": "bbb5eb912bb7bb23aaefe280e2b92354429c0943",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T15:10:23.887099636Z",
+  "completed_at": "2026-07-03T15:11:48.102773885Z",
+  "duration_ms": 84215,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 to REQ-03 are met: live config declares `rule` as project-scope registry-first over `.jit/rules.toml` at [.jit/config.toml](/home/vkaskivuo/Projects/just-in-time/.jit/config.toml:142), the init template/goldens include the same kind at [hierarchy_templates.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/hierarchy_templates.rs:217), and rule resolution is covered by `test_show_item_resolves_rule_by_qualified_id` at [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:1336).\n\nREQ-04 is satisfied by the provided `cargo-ci` gate status `passed`; per instruction, I did not rerun `cargo test` or `cargo clippy`.\n\n**Architecture**\nNo boundary violation found. The implementation is config/template/test focused and continues to use the existing generic item-resolution path.\n\n**Functional Paradigm**\nNo new problematic imperative domain logic found.\n\n**Correctness And Invariants**\nNo issue found for atomic writes, event logging, gate semantics, assignee/label formats, or PID safety in this change. The new rule item uses `text-field = \"name\"`, giving non-empty projected text for colon-free rule ids.\n\n**Safety**\nNo unsafe code was introduced in the reviewed change.\n\n**Testing**\nRequired coverage is present in unit and integration/golden tests. `./scripts/jit-validate.sh` passed. `cargo-ci` passed in the provided gate evidence.\n\n**Error Handling**\nNo new library error-handling issue found.\n\n**CLI Contract**\nNo CLI command surface changed, and the touched CLI tests continue to exercise `--json`.\n\n**Documentation**\nNo new public API was added, so no missing public API examples found.\n\n**Prior Review Feedback**\nThe prior blocking feedback was the incomplete dependency. That is now addressed: dependency `87346f52-a2c4-4506-8819-9ff58c854595` is `done` with both `cargo-ci` and `code-review` passed in [.jit/issues/87346f52-a2c4-4506-8819-9ff58c854595.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/87346f52-a2c4-4506-8819-9ff58c854595.json:4).\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The declared prerequisite is completed, and this change builds on the colon-free rule-name migration.\n\n**Findings**\nNo findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
