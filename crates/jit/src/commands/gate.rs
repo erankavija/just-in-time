@@ -1169,6 +1169,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // First, define gates in registry if they don't exist
         let mut registry = self.storage.load_gate_registry()?;
+        // (key, pre-existing) per registry mutation, for the audit events below.
+        let mut definition_writes: Vec<(String, bool)> = Vec::new();
         for gate_template in &gates_to_apply {
             let mut gate = gate_template.to_gate();
 
@@ -1186,13 +1188,26 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             // Add to registry (update if exists and timeout override specified, or add if new)
-            if timeout_override.is_some() || !registry.gates.contains_key(&gate.key) {
+            let existed = registry.gates.contains_key(&gate.key);
+            if timeout_override.is_some() || !existed {
+                definition_writes.push((gate.key.clone(), existed));
                 registry.gates.insert(gate.key.clone(), gate);
             }
         }
 
         // Save updated registry
         self.storage.save_gate_registry(&registry)?;
+
+        // INV-EVENT-LOG: registry-scoped audit entries for the preset's
+        // definition writes (created for new keys, updated for overwrites).
+        for (key, existed) in definition_writes {
+            let event = if existed {
+                Event::new_gate_definition_updated(key)
+            } else {
+                Event::new_gate_definition_created(key)
+            };
+            self.storage.append_event(&event)?;
+        }
 
         // Now add gates to issue
         let gate_keys: Vec<String> = gates_to_apply.iter().map(|g| g.key.clone()).collect();

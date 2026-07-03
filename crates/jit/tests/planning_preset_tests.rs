@@ -87,3 +87,67 @@ fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node()
         }
     }
 }
+
+/// INV-EVENT-LOG (jit:bb7d57a2): a preset application that WRITES the gate
+/// registry appends a registry-scoped audit event per definition write —
+/// `gate_definition_created` for a new key, `gate_definition_updated` for a
+/// timeout-override overwrite — and a no-write re-application appends none.
+#[test]
+fn test_apply_gate_preset_appends_definition_events() {
+    let h = TestHarness::new();
+    let planning = h.create_issue("Plan the auth epic");
+    h.executor
+        .add_label(&planning, "type:planning")
+        .expect("label P");
+
+    h.executor
+        .apply_gate_preset(&planning, "plan-review", None, false, false, &[])
+        .expect("apply plan-review preset");
+
+    let created = |events: &[jit::domain::Event]| {
+        events
+            .iter()
+            .filter(|e| e.get_type() == "gate_definition_created")
+            .count()
+    };
+    let updated = |events: &[jit::domain::Event]| {
+        events
+            .iter()
+            .filter(|e| e.get_type() == "gate_definition_updated")
+            .count()
+    };
+
+    let events = h.storage.read_events().unwrap();
+    assert_eq!(
+        created(&events),
+        1,
+        "first application defines the preset gate -> one created event"
+    );
+    assert_eq!(updated(&events), 0);
+
+    // Re-apply without an override: the key exists, nothing is written, no event.
+    let second = h.create_issue("Another planning node");
+    h.executor
+        .apply_gate_preset(&second, "plan-review", None, false, false, &[])
+        .expect("re-apply preset");
+    let events = h.storage.read_events().unwrap();
+    assert_eq!(
+        created(&events),
+        1,
+        "no-write re-application appends nothing"
+    );
+    assert_eq!(updated(&events), 0);
+
+    // Re-apply WITH a timeout override: the existing definition is overwritten.
+    let third = h.create_issue("Overridden planning node");
+    h.executor
+        .apply_gate_preset(&third, "plan-review", Some(120), false, false, &[])
+        .expect("re-apply preset with timeout override");
+    let events = h.storage.read_events().unwrap();
+    assert_eq!(created(&events), 1);
+    assert_eq!(
+        updated(&events),
+        1,
+        "timeout-override overwrite of an existing definition -> one updated event"
+    );
+}
