@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "2842f2ab-3407-4df9-9866-7f0e2918ca8d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "42898915-b8c3-4248-b8d0-c69b3f15b697",
+  "commit": "e96d20ed35f27e325d4112c40051add45ca58512",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T14:00:44.227486017Z",
+  "completed_at": "2026-07-03T14:01:38.215121495Z",
+  "duration_ms": 53987,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, and REQ-03 are met. `.jit/config.toml:157` declares `[item_kinds.gate]` with the required six-tuple, `.jit/config.toml:159` uses the kebab-case id pattern, and `.jit/config.toml:163` maps `.jit/gates.toml` `gates` rows from `key` to `description`. CLI coverage exercises both `item list --kind gate --json` and `item show @/gate/cargo-ci --json` in `crates/jit/tests/item_cli_tests.rs:547`.\n\n**Architecture And Separation Of Concerns**\n\nNo blocking boundary issue found. Registry TOML access is routed through `IssueStore::read_repo_file` in `crates/jit/src/commands/item.rs:241`, and projection remains in the domain item loader via `load_toml_scope_items` at `crates/jit/src/commands/item.rs:252`.\n\n**Functional Paradigm**\n\nNo blocking concern. The production path uses iterator-based filtering/extension in `list_items` and generic projection logic. Test setup uses direct fixture writes, which is acceptable for tests.\n\n**Correctness And Invariants**\n\nNo regression found for atomic writes, event logging, gate transitions, assignee/label formats, PID safety, or unsafe code. This change is read/projection-focused and does not introduce state mutation paths.\n\n**Safety**\n\nNo unsafe code was observed in the reviewed change area.\n\n**Testing**\n\nThe provided context records `cargo-ci` passed with exit code 0 at `2026-07-03T13:48:31.147990499+00:00`; per instruction, I did not rerun tests. I ran `./scripts/jit-validate.sh`, and it passed with `Repository validation passed`.\n\n**Error Handling**\n\nNo new non-test `unwrap()`/`expect()` issue found in the production path. TOML source read/projection errors include contextual messages in `crates/jit/src/commands/item.rs:244` and `crates/jit/src/commands/item.rs:253`.\n\n**CLI Contract**\n\nNo new command was introduced. The relevant CLI behavior is covered through JSON invocations at `crates/jit/tests/item_cli_tests.rs:580` and `crates/jit/tests/item_cli_tests.rs:603`.\n\n**Documentation**\n\nNo new public API was introduced for this issue. Existing public command APIs retain doc examples, including `list_items` in `crates/jit/src/commands/item.rs:116`.\n\n**Prior Review Feedback**\n\nThe prior blocking review item has been addressed. The dependency issue `f5d35048` is now marked `done` in `.jit/issues/f5d35048-5c57-4d52-8d6a-5ddb7b73449d.json:5`.\n\n**JIT Issue Management**\n\n`./scripts/jit-validate.sh` passes. The prerequisite dependency listed by `.jit/issues/42898915-b8c3-4248-b8d0-c69b3f15b697.json:8` is completed.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -2,7 +2,7 @@
   "id": "42898915-b8c3-4248-b8d0-c69b3f15b697",
   "title": "Register gate as an addressable item kind",
   "description": "Declare `gate` as a registry-first `[item_kinds]` entry over `.jit/gates.toml` so every gate resolves at `@/gate/<key>`.\n\n## Background\n\nThe project's item-kind engine already supports a project-scoped, registry-first kind sourced from a TOML array-of-tables — `[item_kinds.invariant]` is the shipped precedent (`.jit/config.toml:128-136`): `scope = \"project\"`, `source-of-truth = \"registry-first\"`, `source = { toml, table, id-field, text-field }`. An explicitly-declared `[item_kinds.X]` table must set all six fields of the kind six-tuple or config load fails (`config.rs:1523-1562` `validate_item_kinds`). `.jit/gates.toml` (built by the storage migration this depends on) holds gates as a `[[gates]]` array, each entry carrying a `key` and a `description` field, so `id-field = \"key\"`, `text-field = \"description\"` is a direct fit — the same mapping the story specifies (\"gates resolve at `@/gate/<key>`\").\n\n`jit item show @/INV-02` is the existing precedent for resolving a project-scoped registry-first kind through the shipped binary (`item_cli_tests.rs:482-488`); gate addressing follows the same path but requires the explicit `gate` kind segment (gate keys are kebab-case slugs with no distinguishing id-pattern for inference, unlike `INV-NN`).\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/config.toml` declares `[item_kinds.gate]` with all six required fields: `scope = \"project\"`, `source-of-truth = \"registry-first\"`, `source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }`, an id-pattern matching every shipped gate key (kebab-case slug, e.g. `[a-z][a-z0-9-]*` — matches cargo-ci, code-review, tests, clippy, fmt, jit-validate, plan-review, tdd-reminder, cargo-ci-features, repo-validate, coverage-preview, breakdown-review, npm-ci), and `link-namespaces = []` (a `Gate` has no outbound link field).\n- [hard] REQ-02: `jit item show @/gate/<key> --json` resolves each configured gate (e.g. `@/gate/cargo-ci`) to an item whose text is that gate's `description`, for at least one gate exercised in a CLI or harness test.\n- [hard] REQ-03: `jit item list --kind gate --json` lists every gate in `.jit/gates.toml` as an addressable item (mirrors the existing `jit item list --kind definition`/`--kind invariant` behavior for other project-scoped registry-first kinds).",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T13:49:29.298987635Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T13:48:31.147990499Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T14:00:44.227486017Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:42:21.759398773Z",
-  "updated_at": "2026-07-03T13:59:19.554554355Z"
+  "updated_at": "2026-07-03T14:02:04.735512830Z"
 }

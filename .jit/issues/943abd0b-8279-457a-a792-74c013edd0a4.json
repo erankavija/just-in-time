@@ -2,7 +2,7 @@
   "id": "943abd0b-8279-457a-a792-74c013edd0a4",
   "title": "Sweep gates.json references to gates.toml",
   "description": "Update every remaining consumer, test, and doc reference to the literal `.jit/gates.json` filename so nothing still depends on the retired JSON store.\n\n## Background\n\nAfter the gate registry moves to `.jit/gates.toml`, several places still name the old file literally: the snapshot exporter copies it verbatim, the web server's file-watcher treats it as the graph-relevant registry file, a handful of CLI integration tests write or read it directly (including one test that reads THIS repository's own registry file and asserts on its JSON shape), doc comments describe it by name, and the top-level architecture/reference docs describe `.jit/gates.json` as part of the on-disk layout.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/commands/snapshot.rs:486-489` copies `.jit/gates.toml` (not `.jit/gates.json`) into a generated snapshot's `.jit/` directory.\n- [hard] REQ-02: `crates/server/src/watcher.rs`'s `is_graph_relevant` (the `matches!` at line 116 and its doc comment at line 75) treats a `gates.toml` change as graph-relevant (not `gates.json`); its test `test_relevant_gates_json` (~lines 308-311) is updated to fire a `/repo/.jit/gates.toml` event and renamed to match.\n- [hard] REQ-03: doc comments in `crates/jit/src/commands/template.rs` (lines 51, 276, 881) that name `.jit/gates.json` as where a registry gate key lives are updated to `.jit/gates.toml`.\n- [hard] REQ-04: `crates/jit/tests/invariant_check_cli_tests.rs:228` writes its malformed-gate-registry fixture to `.jit/gates.toml` (not `.jit/gates.json`); `crates/jit/tests/template_apply_tests.rs`'s doc comments (lines 84, 523, 546) and its functional test `test_repo_gates_json_declares_repo_validate_whole_repo_checker` (lines 818-835) are updated to read `.jit/gates.toml` as TOML — locating the `repo-validate` and `jit-validate` gates by scanning the `gates` array for the matching `key` field rather than indexing a JSON object by key — while preserving the same assertions (stage `postcheck`, mode `auto`, the `repo-validate` checker command is whole-repo `jit validate` with no issue id, distinct from the per-issue `jit-validate` gate).\n- [hard] REQ-05: living project documentation that names `.jit/gates.json` as the on-disk gate-registry file is updated to `.jit/gates.toml`: `CLAUDE.md:77`, `docs/reference/storage-format.md:14,114`, `docs/concepts/overview.md:92`, `docs/concepts/core-model.md:646`, `docs/concepts/guarantees.md:328`, `dev/architecture/core-system-design.md:56,79,172,374,408`, `dev/architecture/web-ui-architecture.md:100`, and the gate-resolution comments in `.jit/templates.toml:17,22`.\n- [hard] REQ-06: a repository-wide search for the literal string `gates.json` under `crates/`, `.jit/`, `docs/`, and `dev/architecture/` returns no remaining hits (excluding historical point-in-time planning documents under `dev/active/`, `dev/archive/`, and `dev/studies/`, which are not retroactively edited, and `.jit/` runtime/audit data — `events.jsonl`, `gate-runs/`, `issues/`, and claim records — which are append-only or immutable history whose rewriting would falsify records and touch lifecycle state; the `.jit/` leg of the grep covers authored configuration and registry files only: `config.toml`, `templates.toml`, `rules.toml`, `gates.toml`, `invariants.toml`, `schemas/`). Exclusion list amended with invoker approval, 2026-07-03.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T13:59:27.378510294Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T13:51:32.110534171Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T13:52:30.960621645Z"
     }
   },
   "context": {},
@@ -33,5 +33,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:42:21.779368627Z",
-  "updated_at": "2026-07-03T13:59:19.545274238Z"
+  "updated_at": "2026-07-03T14:02:04.419500631Z"
 }
