@@ -1,7 +1,7 @@
 {
   "epic_id": "f2532a2d-138d-46bf-9547-e1ea517f0170",
   "epic_short_id": "f2532a2d",
-  "current_wave": 3,
+  "current_wave": 6,
   "notes": [
     "Bracket already complete before this session: planning 8f5de6bc done (plan-review passed), breakdown f59d1b6b done (coverage-preview + breakdown-review passed). Plan doc: dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md (decisions D1-D9).",
     "Wave 1 is serialized (no parallel dispatch): all three issues edit overlapping .claude/skills files.",
@@ -14,8 +14,9 @@
     "Wave-3 batch dispatched (4 parallel Opus, worktrees @ main 2ebf6402): 41aa1b75 (planning-lead scenario evals), 0b7e864d (mechanical auto-fixer, fixture-tested, no live-repo mutation), e7d41080 (per-container dispatch prose, must NOT touch frontmatter description), 02a2bbb9 (project-lead skeleton trigger+scenario evals @ runs_per_query=5). Disjoint files. Run check-leak-into-main.sh after wave completes.",
     "INVOKER-DIRECTED PROCESS (2026-07-03): code-review reviewers run cargo-ci inconsistently and hit PRE-EXISTING parallel-run test flakiness (5 tests: serve.rs port-bind + issue.rs claim prechecks; pass in isolation; full suite green for lead: 2836 passed 0 failed). Fix: for every remaining issue, ADD the cargo-ci gate and RUN it BEFORE code-review, so a passed cargo-ci sits in run_history and the reviewer trusts it instead of running its own flaky copy. Adding gates to child issues is lead-autonomous. Applied to 02a2bbb9 -> both gates green -> done.",
     "SESSION 3 END (2026-07-03): handoff written dev/active/f2532a2d-handoff.md. Wave 2 CLOSED (a5b04c9f,6662f738 done). Wave-3 batch: e7d41080 done, 02a2bbb9 done, 0b7e864d in_progress (rework-1 merged, code-review FAIL residual title mismatch, rework-2 deferred per invoker 'no more rework this session'), 41aa1b75 interrupted (WIP preserved branch a4cf8dc7, needs results.md + grading). 7a9eb806 now READY (e7d41080 done). Process in force: add+run cargo-ci gate BEFORE code-review (flaky parallel tests). Leak check clean.",
-    "TRAP #7 (session 4): Filing a NEW standalone issue with zero dependency edges makes jit-validate.sh FAIL with exit 4 ('isolated issue') — an integrity ERROR, not just the orphan-leaf WARNING. code-review reviews whole-tree + runs jit-validate, so an isolated issue fails EVERY concurrently-gating issue's code-review (hit on 41aa1b75 right after filing bug 16402e14). FIX: immediately connect any new standalone issue to the graph with a dep edge (e.g. `jit dep add <milestone> <bug>` so the milestone depends on it) AND add a parent-association label (milestone:v1.0) to clear the orphan-leaf warning too. A membership label ALONE does not fix isolation — an EDGE is required. The 3 pre-existing orphan bugs only WARN because they have edges (something depends on them).",
-    "SESSION 4 START (2026-07-03, drive-to-completion): invoker note '2/3 evals done in 41aa1b75'. Confirmed: 41aa1b75 worktree has research-and-plan+plan-from-existing graded PASS, plan-from-import NOT YET RUN. Dispatched 3 disjoint-file workers in parallel: (1) eval-41aa1b75 resume worktree agent-41aa1b75 (rebased onto main) run+grade 3rd scenario plan-from-import + finalize results.md; (2) rework-0b7e864d fresh worktree anchor scanner line 329 to ^ (Trap #4, ONLY remaining finding, attempt 2/2); (3) doc-7a9eb806 references/coherence-review.md ONLY (no SKILL.md; 304f6d94 owns wiring). SKILL.md-body issues (e8b1cee3 linchpin, 304f6d94, 3c192f5e, 6c5f70ad, eff48a6e, 634b2382) will be SERIALIZED on jit-project-lead/SKILL.md after e8b1cee3 lands. Critical path: 41aa1b75->c23dfe71->e8b1cee3->final-wave."
+    "TRAP #7 (session 4): Filing a NEW standalone issue with zero dependency edges makes jit-validate.sh FAIL with exit 4 ('isolated issue') \u2014 an integrity ERROR, not just the orphan-leaf WARNING. code-review reviews whole-tree + runs jit-validate, so an isolated issue fails EVERY concurrently-gating issue's code-review (hit on 41aa1b75 right after filing bug 16402e14). FIX: immediately connect any new standalone issue to the graph with a dep edge (e.g. `jit dep add <milestone> <bug>` so the milestone depends on it) AND add a parent-association label (milestone:v1.0) to clear the orphan-leaf warning too. A membership label ALONE does not fix isolation \u2014 an EDGE is required. The 3 pre-existing orphan bugs only WARN because they have edges (something depends on them).",
+    "SESSION 4 START (2026-07-03, drive-to-completion): invoker note '2/3 evals done in 41aa1b75'. Confirmed: 41aa1b75 worktree has research-and-plan+plan-from-existing graded PASS, plan-from-import NOT YET RUN. Dispatched 3 disjoint-file workers in parallel: (1) eval-41aa1b75 resume worktree agent-41aa1b75 (rebased onto main) run+grade 3rd scenario plan-from-import + finalize results.md; (2) rework-0b7e864d fresh worktree anchor scanner line 329 to ^ (Trap #4, ONLY remaining finding, attempt 2/2); (3) doc-7a9eb806 references/coherence-review.md ONLY (no SKILL.md; 304f6d94 owns wiring). SKILL.md-body issues (e8b1cee3 linchpin, 304f6d94, 3c192f5e, 6c5f70ad, eff48a6e, 634b2382) will be SERIALIZED on jit-project-lead/SKILL.md after e8b1cee3 lands. Critical path: 41aa1b75->c23dfe71->e8b1cee3->final-wave.",
+    "SESSION 5 (2026-07-03, drive-to-completion): closed the whole final tranche. e8b1cee3 (linchpin, +REQ-02 config-derivation fix), 304f6d94 (verify-and-close), eff48a6e (concrete charter+progress instantiated on milestone 9db27a3a), 206bd960 (standards-sweep mode), 3c192f5e (REQ-06, mode-4 reachable), 634b2382 (parent-escalation policy) all done. 6c5f70ad EXTERNAL dep eed6750c escalated -> invoker said 'finish eed6750c and proceed'; completed eed6750c (cross-epic, invoker-directed: canonical-criteria fix + plan-from-import re-run 8/8) -> unblocked 6c5f70ad. 6c5f70ad four-mode front door: skill+mode-routing.md done; code-review REQ-01 needs routing eval scenarios -> added routing-mode-1..4, running+grading. Every issue: add+run cargo-ci BEFORE code-review (Trap #1 standing). NEW flaky test observed: test_worktree_list_excludes_expired_leases (timing/lease-expiry, same class as Trap #1; re-run cleared it)."
   ],
   "waves": [
     {
@@ -145,7 +146,7 @@
           "short_id": "206bd960",
           "title": "Standards-sweep mode workflow and report",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "7a9eb806",
@@ -159,7 +160,7 @@
           "short_id": "e8b1cee3",
           "title": "jit-project-lead skeleton with config-derived tiers",
           "classification": "implementation",
-          "status": "in_progress-verify-and-close (skeleton SKILL.md + all references already exist & 02a2bbb9-verified; REQ-01..05 all backed; lead reworded one 'epic-level' domain-leak in container-dispatch.md for REQ-02; NEEDS: add+run cargo-ci, run code-review, mark done)"
+          "status": "done"
         }
       ]
     },
@@ -171,35 +172,35 @@
           "short_id": "eff48a6e",
           "title": "Durable vision/charter and resumable progress artifacts",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "634b2382",
           "short_id": "634b2382",
           "title": "Parent-escalation policy for jit-project-lead",
           "classification": "documentation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "304f6d94",
           "short_id": "304f6d94",
           "title": "Sub-strategic dispatch in topological waves with coherence review",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "3c192f5e",
           "short_id": "3c192f5e",
           "title": "Project-wide content-standards sweep mode",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "6c5f70ad",
           "short_id": "6c5f70ad",
           "title": "Four-mode front door with request routing",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress-rework1-routing-evals (REQ-01: added 4 routing scenarios routing-mode-1..4, running+grading; skill + mode-routing.md pass; eed6750c dep now DONE)",
           "external_dep": "eed6750c"
         }
       ]
@@ -244,17 +245,29 @@
     "6662f738": 2,
     "0b7e864d": 1,
     "7a9eb806": 1,
-    "c23dfe71": 1
+    "c23dfe71": 1,
+    "eff48a6e": 1,
+    "206bd960": 1,
+    "3c192f5e": 0,
+    "634b2382": 1,
+    "eed6750c": 1,
+    "6c5f70ad": 1
   },
   "started_at": "2026-07-02T00:00:00Z",
   "reviewed": {
     "e7d41080": "PASS -> done",
     "02a2bbb9": "PASS: trigger 17/17 failed:0, 4 scenarios PASS (activation, tier-derivation this-repo + research, fallback). SKILL.md untouched. done.",
     "c23dfe71": "PASS -> done (rework-1). REQ-01..04 rollup: adjudication doc (a5b04c9f) + exec-lead 4/4 scenarios + planning-lead 3/3 + triggers 17/17 both. Authored docs/reference/lead-skills-eval-baseline.md as the checkable-claim rollup. code-review FAIL round 1: exec-lead evals.json had a 4th scenario 'parent-invoked-escalation' unrun -> ran+graded it PASS 6/6 (validates b46e13d9 context-aware escalation-to-parent), recorded, baseline -> 4/4. Re-run PASS.",
-    "e8b1cee3": "IN PROGRESS verify-and-close. Skeleton SKILL.md (134 lines <500) + references all exist and 02a2bbb9 already verified activation(17/17)+4 scenarios PASS. REQ-01 thin orchestrator OK; REQ-02 config-derived control-flow, type literals only in required examples + prose citations -> lead reworded the one 'epic-level target' domain-leak in container-dispatch.md to 'end-to-end target'; REQ-03/04/05 backed. NEXT: add+run cargo-ci, run code-review, mark done.",
+    "e8b1cee3": "PASS->done. REQ-02 config-derivation fix (standards-scan.sh label ns from config, dropped hardcoded epic|story|milestone). cargo-ci+code-review passed.",
     "41aa1b75": "PASS -> done. 3rd scenario plan-from-import run+graded PASS 8/8 (with finding). All 3 entry-path scenarios recorded in jit-planning-lead/evals/results.md. FINDING: coverage-preview passed vacuously (checkbox-prefixed criteria hidden from [hard] parser) -> filed standalone bug 16402e14 (type:bug, milestone:v1.0, dep-edge to 9db27a3a). First code-review FAILED only on transient isolation of 16402e14 (Trap #7); after wiring bug to graph, re-run PASSED. cargo-ci+code-review green.",
     "0b7e864d": "rework-2 PASS -> done. Anchored scanner:329 to ^ (lockstep with fixer). Worker audited all 4 other position/prefix branches: each has matching fixer strip, no residual gap. Harnesses 28+41 green (fixtures cover mid-title-not-flagged + leading-flagged-and-corrected). cargo-ci+code-review both passed.",
-    "7a9eb806": "PASS: references/coherence-review.md (267 lines), tiers C1/C2/C3, PASS/FAIL verdict + stale-forward sweep + no-argue stop condition, cc-sdd register. REQ-01..04 met. Tier-3 coherence: consistent with e7d41080 container-dispatch.md which defers cross-container coherence to this story. SKILL.md untouched (wiring is 304f6d94). cargo-ci running then code-review."
+    "7a9eb806": "PASS: references/coherence-review.md (267 lines), tiers C1/C2/C3, PASS/FAIL verdict + stale-forward sweep + no-argue stop condition, cc-sdd register. REQ-01..04 met. Tier-3 coherence: consistent with e7d41080 container-dispatch.md which defers cross-container coherence to this story. SKILL.md untouched (wiring is 304f6d94). cargo-ci running then code-review.",
+    "304f6d94": "PASS->done (verify-and-close). wave-layering+container-dispatch+coherence-review wired. gates passed.",
+    "eff48a6e": "PASS->done. rework: reviewer required CONCRETE artifacts+links, not just templates. Instantiated docs/9db27a3a-charter.md (vision+D-1..5) + dev/active/9db27a3a-progress.json (22 epics, 3 waves) linked to milestone 9db27a3a. +rejected-status schema fix. gates passed.",
+    "206bd960": "PASS->done. standards-sweep mode+report; rework: Needs-a-decision jq must union judgment+skipped-mechanical. gates passed.",
+    "3c192f5e": "PASS->done (REQ-06). rework: made mode-4 reachable end-to-end (stub stopped ALL modes); modes 1-3 still pending 6c5f70ad. gates passed.",
+    "634b2382": "PASS->done. parent-escalation policy; rework: keep forward-to-human set EXACTLY three (charter-silent=vision-level cat1, charter-unreadable=operational halt). gates passed.",
+    "eed6750c": "PASS->done (INVOKER-DIRECTED cross-epic, epic 2fbd2a82). jit-planning-lead skill. rework: forbid checkbox-prefixed criteria (coverage-preview vacuity, skill side of bug 16402e14); re-ran plan-from-import eval 8/8 PASS canonical criteria, non-vacuous coverage. gates passed. UNBLOCKED 6c5f70ad."
   },
-  "last_session": 4
+  "last_session": 5
 }
