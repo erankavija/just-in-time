@@ -11,18 +11,27 @@ use std::sync::OnceLock;
 /// Regex for valid label format: `namespace:value`
 ///
 /// - namespace: `[a-z][a-z0-9-]*` (lowercase, alphanumeric, hyphens)
-/// - value: `[a-zA-Z0-9][a-zA-Z0-9._/-]*` (alphanumeric, dots, hyphens,
-///   underscores, and `/`). The `/` admits a QUALIFIED link reference value
-///   `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`) so generic
-///   node→item links can be authored as labels (REQ-05). The unqualified value
-///   form is unchanged.
-/// - separator: exactly one colon `':'`
+/// - value: one of two forms —
+///   - unqualified/qualified-link: `[a-zA-Z0-9][a-zA-Z0-9._/-]*` (alphanumeric,
+///     dots, hyphens, underscores, and `/`). The `/` admits a QUALIFIED link
+///     reference value `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`)
+///     so generic node→item links can be authored as labels (REQ-05).
+///   - `@`-prefixed address: `@` optionally followed by a project name
+///     (`[a-z][a-z0-9-]*`, same shape as the namespace pattern), then at
+///     least two `/`-delimited path segments (kind + self-id, e.g.
+///     `@/rule/label-format` or `@myproject/gate/cargo-ci`). Bare `@` or
+///     `@/` (no path segments) do not validate.
+/// - separator: exactly one colon `':'`. A value — in either form — may not
+///   contain a colon; the colon stays reserved as the sole namespace
+///   separator.
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
 fn label_regex() -> &'static Regex {
     LABEL_REGEX.get_or_init(|| {
-        Regex::new(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
-            .expect("Label regex should compile")
+        Regex::new(
+            r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|@(?:[a-z][a-z0-9-]*)?(?:/[a-zA-Z0-9._-]+){2,})$",
+        )
+        .expect("Label regex should compile")
     })
 }
 
@@ -360,6 +369,33 @@ mod tests {
         assert!(validate_label("ns:MixedCase").is_ok());
         // Qualified link-reference value `<issue>/<self-id>` (REQ-05).
         assert!(validate_label("satisfies:56ab0224/REQ-01").is_ok());
+    }
+
+    #[test]
+    fn test_validate_label_accepts_at_prefixed_address_bare() {
+        // `@` scope token with no project name, followed by kind + self-id segments.
+        assert!(validate_label("enforces:@/rule/label-format").is_ok());
+    }
+
+    #[test]
+    fn test_validate_label_accepts_at_prefixed_address_with_project() {
+        // `@` scope token qualified with a project name, then kind + self-id segments.
+        assert!(validate_label("enforces:@myproject/gate/cargo-ci").is_ok());
+    }
+
+    #[test]
+    fn test_validate_label_rejects_at_prefixed_address_degenerate() {
+        // Bare `@` and `@/` lack the required kind/self-id segments.
+        assert!(validate_label("enforces:@").is_err());
+        assert!(validate_label("enforces:@/").is_err());
+    }
+
+    #[test]
+    fn test_validate_label_rejects_colon_in_at_prefixed_value() {
+        // Colon remains the sole namespace separator; the widened grammar must
+        // not admit a colon anywhere inside an `@`-prefixed value.
+        assert!(validate_label("enforces:@/rule:label-format").is_err());
+        assert!(validate_label("enforces:@bad:name/rule/x").is_err());
     }
 
     #[test]
