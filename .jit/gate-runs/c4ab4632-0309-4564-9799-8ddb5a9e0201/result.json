@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c4ab4632-0309-4564-9799-8ddb5a9e0201",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "3d9e9222-a759-4489-aec0-da77ff13d6ec",
+  "commit": "9d268a3a8719b06c9a941323c523ec57ded3baf8",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-03T11:42:53.751077044Z",
+  "completed_at": "2026-07-03T11:45:42.536692411Z",
+  "duration_ms": 168785,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest test_worktree_list_excludes_expired_leases ... FAILED\ntest result: FAILED. 19 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.23s\n---- test_worktree_list_excludes_expired_leases stdout ----\n\nthread 'test_worktree_list_excludes_expired_leases' (3522733) panicked at crates/jit/tests/worktree_cli_tests.rs:436:5:\nassertion `left == right` failed: both live leases should be counted before expiry\n  left: 1\n right: 2\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

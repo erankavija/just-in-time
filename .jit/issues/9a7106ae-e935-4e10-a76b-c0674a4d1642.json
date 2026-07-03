@@ -6,7 +6,6 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "3d9e9222-a759-4489-aec0-da77ff13d6ec",
     "a1b6b3da-75cf-4021-b879-832fafb48284"
   ],
   "gates_required": [
@@ -33,5 +32,5 @@
     "story:multi-jit-address-form"
   ],
   "created_at": "2026-07-01T23:19:51.187363359Z",
-  "updated_at": "2026-07-01T23:42:42.385015281Z"
+  "updated_at": "2026-07-03T12:07:39.311374838Z"
 }
