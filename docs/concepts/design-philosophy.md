@@ -335,7 +335,7 @@ jit query available --quiet  # Only IDs, one per line
 
 **3. Readable summaries for recorded gate runs**
 ```bash
-jit gate check-all $ISSUE
+jit gate status-all $ISSUE
 Gate 'tests' last run: passed (exit code: 0)
 Gate 'clippy' last run: failed (exit code: 1)
 ```
@@ -430,7 +430,7 @@ Epic cfb3ba94 depends on:
 
 Documentation quality enforced via gates:
 ```bash
-$ jit gate check c8355d70 code-review
+$ jit gate status c8355d70 code-review
 Gate 'code-review' status: pending
 (Will pass when agent:docs-worker completes task)
 ```

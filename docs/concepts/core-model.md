@@ -238,7 +238,7 @@ jit issue claim $ISSUE agent:worker-1
 
 ```bash
 # Inspect latest postcheck runs
-jit gate check-all $ISSUE
+jit gate status-all $ISSUE
 
 # Mark complete
 jit issue update $ISSUE --state done
@@ -564,12 +564,12 @@ in_progress → [POSTCHECK: tests, clippy, code-review] → gated → done
 
 **Manual Gates** - Require human judgment
 - Examples: code review, design approval, security audit
-- Passed explicitly: `jit gate pass $ISSUE code-review --by human:alice`
+- Passed explicitly: `jit gate evaluate $ISSUE code-review --by human:alice`
 - Used for subjective quality checks
 
 **Automated Gates** - Run programmatic checks
 - Examples: tests, linters, builds, security scans
-- Run automatically: `jit gate check $ISSUE tests`
+- Run automatically: `jit gate status $ISSUE tests`
 - Used for objective, repeatable verification
 - Require checker command and timeout configuration
 - All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE` env vars
@@ -611,10 +611,10 @@ Error: Gate validation failed: Cannot transition to 'done' - 2 gate(s) not passe
 → Issue automatically transitioned to 'gated' (awaiting gate approval)
 
 # Fix and pass gates
-$ jit gate check abc123 tests
+$ jit gate status abc123 tests
 ✓ tests passed
 
-$ jit gate pass abc123 code-review --by human:alice
+$ jit gate evaluate abc123 code-review --by human:alice
 ✓ code-review passed
 → Issue automatically transitioned to 'done' (all gates passed)
 ```

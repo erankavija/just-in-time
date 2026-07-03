@@ -110,11 +110,13 @@ fn test_check_all_includes_stdout_for_failing_runs_even_without_full() {
         .output()
         .unwrap();
 
+    // A failed required gate makes `status-all` (alias `check-all`) exit 4.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["gate", "check-all", &issue_id, "--json"])
         .assert()
-        .success()
+        .failure()
+        .code(4)
         .get_output()
         .stdout
         .clone();

@@ -12,8 +12,8 @@ use std::io::{self, Write};
 use thiserror::Error;
 
 use crate::domain::{
-    GateMode, GateRunResult, GateRunStatus, GateStage, GateState, Issue, MinimalBlockedIssue,
-    MinimalIssue, Priority, State,
+    GateMode, GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
+    MinimalBlockedIssue, MinimalIssue, Priority, State,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -1186,10 +1186,26 @@ impl GateRunSummary {
     }
 }
 
-/// JSON payload of `jit gate check-all --json`.
+/// Per-required-gate readiness entry in a [`GateCheckAllResponse`].
 ///
-/// `results` contains one [`GateRunSummary`] per recorded run; `not_run`
-/// lists gate keys configured on the issue that have not executed yet.
+/// Reports one required gate's authoritative per-issue status (`passed`,
+/// `failed`, or `pending`) so a `--json` consumer can distinguish a gate that
+/// ran and failed from one that has never run/attested, both of which map to
+/// the single nonzero exit code of `gate status-all`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateStatusEntry {
+    pub gate_key: String,
+    pub status: GateStatus,
+}
+
+/// JSON payload of `jit gate status-all --json` (alias `gate check-all`).
+///
+/// `results` contains one [`GateRunSummary`] per recorded AUTOMATED run;
+/// `gate_statuses` covers EVERY required gate (automated and manual) with its
+/// readiness status, so manual gates are represented too. `total`, `passed`,
+/// and `not_run` are computed over all required gates: `total` is their count,
+/// `passed` how many are green, and `not_run` the keys still pending.
+/// `all_passed` mirrors the strict exit contract (0 iff true, else 4).
 ///
 /// # Examples
 ///
@@ -1201,6 +1217,8 @@ impl GateRunSummary {
 ///     passed: 0,
 ///     total: 2,
 ///     not_run: vec!["tests".into(), "clippy".into()],
+///     gate_statuses: vec![],
+///     all_passed: false,
 /// };
 /// assert_eq!(payload.not_run.len(), 2);
 /// ```
@@ -1210,6 +1228,8 @@ pub struct GateCheckAllResponse {
     pub passed: usize,
     pub total: usize,
     pub not_run: Vec<String>,
+    pub gate_statuses: Vec<GateStatusEntry>,
+    pub all_passed: bool,
 }
 
 /// JSON payload of `jit gate check --all` / `--limit` (the history view).

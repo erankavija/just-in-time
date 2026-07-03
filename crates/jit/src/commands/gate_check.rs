@@ -1,7 +1,7 @@
 //! Gate checking and execution operations
 
 use super::*;
-use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage};
+use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage, GateStatus};
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
 use crate::output::IssueShowResponse;
@@ -310,6 +310,51 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((results, not_run))
     }
 
+    /// Return the per-issue readiness status of every REQUIRED gate on an issue
+    /// (automated AND manual), ordered by gate priority (insertion order for
+    /// ties).
+    ///
+    /// The authoritative status is the issue's recorded `gates_status`: an auto
+    /// gate's last run and a manual gate's attestation both write there. A gate
+    /// with no recorded state — an auto gate never run, or a manual gate never
+    /// attested — is reported as [`GateStatus::Pending`].
+    ///
+    /// This is the manual-aware companion to
+    /// [`get_last_gate_runs_for_issue`](Self::get_last_gate_runs_for_issue),
+    /// which covers automated gates only. `status-all` folds these statuses into
+    /// its green/not-green readiness verdict.
+    pub fn get_required_gate_statuses_for_issue(
+        &self,
+        issue_id: &str,
+    ) -> Result<Vec<(String, GateStatus)>> {
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issue = self.storage.load_issue(&full_id)?;
+        let registry = self.storage.load_gate_registry()?;
+
+        // Order by gate priority; a required key missing from the registry sorts
+        // last but is still reported (so it is never silently treated as green).
+        let mut ordered: Vec<_> = issue
+            .gates_required
+            .iter()
+            .map(|key| {
+                let priority = registry.gates.get(key).map_or(u32::MAX, |g| g.priority);
+                (key.clone(), priority)
+            })
+            .collect();
+        ordered.sort_by_key(|(_, priority)| *priority);
+
+        Ok(ordered
+            .into_iter()
+            .map(|(key, _)| {
+                let status = issue
+                    .gates_status
+                    .get(&key)
+                    .map_or(GateStatus::Pending, |state| state.status);
+                (key, status)
+            })
+            .collect())
+    }
+
     /// Run all prechecks for an issue
     ///
     /// Returns Ok(()) if all prechecks pass, Err otherwise.
@@ -559,6 +604,100 @@ enforce_leases = "off"
         let result = executor.check_gate(&issue_id, "manual-gate");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("manual"));
+    }
+
+    #[test]
+    fn test_get_required_gate_statuses_covers_auto_and_manual() {
+        use crate::domain::GateStatus;
+        let executor = setup();
+
+        // One auto gate (priority 10) and one manual gate (priority 20).
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "auto-gate".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "auto-gate".to_string(),
+                title: "Auto".to_string(),
+                description: "Test".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 0".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 10,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        registry.gates.insert(
+            "manual-gate".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "manual-gate".to_string(),
+                title: "Manual".to_string(),
+                description: "Test".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 20,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "auto-gate".to_string())
+            .unwrap();
+        executor
+            .add_gate(&issue_id, "manual-gate".to_string())
+            .unwrap();
+
+        // Before any evaluation: both required gates are pending, ordered by priority.
+        let statuses = executor
+            .get_required_gate_statuses_for_issue(&issue_id)
+            .unwrap();
+        assert_eq!(
+            statuses,
+            vec![
+                ("auto-gate".to_string(), GateStatus::Pending),
+                ("manual-gate".to_string(), GateStatus::Pending),
+            ]
+        );
+
+        // Running the auto gate flips only its status; the manual gate stays pending.
+        executor.check_gate(&issue_id, "auto-gate").unwrap();
+        let statuses = executor
+            .get_required_gate_statuses_for_issue(&issue_id)
+            .unwrap();
+        assert_eq!(
+            statuses,
+            vec![
+                ("auto-gate".to_string(), GateStatus::Passed),
+                ("manual-gate".to_string(), GateStatus::Pending),
+            ]
+        );
+
+        // Attesting the manual gate makes every required gate green.
+        executor
+            .pass_gate(&issue_id, "manual-gate".to_string(), None, false)
+            .unwrap();
+        let statuses = executor
+            .get_required_gate_statuses_for_issue(&issue_id)
+            .unwrap();
+        assert!(statuses.iter().all(|(_, s)| *s == GateStatus::Passed));
     }
 
     #[test]

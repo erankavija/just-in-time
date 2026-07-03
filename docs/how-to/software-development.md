@@ -188,7 +188,7 @@ jit issue claim $TASK agent:developer-1
 
 # 2. Write tests FIRST (precheck reminder)
 # ... write failing tests ...
-jit gate pass $TASK tdd-reminder --by agent:developer-1
+jit gate evaluate $TASK tdd-reminder --by agent:developer-1
 
 # 3. Implement code to make tests pass
 # ... write implementation ...
@@ -206,7 +206,7 @@ jit issue update $TASK --state done
 # - clippy: cargo clippy -- -D warnings
 
 # 6. Manual code review
-jit gate pass $TASK code-review --by agent:reviewer
+jit gate evaluate $TASK code-review --by agent:reviewer
 
 # Check final status
 jit issue show $TASK
@@ -440,7 +440,7 @@ jit gate add $BUG_ID code-review
 jit issue update $BUG_ID --state in_progress
 
 # After fix, pass regression gate
-jit gate pass $BUG_ID regression-test --by agent:frontend-dev
+jit gate evaluate $BUG_ID regression-test --by agent:frontend-dev
 
 # Mark done (auto-runs tests)
 jit issue update $BUG_ID --state done
@@ -530,7 +530,7 @@ if [ -z "$ISSUE_ID" ]; then
 fi
 
 # Inspect recorded automated gate runs
-jit gate check-all $ISSUE_ID --json > gate-results.json
+jit gate status-all $ISSUE_ID --json > gate-results.json
 
 # Check if any recorded run failed
 FAILED=$(jq -r '[.results[] | select(.status == "failed")] | length' gate-results.json)
@@ -602,7 +602,7 @@ if command -v jit &> /dev/null; then
   
   if [ -n "$ISSUE_ID" ]; then
     echo "Running local gates for issue $ISSUE_ID..."
-    jit gate check $ISSUE_ID fmt || {
+    jit gate status $ISSUE_ID fmt || {
       echo "❌ Format check failed. Run 'cargo fmt' first."
       exit 1
     }
@@ -615,7 +615,7 @@ fi
 ```bash
 # After PR approval, mark code-review gate as passed
 # (Typically done by reviewer or automation)
-jit gate pass $ISSUE_ID code-review --by human:reviewer-name
+jit gate evaluate $ISSUE_ID code-review --by human:reviewer-name
 ```
 
 ### Status Badges

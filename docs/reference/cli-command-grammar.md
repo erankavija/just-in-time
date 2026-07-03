@@ -56,7 +56,7 @@ Canonical rules:
 - **The subject is positional.** The issue id, gate key, document path, assignee,
   dependency endpoints, template name, preset name, and qualified item id are
   positional because the verb cannot run without them. Examples:
-  `jit issue show <id>`, `jit gate pass <id> <gate-key>`,
+  `jit issue show <id>`, `jit gate evaluate <id> <gate-key>`,
   `jit dep add <from> <to>...`, `jit doc add <id> <path>`.
 - **Modifiers are flags.** Anything that tunes, filters, scopes, or formats is a
   flag: `--priority`, `--state`, `--label`, `--force`, `--depth`, `--json`,
@@ -94,7 +94,7 @@ subject. The forms are fixed per identifier kind:
 | **Qualified item id** | `<scope>/<self-id>` | `scope` is `@` for project scope or an issue reference (and so accepts the same three issue forms); `self-id` is exact. |
 
 **Consistency rule.** Any positional that names an issue — `issue show`,
-`issue update`, `gate add`, `gate pass`, `dep add`, `doc add`, `claim acquire`,
+`issue update`, `gate add`, `gate evaluate`, `dep add`, `doc add`, `claim acquire`,
 `claim release`, and the rest — accepts the full UUID, the 8-char short id, and a
 unique prefix, identically. A command that resolves only the full UUID, or whose
 help omits the accepted forms while a sibling documents them, is nonconforming and
@@ -171,20 +171,23 @@ Mutating the registry, attaching gates to issues, and managing presets.
 **2. Execution** — *produces a verdict and may advance issue state*. These are the
 only gate verbs that mutate gate-run state.
 
-- `gate pass`, `gate pass-all`, `gate fail`.
+- `gate evaluate` (alias `eval`), `gate evaluate-all`, `gate fail`. The legacy
+  verbs `pass` / `pass-all` remain silent aliases of `evaluate` / `evaluate-all`.
 
 **3. Inspection** — *reports definitions or run results with no side effects*.
 Strictly read-only.
 
 - Registry reads: `gate list`, `gate show`.
-- Run-result reads: `gate check`, `gate check-all`.
+- Run-result reads: `gate status`, `gate status-all` (legacy aliases `check` /
+  `check-all`). `gate status-all` is read-only but exits nonzero (4) unless every
+  required gate has passed — a readiness signal, not a mutation.
 
 ### The load-bearing invariant
 
-**Inspection never mutates; execution never merely reports.** `gate check` and
-`gate check-all` show the last recorded run and must stay non-mutating (their help
-already says "inspection only, non-mutating"). `gate pass` / `gate fail` /
-`gate pass-all` run checkers, record verdicts, and can transition the issue. The
+**Inspection never mutates; execution never merely reports.** `gate status` and
+`gate status-all` show recorded state and must stay non-mutating (their help
+already says "inspection only, non-mutating"). `gate evaluate` / `gate fail` /
+`gate evaluate-all` run checkers, record verdicts, and can transition the issue. The
 two must never be conflated: an inspection verb that quietly re-runs a checker, or
 an execution verb dressed as a "check", is nonconforming. This configuration ÷
 execution ÷ inspection partition is the contract the gate rename sweep applies to

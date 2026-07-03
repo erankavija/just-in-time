@@ -829,11 +829,13 @@ fn test_gate_check_all_no_prior_runs_is_non_mutating() {
     let (temp, issue_id) =
         setup_multi_auto_gate_issue(&[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
 
+    // All required gates pending -> strict `status-all` exits 4 (non-mutating).
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["gate", "check-all", &issue_id])
         .assert()
-        .success()
+        .failure()
+        .code(4)
         .stdout(predicate::str::contains("gate-1"))
         .stdout(predicate::str::contains("not been run yet"))
         .stdout(predicate::str::contains("gate-2"));
@@ -874,11 +876,13 @@ fn test_gate_check_all_json_output_reports_not_run_gates() {
         .assert()
         .success();
 
+    // gate-1 passed, gate-2 still pending -> strict `status-all` exits 4.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["gate", "check-all", &issue_id, "--json"])
         .assert()
-        .success()
+        .failure()
+        .code(4)
         .get_output()
         .stdout
         .clone();

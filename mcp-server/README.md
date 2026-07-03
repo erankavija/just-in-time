@@ -121,8 +121,9 @@ The server exposes 60+ tools organized by command, including nested subcommands:
 - `jit_gate_list` - List registered gate definitions
 - `jit_gate_show` - Show a gate definition
 - `jit_gate_add` - Add gate to issue
-- `jit_gate_pass` - Mark gate as passed
+- `jit_gate_evaluate` - Evaluate a gate (run the checker or record attestation)
 - `jit_gate_fail` - Mark gate as failed
+- `jit_gate_status-all` - Report readiness of every required gate (strict)
 
 ### Events
 - `jit_events_tail` - Show recent events

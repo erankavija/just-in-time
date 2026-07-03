@@ -303,7 +303,7 @@ await runTest('generateDefaultTools returns curated subset of all tools', () => 
     assert.ok(allNames.has(tool.name), `default tool ${tool.name} not in full set`);
   }
   // Core workflow tools must be present
-  for (const name of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_check-all']) {
+  for (const name of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_status-all']) {
     assert.ok(defaultTools.some(t => t.name === name), `missing core tool: ${name}`);
   }
 });

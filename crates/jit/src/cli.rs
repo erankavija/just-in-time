@@ -129,7 +129,7 @@ pub enum Commands {
     /// Common workflow:
     ///   1. Define gates in registry: jit gate define code-review --title "Code Review" ...
     ///   2. Add to issues: jit issue create --gate code-review ...
-    ///   3. Execute gates: jit gate pass \<issue\> code-review
+    ///   3. Evaluate gates: jit gate evaluate \<issue\> code-review
     #[command(subcommand)]
     Gate(GateCommands),
 
@@ -919,11 +919,18 @@ pub enum DepCommands {
 /// responsibilities (see docs/reference/cli-command-grammar.md):
 ///
 /// * Configuration — shapes what gates exist and which issues require them:
-///   `define`, `update`, `remove`, `add`, and `preset *`.
-/// * Execution — produces a verdict and may advance issue state:
-///   `pass`, `pass-all`, `fail`.
-/// * Inspection — reports definitions or run results with no side effects:
-///   `list`, `show`, `check`, `check-all`.
+///   `define`, `update`, `remove`, `add`, and `preset *`. These MUTATE the
+///   registry or an issue's requirements.
+/// * Execution — produces a verdict and MUTATES per-issue gate state (and may
+///   advance issue state): `evaluate` (alias `eval`), `evaluate-all`, `fail`.
+///   `evaluate` runs an auto gate's checker or records a manual gate's
+///   attestation; the verdict may be pass or fail.
+/// * Inspection — reports definitions or recorded state with NO side effects:
+///   `list`, `show`, `status`, `status-all`. `status-all` additionally exits
+///   nonzero (4) unless every required gate has passed.
+///
+/// Legacy verbs `pass` / `pass-all` / `check` / `check-all` remain as silent
+/// aliases of `evaluate` / `evaluate-all` / `status` / `status-all`.
 ///
 /// # Examples
 ///
@@ -933,13 +940,14 @@ pub enum DepCommands {
 /// jit gate add abc123 code-review            # attach a registered gate to an issue
 /// jit gate preset apply rust-tdd abc123      # attach a preset bundle
 ///
-/// # Execution
-/// jit gate pass abc123 code-review           # run/attest, record a verdict
-/// jit gate pass-all abc123                   # pass every required gate
+/// # Execution (mutating — produces a verdict)
+/// jit gate evaluate abc123 code-review       # run/attest, record a verdict
+/// jit gate evaluate-all abc123               # evaluate every required gate
 ///
-/// # Inspection (non-mutating)
+/// # Inspection (non-mutating — reports state)
 /// jit gate list                              # registered gate definitions
-/// jit gate check abc123 code-review          # last recorded run for one gate
+/// jit gate status abc123 code-review         # last recorded run for one gate
+/// jit gate status-all abc123                 # readiness of every required gate
 /// ```
 #[derive(Subcommand)]
 pub enum GateCommands {
@@ -1135,12 +1143,16 @@ pub enum GateCommands {
     Preset(PresetCommands),
 
     // ===== Execution: produce a verdict and may advance issue state =====
-    /// Run automated checker (auto gates) or record attestation (manual gates)
+    /// Evaluate a gate: run its checker (auto) or record attestation (manual)
+    ///
+    /// Mutating. Produces a verdict — which may legitimately be *fail*, so this
+    /// is not an override. The legacy verb `pass` is a silent alias; `eval` is
+    /// a short alias.
     ///
     /// The gate key may be supplied as a positional argument or via `--gate`:
     ///
-    ///   jit gate pass <ISSUE_ID> <GATE_KEY>
-    ///   jit gate pass <ISSUE_ID> --gate <GATE_KEY>
+    ///   jit gate evaluate <ISSUE_ID> <GATE_KEY>
+    ///   jit gate evaluate <ISSUE_ID> --gate <GATE_KEY>
     ///
     /// Exactly one of the two forms must be used; supplying both or neither is
     /// an error.
@@ -1159,7 +1171,8 @@ pub enum GateCommands {
     /// When the gate already passed at the current HEAD commit, the checker is
     /// skipped: the command exits 0 and reports `already_passed: true` in --json.
     /// Use --force to re-run the checker unconditionally.
-    Pass {
+    #[command(visible_alias = "pass", visible_alias = "eval")]
+    Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
@@ -1182,18 +1195,20 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Pass all of an issue's required gates in one command, fail-fast
+    /// Evaluate all of an issue's required gates in one command, fail-fast
     ///
-    /// Runs each required gate in declaration order, stopping at the FIRST gate
-    /// that does not pass and exiting with that gate's code from the `gate pass`
-    /// taxonomy (0 pass / 2 bad-args / 3 not-found / 4 checker-failed / 10
-    /// runner-error). Later gates are not attempted once one fails.
+    /// Mutating. Runs each required gate in declaration order, stopping at the
+    /// FIRST gate that does not pass and exiting with that gate's code from the
+    /// `gate evaluate` taxonomy (0 pass / 2 bad-args / 3 not-found / 4
+    /// checker-failed / 10 runner-error). Later gates are not attempted once one
+    /// fails. The legacy verb `pass-all` is a silent alias.
     ///
     /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
     /// passed at the current HEAD commit is not re-run. Use --force to re-run
     /// every gate's checker unconditionally. An issue with no required gates
     /// succeeds (exit 0) with an empty result set.
-    PassAll {
+    #[command(visible_alias = "pass-all")]
+    EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
@@ -1243,11 +1258,13 @@ pub enum GateCommands {
 
     /// Inspect gate run results (inspection only, non-mutating)
     ///
-    /// `gate check` is the unified gate-run inspection surface. By default it
-    /// shows the latest run for one gate:
+    /// `gate status` is the unified gate-run inspection surface. It only reports
+    /// recorded state and never exits nonzero on a pending/failed gate (that
+    /// readiness contract belongs to `gate status-all`). The legacy verb `check`
+    /// is a silent alias. By default it shows the latest run for one gate:
     ///
-    ///   jit gate check <ISSUE_ID> <GATE_KEY>
-    ///   jit gate check <ISSUE_ID> --gate <GATE_KEY>
+    ///   jit gate status <ISSUE_ID> <GATE_KEY>
+    ///   jit gate status <ISSUE_ID> --gate <GATE_KEY>
     ///
     /// Exactly one of the two gate-key forms must be used for the default
     /// latest-run view; supplying both or neither is an error.
@@ -1257,19 +1274,20 @@ pub enum GateCommands {
     /// `--gate`); `--status <passed|failed|error|pending|skipped>` filters by
     /// outcome:
     ///
-    ///   jit gate check <ISSUE_ID> --all
-    ///   jit gate check <ISSUE_ID> --limit 5 --gate tests --status failed
+    ///   jit gate status <ISSUE_ID> --all
+    ///   jit gate status <ISSUE_ID> --limit 5 --gate tests --status failed
     ///
     /// Flat view (`--stdout` / `--stderr` / `--tail <N>`) prints the latest
     /// run's stored report text verbatim, with no wrapping or decoration. The
     /// gate key is required here; `--tail <N>` keeps only the last N lines:
     ///
-    ///   jit gate check <ISSUE_ID> <GATE_KEY> --stdout
-    ///   jit gate check <ISSUE_ID> <GATE_KEY> --stderr --tail 40
+    ///   jit gate status <ISSUE_ID> <GATE_KEY> --stdout
+    ///   jit gate status <ISSUE_ID> <GATE_KEY> --stderr --tail 40
     ///
     /// History flags and flat-output flags are mutually exclusive. Every view
     /// supports `--json`.
-    Check {
+    #[command(visible_alias = "check")]
+    Status {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
@@ -1310,11 +1328,21 @@ pub enum GateCommands {
         json: bool,
     },
 
-    /// Show the last run result for all automated gates on an issue
-    /// (inspection only, non-mutating). With `--json`, stdout/stderr are
-    /// omitted from passing runs by default; pass `--full` to include them.
-    /// Failing runs always include stdout/stderr.
-    CheckAll {
+    /// Report readiness of every required gate on an issue (strict exit)
+    ///
+    /// Inspection only — never mutates gate state. Considers EVERY required
+    /// gate, automated and manual: a required gate is green only when its
+    /// recorded status is `passed`; a pending (auto never run, or manual never
+    /// attested) or failed gate is not green. Exits 0 only when all required
+    /// gates are green, otherwise 4 (pending and failed share the one nonzero
+    /// code; `--json` distinguishes them per gate). This readiness contract is
+    /// a single behaviour with no flag. The legacy verb `check-all` is a silent
+    /// alias.
+    ///
+    /// With `--json`, stdout/stderr are omitted from passing runs by default;
+    /// pass `--full` to include them. Failing runs always include stdout/stderr.
+    #[command(visible_alias = "check-all")]
+    StatusAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 

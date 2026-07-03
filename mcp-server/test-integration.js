@@ -191,7 +191,7 @@ async function main() {
       }
       // Core workflow tools must be present
       const names = new Set(tools.map(t => t.name));
-      for (const required of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_check-all']) {
+      for (const required of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_status-all']) {
         assert.ok(names.has(required), `missing core tool: ${required}`);
       }
     });

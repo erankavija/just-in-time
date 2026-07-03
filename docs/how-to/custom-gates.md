@@ -22,7 +22,7 @@ jit gate define code-review \
 jit gate add $ISSUE code-review
 
 # Later, mark as passed
-jit gate pass $ISSUE code-review --by "human:reviewer"
+jit gate evaluate $ISSUE code-review --by "human:reviewer"
 ```
 
 **Use manual gates for:**
@@ -49,11 +49,11 @@ jit gate define tests \
 jit gate add $ISSUE tests
 
 # Run the checker
-jit gate pass $ISSUE tests
+jit gate evaluate $ISSUE tests
 # ✓ Gate 'tests' passed
 
 # Inspect the most recent recorded gate runs
-jit gate check-all $ISSUE
+jit gate status-all $ISSUE
 ```
 
 **Use automated gates for:**
@@ -314,10 +314,10 @@ Each subsequent run includes previous results in `run_history`, sorted chronolog
 
 ```bash
 # First run: run_history is empty
-jit gate check $ISSUE review
+jit gate status $ISSUE review
 
 # Second run: run_history contains the first run's stdout/stderr/exit_code
-jit gate check $ISSUE review
+jit gate status $ISSUE review
 ```
 
 ### Example: AI Review Script
@@ -766,7 +766,7 @@ jit issue update $ISSUE --state done
 # Issue in gated state
 
 # Reviewer approves
-jit gate pass $ISSUE code-review --by "human:alice"
+jit gate evaluate $ISSUE code-review --by "human:alice"
 # Issue auto-transitions to done
 ```
 

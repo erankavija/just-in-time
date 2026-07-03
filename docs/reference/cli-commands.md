@@ -1399,26 +1399,29 @@ Gate: tests
     Timeout: 300s
 ```
 
-### `jit gate check`
+### `jit gate status`
 
-The unified gate-run inspection surface (inspection only, non-mutating). It
-offers three views over the stored run records: the latest run (default), prior
-runs (history), and the raw report text (flat). All three are read-only and
-reuse already-recorded runs; none executes a checker or mutates gate state.
+The unified gate-run inspection surface (inspection only, non-mutating). Legacy
+alias: `check`. It offers three views over the stored run records: the latest
+run (default), prior runs (history), and the raw report text (flat). All three
+are read-only and reuse already-recorded runs; none executes a checker or
+mutates gate state. Unlike [`status-all`](#jit-gate-status-all), the singular
+`status` never exits nonzero on a pending or failed gate — it is pure
+inspection.
 
 **Usage:**
 ```bash
 # Latest-run view (default): one gate, its most recent recorded run
-jit gate check <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
-jit gate check <ISSUE_ID> --gate <GATE_KEY> [--json] [--quiet]
+jit gate status <ISSUE_ID> <GATE_KEY> [--json] [--quiet]
+jit gate status <ISSUE_ID> --gate <GATE_KEY> [--json] [--quiet]
 
 # History view: prior runs newest-first, gate key OPTIONAL (acts as a filter)
-jit gate check <ISSUE_ID> --all [--gate <GATE_KEY>] [--status <STATUS>] [--json]
-jit gate check <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>] [--json]
+jit gate status <ISSUE_ID> --all [--gate <GATE_KEY>] [--status <STATUS>] [--json]
+jit gate status <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>] [--json]
 
 # Flat view: the latest run's stored report text, verbatim
-jit gate check <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>] [--json]
-jit gate check <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>] [--json]
+jit gate status <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>] [--json]
+jit gate status <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>] [--json]
 ```
 
 For the latest-run and flat views the gate key may be supplied as a positional
@@ -1447,57 +1450,69 @@ applies only to the history view. Each violation is reported as an
 **Examples:**
 ```bash
 # Latest-run view (positional and flag forms are equivalent)
-jit gate check abc123 tests
+jit gate status abc123 tests
 # Gate 'tests' last run: passed (exit code: 0)
-jit gate check abc123 --gate tests
+jit gate status abc123 --gate tests
 
 # History view: all prior runs of every gate, newest-first
-jit gate check abc123 --all
+jit gate status abc123 --all
 
 # History view: the 5 most recent failed runs of the 'tests' gate
-jit gate check abc123 --limit 5 --gate tests --status failed
+jit gate status abc123 --limit 5 --gate tests --status failed
 
 # Flat view: the latest 'clippy' run's stderr, last 40 lines, undecorated
-jit gate check abc123 clippy --stderr --tail 40
+jit gate status abc123 clippy --stderr --tail 40
 ```
 
-### `jit gate check-all`
+### `jit gate status-all`
 
-Show the latest recorded runs for all automated gates on an issue.
+Report the readiness of every required gate on an issue (inspection only,
+non-mutating). Legacy alias: `check-all`.
 
 **Usage:**
 ```bash
-jit gate check-all <ISSUE_ID> [--json]
+jit gate status-all <ISSUE_ID> [--json] [--full]
 ```
 
 **Behavior:**
-- Shows the latest recorded run for each automated gate on the issue
-- Does not execute any checker commands
-- Reports which automated gates do not have recorded runs yet
+- Considers EVERY required gate on the issue — automated AND manual. A required
+  manual gate that has not been attested counts as pending.
+- Does not execute any checker commands; it only reports recorded state.
+- Exits `0` only when every required gate has passed; otherwise exits `4`. A
+  pending (auto never run, manual never attested) or failed gate is not green,
+  and both map to the single nonzero code. This readiness contract is a single
+  behaviour with no flag.
+- With `--json`, `total` / `passed` / `not_run` count all required gates, and a
+  `gate_statuses` array carries each required gate's status (`passed` /
+  `failed` / `pending`) so a caller can tell a failed gate from a pending one.
+  `all_passed` mirrors the exit contract. `--full` includes stdout/stderr for
+  passing automated runs (failing runs always include them).
 
-`check-all` stays the cross-gate latest snapshot; it does not take the history
-(`--all` / `--limit` / `--status`) or flat (`--stdout` / `--stderr` / `--tail`)
-flags. Those views operate on a single gate's run records and live on
-`gate check` (use `gate check <id> --all` for history across all gates).
+The singular [`jit gate status`](#jit-gate-status) carries the history
+(`--all` / `--limit` / `--status`) and flat (`--stdout` / `--stderr` / `--tail`)
+views over a single gate's run records; `status-all` is the cross-gate
+readiness snapshot only.
 
 **Example:**
 ```bash
-$ jit gate check-all abc123
+$ jit gate status-all abc123          # exits 4 while any gate is not passed
 
-Gate run results for issue abc123:
+Gate readiness for issue abc123:
 Gate 'tests' last run: passed (exit code: 0)
 Gate 'fmt' last run: passed (exit code: 0)
-Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate pass' to run it.
+Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate evaluate' to run it.
 ```
 
-### `jit gate pass`
+### `jit gate evaluate`
 
-Run the checker (auto gates) or record attestation (manual gates) for a gate on an issue.
+Run the checker (auto gates) or record attestation (manual gates) for a gate on
+an issue. This produces a verdict (which may be *fail*), so it is not an
+override. Legacy alias: `pass`; short alias: `eval`.
 
 **Usage:**
 ```bash
-jit gate pass <ISSUE_ID> <GATE_KEY> [--by <WHO>] [--force]
-jit gate pass <ISSUE_ID> --gate <GATE_KEY> [--by <WHO>] [--force]
+jit gate evaluate <ISSUE_ID> <GATE_KEY> [--by <WHO>] [--force]
+jit gate evaluate <ISSUE_ID> --gate <GATE_KEY> [--by <WHO>] [--force]
 ```
 
 The gate key may be supplied as a positional argument or via `--gate <key>`. Exactly one form must be used; supplying both or neither is an error.
@@ -1510,20 +1525,20 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 **Examples:**
 ```bash
 # Pass manual gate (positional form)
-jit gate pass abc123 code-review --by "human:alice"
+jit gate evaluate abc123 code-review --by "human:alice"
 
 # Same command using the flag form
-jit gate pass abc123 --gate code-review --by "human:alice"
+jit gate evaluate abc123 --gate code-review --by "human:alice"
 
 # Pass without attribution
-jit gate pass abc123 tdd-reminder
+jit gate evaluate abc123 tdd-reminder
 
 # Pass automated gate manually (override checker)
-jit gate pass abc123 tests --by "human:admin"
+jit gate evaluate abc123 tests --by "human:admin"
 
 # Force a re-run even if it already passed at HEAD
-jit gate pass abc123 tests --force
-jit gate pass abc123 --gate tests --force
+jit gate evaluate abc123 tests --force
+jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
@@ -1562,7 +1577,7 @@ a runner error.
 
 **`--json` verdict field:**
 
-`jit gate pass --json` carries a `verdict` field describing the run-path outcome:
+`jit gate evaluate --json` carries a `verdict` field describing the run-path outcome:
 
 - `pass` — top-level field on the success response.
 - `fail` — under `error.details` when the checker ran and failed (code `4`).
@@ -1573,7 +1588,7 @@ verdicts, so they carry no `verdict` field.
 
 ```bash
 # Success response
-jit gate pass abc123 tests --json
+jit gate evaluate abc123 tests --json
 # {
 #   "issue_id": "abc123",
 #   "gate_key": "tests",
@@ -1586,13 +1601,14 @@ jit gate pass abc123 tests --json
 # Runner error    (exit 10): error.details.verdict == "error"
 ```
 
-### `jit gate pass-all`
+### `jit gate evaluate-all`
 
-Pass all of an issue's required gates in one command, **fail-fast**.
+Evaluate all of an issue's required gates in one command, **fail-fast**. Legacy
+alias: `pass-all`.
 
 **Usage:**
 ```bash
-jit gate pass-all <ISSUE_ID> [--by <WHO>] [--force]
+jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 ```
 
 **Options:**
@@ -1600,26 +1616,26 @@ jit gate pass-all <ISSUE_ID> [--by <WHO>] [--force]
 - `--force` - Re-run every gate's checker even if it already passed at the current HEAD commit
 
 **Behavior:**
-- Runs each required gate in declaration order, delegating to `jit gate pass`, so
+- Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
   every gate inherits the same exit-code taxonomy, `verdict` semantics, and the
   **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
   its entry reports `already_passed: true`).
 - **Fail-fast:** on the FIRST gate that does not pass, the command stops
   immediately and exits with that gate's code from the
-  [`jit gate pass`](#jit-gate-pass) taxonomy (`0` pass / `2` bad-args / `3`
+  [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (`0` pass / `2` bad-args / `3`
   not-found / `4` checker-failed / `10` runner-error). Later gates are never
   attempted.
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
   per gate (`gate_key`, `status`, `verdict`, `already_passed`). On the first
-  failure it emits the same JSON-error shape as `jit gate pass` (with
+  failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.verdict` `fail` or `error` and `error.details.gate_key` naming
   the offending gate).
 
 ```bash
 # All gates pass (one already passed at HEAD, one freshly run)
-jit gate pass-all abc123 --json
+jit gate evaluate-all abc123 --json
 # {
 #   "issue_id": "abc123",
 #   "status": "passed",
@@ -1632,7 +1648,7 @@ jit gate pass-all abc123 --json
 # }
 
 # Fail-fast: first failing gate sets the exit code; later gates do not run.
-jit gate pass-all abc123          # exit 4 if a checker fails, 10 on runner error
+jit gate evaluate-all abc123          # exit 4 if a checker fails, 10 on runner error
 ```
 
 ### `jit gate fail`
@@ -1718,10 +1734,10 @@ All gate commands use standard exit codes:
 - `0` - Success
 - `2` - Invalid argument (e.g. gate not required for the issue, duplicate gate)
 - `3` - Resource not found (issue or gate)
-- `4` - Validation/checker failure (e.g. `jit gate pass` checker verdict `fail`)
-- `10` - Runner/external error (e.g. `jit gate pass` checker timeout or crash)
+- `4` - Validation/checker failure (e.g. `jit gate evaluate` checker verdict `fail`)
+- `10` - Runner/external error (e.g. `jit gate evaluate` checker timeout or crash)
 
-See [`jit gate pass`](#jit-gate-pass) above for the full pass-specific taxonomy
+See [`jit gate evaluate`](#jit-gate-evaluate) above for the full pass-specific taxonomy
 and the `--json` `verdict` field.
 
 ## Gate Preset Commands
@@ -2193,7 +2209,7 @@ ISSUE_ID=$1
 
 # Run tests
 if cargo test; then
-  jit gate pass "$ISSUE_ID" tests --quiet
+  jit gate evaluate "$ISSUE_ID" tests --quiet
   echo "✓ Tests passed for $ISSUE_ID"
 else
   jit gate fail "$ISSUE_ID" tests --quiet
@@ -2203,7 +2219,7 @@ fi
 
 # Run linter
 if cargo clippy -- -D warnings; then
-  jit gate pass "$ISSUE_ID" clippy --quiet
+  jit gate evaluate "$ISSUE_ID" clippy --quiet
   echo "✓ Clippy passed for $ISSUE_ID"
 else
   jit gate fail "$ISSUE_ID" clippy --quiet

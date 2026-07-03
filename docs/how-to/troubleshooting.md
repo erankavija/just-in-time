@@ -48,8 +48,8 @@ Blockers:
   - code-review [pending]
 
 To fix:
-  - jit gate check-all def67890
-  - jit gate pass def67890 code-review
+  - jit gate status-all def67890
+  - jit gate evaluate def67890 code-review
 
 Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
 ```
@@ -68,12 +68,12 @@ become ready or complete. Required gates must pass before an issue can become
    ```
 2. **Inspect gate blockers:**
    ```bash
-   jit gate check-all <issue-id>
+   jit gate status-all <issue-id>
    ```
 3. **Resolve the blocker:** complete/reject dependency issues, or pass required
    gates:
    ```bash
-   jit gate pass <issue-id> <gate-key>
+   jit gate evaluate <issue-id> <gate-key>
    ```
 
 For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or

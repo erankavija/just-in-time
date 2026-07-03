@@ -165,18 +165,18 @@ In a real workflow, these gates would be passed automatically or by team members
 
 ```bash
 # Pass gates for Task 1
-jit gate pass $TASK1 unit-tests --by "ci:github-actions"
-jit gate pass $TASK1 review --by "human:tech-lead"
+jit gate evaluate $TASK1 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK1 review --by "human:tech-lead"
 jit issue update $TASK1 --state ready
 
 # Pass gates for Task 2
-jit gate pass $TASK2 unit-tests --by "ci:github-actions"
-jit gate pass $TASK2 review --by "human:tech-lead"
+jit gate evaluate $TASK2 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK2 review --by "human:tech-lead"
 jit issue update $TASK2 --state ready
 
 # Pass gates for Task 3
-jit gate pass $TASK3 unit-tests --by "ci:github-actions"
-jit gate pass $TASK3 review --by "human:tech-lead"
+jit gate evaluate $TASK3 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK3 review --by "human:tech-lead"
 jit issue update $TASK3 --state ready
 
 # Check status
@@ -237,8 +237,8 @@ TASK4=$(jit issue create \
 jit dep add $EPIC $TASK4
 
 # Pass gates and make ready
-jit gate pass $TASK4 unit-tests --by "ci:github-actions"
-jit gate pass $TASK4 review --by "human:security-team"
+jit gate evaluate $TASK4 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK4 review --by "human:security-team"
 jit issue update $TASK4 --state ready
 
 # Another agent claims it
@@ -281,8 +281,8 @@ Final integration and epic completion:
 
 ```bash
 # Epic is unblocked, but still needs its own gates
-jit gate pass $EPIC review --by "human:tech-lead"
-jit gate pass $EPIC integration-tests --by "ci:github-actions"
+jit gate evaluate $EPIC review --by "human:tech-lead"
+jit gate evaluate $EPIC integration-tests --by "ci:github-actions"
 
 # Epic is now ready
 jit issue update $EPIC --state ready
@@ -340,7 +340,7 @@ jit status
 - `jit issue create` with labels and gates
 - `jit dep add` - Build dependency graph
 - `jit issue claim` - Atomic agent assignment
-- `jit gate pass` - Mark gates as passed
+- `jit gate evaluate` - Mark gates as passed
 - `jit query available/blocked` - Find available work
 - `jit graph deps` - Visualize dependency trees
 
