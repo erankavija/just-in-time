@@ -4790,3 +4790,10 @@
 {"type":"issue_updated","id":"a0d413be-9336-4c04-9317-67ea996e1c37","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-02T23:55:26.616550591Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"b0b5b0a2-a14f-4102-8558-f04b7c461142","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-02T23:55:26.624119716Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"19b51a21-eea3-46e0-baf6-8b072c0ef677","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-02T23:55:26.631437541Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_added","id":"69632ab4-13ca-4450-affc-7af655f261df","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-02T23:57:20.091520987Z","gate_key":"cargo-ci"}
+{"type":"gate_passed","id":"8e6599d2-31d0-4050-911a-f3ebc5c2edca","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-02T23:58:44.749424558Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"5f4ca1a4-0520-482b-a1fd-102153d2b0af","issue_id":"eff48a6e-1fa4-4958-8afc-1eda360ffcb8","timestamp":"2026-07-03T00:00:21.047186133Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"d1d0ecad-dffe-40dd-a661-5221ddc09233","issue_id":"206bd960-6531-4aa0-a73a-1d525f4604ee","timestamp":"2026-07-03T00:03:10.692167615Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"e39d8c8f-7612-4aa6-8f82-156d85724669","issue_id":"206bd960-6531-4aa0-a73a-1d525f4604ee","timestamp":"2026-07-03T00:03:10.694971677Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"23e04eab-09b9-4dfb-a736-d9797b78db5c","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-03T00:03:56.922911253Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"520339f8-0ecd-4423-8865-2be2651d5114","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-03T00:03:56.930521589Z","updated_by":"doc-add","fields":["documents"]}

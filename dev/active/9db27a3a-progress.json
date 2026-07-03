@@ -1,0 +1,187 @@
+{
+  "container_id": "9db27a3a-86c5-4d79-9582-9ad68364ea36",
+  "container_short_id": "9db27a3a",
+  "charter_path": "docs/9db27a3a-charter.md",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "containers": [
+        {
+          "id": "14303b30-75b2-4b21-8963-bc6563b95b91",
+          "short_id": "14303b30",
+          "title": "Epic: Agent-Friendly Additions",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
+          "short_id": "1f564776",
+          "title": "Skill-suite maintenance",
+          "wave": 1,
+          "status": "pending"
+        },
+        {
+          "id": "25064508-d563-4073-a970-296607a01adc",
+          "short_id": "25064508",
+          "title": "Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "41d07c6b-24ff-4d4d-8f7f-56daba93bfd7",
+          "short_id": "41d07c6b",
+          "title": "Epic: Usability Improvements",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "53e3fa36-c0cb-4206-8e8e-0a21aafb213e",
+          "short_id": "53e3fa36",
+          "title": "Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "5fe00921-6548-4263-b428-f1e839f68c74",
+          "short_id": "5fe00921",
+          "title": "Epic: Production Stability",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "6eb585bc-998d-4778-906d-415fcdc1916e",
+          "short_id": "6eb585bc",
+          "title": "Core maintenance",
+          "wave": 1,
+          "status": "pending"
+        },
+        {
+          "id": "7095769d-0487-417d-a807-233845433a76",
+          "short_id": "7095769d",
+          "title": "Code-smell cleanup: eliminate cross-boundary leaks and stringly-typed code",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "71373e37-bb30-41d2-af0c-f08f381e027e",
+          "short_id": "71373e37",
+          "title": "Epic: Documentation Lifecycle and Reorganization",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
+          "short_id": "90a2dbfd",
+          "title": "Generalize addressable items to declarative kinds over markdown/toml sources",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
+          "short_id": "94d26c42",
+          "title": "Lifecycle-aware validation enforcement and steering quality",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "9ac9fdac-828a-40f2-9d73-71af14f44ff8",
+          "short_id": "9ac9fdac",
+          "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
+          "short_id": "9d427a6b",
+          "title": "Epic: Production Polish",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "ad601a15-5217-439f-9b3c-94a52c06c18b",
+          "short_id": "ad601a15",
+          "title": "Enable parallel multi-agent work with git worktrees",
+          "wave": 1,
+          "status": "done"
+        },
+        {
+          "id": "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
+          "short_id": "d7bfd4a4",
+          "title": "Epic: Production Observability",
+          "wave": 1,
+          "status": "rejected"
+        },
+        {
+          "id": "f2532a2d-138d-46bf-9547-e1ea517f0170",
+          "short_id": "f2532a2d",
+          "title": "jit-project-lead skill: milestone-level vision steward above the epic lead",
+          "wave": 1,
+          "status": "pending"
+        },
+        {
+          "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
+          "short_id": "f6a704d0",
+          "title": "Generic issue & label validation engine (JSON-Schema-based), with SDD as first application",
+          "wave": 1,
+          "status": "done"
+        }
+      ],
+      "coherence_review": "not-run"
+    },
+    {
+      "wave_number": 2,
+      "containers": [
+        {
+          "id": "2e926e39-906e-4952-8ae0-38215a7e5aac",
+          "short_id": "2e926e39",
+          "title": "Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping",
+          "wave": 2,
+          "status": "done"
+        },
+        {
+          "id": "93f3e4df-990c-4993-b8dc-66a8827acba7",
+          "short_id": "93f3e4df",
+          "title": "Issue Lifecycle - Rejection State",
+          "wave": 2,
+          "status": "done"
+        },
+        {
+          "id": "cfb3ba94-7406-4bc3-9f36-cecdcebacf0e",
+          "short_id": "cfb3ba94",
+          "title": "Epic: User Documentation (Product Docs Phase 2)",
+          "wave": 2,
+          "status": "done"
+        }
+      ],
+      "coherence_review": "not-run"
+    },
+    {
+      "wave_number": 3,
+      "containers": [
+        {
+          "id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
+          "short_id": "2821e177",
+          "title": "Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+          "wave": 3,
+          "status": "pending"
+        },
+        {
+          "id": "4a00b2b0-a527-4f04-9475-62f1d838f903",
+          "short_id": "4a00b2b0",
+          "title": "Epic: AI Agent Validation",
+          "wave": 3,
+          "status": "done"
+        }
+      ],
+      "coherence_review": "not-run"
+    }
+  ],
+  "escalations": [],
+  "notes": [
+    "Roster S = the 22 direct sub-strategic children of milestone 9db27a3a: epics carrying milestone:v1.0. Waves computed per references/wave-layering.md over S only (sibling-deps = jit graph deps <epic> --depth 0 intersected with S).",
+    "d7bfd4a4 (Epic: Production Observability) is REJECTED, not delivered; carried as a status:rejected row so the roster stays complete, but it is not a blocker for milestone completion.",
+    "current_wave=1: Wave 1 still holds non-done epics 1f564776 (Skill-suite maintenance), 6eb585bc (Core maintenance), f2532a2d (jit-project-lead skill). The 17 done epics and the rejected one are recorded at their real state; no re-dispatch."
+  ],
+  "started_at": "2026-07-03"
+}

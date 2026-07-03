@@ -34,11 +34,25 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/9db27a3a-charter.md",
+      "commit": null,
+      "label": "Project charter",
+      "doc_type": "design",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/9db27a3a-progress.json",
+      "commit": null,
+      "label": "Steward progress",
+      "doc_type": "notes"
+    }
+  ],
   "labels": [
     "type:milestone",
     "milestone:v1.0"
   ],
   "created_at": "2025-12-18T20:35:58.694584821Z",
-  "updated_at": "2026-07-02T23:10:59.063416600Z"
+  "updated_at": "2026-07-03T00:03:56.930337519Z"
 }
