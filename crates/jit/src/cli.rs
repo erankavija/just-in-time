@@ -261,6 +261,15 @@ pub enum Commands {
     #[command(subcommand)]
     Invariant(InvariantCommands),
 
+    /// Project the rule + gate registries into a reference document
+    ///
+    /// Rules live in `.jit/rules.toml` and gates in `.jit/gates.toml`; `render`
+    /// writes them as one reference document into the target configured by
+    /// `[rules_gates_projection]` (default: a separate jit-owned file). The target
+    /// path comes only from config.
+    #[command(subcommand)]
+    Reference(ReferenceCommands),
+
     /// Search issues and documents
     Search {
         /// Search query string
@@ -519,6 +528,32 @@ pub enum InvariantCommands {
     ///   jit invariant check           # Human-readable drift report
     ///   jit invariant check --json    # Machine-readable result
     Check {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Rules-and-gates reference subcommands.
+///
+/// `render` projects the effective rule set (`.jit/rules.toml`) and the gate
+/// registry (`.jit/gates.toml`) into one reference document at the
+/// `[rules_gates_projection]` target. Every rule/gate is addressed by its
+/// canonical kind-segmented form (`@/rule/<name>`, `@/gate/<key>`). The target
+/// path/mode/delimiters come only from config.
+#[derive(Subcommand)]
+pub enum ReferenceCommands {
+    /// Render the rule + gate registries into their configured reference document
+    ///
+    /// Reads `[rules_gates_projection]` from config (default: separate-file mode
+    /// targeting a jit-owned file) and writes the rendered registries there. In
+    /// region mode only the delimited region is rewritten; everything outside is
+    /// byte-preserved.
+    ///
+    /// Examples:
+    ///   jit reference render          # Write the configured target
+    ///   jit reference render --json   # Machine-readable result
+    Render {
         /// Output as JSON
         #[arg(long)]
         json: bool,

@@ -20,7 +20,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, InvariantCommands, IssueCommands, ItemCommands,
+    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ReferenceCommands,
 };
 use jit::commands::CommandExecutor;
 use jit::domain::{GateRunResult, Priority, State};
@@ -846,6 +846,62 @@ fn run_invariant_inner<S: IssueStore>(
             // still prints a valid payload.
             if exit_nonzero {
                 std::process::exit(jit::ExitCode::ValidationFailed.code());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Run `jit reference <subcommand>`.
+///
+/// A thin delegation over the [`CommandExecutor`] rules-and-gates methods:
+/// `render` projects the rule + gate registries into their configured reference
+/// document and reports the written target. On `--json` a failure is rendered as a
+/// JSON error object (honoring the machine-readable contract) rather than the
+/// top-level plain `Error: ...`.
+fn run_reference<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: ReferenceCommands,
+    quiet: bool,
+) -> Result<()> {
+    let json = match &command {
+        ReferenceCommands::Render { json } => *json,
+    };
+
+    let result = run_reference_inner(executor, command, quiet);
+    if let Err(e) = result {
+        handle_json_error!(
+            json,
+            e,
+            jit::output::JsonError::new("REFERENCE_COMMAND_FAILED", e.to_string(), "reference")
+        );
+    }
+    Ok(())
+}
+
+/// Inner dispatch for `jit reference`; errors are converted to JSON by
+/// [`run_reference`] when `--json` is set.
+fn run_reference_inner<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    command: ReferenceCommands,
+    quiet: bool,
+) -> Result<()> {
+    match command {
+        ReferenceCommands::Render { json } => {
+            let result = executor.render_rules_and_gates()?;
+            let output_ctx = OutputContext::new(quiet, json);
+            if json {
+                let msg = format!(
+                    "Rendered {} rule(s) and {} gate(s) to {}",
+                    result.rules, result.gates, result.target
+                );
+                let output = JsonOutput::success(&result, "reference render").with_message(msg);
+                println!("{}", output.to_json_string()?);
+            } else {
+                output_ctx.print_data(format!(
+                    "Rendered {} rule(s) and {} gate(s) to {} ({} mode)",
+                    result.rules, result.gates, result.target, result.mode
+                ))?;
             }
         }
     }
@@ -4845,6 +4901,9 @@ fn run() -> Result<()> {
         }
         Commands::Invariant(invariant_cmd) => {
             run_invariant(&executor, invariant_cmd, quiet)?;
+        }
+        Commands::Reference(reference_cmd) => {
+            run_reference(&executor, reference_cmd, quiet)?;
         }
         Commands::Search {
             query,

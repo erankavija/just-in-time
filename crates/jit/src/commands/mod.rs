@@ -44,6 +44,7 @@ pub mod item;
 mod labels;
 pub mod plan_doc;
 mod query;
+pub mod reference;
 mod search;
 pub mod serve;
 pub mod snapshot;
@@ -68,6 +69,7 @@ pub use gate::{
 pub use graph::GraphExportFormat;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use item::{ItemListResult, ItemShowResult};
+pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;
 pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE};
 
