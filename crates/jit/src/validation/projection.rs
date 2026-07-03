@@ -29,7 +29,13 @@ use crate::storage::{IssueStore, PathReadError};
 use crate::validation::invariants::{InvariantKind, InvariantRegistry};
 use thiserror::Error;
 
-/// Errors raised while projecting the invariant registry into its doc target.
+/// Errors raised while projecting a registry into its documentation target.
+///
+/// Shared by the invariant projection ([`project_invariants`]) and the
+/// rules-and-gates projection
+/// ([`project_rules_and_gates`](crate::validation::rules_gates_projection::project_rules_and_gates)),
+/// which both splice through [`splice_region`] and write through the storage
+/// atomic helper.
 ///
 /// Every variant carries enough context (the offending marker, the target path,
 /// or the underlying I/O error) to point an author at the problem. A missing or
@@ -47,14 +53,14 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ProjectionError {
     /// The configured begin marker was not found in the region-mode target.
-    #[error("invariant region begin marker '{marker}' not found in target")]
+    #[error("projection region begin marker '{marker}' not found in target")]
     MissingBeginMarker {
         /// The begin marker that was searched for.
         marker: String,
     },
 
     /// The configured end marker was not found after the begin marker.
-    #[error("invariant region end marker '{marker}' not found after begin marker in target")]
+    #[error("projection region end marker '{marker}' not found after begin marker in target")]
     MissingEndMarker {
         /// The end marker that was searched for.
         marker: String,
@@ -62,7 +68,7 @@ pub enum ProjectionError {
 
     /// The end marker appears before the begin marker (malformed region).
     #[error(
-        "invariant region end marker '{end}' precedes begin marker '{begin}' in target (malformed region)"
+        "projection region end marker '{end}' precedes begin marker '{begin}' in target (malformed region)"
     )]
     MarkersOutOfOrder {
         /// The begin marker.
@@ -72,14 +78,16 @@ pub enum ProjectionError {
     },
 
     /// Region mode requires an existing target file, but none was found.
-    #[error("region-mode invariant target '{path}' does not exist (region mode cannot create it)")]
+    #[error(
+        "region-mode projection target '{path}' does not exist (region mode cannot create it)"
+    )]
     TargetNotFound {
         /// The configured target path.
         path: String,
     },
 
     /// The region-mode target could not be read (invalid path or I/O failure).
-    #[error("failed to read invariant projection target '{path}': {source}")]
+    #[error("failed to read projection target '{path}': {source}")]
     Read {
         /// The configured target path.
         path: String,
@@ -90,7 +98,7 @@ pub enum ProjectionError {
     /// Writing the rendered projection failed (an invalid/escaping path is
     /// rejected as [`PathReadError::InvalidPath`] before any write; an I/O
     /// failure surfaces as [`PathReadError::Other`]).
-    #[error("failed to write invariant projection target '{path}': {source}")]
+    #[error("failed to write projection target '{path}': {source}")]
     Write {
         /// The configured target path.
         path: String,

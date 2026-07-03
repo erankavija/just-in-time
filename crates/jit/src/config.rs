@@ -49,6 +49,16 @@ pub struct JitConfig {
     /// from config and never hardcodes a documentation filename. See
     /// [`InvariantProjectionConfig`].
     pub invariant_projection: Option<InvariantProjectionConfig>,
+    /// Documentation target the rule + gate registries project into (optional).
+    ///
+    /// The rules/gates analogue of [`invariant_projection`](Self::invariant_projection):
+    /// when the `[rules_gates_projection]` table is ABSENT, the projection engine
+    /// falls back to [`RulesGatesProjectionConfig::default`], which targets a
+    /// separate jit-owned file ([`DEFAULT_RULES_GATES_PROJECTION_TARGET`]) in
+    /// separate-file mode, so the default never touches existing docs. The target
+    /// path lives ONLY here in the config layer. See
+    /// [`RulesGatesProjectionConfig`].
+    pub rules_gates_projection: Option<RulesGatesProjectionConfig>,
     /// Worktree and parallel work configuration (optional).
     pub worktree: Option<WorktreeConfig>,
     /// Coordination settings for leases and agents (optional).
@@ -1201,6 +1211,223 @@ pub enum ProjectionStyle {
     IdAnchor,
 }
 
+/// The shipped DEFAULT documentation target for the rules-and-gates projection.
+///
+/// A separate jit-owned file under `.jit/` so the default behavior never touches
+/// existing project docs, mirroring [`DEFAULT_INVARIANT_PROJECTION_TARGET`]. This
+/// is the SOLE place the default filename lives: the projection engine reads the
+/// resolved target from config and contains no documentation-filename literal. It
+/// is the value [`RulesGatesProjectionConfig::target`] resolves to when no
+/// `target` is set.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_PROJECTION_TARGET};
+///
+/// assert_eq!(DEFAULT_RULES_GATES_PROJECTION_TARGET, ".jit/rules-and-gates.md");
+/// assert_eq!(
+///     RulesGatesProjectionConfig::default().target(),
+///     DEFAULT_RULES_GATES_PROJECTION_TARGET
+/// );
+/// ```
+pub const DEFAULT_RULES_GATES_PROJECTION_TARGET: &str = ".jit/rules-and-gates.md";
+
+/// The default begin marker delimiting the rules-and-gates region in `region` mode.
+///
+/// Used by [`RulesGatesProjectionConfig::region_begin`] when no `region-begin` is
+/// configured.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_BEGIN};
+///
+/// assert_eq!(
+///     DEFAULT_RULES_GATES_REGION_BEGIN,
+///     "<!-- jit:rules-and-gates:begin -->"
+/// );
+/// assert_eq!(
+///     RulesGatesProjectionConfig::default().region_begin(),
+///     DEFAULT_RULES_GATES_REGION_BEGIN
+/// );
+/// ```
+pub const DEFAULT_RULES_GATES_REGION_BEGIN: &str = "<!-- jit:rules-and-gates:begin -->";
+
+/// The default end marker delimiting the rules-and-gates region in `region` mode.
+///
+/// Used by [`RulesGatesProjectionConfig::region_end`] when no `region-end` is
+/// configured.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_END};
+///
+/// assert_eq!(
+///     DEFAULT_RULES_GATES_REGION_END,
+///     "<!-- jit:rules-and-gates:end -->"
+/// );
+/// assert_eq!(
+///     RulesGatesProjectionConfig::default().region_end(),
+///     DEFAULT_RULES_GATES_REGION_END
+/// );
+/// ```
+pub const DEFAULT_RULES_GATES_REGION_END: &str = "<!-- jit:rules-and-gates:end -->";
+
+/// Where and how the rule and gate registries project into human-readable docs.
+///
+/// The rules/gates analogue of [`InvariantProjectionConfig`]: an optional
+/// `[rules_gates_projection]` table on [`JitConfig`] declaring the SAME
+/// projection-mode / render-style / region-delimiter knobs (reusing
+/// [`ProjectionMode`] and [`ProjectionStyle`]). When the table is ABSENT, the
+/// engine uses [`RulesGatesProjectionConfig::default`] — separate-file mode
+/// targeting [`DEFAULT_RULES_GATES_PROJECTION_TARGET`] — so the default never
+/// touches existing docs. The `target` path and region delimiters are
+/// config-driven; the projection engine hardcodes no documentation filename.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::{
+///     RulesGatesProjectionConfig, ProjectionMode, DEFAULT_RULES_GATES_PROJECTION_TARGET,
+/// };
+///
+/// // The default targets a separate jit-owned file.
+/// let default = RulesGatesProjectionConfig::default();
+/// assert_eq!(default.mode(), ProjectionMode::SeparateFile);
+/// assert_eq!(default.target(), DEFAULT_RULES_GATES_PROJECTION_TARGET);
+///
+/// // Region mode into a hand-authored reference doc is opt-in via the table.
+/// let cfg: RulesGatesProjectionConfig = toml::from_str(
+///     r#"
+/// mode = "region"
+/// target = "docs/reference/rules-and-gates.md"
+/// region-begin = "<!-- RG START -->"
+/// region-end = "<!-- RG END -->"
+/// "#,
+/// )
+/// .unwrap();
+/// assert_eq!(cfg.mode(), ProjectionMode::Region);
+/// assert_eq!(cfg.target(), "docs/reference/rules-and-gates.md");
+/// assert_eq!(cfg.region_begin(), "<!-- RG START -->");
+/// ```
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+pub struct RulesGatesProjectionConfig {
+    /// Projection mode: a separate jit-owned file or a delimited region within an
+    /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
+    #[serde(default)]
+    pub mode: Option<ProjectionMode>,
+    /// Repo-relative path of the documentation target. Defaults to
+    /// [`DEFAULT_RULES_GATES_PROJECTION_TARGET`] when unset.
+    #[serde(default)]
+    pub target: Option<String>,
+    /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
+    /// [`DEFAULT_RULES_GATES_REGION_BEGIN`] when unset.
+    #[serde(default, rename = "region-begin")]
+    pub region_begin: Option<String>,
+    /// End marker delimiting the rewritten region in `region` mode. Defaults to
+    /// [`DEFAULT_RULES_GATES_REGION_END`] when unset.
+    #[serde(default, rename = "region-end")]
+    pub region_end: Option<String>,
+    /// Render style for the projected markdown block. Defaults to
+    /// [`ProjectionStyle::Full`] when unset (section headings + metadata bullets).
+    #[serde(default)]
+    pub style: Option<ProjectionStyle>,
+}
+
+impl RulesGatesProjectionConfig {
+    /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{RulesGatesProjectionConfig, ProjectionMode};
+    ///
+    /// assert_eq!(
+    ///     RulesGatesProjectionConfig::default().mode(),
+    ///     ProjectionMode::SeparateFile
+    /// );
+    /// ```
+    pub fn mode(&self) -> ProjectionMode {
+        self.mode.unwrap_or_default()
+    }
+
+    /// The resolved repo-relative target path (defaulting to the jit-owned file).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_PROJECTION_TARGET};
+    ///
+    /// assert_eq!(
+    ///     RulesGatesProjectionConfig::default().target(),
+    ///     DEFAULT_RULES_GATES_PROJECTION_TARGET
+    /// );
+    /// ```
+    pub fn target(&self) -> &str {
+        self.target
+            .as_deref()
+            .unwrap_or(DEFAULT_RULES_GATES_PROJECTION_TARGET)
+    }
+
+    /// The resolved begin marker for `region` mode (defaulting to the const).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_BEGIN};
+    ///
+    /// assert_eq!(
+    ///     RulesGatesProjectionConfig::default().region_begin(),
+    ///     DEFAULT_RULES_GATES_REGION_BEGIN
+    /// );
+    /// ```
+    pub fn region_begin(&self) -> &str {
+        self.region_begin
+            .as_deref()
+            .unwrap_or(DEFAULT_RULES_GATES_REGION_BEGIN)
+    }
+
+    /// The resolved end marker for `region` mode (defaulting to the const).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_END};
+    ///
+    /// assert_eq!(
+    ///     RulesGatesProjectionConfig::default().region_end(),
+    ///     DEFAULT_RULES_GATES_REGION_END
+    /// );
+    /// ```
+    pub fn region_end(&self) -> &str {
+        self.region_end
+            .as_deref()
+            .unwrap_or(DEFAULT_RULES_GATES_REGION_END)
+    }
+
+    /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::{RulesGatesProjectionConfig, ProjectionStyle};
+    ///
+    /// assert_eq!(
+    ///     RulesGatesProjectionConfig::default().style(),
+    ///     ProjectionStyle::Full
+    /// );
+    ///
+    /// let cfg: RulesGatesProjectionConfig =
+    ///     toml::from_str("style = \"id-anchor\"").unwrap();
+    /// assert_eq!(cfg.style(), ProjectionStyle::IdAnchor);
+    /// ```
+    pub fn style(&self) -> ProjectionStyle {
+        self.style.unwrap_or_default()
+    }
+}
+
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
 ///
 /// Raised by [`JitConfig::validate_item_kinds`] (and thus [`JitConfig::load`])
@@ -1635,6 +1862,7 @@ impl JitConfig {
                 namespaces: None,
                 item_kinds: None,
                 invariant_projection: None,
+                rules_gates_projection: None,
                 worktree: None,
                 coordination: None,
                 global_operations: None,

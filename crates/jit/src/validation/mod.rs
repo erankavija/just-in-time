@@ -35,6 +35,7 @@ pub mod local;
 pub mod projection;
 pub mod report;
 pub mod rules;
+pub mod rules_gates_projection;
 pub mod serialize;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
