@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Invoked to drive the epic ONLY until story 0efbc594 completes; stop and hand off after wave 8. Bracket P (0b611ccf) and B (923e42fb) already done; breakdown pre-exists.",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -79,8 +79,7 @@
           "title": "Widen the label-value grammar to accept @-prefixed addresses",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "review-held-for-tree-consistency",
-          "note": "code complete (6e73e418), cargo-ci passed; code-review flagged the planned labels.rs/defaults.rs divergence \u2014 542f8b6d lands the lockstep, then 0597febe re-reviews on a consistent tree"
+          "status": "done"
         }
       ]
     },
@@ -93,7 +92,7 @@
           "title": "Keep the label-format regex and generated JSON Schema in lockstep",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "in_review"
         },
         {
           "id": "7a2bbe4f",

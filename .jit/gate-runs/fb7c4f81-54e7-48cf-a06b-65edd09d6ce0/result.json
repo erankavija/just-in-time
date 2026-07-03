@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "fb7c4f81-54e7-48cf-a06b-65edd09d6ce0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0597febe-a888-40f5-8b29-fb86484e3a06",
+  "commit": "6e547e3b3ab5436ec352be504a979439b0c2ca86",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T10:23:13.128641329Z",
+  "completed_at": "2026-07-03T10:24:09.870796021Z",
+  "duration_ms": 56742,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met. `label_regex()` accepts the required `@` forms at `crates/jit/src/labels.rs:32-38`, preserves legacy valid forms in tests at `crates/jit/src/labels.rs:360-375`, and rejects colon-in-value cases at `crates/jit/src/labels.rs:396-402`.\n\nREQ-05 is satisfied by the succeeded `cargo-ci` gate: `.jit/gate-runs/352ebd0f-4b9b-49b7-8f37-a972fa4c0710/result.json` records fmt ok, clippy ok, and `2870 passed, 0 failed, 12 ignored`.\n\n**Architecture And Separation Of Concerns**\n\nPass. The production changes stay in label validation/default validation. No domain/storage/commands/CLI boundary violation found.\n\n**Functional Paradigm**\n\nPass. The change is declarative regex/schema update plus focused tests.\n\n**Correctness And Invariants**\n\nPass. The prior blocker is resolved: `CANONICAL_LABEL_REGEX` now matches `labels::label_regex()` at `crates/jit/src/validation/defaults.rs:61`, and the lockstep regression test is at `crates/jit/src/validation/defaults.rs:467-475`.\n\nThe generated schema is also updated at `.jit/schemas/default-label-format.json:5`, so write/runtime validation and `jit validate` no longer diverge.\n\n**Safety**\n\nPass. No unsafe code introduced.\n\n**Testing**\n\nPass. I did not rerun cargo tests because the issue has a succeeded cargo-ci gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nPass. No new fallible production path or error handling regression found.\n\n**CLI Contract**\n\nPass / N/A. No CLI surface changed.\n\n**Documentation**\n\nPass. No new public API was added. Existing public docs remain intact; `label_regex()` is `pub(crate)` only.\n\n**Prior Review Feedback**\n\nResolved. The stale default rule constant and generated schema called out in the prior failed review have both been updated, and a regression test now prevents future drift.\n\n**JIT Issue Management**\n\nPass. Dependency `37506c12` is marked `done` in the supplied issue context. `./scripts/jit-validate.sh` passed.\n\n**Findings**\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
