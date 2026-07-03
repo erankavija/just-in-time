@@ -46,6 +46,10 @@ struct GatesFile {
 /// file, so this only matters for a hand-deleted store (mirrors the tolerant
 /// absent-file handling elsewhere in storage).
 ///
+/// Two `[[gates]]` rows carrying the same `key` are an error: the key is the
+/// registry identity (and the `gate` item kind's addressable self-id), and
+/// silently keeping one row would drop the other on the next save.
+///
 /// # Examples
 ///
 /// ```
@@ -64,13 +68,18 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
         .with_context(|| format!("Failed to read file: {}", path.display()))?;
     let file: GatesFile =
         toml::from_str(&content).context("Failed to deserialize gate registry")?;
-    Ok(GateRegistry {
-        gates: file
-            .gates
-            .into_iter()
-            .map(|gate| (gate.key.clone(), gate))
-            .collect(),
-    })
+    let mut gates = std::collections::HashMap::with_capacity(file.gates.len());
+    for gate in file.gates {
+        let key = gate.key.clone();
+        if gates.insert(key.clone(), gate).is_some() {
+            return Err(anyhow::anyhow!(
+                "duplicate gate key '{key}' in {}: the key is the registry identity; \
+                 merge or rename the duplicate [[gates]] entry",
+                path.display()
+            ));
+        }
+    }
+    Ok(GateRegistry { gates })
 }
 
 /// Persist the gate registry to `<jit_root>/gates.toml` as a `[[gates]]`
@@ -262,5 +271,39 @@ mod tests {
         let mid_pos = content.find("key = \"mid\"").unwrap();
         let zeta_pos = content.find("key = \"zeta\"").unwrap();
         assert!(alpha_pos < mid_pos && mid_pos < zeta_pos, "{content}");
+    }
+
+    #[test]
+    fn test_load_gate_registry_rejects_duplicate_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let registry_toml = "\
+[[gates]]
+version = 1
+key = \"cargo-ci\"
+title = \"First\"
+description = \"first entry\"
+stage = \"postcheck\"
+mode = \"manual\"
+priority = 100
+auto = false
+
+[[gates]]
+version = 1
+key = \"cargo-ci\"
+title = \"Second\"
+description = \"duplicate key\"
+stage = \"postcheck\"
+mode = \"manual\"
+priority = 100
+auto = false
+";
+        std::fs::write(dir.path().join("gates.toml"), registry_toml).unwrap();
+
+        let err = load_gate_registry(dir.path()).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("duplicate gate key 'cargo-ci'"),
+            "error names the duplicate key: {msg}"
+        );
     }
 }

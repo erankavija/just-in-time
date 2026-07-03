@@ -4601,6 +4601,13 @@ fn run() -> Result<()> {
 
                 // Parse and set value based on expected type
                 let parsed_value: toml_edit::Item = match key.as_str() {
+                    // Typed fields validate on write, not only at load: an
+                    // invalid value must never reach the file (REQ-03 of the
+                    // multi-jit story: project identity is write-validated).
+                    "project.name" => {
+                        let name: jit::config::ProjectName = value.parse()?;
+                        toml_edit::value(name.as_str())
+                    }
                     k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
                         let num: i64 = value
                             .parse()
@@ -4618,8 +4625,8 @@ fn run() -> Result<()> {
 
                 doc[section][field] = parsed_value;
 
-                // Write back
-                fs::write(&config_path, doc.to_string())?;
+                // Write back atomically (temp file + rename, INV-ATOMIC-WRITES).
+                jit::storage::atomic_write::write_file_atomic(&config_path, &doc.to_string())?;
 
                 if json {
                     println!(

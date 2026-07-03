@@ -146,10 +146,14 @@ fn unique_schema_stem(identity: &str, used_stems: &mut HashSet<String>) -> Strin
     if used_stems.insert(base.clone()) {
         return base;
     }
-    (2..)
-        .map(|n| format!("{base}-{n}"))
-        .find(|candidate| used_stems.insert(candidate.clone()))
-        .expect("integer counter always yields an unused stem")
+    let mut n: u64 = 2;
+    loop {
+        let candidate = format!("{base}-{n}");
+        if used_stems.insert(candidate.clone()) {
+            return candidate;
+        }
+        n += 1;
+    }
 }
 
 const FILE_HEADER: &str = "\

@@ -166,3 +166,57 @@ fn test_config_validate_json_reports_invalid_project_name() {
         "errors should report the invalid [project] name as a repo-config error, got: {errors:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// REQ-03 (story 9a7106ae): the `jit config set` write path validates
+// project.name BEFORE writing — an invalid value never reaches the file.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_config_set_rejects_invalid_project_name_without_writing() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("write-path-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    jit_init(&repo_dir);
+    let before = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+
+    let out = Command::new(jit_binary())
+        .args(["config", "set", "project.name", "Bad_Name"])
+        .current_dir(&repo_dir)
+        .output()
+        .expect("failed to run jit config set");
+    assert!(
+        !out.status.success(),
+        "config set must reject an invalid project name on write"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("Bad_Name"),
+        "error names the offending value: {stderr}"
+    );
+
+    let after = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    assert_eq!(before, after, "a rejected set must not modify the file");
+}
+
+#[test]
+fn test_config_set_accepts_valid_project_name_and_round_trips() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("write-path-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    jit_init(&repo_dir);
+
+    let out = Command::new(jit_binary())
+        .args(["config", "set", "project.name", "renamed-project"])
+        .current_dir(&repo_dir)
+        .output()
+        .expect("failed to run jit config set");
+    assert!(out.status.success(), "valid set failed: {:?}", out);
+
+    let content = fs::read_to_string(repo_dir.join(".jit/config.toml")).unwrap();
+    let parsed: toml::Value = toml::from_str(&content).unwrap();
+    assert_eq!(
+        parsed["project"]["name"].as_str().unwrap(),
+        "renamed-project"
+    );
+}
