@@ -132,7 +132,8 @@
           "title": "Enforces link resolution for rule and gate items",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "DONE 2026-07-03 session 3. Commits 23cd2e8e+76fff197 on main; all gates passed first try (one cargo-ci flake-cascade round, not a code finding). Bonus: closed pre-existing unregistered [namespaces.enforces] gap for the invariant kind too."
         },
         {
           "id": "182aa0d5",
@@ -140,8 +141,8 @@
           "title": "Re-address minted qualified ids and remove the legacy kindless resolution path",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
-          "note": "created this session to implement story 7f22d6cf REQ-04 (amendment D11-A); 637764ef now depends on it"
+          "status": "rework-pending",
+          "note": "c85abc76 integrated as 4a116153; cargo-ci + repo-validate passed; code-review R1 FAIL (stale kindless-form doc comments in validation/invariants.rs, drift.rs, markdown fixture). Rework 1 dispatched to worker (manual doc-block read method)."
         }
       ]
     },
