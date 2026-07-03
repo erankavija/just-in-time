@@ -1086,7 +1086,7 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_project_items_rejects_path_traversal_source() {
         // Path-safety: a `..`-traversal source path is rejected by the storage
-        // boundary, so `@/<id>` resolution surfaces a typed InvalidPath error
+        // boundary, so `@/<kind>/<id>` resolution surfaces a typed InvalidPath error
         // rather than reading a file outside the repository.
         let storage = InMemoryStorage::new();
         storage.init().unwrap();

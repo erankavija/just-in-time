@@ -16,7 +16,7 @@
 //!   `POL-02`) under a `## Policies` section.
 //!
 //! Assertions:
-//! - Both items surface in `jit item list --json` with `@/POL-NN` qualified
+//! - Both items surface in `jit item list --json` with `@/policy/POL-NN` qualified
 //!   ids and kind `"policy"`.
 //! - `jit item list --kind policy` returns exactly the two items.
 //! - `jit item show @/policy/POL-01 --json` resolves the item by its qualified id.

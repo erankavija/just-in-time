@@ -2119,7 +2119,7 @@ source-of-truth = \"registry-first\"
 ";
 
     /// Build an executor over an in-memory `.jit` carrying a `.jit/invariants.toml`
-    /// (so the registry-first `invariant` kind resolves `enforces:@/<id>`) and the
+    /// (so the registry-first `invariant` kind resolves `enforces:@/invariant/<id>`) and the
     /// canonical `[item_kinds]` table, seeded with `issues`.
     fn dangling_exec(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();

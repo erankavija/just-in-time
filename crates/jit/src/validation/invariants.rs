@@ -102,7 +102,7 @@ pub enum InvariantKind {
 /// A single project-scoped invariant entry as loaded from `.jit/invariants.toml`.
 ///
 /// The `id` is the entry's SELF-ID; its project-scoped qualified id is
-/// `@/<id>`. `statement` and `kind` are required; `enforced_by` (authored as
+/// `@/invariant/<id>`. `statement` and `kind` are required; `enforced_by` (authored as
 /// `enforced-by`) is an optional binding to a rule name or gate key.
 ///
 /// # Examples
@@ -125,7 +125,7 @@ pub enum InvariantKind {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Invariant {
-    /// The entry's self-id; `@/<id>` is its project-scoped qualified id.
+    /// The entry's self-id; `@/invariant/<id>` is its project-scoped qualified id.
     pub id: String,
     /// The invariant statement (the property the project intends to hold).
     pub statement: String,

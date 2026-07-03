@@ -64,8 +64,10 @@ pub const DEFAULT_ITEM_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
 
 /// The scope sentinel that addresses project-level items not tied to any single
-/// issue. The first segment of a qualified id equal to this string denotes
-/// [`Scope::Project`] (REQ-01).
+/// issue. As a standalone scope token it denotes [`Scope::Project`] (REQ-01); it
+/// also opens every minted qualified id — `@/<kind>/<self-id>` for a project item,
+/// `@/issue/<short-id>/<kind>/<self-id>` for an issue item — so the `issue`
+/// reserved segment, not the leading `@`, is what distinguishes the two.
 pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 
 /// The substrate an addressable item belongs to (REQ-01), one input to its
