@@ -41,8 +41,8 @@ assert = { require-label = { label = "req:*", min = 1 } }
 fn epic(req: bool) -> Issue {
     let mut e = Issue::new("an epic".to_string(), String::new());
     // `epic:auth` keeps the epic strategically consistent so the built-in
-    // `default:strategic-consistency` graph warning does not add findings beyond
-    // the user rule under test.
+    // `strategic-consistency` graph warning (origin = "default") does not add
+    // findings beyond the user rule under test.
     e.labels = if req {
         vec![
             "type:epic".to_string(),

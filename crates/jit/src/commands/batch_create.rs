@@ -485,8 +485,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
             // Type validity: only enforced when the project configures a type
             // hierarchy; an empty set means any type is accepted. (The write-time
-            // `default:type-hierarchy-known` rule only WARNS, so this explicit
-            // check is what makes an unknown type a blocking pre-validation error.)
+            // `type-hierarchy-known` rule (origin = "default") only WARNS, so this
+            // explicit check is what makes an unknown type a blocking
+            // pre-validation error.)
             if let (Some(t), Some(known)) = (&def.r#type, known_types.as_ref()) {
                 if !known.contains(t.as_str()) {
                     problems.push(BatchValidationProblem::UnknownType {
@@ -570,7 +571,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// The set of known type names from the project's `[type_hierarchy]`, or
     /// `None` when no hierarchy is configured (in which case any type is valid,
-    /// matching the write-path `default:type-hierarchy-known` rule's behavior).
+    /// matching the write-path `type-hierarchy-known` rule's behavior).
     fn batch_known_types(&self) -> Result<Option<HashSet<String>>> {
         let config = self.cached_config()?;
         Ok(config
@@ -735,7 +736,8 @@ mod tests {
     #[test]
     fn test_collect_problems_invalid_label_via_write_validation() {
         // A malformed label is now caught by the full write-time validation
-        // (`default:label-format`), surfaced as a WriteValidation problem.
+        // (`label-format`, origin = "default"), surfaced as a WriteValidation
+        // problem.
         let exec = executor();
         let mut d = def("a", &[]);
         d.labels = vec!["NoColon".to_string()];
@@ -749,9 +751,9 @@ mod tests {
     fn test_collect_problems_duplicate_type_label_via_write_validation() {
         // The `type` field plus an explicit `type:*` label yields two `type:`
         // labels, which write-time namespace-uniqueness validation rejects
-        // (`default:namespace-unique:type`). This is the write-time-only
-        // violation that previously slipped past pre-validation into a partial
-        // write.
+        // (`namespace-unique-type`, origin = "default"). This is the
+        // write-time-only violation that previously slipped past pre-validation
+        // into a partial write.
         let exec = executor();
         let mut d = def("bad", &[]);
         d.r#type = Some("task".to_string());

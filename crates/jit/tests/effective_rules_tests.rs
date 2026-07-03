@@ -41,7 +41,7 @@ fn executor(jit_root: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
 fn test_effective_rules_file_present_is_sole_source() {
     let (_dir, jit_root) = repo();
     // A user file with a single rule; its presence must SUPPRESS the in-code
-    // defaults entirely (no default:* rules combined in).
+    // defaults entirely (no `origin = "default"` rules combined in).
     std::fs::write(
         jit_root.join("rules.toml"),
         r#"
@@ -57,8 +57,8 @@ assert = { require-section = { heading = "Goals" } }
     let rules = exec.effective_rules().unwrap();
     let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, vec!["only-rule"]);
-    // The defaults (e.g. default:label-format) are NOT present.
-    assert!(!rules.rules.iter().any(|r| r.name.starts_with("default:")));
+    // The defaults (e.g. `label-format`, origin = "default") are NOT present.
+    assert!(rules.rules.iter().all(|r| r.origin.is_none()));
 }
 
 #[test]
@@ -84,12 +84,16 @@ fn test_effective_rules_absent_file_builds_defaults_in_memory_without_writing() 
 
     let exec = executor(&jit_root);
     let rules = exec.effective_rules().unwrap();
-    // The fixed default ruleset is emitted (canonical format + namespace rules).
-    assert!(rules.rules.iter().any(|r| r.name == "default:label-format"));
+    // The fixed default ruleset is emitted (canonical format + namespace rules),
+    // each carrying `origin = "default"`.
     assert!(rules
         .rules
         .iter()
-        .any(|r| r.name == "default:namespace-unique:type"));
+        .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default")));
+    assert!(rules
+        .rules
+        .iter()
+        .any(|r| r.name == "namespace-unique-type" && r.origin.as_deref() == Some("default")));
 
     // MF4: building the defaults on the read path must NOT materialize the file.
     assert!(

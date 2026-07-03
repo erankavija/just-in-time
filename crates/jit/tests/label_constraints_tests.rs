@@ -4,8 +4,9 @@
 //! The per-namespace `values` / `pattern` / `required` constraints were removed
 //! from config-derived defaults: `.jit/rules.toml` is the sole validation source,
 //! and a repo wanting those constraints authors them there directly. What the
-//! registry still drives is the `default:namespace-registry` rule (unknown
-//! namespaces) and the `default:namespace-unique:<ns>` rules (uniqueness).
+//! registry still drives is the `namespace-registry` rule (unknown namespaces)
+//! and the `namespace-unique-<ns>` rules (uniqueness); both carry `origin =
+//! "default"`.
 //!
 //! Tests exercise the CommandExecutor against a tempdir-backed JsonFileStorage
 //! and a real `config.toml`, so the full load-validate path runs.
@@ -62,10 +63,11 @@ unique = false
     let (_tmp, exec) = setup_repo(cfg);
     create_labeled(&exec, "typo", &["typo:foo"]);
 
-    // An unregistered namespace is caught by the `default:namespace-registry`
-    // rule. It fails `jit validate` but does NOT block the write (enforce=false).
+    // An unregistered namespace is caught by the `namespace-registry` rule
+    // (origin = "default"). It fails `jit validate` but does NOT block the
+    // write (enforce=false).
     let err = exec.validate_silent().unwrap_err().to_string();
-    assert!(err.contains("default:namespace-registry"), "{}", err);
+    assert!(err.contains("namespace-registry"), "{}", err);
     assert!(err.contains("typo:foo"), "{}", err);
 }
 
@@ -106,7 +108,7 @@ unique = true
     );
     let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("default:namespace-unique:priority"),
+        err.contains("namespace-unique-priority"),
         "duplicate unique label must block the write: {err}"
     );
 }
@@ -157,19 +159,19 @@ fn test_config_show_json_includes_namespace_registry() {
     let rules_toml = std::fs::read_to_string(temp.path().join(".jit/rules.toml"))
         .expect("rules.toml scaffolded");
     assert!(
-        rules_toml.contains("default:namespace-unique:type"),
+        rules_toml.contains("namespace-unique-type"),
         "uniqueness rule must be scaffolded: {rules_toml}"
     );
     assert!(
-        !rules_toml.contains("default:namespace-values:"),
+        !rules_toml.contains("namespace-values-"),
         "namespace-values rules must NOT be scaffolded: {rules_toml}"
     );
     assert!(
-        !rules_toml.contains("default:namespace-required:"),
+        !rules_toml.contains("namespace-required-"),
         "namespace-required rules must NOT be scaffolded"
     );
     assert!(
-        !rules_toml.contains("default:namespace-pattern:"),
+        !rules_toml.contains("namespace-pattern-"),
         "namespace-pattern rules must NOT be scaffolded"
     );
 }

@@ -9,7 +9,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
     /// write path uses — NOT a parallel `config.toml` containment check.
     ///
-    /// The `default:type-hierarchy-known` default rule (`validation::defaults`)
+    /// The `type-hierarchy-known` default rule (`validation::defaults`)
     /// reports an undeclared `type:<kind>` as an `error` finding, but because it
     /// is `enforce = false` it only WARNS on the normal write path
     /// (`validate_for_write`). An explicit `--type` is a deliberate, hard
@@ -19,7 +19,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// path) keep their existing warn-only behavior.
     ///
     /// Config stays the single source of truth via the existing validation layer:
-    /// the decision is the rule engine's `default:type-hierarchy-known` finding
+    /// the decision is the rule engine's `type-hierarchy-known` finding
     /// for THIS issue's final shape. When no `[type_hierarchy]` is configured the
     /// behavior matches that rule. `issue` MUST already carry the derived
     /// `type:<kind>` label.
@@ -31,7 +31,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(finding) = evaluation
             .findings()
             .into_iter()
-            .find(|finding| finding.rule == "default:type-hierarchy-known")
+            .find(|finding| finding.rule == "type-hierarchy-known")
         {
             return Err(crate::errors::ValidationFailedError::new(finding.message.clone()).into());
         }
@@ -108,7 +108,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
         // kind through the SAME rule engine the write uses
-        // (`default:type-hierarchy-known`), which only warns on the normal path.
+        // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` writes keep warn-only
         // behavior; runs before the write so a bad type changes nothing.
         if explicit_type {
@@ -302,7 +302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
         // kind through the SAME rule engine the write uses
-        // (`default:type-hierarchy-known`), which only warns on the normal path.
+        // (`type-hierarchy-known`), which only warns on the normal path.
         // Scoped to the explicit-type path so non-`--type` updates keep warn-only
         // behavior; runs before any persistence so a bad type changes nothing. The
         // `type` rule is state-independent, so evaluating against the pre-transition
@@ -1807,7 +1807,7 @@ enforce_leases = "off"
     /// REQ-02: an explicit `--type` whose kind IS declared in the configured
     /// `[type_hierarchy]` is accepted and the canonical `type:<kind>` label is
     /// written. Acceptance is decided by the rule engine: the
-    /// `default:type-hierarchy-known` rule produces no finding for a declared
+    /// `type-hierarchy-known` rule produces no finding for a declared
     /// kind, the SAME validation layer the write path uses.
     #[test]
     fn test_create_explicit_declared_type_accepted_via_rule_engine() {
@@ -1833,7 +1833,7 @@ enforce_leases = "off"
     }
 
     /// REQ-02: an explicit `--type` whose kind is NOT declared is hard-rejected
-    /// through the existing rule engine (the `default:type-hierarchy-known`
+    /// through the existing rule engine (the `type-hierarchy-known`
     /// finding), surfacing as a `ValidationFailedError` (exit 4) and persisting
     /// nothing — NOT via a parallel config containment check.
     #[test]

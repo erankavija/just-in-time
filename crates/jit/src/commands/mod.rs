@@ -947,7 +947,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         if crate::storage::ruleset_store::has_validation_ruleset(jit_root) {
             // `rules.toml` is the sole source when present, so we never clobber it.
-            // But its `default:type-hierarchy-known` rule reads a BAKED schema file
+            // But its `type-hierarchy-known` rule reads a BAKED schema file
             // that does NOT track `[type_hierarchy]` edits — re-init / apply must
             // refresh that one file from config so a newly-declared type stops
             // warning on the write path (R5). This is a no-op when the file is
@@ -983,7 +983,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// config-declared type warn on the write path (R5).
     ///
     /// `.jit/rules.toml` is the sole validation source when present, and its
-    /// `default:type-hierarchy-known` rule reads this frozen enum file rather than
+    /// `type-hierarchy-known` rule reads this frozen enum file rather than
     /// the config hierarchy. After adding a type to `[type_hierarchy].types`, run
     /// this so the write-path rule recognizes it. Idempotent and atomic; a no-op
     /// for a repo with no baked schemas (the read path builds them in memory).

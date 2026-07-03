@@ -1295,16 +1295,16 @@ fn run() -> Result<()> {
                         // Surface the built-in type-hierarchy warnings
                         // (orphan-leaf / strategic-consistency) for the new issue
                         // unless --force or --quiet. These are now GRAPH rule
-                        // findings (`default:orphan-leaf` /
-                        // `default:strategic-consistency`) produced by the rule
-                        // engine, not a hard-coded check. `--orphan` suppresses the
-                        // orphan-leaf hint (acknowledged intentional orphan).
+                        // findings (`orphan-leaf` / `strategic-consistency`,
+                        // origin = "default") produced by the rule engine, not a
+                        // hard-coded check. `--orphan` suppresses the orphan-leaf
+                        // hint (acknowledged intentional orphan).
                         if !force && !quiet {
                             let issues = storage.list_issues()?;
                             let graph_findings = executor.evaluate_graph_rules(&issues)?;
                             for gf in graph_findings.iter().filter(|gf| {
                                 gf.issue_id.as_deref() == Some(id.as_str())
-                                    && !(orphan && gf.finding.rule == "default:orphan-leaf")
+                                    && !(orphan && gf.finding.rule == "orphan-leaf")
                             }) {
                                 let _ =
                                     output_ctx.print_warning(format!("\n⚠ {}", gf.finding.message));

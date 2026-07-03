@@ -891,12 +891,13 @@ mod tests {
         let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
-        // comes from the always-enforced `default:label-format` rule (canonical
-        // format), not the removed inline `validate_label_operations` check.
+        // comes from the always-enforced `label-format` rule (canonical format,
+        // origin = "default"), not the removed inline `validate_label_operations`
+        // check.
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
         assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("default:label-format"));
+        assert!(result.errors[0].1.contains("label-format"));
     }
 
     #[test]
@@ -923,12 +924,12 @@ mod tests {
         let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
 
         // Should reject with error. After the a0f0f342 consolidation the rejection
-        // comes from the always-enforced `default:namespace-unique:type` rule, not
-        // the removed inline uniqueness check.
+        // comes from the always-enforced `namespace-unique-type` rule (origin =
+        // "default"), not the removed inline uniqueness check.
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
         assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("default:namespace-unique:type"));
+        assert!(result.errors[0].1.contains("namespace-unique-type"));
     }
 
     #[test]

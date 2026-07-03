@@ -1,9 +1,10 @@
 //! Integration tests for CLI warning display.
 //!
 //! The orphan-leaf / strategic-consistency warnings are now produced by the
-//! built-in GRAPH rules (`default:orphan-leaf` / `default:strategic-consistency`)
-//! rather than the former hard-coded `check_warnings` path. These tests exercise
-//! that the same create-time warnings still surface, now through the rule engine.
+//! built-in GRAPH rules (`orphan-leaf` / `strategic-consistency`, origin =
+//! "default") rather than the former hard-coded `check_warnings` path. These
+//! tests exercise that the same create-time warnings still surface, now through
+//! the rule engine.
 
 use jit::commands::CommandExecutor;
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -50,7 +51,7 @@ fn test_create_epic_without_label_shows_warning() {
 
     let warnings = warnings_for(&executor, &id);
     assert_eq!(warnings.len(), 1);
-    assert_eq!(warnings[0].finding.rule, "default:strategic-consistency");
+    assert_eq!(warnings[0].finding.rule, "strategic-consistency");
     assert!(warnings[0].finding.message.contains("epic:*"));
 }
 
@@ -75,7 +76,7 @@ fn test_create_task_without_parent_shows_warning() {
 
     let warnings = warnings_for(&executor, &id);
     assert_eq!(warnings.len(), 1);
-    assert_eq!(warnings[0].finding.rule, "default:orphan-leaf");
+    assert_eq!(warnings[0].finding.rule, "orphan-leaf");
     assert!(warnings[0].finding.message.contains("orphaned leaf"));
 }
 

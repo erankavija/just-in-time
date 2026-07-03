@@ -6,9 +6,10 @@
 //! Exercises the full disk-based path: a real `.jit/` scaffolded by
 //! `scaffold_default_rules` (so `rules.toml` + the baked schema exist), a
 //! `config.toml` edited to add a new type, then `CommandExecutor::create_issue`
-//! against `JsonFileStorage`. `default:type-hierarchy-known` is `enforce = false`,
-//! so an unknown type never blocks the write — it surfaces as a WARNING; the
-//! deliverable is that the warning disappears once the schema is regenerated.
+//! against `JsonFileStorage`. `type-hierarchy-known` (origin = "default") is
+//! `enforce = false`, so an unknown type never blocks the write — it surfaces
+//! as a WARNING; the deliverable is that the warning disappears once the
+//! schema is regenerated.
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
@@ -76,8 +77,8 @@ fn create_typed(jit_dir: &std::path::Path, type_label: &str) -> Vec<String> {
 #[test]
 fn test_new_type_warns_on_write_before_schema_regenerated() {
     // BASELINE (the R5 bug): adding `planning` to config but NOT refreshing the
-    // baked schema leaves the write-path `default:type-hierarchy-known` rule
-    // reading the frozen enum, so a `type:planning` issue warns.
+    // baked schema leaves the write-path `type-hierarchy-known` rule reading
+    // the frozen enum, so a `type:planning` issue warns.
     let (_temp, jit_dir) = setup_initialized_repo();
     add_planning_type(&jit_dir);
 

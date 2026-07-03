@@ -204,7 +204,7 @@ fn test_batch_create_invalid_label_exits_2() {
     // A malformed label is caught by the full write-time validation, attributed
     // to the offending key.
     assert!(stderr.contains("'a' fails validation"), "stderr: {stderr}");
-    assert!(stderr.contains("default:label-format"), "stderr: {stderr}");
+    assert!(stderr.contains("label-format"), "stderr: {stderr}");
     assert_eq!(count_issues(&temp), 0);
 }
 
