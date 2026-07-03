@@ -14,21 +14,23 @@
 //!
 //! # The fixed default contract (MF1)
 //!
-//! [`default_ruleset`] emits EXACTLY:
+//! [`default_ruleset`] emits EXACTLY, each carrying `origin = "default"` (a rule
+//! `name` is a colon-free slug; `:` stays reserved for the label
+//! `namespace:value` separator):
 //!
-//! 1. `default:label-format` — `severity = error`, `enforce = true`, ALWAYS. The
+//! 1. `label-format` — `severity = error`, `enforce = true`, ALWAYS. The
 //!    canonical `namespace:value` whole-label format; blocks the write and fails
 //!    `jit validate`.
-//! 2. `default:namespace-registry` — `severity = error`, `enforce = false`, when
+//! 2. `namespace-registry` — `severity = error`, `enforce = false`, when
 //!    the namespace registry is NON-EMPTY. An unknown namespace fails
 //!    `jit validate` but never blocks a write.
-//! 3. `default:type-hierarchy-known` — `severity = error`, `enforce = false`,
+//! 3. `type-hierarchy-known` — `severity = error`, `enforce = false`,
 //!    ALWAYS. A `type:<value>` outside the configured hierarchy fails
 //!    `jit validate` but never blocks a write.
-//! 4. `default:namespace-unique:<ns>` — `severity = error`, `enforce = true`, per
+//! 4. `namespace-unique-<ns>` — `severity = error`, `enforce = true`, per
 //!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
 //!    the write and fails `jit validate`.
-//! 5. `default:orphan-leaf` + `default:strategic-consistency` — `severity = warn`,
+//! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
 //!    `enforce = false`, UNCONDITIONAL. Built-in [`Scope::Graph`] rules whose
 //!    evaluation REUSES the existing
 //!    [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
@@ -66,8 +68,10 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9.
 /// The returned rules are derived purely from the RETAINED taxonomy (the
 /// `[namespaces]` registry and `[type_hierarchy]`); the removed `[validation]`
 /// enforcement flags and per-namespace constraint fields no longer influence it.
-/// Rule names are stable and prefixed `default:`; they are serialized into
-/// `rules.toml` under those names and are user-editable there.
+/// Rule names are stable, colon-free slugs; every rule carries `origin =
+/// Some("default")` marking its provenance (`:` stays reserved for the label
+/// `namespace:value` separator). They are serialized into `rules.toml` under
+/// those names and are user-editable there.
 ///
 /// See the module docs for the EXACT emitted contract. This is a pure function of
 /// its input: no I/O, deterministic, and total.
@@ -91,12 +95,12 @@ const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9.
 /// };
 ///
 /// let rules = default_ruleset(&registry);
-/// assert!(rules.rules.iter().all(|r| r.name.starts_with("default:")));
+/// assert!(rules.rules.iter().all(|r| r.origin.as_deref() == Some("default")));
 /// // The unique `type` namespace yields a uniqueness rule.
 /// assert!(rules
 ///     .rules
 ///     .iter()
-///     .any(|r| r.name == "default:namespace-unique:type"));
+///     .any(|r| r.name == "namespace-unique-type"));
 /// ```
 pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     let mut rules: Vec<Rule> = Vec::new();
@@ -107,7 +111,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // per-whole-label pattern cannot use the value-only `label-value-pattern`
     // shorthand, so it is a raw schema over the projection's `raw_labels` array.
     rules.push(json_schema_rule(
-        "default:label-format",
+        "label-format",
         Selector::default(),
         Severity::Error,
         true,
@@ -122,7 +126,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
         let mut registered: Vec<&str> = namespaces.namespaces.keys().map(|s| s.as_str()).collect();
         registered.sort(); // deterministic alternation order (namespaces is a HashMap)
         rules.push(json_schema_rule(
-            "default:namespace-registry",
+            "namespace-registry",
             Selector::default(),
             Severity::Error,
             false,
@@ -137,7 +141,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // back to the default 4-level set via `get_type_hierarchy`), so this rule is
     // always emitted.
     rules.push(json_schema_rule(
-        "default:type-hierarchy-known",
+        "type-hierarchy-known",
         Selector::default(),
         Severity::Error,
         false,
@@ -153,7 +157,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
         let ns = &namespaces.namespaces[name];
         if ns.unique {
             rules.push(local_rule(
-                &format!("default:namespace-unique:{name}"),
+                &format!("namespace-unique-{name}"),
                 Selector::default(),
                 Severity::Error,
                 true,
@@ -174,14 +178,14 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // true, so unconditional preserves behavior). The repo `HierarchyConfig` is
     // injected by the graph evaluator at evaluation time.
     rules.push(graph_rule(
-        "default:orphan-leaf",
+        "orphan-leaf",
         Severity::Warn,
         Assertion::TypeHierarchy {
             kind: TypeHierarchyKind::OrphanLeaf,
         },
     ));
     rules.push(graph_rule(
-        "default:strategic-consistency",
+        "strategic-consistency",
         Severity::Warn,
         Assertion::TypeHierarchy {
             kind: TypeHierarchyKind::StrategicConsistency,
@@ -191,13 +195,15 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     RuleSet { rules }
 }
 
-/// The stable schema file name the `default:type-hierarchy-known` rule references
-/// once serialized to `.jit/rules.toml` (the sanitized rule name + `.json`). This
-/// is the ONE file the write-path rule reads, so regenerating it from config is
-/// what keeps the write path in sync with `[type_hierarchy]` (R5).
+/// The stable schema file name the `type-hierarchy-known` rule (`origin =
+/// "default"`) references once serialized to `.jit/rules.toml` (the sanitized
+/// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::validation::serialize)'s
+/// schema-stem derivation). This is the ONE file the write-path rule reads, so
+/// regenerating it from config is what keeps the write path in sync with
+/// `[type_hierarchy]` (R5).
 pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json";
 
-/// Build the JSON Schema backing the `default:type-hierarchy-known` rule from a
+/// Build the JSON Schema backing the `type-hierarchy-known` rule from a
 /// repo's namespace registry: an allowed-VALUES enum over the `type` namespace
 /// whose members are the configured hierarchy `types` keys (sorted for
 /// deterministic output).
@@ -239,6 +245,9 @@ pub(crate) fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig 
     }
 }
 
+/// The `origin` every rule this module emits carries (see [`Rule::origin`]).
+const DEFAULT_ORIGIN: &str = "default";
+
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
 fn local_rule(
     name: &str,
@@ -251,6 +260,7 @@ fn local_rule(
     debug_assert_eq!(scope, Scope::Local, "default rules are local-scope only");
     Rule {
         name: name.to_string(),
+        origin: Some(DEFAULT_ORIGIN.to_string()),
         when,
         severity,
         enforce,
@@ -266,6 +276,7 @@ fn graph_rule(name: &str, severity: Severity, assert: Assertion) -> Rule {
     debug_assert_eq!(scope, Scope::Graph, "graph default rules are graph-scope");
     Rule {
         name: name.to_string(),
+        origin: Some(DEFAULT_ORIGIN.to_string()),
         when: Selector::default(),
         severity,
         enforce: false,
@@ -284,6 +295,7 @@ fn json_schema_rule(
 ) -> Rule {
     Rule {
         name: name.to_string(),
+        origin: Some(DEFAULT_ORIGIN.to_string()),
         when,
         severity,
         enforce,
@@ -414,12 +426,17 @@ mod tests {
         assert_eq!(
             names,
             vec![
-                "default:label-format",
-                "default:type-hierarchy-known",
-                "default:orphan-leaf",
-                "default:strategic-consistency",
+                "label-format",
+                "type-hierarchy-known",
+                "orphan-leaf",
+                "strategic-consistency",
             ]
         );
+        // Every emitted rule carries the FIXED default's origin marker.
+        assert!(rules
+            .rules
+            .iter()
+            .all(|r| r.origin.as_deref() == Some("default")));
     }
 
     #[test]
@@ -439,35 +456,37 @@ mod tests {
         assert_eq!(
             got,
             vec![
-                ("default:label-format", Severity::Error, true),
-                ("default:namespace-registry", Severity::Error, false),
-                ("default:type-hierarchy-known", Severity::Error, false),
+                ("label-format", Severity::Error, true),
+                ("namespace-registry", Severity::Error, false),
+                ("type-hierarchy-known", Severity::Error, false),
                 // namespace-unique only for the UNIQUE namespaces, sorted.
-                ("default:namespace-unique:team", Severity::Error, true),
-                ("default:namespace-unique:type", Severity::Error, true),
-                ("default:orphan-leaf", Severity::Warn, false),
-                ("default:strategic-consistency", Severity::Warn, false),
+                ("namespace-unique-team", Severity::Error, true),
+                ("namespace-unique-type", Severity::Error, true),
+                ("orphan-leaf", Severity::Warn, false),
+                ("strategic-consistency", Severity::Warn, false),
             ]
         );
-        // The dropped rules are never emitted.
+        // Every emitted rule carries the FIXED default's origin marker.
+        assert!(rules
+            .rules
+            .iter()
+            .all(|r| r.origin.as_deref() == Some("default")));
+        // No emitted name contains a colon: `:` stays reserved for the label
+        // `namespace:value` separator.
         let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
-        assert!(!names.contains(&"default:require-type-label"));
-        assert!(!names.contains(&"default:label-format-custom"));
-        assert!(!names
-            .iter()
-            .any(|n| n.starts_with("default:namespace-values:")));
-        assert!(!names
-            .iter()
-            .any(|n| n.starts_with("default:namespace-pattern:")));
-        assert!(!names
-            .iter()
-            .any(|n| n.starts_with("default:namespace-required:")));
+        assert!(names.iter().all(|n| !n.contains(':')));
+        // The dropped rules are never emitted.
+        assert!(!names.contains(&"require-type-label"));
+        assert!(!names.contains(&"label-format-custom"));
+        assert!(!names.iter().any(|n| n.starts_with("namespace-values-")));
+        assert!(!names.iter().any(|n| n.starts_with("namespace-pattern-")));
+        assert!(!names.iter().any(|n| n.starts_with("namespace-required-")));
     }
 
     #[test]
     fn test_canonical_label_regex_matches_labels_module() {
         // REQ-02: `CANONICAL_LABEL_REGEX` (the write-path duplicate feeding
-        // `default:label-format`) must stay character-for-character identical to
+        // `label-format`) must stay character-for-character identical to
         // `labels::label_regex` (the value-space source of truth). This fails if
         // either pattern changes without the other, replacing the old manual-sync
         // doc comment with an enforced check.
@@ -535,10 +554,7 @@ mod tests {
     #[test]
     fn test_no_registry_rule_when_registry_empty() {
         let rules = default_ruleset(&registry(vec![]));
-        assert!(rules
-            .rules
-            .iter()
-            .all(|r| r.name != "default:namespace-registry"));
+        assert!(rules.rules.iter().all(|r| r.name != "namespace-registry"));
     }
 
     #[test]
@@ -573,7 +589,7 @@ mod tests {
         assert!(rules
             .rules
             .iter()
-            .all(|r| r.name != "default:namespace-unique:epic"));
+            .all(|r| r.name != "namespace-unique-epic"));
     }
 
     #[test]
@@ -600,7 +616,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_rules_are_named_default_and_unique() {
+    fn test_all_rules_carry_default_origin_and_are_unique() {
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", true)),
@@ -611,8 +627,11 @@ mod tests {
             .rules
             .iter()
             .filter(|r| r.scope == Scope::Graph)
-            .all(|r| r.name == "default:orphan-leaf" || r.name == "default:strategic-consistency"));
-        assert!(rules.rules.iter().all(|r| r.name.starts_with("default:")));
+            .all(|r| r.name == "orphan-leaf" || r.name == "strategic-consistency"));
+        assert!(rules
+            .rules
+            .iter()
+            .all(|r| r.origin.as_deref() == Some("default") && !r.name.contains(':')));
         // All generated rule names are unique.
         let mut names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
         names.sort();

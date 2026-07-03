@@ -946,8 +946,15 @@ impl Assertion {
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
-    /// Unique, human-readable rule name.
+    /// Unique, human-readable rule name. Colon-free: `:` is reserved solely for
+    /// the label `namespace:value` separator, so a rule's provenance lives in
+    /// [`origin`](Rule::origin) rather than an embedded prefix.
     pub name: String,
+    /// Provenance marker, e.g. `"default"` for the FIXED built-in rule set
+    /// ([`default_ruleset`](crate::validation::defaults::default_ruleset)) or
+    /// `"bracket"` for the planning-bracket coverage-preview rule. `None` for a
+    /// plain repo-authored rule.
+    pub origin: Option<String>,
     /// Selector deciding which issues the rule applies to.
     pub when: Selector,
     /// Reporting severity.
@@ -1116,6 +1123,10 @@ struct RawRulesFile {
 #[derive(Debug, Deserialize)]
 struct RawRule {
     name: String,
+    /// Provenance marker (see [`Rule::origin`]); absent for a plain
+    /// repo-authored rule.
+    #[serde(default)]
+    origin: Option<String>,
     #[serde(default)]
     when: Selector,
     #[serde(default)]
@@ -1363,6 +1374,7 @@ impl RawRule {
         let scope = assert.scope();
         Ok(Rule {
             name: self.name,
+            origin: self.origin,
             when: self.when,
             severity: self.severity,
             enforce: self.enforce,
@@ -2261,6 +2273,26 @@ assert = { require-doc-type = { doc-type = "design" } }
     }
 
     #[test]
+    fn test_origin_field_parses_when_present_and_defaults_to_none() {
+        // A rule authoring an `origin` string carries it through parsing; a rule
+        // that omits `origin` gets `None` (a plain repo-authored rule), not an
+        // empty string.
+        let toml = r#"
+[[rules]]
+name = "with-origin"
+origin = "bracket"
+assert = { require-section = { heading = "A" } }
+
+[[rules]]
+name = "without-origin"
+assert = { require-section = { heading = "A" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(set.rules[0].origin.as_deref(), Some("bracket"));
+        assert_eq!(set.rules[1].origin, None);
+    }
+
+    #[test]
     fn test_default_prefix_name_is_now_accepted() {
         // The `default:` reservation was removed (DR §8.2): the default rules now
         // live in the file and are user-editable, so a `default:*` name loads
@@ -2280,7 +2312,7 @@ assert = { require-section = { heading = "A" } }
     fn test_type_hierarchy_orphan_leaf_parses_as_graph_rule() {
         let toml = r#"
 [[rules]]
-name = "default:orphan-leaf"
+name = "orphan-leaf-fixture"
 assert = { type-hierarchy = { kind = "orphan-leaf" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
@@ -2297,7 +2329,7 @@ assert = { type-hierarchy = { kind = "orphan-leaf" } }
     fn test_type_hierarchy_strategic_consistency_parses() {
         let toml = r#"
 [[rules]]
-name = "default:strategic-consistency"
+name = "strategic-consistency-fixture"
 assert = { type-hierarchy = { kind = "strategic-consistency" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
