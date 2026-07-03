@@ -48,11 +48,17 @@ use crate::validation::rules::{
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
 ///
-/// The value class includes `/` so a QUALIFIED link reference value
-/// `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`) is a valid label,
-/// letting generic node→item links be authored as labels (REQ-05). Kept in sync
-/// with [`labels::label_regex`](crate::labels).
-const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._/-]*$";
+/// The value class admits two forms: an unqualified/qualified-link value
+/// (`[a-zA-Z0-9][a-zA-Z0-9._/-]*`), whose `/` lets a QUALIFIED link reference
+/// value `<issue>/<self-id>` (e.g. `satisfies:56ab0224/REQ-01`) be authored as a
+/// label (REQ-05), and an `@`-prefixed address value: `@` optionally followed by
+/// a project name, then at least two `/`-delimited path segments (e.g.
+/// `@myproject/gate/cargo-ci`).
+///
+/// Character-for-character identical to [`labels::label_regex`](crate::labels),
+/// enforced by `test_canonical_label_regex_matches_labels_module` below rather
+/// than left to a manual-sync comment.
+const CANONICAL_LABEL_REGEX: &str = r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|@(?:[a-z][a-z0-9-]*)?(?:/[a-zA-Z0-9._-]+){2,})$";
 
 /// Build the FIXED built-in default [`RuleSet`] from a repo's namespace registry
 /// + type hierarchy (MF1).
@@ -456,6 +462,16 @@ mod tests {
         assert!(!names
             .iter()
             .any(|n| n.starts_with("default:namespace-required:")));
+    }
+
+    #[test]
+    fn test_canonical_label_regex_matches_labels_module() {
+        // REQ-02: `CANONICAL_LABEL_REGEX` (the write-path duplicate feeding
+        // `default:label-format`) must stay character-for-character identical to
+        // `labels::label_regex` (the value-space source of truth). This fails if
+        // either pattern changes without the other, replacing the old manual-sync
+        // doc comment with an enforced check.
+        assert_eq!(CANONICAL_LABEL_REGEX, crate::labels::label_regex().as_str());
     }
 
     #[test]

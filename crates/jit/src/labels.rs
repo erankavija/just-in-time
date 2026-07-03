@@ -26,7 +26,10 @@ use std::sync::OnceLock;
 ///   separator.
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
-fn label_regex() -> &'static Regex {
+/// `pub(crate)` so `validation::defaults::CANONICAL_LABEL_REGEX` (the write-path
+/// duplicate) can be tested against this compiled pattern's source string and
+/// kept in lockstep, rather than drifting behind a manual-sync comment.
+pub(crate) fn label_regex() -> &'static Regex {
     LABEL_REGEX.get_or_init(|| {
         Regex::new(
             r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|@(?:[a-z][a-z0-9-]*)?(?:/[a-zA-Z0-9._-]+){2,})$",
