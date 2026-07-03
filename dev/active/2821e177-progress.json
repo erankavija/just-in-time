@@ -156,7 +156,8 @@
           "title": "Rules and gates reference projection",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched",
+          "note": "worktree agent-ebb6ad45, anchored 2ba53ef9; lead decisions: target docs/reference/rules-and-gates.md, mirror invariant-projection pattern incl. CLI verb, dogfood live render"
         },
         {
           "id": "c01f66dd",
@@ -164,7 +165,8 @@
           "title": "Sweep prior-epic and design docs for legacy address-form references",
           "classification": "documentation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "DONE 2026-07-04 session 3. 19d6d595 -> main b3f2e2c1; code-review passed first try; REQ-01 grep clean, D11 annotation in study, validate green."
         },
         {
           "id": "a8889340",
@@ -172,7 +174,8 @@
           "title": "Update jit item show/resolve CLI help text to the new addressing scheme",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "DONE 2026-07-04 session 3. 182aa0d5's doc sweep had delivered most of it; lead added the @[<project>] token mention to Show/Resolve help. Both gates passed first try."
         }
       ]
     },

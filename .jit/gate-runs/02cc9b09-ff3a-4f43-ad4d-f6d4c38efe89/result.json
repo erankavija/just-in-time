@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "02cc9b09-ff3a-4f43-ad4d-f6d4c38efe89",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a8889340-8f85-468d-9448-93f6f94e72ce",
+  "commit": "ac5c608da78514ae314e338c475c0c90515edffc",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T21:33:46.987368291Z",
+  "completed_at": "2026-07-03T21:34:43.659753672Z",
+  "duration_ms": 56672,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 met: [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:428) documents `@[<project>]/<kind>/<self-id>`, `@/issue/<short-id>/<kind>/<self-id>`, and `<short-id>/<self-id>` sugar. Examples include `@/invariant/INV-01` and no kindless `@/INV-01`.\nREQ-02 met by provided evidence: `cargo-ci` gate passed on `2026-07-03T21:29:09.679749700+00:00`; per instruction, I did not rerun cargo tests/clippy.\nREQ-03 met: `grep -n '@/[A-Z]' crates/jit/src/cli.rs` returned zero matches.\n\n**Architecture And Separation**\nNo boundary violations observed. The change is limited to CLI help/doc comments in `cli.rs`; no domain, storage, command, or output behavior was modified.\n\n**Functional Paradigm**\nNo implementation logic changed, so no new imperative style or mutability concerns were introduced.\n\n**Correctness And Invariants**\nNo state transition, persistence, event logging, gate, assignee, label, or PID logic changed. Atomic write and event logging invariants are unaffected.\n\n**Safety**\nNo unsafe code introduced. This is a docs-only CLI comment change.\n\n**Testing**\nUsed the provided successful `cargo-ci` gate as primary evidence. I also ran `./scripts/jit-validate.sh`, which passed. No prior review feedback exists in `run_history`.\n\n**Error Handling**\nNo fallible code or error messages changed.\n\n**CLI Contract**\nThe existing `--json` fields for `Show` and `Resolve` remain present at [cli.rs:446](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:446) and [cli.rs:460](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:460).\n\n**Documentation**\nThe stale `<scope>/<self-id>` wording has been replaced in the relevant `Show` and `Resolve` help text. The `List` and `Search` comments were left untouched as requested.\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The listed prerequisite issue `10db7a00` is marked `done` in the issue context.\n\n**Findings**\nNo findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "20f7a880-0357-45da-a872-dff1c4a20b08",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c01f66dd-0556-4088-a4d2-1910d45b5ff1",
+  "commit": "b3f2e2c16ed7bd879cb78c0a3299122cb4bb798a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T21:35:10.097838077Z",
+  "completed_at": "2026-07-03T21:36:40.514378126Z",
+  "duration_ms": 90416,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 met. The listed replacements are present at `dev/active/21558ace-invariants-registry.md:5`, `:16`, `:22`; `dev/active/90a2dbfd-kinds-over-sources.md:12`, `:72-74`, `:82`, `:117`, `:208`; and `.jit/invariants.toml:2-3`. `rg -n '@/[A-Z]' dev/active/21558ace-invariants-registry.md dev/active/90a2dbfd-kinds-over-sources.md .jit/invariants.toml` returned no matches.\n\nREQ-02 met. `dev/studies/addressing-v2-rule-gate-items.md:195-200` annotates the backward-compat point as resolved and cites D11 from `dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md`.\n\nREQ-03 met. `./scripts/jit-validate.sh` passed with `✓ Repository validation passed`.\n\n**Architecture And Separation Of Concerns**\nNo boundary violations found. The change is documentation/comment-only across `.jit/invariants.toml` and `dev/**` markdown files; no domain, storage, command, CLI, or output implementation changed.\n\n**Functional Paradigm**\nNo Rust implementation changed, so no new imperative logic, mutability, or side effects were introduced.\n\n**Correctness And Invariants**\nNo persistence, state transition, event logging, gate semantics, assignee/label parsing, PID handling, or atomic write logic changed. The `.jit/invariants.toml:2-3` edit is comment-only and validate still parses the repository.\n\n**Safety**\nNo code changed; no unsafe code introduced.\n\n**Testing**\nThe supplied `run_history` for this issue is empty. I did not run cargo tests. I ran the required repo validation script, which passed.\n\n**Error Handling**\nNo fallible code or user-facing errors changed.\n\n**CLI Contract**\nNo CLI implementation changed, so no command `--json` support was affected.\n\n**Documentation**\nThe requested documentation hygiene updates are present. The stale kindless project examples in the scoped files were replaced with kind-segmented examples.\n\n**Jit Issue Management**\n`./scripts/jit-validate.sh` passed. The prerequisite `10db7a00-9fc3-46db-ac87-ac59580cd305` is marked `done` in `.jit/issues/10db7a00-9fc3-46db-ac87-ac59580cd305.json:5`.\n\n**Findings**\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
