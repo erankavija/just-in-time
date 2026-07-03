@@ -1,0 +1,24 @@
+{
+  "id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+  "title": "SSOT adoption sweep: skills, README, and docs cite @-addresses instead of copying item text",
+  "description": "Epic 2821e177 made project knowledge addressable (`@/<kind>/<self-id>` over invariants, rules, gates, requirements, definitions), but the surrounding tooling still copies prose: skills paste invariant/rule text into dispatch prompts and review protocols, and README/docs restate registry content. Copied text re-creates the drift problem the epic solved. Sweep the authored surfaces to cite addresses and resolve them on demand, per the principle recorded in `dev/studies/addressing-v2-item-use-cases.md` §3: write the fact once in the registry or issue section that owns it; everywhere else, cite the address.\n\nSurfaces:\n1. Repo-tracked skills under `.claude/skills/` (jit-manage, jit-breakdown, jit-parallel, jit-execution-lead, jit-planning-lead, jit-project-lead and their references/): where they restate invariant, rule, or gate behavior, cite the item address (`@/invariant/INV-EVENT-LOG`, `@/rule/coverage-preview`, `@/gate/code-review`) and instruct workers/leads to resolve via `jit item show`. Dispatch-prompt templates gain a standing instruction that cited `@/…` addresses are resolvable context, and lead review protocols verify cited addresses resolve.\n2. `README.md` and `docs/`: introduce the addressing scheme and `jit item` as the way to cite project knowledge; every place quoting an invariant/rule/gate definition carries its address so readers can resolve current text. `docs/reference/rules-and-gates.md` is the rendered SSOT example to point at.\n3. `CLAUDE.md`: guidance outside the rendered invariant region cites addresses rather than restating rule/gate behavior.\n4. Conventions: document the `enforces:@/rule/…` / `enforces:@/gate/…` label convention for work that changes enforcement mechanisms.\n\nUser-global skill copies under `~/.claude/skills/` are outside this repository; this task updates repo-tracked surfaces and notes the sync expectation in the README section it adds.\n\n## Success Criteria\n\n- [hard] REQ-01: every repo-tracked skill file that restates invariant/rule/gate content instead cites the item's `@/…` address with a resolve instruction; a sweep table (file -> change) is attached as evidence.\n- [hard] REQ-02: README and docs/ introduce the addressing scheme and the cite-the-address convention; quoted registry content carries its address.\n- [hard] REQ-03: CLAUDE.md guidance cites addresses for rule/gate/invariant references outside the rendered invariant region.\n- [hard] REQ-04: every `@/…` address cited by the swept surfaces resolves via `jit item show` (dangling-citation check attached as evidence); `jit validate` stays green.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "ebb6ad45-2792-46ba-8d45-dd269da41069"
+  ],
+  "gates_required": [
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-03T23:37:07.531563300Z",
+  "updated_at": "2026-07-03T23:37:18.316955803Z"
+}
