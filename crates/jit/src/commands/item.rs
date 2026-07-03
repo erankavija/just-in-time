@@ -1261,11 +1261,17 @@ enforce = true
     fn test_show_item_resolves_rule_by_qualified_id() {
         // REQ-03 (cdc33a0f): the generic resolver returns a migrated colon-free
         // rule id (e.g. `coverage-preview`) as a project-scope `rule` item via
-        // its `@/<self-id>` address, mirroring the invariant kind's resolution
-        // path above but sourced from `.jit/rules.toml`'s `rules` table.
+        // the kind-segmented `@/rule/<self-id>` address (story 71ebd1e8 REQ-01),
+        // mirroring the invariant kind's resolution path above but sourced from
+        // `.jit/rules.toml`'s `rules` table. The kindless `@/<self-id>` legacy
+        // form is deliberately NOT exercised here: task 182aa0d5 removes that
+        // arm, and this test must still hold after it does.
         let exec = registry_exec_with_rules(ONE_RULE);
-        let shown = exec.show_item("@/coverage-preview").unwrap();
+        let shown = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
+        // Minted qualified ids are still kindless (`@/<self-id>`) until 182aa0d5
+        // flips minting to include the kind segment — this assertion is
+        // transitional, not the contract under test (that's the address above).
         assert_eq!(shown.item.qualified_id, "@/coverage-preview");
         assert_eq!(shown.item.kind, "rule");
         assert_eq!(shown.item.scope, "@");
