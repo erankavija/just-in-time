@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "be8708fd-19f6-4b53-b36e-b08c687c6813",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5222aa47-4171-4855-a305-48fa51159dfb",
+  "commit": "d7714d8b3bc6fce4b8aa44db2ac4a177010dd99e",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T08:52:39.109020450Z",
+  "completed_at": "2026-07-03T08:53:40.555693552Z",
+  "duration_ms": 61446,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 are satisfied. `derive_scope_items` now keys deduplication by `(self_id, kind)` in [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:949), cross-kind duplicates coexist in [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2200), and same-kind duplicates still raise `ItemError::DuplicateSelfId` in [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:2182). The named `index_items` test was updated to coexistence behavior in [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:1651). The stale docs called out by the issue and prior review are corrected in [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:858), [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:912), [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:977), and [item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:1159).\n\n**Architecture And Separation**\n\nNo boundary violations found. The behavioral change stays in `domain/item.rs`; no storage, CLI parsing, output formatting, or filesystem concerns were added to domain code.\n\n**Functional Paradigm**\n\nNo blocking issue found. The local `HashSet` mutation in `derive_scope_items` is scoped validation state and remains pragmatic for this path.\n\n**Correctness And Invariants**\n\nThe requested uniqueness invariant is implemented correctly. Atomic writes, event logging, gate semantics, assignee/label formats, and PID safety are not affected.\n\n**Safety**\n\nNo unsafe code introduced. The workspace still enforces `#![deny(unsafe_code)]`.\n\n**Testing**\n\nPer instruction, I did not rerun cargo tests because the issue has a passed `cargo-ci` gate at `2026-07-03T08:51:07.708671906+00:00`. I ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo new library `unwrap()` or `expect()` issue found outside tests. `DuplicateSelfId` remains contextual and now names the same-kind collision.\n\n**CLI Contract**\n\nNo CLI command behavior changed. No `--json` contract regression found.\n\n**Documentation**\n\nThe prior stale-doc findings are addressed; current public docs describe per-(scope, kind) uniqueness and note that same qualified-id strings can exist across different kinds.\n\n**Prior Review Feedback**\n\nThe most recent failed review cited stale docs at `index_items` and `index_project_sources`. Both have been corrected.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\n**Findings**\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
