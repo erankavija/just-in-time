@@ -2,9 +2,9 @@
   "id": "0597febe-a888-40f5-8b29-fb86484e3a06",
   "title": "Widen the label-value grammar to accept @-prefixed addresses",
   "description": "Widen the label value character class so a value may begin with `@` (optionally followed by a project name and a deeper `/`-delimited path), while leaving the single-colon namespace split untouched.\n\n## Background\n\nToday's canonical label regex lives in `crates/jit/src/labels.rs:22-26` (the `label_regex()`/`LABEL_REGEX` static): `^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._/-]*$`. The value class (`[a-zA-Z0-9][a-zA-Z0-9._/-]*`) has no `@`, so an address of the form `@/rule/label-format` or `@myproject/gate/cargo-ci` cannot be authored as a label value at all — `validate_label` rejects it outright before any resolution logic ever sees it.\n\nThe grammar must admit a leading `@`, an optional project name (`[a-z][a-z0-9-]*` — same character shape as the existing namespace pattern), and one or more `/`-delimited path segments after it, alongside the existing (unqualified and `/`-qualified-link) value forms. The single-colon namespace split (`label.splitn(2, ':')` at `labels.rs:77` and the equivalent in `suggest_label_fix` near `labels.rs:187`) is a separate concern and must not change — colon remains reserved as the sole namespace separator, so a value containing a colon anywhere continues to be rejected by the widened grammar (no code needs to touch the splitn calls themselves for this change).\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_label`/`label_regex()` accepts `enforces:@/rule/label-format` (bare `@`, no project name) and `enforces:@myproject/gate/cargo-ci` (`@` + project name), each with a `/`-delimited path after the `@`-segment.\n- [hard] REQ-02: previously-valid forms keep validating with no regression: `milestone:v1.0`, `type:task`, and the existing qualified-link form `satisfies:56ab0224/REQ-01`.\n- [hard] REQ-03: a value with a colon anywhere after the namespace separator is rejected, e.g. `enforces:@/rule:label-format` and `enforces:@bad:name/rule/x` both fail `validate_label`.\n- [hard] REQ-04: new unit tests are added to the `mod tests` block in `crates/jit/src/labels.rs` (alongside `test_validate_label_valid_formats` et al.) covering both the newly-accepted `@`-forms and the newly-exercised rejected-colon-in-value forms.\n- [hard] REQ-05: `cargo test --lib` and `cargo clippy --workspace --all-targets` pass with zero warnings.\n\n## Notes\n\nThe exact regex construction (e.g. an alternation between the `@`-branch and the legacy branch) is an implementation choice; no single canonical pattern is dictated upstream — only the accepted/rejected forms above are binding.",
-  "state": "backlog",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "37506c12-ecb2-45be-bb85-e99d92e52855"
   ],
@@ -22,5 +22,5 @@
     "story:label-value-grammar"
   ],
   "created_at": "2026-07-01T23:41:54.008964843Z",
-  "updated_at": "2026-07-01T23:42:42.158416077Z"
+  "updated_at": "2026-07-03T10:04:59.094191994Z"
 }
