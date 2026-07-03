@@ -2,7 +2,7 @@
   "id": "3c192f5e-4537-42c3-90c7-3e758c919b27",
   "title": "Project-wide content-standards sweep mode",
   "description": "Adds jit-project-lead's fourth mode: an audit of the whole project against the canonical jit content standards doc, auto-fixing mechanical violations and surfacing judgment calls for review.\n\n## Background\n\nThe canonical standards doc (`docs/reference/jit-content-standards.md`) covers issue-description structure, `[hard]`/`[aspirational]` criteria markers with `REQ-NN` ids, clean titles, standalone-readability, and Mermaid/LaTeX formatting. Some violations are mechanical (a missing marker, an embedded ID in a title) and safe to auto-fix; others require judgment (whether a description is truly standalone-readable) and must be surfaced rather than silently changed.\n\n## Success Criteria\n\n- [hard] REQ-01: The sweep reports every mechanical and judgment violation of the canonical standards doc found across the project's issues and documents.\n- [hard] REQ-02: Mechanical violations (for example: missing `[hard]`/`[aspirational]` markers, embedded IDs or ordinals in titles, a missing `## Success Criteria` section) are auto-fixed.\n- [hard] REQ-03: Judgment violations (for example: a description that is not actually standalone-readable) are listed separately from auto-fixed ones, for human or lead review rather than silent correction.\n\n## Notes\n\nSkill prose follows the cc-sdd/superpowers register. Exemplars: `../jit-research/cc-sdd/tools/cc-sdd/templates/agents/claude-code-skills/skills/kiro-spec-design/SKILL.md`, `../jit-research/superpowers/skills/writing-plans/SKILL.md`, `../jit-research/superpowers/skills/executing-plans/SKILL.md`.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -15,9 +15,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-03T00:23:32.825429431Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T00:28:46.043453726Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T00:30:12.774117065Z"
     }
   },
   "context": {},
@@ -38,5 +43,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:08:58.384371372Z",
-  "updated_at": "2026-07-03T00:23:32.825475641Z"
+  "updated_at": "2026-07-03T00:31:27.851892729Z"
 }
