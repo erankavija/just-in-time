@@ -14,7 +14,7 @@
           "title": "Split rule origin out of self-id in the default rule contract",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "landed-gates-deferred"
         },
         {
           "id": "f5d35048",
@@ -22,7 +22,7 @@
           "title": "Migrate gate registry storage to a gates.toml store",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "landed-gates-deferred"
         },
         {
           "id": "3d9e9222",
@@ -30,7 +30,7 @@
           "title": "Add canonical project-name field to project configuration",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-1"
+          "status": "landed-cargo-ci-passed-review-deferred"
         },
         {
           "id": "a1b6b3da",
@@ -38,14 +38,14 @@
           "title": "Bind the named-project scope token to local resolution or a not-resolvable error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "dispatching-wave-10",
           "note": "sub-wave 9b: amended (invoker-approved) to bind AddressScope::NamedProject + wire resolve_item_address arm; now depends on 3d9e9222; dispatch after 3d9e9222 merges"
         }
       ]
     },
     {
       "wave_number": 10,
-      "note": "cdc33a0f, 943abd0b, ae9dd95a parallel (worktrees); 42898915 serialized AFTER cdc33a0f (both edit .jit/config.toml [item_kinds]). ae9dd95a serialized after 87346f52 by content (docs describe the rename) - DAG allows earlier but review would fail on divergence (handoff trap).",
+      "note": "AMENDED (A-10db7a00): red-validate window until 10db7a00 lands; all code-reviews deferred until green. Parallel: cdc33a0f, 943abd0b, ae9dd95a, a1b6b3da (worktrees). Then 42898915 (config.toml conflict with cdc33a0f), then 10db7a00, then run ALL deferred gates in dep order.",
       "issues": [
         {
           "id": "cdc33a0f",
@@ -79,6 +79,15 @@
           "model": "sonnet",
           "status": "pending",
           "note": "sub-wave 10b, after cdc33a0f (config.toml conflict)"
+        },
+        {
+          "id": "10db7a00",
+          "short_id": "10db7a00",
+          "title": "Rebind invariant enforced-by bindings to addressable items",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "pulled forward from wave 12 per amendment A-10db7a00"
         }
       ]
     },
@@ -120,14 +129,6 @@
           "id": "d30695e4",
           "short_id": "d30695e4",
           "title": "Enforces link resolution for rule and gate items",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "pending"
-        },
-        {
-          "id": "10db7a00",
-          "short_id": "10db7a00",
-          "title": "Rebind invariant enforced-by bindings to addressable items",
           "classification": "implementation",
           "model": "sonnet",
           "status": "pending"
@@ -229,6 +230,13 @@
       "category": "architectural decision / plan-decision amendment",
       "summary": "D3 premise false (requirement catch-all id-pattern makes non-REQ sugar pattern-ambiguous). Invoker approved: D3-A item-backed fallback semantics; D11-A legacy kindless resolution removed in 7f22d6cf (scope extended with REQ-04), not in f4b5e3f4.",
       "resolution": "approved-both-recommendations"
+    },
+    {
+      "date": "2026-07-03",
+      "issue": "10db7a00",
+      "category": "plan edge amendment (sequencing deadlock)",
+      "summary": "87346f52 rename broke enforcement-drift string-match on two enforced-by bindings; validate red blocks all code-reviews and story closes, but plan wired the fix (10db7a00) after story closes. Invoker approved rewiring 10db7a00 deps to {cdc33a0f, 42898915} and deferring reviews until green. Plan amendment A-10db7a00.",
+      "resolution": "approved-rewire-early"
     }
   ],
   "rework_counts": {
