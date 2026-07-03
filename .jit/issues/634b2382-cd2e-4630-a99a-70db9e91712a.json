@@ -14,7 +14,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": ".claude/skills/jit-project-lead/references/parent-escalation.md",
+      "commit": null,
+      "label": "Parent-escalation policy",
+      "doc_type": "reference",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:jit-project-lead",
     "satisfies:REQ-05",
@@ -22,5 +30,5 @@
     "type:task"
   ],
   "created_at": "2026-07-01T22:08:58.353738020Z",
-  "updated_at": "2026-07-03T00:32:15.461561320Z"
+  "updated_at": "2026-07-03T00:34:29.825289886Z"
 }

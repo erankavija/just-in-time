@@ -117,6 +117,17 @@ cross-container coherence review over the wave's accepted containers per
 `references/coherence-review.md`; a FAIL blocks acceptance until every finding is
 resolved. A wave completes before the next begins.
 
+## Subordinate escalations
+
+A dispatched execution lead reports every escalation to the steward, not to the
+human. Read `references/parent-escalation.md` **in full** and follow it: the
+default is to resolve the escalation against the vision and decision log,
+recording the resolution as a new `### D-N` charter entry
+(`references/vision-charter.md` format). Only three categories forward to the
+human: **vision-level conflicts**, **cross-strategic-container dependencies**, and
+**project-wide infrastructure changes**. Every other subordinate escalation is
+resolved from the vision without human involvement.
+
 ## Mode dispatch (stub)
 
 Four invocation modes route from the opening request:
@@ -178,9 +189,9 @@ Stop immediately and report to the invoker when:
 - `jit recover` fails.
 - Sub-strategic dispatch stops (see `references/container-dispatch.md`): a
   corrupt or drifted wave list, a `main` that cannot be made clean for the
-  dispatch script, a dispatch pre-flight or leak-check failure, an unresolvable
-  lead escalation, or a prior wave's results that cannot be landed on `main`
-  before a dependent wave.
+  dispatch script, a dispatch pre-flight or leak-check failure, a lead escalation
+  that `references/parent-escalation.md` classifies as forward-to-human, or a
+  prior wave's results that cannot be landed on `main` before a dependent wave.
 - Standards sweep stops (see `references/standards-sweep.md`): the scanner or
   fixer exits 2 (missing `.jit/`, missing `jq`/`gawk`/`jit`, or an internal scan
   failure), or the config-derived report path cannot be resolved.
