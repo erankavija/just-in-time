@@ -397,8 +397,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// - **File present (even with zero rules):** the parsed file is the SOLE
     ///   source. No in-code default rules are combined with it — every rule
-    ///   (including the `default:*` ones `jit init` scaffolds) lives in the file
-    ///   and is user-editable. An intentionally-emptied file yields an empty set.
+    ///   (including the built-in ones `jit init` scaffolds, marked `origin =
+    ///   "default"`) lives in the file and is user-editable. An
+    ///   intentionally-emptied file yields an empty set.
     /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
     ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) from the
     ///   repo's namespace registry IN MEMORY (MF4). This is read-only — NO disk
