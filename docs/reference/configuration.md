@@ -105,9 +105,15 @@ examples = ["epic:auth", "epic:docs"]
 ```
 
 Declare label namespaces (taxonomy: `description`, `unique`, `examples`). The
-registry drives the `default:namespace-registry` and `default:namespace-unique:*`
+registry drives the `namespace-registry` and `namespace-unique-<ns>`
 rules. Allowed-value enums, value patterns, and required-ness are NOT configured
 here — author them as rules in `.jit/rules.toml`.
+
+Rule names are colon-free slugs (`namespace-registry`, `namespace-unique-team`,
+`label-format`, etc.). A rule's origin (`default` for the built-in rules,
+`bracket` for those a bracket criterion installs) is a separate `origin` field
+on its `.jit/rules.toml` entry, not part of its name. Every rule is addressable
+at `@/rule/<self-id>` (`self-id` being its `name`), e.g. `@/rule/label-format`.
 
 ### Rule selectors (`.jit/rules.toml` `when`)
 

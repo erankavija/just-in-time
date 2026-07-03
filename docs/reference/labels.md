@@ -165,13 +165,19 @@ when used as membership rather than as the version tag) are inferred from
 Each `[namespaces.<name>]` table declares TAXONOMY only:
 
 - **description** (string, required): Human-readable purpose, shown by `jit config show` and the web UI.
-- **unique** (bool, required): If true, an issue can carry at most one label from this namespace. Drives the `default:namespace-unique:<ns>` rule.
+- **unique** (bool, required): If true, an issue can carry at most one label from this namespace. Drives the `namespace-unique-<ns>` rule.
 - **examples** (list of string, optional): Documentation-only examples; not enforced.
 
 The registry drives two fixed default rules in `.jit/rules.toml`:
-`default:namespace-registry` (an undeclared namespace fails `jit validate`) and
-`default:namespace-unique:<ns>` (a unique namespace blocks a second label on
+`namespace-registry` (an undeclared namespace fails `jit validate`) and
+`namespace-unique-<ns>` (a unique namespace blocks a second label on
 write).
+
+Rule names are colon-free slugs. A rule's origin (`default` for the built-in
+rules, `bracket` for those a bracket criterion installs) is a separate
+`origin` field on its `.jit/rules.toml` entry, not part of its name. Every
+rule is addressable at `@/rule/<self-id>` (`self-id` being its `name`), e.g.
+`@/rule/namespace-registry`.
 
 > **Enforcement lives in `.jit/rules.toml`, the single source of truth.** Allowed
 > values, value patterns, required namespaces, the canonical label format, and the
@@ -192,7 +198,7 @@ enforce = false
 assert = { label-value-pattern = { namespace = "type", regex = '^(epic|story|task|bug|spike|chore|milestone)$' } }
 ```
 
-When `jit validate` reports an unregistered namespace, the `default:namespace-registry` rule names the offending label so typos are caught.
+When `jit validate` reports an unregistered namespace, the `namespace-registry` rule names the offending label so typos are caught.
 
 ### Standard Work Item Types
 
