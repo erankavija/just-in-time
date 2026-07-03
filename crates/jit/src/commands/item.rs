@@ -875,6 +875,36 @@ source-of-truth = \"registry-first\"
     }
 
     #[test]
+    fn test_show_item_named_project_address_not_yet_supported() {
+        // Audit (jit:7a2bbe4f) REQ-02: a named-project address
+        // `@<name>/<kind>/<self-id>` parses structurally into
+        // `AddressScope::NamedProject`, but `resolve_item_address` has not
+        // wired named-project RESOLUTION yet (task a1b6b3da). Confirm routing
+        // surfaces that specific not-yet-supported error rather than
+        // mis-splitting into the legacy bare-`@` project form or panicking.
+        let exec = executor_with(vec![]);
+        let err = exec.show_item("@acme/requirement/REQ-01").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("named-project"), "got: {msg}");
+        assert!(msg.contains("acme"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_show_item_named_project_two_segment_form_is_not_legacy_project() {
+        // Audit (jit:7a2bbe4f) REQ-02: a named-project two-segment form
+        // `@<name>/<self-id>` (no kind segment) must NOT be mis-split into the
+        // legacy bare-`@` project fallback: that fallback guards on
+        // `scope == PROJECT_SCOPE_SENTINEL` exactly ("@"), not "@acme", so the
+        // parser's own segment-count `InvalidAddress` surfaces instead of a
+        // wrong "no addressable item" not-found.
+        let exec = executor_with(vec![]);
+        let err = exec.show_item("@acme/GLOSS-01").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("segments"), "got: {msg}");
+        assert!(!msg.contains("no addressable item"), "got: {msg}");
+    }
+
+    #[test]
     fn test_resolve_link_label_classifies_all_address_forms() {
         // REQ-03: resolve_link_label treats every address form (explicit project,
         // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference,
@@ -919,6 +949,20 @@ source-of-truth = \"registry-first\"
             .resolve_link_label("satisfies:REQ-01")
             .unwrap()
             .is_none());
+    }
+
+    #[test]
+    fn test_resolve_link_label_named_project_form_routes_without_panic() {
+        // Audit (jit:7a2bbe4f) REQ-02: the named-project form
+        // `@<name>/<kind>/<self-id>` is classified as a qualified reference
+        // (it has a `/`) and routes through `show_item`, surfacing the SAME
+        // not-yet-supported error rather than a silent `None` or a panic.
+        let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
+        let exec = executor_with(vec![a]);
+        let err = exec
+            .resolve_link_label("satisfies:@acme/requirement/REQ-01")
+            .unwrap_err();
+        assert!(err.to_string().contains("unresolvable qualified item id"));
     }
 
     #[test]

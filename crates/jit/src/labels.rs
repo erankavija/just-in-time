@@ -458,6 +458,21 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_label_at_prefixed_address_value_unsplit() {
+        // Audit (jit:7a2bbe4f) REQ-01: `parse_label`'s `splitn(2, ':')` stops at
+        // the first colon, so a widened-grammar `@`-prefixed value — which itself
+        // carries `/`-delimited segments but never a `:` — passes through whole,
+        // unsplit any further.
+        let (ns, val) = parse_label("enforces:@/rule/label-format").unwrap();
+        assert_eq!(ns, "enforces");
+        assert_eq!(val, "@/rule/label-format");
+
+        let (ns, val) = parse_label("enforces:@myproject/gate/cargo-ci").unwrap();
+        assert_eq!(ns, "enforces");
+        assert_eq!(val, "@myproject/gate/cargo-ci");
+    }
+
+    #[test]
     fn test_parse_label_invalid() {
         assert!(parse_label("invalid").is_err());
         assert!(parse_label("Invalid:value").is_err());
@@ -532,6 +547,15 @@ mod tests {
         assert!(!is_type_label("type:")); // missing value
         assert!(!is_type_label("notacolon"));
         assert!(!is_type_label(""));
+    }
+
+    #[test]
+    fn test_type_value_of_at_prefixed_address_value_unsplit() {
+        // Audit (jit:7a2bbe4f) REQ-01: `type_value_of`'s `split_once(':')` only
+        // borrows the value `parse_label` already validated as a whole; a
+        // widened-grammar `@`-prefixed value passes through unsplit, same as
+        // `parse_label` itself.
+        assert_eq!(type_value_of("type:@/kind/self-id"), Some("@/kind/self-id"));
     }
 
     // Tests for TYPE_NAMESPACE and type_label_value

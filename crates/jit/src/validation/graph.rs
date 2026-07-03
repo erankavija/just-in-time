@@ -67,6 +67,47 @@ const DEFAULT_CRITERIA_SECTION: &str = "success_criteria";
 /// Default regex extracting a criterion id from an item's text (e.g. `REQ-01`).
 const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 
+/// Audit (jit:7a2bbe4f): every `splitn`/`split_once`/`split(` re-split site over
+/// a label value in `crates/jit/src` (excluding tests) falls into one of three
+/// buckets once the value grammar admits `@`-prefixed addresses:
+///
+/// 1. **Colon-split (namespace) sites** — stop at the first colon and never
+///    look at the rest of the value, so the widened value grammar cannot
+///    change their behavior: `labels::parse_label`, `labels::type_value_of`,
+///    [`crate::commands::CommandExecutor::resolve_link_label`],
+///    [`crate::commands::CommandExecutor::dangling_link_findings`],
+///    `validation::desugar::desugar_require_label`,
+///    [`crate::commands::CommandExecutor::query_by_label`],
+///    `snapshot::SnapshotScope::parse`, plus the unrelated-namespace assignee
+///    parsers (`commands::claim::assert_valid_actor`,
+///    `domain::types::Assignee::from_str` /
+///    `domain::types::Assignee`'s `PartialEq<str>` — label values never reach
+///    these; they parse `{type}:{identifier}` assignees, a different input
+///    domain per INV-ASSIGNEE-FORMAT).
+/// 2. **Slash-decode qualified-id sites** — route through the structural
+///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
+///    [`crate::domain::item::expand_sugar_address`]):
+///    [`crate::commands::CommandExecutor::show_item`] (via
+///    `resolve_item_address`), `resolve_link_label`'s qualified check (now
+///    [`crate::domain::item::is_qualified_reference`]), `dangling_link_findings`,
+///    and [`label_credits_id`] below — which deliberately performs its OWN
+///    two-segment split per decision D10 rather than routing through the
+///    parser (see its doc comment).
+/// 3. **Slash-splitters unrelated to qualified ids — confirmed OUT OF SCOPE,
+///    no change needed.** These never see a label value:
+///    [`crate::storage::memory::InMemoryStorage`]'s repo-relative path-segment
+///    check, [`crate::storage::path_errors::validate_repo_relative_path`]'s
+///    `..`-traversal check, four JSON-pointer-style instance-path splits in
+///    `validation::engine` (`empty_items_section_slug`,
+///    `render_contains_message`, `contains_subschema_via_schema_path`,
+///    `readable_instance_path`), [`slug_to_heading`] below (splits a section
+///    slug on `_`, not `/` or `:`), and `crates/server/src/routes.rs`'s
+///    `compute_base_href` (an unrelated raw-file route path).
+///
+/// A future reader auditing a new re-split site should re-run
+/// `rg -n "splitn|split_once|\.split\(" crates/jit/src crates/server/src --type rust`
+/// and classify against these three buckets rather than re-deriving them.
+///
 /// Whether a link `label` credits criterion `id` for the scope `scope_short_id`,
 /// accepting BOTH the legacy unqualified form and the qualified form (REQ-05).
 ///
@@ -1686,6 +1727,35 @@ mod tests {
         ));
         assert!(!label_credits_id(
             "plainlabel",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+    }
+
+    #[test]
+    fn test_label_credits_id_widened_grammar_forms_never_mis_credit() {
+        // Audit (jit:7a2bbe4f) REQ-02: `label_credits_id` deliberately performs
+        // its OWN two-segment `<scope>/<self-id>` split (decision D10) rather
+        // than routing through the kind-segmented address parser. Confirm the
+        // widened grammar's deeper `@`-prefixed forms — which carry MORE than
+        // one `/` — never mis-split into an accidental credit: splitting on the
+        // FIRST `/` always leaves a self-id fragment that still contains a `/`,
+        // so it can never equal a bare criterion id, by design (not a bug).
+        assert!(!label_credits_id(
+            "satisfies:@/rule/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        assert!(!label_credits_id(
+            "satisfies:@/issue/abc12345/requirement/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        assert!(!label_credits_id(
+            "satisfies:@acme/requirement/REQ-01",
             "satisfies",
             "REQ-01",
             "abc12345"

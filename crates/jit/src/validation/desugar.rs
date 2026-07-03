@@ -511,6 +511,43 @@ mod tests {
         assert_equivalent(&desugared, &handwritten, &cases);
     }
 
+    #[test]
+    fn test_require_label_exact_at_prefixed_value_matches_handwritten() {
+        // Audit (jit:7a2bbe4f) REQ-01: `desugar_require_label`'s
+        // `label.split_once(':')` stops at the first colon, so a
+        // widened-grammar `@`-prefixed value (itself carrying `/`-delimited
+        // segments) becomes the schema's `const` whole, unsplit any further.
+        let desugared = desugar(&Assertion::RequireLabel {
+            label: "enforces:@/rule/label-format".to_string(),
+            min: None,
+            max: None,
+        })
+        .unwrap();
+        let handwritten = json!({
+            "type": "object",
+            "properties": {
+                "labels": {
+                    "type": "object",
+                    "required": ["enforces"],
+                    "properties": {
+                        "enforces": {
+                            "type": "array",
+                            "contains": { "const": "@/rule/label-format" },
+                            "minContains": 1
+                        }
+                    }
+                }
+            }
+        });
+        let cases = vec![
+            json!({ "labels": {} }),
+            json!({ "labels": { "enforces": [] } }),
+            json!({ "labels": { "enforces": ["@/rule/label-format"] } }),
+            json!({ "labels": { "enforces": ["@/rule/other-rule"] } }),
+        ];
+        assert_equivalent(&desugared, &handwritten, &cases);
+    }
+
     // --- label-value-pattern ----------------------------------------------
 
     #[test]

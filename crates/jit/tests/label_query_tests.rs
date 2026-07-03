@@ -238,6 +238,50 @@ fn test_query_by_label_case_sensitive() {
 }
 
 #[test]
+fn test_query_by_label_at_prefixed_value_matches_whole() {
+    // Audit (jit:7a2bbe4f) REQ-01: `query_by_label`'s `splitn(2, ':')` only
+    // validates the namespace segment's charset; the ORIGINAL, un-re-split
+    // `pattern` is what `domain::queries::query_by_label` (via
+    // `labels::matches_pattern`'s exact-string comparison) matches against, so
+    // a widened-grammar `@`-prefixed value is compared whole, never re-split
+    // further.
+    let storage = InMemoryStorage::new();
+    let executor = CommandExecutor::new(storage);
+    executor.init().unwrap();
+
+    let (matching_id, _) = executor
+        .create_issue(
+            "Rule-linked".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["enforces:@/rule/label-format".to_string()],
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+    executor
+        .create_issue(
+            "Other rule-linked".to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["enforces:@/rule/other-rule".to_string()],
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+
+    let results = executor
+        .query_by_label("enforces:@/rule/label-format")
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].id, matching_id);
+}
+
+#[test]
 fn test_query_by_label_invalid_pattern() {
     let storage = InMemoryStorage::new();
     let executor = CommandExecutor::new(storage);

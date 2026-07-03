@@ -311,6 +311,23 @@ mod tests {
     }
 
     #[test]
+    fn test_scope_parse_label_at_prefixed_value_unsplit() {
+        // Audit (jit:7a2bbe4f) REQ-01: `SnapshotScope::parse`'s
+        // `label_part.splitn(2, ':')` (applied after stripping the `label:`
+        // prefix) stops at the first colon, so a widened-grammar `@`-prefixed
+        // value — itself carrying `/`-delimited segments — passes through
+        // whole, unsplit any further.
+        let scope = SnapshotScope::parse("label:enforces:@/rule/label-format").unwrap();
+        match &scope {
+            SnapshotScope::Label { namespace, value } => {
+                assert_eq!(namespace, "enforces");
+                assert_eq!(value, "@/rule/label-format");
+            }
+            _ => panic!("Expected Label variant"),
+        }
+    }
+
+    #[test]
     fn test_scope_parse_label_missing_value() {
         let result = SnapshotScope::parse("label:epic");
         assert!(result.is_err());

@@ -2258,6 +2258,22 @@ source-of-truth = \"registry-first\"
     }
 
     #[test]
+    fn test_dangling_link_findings_named_project_form_is_dangling_not_panic() {
+        // Audit (jit:7a2bbe4f) REQ-02: a named-project `@<name>/<kind>/<self-id>`
+        // link value is a qualified reference (`is_qualified_reference` sees the
+        // `/`), and since named-project RESOLUTION is not yet wired
+        // (task a1b6b3da), it resolves through the SAME path as any other
+        // unresolvable qualified id: a dangling-link finding, never a panic or
+        // a silently-ignored label.
+        let node = issue_with_labels("node", "", &["enforces:@acme/invariant/INV-01"]);
+        let exec = dangling_exec(vec![node]);
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].finding.message.contains("dangling item link"));
+    }
+
+    #[test]
     fn test_dangling_link_findings_unqualified_and_non_link_ns_ignored() {
         // A legacy unqualified label (`satisfies:REQ-01`) and a non-link namespace
         // (`type:task`) are NOT link references and produce no finding.
