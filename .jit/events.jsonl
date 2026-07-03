@@ -4933,3 +4933,11 @@
 {"type":"issue_state_changed","id":"1b759ddd-3626-4cf5-bcd5-af2f5787bd7c","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:13.976989698Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"5eb526df-1c8d-49ba-bb42-26ce78bcd674","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:14.248658735Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"f0a1aec1-bd42-41db-9fbf-6a5e8121aff0","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:14.249871976Z","assignee":"agent:jit-execution-lead"}
+{"type":"gate_passed","id":"4b7bb9ca-2a8f-4ed4-b666-985985833ed7","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:03:51.163308520Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8cd45faa-6cfa-4eb7-b8a8-f53a708ec5c9","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:03:51.374745304Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"20822839-cc2c-458f-af67-2438a5014a62","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:05:09.776150555Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"6c86a8f7-cf82-4dda-a494-1b78ba6d3311","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:05:27.666022634Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"a58a0366-6841-48e3-b44f-9a4e9066d2be","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:05:27.666048854Z"}
+{"type":"issue_state_changed","id":"4afb6a95-55fd-4387-b521-fe097fa05110","issue_id":"87346f52-a2c4-4506-8819-9ff58c854595","timestamp":"2026-07-03T11:05:27.796529779Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"c9ad125d-4ade-406e-be0f-517072b519a8","issue_id":"ae9dd95a-ce1d-428b-b1f0-efab90b20f8f","timestamp":"2026-07-03T11:05:27.855565142Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"a11a2c8c-bc92-4469-b980-d97dbbe1696c","issue_id":"f5d35048-5c57-4d52-8d6a-5ddb7b73449d","timestamp":"2026-07-03T11:05:27.935873501Z","from":"backlog","to":"ready"}

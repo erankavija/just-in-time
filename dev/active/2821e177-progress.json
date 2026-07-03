@@ -114,7 +114,7 @@
           "title": "STORY CLOSE: Label-value grammar widening and re-split-site audit",
           "classification": "lead-verification",
           "model": "lead",
-          "status": "in_review",
+          "status": "done",
           "note": "STOP after this per invocation scope"
         }
       ]
@@ -135,5 +135,6 @@
     "37506c12": 1,
     "7a2bbe4f": 1
   },
-  "started_at": "2026-07-03T00:00:00Z"
+  "started_at": "2026-07-03T00:00:00Z",
+  "session_1_complete": "2026-07-03: invocation scope (until 0efbc594) fulfilled; handoff at dev/active/2821e177-handoff.md"
 }
