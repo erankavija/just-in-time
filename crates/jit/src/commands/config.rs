@@ -1,17 +1,18 @@
 //! Config-mutation command (`jit config set`).
 //!
-//! Owns the `jit config set` write end to end: target-file resolution (repo vs
-//! user-global), TOML document read/mutate, typed validation of the incoming
-//! value (notably `project.name` through [`ProjectName`], REQ-03 of the
-//! multi-jit story: an invalid identity must never reach the file), and the
-//! atomic write through the storage-layer primitive
-//! ([`write_file_atomic`](crate::storage::atomic_write::write_file_atomic),
-//! INV-ATOMIC-WRITES). The CLI layer only parses args and formats the returned
-//! [`ConfigSetOutcome`]; no config persistence lives in `main.rs` (the layer
-//! boundary in CLAUDE.md "Separation of Concerns").
+//! Owns the `jit config set` command logic: target-file resolution (repo vs
+//! user-global), key parsing, per-type value dispatch, and typed validation of
+//! the incoming value (notably `project.name` through [`ProjectName`], REQ-03 of
+//! the multi-jit story: an invalid identity must never reach the file). ALL
+//! config-file IO — reading the TOML document and the atomic write — is
+//! delegated to [`crate::storage::config_store`], so no persistence lives in
+//! this command module (the layer boundary in CLAUDE.md "Separation of
+//! Concerns"). The CLI layer only parses args and formats the returned
+//! [`ConfigSetOutcome`].
 
 use super::*;
 use crate::config::ProjectName;
+use crate::storage::config_store;
 use std::path::PathBuf;
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
@@ -19,6 +20,26 @@ use std::path::PathBuf;
 /// Returned by [`CommandExecutor::set_config`]. `file` is the config file that
 /// was written and `scope` is its origin token (`"user"` for a global write,
 /// `"repo"` otherwise), mirroring the tokens the `--json` payload reports.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::ConfigSetOutcome;
+/// use std::path::PathBuf;
+///
+/// // The fields mirror a completed repo-scoped set (built by hand here to show
+/// // the serialized shape).
+/// let outcome = ConfigSetOutcome {
+///     key: "project.name".to_string(),
+///     value: "my-project".to_string(),
+///     file: PathBuf::from(".jit/config.toml"),
+///     scope: "repo",
+/// };
+/// assert_eq!(outcome.scope, "repo");
+/// let json = serde_json::to_value(&outcome).unwrap();
+/// assert_eq!(json["key"], "project.name");
+/// assert_eq!(json["value"], "my-project");
+/// ```
 #[derive(Debug, Serialize)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
@@ -36,36 +57,40 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `config.toml`, returning what the CLI needs to print.
     ///
     /// Resolves the target file, reads the existing TOML document (or starts an
-    /// empty one), parses `value` into the expected type for the key, and writes
-    /// the document back atomically. Typed fields are validated ON WRITE, not
-    /// only at load: `project.name` is parsed through [`ProjectName`] so an
-    /// invalid identity is rejected before the write (REQ-03) and the file is
-    /// left untouched. Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
-    /// (`enable_*`/`require_*`/`auto_*`) keys are likewise parsed into their TOML
-    /// types; any other key is stored as a string.
+    /// empty one) and writes it back through [`crate::storage::config_store`] —
+    /// this command owns no file IO. `value` is parsed into the expected type for
+    /// the key BEFORE the write: `project.name` is validated through
+    /// [`ProjectName`] so an invalid identity is rejected and the file is left
+    /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
+    /// (`enable_*`/`require_*`/`auto_*`) keys are parsed into their TOML types;
+    /// any other key is stored as a string.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let outcome = executor
+    ///     .set_config("project.name", "renamed-project", false)
+    ///     .unwrap();
+    /// assert_eq!(outcome.scope, "repo");
+    /// assert_eq!(outcome.value, "renamed-project");
+    /// ```
     pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome> {
-        use std::fs;
-
-        // Determine the target config file.
+        // Determine the target config file (path derivation only; the store owns
+        // the read/write IO).
         let config_path = if global {
             let home =
                 dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
-            let config_dir = home.join(".config/jit");
-            fs::create_dir_all(&config_dir)?;
-            config_dir.join("config.toml")
+            home.join(".config/jit").join("config.toml")
         } else {
-            self.storage.root().join("config.toml")
+            config_store::repo_config_path(self.storage.root())
         };
 
-        // Load the existing config or start an empty document.
-        let mut doc = if config_path.exists() {
-            let content = fs::read_to_string(&config_path)?;
-            content
-                .parse::<toml_edit::DocumentMut>()
-                .map_err(|e| anyhow!("Failed to parse config: {}", e))?
-        } else {
-            toml_edit::DocumentMut::new()
-        };
+        // Load the existing config or start an empty document (through storage).
+        let mut doc = config_store::read_config_document(&config_path)?;
 
         // Parse the key into section.field.
         let parts: Vec<&str> = key.split('.').collect();
@@ -106,8 +131,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         doc[section][field] = parsed_value;
 
-        // Write back atomically (temp file + rename, INV-ATOMIC-WRITES).
-        crate::storage::atomic_write::write_file_atomic(&config_path, &doc.to_string())?;
+        // Persist through storage (atomic write, parent dir ensured for the
+        // user-global first-write case).
+        config_store::save_config_document(&config_path, &doc)?;
 
         Ok(ConfigSetOutcome {
             key: key.to_string(),

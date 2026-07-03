@@ -1143,24 +1143,24 @@ fn run() -> Result<()> {
                 .cloned()
                 .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
 
-            // Write config.toml only when it did not already exist (idempotent).
-            // Atomic temp-file + rename per the project's file-write invariant.
-            // The `[project]` table is seeded here (alongside the template's
-            // generated content, not inside it) so a re-init that skips this
-            // branch entirely also leaves an existing `[project]` table
-            // untouched, satisfying REQ-03 for free.
+            // Seed config.toml only when it did not already exist (idempotent).
+            // The `[project]` table is seeded alongside the template's generated
+            // content, so a re-init that skips this branch leaves an existing
+            // `[project]` table untouched, satisfying REQ-03 for free. The store
+            // owns the file format and the atomic write; this layer only derives
+            // the project name from the repo directory basename.
             if !config_already_existed {
                 let dir_basename = current_dir
                     .file_name()
                     .and_then(|name| name.to_str())
                     .unwrap_or("");
-                let project_name = jit::config::slugify_project_name(dir_basename);
-                let config_toml = format!(
-                    "{}\n# =============================================================================\n# PROJECT IDENTITY\n# =============================================================================\n# Canonical, human-editable project name: the `@<project>` scope token in the\n# multi-jit addressing scheme. Must match ^[a-z][a-z0-9-]*$. Defaults to a\n# slug of this repository's directory name; edit freely.\n[project]\nname = \"{}\"\n",
-                    chosen.generate_config_toml(),
-                    project_name
-                );
-                jit::storage::atomic_write::write_file_atomic(&config_path, &config_toml)?;
+                let project_name: jit::config::ProjectName =
+                    jit::config::slugify_project_name(dir_basename).parse()?;
+                jit::storage::config_store::seed_repo_config(
+                    &jit_dir,
+                    &chosen.generate_config_toml(),
+                    &project_name,
+                )?;
             }
 
             // Scaffold .jit/rules.toml (the operative single source of truth) with

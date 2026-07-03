@@ -12,6 +12,7 @@ use std::collections::HashMap;
 pub mod atomic_write;
 pub mod claim_coordinator;
 pub mod claims_log;
+pub mod config_store;
 pub mod control_plane;
 pub mod errors;
 pub mod gate_runs;
