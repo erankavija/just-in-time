@@ -1,97 +1,102 @@
-# Completion Report — Plan-from-Import: In-memory TTL cache
+# Completion Report — TTL Cache (plan-from-import)
 
-Entry path: **[plan-from-import]**. An external design note (`notes/ttl-cache-design.md`),
-not previously in jit, was ingested, reconciled into a jit container, planned through its
-plan-review gate, and broken down so every `[hard]` criterion is covered by a child. This
-was planning and breakdown only. **No planned implementation work was performed.**
+> Re-run of 2026-07-03 against the fixed skill (criteria-format discipline: criteria must
+> be canonical `- [hard] REQ-NN: <outcome>` with the marker starting the bullet, never a
+> GitHub checkbox prefix). Supersedes the original run, which emitted checkbox-prefixed
+> criteria and passed `coverage-preview` vacuously. This run's criteria are canonical and
+> `coverage-preview` checks them non-vacuously.
 
-## Container (C)
+Entry path: **plan-from-import**. The external design note `notes/ttl-cache-design.md`
+was ingested, reconciled against the (greenfield) codebase, and turned into a fully
+planned and broken-down jit work tree. Planning and breakdown only — no implementation
+work was performed.
 
-- **`b3d778c0`** — "In-memory TTL cache for the utility library" (`type:epic`, `epic:ttl-cache`).
-- **6 `[hard]` REQ criteria**, derived from the note and verified against the project (an
-  empty, greenfield Python utility library — no existing cache/TTL/LRU code to collide with):
-  - REQ-01 store/retrieve a live key; REQ-02 expired read is a miss (no stale value);
-    REQ-03 configurable max size with LRU eviction; REQ-04 `get_or_compute(key, fn)`;
-    REQ-05 readable hit/miss counts; REQ-06 whole-second granularity, per-entry TTL overrides default.
-- Imported note linked to C: `jit doc add b3d778c0 notes/ttl-cache-design.md --doc-type notes`.
+## What was produced
 
-## Bracket and plan
+### Container (C)
+- **`0a5624aa`** — epic "Add in-memory TTL cache to the utility library" (label `epic:ttl-cache`).
+- Six canonical `[hard]` success criteria, each `- [hard] REQ-NN: <outcome>` (no checkbox prefixes), derived from the note and verified against the live repo:
+  - REQ-01: store key/value; `get` returns stored value while unexpired.
+  - REQ-02: `get` past expiry reports a miss, never the stale value.
+  - REQ-03: configurable `maxsize`; LRU eviction when a new insertion would exceed it.
+  - REQ-04: `get_or_compute(key, fn)` — cached on hit; compute/store/return on miss.
+  - REQ-05: caller-readable hit and miss counts.
+  - REQ-06: per-entry TTL overrides a default TTL; whole-second expiry granularity.
 
-- Scaffolded with `jit apply plan b3d778c0` → planning node **`f48d19ff`** (P) and breakdown
-  node **`a6785c53`** (B, `brackets:b3d778c0`). Spine: `C → impl → B → P`.
-- Plan authored at **`dev/active/b3d778c0-plan.md`** (linked to P, `--doc-type design`) by an
-  investigate → synthesize → review sub-agent pipeline. The plan **references the imported
-  note's external knowledge** explicitly (header + §1: whole-second granularity, per-entry
-  overrides default, single-threaded scope) and is grounded in a cited investigation study
-  (`dev/studies/ttl-cache-investigation.md`, linked to P): `time.monotonic()` clock,
-  `collections.OrderedDict` LRU, lazy expiry, `None`-sentinel TTL.
-- Adversarial plan review returned **no blocking findings**; its 4 advisory notes (expiry
-  testability via injectable clock, `ttl=0`/`max_size=0` boundary criteria, shared-`get`
-  edit coordination, recency ownership) were folded into the plan before the gate.
+### Reconciliation against the project
+The repo is a greenfield Python package: `src/__init__.py` is a one-line docstring stub,
+`tests/__init__.py` is empty, and a tree-wide grep for `ttl|cache|TTLCache` over `src/` and
+`tests/` returns nothing. All six criteria classified **valid-and-open** (nothing already
+done, nothing invalid). No remove/rename/migrate intent, so no consumer sweep was needed.
 
-## Breakdown fan-out — 4 fan-out-ready leaf stories
+### Plan bracket
+- **Planning node (P): `6d6ef389`** — plan authored at `dev/active/0a5624aa-plan.md` (linked as `design`), structured to the four plan-review areas, with a Decisions log and Risks table. The plan references the imported note's external knowledge throughout (§2 "Origin" citing `notes/ttl-cache-design.md` lines 6-16; decisions D2/D3/D4 cite specific note lines). State: **Done**.
+- **Breakdown node (B): `951205ec`** (`brackets:0a5624aa`). State: **Done**.
+- Spine: `C → 90d342e3 → 18e5df60 → 8ffbb36f → de373d15 → B → P` (the scaffold's direct `C → B` edge was dropped by transitive reduction; C depends only on the sink child `90d342e3`).
 
-Instantiated exactly from the plan's §3 sketch (plan-authoritative). Each `type:story`,
-`epic:ttl-cache` + own `story:*` slug, `tests` + `code-review` gates, `satisfies:REQ-NN`:
+### Impl children (fan-out; all `type:task`, label `epic:ttl-cache`, gates `tests` + `code-review` attached-not-run)
+| Child | Title | satisfies | depends on | State |
+|---|---|---|---|---|
+| `de373d15` | TTL cache module skeleton and bounded key/value store | REQ-01, REQ-03 | B (source) | Ready |
+| `8ffbb36f` | Per-entry and default TTL expiry | REQ-01, REQ-02, REQ-06 | de373d15 | Backlog |
+| `18e5df60` | Compute-on-miss convenience method | REQ-04 | 8ffbb36f | Backlog |
+| `90d342e3` | Hit/miss lookup counters (sink; C depends on it) | REQ-05 | 18e5df60 | Backlog |
 
-| Story | short-id | satisfies | depends-on |
-|---|---|---|---|
-| TTL cache core store with lazy expiry | `ad923f75` | REQ-01, REQ-02, REQ-06 | B (source) |
-| LRU eviction under a configurable maximum size | `9a40fcdb` | REQ-03 | core store |
-| Compute-on-miss helper | `7226b03e` | REQ-04 | core store |
-| Hit and miss statistics | `ce8f4de6` | REQ-05 | core store |
+Coverage is total: every REQ-01..REQ-06 is credited by at least one child's `satisfies:` label. The source child `de373d15` is now Ready; the rest are Backlog behind their chain predecessors — the tree is fan-out-ready for execution.
 
-Spine verified: `C → {LRU, compute, stats} → core store → B → P` (scaffold `C→B` edge dropped
-by transitive reduction). Cross-sibling coherence review (all four build one `TTLCache`) found
-one **blocking** interface gap — the core `get()` miss signal must be distinct from any stored
-value (a cached `None`/falsy is a hit, not a miss). Folded into the core store (criterion
-STORE-05) and the plan (Decision D6); advisory notes on shared-`get` coordination and
-transitive stats counting also folded. Every `[hard]` REQ-01..06 is covered by exactly one
-story; `jit validate` clean; content lint clean (clean titles, membership + identifying labels,
-gates present, satisfies credits present).
-
-## Levels planned
-
-- 1 breakable container processed (the epic). Children are `type:story`; `story` is in no
-  template's `applies_to`, so the frontier is empty — no recursion. All 4 stories are
-  right-sized leaves.
+## Reviews performed (read-and-report sub-agents; no code written)
+- **Plan synthesis** (sub-agent) → wrote the plan doc from the note + investigator findings.
+- **Adversarial plan review** (sub-agent) → 1 blocking finding: the "truncated to whole seconds" expiry phrasing was ambiguous and, under its literal reading, expired entries up to ~1s early (contradicting local criterion L-03). **Resolved** by pinning the algorithm (raw untruncated `time.monotonic()` readings; whole-second granularity constrained to the `ttl` unit; no clock flooring), added as decision D2 + a §4 risk row + decision D5 for expired-entry disposition-on-read. Re-verified before the gate.
+- **Adversarial breakdown + cross-sibling coherence review** (sub-agent, one pass — all four children extend the same `src/ttl_cache.py`/`TTLCache` surface): **no blocking findings**. Advisories were plan-level decisions already accepted at plan-review.
 
 ## Command / Gate-Invocation Log
 
-Gates **defined** for this project (pre-existing in `.jit/gates.json`; none were newly
-created): `repo-validate`, `plan-review`, `coverage-preview`, `breakdown-review`, `tests`,
-`code-review`. Gate presets used: the `plan` template's `plan-review` (on P) and
-`coverage-preview` + `breakdown-review` (on B).
+Gates **defined**: none newly defined — all gates were already declared in `.jit/gates.json`
+(`repo-validate`, `coverage-preview`, `plan-review`, `breakdown-review`, `code-review`, `tests`)
+and the plan bracket's gates were attached by `jit apply plan` from `.jit/templates.toml`.
 
-Gate invocations I **executed** during planning/breakdown:
+Gates **executed** (via `jit gate pass`) during planning + breakdown:
 
-| Command | Target | Result |
-|---|---|---|
-| `jit recover` / `jit validate` (pre-flight) | repo | clean |
-| `jit apply plan b3d778c0` | C | bracket scaffolded (P, B) |
-| `jit gate pass f48d19ff plan-review` | P | **passed** (1 round; no blocking findings) |
-| `jit gate pass a6785c53 coverage-preview` | B | **passed** (runs `jit validate --scope b3d778c0`; all 6 REQ credited) |
-| `jit gate pass a6785c53 breakdown-review` | B | **passed** (attested after cross-sibling coherence review) |
-| `jit validate` (repeated, incl. post-fan-out) | repo | clean |
-| `jit validate --fix` | repo | no fixes needed |
+| Order | Command | Node | Result |
+|---|---|---|---|
+| 1 | `jit gate pass 6d6ef389 plan-review` | P | passed (manual attestation after adversarial review) |
+| 2 | `jit gate pass 951205ec coverage-preview` | B | passed, exit 0 (auto: `jit validate --scope 0a5624aa`; all `[hard]` REQs credited) |
+| 3 | `jit gate pass 951205ec breakdown-review` | B | passed (manual attestation after adversarial + coherence review) |
 
-State transitions driven: P `f48d19ff` → Done (plan-review passed); B `a6785c53` → Done
-(coverage-preview + breakdown-review passed), which released the core-store story to Ready.
+Gates **attached but NOT executed**: the `tests` gate and `code-review` gate on each of the
+four impl children (`de373d15`, `8ffbb36f`, `18e5df60`, `90d342e3`). These remain **pending**
+— they belong to the execution phase, which was intentionally not entered.
 
-**Gates NOT executed (correctly left for execution):** `repo-validate` on C (execution-time,
-container still Backlog), and the `tests` + `code-review` gates on all four stories (Pending —
-they belong to the implementation phase).
+Other jit commands run: `jit recover`, `jit validate` (repo integrity, several times — all
+passed), `jit issue create` (container + 4 children), `jit apply plan 0a5624aa`,
+`jit dep add` (sibling chain + bracket spine), `jit doc add`, `jit issue update --state done`
+(P and B). State was committed to git after each milestone.
 
-### Affirmation
+### Affirmation: no build/test runner was invoked
+No build or test runner was executed at any point. Specifically, **`pytest` was never run**
+(the `tests` gate — `python -m pytest tests/ -q` — was attached to the impl children but never
+passed/executed), and no `python`, build, or compile step ran against application code. The
+only auto-gate executed was `coverage-preview`, whose checker is `jit validate --scope`
+(a deterministic jit coverage check over issue labels), not a test runner. This was a
+planning-and-breakdown engagement only; implementation and its gates are left for
+jit-execution-lead.
 
-**No build or test runner was invoked at any point.** In particular, `pytest` /
-`python -m pytest` (the `tests` gate's checker command) was **never run**; the `tests` and
-`code-review` gates on the four stories remain Pending. The only auto-gate checker executed
-was `coverage-preview`, whose checker is `jit validate --scope <container>` — a jit-internal
-DAG/label coverage check, not a code build or test run. No application/library code was
-written, compiled, or tested. Work was strictly planning and breakdown.
+## Adjudicator note — fix verification (2026-07-03 re-run)
+
+Checked directly against the run repo, independent of this report's self-claims:
+
+- **Canonical criteria, zero checkbox prefixes.** `jit issue show 0a5624aa` `## Success
+  Criteria` holds six `- [hard] REQ-NN: …` lines; a `grep -nE '^\s*-\s*\[[ x]\]'` over the
+  description returns nothing.
+- **Non-vacuous item projection.** `jit item list --json` projects all six container REQs
+  (`0a5624aa/REQ-01..06`, `kind: requirement`) — not zero, as the original checkbox run
+  produced.
+- **Non-vacuous coverage.** Baseline `jit validate --scope 0a5624aa` passes (exit 0) with
+  all six credited. Stripping `satisfies:REQ-05` from `90d342e3` then makes scope
+  validation **fail (exit 4)** naming the uncovered REQ: `criterion 'REQ-05' of issue
+  0a5624aa is not satisfied by any dependency child`. The label was restored and scope
+  validation passes again — proving the `coverage-preview` gate has teeth on this output.
 
 ## Next step
-
-`b3d778c0` is fully broken down and gated. Hand the tree to **jit-execution-lead** to execute
-the four stories (start with the released core store `ad923f75`).
+`0a5624aa` is fully planned and broken down — hand to **jit-execution-lead** to execute the
+four impl children (starting with the Ready source child `de373d15`).

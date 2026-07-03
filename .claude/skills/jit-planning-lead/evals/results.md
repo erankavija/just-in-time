@@ -33,23 +33,34 @@ just the final tree.
 |---|---|---|---|
 | `research-and-plan` | 2026-07-03 | **PASS** | itemized checklist below + [run report](transcripts/research-and-plan.completion-report.md) |
 | `plan-from-existing` | 2026-07-03 | **PASS** | itemized checklist below + [run report](transcripts/plan-from-existing.completion-report.md) |
-| `plan-from-import` | 2026-07-03 | **PASS** (8/8, with finding) | itemized checklist below + [run report](transcripts/plan-from-import.completion-report.md) |
+| `plan-from-import` | 2026-07-03 | **PASS** (8/8) | itemized checklist below + [run report](transcripts/plan-from-import.completion-report.md) |
 
-> **Finding on `plan-from-import`.** The run passed every `expected_output` item, but it
-> wrote the container's success criteria in GitHub-checkbox form (`- [ ] [hard] REQ-NN …`)
-> instead of the skill-prescribed `- [hard] REQ-NN: …` (see
-> `jit-planning-lead/references/plan-doc-template.md`: *"Never bare, never mixed markers"*).
-> Because the `[hard]` marker is matched only at the **start** of a projected list item
-> (`crates/jit/src/validation/graph.rs`), the leading `[ ]` checkbox hides every criterion
+> **Finding on `plan-from-import` — RESOLVED (skill side).** The original run passed every
+> `expected_output` item but wrote the container's success criteria in GitHub-checkbox form
+> (`- [ ] [hard] REQ-NN …`) instead of the skill-prescribed `- [hard] REQ-NN: …`. Because
+> the `[hard]` marker is matched only at the **start** of a projected list item
+> (`crates/jit/src/validation/graph.rs`), the leading `[ ]` checkbox hid every criterion
 > from both the item projector (`jit item list` → **0 items**) and the `label-coverage`
-> rule. The **coverage-preview gate therefore passed vacuously**: it verified nothing. Real
-> coverage is nonetheless complete — the four stories carry `satisfies:` labels covering all
-> six REQs (checklist item 5, verified by direct label inspection, independent of the
-> parser). Proven non-destructively on a throwaway copy of the run repo: reformatting the
-> criteria to `- [hard] REQ-NN` makes `jit item list` report all 6 and gives the gate teeth
-> (stripping one `satisfies:` label then fails scope validation naming the uncovered REQ).
-> This is a genuine weakness surfaced by the eval; the eval itself (this issue) only adds the
-> scenario, so fixing the skill's criteria-format discipline is a separate decision.
+> rule, so that run's `coverage-preview` passed **vacuously**.
+>
+> The skill has since been fixed: `jit-planning-lead` now forbids checkbox-prefixed criteria
+> and mandates canonical `- [hard] REQ-NN: <outcome>` with the marker starting the bullet,
+> stripping any checkbox prefix on import (SKILL.md step 5,
+> `references/interview-protocol.md`, `references/plan-doc-template.md`: *"never a GitHub
+> checkbox prefix … a checkbox-prefixed criterion reads as zero criteria and coverage-preview
+> passes vacuously"*). The scenario was **re-run against the fixed skill on 2026-07-03**
+> (container `0a5624aa`), and the finding no longer reproduces:
+> - **Canonical criteria, zero checkbox prefixes** — all six criteria are `- [hard] REQ-NN:`;
+>   a `grep -nE '^\s*-\s*\[[ x]\]'` over the description matches nothing.
+> - **Non-vacuous projection** — `jit item list --json` projects all six container REQs
+>   (`0a5624aa/REQ-01..06`), not zero.
+> - **Non-vacuous coverage** — baseline `jit validate --scope 0a5624aa` passes with all six
+>   credited; stripping one `satisfies:REQ-05` label makes it **fail (exit 4)** naming the
+>   uncovered REQ, then restoring passes again. The gate has teeth on this output.
+>
+> The separate engine-side parser leniency (the coverage parser should reject or tolerate a
+> checkbox prefix rather than silently read zero criteria) is orthogonal to this skill and
+> remains tracked in bug `16402e14`; it does not affect this skill's output.
 
 ---
 
@@ -129,13 +140,16 @@ for planning-only.
 
 ---
 
-## `plan-from-import` — PASS (2026-07-03)
+## `plan-from-import` — PASS (2026-07-03, re-run against fixed skill)
 
-- **Run:** external note `notes/ttl-cache-design.md` imported into container `b3d778c0`
-  (`type:epic`, `epic:ttl-cache`, 6 `[hard]` criteria REQ-01..REQ-06); plan node `f48d19ff`;
-  breakdown node `a6785c53`; impl children `ad923f75` (satisfies REQ-01,02,06), `9a40fcdb`
-  (REQ-03), `7226b03e` (REQ-04), `ce8f4de6` (REQ-05).
+- **Run:** external note `notes/ttl-cache-design.md` imported into container `0a5624aa`
+  (`type:epic`, `epic:ttl-cache`, 6 canonical `[hard]` criteria REQ-01..REQ-06); plan node
+  `6d6ef389`; breakdown node `951205ec`; impl children `de373d15` (satisfies REQ-01,03),
+  `8ffbb36f` (REQ-01,02,06), `18e5df60` (REQ-04), `90d342e3` (REQ-05).
 - **Run report:** [`transcripts/plan-from-import.completion-report.md`](transcripts/plan-from-import.completion-report.md).
+- **Supersedes** the original 2026-07-03 run (container `b3d778c0`), which emitted
+  checkbox-prefixed criteria and passed `coverage-preview` vacuously — the finding fixed on
+  the skill and re-verified here (see the Finding callout above).
 
 `expected_output`: *"The external design note notes/ttl-cache-design.md is reconciled into a
 container issue (type:epic) whose `## Success Criteria` section holds `[hard] REQ-NN` criteria
@@ -152,22 +166,22 @@ validate` passes on the final repo."*
 
 | # | Item | Evidence | Mark |
 |---|---|---|---|
-| 1 | Note reconciled into a container (`type:epic`) whose `## Success Criteria` holds `[hard] REQ-NN` derived from the note (expiry-as-miss, LRU eviction, get_or_compute, hit/miss stats) | `b3d778c0` is `type:epic`; its `## Success Criteria` holds 6 `[hard] REQ-01..06` lines covering all four named note requirements (REQ-02 expiry-as-miss, REQ-03 max-size LRU, REQ-04 `get_or_compute`, REQ-05 hit/miss counts) plus REQ-01 store/retrieve and REQ-06 per-entry TTL; note linked as a document. Format caveat: written as `- [ ] [hard] REQ-NN …` (checkbox), non-canonical — see finding | PASS |
-| 2 | Plan bracket scaffolded via `jit apply plan` (P + B on `C → B → P`) | `f48d19ff` `type:planning`, `a6785c53` `type:breakdown` (`brackets:b3d778c0`); spine present; `jit validate` acyclic | PASS |
-| 3 | Plan doc at P's plan-doc path, linked to P; P `done` with `plan-review` passed | `dev/active/b3d778c0-plan.md` exists; `jit doc list f48d19ff` → `dev/active/b3d778c0-plan.md [HEAD] <design>`; `jit issue show f48d19ff` → state `done`; `plan-review` status `passed` + `gate_passed` event; INV-GATE-SEMANTICS | PASS |
-| 4 | The plan (or a linked artifact) references the imported note as external knowledge source | `dev/active/b3d778c0-plan.md` cites `notes/ttl-cache-design.md` in its header and §1 (whole-second granularity, per-entry-overrides-default, single-threaded scope), plus a linked grounding study `dev/studies/ttl-cache-investigation.md` | PASS |
-| 5 | Impl children are non-breakable leaves covering every `[hard]` via `satisfies` | 4 children all `type:story`; `story` is in no `.jit/templates.toml` template's `applies_to` (only `epic` is breakable) → frontier empty; `satisfies:` union = REQ-01..06 = full criterion set (verified by direct label inspection, independent of the parser) | PASS |
-| 6 | B's `coverage-preview` and `breakdown-review` passed and B is `done` | `jit issue show a6785c53` → state `done`; `coverage-preview` status `passed` (`.jit/gate-runs/…/result.json` exit 0, `auto:executor`), `breakdown-review` status `passed` (attested; `gate_passed` event). **Caveat:** the `coverage-preview` pass is **vacuous** — the checkbox criteria format hides all 6 REQs from the `label-coverage` rule (proven on a throwaway copy: stripping a `satisfies:` label still validates clean; reformatting to `- [hard] REQ-NN` then fails naming the uncovered REQ). Real coverage holds via item 5. See finding | PASS |
+| 1 | Note reconciled into a container (`type:epic`) whose `## Success Criteria` holds `[hard] REQ-NN` derived from the note (expiry-as-miss, LRU eviction, get_or_compute, hit/miss stats) | `0a5624aa` is `type:epic`; its `## Success Criteria` holds 6 canonical `- [hard] REQ-01..06:` lines covering all four named note requirements (REQ-02 expiry-as-miss, REQ-03 max-size LRU, REQ-04 `get_or_compute`, REQ-05 hit/miss counts) plus REQ-01 store/retrieve and REQ-06 per-entry TTL; note linked as a document. **Fix confirmed:** zero checkbox prefixes (`grep -nE '^\s*-\s*\[[ x]\]'` matches nothing); `jit item list --json` projects all 6 REQs (not zero) | PASS |
+| 2 | Plan bracket scaffolded via `jit apply plan` (P + B on `C → B → P`) | `6d6ef389` `type:planning`, `951205ec` `type:breakdown` (`brackets:0a5624aa`); spine present; `jit validate` acyclic | PASS |
+| 3 | Plan doc at P's plan-doc path, linked to P; P `done` with `plan-review` passed | `dev/active/0a5624aa-plan.md` exists; `jit doc list 6d6ef389` → `dev/active/0a5624aa-plan.md [HEAD] <design>`; `jit issue show 6d6ef389` → state `done`; `plan-review` status `passed`; INV-GATE-SEMANTICS | PASS |
+| 4 | The plan (or a linked artifact) references the imported note as external knowledge source | `dev/active/0a5624aa-plan.md` cites `notes/ttl-cache-design.md` (4 occurrences: §2 "Origin" citing note lines 6-16, decisions D2/D3/D4 citing specific note lines) | PASS |
+| 5 | Impl children are non-breakable leaves covering every `[hard]` via `satisfies` | 4 children all `type:task`; `task` is in no `.jit/templates.toml` template's `applies_to` (only `epic` is breakable) → frontier empty; `satisfies:` union = REQ-01..06 = full criterion set (verified by direct label inspection) | PASS |
+| 6 | B's `coverage-preview` and `breakdown-review` passed and B is `done` | `jit issue show 951205ec` → state `done`; `coverage-preview` status `passed` (`.jit/gate-runs/…/result.json` exit 0), `breakdown-review` status `passed` (attested). **Non-vacuous (fix confirmed):** with canonical criteria, `jit validate --scope 0a5624aa` credits all 6 REQs; stripping one `satisfies:REQ-05` label makes scope validation **fail (exit 4)** naming the uncovered REQ (`criterion 'REQ-05' … is not satisfied by any dependency child`), then restoring passes again — the gate has teeth | PASS |
 | 7 | No implementation code written (negative — both halves) | **Repo-state:** working tree holds only seed `src/__init__.py` (28 bytes) and empty `tests/__init__.py`; no cache module. **Run-record command log:** the only auto gate-run is 1× `coverage-preview` (`jit validate --scope`); no `pytest`/`cargo`/`npm` in any run; the `tests` gate never executed (children `backlog`/`ready`); report's Command/Gate-Invocation Log affirms no build/test runner invoked | PASS |
 | 8 | `jit validate` passes on the final repo | `jit validate` → `✓ Repository validation passed` | PASS |
 
-Also observed: exactly one epic exists (`b3d778c0`), still `backlog` with `repo-validate`
-pending — correct for planning-only. The run report's claim that coverage-preview credited
-"all 6 REQ" is a self-report inaccuracy (it credited none); graded against repo-state per the
-method, the gate passed vacuously, which is why item 6 carries the caveat and the finding is
-recorded above.
+Also observed: exactly one epic exists (`0a5624aa`), still `backlog` with `repo-validate`
+pending — correct for planning-only. Unlike the original run, this run's criteria are
+canonical, so `jit item list` projects all 6 REQs and `coverage-preview` verifies real
+coverage rather than passing vacuously (items 1 and 6).
 
-**Verdict: PASS** (8/8), with the recorded finding on the vacuous `coverage-preview` gate.
+**Verdict: PASS** (8/8), criteria canonical and `coverage-preview` non-vacuous (the prior
+finding resolved on the skill side).
 
 ---
 
