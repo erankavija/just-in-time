@@ -126,7 +126,7 @@ default_type = "task"
 #   examples    — documentation only, not enforced
 #
 # Allowed-value enums, value patterns, and required-ness are NOT configured here:
-# they live as `default:namespace-*` rules in `.jit/rules.toml`, the single source
+# they live as `namespace-*` rules in `.jit/rules.toml`, the single source
 # of truth (scaffolded by `jit init`).
 
 [namespaces.type]
