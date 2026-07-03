@@ -69,9 +69,13 @@ makes the aggregate read command fail loudly when gates are not green.
 - [ ] REQ-04: subcommand help groups the gate verbs by whether they produce a
   verdict (mutate: `evaluate`, `evaluate-all`, `fail`) or report state (read:
   `list`, `show`, `status`, `status-all`), and states which verbs mutate.
-- [ ] REQ-05: stale in-tree references to the old verbs are swept — the
-  never-run hint ("Use 'jit gate pass' to run it"), the `cli.rs` gate-taxonomy
-  doc comments, and the top-level usage example now name `evaluate` / `status`.
+- [ ] REQ-05: stale references to the old verbs in **live** in-tree surfaces
+  are swept — the never-run hint ("Use 'jit gate pass' to run it"), the `cli.rs`
+  gate-taxonomy doc comments, the top-level usage example, and current product
+  docs under `docs/` — now name `evaluate` / `status`. **Out of scope:**
+  historical/archived dev docs (`dev/archive`, `dev/sessions`, and prior plan
+  documents) and existing issue descriptions stored in `.jit/` are historical
+  records and are left as-authored.
 
 ## Design
 
@@ -160,8 +164,17 @@ milestone.
    failed, all-passed (REQ-02).
 5. Add CLI tests asserting the legacy aliases still resolve to the renamed
    commands (REQ-01, REQ-03).
-6. Sweep docs/skills references only where they are in-repo product docs; skill
-   files under `~/.claude` are out of the repo and out of scope.
+6. Sweep live references only: `cli.rs` help/doc comments, the never-run hint,
+   and current product docs under `docs/`. Historical/archived dev docs
+   (`dev/archive`, `dev/sessions`, prior plan documents) and existing `.jit/`
+   issue descriptions are historical records and are left untouched; skill files
+   under `~/.claude` are out of the repo and out of scope.
+
+## Gates
+
+`code-review` and `cargo-ci` (fmt + clippy + full workspace test suite) — this
+is a Rust CLI change with new tests. Both apply to 949cd9d0 and to the follow-up
+removal issue c505031a.
 
 ## Testing Approach
 
