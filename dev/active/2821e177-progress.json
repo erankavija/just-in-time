@@ -223,6 +223,13 @@
   ],
   "escalations": [
     {
+      "date": "2026-07-04",
+      "issue": "637764ef",
+      "category": "issue scope change (REQ-03 exception-list amendment)",
+      "summary": "code-review R1 FAIL: REQ-03's two named exception classes don't cover three surfaced hit categories (epic design brief historical text preserved per c01f66dd's own mandate; 7 historical issue descriptions in .jit/issues/*.json; the evidence file's own verbatim quotes). Literal compliance would contradict c01f66dd's approved instructions and rewrite done-issue history. AWAITING INVOKER: amend exception list (recommended) / fix everything literally / hybrid.",
+      "resolution": "PENDING"
+    },
+    {
       "date": "2026-07-03",
       "issue": "a1b6b3da",
       "category": "issue scope change (description/criteria amendment)",

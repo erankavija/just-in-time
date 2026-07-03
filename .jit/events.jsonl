@@ -5156,3 +5156,5 @@
 {"type":"issue_claimed","id":"6d64f2f4-46b0-44c4-a63e-9d2fedb685f6","issue_id":"637764ef-534a-4ee5-a4ad-331f0f23fb62","timestamp":"2026-07-03T22:02:39.646518410Z","assignee":"agent:claude"}
 {"type":"issue_created","id":"80961ca0-1da0-4900-95f1-0afd45ffab9d","issue_id":"8d2c5ff3-0804-47b1-beff-583fb5323123","timestamp":"2026-07-03T22:16:43.860796422Z","title":"Rule descriptions: schema field, seeded texts, item text-field flip, richer reference rendering","priority":"normal"}
 {"type":"issue_updated","id":"2c394040-7a67-4878-b6e5-34edf439b10e","issue_id":"8d2c5ff3-0804-47b1-beff-583fb5323123","timestamp":"2026-07-03T22:16:52.279397354Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_passed","id":"bc2e8209-d47e-497e-9ab9-b90198fb2f01","issue_id":"637764ef-534a-4ee5-a4ad-331f0f23fb62","timestamp":"2026-07-03T22:21:34.580846817Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"0bcf6881-a666-47f6-bf6c-dfa519897884","issue_id":"637764ef-534a-4ee5-a4ad-331f0f23fb62","timestamp":"2026-07-03T22:23:23.590606126Z","gate_key":"code-review","updated_by":"auto:executor"}
