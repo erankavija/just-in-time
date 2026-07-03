@@ -13,7 +13,7 @@
 use super::*;
 use crate::config::ProjectName;
 use crate::storage::config_store;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Result of a `jit config set` write, carrying what the CLI needs to print.
 ///
@@ -107,13 +107,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Parse and set the value based on the expected type.
         let parsed_value: toml_edit::Item = match key {
-            // Typed fields validate on write, not only at load: an invalid value
-            // must never reach the file (REQ-03 of the multi-jit story: project
-            // identity is write-validated).
-            "project.name" => {
-                let name: ProjectName = value.parse()?;
-                toml_edit::value(name.as_str())
-            }
             k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
                 let num: i64 = value
                     .parse()
@@ -131,6 +124,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         doc[section][field] = parsed_value;
 
+        // REQ-03: the canonical `[project].name` is validated on EVERY document
+        // write, not only when it is the key being set. Validating the
+        // POST-mutation document makes a valid replacement
+        // (`config set project.name good-name`) the repair path, while an
+        // unrelated set over a document that already holds an invalid name is
+        // rejected. The typed error names the offending value, and nothing is
+        // persisted before this check so a rejected write leaves the file
+        // untouched.
+        if let Some(name) = doc
+            .get("project")
+            .and_then(|project| project.get("name"))
+            .and_then(|name| name.as_str())
+        {
+            let _validated: ProjectName = name.parse()?;
+        }
+
         // Persist through storage (atomic write, parent dir ensured for the
         // user-global first-write case).
         config_store::save_config_document(&config_path, &doc)?;
@@ -141,5 +150,54 @@ impl<S: IssueStore> CommandExecutor<S> {
             file: config_path,
             scope: if global { "user" } else { "repo" },
         })
+    }
+
+    /// Seed the repo `[project]` identity into a freshly-initialized `.jit`
+    /// (REQ-01), returning the seeded name (or `None` when it was a no-op).
+    ///
+    /// Owns the seeding orchestration: the config-existence check, the
+    /// default-name computation (slugifying `repo_dir`'s basename via
+    /// [`slugify_project_name`](crate::config::slugify_project_name)), and the
+    /// call to [`crate::storage::config_store::seed_repo_config`], which appends
+    /// the `[project]` table to the template-generated `base_config_toml` body
+    /// and writes it atomically. Idempotent: when `config.toml` already exists it
+    /// is a no-op returning `Ok(None)`, so a re-init never disturbs an existing
+    /// `[project]` table.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    /// use std::path::Path;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // On a fresh repo this seeds `[project]` from the directory basename.
+    /// let seeded = executor
+    ///     .seed_project_config(Path::new("/repo/My Project"), "")
+    ///     .unwrap();
+    /// assert!(seeded.is_some());
+    /// ```
+    pub fn seed_project_config(
+        &self,
+        repo_dir: &Path,
+        base_config_toml: &str,
+    ) -> Result<Option<ProjectName>> {
+        let jit_root = self.storage.root();
+
+        // Idempotent: an existing config.toml keeps its `[project]` table, so a
+        // re-init never reseeds (REQ-03 preserved for free).
+        if config_store::repo_config_path(jit_root).exists() {
+            return Ok(None);
+        }
+
+        let dir_basename = repo_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+        let project_name: ProjectName =
+            crate::config::slugify_project_name(dir_basename).parse()?;
+        config_store::seed_repo_config(jit_root, base_config_toml, &project_name)?;
+        Ok(Some(project_name))
     }
 }

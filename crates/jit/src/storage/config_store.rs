@@ -92,9 +92,11 @@ pub fn save_config_document(path: &Path, doc: &toml_edit::DocumentMut) -> Result
 /// written atomically.
 ///
 /// This owns the `[project]` block's on-disk format (its guiding comment and the
-/// `name = "..."` line) so no config-file construction lives in the CLI layer.
-/// Callers invoke it only when `config.toml` does not yet exist, keeping `jit
-/// init` idempotent (a re-init leaves an existing `[project]` table untouched).
+/// `name = "..."` line) so no config-file construction lives in the command or
+/// CLI layers. The command-layer seeding orchestration
+/// (`CommandExecutor::seed_project_config`) invokes it only when `config.toml`
+/// does not yet exist, keeping `jit init` idempotent (a re-init leaves an
+/// existing `[project]` table untouched).
 ///
 /// # Examples
 ///

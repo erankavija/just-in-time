@@ -220,3 +220,67 @@ fn test_config_set_accepts_valid_project_name_and_round_trips() {
         "renamed-project"
     );
 }
+
+// REQ-03: the write path validates `[project].name` on EVERY document write, not
+// only when `project.name` is the key being set. A set on an UNRELATED key must
+// not silently rewrite a document that already holds an invalid name.
+
+#[test]
+fn test_config_set_unrelated_key_rejects_preexisting_invalid_project_name() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("write-path-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    jit_init(&repo_dir);
+
+    // Corrupt the config with an invalid `[project]` name that a later, unrelated
+    // set must not persist unvalidated.
+    let config_path = repo_dir.join(".jit/config.toml");
+    fs::write(&config_path, "[project]\nname = \"Bad_Name\"\n").unwrap();
+    let before = fs::read_to_string(&config_path).unwrap();
+
+    let out = Command::new(jit_binary())
+        .args(["config", "set", "coordination.default_ttl_secs", "900"])
+        .current_dir(&repo_dir)
+        .output()
+        .expect("failed to run jit config set");
+    assert!(
+        !out.status.success(),
+        "setting an unrelated key must fail while [project].name is invalid"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("Bad_Name"),
+        "error names the offending value: {stderr}"
+    );
+
+    let after = fs::read_to_string(&config_path).unwrap();
+    assert_eq!(before, after, "a rejected set must not modify the file");
+}
+
+#[test]
+fn test_config_set_project_name_repairs_preexisting_invalid_name() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("write-path-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    jit_init(&repo_dir);
+
+    let config_path = repo_dir.join(".jit/config.toml");
+    fs::write(&config_path, "[project]\nname = \"Bad_Name\"\n").unwrap();
+
+    // Setting `project.name` to a valid value is the repair path: validation runs
+    // on the POST-mutation document, so the good replacement passes and persists.
+    let out = Command::new(jit_binary())
+        .args(["config", "set", "project.name", "good-name"])
+        .current_dir(&repo_dir)
+        .output()
+        .expect("failed to run jit config set");
+    assert!(
+        out.status.success(),
+        "valid project.name repair failed: {:?}",
+        out
+    );
+
+    let content = fs::read_to_string(&config_path).unwrap();
+    let parsed: toml::Value = toml::from_str(&content).unwrap();
+    assert_eq!(parsed["project"]["name"].as_str().unwrap(), "good-name");
+}
