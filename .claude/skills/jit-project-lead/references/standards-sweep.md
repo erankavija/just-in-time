@@ -137,11 +137,15 @@ jq -r 'select(.action=="applied") | [.target_kind, .target, .rule, .line, .detai
 correct, e.g. a criterion whose issue has every `REQ-NN` id reserved). `Target`
 and `Rule` come straight from the record. `Why it needs a decision` is the
 rule's rationale from the table below for a judgment finding, or the skip
-`detail` for a skipped record. Select and stably order:
+`detail` for a skipped record. The section is the union of two selections —
+never drop the skipped-mechanical rows, or a finding the fixer could not correct
+vanishes from the report entirely. Select both and stably order the combined
+set:
 
 ```
-jq -r 'select(.classification=="judgment") | [.target_kind, .target, .rule, .line, .detail] | @tsv' \
-    findings.jsonl | sort
+{ jq -r 'select(.classification=="judgment") | [.target_kind, .target, .rule, .line, .detail] | @tsv' findings.jsonl
+  jq -r 'select(.action=="skipped")        | [.target_kind, .target, .rule, .line, .detail] | @tsv' applied.jsonl
+} | sort
 ```
 
 Both sections are empty when their selection is empty; the section heading still
