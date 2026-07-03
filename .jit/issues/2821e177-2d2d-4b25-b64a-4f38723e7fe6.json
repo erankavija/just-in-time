@@ -17,20 +17,20 @@
     "repo-validate"
   ],
   "gates_status": {
-    "repo-validate": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T22:59:36.756254060Z"
+      "updated_at": "2026-07-03T22:59:36.983360485Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T22:55:58.928383251Z"
     },
-    "code-review": {
+    "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T22:59:36.983360485Z"
+      "updated_at": "2026-07-03T22:59:36.756254060Z"
     }
   },
   "context": {},
@@ -153,6 +153,13 @@
           "is_shared": false
         }
       ]
+    },
+    {
+      "path": "dev/studies/addressing-v2-item-use-cases.md",
+      "commit": null,
+      "label": "Addressable items: use cases and the SSOT adoption push",
+      "doc_type": "study",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -161,5 +168,5 @@
     "type:epic"
   ],
   "created_at": "2026-06-28T11:52:45.519022826Z",
-  "updated_at": "2026-07-03T23:04:35.095618136Z"
+  "updated_at": "2026-07-03T23:35:57.298662739Z"
 }
