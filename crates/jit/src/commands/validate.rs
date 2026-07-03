@@ -2169,6 +2169,104 @@ source-of-truth = \"registry-first\"
         issue
     }
 
+    /// `[item_kinds]` declarations for `rule` and `gate` (jit:d30695e4), both
+    /// declaring `link-namespaces = ["enforces"]` like the live repo's config, so
+    /// an `enforces:@/rule/<name>` / `enforces:@/gate/<key>` label is recognized
+    /// by the dangling-link pass alongside [`CANONICAL_ITEM_KINDS`]'s invariant.
+    const RULE_AND_GATE_ITEM_KINDS: &str = "\
+[item_kinds.rule]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source-of-truth = \"registry-first\"
+
+[item_kinds.gate]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = [\"enforces\"]
+scope = \"project\"
+source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
+source-of-truth = \"registry-first\"
+";
+
+    const ONE_RULE: &str = "\
+[[rules]]
+name = \"label-format\"
+";
+
+    const ONE_GATE: &str = "\
+[[gates]]
+key = \"cargo-ci\"
+description = \"Full Rust CI pipeline must pass.\"
+";
+
+    /// Like [`dangling_exec`] but ALSO declares `rule` and `gate` item kinds and
+    /// seeds `.jit/rules.toml` / `.jit/gates.toml`, exercising the dangling-link
+    /// pass for `enforces:@/rule/<name>` and `enforces:@/gate/<key>` labels.
+    fn dangling_exec_with_rules_and_gates(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config = format!("{CANONICAL_ITEM_KINDS}\n{RULE_AND_GATE_ITEM_KINDS}");
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        storage.add_repo_file(".jit/invariants.toml", REGISTRY_TOML);
+        storage.add_repo_file(".jit/rules.toml", ONE_RULE);
+        storage.add_repo_file(".jit/gates.toml", ONE_GATE);
+        for issue in issues {
+            storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    #[test]
+    fn test_dangling_link_findings_resolves_enforces_rule_and_gate_links() {
+        // REQ-01 (jit:d30695e4): `rule` and `gate` declaring
+        // `link-namespaces = ["enforces"]` means the SAME generic dangling-link
+        // pass that already resolves `enforces:@/<invariant-id>` above now also
+        // resolves an `enforces:@/rule/<name>` and `enforces:@/gate/<key>` label —
+        // no new resolution code, just the kind-config declaration.
+        let node = issue_with_labels(
+            "node",
+            "",
+            &["enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"],
+        );
+        let exec = dangling_exec_with_rules_and_gates(vec![node]);
+        let issues = exec.storage().list_issues().unwrap();
+        assert!(
+            exec.dangling_link_findings(&issues).unwrap().is_empty(),
+            "enforces: rule/gate links must resolve, not dangle"
+        );
+    }
+
+    #[test]
+    fn test_dangling_link_findings_reports_unresolvable_enforces_rule_and_gate_links() {
+        // The negative case: an `enforces:` link to a rule/gate self-id that does
+        // not exist in the registry is qualified but unresolvable, so it is
+        // reported as dangling rather than silently ignored.
+        let node = issue_with_labels(
+            "node",
+            "",
+            &[
+                "enforces:@/rule/no-such-rule",
+                "enforces:@/gate/no-such-gate",
+            ],
+        );
+        let exec = dangling_exec_with_rules_and_gates(vec![node]);
+        let issues = exec.storage().list_issues().unwrap();
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 2);
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("no-such-rule")));
+        assert!(findings
+            .iter()
+            .any(|f| f.finding.message.contains("no-such-gate")));
+    }
+
     #[test]
     fn test_dangling_link_findings_reports_unresolvable_qualified_id() {
         // REQ-03: a node carrying `satisfies:<scope>/BOGUS` (a registered link

@@ -602,16 +602,17 @@ fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
     );
 }
 
-/// Append a `config.toml` namespace registration so a link-namespace label
-/// (`satisfies`, `enforces`) passes the default namespace-registry check, leaving
-/// the dangling-item-link finding as the only validation error under test.
+/// Append a `config.toml` namespace registration so the `satisfies` link-namespace
+/// label passes the default namespace-registry check, leaving the
+/// dangling-item-link finding as the only validation error under test.
+/// `enforces` is NOT appended here: `jit init` already declares
+/// `[namespaces.enforces]` (jit:d30695e4), so appending it again would define the
+/// same TOML table twice and fail to parse.
 fn register_link_namespaces(dir: &std::path::Path) {
     let config_path = dir.join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap();
-    config.push_str(
-        "\n[namespaces.satisfies]\ndescription = \"Satisfied item.\"\nunique = false\n\
-         [namespaces.enforces]\ndescription = \"Enforced invariant.\"\nunique = false\n",
-    );
+    config
+        .push_str("\n[namespaces.satisfies]\ndescription = \"Satisfied item.\"\nunique = false\n");
     std::fs::write(config_path, config).unwrap();
 }
 
@@ -735,5 +736,126 @@ fn test_validate_no_finding_for_resolvable_item_link() {
             .iter()
             .any(|f| f["rule"].as_str() == Some("dangling-item-link")),
         "a resolvable link must yield no dangling-item-link finding: {json}"
+    );
+}
+
+#[test]
+fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
+    // REQ-01/REQ-02 (jit:d30695e4): `rule` and `gate` declare
+    // `link-namespaces = ["enforces"]`, so an authored `enforces:@/rule/<name>`
+    // and `enforces:@/gate/<key>` label both resolve through the shipped `jit
+    // item show`, AND `jit validate` reports neither a dangling-item-link finding
+    // (the labels resolve) nor a namespace-registry finding (`jit init` now
+    // declares `[namespaces.enforces]`) — no `register_link_namespaces` helper
+    // needed here, unlike the `satisfies` tests above.
+    let temp = setup_test_repo();
+
+    // `jit init` scaffolds `.jit/rules.toml` with a default `label-format` rule
+    // but leaves `.jit/gates.toml` empty; define a gate so `@/gate/cargo-ci`
+    // resolves.
+    let define_output = Command::new(jit_binary())
+        .args([
+            "gate",
+            "define",
+            "cargo-ci",
+            "--title",
+            "Cargo CI",
+            "--description",
+            "Full Rust CI pipeline must pass.",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        define_output.status.success(),
+        "gate define failed: {}",
+        String::from_utf8_lossy(&define_output.stderr)
+    );
+
+    let target = create_issue(
+        temp.path(),
+        "target",
+        "## Success Criteria\n\n- [hard] REQ-01: real\n",
+    );
+    let node = Command::new(jit_binary())
+        .args([
+            "issue",
+            "create",
+            "-t",
+            "node",
+            "-d",
+            "node body",
+            "-l",
+            "enforces:@/rule/label-format",
+            "-l",
+            "enforces:@/gate/cargo-ci",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        node.status.success(),
+        "issue create failed: {}",
+        String::from_utf8_lossy(&node.stderr)
+    );
+    let node_json: Value = serde_json::from_slice(&node.stdout).unwrap();
+    let node_short: String = node_json["id"].as_str().unwrap().chars().take(8).collect();
+    // Connect the two so neither is an isolated node (an integrity error that
+    // would abort validation before the rule report is built).
+    Command::new(jit_binary())
+        .args(["dep", "add", &node_short, &target])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Both kind-segmented addresses resolve through the shipped CLI.
+    let show_rule = Command::new(jit_binary())
+        .args(["item", "show", "@/rule/label-format", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        show_rule.status.success(),
+        "item show @/rule/label-format failed: {}",
+        String::from_utf8_lossy(&show_rule.stderr)
+    );
+    let rule_json: Value = serde_json::from_slice(&show_rule.stdout).unwrap();
+    assert_eq!(rule_json["item"]["kind"].as_str().unwrap(), "rule");
+
+    let show_gate = Command::new(jit_binary())
+        .args(["item", "show", "@/gate/cargo-ci", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        show_gate.status.success(),
+        "item show @/gate/cargo-ci failed: {}",
+        String::from_utf8_lossy(&show_gate.stderr)
+    );
+    let gate_json: Value = serde_json::from_slice(&show_gate.stdout).unwrap();
+    assert_eq!(gate_json["item"]["kind"].as_str().unwrap(), "gate");
+
+    let output = Command::new(jit_binary())
+        .args(["validate", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let findings = json["rule_findings"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f["rule"].as_str() == Some("dangling-item-link")),
+        "an enforces: rule/gate link must resolve, not dangle: {json}"
+    );
+    assert!(
+        !findings
+            .iter()
+            .any(|f| f["rule"].as_str() == Some("namespace-registry")),
+        "jit init must register the enforces namespace: {json}"
     );
 }

@@ -94,7 +94,7 @@ source-of-truth = \"registry-first\"
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
 source-of-truth = \"registry-first\"
@@ -110,7 +110,7 @@ source-of-truth = \"registry-first\"
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
 source-of-truth = \"registry-first\"
@@ -125,6 +125,20 @@ fn test_init_emits_golden_item_kinds_table() {
     assert!(
         config.contains(GOLDEN_ITEM_KINDS_BLOCK),
         "jit init must emit the golden [item_kinds] block; got:\n{config}"
+    );
+}
+
+#[test]
+fn test_init_emits_enforces_namespace() {
+    // REQ-02 (jit:d30695e4): `rule` and `gate` declare `enforces` as a
+    // link-namespace, so `jit init` must register `[namespaces.enforces]` too —
+    // otherwise an authored `enforces:` label would fail the namespace-registry
+    // rule even though it resolves.
+    let temp = setup_test_repo();
+    let config = std::fs::read_to_string(temp.path().join(".jit").join("config.toml")).unwrap();
+    assert!(
+        config.contains("[namespaces.enforces]"),
+        "jit init must declare the enforces namespace; got:\n{config}"
     );
 }
 

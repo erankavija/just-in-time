@@ -635,7 +635,7 @@ source-of-truth = \"registry-first\"
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
 source-of-truth = \"registry-first\"
@@ -1368,7 +1368,7 @@ enforce = true
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
-link-namespaces = []
+link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }
 source-of-truth = \"registry-first\"
@@ -1799,6 +1799,32 @@ stage = \"postcheck\"
         assert_eq!(inv.item.kind, "invariant");
         assert_eq!(inv.item.qualified_id, "@/INV-01");
         assert_eq!(inv.item.scope, "@");
+    }
+
+    #[test]
+    fn test_resolve_link_label_resolves_rule_and_gate_enforces_links() {
+        // REQ-01 (jit:d30695e4): `rule` and `gate` now declare
+        // `link-namespaces = ["enforces"]`, so an `enforces:@/rule/<name>` and an
+        // `enforces:@/gate/<key>` label both resolve through the SAME generic
+        // scan `test_resolve_link_label_across_all_four_kinds` exercises above for
+        // requirement/decision/risk/invariant — no new resolution code, just the
+        // kind-config declaration. Kind-segmented addresses only (the kindless
+        // `@/<self-id>` legacy form is being removed in a sibling task).
+        let exec = registry_exec_with_rules_and_gates(ONE_RULE, TWO_GATES);
+
+        let rule = exec
+            .resolve_link_label("enforces:@/rule/coverage-preview")
+            .unwrap()
+            .expect("enforces resolves the rule item");
+        assert_eq!(rule.item.kind, "rule");
+        assert_eq!(rule.item.self_id, "coverage-preview");
+
+        let gate = exec
+            .resolve_link_label("enforces:@/gate/cargo-ci")
+            .unwrap()
+            .expect("enforces resolves the gate item");
+        assert_eq!(gate.item.kind, "gate");
+        assert_eq!(gate.item.self_id, "cargo-ci");
     }
 
     #[test]
