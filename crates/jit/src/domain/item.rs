@@ -876,8 +876,8 @@ pub struct AddressableItem {
     pub links: Vec<String>,
 }
 
-/// A candidate addressable item extracted from a scope's source, before per-scope
-/// uniqueness has been enforced and the qualified id derived.
+/// A candidate addressable item extracted from a scope's source, before
+/// per-(scope, kind) uniqueness has been enforced and the qualified id derived.
 ///
 /// This is the single shape every substrate (issue-scope markdown, project-scope
 /// registry) funnels into [`derive_scope_items`], so the dedup + qualified-id
@@ -974,9 +974,10 @@ pub fn derive_scope_items(
 /// kind's markers and yield a self-id under its id-pattern. The qualified id is
 /// derived as `<issue-short-id>/<self-id>` via the shared [`derive_scope_items`].
 ///
-/// Self-id uniqueness is enforced PER SCOPE (here, the issue): a repeated self-id
-/// is an [`ItemError::DuplicateSelfId`]. A list entry with no self-id match is
-/// plain prose and is skipped, never an error (REQ-06).
+/// Self-id uniqueness is enforced per (scope, kind) (here, the issue): a self-id
+/// repeated under the SAME kind is an [`ItemError::DuplicateSelfId`]; the same
+/// self-id under a *different* kind coexists. A list entry with no self-id match
+/// is plain prose and is skipped, never an error (REQ-06).
 ///
 /// # Examples
 ///
@@ -1023,8 +1024,9 @@ pub fn index_items(
 /// project-scope source file): for each kind it scans its declared section's list
 /// entries, keeps those that match the kind's markers, and extracts the self-id
 /// under its id-pattern. A line with no self-id match is plain prose and is
-/// skipped, never an error (REQ-06). Per-scope uniqueness is NOT enforced here —
-/// that is [`derive_scope_items`]' job — so this stays a pure, reusable scanner.
+/// skipped, never an error (REQ-06). Per-(scope, kind) uniqueness is NOT enforced
+/// here — that is [`derive_scope_items`]' job — so this stays a pure, reusable
+/// scanner.
 fn extract_raw_items(
     sections: &std::collections::BTreeMap<String, crate::domain::ProjectedSection>,
     kinds: &[ItemKind],
@@ -1141,7 +1143,8 @@ pub struct ProjectSource {
     pub markdown: String,
 }
 
-/// Index every project-scope (`@`) substrate through ONE per-scope dedup pass.
+/// Index every project-scope (`@`) substrate through ONE per-(scope, kind) dedup
+/// pass.
 ///
 /// Two substrates feed the project scope and BOTH funnel through the SAME single
 /// [`derive_scope_items`] call here, so per-(scope, kind) uniqueness and
@@ -1153,10 +1156,11 @@ pub struct ProjectSource {
 ///    `registry_items` — already projected from a structured registry, NOT a
 ///    markdown section, since the registry is their authoritative source (REQ-02).
 ///
-/// Pooling all candidates before deriving means a self-id repeated across any two
-/// project kinds (markdown or registry) is reported as a duplicate (REQ-03), and
-/// qualified-id derivation matches issue scope (REQ-01, REQ-05). Empty inputs yield
-/// no items (graceful), never an error.
+/// Pooling all candidates before deriving means a self-id repeated across a
+/// markdown source and a registry candidate of the SAME kind is reported as a
+/// duplicate (REQ-03); different kinds sharing a self-id coexist, deriving the
+/// same qualified-id string. Qualified-id derivation matches issue scope (REQ-01,
+/// REQ-05). Empty inputs yield no items (graceful), never an error.
 ///
 /// # Examples
 ///
