@@ -2,7 +2,7 @@
 //!
 //! Mirrors [`crate::storage::ruleset_store`]'s atomic-write pattern: this store
 //! is the sole source of truth for the gate registry, replacing the prior
-//! `.jit/gates.json`. `Gate` already derives `Serialize`/`Deserialize` (unlike
+//! JSON-based gate registry file. `Gate` already derives `Serialize`/`Deserialize` (unlike
 //! [`Rule`](crate::validation::rules::Rule), which needed a hand-rolled
 //! renderer), so this module serializes/deserializes it directly through a
 //! thin `[[gates]]` array-of-tables wrapper — the same shape

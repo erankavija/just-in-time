@@ -325,7 +325,7 @@ All coordination happens through filesystem operations:
 .jit/
 ├── issues/{id}.json          # Issue data (per-file locks)
 ├── index.json                # Issue index (exclusive lock)
-├── gates.json                # Gate registry (exclusive lock)
+├── gates.toml                # Gate registry (exclusive lock)
 ├── events.jsonl              # Event log (append-only, locked)
 └── .git/jit/                 # Shared control plane
     ├── claims.jsonl          # Claim log (append-only)

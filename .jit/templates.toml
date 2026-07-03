@@ -14,12 +14,12 @@ applies_to  = ["epic"]           # container types this template may be applied 
   [[template.anchors]]
   name  = "container"            # bound at apply time to the target issue
   # REQ-13 (issue 552ff75c): whole-repo integrity gate on the breakable
-  # container. `repo-validate` is a CONFIG-DECLARED gate in .jit/gates.json whose
+  # container. `repo-validate` is a CONFIG-DECLARED gate in .jit/gates.toml whose
   # checker runs `jit validate` with NO issue id (whole-repo run_rules(None)),
   # distinct from the per-issue `jit-validate` gate (`jit validate
   # "$JIT_ISSUE_ID"`). By INV-GATE-SEMANTICS the bound container cannot reach
   # Done until whole-repo validation passes.
-  gates = ["repo-validate"]      # gate name: a preset OR a gates.json registry key
+  gates = ["repo-validate"]      # gate name: a preset OR a gates.toml registry key
 
   [[template.nodes]]
   role        = "planning"

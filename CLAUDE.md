@@ -74,7 +74,7 @@ Cargo workspace with three crates plus Node.js and React components:
 .jit/
 ├── index.json          # Repository metadata
 ├── config.toml         # Configuration (type hierarchy, validation strictness)
-├── gates.json          # Gate registry
+├── gates.toml          # Gate registry
 ├── issues/{id}.json    # Individual issue files
 ├── events.jsonl        # Append-only event log
 ├── claims.jsonl        # Claim/lease log

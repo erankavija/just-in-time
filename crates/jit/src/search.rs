@@ -279,7 +279,7 @@ mod tests {
     fn test_extract_issue_id_from_document_path() {
         assert_eq!(extract_issue_id("docs/design.md"), None);
         assert_eq!(extract_issue_id("README.md"), None);
-        assert_eq!(extract_issue_id(".jit/gates.json"), None);
+        assert_eq!(extract_issue_id(".jit/gates.toml"), None);
     }
 
     #[test]

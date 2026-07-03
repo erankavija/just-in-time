@@ -92,7 +92,7 @@ constrain what it must contain:
   negative command-attempt item, the equivalent runner's completion report MUST include a
   **command / gate-invocation log**: the gates the run defined and executed, and an
   explicit affirmation when no build/test-runner command was invoked, each traceable to
-  the run repo's gate registry (`.jit/gates.json`) and event log (`.jit/events.jsonl`).
+  the run repo's gate registry (`.jit/gates.toml`) and event log (`.jit/events.jsonl`).
   These are the run's own on-disk records, not the report's self-report, so a later reader
   reproduces the check by inspecting (or re-deriving) them. A scenario with no negative
   items needs no such log. If a scenario has a negative item and no invocation log can be

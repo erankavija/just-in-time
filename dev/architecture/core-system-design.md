@@ -53,7 +53,7 @@ Issue (stored per-file)
 - context: map[string, string] - flexible key-value for agent-specific data
   - Example: {"epic": "auth", "pr_url": "...", "agent_notes": "..."}
 
-Gate Definition (global registry, .jit/gates.json)
+Gate Definition (global registry, .jit/gates.toml)
 - key: string (unique)
 - title: string
 - description: string
@@ -76,7 +76,7 @@ Derived fields:
 - docs/design.md
 - .jit/
   - index.json
-  - gates.json
+  - gates.toml
   - issues/ (per-issue files, one file per issue id)
 - cli/
   - README.md (placeholder)
@@ -169,7 +169,7 @@ Machine outputs
 
 Phase 0 (this PR)
 - Add README and docs/design.md
-- Add .jit/gates.json and .jit/index.json with samples
+- Add .jit/gates.toml and .jit/index.json with samples
 - Add cli/ placeholder and .gitignore
 
 Phase 1: Core Issue Management
@@ -371,7 +371,7 @@ jit metrics report --format csv --output metrics.csv
 1. **Language**: Rust (clap, serde, ulid crate)
 2. **ID format**: ULID to avoid central coordination and race conditions
 3. **Ready state**: explicit but auto-evaluated from dependencies + gate statuses
-4. **Gate registry**: global registry (.jit/gates.json) to prevent typos and provide metadata
+4. **Gate registry**: global registry (.jit/gates.toml) to prevent typos and provide metadata
 5. **Assignee format**: `{type}:{identifier}` (e.g., "copilot:session-1", "human:alice")
 6. **Architecture**: Separate core tracker (`jit`) from orchestrator (`jit-dispatch`) for clean boundaries
 7. **Orchestration**: Push-based via jit-dispatch (Phase 3) with pull-based fallback available
@@ -405,21 +405,20 @@ Open questions for later phases:
 
 ## Example file formats
 
-.jit/gates.json (sample)
-{
-  "review": {
-    "key": "review",
-    "title": "Code review",
-    "description": "Manual code review approval",
-    "auto": false
-  },
-  "unit-tests": {
-    "key": "unit-tests",
-    "title": "Unit tests",
-    "description": "Unit test run must pass (automation)",
-    "auto": true
-  }
-}
+.jit/gates.toml (sample; `[[gates]]` array of tables, each entry carrying its own `key`)
+[[gates]]
+key         = "review"
+title       = "Code review"
+description = "Manual code review approval"
+stage       = "postcheck"
+mode        = "manual"
+
+[[gates]]
+key         = "unit-tests"
+title       = "Unit tests"
+description = "Unit test run must pass (automation)"
+stage       = "postcheck"
+mode        = "auto"
 
 .jit/index.json (sample)
 {

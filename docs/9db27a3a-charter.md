@@ -31,7 +31,7 @@ end to end is out of scope, however useful in isolation.
 
 ### D-2: Config-declared gates over hardcoded presets
 
-- **Chosen:** Quality gates are declared in `.jit/gates.json` and referenced by
+- **Chosen:** Quality gates are declared in `.jit/gates.toml` and referenced by
   key; a project defines its own gate set and checkers there.
 - **Rejected:** Baking a fixed set of gate presets into the Rust binary — every
   new or tuned gate would require recompiling and reinstalling `jit`.

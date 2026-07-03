@@ -643,7 +643,7 @@ Terminal state `done` requires gates, but `rejected` does not.
 
 ### Gate Registry
 
-Gates are defined globally in the **gate registry** (`.jit/gates.json`):
+Gates are defined globally in the **gate registry** (`.jit/gates.toml`):
 - Each gate has a unique key (e.g., `tests`, `code-review`)
 - Gate definitions are reusable across issues
 - Changes to gate definitions don't affect existing gate status

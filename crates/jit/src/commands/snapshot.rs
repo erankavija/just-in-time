@@ -483,10 +483,10 @@ This is a read-only export. Future versions may support:
             std::fs::copy(&config_src, &config_dest)?;
         }
 
-        // Copy gates.json if it exists
-        let gates_src = self.storage.root().join("gates.json");
+        // Copy gates.toml if it exists
+        let gates_src = self.storage.root().join("gates.toml");
         if gates_src.exists() {
-            let gates_dest = jit_dir.join("gates.json");
+            let gates_dest = jit_dir.join("gates.toml");
             std::fs::copy(&gates_src, &gates_dest)?;
         }
 

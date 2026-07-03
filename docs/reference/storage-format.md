@@ -11,7 +11,7 @@ JIT stores all data in the `.jit/` directory at the repository root.
 ├── config.toml        # Repository configuration
 ├── index.json         # Issue index for fast queries
 ├── events.jsonl       # Append-only event log
-├── gates.json         # Gate registry definitions
+├── gates.toml         # Gate registry definitions
 ├── worktree.json      # Worktree metadata (if using git worktrees)
 ├── claims.jsonl       # Active lease records
 ├── issues/            # One JSON file per issue
@@ -111,22 +111,21 @@ See [Configuration Reference](configuration.md) for full options.
 
 ## Gate Registry
 
-`gates.json` stores gate definitions:
+`gates.toml` stores gate definitions as a `[[gates]]` array of tables. Each
+entry carries its own `key`, rather than being indexed as an object field:
 
-```json
-{
-  "gates": {
-    "tests": {
-      "key": "tests",
-      "title": "All Tests Pass",
-      "description": "Run test suite",
-      "stage": "postcheck",
-      "mode": "auto",
-      "checker_command": "cargo test",
-      "timeout": 300
-    }
-  }
-}
+```toml
+[[gates]]
+key         = "tests"
+title       = "All Tests Pass"
+description = "Run test suite"
+stage       = "postcheck"
+mode        = "auto"
+
+[gates.checker]
+type            = "exec"
+command         = "cargo test"
+timeout_seconds = 300
 ```
 
 ## Versioning

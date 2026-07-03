@@ -72,7 +72,7 @@ const DEBOUNCE_MS: u64 = 200;
 /// Paths that *do* trigger a refresh:
 /// * `issues/*.json` — issue state, labels, gates, dependencies
 /// * `index.json` — issue added or removed
-/// * `gates.json` — gate registry changed
+/// * `gates.toml` — gate registry changed
 /// * `gate-runs/**` — automated gate execution results
 pub fn is_graph_relevant(event: &notify::Event) -> bool {
     event.paths.iter().any(|path| {
@@ -113,7 +113,7 @@ pub fn is_graph_relevant(event: &notify::Event) -> bool {
         }
 
         // Top-level registry files.
-        matches!(filename, "index.json" | "gates.json")
+        matches!(filename, "index.json" | "gates.toml")
     })
 }
 
@@ -305,8 +305,8 @@ mod tests {
     }
 
     #[test]
-    fn test_relevant_gates_json() {
-        let e = make_event(&["/repo/.jit/gates.json"]);
+    fn test_relevant_gates_toml() {
+        let e = make_event(&["/repo/.jit/gates.toml"]);
         assert!(is_graph_relevant(&e));
     }
 

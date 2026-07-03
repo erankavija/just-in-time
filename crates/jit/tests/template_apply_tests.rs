@@ -81,7 +81,7 @@ fn type_of(issue: &jit::domain::Issue) -> Option<String> {
 }
 
 fn create_epic(h: &TestHarness, title: &str) -> String {
-    // `repo-validate` is a CONFIG-DECLARED gate (it lives in `.jit/gates.json`,
+    // `repo-validate` is a CONFIG-DECLARED gate (it lives in `.jit/gates.toml`,
     // not the built-in preset set), so the in-memory registry must declare it for
     // the `plan` template's `container` anchor to resolve it as a registry gate
     // key. Mirrors the shipped whole-repo `jit validate` gate.
@@ -520,7 +520,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
     // REQ-13 (issue 552ff75c): applying the `plan` template attaches the
     // whole-repo integrity gate `repo-validate` to the bound container anchor —
     // now via the registry-gate-key path (`repo-validate` is config-declared in
-    // `.jit/gates.json`, registered here by `create_epic`, NOT a built-in preset)
+    // `.jit/gates.toml`, registered here by `create_epic`, NOT a built-in preset)
     // — so the container cannot reach Done until whole-repo validation passes.
     let h = TestHarness::new();
     let template = plan_template();
@@ -543,7 +543,7 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
 #[test]
 fn test_apply_attaches_registry_gate_key_not_preset() {
     // REQ-13 (issue 552ff75c): a template gate that names a REGISTRY GATE KEY
-    // (declared in `.jit/gates.json`, NOT a built-in preset) is attached to the
+    // (declared in `.jit/gates.toml`, NOT a built-in preset) is attached to the
     // bound issue at apply time — the same effect as `jit gate add <issue> <key>`.
     // Here the anchor and a node each name `deploy-check`, a registry-only gate.
     let h = TestHarness::new();

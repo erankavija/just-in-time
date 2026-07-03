@@ -97,7 +97,7 @@
 │                   STORAGE LAYER (JSON Files)                         │
 │  • .jit/index.json         → Issue index                            │
 │  • .jit/issues/*.json      → Individual issues                      │
-│  • .jit/gates.json         → Gate registry                          │
+│  • .jit/gates.toml         → Gate registry                          │
 │  • .jit/events.jsonl       → Event log                              │
 │  • Git repository          → Document content                       │
 └──────────────────────────────────────────────────────────────────────┘

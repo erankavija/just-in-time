@@ -48,7 +48,7 @@ use crate::templates::{GraphTemplate, TemplateNode, BREAKDOWN_ROLE};
 use serde::Serialize;
 
 /// How a template node/anchor gate NAME resolves: a registered gate PRESET
-/// bundle, or a single gate KEY declared in the gate registry (`.jit/gates.json`).
+/// bundle, or a single gate KEY declared in the gate registry (`.jit/gates.toml`).
 ///
 /// Resolving anchors/nodes against BOTH lets a config-declared gate (e.g.
 /// `repo-validate`) be referenced from a template without being a built-in
@@ -273,7 +273,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Every gate NAME declared across the template's nodes must resolve
         // BEFORE the first mutation — either as a registered gate PRESET bundle
-        // or as a single gate KEY in the gate registry (`.jit/gates.json`).
+        // or as a single gate KEY in the gate registry (`.jit/gates.toml`).
         // `apply_gate_preset` / `add_gates` resolve lazily during instantiation,
         // so an unknown name would otherwise fail AFTER one or more nodes are
         // persisted — violating "a failure creates zero nodes" (APPA-01). Resolve
@@ -878,7 +878,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Resolve a template node/anchor gate `name` to either a registered gate
     /// PRESET bundle or a single gate KEY declared in the gate registry
-    /// (`.jit/gates.json`), PREFERRING the preset.
+    /// (`.jit/gates.toml`), PREFERRING the preset.
     ///
     /// Config-declared gates (e.g. `repo-validate`) are usable from template
     /// anchors/nodes this way without being built-in presets. Returns an error
