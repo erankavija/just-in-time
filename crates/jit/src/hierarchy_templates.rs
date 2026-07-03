@@ -162,7 +162,7 @@ examples = ["resolution:wont-fix", "resolution:duplicate"]
 [namespaces.enforces]
 description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
 unique = false
-examples = ["enforces:@/INV-01", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+examples = ["enforces:@/invariant/INV-01", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 
 # =============================================================================
 # ITEM KINDS
