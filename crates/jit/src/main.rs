@@ -4563,87 +4563,30 @@ fn run() -> Result<()> {
             } => {
                 use jit::output::JsonOutput;
                 use serde_json::json;
-                use std::fs;
 
-                // Determine target config file
-                let config_path = if global {
-                    let home = dirs::home_dir()
-                        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
-                    let config_dir = home.join(".config/jit");
-                    fs::create_dir_all(&config_dir)?;
-                    config_dir.join("config.toml")
-                } else {
-                    jit_dir.join("config.toml")
-                };
-
-                // Load existing config or create empty
-                let mut doc = if config_path.exists() {
-                    let content = fs::read_to_string(&config_path)?;
-                    content
-                        .parse::<toml_edit::DocumentMut>()
-                        .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?
-                } else {
-                    toml_edit::DocumentMut::new()
-                };
-
-                // Parse key into section.field
-                let parts: Vec<&str> = key.split('.').collect();
-                if parts.len() != 2 {
-                    anyhow::bail!("Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)");
-                }
-                let section = parts[0];
-                let field = parts[1];
-
-                // Ensure section exists
-                if doc.get(section).is_none() {
-                    doc[section] = toml_edit::Item::Table(toml_edit::Table::new());
-                }
-
-                // Parse and set value based on expected type
-                let parsed_value: toml_edit::Item = match key.as_str() {
-                    // Typed fields validate on write, not only at load: an
-                    // invalid value must never reach the file (REQ-03 of the
-                    // multi-jit story: project identity is write-validated).
-                    "project.name" => {
-                        let name: jit::config::ProjectName = value.parse()?;
-                        toml_edit::value(name.as_str())
-                    }
-                    k if k.ends_with("_secs") || k.ends_with("_pct") || k.contains("max_") => {
-                        let num: i64 = value
-                            .parse()
-                            .map_err(|_| anyhow::anyhow!("Expected numeric value for {}", key))?;
-                        toml_edit::value(num)
-                    }
-                    k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
-                        let b: bool = value.parse().map_err(|_| {
-                            anyhow::anyhow!("Expected boolean (true/false) for {}", key)
-                        })?;
-                        toml_edit::value(b)
-                    }
-                    _ => toml_edit::value(&value),
-                };
-
-                doc[section][field] = parsed_value;
-
-                // Write back atomically (temp file + rename, INV-ATOMIC-WRITES).
-                jit::storage::atomic_write::write_file_atomic(&config_path, &doc.to_string())?;
+                let outcome = executor.set_config(&key, &value, global)?;
 
                 if json {
                     println!(
                         "{}",
                         JsonOutput::success(
                             json!({
-                                "key": key,
-                                "value": value,
-                                "file": config_path.display().to_string(),
-                                "scope": if global { "user" } else { "repo" }
+                                "key": outcome.key,
+                                "value": outcome.value,
+                                "file": outcome.file.display().to_string(),
+                                "scope": outcome.scope
                             }),
                             "config set"
                         )
                         .to_json_string()?
                     );
                 } else {
-                    println!("Set {} = {} in {}", key, value, config_path.display());
+                    println!(
+                        "Set {} = {} in {}",
+                        outcome.key,
+                        outcome.value,
+                        outcome.file.display()
+                    );
                 }
             }
             jit::cli::ConfigCommands::Validate { json } => {

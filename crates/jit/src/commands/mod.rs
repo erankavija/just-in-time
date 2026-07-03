@@ -10,6 +10,8 @@
 //! - `template`: Graph-template apply engine (`jit apply <template> <container>`):
 //!   the plan-before-fan-out scaffold (planning node `P` + breakdown node `B`),
 //!   validating, snapshotting anchors, and instantiating the template's nodes
+//! - `config`: `jit config set` write (target-file resolution, typed
+//!   value validation incl. `project.name`, atomic write)
 //! - `gate`: Quality gate operations
 //! - `graph`: Graph visualization and traversal
 //! - `query`: Issue query operations
@@ -27,6 +29,7 @@ pub mod batch_create;
 mod breakdown;
 pub mod bulk_update;
 pub mod claim;
+mod config;
 mod dependency;
 mod document;
 mod events;
@@ -57,6 +60,7 @@ pub use batch_create::{
 };
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
+pub use config::ConfigSetOutcome;
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
     PassAllOutcome,
