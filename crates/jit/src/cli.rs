@@ -427,10 +427,12 @@ pub enum ItemCommands {
 
     /// Show / resolve a single item by its qualified id
     ///
-    /// Accepts the uniform kind-segmented address (`@/<kind>/<self-id>` for a
-    /// project item, `@/issue/<short-id>/<kind>/<self-id>` for an issue item) and the
-    /// `<short-id>/<self-id>` input sugar (the kind is inferred from the self-id's
-    /// shape). An issue reference may be a full id, short id, or unique prefix.
+    /// Accepts the uniform kind-segmented address (`@[<project>]/<kind>/<self-id>`
+    /// for a project item — the optional `<project>` names a jit project and only
+    /// the local project's name resolves — `@/issue/<short-id>/<kind>/<self-id>` for
+    /// an issue item) and the `<short-id>/<self-id>` input sugar (the kind is
+    /// inferred from the self-id's shape). An issue reference may be a full id,
+    /// short id, or unique prefix.
     ///
     /// Examples:
     ///   jit item show @/issue/56ab0224/requirement/REQ-01
