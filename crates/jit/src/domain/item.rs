@@ -165,9 +165,10 @@ impl Scope {
 /// non-exhaustive. Wiring [`Scope`] itself to the third form is later work; this
 /// parser is additive only.
 ///
-/// [`AddressScope::NamedProject`] carries `<name>` purely STRUCTURALLY — it is
-/// not resolved against any declared project identity (a separate, later
-/// concern).
+/// [`AddressScope::NamedProject`] carries `<name>` purely STRUCTURALLY as
+/// parsed — this parser never matches on `@`-prefixes beyond splitting out the
+/// token. Binding `<name>` against a declared local project identity is
+/// [`AddressScope::bind_local`]'s job, not this parser's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AddressScope {
     /// The local project, addressed as bare `@`.
@@ -176,6 +177,65 @@ pub enum AddressScope {
     NamedProject(String),
     /// An issue scope, carrying the issue short-id from `@/issue/<short-id>/...`.
     Issue(String),
+}
+
+impl AddressScope {
+    /// Bind this parsed address-grammar scope token to local project identity,
+    /// collapsing it to the two-variant [`Scope`] every non-address caller
+    /// already resolves against (REQ-01, REQ-09, design decision D5).
+    ///
+    /// `local_project_name` is the repo's declared `[project] name`
+    /// (`None` when undeclared), supplied by the caller from an
+    /// already-loaded config — this function does no I/O.
+    ///
+    /// - [`AddressScope::Project`] (bare `@`) binds to [`Scope::Project`],
+    ///   unchanged from today.
+    /// - [`AddressScope::NamedProject`] binds to [`Scope::Project`] ONLY when
+    ///   `name` equals `local_project_name`: a `@<name>` address naming the
+    ///   local project resolves identically to bare `@`. Every other
+    ///   named-project reference — a different name, or no local name
+    ///   declared at all — is [`ItemError::NotResolvable`]: this module
+    ///   performs no federation or remote lookup, so a project other than the
+    ///   local one is syntactically valid but never resolves here.
+    /// - [`AddressScope::Issue`] passes through unchanged: an issue-scoped
+    ///   address carries no project identity to bind.
+    ///
+    /// This consumes the already-PARSED scope token and never re-matches on
+    /// any `@`-prefix itself (REQ-01).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::item::{AddressScope, Scope};
+    ///
+    /// assert_eq!(
+    ///     AddressScope::Project.bind_local(Some("acme")).unwrap(),
+    ///     Scope::Project
+    /// );
+    /// assert_eq!(
+    ///     AddressScope::NamedProject("acme".to_string())
+    ///         .bind_local(Some("acme"))
+    ///         .unwrap(),
+    ///     Scope::Project
+    /// );
+    /// let err = AddressScope::NamedProject("other".to_string())
+    ///     .bind_local(Some("acme"))
+    ///     .unwrap_err();
+    /// assert!(err.to_string().contains("other"));
+    /// ```
+    pub fn bind_local(self, local_project_name: Option<&str>) -> Result<Scope, ItemError> {
+        match self {
+            AddressScope::Project => Ok(Scope::Project),
+            AddressScope::Issue(short_id) => Ok(Scope::Issue(short_id)),
+            AddressScope::NamedProject(name) => {
+                if local_project_name == Some(name.as_str()) {
+                    Ok(Scope::Project)
+                } else {
+                    Err(ItemError::NotResolvable { project: name })
+                }
+            }
+        }
+    }
 }
 
 /// A kind-segmented address, parsed into its `(scope, kind, self-id)` components
@@ -661,6 +721,21 @@ pub enum ItemError {
         /// Every issue-scoped kind name whose id-pattern matched, in
         /// kind-list order.
         candidates: Vec<String>,
+    },
+    /// A named-project address `@<name>/...` named a project OTHER than the
+    /// locally declared one, or no local project name is declared at all, so
+    /// [`AddressScope::bind_local`] could not bind it to local project
+    /// identity. Resolution is local-only: no federation or remote lookup was
+    /// attempted for `project`.
+    #[error(
+        "project '{project}' is not resolvable here: resolution is local-only \
+         and no federation or remote lookup was attempted; only the locally \
+         declared project name binds to '@'"
+    )]
+    NotResolvable {
+        /// The named-project token that could not be bound to any local
+        /// identity.
+        project: String,
     },
 }
 
@@ -2398,6 +2473,84 @@ enforced-by = \"tests\"
         assert_eq!(addr.scope, AddressScope::NamedProject("acme".to_string()));
         assert_eq!(addr.kind, "requirement");
         assert_eq!(addr.self_id, "REQ-01");
+    }
+
+    #[test]
+    fn test_bind_local_project_scope_resolves_regardless_of_declared_name() {
+        // REQ-01: bare `@` always binds to the local project, whether or not a
+        // local name is declared, consuming the already-parsed scope token.
+        assert_eq!(
+            AddressScope::Project.bind_local(Some("acme")).unwrap(),
+            Scope::Project
+        );
+        assert_eq!(
+            AddressScope::Project.bind_local(None).unwrap(),
+            Scope::Project
+        );
+    }
+
+    #[test]
+    fn test_bind_local_named_project_matching_local_name_resolves_as_local() {
+        // REQ-01: `AddressScope::NamedProject("acme")` binds identically to the
+        // bare-`@` local scope when "acme" is the declared local project name.
+        assert_eq!(
+            AddressScope::NamedProject("acme".to_string())
+                .bind_local(Some("acme"))
+                .unwrap(),
+            Scope::Project
+        );
+    }
+
+    #[test]
+    fn test_bind_local_named_project_different_name_is_not_resolvable() {
+        // REQ-02: a named-project reference to a project OTHER than the local one
+        // is syntactically valid but not resolvable, and the error names it and
+        // states resolution is local-only with no remote attempt.
+        let err = AddressScope::NamedProject("other-project".to_string())
+            .bind_local(Some("acme"))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            ItemError::NotResolvable { ref project } if project == "other-project"
+        ));
+        let msg = err.to_string();
+        assert!(msg.contains("other-project"), "message: {msg}");
+        assert!(msg.contains("local-only"), "message: {msg}");
+        assert!(
+            msg.contains("no federation or remote lookup"),
+            "message: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_bind_local_named_project_no_declared_name_is_not_resolvable() {
+        // REQ-02: with no local project name declared at all, ANY named-project
+        // reference is not resolvable.
+        let err = AddressScope::NamedProject("acme".to_string())
+            .bind_local(None)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            ItemError::NotResolvable { ref project } if project == "acme"
+        ));
+    }
+
+    #[test]
+    fn test_bind_local_issue_scope_passes_through_unchanged() {
+        // Issue-scoped addresses carry no project identity, so the binding leaves
+        // them untouched regardless of the declared local project name.
+        assert_eq!(
+            AddressScope::Issue("56ab0224".to_string())
+                .bind_local(Some("acme"))
+                .unwrap(),
+            Scope::Issue("56ab0224".to_string())
+        );
+        assert_eq!(
+            AddressScope::Issue("56ab0224".to_string())
+                .bind_local(None)
+                .unwrap(),
+            Scope::Issue("56ab0224".to_string())
+        );
     }
 
     #[test]

@@ -11,8 +11,8 @@ use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
-    AddressableItem, ItemError, ItemKind, ProjectSource, PROJECT_SCOPE_SENTINEL,
+    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressableItem,
+    ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -299,6 +299,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Accepts the full address grammar:
     /// - `@/<kind>/<self-id>` — a project-scope item of an explicit kind.
+    /// - `@<name>/<kind>/<self-id>` — a named-project form, routed through
+    ///   [`AddressScope::bind_local`](crate::domain::item::AddressScope::bind_local):
+    ///   it resolves identically to the bare-`@`
+    ///   form when `<name>` is the repo's declared `[project] name`, and is an
+    ///   [`ItemError::NotResolvable`] error otherwise (no federation or remote
+    ///   lookup is attempted).
     /// - `@/issue/<short-id>/<kind>/<self-id>` — an issue-scope item of an explicit
     ///   kind; the issue reference is resolved through the SAME issue-id resolver the
     ///   rest of the CLI uses (full id, short id, or unique prefix).
@@ -462,30 +468,36 @@ impl<S: IssueStore> CommandExecutor<S> {
         // An `@`-prefixed input is an explicit kind-segmented address, or the legacy
         // project form the kind-segmented grammar does not cover.
         match parse_kind_segmented_address(qualified) {
-            Ok(addr) => match addr.scope {
-                AddressScope::Project => Ok(ResolvedItemAddress::Project {
-                    kind: Some(addr.kind),
-                    self_id: addr.self_id,
-                }),
-                AddressScope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
-                    issue_ref,
-                    kind: Some(addr.kind),
-                    self_id: addr.self_id,
-                }),
-                // Named-project resolution is later work (task a1b6b3da): until it
-                // lands, a named-project address matches nothing rather than
-                // resolving to a local item or aborting a whole validate run. The
-                // error carries every PARSED component (project, kind, self-id), so
-                // a caller can confirm the value was structurally routed — not
-                // mis-split — even though resolution is deferred.
-                AddressScope::NamedProject(name) => Err(anyhow!(
-                    "named-project address '{qualified}' (project '{name}', kind '{}', \
-                     self-id '{}') is not resolvable: only the local project resolves; \
-                     named-project resolution is later work (a1b6b3da)",
-                    addr.kind,
-                    addr.self_id,
-                )),
-            },
+            Ok(addr) => {
+                // Bind the parsed scope token to local project identity: a bare
+                // `@` or a `@<name>` naming the repo's own declared project both
+                // collapse to `Scope::Project`; a `@<name>` naming any other
+                // project is `ItemError::NotResolvable` (no federation or remote
+                // lookup — REQ-09, D5). The wrapping context keeps the kind and
+                // self-id visible so a caller can confirm the value was
+                // structurally routed, not mis-split, even on the error path.
+                let local_name = self
+                    .config_manager
+                    .project_name_from_config(self.cached_config()?);
+                let scope = addr.scope.bind_local(local_name.as_deref()).map_err(|err| {
+                    anyhow!(
+                        "cannot resolve item address '{qualified}' (kind '{}', self-id '{}'): {err}",
+                        addr.kind,
+                        addr.self_id,
+                    )
+                })?;
+                match scope {
+                    Scope::Project => Ok(ResolvedItemAddress::Project {
+                        kind: Some(addr.kind),
+                        self_id: addr.self_id,
+                    }),
+                    Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
+                        issue_ref,
+                        kind: Some(addr.kind),
+                        self_id: addr.self_id,
+                    }),
+                }
+            }
             // The one well-formed `@`-address the kind-segmented grammar does not
             // cover is the legacy project form `@/<self-id>` (kind-agnostic), which
             // project items still derive as their qualified_id; recognize exactly
@@ -632,6 +644,38 @@ source-of-truth = \"registry-first\"
         std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
         for issue in issues {
             storage.save_issue(issue).unwrap();
+        }
+        CommandExecutor::new(storage)
+    }
+
+    /// Build an [`InMemoryStorage`] executor whose `config.toml` declares
+    /// `[project] name = "<name>"` alongside a single markdown-first,
+    /// project-scope `glossary` kind sourced from `project-items.md` (task
+    /// a1b6b3da: exercises the `@<name>/<kind>/<self-id>` binding against a repo
+    /// with a real declared project identity).
+    fn project_exec_with_name(
+        name: &str,
+        source_md: Option<&str>,
+    ) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        let config = format!(
+            "[project]\n\
+             name = \"{name}\"\n\
+             \n\
+             [item_kinds.glossary]\n\
+             section = \"success_criteria\"\n\
+             id-pattern = \"GLOSS-[0-9]+\"\n\
+             markers = []\n\
+             link-namespaces = [\"defines\"]\n\
+             scope = \"project\"\n\
+             source = \"project-items.md\"\n\
+             source-of-truth = \"markdown-first\"\n"
+        );
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
+        if let Some(md) = source_md {
+            storage.add_repo_file("project-items.md", md);
         }
         CommandExecutor::new(storage)
     }
@@ -890,24 +934,49 @@ source-of-truth = \"registry-first\"
     }
 
     #[test]
-    fn test_show_item_named_project_address_not_yet_supported() {
-        // Audit (jit:7a2bbe4f) REQ-02: a named-project address
-        // `@<name>/<kind>/<self-id>` parses structurally into
-        // `AddressScope::NamedProject`, but `resolve_item_address` has not
-        // wired named-project RESOLUTION yet (task a1b6b3da). Confirm routing
-        // surfaces that specific not-yet-supported error rather than
-        // mis-splitting into the legacy bare-`@` project form or panicking.
+    fn test_show_item_named_project_matching_local_name_resolves_like_bare_at() {
+        // REQ-03 (task a1b6b3da): `@<declared-name>/<kind>/<self-id>` routes
+        // through `AddressScope::bind_local` and resolves identically to the
+        // bare-`@/<kind>/<self-id>` form when the repo declares that name.
+        let exec = project_exec_with_name(
+            "acme",
+            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
+        );
+        let named = exec.show_item("@acme/glossary/GLOSS-01").unwrap();
+        let bare = exec.show_item("@/glossary/GLOSS-01").unwrap();
+        assert_eq!(named.item, bare.item);
+        assert_eq!(named.item.qualified_id, "@/GLOSS-01");
+    }
+
+    #[test]
+    fn test_show_item_named_project_other_name_is_not_resolvable() {
+        // REQ-03 (task a1b6b3da): a named-project address naming a project OTHER
+        // than the locally declared one is syntactically valid but not
+        // resolvable — the stopgap "not yet supported" error is replaced by
+        // `ItemError::NotResolvable`, which names the unresolvable project and
+        // states resolution is local-only.
+        let exec = project_exec_with_name(
+            "acme",
+            Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
+        );
+        let err = exec
+            .show_item("@other-project/glossary/GLOSS-01")
+            .unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("other-project"), "got: {msg}");
+        assert!(msg.contains("local-only"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_show_item_named_project_no_declared_name_is_not_resolvable() {
+        // REQ-02/REQ-03: with no `[project] name` declared at all, ANY
+        // named-project reference is not resolvable, even one that happens to
+        // name an item kind and self-id that do exist locally.
         let exec = executor_with(vec![]);
         let err = exec.show_item("@acme/requirement/REQ-01").unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("named-project"), "got: {msg}");
-        // The error carries the three PARSED components in distinct phrasing
-        // (`project 'acme'`, `kind 'requirement'`, `self-id 'REQ-01'`), proving the
-        // value was structurally routed into (project, kind, self-id) rather than
-        // mis-split. These phrases cannot come from the raw address verbatim.
-        assert!(msg.contains("project 'acme'"), "got: {msg}");
-        assert!(msg.contains("kind 'requirement'"), "got: {msg}");
-        assert!(msg.contains("self-id 'REQ-01'"), "got: {msg}");
+        assert!(msg.contains("acme"), "got: {msg}");
+        assert!(msg.contains("local-only"), "got: {msg}");
     }
 
     #[test]
@@ -974,10 +1043,12 @@ source-of-truth = \"registry-first\"
 
     #[test]
     fn test_resolve_link_label_named_project_form_routes_without_panic() {
-        // Audit (jit:7a2bbe4f) REQ-02: the named-project form
-        // `@<name>/<kind>/<self-id>` is classified as a qualified reference
-        // (it has a `/`) and routes through `show_item`, surfacing the SAME
-        // not-yet-supported error rather than a silent `None` or a panic.
+        // Audit (jit:7a2bbe4f) REQ-02, wired to the a1b6b3da binding: the
+        // named-project form `@<name>/<kind>/<self-id>` is classified as a
+        // qualified reference (it has a `/`) and routes through `show_item`; with
+        // no local project name declared in this repo, the reference is not
+        // resolvable, surfacing that error rather than a silent `None` or a
+        // panic.
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let exec = executor_with(vec![a]);
         let err = exec
