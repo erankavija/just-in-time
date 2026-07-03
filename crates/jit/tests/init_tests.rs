@@ -59,7 +59,7 @@ fn test_init_creates_required_files() {
 
     let jit = temp.path().join(".jit");
     assert!(jit.join("index.json").exists(), "index.json missing");
-    assert!(jit.join("gates.json").exists(), "gates.json missing");
+    assert!(jit.join("gates.toml").exists(), "gates.toml missing");
     assert!(jit.join("events.jsonl").exists(), "events.jsonl missing");
     assert!(jit.join("config.toml").exists(), "config.toml missing");
 }

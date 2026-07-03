@@ -6,7 +6,7 @@
 //!   2. Fields not passed are preserved (partial update).
 //!   3. Updating a non-existent key errors; `--json` yields a machine-readable error.
 //!   4. Per-issue `gates_status` on an issue requiring the gate is unchanged.
-//!   5. The registry write is atomic: a sibling gate stays intact and valid JSON.
+//!   5. The registry write is atomic: a sibling gate stays intact and valid TOML.
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
@@ -302,23 +302,34 @@ fn test_gate_update_is_atomic_sibling_gate_intact() {
         .assert()
         .success();
 
-    // The registry file is valid JSON and the sibling gate is intact.
-    let gates_path = temp.path().join(".jit").join("gates.json");
+    // The registry file is valid TOML and the sibling gate is intact. Gates
+    // persist as a `[[gates]]` array-of-tables (not a keyed JSON object), so
+    // each entry is located by scanning for its `key` field.
+    let gates_path = temp.path().join(".jit").join("gates.toml");
     assert!(Path::new(&gates_path).exists());
-    let registry: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(&gates_path).unwrap())
-            .expect("registry must remain valid JSON after an update");
+    let registry: toml::Value = toml::from_str(&fs::read_to_string(&gates_path).unwrap())
+        .expect("registry must remain valid TOML after an update");
+    let gates = registry
+        .get("gates")
+        .and_then(toml::Value::as_array)
+        .expect("gates.toml persists gates as a [[gates]] array");
+    let find_gate = |key: &str| -> &toml::Value {
+        gates
+            .iter()
+            .find(|g| g.get("key").and_then(toml::Value::as_str) == Some(key))
+            .unwrap_or_else(|| panic!("gate '{key}' missing from registry: {gates:?}"))
+    };
     assert_eq!(
-        registry["gates"]["clippy"]["checker"]["command"],
-        "cargo clippy"
+        find_gate("clippy")["checker"]["command"].as_str(),
+        Some("cargo clippy")
     );
     assert_eq!(
-        registry["gates"]["clippy"]["checker"]["timeout_seconds"],
-        90
+        find_gate("clippy")["checker"]["timeout_seconds"].as_integer(),
+        Some(90)
     );
     assert_eq!(
-        registry["gates"]["tests"]["checker"]["timeout_seconds"],
-        777
+        find_gate("tests")["checker"]["timeout_seconds"].as_integer(),
+        Some(777)
     );
 }
 
