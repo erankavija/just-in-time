@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "4ac0eb17-bf05-4e3d-9e2a-a4fb88bb5022",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7f22d6cf-e2d6-4103-b941-690f602734c1",
+  "commit": "b9e61d56a3cdc4439bfea71e1ee07bd923fc4b96",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T22:53:32.346691040Z",
+  "completed_at": "2026-07-03T22:55:18.611963814Z",
+  "duration_ms": 106265,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 is met. Uniform kind-segmented IDs are minted in `crates/jit/src/domain/item.rs:1036-1067`, and live `.jit/issues/*.json` labels retain bare `satisfies:REQ-NN` coverage labels without live qualified `satisfies:@...` labels.\n\nREQ-02 is met. Provided `cargo-ci` passed for this issue, and I ran `./scripts/jit-validate.sh`; it passed.\n\nREQ-03 is met under amendment A-7f22d6cf-v2. The operative scan over `crates/`, `docs/`, and live `.jit` config/registry/schema files found no legacy kindless `@/INV-*` style addresses or colon-prefixed rule IDs. Remaining old literals are under exempt `dev/**` or historical issue-description context.\n\nREQ-04 is met. `qualified_id` mints `@/<kind>/<self-id>` and `@/issue/<short>/<kind>/<self-id>` at `crates/jit/src/domain/item.rs:1067`. `resolve_item_address` no longer has a kindless project fallback; malformed `@/<self-id>` routes to parser error at `crates/jit/src/commands/item.rs:468-509`, with regression coverage at `crates/jit/src/commands/item.rs:1708`.\n\n**Architecture And Separation Of Concerns**\n\nNo boundary violation found. Domain projection stays in `domain/item.rs`; command resolution stays in `commands/item.rs`; storage remains behind the existing storage APIs.\n\n**Functional Paradigm**\n\nNo blocking issue. The resolver uses some command-layer control flow for parsing and error context, which is appropriate orchestration code.\n\n**Correctness And Invariants**\n\nNo new issue found for atomic writes, event logging, gate semantics, assignee/label format, or PID safety. PID signaling is guarded against overflowing `u32 -> i32` conversion at `crates/jit/src/commands/serve.rs:211-225` and `:543-550`.\n\n**Safety**\n\n`#![deny(unsafe_code)]` is present in `crates/jit/src/lib.rs:6`, `crates/jit/src/main.rs:14`, `crates/server/src/lib.rs:6`, and `crates/server/src/main.rs:6`.\n\n**Testing**\n\nPer instruction, I did not rerun cargo tests because this issue has succeeded `cargo-ci` evidence. The issue gate evidence shows `cargo-ci` passed and `repo-validate` passed; `./scripts/jit-validate.sh` also passed locally.\n\n**Error Handling**\n\nNo new production `unwrap()` / `expect()` issue found in the reviewed addressing path. Resolver errors include the input address plus kind/self-id context at `crates/jit/src/commands/item.rs:481-509`.\n\n**CLI Contract**\n\nNo new CLI command was added. Existing item show/list paths retain JSON-capable command surfaces.\n\n**Documentation**\n\nPublic API docs for the new addressing projection include examples at `crates/jit/src/domain/item.rs:1036-1067`. The prior documentation-hygiene blocker is now outside the operative scope by the invoker-approved `dev/**` exemption recorded in `.jit/issues/7f22d6cf-e2d6-4103-b941-690f602734c1.json:4`.\n\n**Prior Review Feedback**\n\nThe most recent failed review flagged legacy literals under `dev/**`. The current issue description explicitly exempts `dev/**` process records as a class, and the operative scan outside that exemption is clean. Earlier code/test literal findings in `crates/` are no longer present.\n\n**Jit Issue Management**\n\nDependency `637764ef` is done. Required gates have passing evidence for `cargo-ci` and `repo-validate`; current code-review is the remaining gate under review.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
