@@ -119,17 +119,22 @@ resolved. A wave completes before the next begins.
 
 ## Mode dispatch (stub)
 
-Four invocation modes route from the opening request. The routing block and
-mode bodies are authored by the four-mode front-door work:
+Four invocation modes route from the opening request:
 
 1. Lead existing strategic work.
 2. Plan and execute a vague high-level objective.
 3. Steering discussion.
 4. Standards sweep — body defined below (## Standards sweep mode).
 
-The routing front-door and the mode-1..3 bodies arrive with the four-mode
-front-door work; the mode-4 body is already defined below. Until routing lands,
-complete pre-flight, report that mode routing is pending, and stop.
+The full request-routing front-door and the mode-1..3 bodies arrive with the
+four-mode front-door work. The mode-4 body is already defined and runnable now:
+when the opening request is a standards sweep (audit the project against the
+content standards, fix mechanical violations, surface judgment ones), complete
+pre-flight and run the Standards sweep mode below end to end — do not stop for
+pending routing. For a request that resolves to mode 1, 2, or 3, those bodies are
+not authored yet: complete pre-flight, report that mode routing is pending, and
+stop. When the request is ambiguous between mode 4 and another mode, ask rather
+than guess (see Stop and escalate).
 
 ## Standards sweep mode
 
