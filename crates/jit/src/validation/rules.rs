@@ -121,6 +121,19 @@ pub enum RuleConfigError {
         valid: String,
     },
 
+    /// A rule's `name` contains a `:`. Colon is reserved exclusively for the
+    /// label `namespace:value` separator (see [`Rule::name`]); a rule's
+    /// self-id must be a colon-free slug, with provenance carried in the
+    /// separate `origin` field rather than an embedded prefix.
+    #[error(
+        "rule name '{name}' contains ':'; colon is reserved for the label \
+         namespace:value separator — put provenance in the 'origin' field instead"
+    )]
+    InvalidRuleName {
+        /// The offending name as authored.
+        name: String,
+    },
+
     /// Two or more rules share the same `name`. Rule names MUST be unique so
     /// that every finding attributes unambiguously to exactly one rule: a
     /// finding naming rule `"foo"` must refer to a single rule. (The engine
@@ -1354,6 +1367,13 @@ struct RawLabelValuePattern {
 
 impl RawRule {
     fn into_rule(self, jit_root: &Path) -> Result<Rule, RuleConfigError> {
+        // A rule's name is its addressable self-id (`@/rule/<name>`); colon is
+        // reserved for the label namespace:value separator, so a colon-bearing
+        // name would mint an unaddressable label value. Reject at load time
+        // rather than let it silently produce a broken address.
+        if self.name.contains(':') {
+            return Err(RuleConfigError::InvalidRuleName { name: self.name });
+        }
         // Validate the `when` state predicate at load so a typo'd state (which
         // would otherwise silently never match any issue) is rejected with an
         // error naming the rule and the valid tokens.
@@ -2293,17 +2313,22 @@ assert = { require-section = { heading = "A" } }
     }
 
     #[test]
-    fn test_default_prefix_name_is_now_accepted() {
-        // The `default:` reservation was removed (DR §8.2): the default rules now
-        // live in the file and are user-editable, so a `default:*` name loads
-        // like any other (only the uniqueness guard remains).
+    fn test_colon_bearing_name_is_rejected() {
+        // The `default:` reservation was removed (DR §8.2), but colon itself
+        // stays reserved for the label `namespace:value` separator: a rule's
+        // name is its addressable self-id (`@/rule/<name>`), so a colon-bearing
+        // name would mint a label value the address grammar cannot express.
+        // Provenance belongs in the separate `origin` field, not a `prefix:`.
         let toml = r#"
 [[rules]]
 name = "default:my-rule"
 assert = { require-section = { heading = "A" } }
 "#;
-        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].name, "default:my-rule");
+        let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
+        match err {
+            RuleConfigError::InvalidRuleName { name } => assert_eq!(name, "default:my-rule"),
+            other => panic!("expected InvalidRuleName, got {other:?}"),
+        }
     }
 
     // --- type-hierarchy assert kind ----------------------------------------

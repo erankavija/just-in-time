@@ -772,12 +772,12 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_
     #[test]
     fn test_colliding_schema_rule_names_get_unique_files() {
         // Two DISTINCT rule names that sanitize to the SAME stem
-        // (`a:b` and `a/b` both -> `a-b`) must NOT produce the same schema
+        // (`a b` and `a/b` both -> `a-b`) must NOT produce the same schema
         // file name, or one schema would silently overwrite the other and a
         // rule would validate against the wrong schema (finding #1).
         let toml = r#"
 [[rules]]
-name = "a:b"
+name = "a b"
 severity = "error"
 assert = { json-schema = "schemas/first.json" }
 
