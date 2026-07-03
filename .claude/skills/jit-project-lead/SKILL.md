@@ -125,10 +125,32 @@ mode bodies are authored by the four-mode front-door work:
 1. Lead existing strategic work.
 2. Plan and execute a vague high-level objective.
 3. Steering discussion.
-4. Standards sweep.
+4. Standards sweep — body defined below (## Standards sweep mode).
 
-Until that work lands, complete pre-flight, report that mode routing is
-pending, and stop.
+The routing front-door and the mode-1..3 bodies arrive with the four-mode
+front-door work; the mode-4 body is already defined below. Until routing lands,
+complete pre-flight, report that mode routing is pending, and stop.
+
+## Standards sweep mode
+
+Mode 4. Run end to end to bring the whole project's issues and documents into
+content-standards compliance: scan every issue and document against the canonical
+rules, auto-apply every mechanical correction, and report the auto-fixed items
+and the human-judgment items in one report with the two kept visibly separate.
+
+Read `references/standards-sweep.md` **in full**, then execute it: run
+`scripts/standards-scan.sh` to a findings file, feed that file to
+`scripts/standards-fix.sh` to apply the mechanical corrections and emit the fix
+ledger, then build the single sweep report from the scanner findings (the
+Needs-a-decision section) and the fixer ledger (the Auto-fixed section). The
+scanner and fixer are the tested scripts this mode composes; do not re-implement
+either.
+
+Auto-applied: only the mechanical corrections, written through the jit CLI.
+Left open: every judgment violation, reported for a human or the lead to decide,
+never auto-changed. Scanner or fixer exit 2, or an unresolvable report path,
+stops the mode (see Stop and escalate); the reference lists the mode's own red
+flags.
 
 ## Stop and escalate
 
@@ -154,11 +176,15 @@ Stop immediately and report to the invoker when:
   dispatch script, a dispatch pre-flight or leak-check failure, an unresolvable
   lead escalation, or a prior wave's results that cannot be landed on `main`
   before a dependent wave.
+- Standards sweep stops (see `references/standards-sweep.md`): the scanner or
+  fixer exits 2 (missing `.jit/`, missing `jq`/`gawk`/`jit`, or an internal scan
+  failure), or the config-derived report path cannot be resolved.
 
 ## Red flags
 
-- Authoring mode behavior from this shell. Mode bodies arrive with the
-  front-door work; stop at the stub.
+- Authoring mode behavior from this shell. Mode-1..3 bodies arrive with the
+  front-door work; stop at the stub. The mode-4 body is a thin wiring to
+  `references/standards-sweep.md` and adds no behavior here.
 - Guessing tier names when derivation inputs are ambiguous. Stop and ask.
 - Skipping `jit recover`. Stale locks corrupt every downstream operation.
 - Hardcoding a domain type name where the config supplies it.
