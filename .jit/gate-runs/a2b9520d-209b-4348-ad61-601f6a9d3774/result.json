@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a2b9520d-209b-4348-ad61-601f6a9d3774",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "87346f52-a2c4-4506-8819-9ff58c854595",
+  "commit": "ea5eca4cfd1b58acbe97771c1e4f9da367c6e16a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-03T13:40:40.642680139Z",
+  "completed_at": "2026-07-03T13:41:41.158723635Z",
+  "duration_ms": 60516,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are mostly satisfied: `.jit/rules.toml` has the requested `name`/`origin` pairs, `default_ruleset()` emits colon-free names with `origin = \"default\"`, origin round-trip coverage was added, and the named consumers now match colon-free literals.\n\nREQ-06 fails. The removed literal `default:label-format` still appears under `crates/`, which the issue explicitly disallows.\n\n**Architecture And Safety**\n\nNo boundary violations found in the reviewed changes. `default_ruleset()` remains pure, storage concerns are not introduced, and no unsafe code was observed in the touched surface.\n\n**Functional Paradigm**\n\nNo blocking concerns found. The changes follow the existing style in the validation code.\n\n**Correctness And Invariants**\n\nNo new atomic-write, event logging, gate transition, assignee, label, or PID-safety issues found in the reviewed surface. The rule-name/origin behavior is implemented, but the stale literal contract failure below blocks acceptance.\n\n**Testing And Gates**\n\nI did not run `cargo test` or `cargo clippy` because the supplied issue context has a succeeded `cargo-ci` gate at `2026-07-03T13:36:53Z`. I did run `./scripts/jit-validate.sh`; it passed. `run_history` is empty, so there is no prior review feedback to re-check.\n\n**Jit Issue Management**\n\nThe listed dependency `0efbc594` is marked `done` in the supplied issue context. Local repository validation passed.\n\n**Findings**\n\n1. [crates/jit/src/validation/drift.rs:23](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/drift.rs:23), [crates/jit/src/validation/drift.rs:446](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/drift.rs:446), and [crates/jit/src/validation/drift.rs:452](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/drift.rs:452) still contain the removed literal `default:label-format`. This violates hard REQ-06, which requires a repo-wide grep for the removed literal patterns to return no hits under `crates/` or `.jit/rules.toml`. The lingering test can preserve legacy-colon-form coverage without tripping the contract by constructing the string or using a different non-removed legacy fixture.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1564 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f2835-c703-7cf2-b1c5-47e02560b347\n--------\nuser\n--- 1551 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

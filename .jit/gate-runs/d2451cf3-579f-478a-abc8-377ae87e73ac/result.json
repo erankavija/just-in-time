@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d2451cf3-579f-478a-abc8-377ae87e73ac",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ae9dd95a-ce1d-428b-b1f0-efab90b20f8f",
+  "commit": "ea5eca4cfd1b58acbe97771c1e4f9da367c6e16a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T13:44:36.994789618Z",
+  "completed_at": "2026-07-03T13:46:20.933108800Z",
+  "duration_ms": 103938,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 is met. The reviewed commit `6d1bf408` updates the stale names in [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:108), [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:168), [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:172), and [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:201). The required grep for old `default:*` / `bracket:*` names under `docs/` returned no hits.\n\nREQ-02 is met. Both docs state that `origin` is a separate `.jit/rules.toml` field and that rules resolve at `@/rule/<self-id>`: [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:112), [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:176).\n\n**Architecture And Separation**\nThe change is docs-only and touches exactly `docs/reference/configuration.md` and `docs/reference/labels.md`. No domain, storage, command, CLI, or output boundary is affected.\n\n**Functional Paradigm**\nNo Rust implementation changed.\n\n**Correctness And Invariants**\nNo persistence, event logging, gate transition, assignee/label parsing, or PID-handling code changed. No invariant regression found.\n\n**Safety**\nNo Rust code changed; `unsafe` is not introduced.\n\n**Testing**\n`run_history` is empty, so there were no prior failing test results to evaluate. I did not run the full test suite. I did run the required repository validation script, and `./scripts/jit-validate.sh` passed.\n\n**Error Handling**\nNo fallible code or error types changed.\n\n**CLI Contract**\nNo CLI behavior changed.\n\n**Documentation**\nThe documentation updates are scoped to the requested references and include the required origin/addressing note near the changed rule-name references.\n\n**Prior Review Feedback**\nNo prior review feedback was supplied in `run_history`.\n\n**Jit Issue Management**\nThe prerequisite issue `0efbc594` is complete, with `cargo-ci`, `repo-validate`, and `code-review` gates passed in `.jit/issues/0efbc594-cad7-4afe-9f99-e888a12c6bc1.json`. `./scripts/jit-validate.sh` passed for the current repository state.\n\n**Findings**\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

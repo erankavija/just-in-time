@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T13:48:31.147990499Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T13:49:29.298987635Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -22,5 +33,5 @@
     "story:gate-addressable-kind"
   ],
   "created_at": "2026-07-01T23:42:21.759398773Z",
-  "updated_at": "2026-07-03T12:58:24.393281259Z"
+  "updated_at": "2026-07-03T13:51:32.101494304Z"
 }

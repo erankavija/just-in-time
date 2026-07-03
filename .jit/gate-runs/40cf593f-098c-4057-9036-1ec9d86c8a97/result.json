@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "40cf593f-098c-4057-9036-1ec9d86c8a97",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cdc33a0f-8edd-497f-b27d-a112edde9862",
+  "commit": "ea5eca4cfd1b58acbe97771c1e4f9da367c6e16a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-03T13:47:18.592336498Z",
+  "completed_at": "2026-07-03T13:48:31.139245953Z",
+  "duration_ms": 72546,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01 through REQ-03 are implemented: live config declares `rule` as project-scope registry-first over `.jit/rules.toml`, the init template/golden kind list include `rule`, and `test_show_item_resolves_rule_by_qualified_id` covers `@/rule/coverage-preview` with non-empty text.\n\nREQ-04 evidence is satisfied by the provided `cargo-ci` gate status `passed`; I did not rerun tests per instruction.\n\n**Architecture**\nNo boundary violation found. The change is configuration/template/test-only for the reviewed feature path; persistence remains behind storage abstractions.\n\n**Functional Paradigm**\nNo new problematic imperative domain logic found.\n\n**Correctness And Invariants**\nNo issue found for atomic writes, event logging, gate semantics, assignee/label formats, or PID safety in this change.\n\n**Safety**\n`#![deny(unsafe_code)]` remains enforced in `crates/jit/src/lib.rs` and `crates/jit/src/main.rs`; no unsafe code found in the reviewed change.\n\n**Testing**\nThe required tests are present in `crates/jit/src/hierarchy_templates.rs` and `crates/jit/src/commands/item.rs`. Provided cargo-ci passed. I also ran `./scripts/jit-validate.sh`, which passed.\n\n**Error Handling**\nNo new library error-handling issue found in the reviewed implementation.\n\n**CLI Contract**\nNo CLI command surface changed; no missing `--json` support introduced.\n\n**Documentation**\nNo new public API was added, so no missing public API examples found.\n\n**Prior Review Feedback**\n`run_history` is empty, so there was no prior review feedback to verify.\n\n**Jit Issue Management**\nThe prerequisite check fails: the current issue depends on `87346f52-a2c4-4506-8819-9ff58c854595`, but that dependency is still `in_progress`.\n\n1. Blocking: prerequisite issue `87346f52-a2c4-4506-8819-9ff58c854595` is not completed. The reviewed issue declares it in `dependencies` at [.jit/issues/cdc33a0f-8edd-497f-b27d-a112edde9862.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/cdc33a0f-8edd-497f-b27d-a112edde9862.json:8), and the dependency issue’s state is `\"in_progress\"` at [.jit/issues/87346f52-a2c4-4506-8819-9ff58c854595.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/87346f52-a2c4-4506-8819-9ff58c854595.json:5). The review instructions require checking that prerequisite work has been completed, so this blocks approval even though the direct code requirements look satisfied.\n\nTotal findings: 1\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3573 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f283b-d97e-7c60-9cfd-a0dba7168293\n--------\nuser\n--- 3560 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
