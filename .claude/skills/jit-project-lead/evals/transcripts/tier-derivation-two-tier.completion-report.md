@@ -29,10 +29,10 @@ Runner: harness-governed fresh-context sub-agent given the scenario `prompt` ver
 
 ## 3. Stop point
 
-Stopped at the mode-dispatch stub (SKILL.md §"Mode dispatch (stub)", lines 67-78). The four modes are
-authored by the not-yet-landed four-mode front-door work; per the stub, the correct behavior is to
-complete pre-flight, derive tiers, report mode routing pending, and stop. Not a stop-and-escalate
-condition (none triggered).
+Stopped at §Mode dispatch. The scenario prompt is generic (no explicit mode signal), so the front door
+cannot pick exactly one of the four modes: per `references/mode-routing.md` Stop and ask, it reports the
+derived tiers and asks which mode to run rather than guessing one. Not a stop-and-escalate tooling
+failure (none triggered).
 
 ## 4. Command / state log
 

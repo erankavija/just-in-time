@@ -128,24 +128,35 @@ human: **vision-level conflicts**, **cross-strategic-container dependencies**, a
 **project-wide infrastructure changes**. Every other subordinate escalation is
 resolved from the vision without human involvement.
 
-## Mode dispatch (stub)
+## Mode dispatch
 
 Four invocation modes route from the opening request:
 
-1. Lead existing strategic work.
-2. Plan and execute a vague high-level objective.
-3. Steering discussion.
+1. Lead an already-existing strategic container.
+2. Plan and execute a vague high-level goal (cold start, no container yet).
+3. Steering discussion (interactive vision/decision work, no workers dispatched).
 4. Standards sweep — body defined below (## Standards sweep mode).
 
-The full request-routing front-door and the mode-1..3 bodies arrive with the
-four-mode front-door work. The mode-4 body is already defined and runnable now:
-when the opening request is a standards sweep (audit the project against the
-content standards, fix mechanical violations, surface judgment ones), complete
-pre-flight and run the Standards sweep mode below end to end — do not stop for
-pending routing. For a request that resolves to mode 1, 2, or 3, those bodies are
-not authored yet: complete pre-flight, report that mode routing is pending, and
-stop. When the request is ambiguous between mode 4 and another mode, ask rather
-than guess (see Stop and escalate).
+After completing pre-flight and tier derivation, read `references/mode-routing.md`
+**in full** and classify the opening request into exactly one mode, then run that
+mode's handoff:
+
+- **Mode 1** — resolve the existing strategic container named in the request (an
+  id, or a name/label that resolves to one anchor-tier container per the ANCHOR
+  TYPE from tier derivation) and hand it plus the invocation context to
+  `## Sub-strategic dispatch`. Mode 1 is resolve-and-handoff only: wave execution,
+  coherence review, and charter/progress maintenance belong to that section, not
+  to the front door.
+- **Modes 2 and 3** — route to the `jit-planning-lead` skill invoked at the
+  strategic altitude (its cold-start interview for mode 2; its interactive
+  strategic-altitude planning for mode 3). Read that skill and follow it; do not
+  reimplement planning. Neither mode dispatches a worker from the front door.
+- **Mode 4** — run the `## Standards sweep mode` below end to end.
+
+When the request does not clearly signal exactly one mode, **stop and ask** which
+mode — never guess or default (see `references/mode-routing.md` Stop and ask, and
+Stop and escalate below). A generic request with no explicit mode signal reports
+the derived tiers and asks which of the four modes to run.
 
 ## Standards sweep mode
 
@@ -187,6 +198,11 @@ Stop immediately and report to the invoker when:
 - The canonical content standards doc is unreadable at its skill-base-relative
   path.
 - `jit recover` fails.
+- Mode routing cannot pick exactly one mode (see `references/mode-routing.md`
+  Stop and ask): the request signals no explicit mode, signals more than one, or
+  a mode-1 identifier does not resolve to exactly one anchor-tier container.
+  Report the derived tiers and the ambiguity, and ask which mode; write no issue
+  state.
 - Sub-strategic dispatch stops (see `references/container-dispatch.md`): a
   corrupt or drifted wave list, a `main` that cannot be made clean for the
   dispatch script, a dispatch pre-flight or leak-check failure, a lead escalation
@@ -198,9 +214,12 @@ Stop immediately and report to the invoker when:
 
 ## Red flags
 
-- Authoring mode behavior from this shell. Mode-1..3 bodies arrive with the
-  front-door work; stop at the stub. The mode-4 body is a thin wiring to
-  `references/standards-sweep.md` and adds no behavior here.
+- Authoring mode behavior from this shell. The front door routes; each mode's
+  work lives in the section it hands to (`## Sub-strategic dispatch`,
+  `jit-planning-lead`, `## Standards sweep mode`). Do not carry the work here.
+- Guessing a mode the request does not clearly signal. A generic or ambiguous
+  request stops and asks which mode (see `references/mode-routing.md`); never
+  default to a mode.
 - Guessing tier names when derivation inputs are ambiguous. Stop and ask.
 - Skipping `jit recover`. Stale locks corrupt every downstream operation.
 - Hardcoding a domain type name where the config supplies it.

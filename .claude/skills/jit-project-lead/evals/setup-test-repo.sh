@@ -3,8 +3,9 @@
 # Usage: ./setup-test-repo.sh <target-dir> <scenario>
 # Scenarios: "two-tier" | "collapsed" | "fallback"
 #
-# The skeleton's observable behavior is pre-flight + tier derivation + the
-# mode-dispatch stub stop; it does not mutate .jit/ issue state. So each repo
+# These scenarios' observable behavior is pre-flight + tier derivation + the
+# front-door stop-and-ask (a generic prompt has no explicit mode signal, so the
+# front door asks which mode); it does not mutate .jit/ issue state. So each repo
 # only needs a valid .jit/ (config + optional templates) and one git commit so
 # `jit recover` (pre-flight step 2) succeeds. The canonical content-standards
 # doc the skill reads is resolved from the jit repo through the ~/.claude/skills

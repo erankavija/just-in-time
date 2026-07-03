@@ -35,10 +35,10 @@ Assumption checks (LEVEL MAP `config.toml:28`): A `milestone`(1) ≤ `epic`(2) �
 
 ## 3. Stop point
 
-Stopped at §Mode dispatch (stub). Reason given (SKILL.md:76-77): the four-mode routing block and
-mode bodies are authored by the not-yet-landed four-mode front-door work; "Until that work lands,
-complete pre-flight, report that mode routing is pending, and stop." No stop-and-escalate condition
-and no tier-derivation stop triggered. Mode routing reported pending.
+Stopped at §Mode dispatch. The scenario prompt is generic ("steward this project") and carries no
+explicit mode signal, so the front door cannot pick exactly one of the four modes: per
+`references/mode-routing.md` Stop and ask, it reports the derived tiers and asks which mode to run
+rather than guessing one. No stop-and-escalate tooling failure and no tier-derivation stop triggered.
 
 ## 4. Command / state log
 

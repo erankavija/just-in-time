@@ -5,18 +5,20 @@ method in [`docs/reference/skill-eval-adjudication.md`](../../../../docs/referen
 each scenario's `expected_output` is decomposed into an itemized checklist and every item is
 scored against observable evidence from a recorded run.
 
-**Scope:** the jit-project-lead **skeleton** — activation, pre-flight, and config-derived tier
-derivation. The mode-routing block and mode bodies are out of scope (later stories own them); every
-scenario runs to the skeleton's mode-dispatch stub, which completes pre-flight, derives tiers, reports
-mode routing pending, and stops.
+**Scope:** activation, pre-flight, and config-derived tier derivation. These scenarios do not exercise a
+specific mode body. Their prompts are generic with no explicit mode signal, so the front door completes
+pre-flight, derives tiers, then stops and asks which of the four modes to run (per
+`references/mode-routing.md` Stop and ask) — it does not guess a mode. The `fallback-stop-and-ask`
+scenario stops earlier, at tier derivation, before routing is reached.
 
 **Runner:** harness-governed fresh-context sub-agent given the scenario `prompt` verbatim (the
 equivalent-runner path documented in the adjudication method), one per scenario, each against an
 isolated repo built by [`setup-test-repo.sh`](setup-test-repo.sh) under `/tmp/jit-plead-evals/<scenario>`.
 The `jit` CLI binary (`/home/vkaskivuo/.cargo/bin/jit`) was used directly; no MCP. Verdicts were scored by
 inspecting the final repo state (`jit issue list --json`, `git status`, config/template contents) and the
-run's completion report, not the run's self-report alone. Because the skeleton stops at the mode-dispatch
-stub and never writes issue state, tier-derivation outputs leave no on-disk trace; for those items the
+run's completion report, not the run's self-report alone. Because each run stops at the front-door
+stop-and-ask (or, for `fallback`, at tier derivation) and never writes issue state, tier-derivation
+outputs leave no on-disk trace; for those items the
 completion report is the evidence, cross-checked against the config/template inputs and the independently
 re-verified repo state. Each scenario carrying a "no mutation / did not apply" negative item is backed by
 the report's command / state log (adjudication method's equivalent-runner rule) **and** the
@@ -44,9 +46,9 @@ absent for `fallback`, matching each scenario's setup.
 `expected_output`: *"The jit-project-lead skill activates and executes its pre-flight in order: confirms
 .jit/ exists, runs `jit recover`, reads .jit/config.toml (type hierarchy and strategic_types), reads
 .jit/templates.toml (the applies_to lists), and reads the canonical content-standards doc. It then performs
-tier derivation once and, reaching the mode-dispatch stub, reports that mode routing is pending and stops
-without authoring any mode behavior. No .jit/ issue state is created or mutated (only `jit recover`'s lock
-cleanup is permitted)."*
+tier derivation once and, reaching mode dispatch with a generic prompt that carries no explicit mode signal,
+stops and asks which of the four modes to run rather than guessing one, without authoring any mode behavior.
+No .jit/ issue state is created or mutated (only `jit recover`'s lock cleanup is permitted)."*
 
 | # | Item | Evidence | Mark |
 |---|---|---|---|
@@ -57,7 +59,7 @@ cleanup is permitted)."*
 | 5 | Reads `.jit/templates.toml` (applies_to) | Report §1 step 4: `applies_to = ["epic"]`, union `{epic}` | PASS |
 | 6 | Reads canonical content-standards doc | Report §1 step 5: resolved and read `jit-content-standards.md` (6994 bytes) | PASS |
 | 7 | Performs tier derivation once | Report §2: primary-path derivation anchor=milestone, boundary={epic}, two tier | PASS |
-| 8 | Reaches the stub, reports mode routing pending, stops without authoring mode behavior | Report §3: stopped at §Mode dispatch (stub), mode routing reported pending, no mode body authored | PASS |
+| 8 | Reaches mode dispatch, stops and asks which mode (no explicit signal), no mode behavior authored | Report §3: stopped at §Mode dispatch, generic prompt has no mode signal → asked which of the four modes, no mode body authored | PASS |
 | 9 | No `.jit/` issue state created/mutated (recover lock cleanup only) | **Repo-state:** `jit issue list --json` → `count:0`; `events.jsonl` 0 bytes; `.jit/issues/` empty; tracked git clean. **Run-record:** report §4 command/state log lists only reads + `jit recover`, no issue-writing command. Both halves per the negative-item rule. | PASS |
 
 **Verdict: PASS** (9/9).
@@ -73,7 +75,8 @@ cleanup is permitted)."*
 first entry of strategic_types in .jit/config.toml), delegation boundary = {epic} (the union of applies_to
 across the .jit/templates.toml [[template]] entries), and shape = two tier (two strategic entries and the
 anchor is not itself a boundary type). Assumption checks A (strategic order) and B (boundary at or below
-anchor) pass. The run reports these derived tiers and stops at the mode-dispatch stub."*
+anchor) pass. The run reports these derived tiers, then — the prompt carrying no explicit mode signal —
+stops and asks which of the four modes to run rather than guessing one."*
 
 | # | Item | Evidence | Mark |
 |---|---|---|---|
@@ -82,7 +85,7 @@ anchor) pass. The run reports these derived tiers and stops at the mode-dispatch
 | 3 | Shape = two tier (two strategic entries, anchor not a boundary type) | Report §2: two entries, `milestone` ∉ `{epic}` → two tier | PASS |
 | 4 | Assumption check A passes | Report §2: milestone(1) ≤ epic(2), anchor holds minimum → PASS | PASS |
 | 5 | Assumption check B passes | Report §2: epic(2) ≥ milestone(1) → PASS | PASS |
-| 6 | Reports derived tiers and stops at mode-dispatch stub | Report §3: tiers reported, stopped at §Mode dispatch (stub), mode routing pending | PASS |
+| 6 | Reports derived tiers, then stops and asks which mode (no explicit signal) | Report §3: tiers reported, stopped at §Mode dispatch, generic prompt has no mode signal → asked which of the four modes | PASS |
 
 Also observed: `jit issue list --json` → `count:0`; tracked git clean (config/templates untouched).
 
@@ -98,8 +101,9 @@ Also observed: `jit issue list --json` → `count:0`; tracked git clean (config/
 `expected_output`: *"Tier derivation against the research example ruleset yields steward anchor = goal (the
 sole entry of strategic_types in .jit/config.toml), delegation boundary = {goal} (the union of applies_to
 across .jit/templates.toml), and shape = collapsed single tier (exactly one strategic entry that is itself a
-member of the boundary set). Assumption checks A and B pass. The run reports these derived tiers and stops at
-the mode-dispatch stub."*
+member of the boundary set). Assumption checks A and B pass. The run reports these derived tiers, then — the
+prompt carrying no explicit mode signal — stops and asks which of the four modes to run rather than guessing
+one."*
 
 | # | Item | Evidence | Mark |
 |---|---|---|---|
@@ -108,7 +112,7 @@ the mode-dispatch stub."*
 | 3 | Shape = collapsed single tier (one strategic entry that is itself a boundary type) | Report §2: single entry `goal` ∈ boundary `{goal}` → collapsed single tier | PASS |
 | 4 | Assumption check A passes | Report §2: single entry trivially ordered; anchor `goal`(2) holds minimum → PASS | PASS |
 | 5 | Assumption check B passes | Report §2: boundary `goal`(2) ≥ anchor `goal`(2) → PASS | PASS |
-| 6 | Reports derived tiers and stops at mode-dispatch stub | Report §3: tiers reported, stopped at §Mode dispatch (stub), mode routing pending | PASS |
+| 6 | Reports derived tiers, then stops and asks which mode (no explicit signal) | Report §3: tiers reported, stopped at §Mode dispatch, generic prompt has no mode signal → asked which of the four modes | PASS |
 
 Also observed: `jit issue list --json` → `count:0`; tracked git clean (config/templates untouched). Matches
 tier-derivation.md worked verification Ruleset 2.

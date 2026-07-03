@@ -35,9 +35,10 @@ Matches tier-derivation.md worked verification "Ruleset 2 — research example (
 
 ## 3. Stop point
 
-Stopped at §Mode dispatch (stub) (SKILL.md:67-77). After pre-flight and tier derivation, the four modes
-are unimplemented; per the stub, report mode routing pending and stop. Not a tier-derivation stop-and-ask
-(derivation succeeded on the primary path).
+Stopped at §Mode dispatch. After pre-flight and tier derivation, the scenario prompt carries no explicit
+mode signal, so the front door cannot pick exactly one of the four modes: per `references/mode-routing.md`
+Stop and ask, it reports the derived tiers and asks which mode to run rather than guessing one. Not a
+tier-derivation stop-and-ask (derivation succeeded on the primary path).
 
 ## 4. Command / state log
 
