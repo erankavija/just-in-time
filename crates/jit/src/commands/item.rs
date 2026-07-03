@@ -187,7 +187,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   `Some` here.
     ///
     /// Both substrates' candidates are deduped once through the single
-    /// [`index_project_sources`] derivation, so per-scope uniqueness and
+    /// [`index_project_sources`] derivation, so per-(scope, kind) uniqueness and
     /// qualified-id derivation are identical across them.
     ///
     /// [`ItemError::MissingProjectSource`]: crate::domain::item::ItemError::MissingProjectSource

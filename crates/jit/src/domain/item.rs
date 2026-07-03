@@ -28,7 +28,7 @@
 //! with the model without rewriting any rule (REQ-05).
 //!
 //! Indexing is pure and substrate-specific but shares one derivation core
-//! ([`derive_scope_items`], which enforces per-scope uniqueness and mints
+//! ([`derive_scope_items`], which enforces per-(scope, kind) uniqueness and mints
 //! qualified ids): [`index_items`] projects an issue's markdown (markdown is the
 //! single source of truth, recomputed on demand), while [`index_markdown_items`]
 //! projects a standalone markdown source file (used for project-scope (`@`)
@@ -69,8 +69,9 @@ pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 ///
 /// A scope is EITHER one issue (addressed by its short-id) or the whole project
 /// (the `@` sentinel, for items such as invariants that no single issue owns).
-/// Self-id uniqueness is enforced *per scope* (REQ-04), so the same self-id may
-/// appear under two distinct scopes without collision.
+/// Self-id uniqueness is enforced *per (scope, kind)* (REQ-04), so the same
+/// self-id may appear under two distinct scopes, or under two different kinds
+/// within one scope, without collision.
 ///
 /// The qualified id is a pure projection: [`Scope::prefix`] renders the first
 /// segment and nothing about the scope is persisted separately (REQ-05).
@@ -860,7 +861,7 @@ pub struct AddressableItem {
     /// mint `@/coverage-preview`). Resolution disambiguates using this item's
     /// separate `kind` field alongside `self_id`.
     pub qualified_id: String,
-    /// The human-authored self-id, unique within its scope.
+    /// The human-authored self-id, unique within its scope for a given kind.
     pub self_id: String,
     /// Scope prefix this item was projected from: an issue short-id, or `@` for
     /// the project scope.
@@ -1058,8 +1059,8 @@ fn extract_raw_items(
 /// hardcoded). This parses `markdown` with the SAME [`ContentParser`] and
 /// section-scanning path ([`extract_raw_items`]) as issue descriptions, then runs
 /// the candidates through the SAME [`derive_scope_items`] derivation, so
-/// qualified-id derivation and per-scope uniqueness (REQ-03, REQ-04, REQ-05) are
-/// identical across substrates. With `scope = Scope::Project` each item's
+/// qualified-id derivation and per-(scope, kind) uniqueness (REQ-03, REQ-04,
+/// REQ-05) are identical across substrates. With `scope = Scope::Project` each item's
 /// qualified id is `@/<self-id>` and resolution of `@/<self-id>` finds it
 /// (REQ-01).
 ///
@@ -1143,8 +1144,8 @@ pub struct ProjectSource {
 /// Index every project-scope (`@`) substrate through ONE per-scope dedup pass.
 ///
 /// Two substrates feed the project scope and BOTH funnel through the SAME single
-/// [`derive_scope_items`] call here, so per-scope uniqueness and qualified-id
-/// derivation are identical across them (REQ-03, REQ-04, REQ-05):
+/// [`derive_scope_items`] call here, so per-(scope, kind) uniqueness and
+/// qualified-id derivation are identical across them (REQ-03, REQ-04, REQ-05):
 ///
 /// 1. **Markdown-first** kinds (each a [`ProjectSource`]) are parsed and scanned
 ///    via the same [`extract_raw_items`] path as issue descriptions.
