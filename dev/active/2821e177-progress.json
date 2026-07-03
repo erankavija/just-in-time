@@ -8,66 +8,212 @@
       "wave_number": 9,
       "note": "Parallel worktree dispatch (worktree-dispatch-protocol). File-disjoint; merge order f5d35048 -> 87346f52 -> 3d9e9222 -> a1b6b3da; run each issue's gates on main post-merge.",
       "issues": [
-        {"id": "87346f52", "short_id": "87346f52", "title": "Split rule origin out of self-id in the default rule contract", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "f5d35048", "short_id": "f5d35048", "title": "Migrate gate registry storage to a gates.toml store", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "3d9e9222", "short_id": "3d9e9222", "title": "Add canonical project-name field to project configuration", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "a1b6b3da", "short_id": "a1b6b3da", "title": "Bind the named-project scope token to local resolution or a not-resolvable error", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "sub-wave 9b: amended (invoker-approved) to bind AddressScope::NamedProject + wire resolve_item_address arm; now depends on 3d9e9222; dispatch after 3d9e9222 merges"}
+        {
+          "id": "87346f52",
+          "short_id": "87346f52",
+          "title": "Split rule origin out of self-id in the default rule contract",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "f5d35048",
+          "short_id": "f5d35048",
+          "title": "Migrate gate registry storage to a gates.toml store",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "3d9e9222",
+          "short_id": "3d9e9222",
+          "title": "Add canonical project-name field to project configuration",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "rework-1"
+        },
+        {
+          "id": "a1b6b3da",
+          "short_id": "a1b6b3da",
+          "title": "Bind the named-project scope token to local resolution or a not-resolvable error",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "sub-wave 9b: amended (invoker-approved) to bind AddressScope::NamedProject + wire resolve_item_address arm; now depends on 3d9e9222; dispatch after 3d9e9222 merges"
+        }
       ]
     },
     {
       "wave_number": 10,
       "note": "cdc33a0f, 943abd0b, ae9dd95a parallel (worktrees); 42898915 serialized AFTER cdc33a0f (both edit .jit/config.toml [item_kinds]). ae9dd95a serialized after 87346f52 by content (docs describe the rename) - DAG allows earlier but review would fail on divergence (handoff trap).",
       "issues": [
-        {"id": "cdc33a0f", "short_id": "cdc33a0f", "title": "Declare rule as a registry-first addressable kind over rules.toml", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "943abd0b", "short_id": "943abd0b", "title": "Sweep gates.json references to gates.toml", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "ae9dd95a", "short_id": "ae9dd95a", "title": "Update rule-naming documentation for the origin/id split", "classification": "documentation", "model": "sonnet", "status": "pending"},
-        {"id": "42898915", "short_id": "42898915", "title": "Register gate as an addressable item kind", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "sub-wave 10b, after cdc33a0f (config.toml conflict)"}
+        {
+          "id": "cdc33a0f",
+          "short_id": "cdc33a0f",
+          "title": "Declare rule as a registry-first addressable kind over rules.toml",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "943abd0b",
+          "short_id": "943abd0b",
+          "title": "Sweep gates.json references to gates.toml",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "ae9dd95a",
+          "short_id": "ae9dd95a",
+          "title": "Update rule-naming documentation for the origin/id split",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "42898915",
+          "short_id": "42898915",
+          "title": "Register gate as an addressable item kind",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "sub-wave 10b, after cdc33a0f (config.toml conflict)"
+        }
       ]
     },
     {
       "wave_number": 11,
       "note": "Lead story-close verifications. 9a7106ae closes as soon as its two wave-9 tasks pass.",
       "issues": [
-        {"id": "9a7106ae", "short_id": "9a7106ae", "title": "STORY CLOSE: Multi-jit address form with project identity and local-only resolution", "classification": "lead-verification", "model": "lead", "status": "pending"},
-        {"id": "71ebd1e8", "short_id": "71ebd1e8", "title": "STORY CLOSE: Rule as an addressable kind with origin lifted out of the id", "classification": "lead-verification", "model": "lead", "status": "pending"},
-        {"id": "bb7d57a2", "short_id": "bb7d57a2", "title": "STORY CLOSE: Gate as an addressable kind over migrated gates.toml", "classification": "lead-verification", "model": "lead", "status": "pending"}
+        {
+          "id": "9a7106ae",
+          "short_id": "9a7106ae",
+          "title": "STORY CLOSE: Multi-jit address form with project identity and local-only resolution",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        },
+        {
+          "id": "71ebd1e8",
+          "short_id": "71ebd1e8",
+          "title": "STORY CLOSE: Rule as an addressable kind with origin lifted out of the id",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        },
+        {
+          "id": "bb7d57a2",
+          "short_id": "bb7d57a2",
+          "title": "STORY CLOSE: Gate as an addressable kind over migrated gates.toml",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 12,
       "note": "Parallel worktrees, file-disjoint: d30695e4 (config/namespaces), 10db7a00 (invariants.toml + resolution check), 182aa0d5 (domain/item.rs + commands/item.rs; opus).",
       "issues": [
-        {"id": "d30695e4", "short_id": "d30695e4", "title": "Enforces link resolution for rule and gate items", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "10db7a00", "short_id": "10db7a00", "title": "Rebind invariant enforced-by bindings to addressable items", "classification": "implementation", "model": "sonnet", "status": "pending"},
-        {"id": "182aa0d5", "short_id": "182aa0d5", "title": "Re-address minted qualified ids and remove the legacy kindless resolution path", "classification": "implementation", "model": "opus", "status": "pending", "note": "created this session to implement story 7f22d6cf REQ-04 (amendment D11-A); 637764ef now depends on it"}
+        {
+          "id": "d30695e4",
+          "short_id": "d30695e4",
+          "title": "Enforces link resolution for rule and gate items",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "10db7a00",
+          "short_id": "10db7a00",
+          "title": "Rebind invariant enforced-by bindings to addressable items",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "182aa0d5",
+          "short_id": "182aa0d5",
+          "title": "Re-address minted qualified ids and remove the legacy kindless resolution path",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "created this session to implement story 7f22d6cf REQ-04 (amendment D11-A); 637764ef now depends on it"
+        }
       ]
     },
     {
       "wave_number": 13,
       "note": "Parallel, file-disjoint: ebb6ad45 (projection renderer + config-declared target; lead decision: target docs/reference/rules-and-gates.md), c01f66dd (dev-doc sweep), a8889340 (cli.rs help).",
       "issues": [
-        {"id": "ebb6ad45", "short_id": "ebb6ad45", "title": "Rules and gates reference projection", "classification": "implementation", "model": "opus", "status": "pending"},
-        {"id": "c01f66dd", "short_id": "c01f66dd", "title": "Sweep prior-epic and design docs for legacy address-form references", "classification": "documentation", "model": "sonnet", "status": "pending"},
-        {"id": "a8889340", "short_id": "a8889340", "title": "Update jit item show/resolve CLI help text to the new addressing scheme", "classification": "implementation", "model": "sonnet", "status": "pending"}
+        {
+          "id": "ebb6ad45",
+          "short_id": "ebb6ad45",
+          "title": "Rules and gates reference projection",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "c01f66dd",
+          "short_id": "c01f66dd",
+          "title": "Sweep prior-epic and design docs for legacy address-form references",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "a8889340",
+          "short_id": "a8889340",
+          "title": "Update jit item show/resolve CLI help text to the new addressing scheme",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 14,
       "issues": [
-        {"id": "637764ef", "short_id": "637764ef", "title": "Confirm uniform re-addressing acceptance with green validate and tree-wide legacy grep", "classification": "research", "model": "sonnet", "status": "pending"}
+        {
+          "id": "637764ef",
+          "short_id": "637764ef",
+          "title": "Confirm uniform re-addressing acceptance with green validate and tree-wide legacy grep",
+          "classification": "research",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 15,
       "note": "Story close 7f22d6cf, then epic gates (cargo-ci, code-review, repo-validate), completion report, epic done.",
       "issues": [
-        {"id": "7f22d6cf", "short_id": "7f22d6cf", "title": "STORY CLOSE: Uniform re-addressing of all kinds with repo data and doc migration", "classification": "lead-verification", "model": "lead", "status": "pending"},
-        {"id": "2821e177", "short_id": "2821e177", "title": "EPIC CLOSE: Addressing v2", "classification": "lead-verification", "model": "lead", "status": "pending"}
+        {
+          "id": "7f22d6cf",
+          "short_id": "7f22d6cf",
+          "title": "STORY CLOSE: Uniform re-addressing of all kinds with repo data and doc migration",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        },
+        {
+          "id": "2821e177",
+          "short_id": "2821e177",
+          "title": "EPIC CLOSE: Addressing v2",
+          "classification": "lead-verification",
+          "model": "lead",
+          "status": "pending"
+        }
       ]
     }
   ],
   "created_during_execution": [
-    {"id": "182aa0d5", "reason": "Story 7f22d6cf REQ-04 (amendment D11-A) had no implementing task; 637764ef explicitly adds no implementation. Task-level creation, lead autonomy."}
+    {
+      "id": "182aa0d5",
+      "reason": "Story 7f22d6cf REQ-04 (amendment D11-A) had no implementing task; 637764ef explicitly adds no implementation. Task-level creation, lead autonomy."
+    }
   ],
   "escalations": [
     {
@@ -88,7 +234,8 @@
   "rework_counts": {
     "5222aa47": 2,
     "37506c12": 1,
-    "7a2bbe4f": 1
+    "7a2bbe4f": 1,
+    "3d9e9222": 1
   },
   "session_1_waves": "1-8 all done: d6c3bff6, 5222aa47, 0910a381, f4b5e3f4, 37506c12 (story), 0597febe, 542f8b6d, 7a2bbe4f, 0efbc594 (story)",
   "started_at": "2026-07-03T00:00:00Z",
