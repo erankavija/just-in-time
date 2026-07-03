@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Invoked to drive the epic ONLY until story 0efbc594 completes; stop and hand off after wave 8. Bracket P (0b611ccf) and B (923e42fb) already done; breakdown pre-exists.",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -40,7 +40,7 @@
           "title": "Expand short-id/self-id sugar to a canonical issue address via kind inference",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -53,7 +53,7 @@
           "title": "Rewire item resolution to match on scope, kind, and self-id",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "642e496d-1e47-4b24-bc15-683689def24b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0910a381-2e39-4853-be9d-252c5e79a7df",
+  "commit": "6749e0e3e59845398ac08d89f05b3f68752e0a56",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T09:03:43.932241293Z",
+  "completed_at": "2026-07-03T09:05:14.140250541Z",
+  "duration_ms": 90208,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met in [crates/jit/src/domain/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:359). `expand_sugar_address` filters to issue-scoped kinds, uses `id_pattern.find`, returns `AddressScope::Issue(short_id)` with inferred kind and verbatim `self_id`, and emits distinct typed errors for zero and ambiguous matches. Unit coverage exists at lines 2477, 2488, 2498, 2513, and 2548.\n\n**Architecture**\n\nNo boundary violations found. The change is confined to `domain/item.rs`; it is pure domain logic with no storage, CLI parsing, output formatting, or file I/O. Resolver call sites were not touched, as requested.\n\n**Functional Paradigm**\n\nThe candidate selection uses iterator combinators at [lines 369-373](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:369). The function is expression-oriented and side-effect free.\n\n**Correctness And Invariants**\n\nNo regressions found. Atomic writes, event logging, gate semantics, assignee/label formats, and PID safety are not affected by this domain-only change. Regex matching uses the same `id_pattern.find` mechanism as `extract_raw_items` at [line 1162](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:1162).\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains present in the Rust crates. No unsafe code was introduced.\n\n**Testing**\n\nThe supplied cargo-ci gate passed for commit `6749e0e3e59845398ac08d89f05b3f68752e0a56`: fmt ok, clippy ok, tests `2855 passed, 0 failed, 12 ignored`. I did not rerun cargo tests. I did run `./scripts/jit-validate.sh`, which passed.\n\n**Error Handling**\n\nNo issues found. New errors are typed `thiserror` variants: `SugarKindNotFound` and `SugarKindAmbiguous` at [lines 609-638](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:609). Messages include address/self-id context, and ambiguous errors include all candidate kinds.\n\n**CLI Contract**\n\nNo CLI commands were changed or added, so `--json` coverage is not affected.\n\n**Documentation**\n\nThe new public function has doc comments and a `# Examples` section at [lines 312-358](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:312). New public error variants are documented.\n\n**Jit Issue Management**\n\nPrerequisite issue `d6c3bff6` is done. `.jit` metadata records cargo-ci as passed, and repository validation passed. No prior review feedback exists in `run_history`.\n\n1. No findings.\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
