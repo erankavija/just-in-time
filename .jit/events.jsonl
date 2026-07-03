@@ -4926,3 +4926,10 @@
 {"type":"issue_claimed","id":"59eb72e9-1fbd-4dbc-aac0-287a97c2978b","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T10:28:58.458067955Z","assignee":"agent:claude"}
 {"type":"gate_passed","id":"971999d0-8afe-4964-992d-f7c5301a5113","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T10:46:56.192688508Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"6e3e1dd7-3159-403f-887d-8e60c26fcc20","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T10:48:30.431703836Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"17d0dbae-e0a8-4e14-abfd-210f048ddb54","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T10:59:31.696893462Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f62af954-e2df-41f7-a242-2f27396d8e79","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T11:00:45.091050693Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"cbd915ad-da15-470b-9125-7dba908899aa","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T11:01:13.953090350Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"439e1c71-7938-4971-896d-67190db38d2f","issue_id":"7a2bbe4f-2b8d-4a2f-b940-0a09fa179118","timestamp":"2026-07-03T11:01:13.953112790Z"}
+{"type":"issue_state_changed","id":"1b759ddd-3626-4cf5-bcd5-af2f5787bd7c","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:13.976989698Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"5eb526df-1c8d-49ba-bb42-26ce78bcd674","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:14.248658735Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"f0a1aec1-bd42-41db-9fbf-6a5e8121aff0","issue_id":"0efbc594-cad7-4afe-9f99-e888a12c6bc1","timestamp":"2026-07-03T11:01:14.249871976Z","assignee":"agent:jit-execution-lead"}
