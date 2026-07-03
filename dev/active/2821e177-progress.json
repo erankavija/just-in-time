@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Session 2: drive the epic to completion. Session-1 waves 1-8 (stories 37506c12, 0efbc594) done; see dev/active/2821e177-handoff.md. Bracket P (0b611ccf) and B (923e42fb) done.",
-  "current_wave": 12,
+  "current_wave": 13,
   "waves": [
     {
       "wave_number": 9,
@@ -141,8 +141,8 @@
           "title": "Re-address minted qualified ids and remove the legacy kindless resolution path",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework-pending",
-          "note": "c85abc76 integrated as 4a116153; cargo-ci + repo-validate passed; code-review R1 FAIL (stale kindless-form doc comments in validation/invariants.rs, drift.rs, markdown fixture). Rework 1 dispatched to worker (manual doc-block read method)."
+          "status": "done",
+          "note": "DONE 2026-07-04 session 3. c85abc76 integrated as 4a116153 + doc rework 33c60a41 + lead one-liner. 3 review rounds (R1 stale kindless docs, R2 one stale sibling-task comment introduced by d30695e4's test). All gates green; legacy kindless resolution fully removed, minted ids canonical."
         }
       ]
     },
@@ -249,6 +249,7 @@
     }
   ],
   "rework_counts": {
+    "182aa0d5": 1,
     "5222aa47": 2,
     "37506c12": 1,
     "7a2bbe4f": 1,

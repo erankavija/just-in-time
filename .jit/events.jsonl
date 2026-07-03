@@ -5116,3 +5116,10 @@
 {"type":"gate_failed","id":"411363dd-3c69-4202-bd2d-fa121f299755","issue_id":"182aa0d5-f076-47ec-afc0-70dae068e448","timestamp":"2026-07-03T20:36:30.307048649Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"9d428f27-7269-4cb1-92a9-d53de81f10dc","issue_id":"d30695e4-3148-4c65-9b65-faad637829b3","timestamp":"2026-07-03T20:37:15.640396775Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"d3272d86-aa7c-481b-a86c-d8c6492ba9b9","issue_id":"d30695e4-3148-4c65-9b65-faad637829b3","timestamp":"2026-07-03T20:37:15.640422605Z"}
+{"type":"gate_passed","id":"d50399b0-bd75-4c89-97e7-17c95d5c0256","issue_id":"949cd9d0-8920-4feb-8f13-ff0e2eeca0ee","timestamp":"2026-07-03T21:04:46.513323270Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"4749c07e-3c08-4aeb-bf8a-a25e98c65268","issue_id":"182aa0d5-f076-47ec-afc0-70dae068e448","timestamp":"2026-07-03T21:05:32.552712119Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"1c11cf2c-bba7-4ddf-ab03-5726632f1d1a","issue_id":"949cd9d0-8920-4feb-8f13-ff0e2eeca0ee","timestamp":"2026-07-03T21:06:18.546952245Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8ae8638b-260a-44bd-bae6-a2acb6ab0b66","issue_id":"182aa0d5-f076-47ec-afc0-70dae068e448","timestamp":"2026-07-03T21:07:51.513727398Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"80d2c3d0-858f-4068-bd4f-9d0e883b0e19","issue_id":"949cd9d0-8920-4feb-8f13-ff0e2eeca0ee","timestamp":"2026-07-03T21:07:53.599324165Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"9f5dcda7-b2b2-45d8-a2d8-67861dc73835","issue_id":"182aa0d5-f076-47ec-afc0-70dae068e448","timestamp":"2026-07-03T21:08:19.068129695Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"f063ed77-903c-46e0-a479-addec079c747","issue_id":"182aa0d5-f076-47ec-afc0-70dae068e448","timestamp":"2026-07-03T21:08:19.068151555Z"}

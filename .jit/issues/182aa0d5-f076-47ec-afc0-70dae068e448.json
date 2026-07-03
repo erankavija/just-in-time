@@ -2,7 +2,7 @@
   "id": "182aa0d5-f076-47ec-afc0-70dae068e448",
   "title": "Re-address minted qualified ids and remove the legacy kindless resolution path",
   "description": "Re-address the minted qualified ids to the uniform kind-segmented scheme and remove the legacy kind-agnostic resolution path, flipping list output and resolution together. This is the implementation half of story 7f22d6cf's REQ-04 (plan amendment D11-A, invoker-approved 2026-07-03): the resolver-rewire task f4b5e3f4 deliberately kept an explicitly-commented legacy resolution path because `derive_scope_items` still mints kindless qualified-id strings; this task ends that transitional state.\n\n## Background\n\n- `derive_scope_items` (`crates/jit/src/domain/item.rs`) currently mints kindless `<scope>/<self-id>` qualified-id strings (e.g. `@/INV-01`, `56ab0224/REQ-01`) that `jit item list`/`jit item show` print as each item's qualified id.\n- `resolve_item_address` (`crates/jit/src/commands/item.rs`) carries an explicitly-commented legacy kind-agnostic arm: a kindless `@/<self-id>` input still resolves by self-id equality alone (`ResolvedItemAddress::Project { kind: None, .. }`). Its doc comment names story 7f22d6cf as the removal point.\n- The uniform scheme (epic 2821e177 REQ-01) is `@[<project>]/<kind>/<self-id>` for project items and `@/issue/<short-id>/<kind>/<self-id>` for issue items, with `<short-id>/<self-id>` remaining valid input sugar for the issue form (decision D11: sugar is NOT legacy; D3-A governs its kind inference).\n\n## What to do\n\n1. Change the minted qualified-id strings so every minted id carries the kind segment in canonical uniform form: project-scope items mint `@/<kind>/<self-id>`; issue-scope items mint `@/issue/<short-id>/<kind>/<self-id>`. The `<short-id>/<self-id>` sugar remains an accepted INPUT form (unchanged), but minted OUTPUT is canonical.\n2. Remove the legacy kind-agnostic resolution arm in `resolve_item_address`: a kindless `@/<self-id>` input becomes a clear parse or not-found error, never a self-id-only match. Remove the transitional doc comments that described the legacy window.\n3. Update every test that asserted kindless minted ids or kindless `@/<self-id>` resolution to the uniform scheme. Round-trip must hold: every qualified id printed by `jit item list` resolves via `jit item show <that-id>`.\n4. Do not change `label_credits_id` crediting semantics: coverage crediting stays scope+self-id-only per decision D10 and f4b5e3f4's REQ-04; its tests must pass unmodified.\n\n## Success Criteria\n\n- [hard] REQ-01: minted qualified ids carry the kind segment under the uniform scheme (`@/<kind>/<self-id>` for project scope, `@/issue/<short-id>/<kind>/<self-id>` for issue scope); every id printed by `jit item list --json` resolves through `jit item show` (round-trip test).\n- [hard] REQ-02: the legacy kind-agnostic resolution path in `commands/item.rs` is removed — a kindless `@/<self-id>` input is a clear parse/not-found error, not a self-id-only match — and the tests that asserted kindless resolution are updated to the uniform scheme.\n- [hard] REQ-03: the `<short-id>/<self-id>` sugar input form still resolves (per D3-A item-backed fallback semantics), and `label_credits_id`'s scope+self-id-only crediting tests pass unmodified.\n- [hard] REQ-04: `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` are green, and `jit validate` exits clean over this repository.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -15,20 +15,20 @@
     "repo-validate"
   ],
   "gates_status": {
-    "repo-validate": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T20:32:53.524646510Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T20:34:32.345701211Z"
+      "updated_at": "2026-07-03T21:06:51.932605602Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T20:31:53.567875421Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T20:32:53.524646510Z"
     }
   },
   "context": {},
@@ -40,5 +40,5 @@
     "type:task"
   ],
   "created_at": "2026-07-03T11:20:29.811353773Z",
-  "updated_at": "2026-07-03T20:36:30.306853699Z"
+  "updated_at": "2026-07-03T21:08:19.067935925Z"
 }

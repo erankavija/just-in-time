@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "2020e9b2-741c-4cc6-98d2-d0cca3da2ab4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "182aa0d5-f076-47ec-afc0-70dae068e448",
+  "commit": "5f18e08b364e87622ae8d0dad464ec4dd68ea44c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T21:06:51.932605602Z",
+  "completed_at": "2026-07-03T21:07:51.513297218Z",
+  "duration_ms": 59580,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 are satisfied. Minting now uses canonical kind-segmented ids in [domain/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:1067), resolver routing rejects kindless `@/<self-id>` via parser errors in [commands/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:437), and `<short-id>/<self-id>` sugar remains handled in [commands/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:440). Round-trip CLI coverage is present in [item_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/item_cli_tests.rs:885).\n\nREQ-04 has green provided evidence: `cargo-ci` passed and `repo-validate` passed in the issue context. I did not rerun tests because the issue has a succeeded `cargo-ci` gate.\n\n**Architecture And Separation**\n\nNo blocking boundary violation found. Domain minting/parsing stays in `domain/item.rs`; command code orchestrates config/storage and domain functions; no CLI formatting or parsing concerns moved into the domain or storage layers.\n\n**Functional Paradigm**\n\nNo blocking regression found. The touched production paths remain expression/iterator-oriented where appropriate, with local mutation limited to collection building in command orchestration.\n\n**Correctness And Invariants**\n\nThe addressing invariants are met: project ids filter by kind and self-id, issue ids filter by explicit or inferred kind, kindless `@/<self-id>` no longer resolves by self-id only, and list/show round-trip is covered. Atomic writes, event logging, gate transitions, assignee/label formats, PID safety, and unsafe-code policy were not regressed by this change.\n\n**Safety**\n\nNo unsafe code introduced.\n\n**Testing**\n\nRelevant tests cover canonical minted ids, kindless-address rejection, sugar input, and CLI round-trip behavior. The provided gate evidence is green; no failed test evidence remains for this issue.\n\n**Error Handling**\n\nInvalid address handling includes contextual errors, e.g. `cannot resolve item address '<input>'`, and no new non-test `unwrap()`/`expect()` issue was found in the reviewed delta.\n\n**CLI Contract**\n\nNo new command was added. Existing `item list --json` and `item show <qualified-id> --json` behavior is covered by integration tests.\n\n**Documentation**\n\nThe previous stale docs were addressed. Invariant and drift docs now describe `@/invariant/<id>` in [invariants.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/invariants.rs:104) and [drift.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/drift.rs:52). The most recent failed-review comment was also corrected in [commands/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:1844).\n\n**Prior Review Feedback**\n\nThe latest failed review flagged the stale “being removed in a sibling task” comment. Current HEAD replaces it with the accurate parse-error behavior, so that feedback is resolved.\n\n**Jit Issue Management**\n\nThe issue dependencies listed in the context are marked `done`. `repo-validate` passed per provided evidence; label warnings are allowed.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
