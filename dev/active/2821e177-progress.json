@@ -101,8 +101,8 @@
           "title": "STORY CLOSE: Multi-jit address form with project identity and local-only resolution",
           "classification": "lead-verification",
           "model": "lead",
-          "status": "rework-pending",
-          "note": "in_progress; cargo-ci+repo-validate passed; code-review FAIL R2: config persistence in main.rs violates command/storage boundary (config-set path + init seeding). Rework 2 = extract config-set into command layer; escalate init-scaffold part if reviewer insists. rework_counts at 1."
+          "status": "done",
+          "note": "DONE 2026-07-03 session 3. Took 6 code-review rounds total; session-3 reworks: a29f8e5d (commands/config.rs extraction), 227dfa61 (storage/config_store.rs), 36825473 (every-write project.name validation + init seeding orchestration to command layer). All gates passed at 36825473; lead review PASS all tiers."
         },
         {
           "id": "71ebd1e8",
@@ -234,6 +234,13 @@
     },
     {
       "date": "2026-07-03",
+      "issue": "9a7106ae",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS + same-root-cause finding x3",
+      "summary": "code-review architecture finding repeated R2/R3/R4, each demanding deeper layering (CLI->commands->storage); R4 also flagged init [project] seeding and missing # Examples. Invoker: dispatch rework with proper scoping and discipline (guidance resets counter). Rework 3 = storage/config_store.rs + init seeding routed through it + docs.",
+      "resolution": "approved-rework-3-with-guidance"
+    },
+    {
+      "date": "2026-07-03",
       "issue": "10db7a00",
       "category": "plan edge amendment (sequencing deadlock)",
       "summary": "87346f52 rename broke enforcement-drift string-match on two enforced-by bindings; validate red blocks all code-reviews and story closes, but plan wired the fix (10db7a00) after story closes. Invoker approved rewiring 10db7a00 deps to {cdc33a0f, 42898915} and deferring reviews until green. Plan amendment A-10db7a00.",
@@ -249,7 +256,8 @@
     "10db7a00": 1,
     "bb7d57a2": 2,
     "87346f52": 2,
-    "9a7106ae": 1,
+    "9a7106ae": 4,
+    "9a7106ae_note": "4 rework dispatches total; counter reset by invoker guidance 2026-07-03 after attempt 2; closed at attempt 4 (36825473)",
     "71ebd1e8": 1
   },
   "session_1_waves": "1-8 all done: d6c3bff6, 5222aa47, 0910a381, f4b5e3f4, 37506c12 (story), 0597febe, 542f8b6d, 7a2bbe4f, 0efbc594 (story)",

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0b59f857-8aa0-4419-a834-88c3596cefb5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9a7106ae-e935-4e10-a76b-c0674a4d1642",
+  "commit": "368254731d87a1003e27a391a4345d5b5fef2bdb",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T19:33:39.967952679Z",
+  "completed_at": "2026-07-03T19:35:00.088309270Z",
+  "duration_ms": 80120,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, and REQ-03 are met. `jit init` seeds `[project].name` through `CommandExecutor::seed_project_config` at `crates/jit/src/main.rs:1146`, named project binding is pure domain logic in `crates/jit/src/domain/item.rs:226`, and non-local names return `ItemError::NotResolvable` at `crates/jit/src/domain/item.rs:234`. `config set` validates `[project].name` on every write at `crates/jit/src/commands/config.rs:135`.\n\n**Architecture And Separation Of Concerns**\n\nPrior feedback is addressed. The CLI delegates init seeding to the command layer, and config file reads/writes are contained in `storage/config_store.rs`. No new domain I/O or CLI formatting in commands found in the reviewed paths.\n\n**Correctness And Invariants**\n\nAtomic config writes use `write_file_atomic` in `crates/jit/src/storage/config_store.rs:87` and `crates/jit/src/storage/config_store.rs:127`. The prior invalid existing `[project].name` gap is covered by post-mutation validation before save.\n\n**Testing**\n\nI did not run tests because the issue has a passed `cargo-ci` gate. Provided evidence shows `cargo-ci` passed at `2026-07-03T19:30:03Z` and `repo-validate` passed at `2026-07-03T19:33:39Z`. Regression tests cover invalid direct set, unrelated-key set over an invalid existing project name, and repair via valid `project.name`.\n\n**Prior Review Feedback**\n\nThe latest two findings are resolved: unrelated config writes now reject invalid pre-existing `[project].name`, and init project identity seeding moved out of `main.rs` into `CommandExecutor::seed_project_config`.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
