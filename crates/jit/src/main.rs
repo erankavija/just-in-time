@@ -31,7 +31,7 @@ use std::str::FromStr;
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
-    // A `gate pass` checker that ran but did not pass: split checker-failure
+    // A `gate evaluate` checker that ran but did not pass: split checker-failure
     // (verdict `fail`, validation error) from runner/infra error (verdict
     // `error`, external error). `Passed` never produces this error.
     if let Some(gate_failure) = error.downcast_ref::<jit::commands::GatePassFailed>() {
@@ -236,9 +236,9 @@ fn claim_json_error(
     JsonError::new(code, error.to_string(), command)
 }
 
-/// Render a failed `gate pass` / `gate pass-all` outcome and terminate appropriately.
+/// Render a failed `gate evaluate` / `gate evaluate-all` outcome and terminate appropriately.
 ///
-/// Shared by the `gate pass` and `gate pass-all` handlers so both classify the
+/// Shared by the `gate evaluate` and `gate evaluate-all` handlers so both classify the
 /// same error the same way. In `--json` mode it prints a structured
 /// [`JsonError`](jit::output::JsonError) and exits with its mapped code:
 /// `GatePassFailed` becomes a checker failure (`GATE_FAILED`, exit 4, verdict
@@ -283,11 +283,11 @@ fn render_gate_pass_error(
                 "warnings": gate_failure.warnings,
             }))
             .with_suggestion(format!(
-                "Inspect the checker result with: jit gate check {} {}",
+                "Inspect the checker result with: jit gate status {} {}",
                 gate_failure.issue_id, gate_failure.gate_key
             ))
             .with_suggestion(format!(
-                "Fix the failing gate and rerun: jit gate pass {} {}",
+                "Fix the failing gate and rerun: jit gate evaluate {} {}",
                 gate_failure.issue_id, gate_failure.gate_key
             ))
     } else if let Some(not_required) = e.downcast_ref::<jit::commands::GateNotRequiredError>() {
@@ -2794,7 +2794,7 @@ fn run() -> Result<()> {
                     let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
 
                     // Transposed-argument guard. The canonical form is
-                    // `jit gate check <issue> <gate-key>`. If <id> is not an issue but
+                    // `jit gate status <issue> <gate-key>`. If <id> is not an issue but
                     // <gate_key> resolves to one and <id> is a registered gate key, the
                     // two positionals are almost certainly swapped, so emit an
                     // actionable did-you-mean rather than misparsing into
@@ -2807,7 +2807,7 @@ fn run() -> Result<()> {
                             .map(|gates| gates.iter().any(|g| g.key == id))
                             .unwrap_or(false);
                         if gate_key_is_issue && id_is_gate {
-                            let canonical = format!("jit gate check {} {}", gate_key, id);
+                            let canonical = format!("jit gate status {} {}", gate_key, id);
                             let message = format!(
                                 "'{id}' is a gate key and '{gate_key}' is an issue; the issue id and gate key look transposed."
                             );

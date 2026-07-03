@@ -126,13 +126,13 @@ Gate-blocked example:
         }
       ],
       "remediation": [
-        "jit gate check-all work-id",
-        "jit gate pass work-id code-review"
+        "jit gate status-all work-id",
+        "jit gate evaluate work-id code-review"
       ]
     },
     "suggestions": [
-      "jit gate check-all work-id",
-      "jit gate pass work-id code-review"
+      "jit gate status-all work-id",
+      "jit gate evaluate work-id code-review"
     ]
   }
 }
@@ -1548,7 +1548,7 @@ jit gate evaluate abc123 --gate tests --force
 
 **Skip when already passed at HEAD:**
 - If the gate's latest run already passed at the current `HEAD` commit, `jit gate
-  pass` skips the (often expensive) checker, exits `0`, and reports
+  evaluate` skips the (often expensive) checker, exits `0`, and reports
   `already_passed: true` in `--json`. The non-`--json` path prints a concise
   "already passed at HEAD, skipping (use --force to re-run)" line.
 - The skip compares the current `HEAD` against the commit stamped on the latest

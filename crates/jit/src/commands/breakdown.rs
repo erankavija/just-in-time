@@ -87,7 +87,7 @@ pub struct BracketChild {
 /// names `B` carries in [`coverage_gate_preset`](Self::coverage_gate_preset) and
 /// [`breakdown_review_gate_preset`](Self::breakdown_review_gate_preset). It does
 /// **not** run, stamp, or fabricate a coverage verdict — those gates are run
-/// separately by the standard gate runner (`jit gate pass`) as breakdown-workflow
+/// separately by the standard gate runner (`jit gate evaluate`) as breakdown-workflow
 /// steps, exactly as every gate in the project is run by the orchestrator. So
 /// there is no `coverage_passed`/`coverage_report` field here.
 ///
@@ -227,7 +227,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `B`'s two gates — the deterministic coverage gate and the agent
     /// breakdown-review gate — were ATTACHED by `jit apply plan` and are left
     /// PENDING. Breakdown neither re-attaches nor runs them: they are run later by
-    /// the standard gate runner (`jit gate pass <B> <gate>`) as breakdown-workflow
+    /// the standard gate runner (`jit gate evaluate <B> <gate>`) as breakdown-workflow
     /// steps — the orchestrator runs every gate in this project, never command
     /// code. Because the impl subgraph transitively depends on `B`, jit's gate
     /// enforcement is self-guiding: the fan-out cannot release until both gates on
@@ -480,7 +480,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // B's two gates were ATTACHED by `jit apply plan` and left PENDING; the
-        // standard gate runner (`jit gate pass <B> <gate>`) evaluates them as
+        // standard gate runner (`jit gate evaluate <B> <gate>`) evaluates them as
         // breakdown-workflow steps — the orchestrator runs every gate, never this
         // command code. Breakdown is a clean spine-splicer: no faked verdict, no
         // gate stamping, no gate events emitted by breakdown.

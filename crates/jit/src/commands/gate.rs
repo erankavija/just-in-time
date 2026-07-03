@@ -3,7 +3,7 @@
 use super::*;
 use crate::domain::{GateMode, GateRunResult, GateRunStatus};
 
-/// Error returned when `jit gate pass` runs an automated checker that does not pass.
+/// Error returned when `jit gate evaluate` runs an automated checker that does not pass.
 ///
 /// The checker result is preserved so CLI callers can report the failed status
 /// without disagreeing with the persisted `gates_status` value.
@@ -14,12 +14,12 @@ use crate::domain::{GateMode, GateRunResult, GateRunStatus};
 /// use jit::commands::GatePassFailed;
 ///
 /// fn remediation(error: &GatePassFailed) -> String {
-///     format!("jit gate check {} {}", error.issue_id, error.gate_key)
+///     format!("jit gate status {} {}", error.issue_id, error.gate_key)
 /// }
 /// ```
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate check {issue_id} {gate_key}"
+    "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key}"
 )]
 pub struct GatePassFailed {
     /// Issue whose gate was checked.
@@ -36,7 +36,7 @@ pub struct GatePassFailed {
     pub warnings: Vec<String>,
 }
 
-/// Error returned when `jit gate pass` targets a gate that the issue does not require.
+/// Error returned when `jit gate evaluate` targets a gate that the issue does not require.
 ///
 /// This is an argument/lookup error raised before any checker runs: the named
 /// gate is simply not in the issue's `gates_required` list. CLI callers classify
@@ -696,7 +696,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(gate) = registry.gates.get(&gate_key) {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
-                    "Gate '{}' is automated and cannot be manually failed. Use 'jit gate check {} {}' to run the checker.",
+                    "Gate '{}' is automated and cannot be manually failed. Use 'jit gate evaluate {} {}' to run the checker.",
                     gate_key, &full_id, gate_key
                 ));
             }

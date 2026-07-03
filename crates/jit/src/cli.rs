@@ -126,6 +126,20 @@ pub enum Commands {
     /// Unlike labels (which are arbitrary tags for organization), gates have executable logic
     /// and block state transitions until they pass.
     ///
+    /// Verbs group by what they do to gate state:
+    ///
+    /// Produce a verdict (MUTATE gate state): evaluate (alias eval), evaluate-all, fail.
+    ///
+    /// Report state (READ-ONLY): list, show, status, status-all.
+    ///
+    /// Shape gates and requirements (MUTATE): define, update, remove, add, preset.
+    ///
+    /// Only the verdict and configuration verbs mutate; the report-state verbs
+    /// never change anything. `status-all` is read-only but exits nonzero unless
+    /// every required gate has passed. Legacy verbs pass / pass-all / check /
+    /// check-all remain silent aliases of evaluate / evaluate-all / status /
+    /// status-all.
+    ///
     /// Common workflow:
     ///   1. Define gates in registry: jit gate define code-review --title "Code Review" ...
     ///   2. Add to issues: jit issue create --gate code-review ...

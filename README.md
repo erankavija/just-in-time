@@ -134,8 +134,8 @@ Gates are checkpoints that must pass before an issue can progress or complete.
 jit issue create --title "Add feature" --gate unit-tests
 
 # Gate automatically checks when issue completes
-# Or manually pass/fail:
-jit gate pass <issue> unit-tests
+# Or manually evaluate/fail:
+jit gate evaluate <issue> unit-tests
 ```
 
 **Gate types:**

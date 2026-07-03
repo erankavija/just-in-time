@@ -257,7 +257,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 1. Predictability: Users get exactly the state they specify (no surprises)
         // 2. Performance: Avoiding gate execution for many issues
         // 3. Safety: Explicit control for large-scale changes
-        // 4. Composability: Users can layer operations (bulk update → bulk gate check)
+        // 4. Composability: Users can layer operations (bulk update → bulk gate status)
         // 5. Precedent: Bulk tools (SQL UPDATE, jq, sed) use literal semantics
         //
         // Validation still occurs (dependencies, gate requirements) but no

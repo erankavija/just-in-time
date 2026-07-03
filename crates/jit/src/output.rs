@@ -460,7 +460,7 @@ impl JsonError {
         .with_suggestion("Issue automatically transitioned to 'gated' (awaiting gate approval)")
         .with_suggestion("The issue will auto-transition to 'done' when all gates pass")
         .with_suggestion(format!(
-            "To complete: jit gate pass {} <gate_key>",
+            "To complete: jit gate evaluate {} <gate_key>",
             issue_id
         ))
     }
@@ -1232,7 +1232,7 @@ pub struct GateCheckAllResponse {
     pub all_passed: bool,
 }
 
-/// JSON payload of `jit gate check --all` / `--limit` (the history view).
+/// JSON payload of `jit gate status --all` / `--limit` (the history view).
 ///
 /// `results` holds one [`GateRunSummary`] per matching run, newest-first, after
 /// any `--gate` / `--status` filtering and `--limit` capping. Each summary is the
@@ -1256,7 +1256,7 @@ pub struct GateRunHistoryResponse {
     pub count: usize,
 }
 
-/// JSON payload of `jit gate check`'s flat report-text view
+/// JSON payload of `jit gate status`'s flat report-text view
 /// (`--stdout` / `--stderr` / `--tail`).
 ///
 /// Carries the latest run's stored report text for the selected stream(s),

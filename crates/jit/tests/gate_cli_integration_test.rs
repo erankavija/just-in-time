@@ -234,7 +234,7 @@ fn test_gate_check_shows_last_run_after_failure() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Gate 'test-gate' failed"))
-        .stderr(predicate::str::contains("jit gate check"));
+        .stderr(predicate::str::contains("jit gate status"));
 
     // gate check shows the failure
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -287,7 +287,7 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|suggestion| suggestion.as_str().unwrap().contains("jit gate check")),
+            .any(|suggestion| suggestion.as_str().unwrap().contains("jit gate status")),
         "expected remediation suggestion in JSON: {json}"
     );
 

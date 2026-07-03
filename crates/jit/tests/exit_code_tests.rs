@@ -369,7 +369,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("gate") || stderr.contains("tests"));
     assert!(stderr.contains("gated") || stderr.contains("not passed"));
-    assert!(stderr.contains("jit gate pass"));
+    assert!(stderr.contains("jit gate evaluate"));
     assert!(stderr.contains(id));
 
     // Verify issue is in gated state (auto-transition happened)
@@ -476,11 +476,11 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
     assert!(remediation.iter().any(|cmd| cmd
         .as_str()
         .unwrap()
-        .contains(&format!("jit gate pass {} tests", id))));
+        .contains(&format!("jit gate evaluate {} tests", id))));
     assert!(remediation.iter().any(|cmd| cmd
         .as_str()
         .unwrap()
-        .contains(&format!("jit gate check-all {}", id))));
+        .contains(&format!("jit gate status-all {}", id))));
 }
 
 #[test]
@@ -752,7 +752,7 @@ fn test_exit_code_claim_blocked_by_precheck_gate_json() {
     assert!(remediation.iter().any(|cmd| cmd
         .as_str()
         .unwrap()
-        .contains(&format!("jit gate pass {} tdd-reminder", issue))));
+        .contains(&format!("jit gate evaluate {} tdd-reminder", issue))));
 }
 
 #[test]

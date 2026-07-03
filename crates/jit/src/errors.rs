@@ -577,7 +577,7 @@ impl TransitionBlockedError {
     pub(crate) fn remediation_commands(&self) -> Vec<String> {
         let inspect_command = match self.blockers.first() {
             Some(TransitionBlocker::Gate { .. }) => {
-                format!("jit gate check-all {}", self.issue_id)
+                format!("jit gate status-all {}", self.issue_id)
             }
             Some(TransitionBlocker::GraphRule { .. }) => {
                 format!("jit validate --explain {}", self.issue_id)
@@ -604,7 +604,7 @@ impl TransitionBlockedError {
                     format!("jit validate --json  # missing dependency: {}", issue_id)
                 }
                 TransitionBlocker::Gate { gate_key, .. } => {
-                    format!("jit gate pass {} {}", self.issue_id, gate_key)
+                    format!("jit gate evaluate {} {}", self.issue_id, gate_key)
                 }
                 TransitionBlocker::GraphRule { rule, .. } => {
                     format!(

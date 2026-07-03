@@ -130,7 +130,7 @@ fn test_gate_check_transposed_args_did_you_mean() {
         .assert()
         .success();
 
-    // Canonical form is `jit gate check <issue> <gate-key>`. Pass them transposed.
+    // Canonical form is `jit gate status <issue> <gate-key>`. Pass them transposed.
     let assert = jit()
         .current_dir(temp.path())
         .args(["gate", "check", "tests", &id])
@@ -159,7 +159,7 @@ fn test_gate_check_transposed_args_did_you_mean() {
         suggestions.iter().any(|s| s
             .as_str()
             .unwrap()
-            .contains(&format!("gate check {} tests", id))),
+            .contains(&format!("gate status {} tests", id))),
         "expected suggestion with the corrected argument order"
     );
 }
