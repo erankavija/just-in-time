@@ -602,7 +602,7 @@ if command -v jit &> /dev/null; then
   
   if [ -n "$ISSUE_ID" ]; then
     echo "Running local gates for issue $ISSUE_ID..."
-    jit gate status $ISSUE_ID fmt || {
+    jit gate evaluate $ISSUE_ID fmt || {
       echo "❌ Format check failed. Run 'cargo fmt' first."
       exit 1
     }

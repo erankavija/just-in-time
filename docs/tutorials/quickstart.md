@@ -32,8 +32,8 @@ jit issue claim <short-hash> agent:your-id
 # Check status
 jit issue show <short-hash> --json
 
-# Pass gates
-jit gate status <short-hash> tests
+# Evaluate gates
+jit gate evaluate <short-hash> tests
 jit gate evaluate <short-hash> code-review
 
 # Complete

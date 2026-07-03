@@ -569,7 +569,7 @@ in_progress → [POSTCHECK: tests, clippy, code-review] → gated → done
 
 **Automated Gates** - Run programmatic checks
 - Examples: tests, linters, builds, security scans
-- Run automatically: `jit gate status $ISSUE tests`
+- Run automatically: `jit gate evaluate $ISSUE tests`
 - Used for objective, repeatable verification
 - Require checker command and timeout configuration
 - All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE` env vars
@@ -610,8 +610,8 @@ $ jit issue update abc123 --state done
 Error: Gate validation failed: Cannot transition to 'done' - 2 gate(s) not passed: tests, code-review
 → Issue automatically transitioned to 'gated' (awaiting gate approval)
 
-# Fix and pass gates
-$ jit gate status abc123 tests
+# Fix and evaluate gates
+$ jit gate evaluate abc123 tests
 ✓ tests passed
 
 $ jit gate evaluate abc123 code-review --by human:alice

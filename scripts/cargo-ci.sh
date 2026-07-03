@@ -24,7 +24,7 @@ set -euo pipefail
 
 # Host-wide build serialization. Only one cargo-ci run executes the heavy
 # build/test steps at a time across the whole host. Concurrent gate runs (e.g.
-# several agent sessions each calling `jit gate pass ... cargo-ci`) otherwise
+# several agent sessions each calling `jit gate evaluate ... cargo-ci`) otherwise
 # oversubscribe the CPU — every `cargo build` fans out to all cores, so K runs
 # demand K×nproc — and multiply peak RAM into swap, making the host and any
 # interactive shell laggy. Serializing also protects the load-sensitive

@@ -361,7 +361,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_gate_check`** - Show the latest recorded run for a gate
+**`jit_gate_status`** - Show the latest recorded run for a gate (read-only)
 ```javascript
 {
   id: string,
@@ -370,7 +370,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_gate_check_all`** - Show the latest recorded runs for all automated gates
+**`jit_gate_status_all`** - Report readiness of every required gate; nonzero unless all passed (read-only)
 ```javascript
 {
   id: string,
@@ -378,7 +378,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_gate_pass`** - Mark gate as passed
+**`jit_gate_evaluate`** - Evaluate a gate: run its checker (auto) or record attestation (manual)
 ```javascript
 {
   id: string,
@@ -674,8 +674,8 @@ await jit_issue_claim({
 // Do work...
 
 // Pass gates
-await jit_gate_check({ id: issueId, gate_key: "tests" });
-await jit_gate_pass({ 
+await jit_gate_status({ id: issueId, gate_key: "tests" });
+await jit_gate_evaluate({ 
   id: issueId, 
   gate_key: "code-review",
   by: "human:reviewer"
@@ -751,15 +751,15 @@ console.log(`Created ${issueIds.length} issues`);
 ```typescript
 // Good: Parallel
 await Promise.all([
-  jit_gate_check({ id, gate_key: "tests" }),
-  jit_gate_check({ id, gate_key: "clippy" }),
-  jit_gate_check({ id, gate_key: "fmt" })
+  jit_gate_status({ id, gate_key: "tests" }),
+  jit_gate_status({ id, gate_key: "clippy" }),
+  jit_gate_status({ id, gate_key: "fmt" })
 ]);
 
 // Avoid: Sequential
-await jit_gate_check({ id, gate_key: "tests" });
-await jit_gate_check({ id, gate_key: "clippy" });
-await jit_gate_check({ id, gate_key: "fmt" });
+await jit_gate_status({ id, gate_key: "tests" });
+await jit_gate_status({ id, gate_key: "clippy" });
+await jit_gate_status({ id, gate_key: "fmt" });
 ```
 
 **✅ Chain MCP calls**
@@ -774,7 +774,7 @@ await jit_issue_claim({ id: firstIssue.id, assignee: agentId });
 ```typescript
 // Works with short prefixes (4+ chars)
 await jit_issue_show({ id: "01abc" });  // Instead of full UUID
-await jit_gate_pass({ id: "003f", gate_key: "tests" });
+await jit_gate_evaluate({ id: "003f", gate_key: "tests" });
 ```
 
 **✅ Check JSON output structure**
@@ -1524,17 +1524,17 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 
 **Examples:**
 ```bash
-# Pass manual gate (positional form)
+# Evaluate a manual gate — record attestation (positional form)
 jit gate evaluate abc123 code-review --by "human:alice"
 
 # Same command using the flag form
 jit gate evaluate abc123 --gate code-review --by "human:alice"
 
-# Pass without attribution
+# Evaluate without attribution
 jit gate evaluate abc123 tdd-reminder
 
-# Pass automated gate manually (override checker)
-jit gate evaluate abc123 tests --by "human:admin"
+# Evaluate an automated gate — runs its checker (no manual override)
+jit gate evaluate abc123 tests
 
 # Force a re-run even if it already passed at HEAD
 jit gate evaluate abc123 tests --force

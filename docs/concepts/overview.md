@@ -120,7 +120,7 @@ jit issue claim abc123 agent:worker-1
 # Agent does work...
 
 # Agent validates quality
-jit gate status abc123 tests
+jit gate evaluate abc123 tests
 jit gate evaluate abc123 code-review
 
 # Issue auto-transitions to done when gates pass

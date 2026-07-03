@@ -340,7 +340,7 @@ jit status
 - `jit issue create` with labels and gates
 - `jit dep add` - Build dependency graph
 - `jit issue claim` - Atomic agent assignment
-- `jit gate evaluate` - Mark gates as passed
+- `jit gate evaluate` - Produce a gate verdict: run the checker (auto) or record attestation (manual)
 - `jit query available/blocked` - Find available work
 - `jit graph deps` - Visualize dependency trees
 

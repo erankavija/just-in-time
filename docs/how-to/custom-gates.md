@@ -314,10 +314,10 @@ Each subsequent run includes previous results in `run_history`, sorted chronolog
 
 ```bash
 # First run: run_history is empty
-jit gate status $ISSUE review
+jit gate evaluate $ISSUE review
 
 # Second run: run_history contains the first run's stdout/stderr/exit_code
-jit gate status $ISSUE review
+jit gate evaluate $ISSUE review
 ```
 
 ### Example: AI Review Script

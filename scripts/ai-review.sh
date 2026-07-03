@@ -36,7 +36,7 @@ set -euo pipefail
 #          --checker-command "./scripts/ai-review.sh" \
 #          --env REVIEWER_AGENT="codex review -" \
 #          --timeout 120
-#   4. Run: jit gate check <issue> ai-review
+#   4. Run: jit gate evaluate <issue> ai-review
 
 if [ -z "${JIT_CONTEXT_FILE:-}" ]; then
   echo "ERROR: JIT_CONTEXT_FILE not set. This gate requires --pass-context." >&2
