@@ -108,8 +108,8 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
         .iter()
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
-    assert!(qids.contains(&format!("{short}/RISK-01").as_str()));
-    assert!(qids.contains(&format!("{short}/RISK-02").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/risk/RISK-01").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/risk/RISK-02").as_str()));
 }
 
 /// Build a [`JsonFileStorage`]-backed executor over a `.jit` repo whose
@@ -171,7 +171,10 @@ fn test_default_repo_mitigates_label_resolves_risk() {
         .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
     assert_eq!(resolved.item.self_id, "RISK-01");
     assert_eq!(resolved.item.kind, "risk");
-    assert_eq!(resolved.item.qualified_id, format!("{short}/RISK-01"));
+    assert_eq!(
+        resolved.item.qualified_id,
+        format!("@/issue/{short}/risk/RISK-01")
+    );
     assert!(resolved.item.text.contains("data loss"));
 
     // A registered `mitigates:` namespace whose qualified id cannot be resolved is
@@ -203,7 +206,10 @@ fn test_default_repo_resolves_label_resolves_risk() {
         .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
     assert_eq!(resolved.item.self_id, "RISK-01");
     assert_eq!(resolved.item.kind, "risk");
-    assert_eq!(resolved.item.qualified_id, format!("{short}/RISK-01"));
+    assert_eq!(
+        resolved.item.qualified_id,
+        format!("@/issue/{short}/risk/RISK-01")
+    );
     assert!(resolved.item.text.contains("data loss"));
 
     // A registered `resolves:` namespace whose qualified id cannot be resolved is

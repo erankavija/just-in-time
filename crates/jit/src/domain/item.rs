@@ -2,15 +2,19 @@
 //!
 //! An **addressable item** is a structured list entry in a declared section of an
 //! issue description that carries a *self-id* matched by an id-pattern. Its
-//! **qualified id** `<scope>/<self-id>` is *derived* from existing data (the
-//! resolved scope plus the parsed self-id) — nothing is persisted twice (REQ-02,
-//! REQ-03). Two items of *different* kinds may derive the same qualified-id
-//! STRING when they share a scope and self-id (e.g. both mint
-//! `@/coverage-preview`); the item's separate `kind` field disambiguates them.
+//! **qualified id** is *derived* from existing data (the resolved scope, the kind,
+//! and the parsed self-id) under the uniform kind-segmented scheme (epic 2821e177
+//! REQ-01): `@/<kind>/<self-id>` for a project item, `@/issue/<short-id>/<kind>/
+//! <self-id>` for an issue item. Nothing is persisted twice (REQ-02, REQ-03).
+//! Because the kind is a segment of the id, two items of *different* kinds sharing
+//! a scope and self-id (e.g. a `rule` and a `gate` both named `coverage-preview`)
+//! derive DISTINCT qualified ids (`@/rule/coverage-preview` vs
+//! `@/gate/coverage-preview`), so a minted qualified id is unique per
+//! `(scope, kind, self-id)`.
 //!
-//! A **scope** ([`Scope`]) is the first segment of a qualified id. It is either an
-//! issue short-id ([`Scope::Issue`]) or the project sentinel `@`
-//! ([`Scope::Project`], for items not tied to any single issue). Self-id
+//! A **scope** ([`Scope`]) is the substrate a qualified id addresses. It is either
+//! an issue (by its short-id, [`Scope::Issue`]) or the whole project (the sentinel
+//! `@`, [`Scope::Project`], for items not tied to any single issue). Self-id
 //! uniqueness is enforced *per (scope, kind)*: the same self-id may exist under two
 //! different scopes, or under two different kinds within one scope, without
 //! conflict; a self-id repeated within one scope under the SAME kind is a
@@ -64,8 +68,8 @@ pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
 /// [`Scope::Project`] (REQ-01).
 pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 
-/// The scope half of a qualified id `<scope>/<self-id>`: the substrate an
-/// addressable item belongs to (REQ-01).
+/// The substrate an addressable item belongs to (REQ-01), one input to its
+/// derived qualified id.
 ///
 /// A scope is EITHER one issue (addressed by its short-id) or the whole project
 /// (the `@` sentinel, for items such as invariants that no single issue owns).
@@ -73,8 +77,11 @@ pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 /// self-id may appear under two distinct scopes, or under two different kinds
 /// within one scope, without collision.
 ///
-/// The qualified id is a pure projection: [`Scope::prefix`] renders the first
-/// segment and nothing about the scope is persisted separately (REQ-05).
+/// The qualified id is a pure projection ([`qualified_id`]): the scope selects the
+/// uniform address shape (`@/<kind>/<self-id>` for the project, `@/issue/<short-id>/
+/// <kind>/<self-id>` for an issue) and [`Scope::prefix`] renders the item's own
+/// `scope` field (`@` or the short-id); nothing about the scope is persisted
+/// separately (REQ-05).
 ///
 /// # Examples
 ///
@@ -122,8 +129,10 @@ impl Scope {
         }
     }
 
-    /// The qualified-id prefix this scope renders to (`@` for the project, the
-    /// issue short-id otherwise).
+    /// The scope prefix this renders to (`@` for the project, the issue short-id
+    /// otherwise): the value carried in an item's `scope` field and named in a
+    /// [`ItemError::DuplicateSelfId`] error. The minted qualified id embeds this
+    /// through [`qualified_id`] rather than concatenating it directly.
     ///
     /// # Examples
     ///
@@ -264,8 +273,7 @@ pub struct KindSegmentedAddress {
 /// This is a pure structural parse: `kind` and `self_id` are returned verbatim,
 /// unvalidated against any kind registry (the caller matches them against its own
 /// configured kinds, keeping this domain function free of kind-name literals).
-/// The `<short-id>/<self-id>` sugar form and [`Scope`]'s own two-segment
-/// `<scope>/<self-id>` form are separate. The sugar form is expanded to this same
+/// The `<short-id>/<self-id>` sugar form is separate: it is expanded to this same
 /// triple shape by [`expand_sugar_address`], which infers the kind segment this
 /// parser requires explicit.
 ///
@@ -482,7 +490,7 @@ pub fn expand_sugar_address(
 ///
 /// A kind is either issue-scoped (its items come from issue descriptions) or
 /// project-scoped (its items come from a config-declared `source` file and address
-/// as `@/<self-id>`). This is the `scope` half of the kind registry's six-tuple
+/// as `@/<kind>/<self-id>`). This is the `scope` half of the kind registry's six-tuple
 /// the epic builds toward; sibling work adds the remaining `source-of-truth` field
 /// without disturbing this one.
 ///
@@ -497,9 +505,11 @@ pub fn expand_sugar_address(
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KindScope {
-    /// Items are projected from issue descriptions (`<issue>/<self-id>`).
+    /// Items are projected from issue descriptions
+    /// (`@/issue/<short-id>/<kind>/<self-id>`).
     Issue,
-    /// Items are projected from a config-declared source file (`@/<self-id>`).
+    /// Items are projected from a config-declared source file
+    /// (`@/<kind>/<self-id>`).
     Project,
 }
 
@@ -1021,25 +1031,45 @@ impl ItemKind {
     }
 }
 
-/// Compute an addressable item's qualified id `<scope>/<self-id>`.
+/// Mint an addressable item's canonical qualified id under the uniform
+/// kind-segmented scheme (epic 2821e177 REQ-01):
 ///
-/// A pure projection over the scope prefix and the parsed self-id; nothing is
-/// persisted (REQ-05). The first segment is whatever scope prefix the caller
-/// passes — an issue short-id (use
-/// [`Issue::short_id`](crate::domain::Issue::short_id)) or [`Scope::prefix`] for
-/// the project sentinel `@`.
+/// - project scope: `@/<kind>/<self-id>`
+/// - issue scope: `@/issue/<short-id>/<kind>/<self-id>` (`issue` is the reserved
+///   built-in segment, never a kind name)
+///
+/// A pure projection over the scope, the kind, and the parsed self-id; nothing is
+/// persisted (REQ-05). Every minted id carries its kind segment, so the string is
+/// unique per `(scope, kind, self-id)` — the address round-trips through
+/// [`parse_kind_segmented_address`] and resolves via
+/// [`show_item`](crate::commands::CommandExecutor::show_item). The
+/// `<short-id>/<self-id>` sugar remains an accepted INPUT form (expanded by
+/// [`expand_sugar_address`]) but is never minted.
 ///
 /// # Examples
 ///
 /// ```
 /// use jit::domain::item::{qualified_id, Scope};
 ///
-/// assert_eq!(qualified_id("56ab0224", "REQ-01"), "56ab0224/REQ-01");
-/// // Project scope renders with the `@` sentinel.
-/// assert_eq!(qualified_id(Scope::Project.prefix(), "INV-01"), "@/INV-01");
+/// // Issue scope mints the reserved-`issue` uniform form.
+/// assert_eq!(
+///     qualified_id(&Scope::Issue("56ab0224".to_string()), "requirement", "REQ-01"),
+///     "@/issue/56ab0224/requirement/REQ-01"
+/// );
+/// // Project scope carries the kind directly after the `@` sentinel.
+/// assert_eq!(
+///     qualified_id(&Scope::Project, "invariant", "INV-01"),
+///     "@/invariant/INV-01"
+/// );
 /// ```
-pub fn qualified_id(scope_prefix: &str, self_id: &str) -> String {
-    format!("{scope_prefix}/{self_id}")
+pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
+    match scope {
+        Scope::Project => format!("{PROJECT_SCOPE_SENTINEL}/{kind}/{self_id}"),
+        Scope::Issue(short_id) => format!(
+            "{PROJECT_SCOPE_SENTINEL}/{}/{short_id}/{kind}/{self_id}",
+            KindScope::ISSUE_TOKEN
+        ),
+    }
 }
 
 /// Whether `value` is a qualified item reference under the address grammar,
@@ -1052,9 +1082,9 @@ pub fn qualified_id(scope_prefix: &str, self_id: &str) -> String {
 ///
 /// Every address form carries at least one `/`: the explicit `@`-prefixed
 /// kind-segmented forms (`@/<kind>/<self-id>`,
-/// `@/issue/<short-id>/<kind>/<self-id>`), the legacy project form
-/// (`@/<self-id>`), and the `<short-id>/<self-id>` sugar. A bare self-id has no
-/// `/`. That single structural distinction is the qualified/unqualified boundary.
+/// `@/issue/<short-id>/<kind>/<self-id>`) and the `<short-id>/<self-id>` sugar. A
+/// bare self-id has no `/`. That single structural distinction is the
+/// qualified/unqualified boundary.
 ///
 /// # Examples
 ///
@@ -1064,7 +1094,6 @@ pub fn qualified_id(scope_prefix: &str, self_id: &str) -> String {
 /// assert!(is_qualified_reference("@/rule/coverage-preview"));
 /// assert!(is_qualified_reference("@/issue/56ab0224/rule/coverage-preview"));
 /// assert!(is_qualified_reference("56ab0224/REQ-01"));
-/// assert!(is_qualified_reference("@/INV-01"));
 /// assert!(!is_qualified_reference("REQ-01"));
 /// ```
 pub fn is_qualified_reference(value: &str) -> bool {
@@ -1080,11 +1109,12 @@ pub fn is_qualified_reference(value: &str) -> bool {
 pub struct AddressableItem {
     /// The kind this item belongs to (display name).
     pub kind: String,
-    /// Qualified id `<scope>/<self-id>` (derived). Unique within its scope for a
-    /// given kind, but not globally unique as a string: two items of different
-    /// kinds sharing a scope and self-id derive the same qualified id (e.g. both
-    /// mint `@/coverage-preview`). Resolution disambiguates using this item's
-    /// separate `kind` field alongside `self_id`.
+    /// Derived qualified id in the uniform kind-segmented scheme:
+    /// `@/<kind>/<self-id>` for a project item, `@/issue/<short-id>/<kind>/<self-id>`
+    /// for an issue item. Because the kind is a segment, the string is unique per
+    /// `(scope, kind, self-id)`: two items of different kinds sharing a scope and
+    /// self-id derive DISTINCT qualified ids (`@/rule/coverage-preview` vs
+    /// `@/gate/coverage-preview`).
     pub qualified_id: String,
     /// The human-authored self-id, unique within its scope for a given kind.
     pub self_id: String,
@@ -1135,15 +1165,17 @@ pub struct RawScopeItem {
 }
 
 /// Enforce per-(scope, kind) self-id uniqueness over raw candidates and derive
-/// their qualified ids `<scope>/<self-id>` (REQ-03, REQ-04, REQ-05).
+/// their uniform kind-segmented qualified ids (`@/<kind>/<self-id>` for project
+/// scope, `@/issue/<short-id>/<kind>/<self-id>` for issue scope) via
+/// [`qualified_id`] (REQ-03, REQ-04, REQ-05).
 ///
 /// This is the one code path that turns extracted candidates into addressable
 /// items, shared by [`index_items`] (issue scope) and [`index_markdown_items`]
 /// (any scope, including project). Uniqueness is keyed on the pair `(self_id,
-/// kind)`: two DIFFERENT kinds minting the same self-id in one scope now coexist
-/// as distinct items (they derive the same qualified-id string, but their `kind`
-/// fields differ), while a self-id repeated under the SAME kind in one scope is a
-/// [`ItemError::DuplicateSelfId`]. The same self-id under a *different* scope is
+/// kind)`: two DIFFERENT kinds minting the same self-id in one scope coexist as
+/// distinct items and derive distinct qualified-id strings (the kind is a segment
+/// of the minted id), while a self-id repeated under the SAME kind in one scope is
+/// a [`ItemError::DuplicateSelfId`]. The same self-id under a *different* scope is
 /// fine because each call is scoped to one [`Scope`] (REQ-04).
 ///
 /// # Examples
@@ -1158,7 +1190,7 @@ pub struct RawScopeItem {
 ///     links: Vec::new(),
 /// }];
 /// let items = derive_scope_items(&Scope::Project, raw).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/INV-01");
+/// assert_eq!(items[0].qualified_id, "@/policy/INV-01");
 /// assert_eq!(items[0].scope, "@");
 /// ```
 pub fn derive_scope_items(
@@ -1181,7 +1213,7 @@ pub fn derive_scope_items(
             });
         }
         out.push(AddressableItem {
-            qualified_id: qualified_id(prefix, &candidate.self_id),
+            qualified_id: qualified_id(scope, &candidate.kind, &candidate.self_id),
             scope: prefix.to_string(),
             kind: candidate.kind,
             self_id: candidate.self_id,
@@ -1197,7 +1229,8 @@ pub fn derive_scope_items(
 /// A pure projection: parses the issue description with `parser`, and for each
 /// kind scans its declared section's list entries, keeping those that match the
 /// kind's markers and yield a self-id under its id-pattern. The qualified id is
-/// derived as `<issue-short-id>/<self-id>` via the shared [`derive_scope_items`].
+/// derived as `@/issue/<issue-short-id>/<kind>/<self-id>` via the shared
+/// [`derive_scope_items`].
 ///
 /// Self-id uniqueness is enforced per (scope, kind) (here, the issue): a self-id
 /// repeated under the SAME kind is an [`ItemError::DuplicateSelfId`]; the same
@@ -1288,8 +1321,8 @@ fn extract_raw_items(
 /// the candidates through the SAME [`derive_scope_items`] derivation, so
 /// qualified-id derivation and per-(scope, kind) uniqueness (REQ-03, REQ-04,
 /// REQ-05) are identical across substrates. With `scope = Scope::Project` each item's
-/// qualified id is `@/<self-id>` and resolution of `@/<self-id>` finds it
-/// (REQ-01).
+/// qualified id is `@/<kind>/<self-id>` and resolution of `@/<kind>/<self-id>` finds
+/// it (REQ-01).
 ///
 /// # Examples
 ///
@@ -1311,7 +1344,7 @@ fn extract_raw_items(
 /// let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n";
 /// let items =
 ///     index_markdown_items(md, &Scope::Project, &[kind], &MarkdownContentParser).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/INV-01");
+/// assert_eq!(items[0].qualified_id, "@/example/INV-01");
 /// ```
 pub fn index_markdown_items(
     markdown: &str,
@@ -1383,9 +1416,10 @@ pub struct ProjectSource {
 ///
 /// Pooling all candidates before deriving means a self-id repeated across a
 /// markdown source and a registry candidate of the SAME kind is reported as a
-/// duplicate (REQ-03); different kinds sharing a self-id coexist, deriving the
-/// same qualified-id string. Qualified-id derivation matches issue scope (REQ-01,
-/// REQ-05). Empty inputs yield no items (graceful), never an error.
+/// duplicate (REQ-03); different kinds sharing a self-id coexist and derive
+/// distinct qualified-id strings (the kind is a segment). Qualified-id derivation
+/// matches issue scope (REQ-01, REQ-05). Empty inputs yield no items (graceful),
+/// never an error.
 ///
 /// # Examples
 ///
@@ -1417,8 +1451,8 @@ pub struct ProjectSource {
 /// }];
 /// let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
 /// let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
-/// assert!(qids.contains(&"@/REQ-01"));
-/// assert!(qids.contains(&"@/INV-01"));
+/// assert!(qids.contains(&"@/example/REQ-01"));
+/// assert!(qids.contains(&"@/policy/INV-01"));
 /// ```
 pub fn index_project_sources(
     sources: &[ProjectSource],
@@ -1443,7 +1477,7 @@ pub fn index_project_sources(
 /// the already-read `toml_content` (the file I/O happens in the command layer
 /// through the storage boundary, so this stays a PURE function) and maps each
 /// entry of the descriptor's named array-of-tables into a [`RawScopeItem`]:
-/// `id-field` -> self-id (so the derived qualified id is `@/<self-id>`),
+/// `id-field` -> self-id (so the derived qualified id is `@/<kind>/<self-id>`),
 /// `text-field` -> text, and each `link-fields` entry -> `<namespace>:<target>`
 /// link labels (the mapped field may be a single string or an array of strings).
 /// `kind_name` tags every candidate so the derived item reports the right kind.
@@ -1805,10 +1839,18 @@ mod tests {
 
     #[test]
     fn test_qualified_id_is_derived() {
-        // REQ-02: qualified id is <issue-id>/<self-id>, a pure projection.
+        // REQ-01: qualified id is the uniform kind-segmented address, a pure
+        // projection over (scope, kind, self-id).
         let mut issue = Issue::new("T".to_string(), String::new());
         issue.id = "56ab0224-fd6e-4929-a61e-ffb1a3104496".to_string();
-        assert_eq!(qualified_id(&issue.short_id(), "REQ-01"), "56ab0224/REQ-01");
+        assert_eq!(
+            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01"),
+            "@/issue/56ab0224/requirement/REQ-01"
+        );
+        assert_eq!(
+            qualified_id(&Scope::Project, "invariant", "INV-01"),
+            "@/invariant/INV-01"
+        );
     }
 
     #[test]
@@ -1848,7 +1890,11 @@ mod tests {
         assert_eq!(items[0].kind, "requirement");
         assert_eq!(
             items[0].qualified_id,
-            qualified_id(&issue.short_id(), "REQ-01")
+            qualified_id(&Scope::Issue(issue.short_id()), "requirement", "REQ-01")
+        );
+        assert_eq!(
+            items[0].qualified_id,
+            format!("@/issue/{}/requirement/REQ-01", issue.short_id())
         );
         assert_eq!(items[1].self_id, "REQ-02");
     }
@@ -1918,8 +1964,12 @@ mod tests {
         assert!(items.iter().all(|item| item.self_id == "REQ-01"));
         let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
         assert_eq!(kinds, HashSet::from(["requirement", "decision"]));
-        // They derive the same qualified-id string; only `kind` disambiguates.
-        assert_eq!(items[0].qualified_id, items[1].qualified_id);
+        // The kind is a segment of the minted id, so the two coexisting items derive
+        // DISTINCT qualified ids that differ only by that segment.
+        assert_ne!(items[0].qualified_id, items[1].qualified_id);
+        let qids: HashSet<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
+        assert!(qids.iter().any(|q| q.ends_with("/requirement/REQ-01")));
+        assert!(qids.iter().any(|q| q.ends_with("/decision/REQ-01")));
     }
 
     #[test]
@@ -2152,7 +2202,7 @@ mod tests {
     #[test]
     fn test_index_project_sources_pools_registry_and_markdown() {
         // Both substrates dedup through one pass: a markdown source and a
-        // registry-derived candidate both surface as `@/<self-id>`.
+        // registry-derived candidate both surface under `@/<kind>/<self-id>`.
         let sources = vec![ProjectSource {
             kind: req_kind(),
             markdown: "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
@@ -2165,8 +2215,8 @@ mod tests {
         }];
         let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
         let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
-        assert!(qids.contains(&"@/REQ-01"));
-        assert!(qids.contains(&"@/INV-01"));
+        assert!(qids.contains(&"@/requirement/REQ-01"));
+        assert!(qids.contains(&"@/invariant/INV-01"));
     }
 
     #[test]
@@ -2399,25 +2449,27 @@ enforced-by = \"tests\"
 
     #[test]
     fn test_derive_scope_items_derives_at_project_scope() {
-        // REQ-01: project-scoped candidates resolve under the `@` prefix.
+        // REQ-01: project-scoped candidates mint `@/<kind>/<self-id>`; the item's
+        // own `scope` field stays the bare `@` prefix.
         let items = derive_scope_items(&Scope::Project, vec![raw("invariant", "INV-01")]).unwrap();
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].qualified_id, "@/INV-01");
+        assert_eq!(items[0].qualified_id, "@/invariant/INV-01");
         assert_eq!(items[0].scope, "@");
         assert_eq!(items[0].self_id, "INV-01");
     }
 
     #[test]
     fn test_index_markdown_items_at_project_scope() {
-        // REQ-01: a markdown source scanned at project scope mints `@/<self-id>`,
-        // through the SAME parse + extract + derive path as issue scope.
+        // REQ-01: a markdown source scanned at project scope mints
+        // `@/<kind>/<self-id>`, through the SAME parse + extract + derive path as
+        // issue scope.
         let kinds = vec![req_kind()];
         let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n- prose line\n";
         let items =
             index_markdown_items(md, &Scope::Project, &kinds, &MarkdownContentParser).unwrap();
         // The prose line without a self-id is skipped (REQ-06).
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].qualified_id, "@/INV-01");
+        assert_eq!(items[0].qualified_id, "@/requirement/INV-01");
         assert_eq!(items[0].scope, "@");
     }
 
@@ -2452,8 +2504,11 @@ enforced-by = \"tests\"
         assert!(items.iter().all(|item| item.self_id == "X-1"));
         let kinds: HashSet<&str> = items.iter().map(|item| item.kind.as_str()).collect();
         assert_eq!(kinds, HashSet::from(["invariant", "decision"]));
-        // They derive the same qualified-id string; only `kind` disambiguates.
-        assert_eq!(items[0].qualified_id, items[1].qualified_id);
+        // The kind is a segment of the minted id, so the two coexisting items derive
+        // DISTINCT qualified ids.
+        assert_ne!(items[0].qualified_id, items[1].qualified_id);
+        let qids: HashSet<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
+        assert_eq!(qids, HashSet::from(["@/invariant/X-1", "@/decision/X-1"]));
     }
 
     #[test]
@@ -2705,12 +2760,19 @@ enforced-by = \"tests\"
 
         assert_eq!(issue_items.len(), 1);
         assert_eq!(project_items.len(), 1);
-        // Distinct qualified ids: issue-scope prefix vs `@`.
+        // Distinct qualified ids: the issue-scope address carries the reserved
+        // `issue` segment and short-id, the project one carries the bare `@`.
         assert_ne!(issue_items[0].qualified_id, project_items[0].qualified_id);
         assert_eq!(issue_items[0].self_id, project_items[0].self_id);
-        assert_eq!(project_items[0].qualified_id, "@/REQ-01");
-        assert!(issue_items[0].qualified_id.ends_with("/REQ-01"));
-        assert!(!issue_items[0].qualified_id.starts_with('@'));
+        assert_eq!(project_items[0].qualified_id, "@/requirement/REQ-01");
+        assert_eq!(
+            issue_items[0].qualified_id,
+            format!("@/issue/{}/requirement/REQ-01", issue.short_id())
+        );
+        // Both minted ids now carry the `@` sentinel; the issue form's `/issue/`
+        // segment is what distinguishes it from the project form.
+        assert!(issue_items[0].qualified_id.starts_with("@/issue/"));
+        assert!(!project_items[0].qualified_id.starts_with("@/issue/"));
     }
 
     #[test]

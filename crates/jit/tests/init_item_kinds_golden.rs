@@ -220,9 +220,9 @@ fn test_init_authored_table_indexes_all_kinds() {
         .iter()
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
-    assert!(qids.contains(&format!("{short}/REQ-01").as_str()));
-    assert!(qids.contains(&"@/INV-01"));
-    assert!(qids.contains(&"@/cargo-ci"));
+    assert!(qids.contains(&format!("@/issue/{short}/requirement/REQ-01").as_str()));
+    assert!(qids.contains(&"@/invariant/INV-01"));
+    assert!(qids.contains(&"@/gate/cargo-ci"));
 }
 
 #[test]

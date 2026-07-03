@@ -106,24 +106,25 @@ fn test_default_repo_item_list_kind_decision_returns_decisions() {
         .iter()
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
-    assert!(qids.contains(&format!("{short}/D-01").as_str()));
-    assert!(qids.contains(&format!("{short}/D-02").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/decision/D-01").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/decision/D-02").as_str()));
 }
 
 #[test]
 fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
-    // REQ-01: a decision resolves by its derived qualified id through the real
-    // `jit item show` binary, in a default repo.
+    // REQ-01: a decision resolves through the real `jit item show` binary by its
+    // `<short-id>/<self-id>` sugar INPUT, and reports the canonical uniform
+    // kind-segmented qualified id.
     let temp = setup_test_repo();
     let short = create_issue(
         temp.path(),
         "Architecture",
         "## Decisions\n\n- D-01: use json storage\n",
     );
-    let qualified = format!("{short}/D-01");
+    let sugar = format!("{short}/D-01");
 
     let output = Command::new(jit_binary())
-        .args(["item", "show", &qualified, "--json"])
+        .args(["item", "show", &sugar, "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -135,7 +136,10 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["item"]["self_id"].as_str().unwrap(), "D-01");
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "decision");
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), qualified);
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        format!("@/issue/{short}/decision/D-01")
+    );
     assert!(json["item"]["text"]
         .as_str()
         .unwrap()
@@ -198,7 +202,10 @@ fn test_default_repo_per_label_resolves_decision() {
         .expect("a per:<issue>/D-01 label resolves to the addressed decision");
     assert_eq!(resolved.item.self_id, "D-01");
     assert_eq!(resolved.item.kind, "decision");
-    assert_eq!(resolved.item.qualified_id, format!("{short}/D-01"));
+    assert_eq!(
+        resolved.item.qualified_id,
+        format!("@/issue/{short}/decision/D-01")
+    );
     assert!(resolved.item.text.contains("json storage"));
 
     // A registered `per:` namespace whose qualified id cannot be resolved is an

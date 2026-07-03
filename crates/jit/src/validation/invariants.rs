@@ -6,13 +6,13 @@
 //! parse/load step (read the file if present, parse with serde + toml, return a
 //! typed error on malformed/invalid content). Wiring the loaded registry into
 //! [`JitConfig::load`](crate::config::JitConfig::load) is the config layer's job,
-//! and indexing/querying invariants as addressable items (`@/<self-id>`) is built
-//! on top of this registry by a later layer.
+//! and indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
+//! is built on top of this registry by a later layer.
 //!
 //! The loader mirrors [`RuleSet::load`](crate::validation::rules::RuleSet::load):
 //! an absent file is graceful (an empty registry, NOT an error), and each entry
 //! is keyed by its `id` field — the entry's SELF-ID, from which the project-scoped
-//! qualified id `@/<self-id>` is derived.
+//! qualified id `@/invariant/<self-id>` is derived.
 
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -59,7 +59,7 @@ pub enum InvariantConfigError {
     Toml(#[from] toml::de::Error),
 
     /// Two or more invariants share the same `id`. Ids MUST be unique so the
-    /// project-scoped qualified id `@/<self-id>` addresses exactly one entry.
+    /// project-scoped qualified id `@/invariant/<self-id>` addresses exactly one entry.
     #[error("duplicate invariant id '{id}': invariant ids must be unique")]
     DuplicateId {
         /// The id that appeared more than once.
@@ -232,8 +232,8 @@ impl InvariantRegistry {
     pub fn from_toml_str(content: &str) -> Result<Self, InvariantConfigError> {
         let raw: RawInvariantsFile = toml::from_str(content)?;
 
-        // Enforce id uniqueness so each project-scoped `@/<self-id>` addresses
-        // exactly one entry; detect the first collision via a `HashSet` insert.
+        // Enforce id uniqueness so each project-scoped `@/invariant/<self-id>`
+        // addresses exactly one entry; detect the first collision via a `HashSet` insert.
         let mut seen = HashSet::new();
         if let Some(inv) = raw.invariants.iter().find(|i| !seen.insert(i.id.as_str())) {
             return Err(InvariantConfigError::DuplicateId { id: inv.id.clone() });

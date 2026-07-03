@@ -64,8 +64,8 @@ fn test_item_list_indexes_requirements() {
         .iter()
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
-    assert!(qids.contains(&format!("{short}/REQ-01").as_str()));
-    assert!(qids.contains(&format!("{short}/REQ-02").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/requirement/REQ-01").as_str()));
+    assert!(qids.contains(&format!("@/issue/{short}/requirement/REQ-02").as_str()));
     assert_eq!(items[0]["kind"].as_str().unwrap(), "requirement");
 }
 
@@ -136,18 +136,21 @@ fn test_item_show_and_resolve_by_qualified_id() {
         "Foundational",
         "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n",
     );
-    let qualified = format!("{short}/REQ-01");
+    // The `<short-id>/<self-id>` sugar is the INPUT; the minted qualified id is the
+    // canonical uniform kind-segmented form.
+    let sugar = format!("{short}/REQ-01");
+    let expected_qid = format!("@/issue/{short}/requirement/REQ-01");
 
     for verb in ["show", "resolve"] {
         let output = Command::new(jit_binary())
-            .args(["item", verb, &qualified, "--json"])
+            .args(["item", verb, &sugar, "--json"])
             .current_dir(temp.path())
             .output()
             .unwrap();
         assert!(output.status.success(), "item {verb} failed");
         let json: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(json["item"]["self_id"].as_str().unwrap(), "REQ-01");
-        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), qualified);
+        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), expected_qid);
         assert!(json["item"]["text"]
             .as_str()
             .unwrap()
@@ -241,10 +244,10 @@ fn test_issue_show_resolves_qualified_item_id() {
         "Foundational",
         "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n",
     );
-    let qualified = format!("{short}/REQ-01");
+    let sugar = format!("{short}/REQ-01");
 
     let output = Command::new(jit_binary())
-        .args(["issue", "show", &qualified, "--json"])
+        .args(["issue", "show", &sugar, "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -255,11 +258,14 @@ fn test_issue_show_resolves_qualified_item_id() {
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["item"]["self_id"].as_str().unwrap(), "REQ-01");
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), qualified);
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        format!("@/issue/{short}/requirement/REQ-01")
+    );
 
     // Human (non-JSON) path also renders the addressed item.
     let output = Command::new(jit_binary())
-        .args(["issue", "show", &qualified])
+        .args(["issue", "show", &sugar])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -332,7 +338,7 @@ fn configure_project_scope_kind(repo: &std::path::Path, source_md: Option<&str>)
 
 #[test]
 fn test_item_show_project_scope_resolves_through_real_cli() {
-    // REQ-01: `@/<self-id>` RESOLVES through the actual `jit item show` binary,
+    // REQ-01: `@/<kind>/<self-id>` RESOLVES through the actual `jit item show` binary,
     // sourced from a config-declared repository-local file (no test seam).
     let temp = setup_test_repo();
     configure_project_scope_kind(
@@ -342,18 +348,21 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
 
     for verb in ["show", "resolve"] {
         let output = Command::new(jit_binary())
-            .args(["item", verb, "@/GLOSS-01", "--json"])
+            .args(["item", verb, "@/glossary/GLOSS-01", "--json"])
             .current_dir(temp.path())
             .output()
             .unwrap();
         assert!(
             output.status.success(),
-            "@/GLOSS-01 must resolve via item {verb}: {}",
+            "@/glossary/GLOSS-01 must resolve via item {verb}: {}",
             String::from_utf8_lossy(&output.stdout)
         );
         let json: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(json["item"]["self_id"].as_str().unwrap(), "GLOSS-01");
-        assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/GLOSS-01");
+        assert_eq!(
+            json["item"]["qualified_id"].as_str().unwrap(),
+            "@/glossary/GLOSS-01"
+        );
         assert_eq!(json["item"]["scope"].as_str().unwrap(), "@");
         assert_eq!(json["item"]["kind"].as_str().unwrap(), "glossary");
         assert!(json["item"]["text"].as_str().unwrap().contains("atomic"));
@@ -361,16 +370,19 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
 
     // The same `@` id resolves through `jit issue show <qualified>` too.
     let output = Command::new(jit_binary())
-        .args(["issue", "show", "@/GLOSS-01", "--json"])
+        .args(["issue", "show", "@/glossary/GLOSS-01", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
         output.status.success(),
-        "issue show @/GLOSS-01 must resolve"
+        "issue show @/glossary/GLOSS-01 must resolve"
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/GLOSS-01");
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        "@/glossary/GLOSS-01"
+    );
 
     // And it appears in `jit item list`.
     let output = Command::new(jit_binary())
@@ -386,8 +398,8 @@ fn test_item_show_project_scope_resolves_through_real_cli() {
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
     assert!(
-        qids.contains(&"@/GLOSS-01"),
-        "list must include @/GLOSS-01: {qids:?}"
+        qids.contains(&"@/glossary/GLOSS-01"),
+        "list must include @/glossary/GLOSS-01: {qids:?}"
     );
 }
 
@@ -400,7 +412,7 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
     configure_project_scope_kind(temp.path(), None);
 
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/GLOSS-01", "--json"])
+        .args(["item", "show", "@/glossary/GLOSS-01", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -421,7 +433,7 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
 #[test]
 fn test_item_list_kind_invariant_registry_first_through_real_cli() {
     // REQ-01 + Finding 1/2 (rework): the SHIPPED CLI returns each invariant from
-    // `.jit/invariants.toml` as `@/<self-id>`, with NO `[item_kinds]` config (the
+    // `.jit/invariants.toml` as `@/<kind>/<self-id>`, with NO `[item_kinds]` config (the
     // built-in registry-first invariant kind), and NO markdown source involved.
     let temp = setup_test_repo();
     std::fs::write(
@@ -463,12 +475,12 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
     assert!(
-        qids.contains(&"@/INV-01"),
-        "list must include @/INV-01: {qids:?}"
+        qids.contains(&"@/invariant/INV-01"),
+        "list must include @/invariant/INV-01: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/INV-02"),
-        "list must include @/INV-02: {qids:?}"
+        qids.contains(&"@/invariant/INV-02"),
+        "list must include @/invariant/INV-02: {qids:?}"
     );
     // The decoy INV-99 from an issue description is NOT an invariant (REQ-02).
     assert!(
@@ -483,15 +495,21 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
         "Every dependency edge stays acyclic."
     );
 
-    // `jit item show @/INV-02` resolves through the shipped binary too.
+    // `jit item show @/invariant/INV-02` resolves through the shipped binary too.
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/INV-02", "--json"])
+        .args(["item", "show", "@/invariant/INV-02", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
-    assert!(output.status.success(), "item show @/INV-02 must resolve");
+    assert!(
+        output.status.success(),
+        "item show @/invariant/INV-02 must resolve"
+    );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-02");
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        "@/invariant/INV-02"
+    );
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
 }
 
@@ -539,7 +557,10 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
     let items = json["items"].as_array().unwrap();
-    assert_eq!(items[0]["qualified_id"].as_str().unwrap(), "@/INV-01");
+    assert_eq!(
+        items[0]["qualified_id"].as_str().unwrap(),
+        "@/invariant/INV-01"
+    );
     assert_eq!(items[0]["kind"].as_str().unwrap(), "invariant");
 }
 
@@ -857,5 +878,80 @@ fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
             .iter()
             .any(|f| f["rule"].as_str() == Some("namespace-registry")),
         "jit init must register the enforces namespace: {json}"
+    );
+}
+
+#[test]
+fn test_item_list_qualified_ids_round_trip_through_show() {
+    // REQ-01/REQ-04: every qualified id `jit item list --json` prints is itself a
+    // canonical kind-segmented address that resolves through `jit item show`,
+    // yielding the SAME id back. Exercises both substrates the `jit init` scaffold
+    // populates: issue-scope items (from the created issue's markdown) and
+    // project-scope registry-first items (the seeded `.jit/rules.toml` rules).
+    let temp = setup_test_repo();
+    create_issue(
+        temp.path(),
+        "Foundational",
+        "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n- [hard] REQ-02: cycle detect\n",
+    );
+
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let list: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let items = list["items"].as_array().unwrap();
+    assert!(
+        !items.is_empty(),
+        "the init scaffold must list at least the created issue's requirements"
+    );
+
+    let mut saw_issue_scope = false;
+    let mut saw_project_scope = false;
+    for item in items {
+        let qid = item["qualified_id"].as_str().unwrap();
+        // Every minted id carries the kind segment; none is the retired kindless
+        // `@/<self-id>` project form.
+        assert!(
+            qid.starts_with("@/issue/") || qid.starts_with('@'),
+            "every minted id is kind-segmented under the `@` scheme: {qid}"
+        );
+        if qid.starts_with("@/issue/") {
+            saw_issue_scope = true;
+        } else {
+            saw_project_scope = true;
+        }
+
+        let shown = Command::new(jit_binary())
+            .args(["item", "show", qid, "--json"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            shown.status.success(),
+            "qualified id '{qid}' from `item list` must resolve via `item show`: {}",
+            String::from_utf8_lossy(&shown.stdout)
+        );
+        let shown_json: Value = serde_json::from_slice(&shown.stdout).unwrap();
+        assert_eq!(
+            shown_json["item"]["qualified_id"].as_str().unwrap(),
+            qid,
+            "round-trip must return the same qualified id"
+        );
+        assert_eq!(
+            shown_json["item"]["self_id"].as_str(),
+            item["self_id"].as_str(),
+            "round-trip must return the same self-id for {qid}"
+        );
+    }
+    assert!(
+        saw_issue_scope,
+        "the created issue's requirements must appear as issue-scope items"
+    );
+    assert!(
+        saw_project_scope,
+        "the init-scaffolded rules registry must appear as project-scope items"
     );
 }

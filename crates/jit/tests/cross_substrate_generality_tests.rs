@@ -13,9 +13,9 @@
 //! - **issue-scope, markdown-first** — `requirement` (`## Success Criteria`,
 //!   `REQ-NN`), `decision` (`## Decisions`, `D-NN`), and `risk` (`## Risks`,
 //!   `RISK-NN`) are parsed from an issue description and addressed as
-//!   `<short-id>/<self-id>`.
+//!   `@/issue/<short-id>/<kind>/<self-id>`.
 //! - **project-scope, registry-first** — `invariant` is read from
-//!   `.jit/invariants.toml` and addressed as `@/<self-id>`.
+//!   `.jit/invariants.toml` and addressed as `@/<kind>/<self-id>`.
 //!
 //! A single test (`test_all_four_kinds_through_one_generic_path`) exercises all
 //! four through `jit item list`, `jit item list --kind <X>`, `jit item show`, and
@@ -156,7 +156,7 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 /// 2. `jit item list --kind <each>` returns exactly the item(s) of that kind.
 /// 3. `jit item show <qualified-id>` resolves one item of EACH kind:
 ///    - issue-scope: `<short>/<REQ-01>`, `<short>/D-01`, `<short>/RISK-01`
-///    - project-scope: `@/INV-01`
+///    - project-scope: `@/invariant/INV-01`
 /// 4. `jit item search <term>` finds across kinds.
 ///
 /// ## REQ-02 assertion
@@ -202,10 +202,11 @@ fn test_all_four_kinds_through_one_generic_path() {
     let all = item_list(temp.path(), None);
     let all_qids = qualified_ids(&all);
 
-    // Issue-scope, markdown-first items are scoped by the issue short-id.
-    let req_qid = format!("{short}/REQ-01");
-    let dec_qid = format!("{short}/D-01");
-    let risk_qid = format!("{short}/RISK-01");
+    // Issue-scope, markdown-first items mint the uniform kind-segmented address
+    // carrying the reserved `issue` segment, the short-id, the kind, and the self-id.
+    let req_qid = format!("@/issue/{short}/requirement/REQ-01");
+    let dec_qid = format!("@/issue/{short}/decision/D-01");
+    let risk_qid = format!("@/issue/{short}/risk/RISK-01");
 
     assert!(
         all_qids.contains(&req_qid.as_str()),
@@ -225,8 +226,8 @@ fn test_all_four_kinds_through_one_generic_path() {
     // (REQ-02): there is no separate `jit invariant list` or `jit item
     // list-registry`; the same `list_items` code path routes to the registry.
     assert!(
-        all_qids.contains(&"@/INV-01"),
-        "unfiltered list must include the invariant @/INV-01 alongside issue-scope items: {all_qids:?}"
+        all_qids.contains(&"@/invariant/INV-01"),
+        "unfiltered list must include the invariant @/invariant/INV-01 alongside issue-scope items: {all_qids:?}"
     );
 
     // Confirm the kinds are correctly tagged.
@@ -240,13 +241,13 @@ fn test_all_four_kinds_through_one_generic_path() {
     assert_eq!(kind_of(&req_qid), Some("requirement"));
     assert_eq!(kind_of(&dec_qid), Some("decision"));
     assert_eq!(kind_of(&risk_qid), Some("risk"));
-    assert_eq!(kind_of("@/INV-01"), Some("invariant"));
+    assert_eq!(kind_of("@/invariant/INV-01"), Some("invariant"));
 
     // Confirm substrate routing: issue-scope items are scoped by the issue
     // short-id; the invariant is `@`-scoped (registry, no owning issue).
     let inv = items
         .iter()
-        .find(|i| i["qualified_id"] == "@/INV-01")
+        .find(|i| i["qualified_id"] == "@/invariant/INV-01")
         .unwrap();
     assert_eq!(
         inv["scope"].as_str(),
@@ -268,7 +269,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     assert!(
         !req_qids
             .iter()
-            .any(|q| *q == "@/INV-01" || q.contains("/D-01") || q.contains("/RISK-01")),
+            .any(|q| *q == "@/invariant/INV-01" || q.contains("/D-01") || q.contains("/RISK-01")),
         "--kind requirement must not return decisions, risks, or invariants: {req_qids:?}"
     );
 
@@ -281,7 +282,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     assert!(
         !dec_qids
             .iter()
-            .any(|q| *q == "@/INV-01" || q.contains("/REQ-01") || q.contains("/RISK-01")),
+            .any(|q| *q == "@/invariant/INV-01" || q.contains("/REQ-01") || q.contains("/RISK-01")),
         "--kind decision must not return requirements, risks, or invariants: {dec_qids:?}"
     );
 
@@ -294,15 +295,15 @@ fn test_all_four_kinds_through_one_generic_path() {
     assert!(
         !risk_qids
             .iter()
-            .any(|q| *q == "@/INV-01" || q.contains("/REQ-01") || q.contains("/D-01")),
+            .any(|q| *q == "@/invariant/INV-01" || q.contains("/REQ-01") || q.contains("/D-01")),
         "--kind risk must not return requirements, decisions, or invariants: {risk_qids:?}"
     );
 
     let invs = item_list(temp.path(), Some("invariant"));
     let inv_qids = qualified_ids(&invs);
     assert!(
-        inv_qids.contains(&"@/INV-01"),
-        "--kind invariant must return @/INV-01: {inv_qids:?}"
+        inv_qids.contains(&"@/invariant/INV-01"),
+        "--kind invariant must return @/invariant/INV-01: {inv_qids:?}"
     );
     assert!(
         !inv_qids
@@ -316,8 +317,8 @@ fn test_all_four_kinds_through_one_generic_path() {
     // EACH kind — the same `show_item` code path, no substrate-specific
     // variant.
     //
-    // Issue-scope items: `<short>/REQ-01`, `<short>/D-01`, `<short>/RISK-01`
-    // Project-scope item: `@/INV-01`
+    // Issue-scope items: `@/issue/<short>/{requirement,decision,risk}/<self-id>`
+    // Project-scope item: `@/invariant/INV-01`
     //
     // REQ-02: all four resolve through the SAME `jit item show` command.
     // -----------------------------------------------------------------------
@@ -382,10 +383,13 @@ fn test_all_four_kinds_through_one_generic_path() {
 
     // invariant (project-scope, registry-first) — the same `jit item show`
     // command resolves it; no separate command exists for registry items.
-    let shown_inv = item_show(temp.path(), "@/INV-01");
+    let shown_inv = item_show(temp.path(), "@/invariant/INV-01");
     assert_eq!(shown_inv["item"]["self_id"].as_str(), Some("INV-01"));
     assert_eq!(shown_inv["item"]["kind"].as_str(), Some("invariant"));
-    assert_eq!(shown_inv["item"]["qualified_id"].as_str(), Some("@/INV-01"));
+    assert_eq!(
+        shown_inv["item"]["qualified_id"].as_str(),
+        Some("@/invariant/INV-01")
+    );
     assert_eq!(shown_inv["item"]["scope"].as_str(), Some("@"));
     assert!(
         shown_inv["item"]["text"]
@@ -419,7 +423,7 @@ fn test_all_four_kinds_through_one_generic_path() {
         "search 'atomic' must find the requirement: {atomic_qids:?}"
     );
     assert!(
-        !atomic_qids.contains(&"@/INV-01"),
+        !atomic_qids.contains(&"@/invariant/INV-01"),
         "search 'atomic' must not return the invariant: {atomic_qids:?}"
     );
 
@@ -445,7 +449,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     let hits_acyclic = item_search(temp.path(), "acyclic");
     let acyclic_qids = qualified_ids(&hits_acyclic);
     assert!(
-        acyclic_qids.contains(&"@/INV-01"),
+        acyclic_qids.contains(&"@/invariant/INV-01"),
         "search 'acyclic' must find the invariant through the same search path: {acyclic_qids:?}"
     );
     assert!(
@@ -458,7 +462,7 @@ fn test_all_four_kinds_through_one_generic_path() {
     // Search by self-id across substrates confirms both are reachable.
     let hits_inv01 = item_search(temp.path(), "INV-01");
     assert!(
-        qualified_ids(&hits_inv01).contains(&"@/INV-01"),
+        qualified_ids(&hits_inv01).contains(&"@/invariant/INV-01"),
         "searching by self-id 'INV-01' must find the invariant: {:?}",
         qualified_ids(&hits_inv01)
     );

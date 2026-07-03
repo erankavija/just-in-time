@@ -170,7 +170,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
     assert_eq!(dec_items[0]["kind"].as_str().unwrap(), "decision");
     assert_eq!(
         dec_items[0]["qualified_id"].as_str().unwrap(),
-        format!("{short}/D-01")
+        format!("@/issue/{short}/decision/D-01")
     );
     // The decision index must NOT contain risk items.
     assert!(
@@ -201,7 +201,7 @@ fn test_story_item_list_decision_and_risk_coexist() {
     assert_eq!(risk_items[0]["kind"].as_str().unwrap(), "risk");
     assert_eq!(
         risk_items[0]["qualified_id"].as_str().unwrap(),
-        format!("{short}/RISK-01")
+        format!("@/issue/{short}/risk/RISK-01")
     );
     // The risk index must NOT contain decision items.
     assert!(
@@ -230,7 +230,10 @@ fn test_story_per_label_resolves_decision() {
         .expect("a per:<issue>/D-01 label resolves to the addressed decision");
     assert_eq!(resolved.item.self_id, "D-01");
     assert_eq!(resolved.item.kind, "decision");
-    assert_eq!(resolved.item.qualified_id, format!("{short}/D-01"));
+    assert_eq!(
+        resolved.item.qualified_id,
+        format!("@/issue/{short}/decision/D-01")
+    );
     assert!(
         resolved.item.text.contains("markdown-first"),
         "resolved decision text must match the authored entry"
@@ -265,7 +268,10 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
         .expect("a mitigates:<issue>/RISK-01 label resolves to the addressed risk");
     assert_eq!(mit_resolved.item.self_id, "RISK-01");
     assert_eq!(mit_resolved.item.kind, "risk");
-    assert_eq!(mit_resolved.item.qualified_id, format!("{short}/RISK-01"));
+    assert_eq!(
+        mit_resolved.item.qualified_id,
+        format!("@/issue/{short}/risk/RISK-01")
+    );
     assert!(
         mit_resolved.item.text.contains("parsing ambiguity"),
         "resolved risk text must match the authored entry"
@@ -279,7 +285,10 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
         .expect("a resolves:<issue>/RISK-01 label resolves to the addressed risk");
     assert_eq!(res_resolved.item.self_id, "RISK-01");
     assert_eq!(res_resolved.item.kind, "risk");
-    assert_eq!(res_resolved.item.qualified_id, format!("{short}/RISK-01"));
+    assert_eq!(
+        res_resolved.item.qualified_id,
+        format!("@/issue/{short}/risk/RISK-01")
+    );
 
     // Both namespaces ALSO return an error when the qualified id is unresolvable.
     let bad_mit = format!("mitigates:{short}/RISK-99");

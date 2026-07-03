@@ -2314,7 +2314,7 @@ description = \"Full Rust CI pipeline must pass.\"
                 &format!("satisfies:{short}/REQ-01"),
                 &format!("per:{short}/D-01"),
                 &format!("mitigates:{short}/RISK-01"),
-                "enforces:@/INV-01",
+                "enforces:@/invariant/INV-01",
             ],
         );
         let exec = dangling_exec(vec![target, node]);
@@ -2399,9 +2399,9 @@ description = \"Full Rust CI pipeline must pass.\"
 
     #[test]
     fn test_dangling_invariant_link_reports_finding() {
-        // REQ-03 for the project-scope invariant kind: `enforces:@/BOGUS` is a
-        // registered link namespace with a qualified-but-unresolvable id.
-        let node = issue_with_labels("node", "", &["enforces:@/INV-99"]);
+        // REQ-03 for the project-scope invariant kind: `enforces:@/invariant/INV-99`
+        // is a registered link namespace with a qualified-but-unresolvable id.
+        let node = issue_with_labels("node", "", &["enforces:@/invariant/INV-99"]);
         let exec = dangling_exec(vec![node]);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();

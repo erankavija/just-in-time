@@ -436,7 +436,7 @@ pub struct NamespaceConfig {
 /// ```
 ///
 /// A kind may instead be **project-scoped**, addressing items not tied to any
-/// single issue (qualified id `@/<self-id>`). A *markdown-first* project kind sets
+/// single issue (qualified id `@/<kind>/<self-id>`). A *markdown-first* project kind sets
 /// `scope = "project"` and a `source` file (a repository-local path, relative to
 /// the repo root) whose markdown is scanned the SAME way an issue description is. It
 /// still declares all six required fields (the optional `source` PATH is in
@@ -490,9 +490,9 @@ pub struct ItemKindConfig {
     #[serde(rename = "link-namespaces")]
     pub link_namespaces: Option<Vec<String>>,
     /// Addressing scope: [`KindScopeConfig::Issue`] for items projected from issue
-    /// descriptions (qualified id `<issue>/<self-id>`), or
+    /// descriptions (qualified id `@/issue/<short-id>/<kind>/<self-id>`), or
     /// [`KindScopeConfig::Project`] for items projected from a repository-local
-    /// `source` file (qualified id `@/<self-id>`). Required in an explicit
+    /// `source` file (qualified id `@/<kind>/<self-id>`). Required in an explicit
     /// declaration; an unrecognised token is a TOML parse error, not a silent
     /// fallback.
     pub scope: Option<KindScopeConfig>,
@@ -730,7 +730,7 @@ impl<'de> Deserialize<'de> for ItemKindSource {
 /// items for a registry-first project kind.
 ///
 /// Each entry of the named `table` (an array-of-tables) becomes one addressable
-/// item: `id-field` supplies its self-id (so its qualified id is `@/<self-id>`),
+/// item: `id-field` supplies its self-id (so its qualified id is `@/<kind>/<self-id>`),
 /// `text-field` supplies its display text, and each `link-fields` entry maps a
 /// toml field holding link targets to the link NAMESPACE those targets are
 /// labelled under. A `link-fields` value may be a single string or an array of
@@ -831,9 +831,11 @@ pub enum KindScopeConfigError {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KindScopeConfig {
-    /// Items are projected from issue descriptions (`<issue>/<self-id>`).
+    /// Items are projected from issue descriptions
+    /// (`@/issue/<short-id>/<kind>/<self-id>`).
     Issue,
-    /// Items are projected from a config-declared source file (`@/<self-id>`).
+    /// Items are projected from a config-declared source file
+    /// (`@/<kind>/<self-id>`).
     Project,
 }
 

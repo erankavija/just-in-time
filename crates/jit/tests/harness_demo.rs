@@ -282,10 +282,14 @@ fn test_harness_item_list_and_resolve() {
     let listed = h.executor.list_items(None).unwrap();
     assert_eq!(listed.count, 2);
 
-    // The qualified id resolves through the same issue-id resolver.
+    // The `<short-id>/<self-id>` sugar resolves through the same issue-id resolver,
+    // and the resolved item reports its canonical uniform qualified id.
     let shown = h.executor.show_item(&format!("{short}/REQ-01")).unwrap();
     assert_eq!(shown.item.self_id, "REQ-01");
-    assert_eq!(shown.item.qualified_id, format!("{short}/REQ-01"));
+    assert_eq!(
+        shown.item.qualified_id,
+        format!("@/issue/{short}/requirement/REQ-01")
+    );
 }
 
 #[test]
@@ -328,7 +332,10 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
         .unwrap()
         .expect("qualified satisfies: reference resolves to the addressed item");
     assert_eq!(resolved.item.self_id, "REQ-01");
-    assert_eq!(resolved.item.qualified_id, format!("{short}/REQ-01"));
+    assert_eq!(
+        resolved.item.qualified_id,
+        format!("@/issue/{short}/requirement/REQ-01")
+    );
 
     // An unresolvable qualified reference is reported, not silently dropped.
     let bad = format!("satisfies:{short}/REQ-99");

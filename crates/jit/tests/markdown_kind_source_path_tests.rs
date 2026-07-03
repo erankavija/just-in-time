@@ -19,7 +19,7 @@
 //! - Both items surface in `jit item list --json` with `@/POL-NN` qualified
 //!   ids and kind `"policy"`.
 //! - `jit item list --kind policy` returns exactly the two items.
-//! - `jit item show @/POL-01 --json` resolves the item by its qualified id.
+//! - `jit item show @/policy/POL-01 --json` resolves the item by its qualified id.
 //!
 //! The test uses ONLY the isolated temp repo — this repo's real
 //! `.jit/config.toml` is never read or written.
@@ -130,9 +130,9 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 ///
 /// Verifies (REQ-01, story 90a2dbfd):
 /// - `[item_kinds.policy]` with `source = "policies.md"` is sufficient to make
-///   `jit item list` return `@/POL-01` and `@/POL-02`.
+///   `jit item list` return `@/policy/POL-01` and `@/policy/POL-02`.
 /// - `--kind policy` filter returns exactly those items.
-/// - `jit item show @/POL-01` resolves the item by its qualified id.
+/// - `jit item show @/policy/POL-01` resolves the item by its qualified id.
 ///
 /// This repo's real `.jit/config.toml` is never touched.
 #[test]
@@ -147,17 +147,17 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     let all = item_list(temp.path(), None);
     let all_qids = qualified_ids(&all);
     assert!(
-        all_qids.contains(&"@/POL-01"),
-        "unfiltered list must include @/POL-01; got: {all_qids:?}"
+        all_qids.contains(&"@/policy/POL-01"),
+        "unfiltered list must include @/policy/POL-01; got: {all_qids:?}"
     );
     assert!(
-        all_qids.contains(&"@/POL-02"),
-        "unfiltered list must include @/POL-02; got: {all_qids:?}"
+        all_qids.contains(&"@/policy/POL-02"),
+        "unfiltered list must include @/policy/POL-02; got: {all_qids:?}"
     );
 
     // Both items carry the declared kind and the project scope.
     let items = all["items"].as_array().unwrap();
-    for qid in ["@/POL-01", "@/POL-02"] {
+    for qid in ["@/policy/POL-01", "@/policy/POL-02"] {
         let item = items
             .iter()
             .find(|i| i["qualified_id"].as_str() == Some(qid))
@@ -187,19 +187,19 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     );
     let kind_qids = qualified_ids(&by_kind);
     assert!(
-        kind_qids.contains(&"@/POL-01"),
-        "--kind policy must return @/POL-01: {kind_qids:?}"
+        kind_qids.contains(&"@/policy/POL-01"),
+        "--kind policy must return @/policy/POL-01: {kind_qids:?}"
     );
     assert!(
-        kind_qids.contains(&"@/POL-02"),
-        "--kind policy must return @/POL-02: {kind_qids:?}"
+        kind_qids.contains(&"@/policy/POL-02"),
+        "--kind policy must return @/policy/POL-02: {kind_qids:?}"
     );
 
     // -----------------------------------------------------------------------
-    // Part 3: `jit item show @/POL-01 --json` resolves through the same
+    // Part 3: `jit item show @/policy/POL-01 --json` resolves through the same
     // generic path — no substrate-specific command or code branch required.
     // -----------------------------------------------------------------------
-    let shown = item_show(temp.path(), "@/POL-01");
+    let shown = item_show(temp.path(), "@/policy/POL-01");
     assert_eq!(
         shown["item"]["self_id"].as_str(),
         Some("POL-01"),
@@ -207,8 +207,8 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
     );
     assert_eq!(
         shown["item"]["qualified_id"].as_str(),
-        Some("@/POL-01"),
-        "show must return qualified_id = '@/POL-01'"
+        Some("@/policy/POL-01"),
+        "show must return qualified_id = '@/policy/POL-01'"
     );
     assert_eq!(
         shown["item"]["kind"].as_str(),

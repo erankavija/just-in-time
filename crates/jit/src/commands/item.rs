@@ -27,7 +27,7 @@ pub struct ItemListResult {
 /// Result of a `jit item show` / `resolve` query for one qualified id.
 ///
 /// `issue_full_id` / `issue_title` are populated only for an issue-scoped item;
-/// for a project-scoped item (`@/<self-id>`) both are `None`, since no single
+/// for a project-scoped item (`@/<kind>/<self-id>`) both are `None`, since no single
 /// issue owns it (REQ-01).
 #[derive(Debug, Serialize)]
 pub struct ItemShowResult {
@@ -42,17 +42,15 @@ pub struct ItemShowResult {
 /// An item address classified into the scope + kind + self-id `show_item` resolves
 /// against, after applying the sugar-expansion and kind-segmented grammars.
 ///
-/// The `kind` is `Some` for every explicit-kind or sugar address (resolution
-/// filters by kind AND self-id) and `None` only for the legacy project form
-/// `@/<self-id>` (kind-agnostic, kept so a project item's derived `qualified_id`
-/// round-trips).
+/// A project-scope address always names its kind explicitly (`@/<kind>/<self-id>`),
+/// so [`ResolvedItemAddress::Project`] carries a concrete `kind`. An issue-scope
+/// address's `kind` is `Some` for an explicit `@/issue/<short-id>/<kind>/<self-id>`
+/// or an unambiguously-inferred sugar, and `None` only when a sugar's self-id shape
+/// is pattern-ambiguous or matches no kind (deferring to actual-item matching, per
+/// amendment D3-A).
 enum ResolvedItemAddress {
-    /// A project-scope address: `@/<kind>/<self-id>` (kind `Some`) or the legacy
-    /// `@/<self-id>` (kind `None`).
-    Project {
-        kind: Option<String>,
-        self_id: String,
-    },
+    /// A project-scope address `@/<kind>/<self-id>` of an explicit kind.
+    Project { kind: String, self_id: String },
     /// An issue-scope address: an explicit `@/issue/<short-id>/<kind>/<self-id>`
     /// (kind `Some`), or the `<short-id>/<self-id>` sugar whose kind is `Some` when
     /// the self-id's shape names exactly one issue-scoped kind and `None` when it is
@@ -310,8 +308,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   rest of the CLI uses (full id, short id, or unique prefix).
     /// - `<short-id>/<self-id>` — sugar for an issue-scope item whose kind is
     ///   inferred from the self-id's shape ([`expand_sugar_address`]).
-    /// - `@/<self-id>` — the legacy project form (kind-agnostic), kept so a project
-    ///   item's own derived `qualified_id` round-trips through `show_item`.
+    ///
+    /// Every minted qualified id (`@/<kind>/<self-id>` for project scope,
+    /// `@/issue/<short-id>/<kind>/<self-id>` for issue scope) is itself an explicit
+    /// kind-segmented address, so `jit item show` round-trips every id `jit item
+    /// list` prints. A kindless `@/<self-id>` input is not a valid address: it is a
+    /// clear parse error from [`parse_kind_segmented_address`], never a self-id-only
+    /// match.
     ///
     /// Explicit-kind and sugar addresses filter candidates by BOTH kind and self-id,
     /// so two same-scope same-self-id items of different kinds (e.g. a `rule` and a
@@ -335,22 +338,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
         match self.resolve_item_address(qualified)? {
             // Project scope: sourced from a config-declared file, no owning issue
-            // (REQ-01). An explicit kind filters by kind AND self-id; the legacy
-            // form filters by self-id alone.
+            // (REQ-01). The address always names its kind, so filter by kind AND
+            // self-id.
             ResolvedItemAddress::Project { kind, self_id } => {
                 let item = self
                     .project_items()?
                     .into_iter()
-                    .find(|i| kind.as_deref().is_none_or(|k| i.kind == k) && i.self_id == self_id)
-                    .ok_or_else(|| match &kind {
-                        Some(k) => anyhow!(
-                            "project scope '@' declares no addressable item of kind '{k}' \
+                    .find(|i| i.kind == kind && i.self_id == self_id)
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "project scope '@' declares no addressable item of kind '{kind}' \
                              with self-id '{self_id}'"
-                        ),
-                        None => anyhow!(
-                            "project scope '@' declares no addressable item \
-                             with self-id '{self_id}'"
-                        ),
+                        )
                     })?;
                 Ok(ItemShowResult {
                     item,
@@ -432,8 +431,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// resolves against, applying the sugar-expansion and kind-segmented grammars.
     ///
     /// A non-`@` input is the `<short-id>/<self-id>` sugar, whose kind is inferred
-    /// from the self-id's shape. An `@`-prefixed input is either an explicit
-    /// kind-segmented address or the legacy project form `@/<self-id>`.
+    /// from the self-id's shape. An `@`-prefixed input is an explicit kind-segmented
+    /// address; a malformed one (including a kindless `@/<self-id>`) is the parser's
+    /// own [`ItemError::InvalidAddress`], never a self-id-only match.
     fn resolve_item_address(&self, qualified: &str) -> Result<ResolvedItemAddress> {
         // Sugar `<short-id>/<self-id>`: infer the kind from the self-id's shape
         // against the issue-scoped kinds (project-scoped kinds have no sugar form).
@@ -465,8 +465,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
         }
 
-        // An `@`-prefixed input is an explicit kind-segmented address, or the legacy
-        // project form the kind-segmented grammar does not cover.
+        // An `@`-prefixed input is an explicit kind-segmented address. A malformed
+        // one (including a kindless `@/<self-id>`) surfaces the parser's own
+        // InvalidAddress error; there is no self-id-only fallback (story 7f22d6cf
+        // REQ-04 retired the legacy kind-agnostic path).
         match parse_kind_segmented_address(qualified) {
             Ok(addr) => {
                 // Bind the parsed scope token to local project identity: a bare
@@ -488,7 +490,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 })?;
                 match scope {
                     Scope::Project => Ok(ResolvedItemAddress::Project {
-                        kind: Some(addr.kind),
+                        kind: addr.kind,
                         self_id: addr.self_id,
                     }),
                     Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
@@ -498,28 +500,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }),
                 }
             }
-            // The one well-formed `@`-address the kind-segmented grammar does not
-            // cover is the legacy project form `@/<self-id>` (kind-agnostic), which
-            // project items still derive as their qualified_id; recognize exactly
-            // that and surface every other malformed `@`-address as the parser's
-            // own error. A colon anywhere (including in `self_id`) is never a valid
-            // address; excluding it here lets the parser's own InvalidAddress error
-            // surface below instead of this fallback silently treating a grammar
-            // violation as a legacy-form not-found.
-            Err(parse_err) => match qualified.split_once('/') {
-                Some((scope, self_id))
-                    if scope == PROJECT_SCOPE_SENTINEL
-                        && !self_id.is_empty()
-                        && !self_id.contains(':') =>
-                {
-                    Ok(ResolvedItemAddress::Project {
-                        kind: None,
-                        self_id: self_id.to_string(),
-                    })
-                }
-                _ => Err(anyhow::Error::new(parse_err)
-                    .context(format!("cannot resolve item address '{qualified}'"))),
-            },
+            // A malformed `@`-address surfaces the parser's own InvalidAddress
+            // error. There is no kind-agnostic fallback: a kindless `@/<self-id>`
+            // (once the legacy project form) is now just an address missing its kind
+            // segment, so it is a clear parse error rather than a self-id-only match
+            // (story 7f22d6cf REQ-04, plan amendment D11-A).
+            Err(parse_err) => Err(anyhow::Error::new(parse_err)
+                .context(format!("cannot resolve item address '{qualified}'"))),
         }
     }
 
@@ -568,9 +555,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // A generic qualified reference is any address-grammar form (explicit
-        // kind-segmented, legacy project, or `<short-id>/<self-id>` sugar); the
-        // legacy unqualified `satisfies:REQ-01` shape has no `/` and is left to the
-        // existing rules.
+        // kind-segmented or `<short-id>/<self-id>` sugar); the legacy unqualified
+        // `satisfies:REQ-01` shape has no `/` and is left to the existing rules.
         if !is_qualified_reference(value) {
             return Ok(None);
         }
@@ -734,10 +720,14 @@ source-of-truth = \"registry-first\"
         let short = a.short_id();
         let exec = executor_with(vec![a]);
 
-        let qualified = format!("{short}/REQ-01");
-        let shown = exec.show_item(&qualified).unwrap();
+        // The `<short-id>/<self-id>` sugar still resolves as INPUT (D3-A), but the
+        // minted qualified id it resolves to is the canonical kind-segmented form.
+        let shown = exec.show_item(&format!("{short}/REQ-01")).unwrap();
         assert_eq!(shown.item.self_id, "REQ-01");
-        assert_eq!(shown.item.qualified_id, qualified);
+        assert_eq!(
+            shown.item.qualified_id,
+            format!("@/issue/{short}/requirement/REQ-01")
+        );
         assert_eq!(shown.issue_title.as_deref(), Some("A"));
         // The owning issue id is the FULL id, resolved from the short-id scope.
         assert!(shown.issue_full_id.as_deref().unwrap().starts_with(&short));
@@ -783,16 +773,16 @@ source-of-truth = \"registry-first\"
 
     #[test]
     fn test_show_item_resolves_project_scope() {
-        // REQ-01: `@/<self-id>` resolves through the config-driven path with the
-        // source served by the storage boundary (in-memory repo-file map, no fs).
+        // REQ-01: `@/<kind>/<self-id>` resolves through the config-driven path with
+        // the source served by the storage boundary (in-memory repo-file map, no fs).
         let exec = project_exec(
             Some("## Success Criteria\n\n- GLOSS-01: all writes are atomic\n"),
             "",
             vec![],
         );
-        let shown = exec.show_item("@/GLOSS-01").unwrap();
+        let shown = exec.show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(shown.item.self_id, "GLOSS-01");
-        assert_eq!(shown.item.qualified_id, "@/GLOSS-01");
+        assert_eq!(shown.item.qualified_id, "@/glossary/GLOSS-01");
         assert_eq!(shown.item.scope, "@");
         assert_eq!(shown.item.kind, "glossary");
         assert_eq!(shown.issue_full_id, None);
@@ -803,7 +793,7 @@ source-of-truth = \"registry-first\"
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
         let exec = project_exec(Some("## Success Criteria\n\n- GLOSS-01: x\n"), "", vec![]);
-        let err = exec.show_item("@/GLOSS-99").unwrap_err();
+        let err = exec.show_item("@/glossary/GLOSS-99").unwrap_err();
         assert!(err.to_string().contains("project scope"));
         assert!(err.to_string().contains("no addressable item"));
     }
@@ -811,10 +801,10 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_show_item_project_scope_absent_source_is_graceful() {
         // REQ-01 (degradation): with no source seeded, `read_repo_file` returns
-        // None and `@/<id>` resolves to a descriptive not-found error (not a panic,
-        // not the issue resolver).
+        // None and `@/<kind>/<id>` resolves to a descriptive not-found error (not a
+        // panic, not the issue resolver).
         let exec = project_exec(None, "", vec![]);
-        let err = exec.show_item("@/GLOSS-01").unwrap_err();
+        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"));
         assert!(!msg.contains("resolve issue scope"));
@@ -843,7 +833,7 @@ source-of-truth = \"registry-first\"
         );
 
         let from_issue = exec.show_item(&format!("{short}/GLOSS-01")).unwrap();
-        let from_project = exec.show_item("@/GLOSS-01").unwrap();
+        let from_project = exec.show_item("@/glossary/GLOSS-01").unwrap();
         assert!(from_issue.item.text.contains("issue one"));
         assert!(from_project.item.text.contains("project one"));
         assert_ne!(from_issue.item.qualified_id, from_project.item.qualified_id);
@@ -909,9 +899,12 @@ source-of-truth = \"registry-first\"
         assert_eq!(gate.item.self_id, "coverage-preview");
         assert!(gate.item.text.contains("gate form"));
 
-        // Distinct items despite sharing a scope and self-id (they derive the same
-        // qualified id, so only the kind filter separates them).
+        // Distinct items sharing a scope and self-id: the kind is a segment of the
+        // minted id, so they even derive DISTINCT qualified ids.
         assert_ne!(rule.item.text, gate.item.text);
+        assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
+        assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
+        assert_ne!(rule.item.qualified_id, gate.item.qualified_id);
     }
 
     #[test]
@@ -949,7 +942,7 @@ source-of-truth = \"registry-first\"
         let named = exec.show_item("@acme/glossary/GLOSS-01").unwrap();
         let bare = exec.show_item("@/glossary/GLOSS-01").unwrap();
         assert_eq!(named.item, bare.item);
-        assert_eq!(named.item.qualified_id, "@/GLOSS-01");
+        assert_eq!(named.item.qualified_id, "@/glossary/GLOSS-01");
     }
 
     #[test]
@@ -1087,7 +1080,7 @@ source-of-truth = \"registry-first\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/GLOSS-01"));
+        assert!(qids.contains(&"@/glossary/GLOSS-01"));
     }
 
     #[test]
@@ -1111,7 +1104,7 @@ source-of-truth = \"registry-first\"
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/GLOSS-01").unwrap_err();
+        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
         // The typed InvalidPath cause is in the error chain (alternate Display
         // renders the full anyhow context chain).
         let msg = format!("{err:#}");
@@ -1140,7 +1133,7 @@ source-of-truth = \"registry-first\"
         )
         .unwrap();
         let exec = CommandExecutor::new(storage);
-        let err = exec.show_item("@/GLOSS-01").unwrap_err();
+        let err = exec.show_item("@/glossary/GLOSS-01").unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains("absolute paths are not permitted"),
@@ -1190,14 +1183,14 @@ statement = \"Every dependency edge stays acyclic.\"
     #[test]
     fn test_project_items_indexes_custom_toml_registry_kind() {
         // REQ-02: a NON-invariant registry-first kind backed by a custom `.toml`
-        // through the declared field mapping indexes `@/<self-id>` items, with the
-        // toml read going through the storage boundary and link-fields surfacing as
-        // namespace-qualified link labels.
+        // through the declared field mapping indexes `@/<kind>/<self-id>` items, with
+        // the toml read going through the storage boundary and link-fields surfacing
+        // as namespace-qualified link labels.
         let exec = policy_exec(Some(TWO_POLICIES));
 
-        let first = exec.show_item("@/POL-01").unwrap();
+        let first = exec.show_item("@/policy/POL-01").unwrap();
         assert_eq!(first.item.self_id, "POL-01");
-        assert_eq!(first.item.qualified_id, "@/POL-01");
+        assert_eq!(first.item.qualified_id, "@/policy/POL-01");
         assert_eq!(first.item.scope, "@");
         assert_eq!(first.item.kind, "policy");
         assert!(first.item.text.contains("atomic"));
@@ -1213,7 +1206,7 @@ statement = \"Every dependency edge stays acyclic.\"
         assert_eq!(first.issue_full_id, None);
 
         // An entry with no link field is graceful: it still indexes, with no labels.
-        let second = exec.show_item("@/POL-02").unwrap();
+        let second = exec.show_item("@/policy/POL-02").unwrap();
         assert_eq!(second.item.self_id, "POL-02");
         assert!(second.item.links.is_empty());
 
@@ -1225,10 +1218,10 @@ statement = \"Every dependency edge stays acyclic.\"
     #[test]
     fn test_project_items_custom_toml_absent_file_is_graceful() {
         // REQ-02 (degradation): with no descriptor toml seeded, the storage read
-        // returns None and `@/<id>` resolves to a descriptive not-found error,
+        // returns None and `@/<kind>/<id>` resolves to a descriptive not-found error,
         // never a panic and never the issue resolver.
         let exec = policy_exec(None);
-        let err = exec.show_item("@/POL-01").unwrap_err();
+        let err = exec.show_item("@/policy/POL-01").unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("project scope"), "got: {msg}");
         assert!(!msg.contains("resolve issue scope"), "got: {msg}");
@@ -1286,7 +1279,7 @@ kind = \"advisory\"
     fn test_list_items_kind_invariant_returns_registry_entry() {
         // REQ-01: in a repo with the canonical `[item_kinds]` table and a
         // `.jit/invariants.toml`, `jit item list --kind invariant` returns each
-        // loaded invariant addressed as `@/<self-id>`.
+        // loaded invariant addressed as `@/<kind>/<self-id>`.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let result = exec.list_items(Some("invariant")).unwrap();
         assert_eq!(result.count, 2);
@@ -1295,8 +1288,8 @@ kind = \"advisory\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/INV-01"));
-        assert!(qids.contains(&"@/INV-02"));
+        assert!(qids.contains(&"@/invariant/INV-01"));
+        assert!(qids.contains(&"@/invariant/INV-02"));
         // The self-id is the invariant's id; the statement is its text; the kind is
         // `invariant`; the scope is `@`.
         let first = result.items.iter().find(|i| i.self_id == "INV-01").unwrap();
@@ -1307,11 +1300,12 @@ kind = \"advisory\"
 
     #[test]
     fn test_show_item_resolves_invariant_by_qualified_id() {
-        // REQ-01: the generic resolver returns an invariant by its `@/<self-id>`.
+        // REQ-01: the generic resolver returns an invariant by its
+        // `@/<kind>/<self-id>` address.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
-        let shown = exec.show_item("@/INV-02").unwrap();
+        let shown = exec.show_item("@/invariant/INV-02").unwrap();
         assert_eq!(shown.item.self_id, "INV-02");
-        assert_eq!(shown.item.qualified_id, "@/INV-02");
+        assert_eq!(shown.item.qualified_id, "@/invariant/INV-02");
         assert_eq!(shown.item.kind, "invariant");
         assert_eq!(shown.item.scope, "@");
         // No owning issue for a project-scope item.
@@ -1338,16 +1332,13 @@ enforce = true
         // rule id (e.g. `coverage-preview`) as a project-scope `rule` item via
         // the kind-segmented `@/rule/<self-id>` address (story 71ebd1e8 REQ-01),
         // mirroring the invariant kind's resolution path above but sourced from
-        // `.jit/rules.toml`'s `rules` table. The kindless `@/<self-id>` legacy
-        // form is deliberately NOT exercised here: task 182aa0d5 removes that
-        // arm, and this test must still hold after it does.
+        // `.jit/rules.toml`'s `rules` table.
         let exec = registry_exec_with_rules(ONE_RULE);
         let shown = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(shown.item.self_id, "coverage-preview");
-        // Minted qualified ids are still kindless (`@/<self-id>`) until 182aa0d5
-        // flips minting to include the kind segment — this assertion is
-        // transitional, not the contract under test (that's the address above).
-        assert_eq!(shown.item.qualified_id, "@/coverage-preview");
+        // The minted qualified id carries the kind segment, so it equals the
+        // kind-segmented address it resolved from (round-trip).
+        assert_eq!(shown.item.qualified_id, "@/rule/coverage-preview");
         assert_eq!(shown.item.kind, "rule");
         assert_eq!(shown.item.scope, "@");
         assert!(!shown.item.text.is_empty());
@@ -1418,8 +1409,8 @@ stage = \"postcheck\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/cargo-ci"));
-        assert!(qids.contains(&"@/tests"));
+        assert!(qids.contains(&"@/gate/cargo-ci"));
+        assert!(qids.contains(&"@/gate/tests"));
         let cargo_ci = result
             .items
             .iter()
@@ -1438,16 +1429,14 @@ stage = \"postcheck\"
     fn test_show_item_resolves_gate_by_qualified_id() {
         // REQ-02: `jit item show @/gate/<key>` resolves a configured gate's item,
         // whose text is that gate's description. Uses the kind-segmented address
-        // (story 71ebd1e8 REQ-01), never the kindless `@/<key>` legacy form (task
-        // 182aa0d5 removes that resolution arm, and this test must still hold after
-        // it does).
+        // (story 71ebd1e8 REQ-01); the kindless `@/<key>` form is no longer a valid
+        // address at all.
         let exec = registry_exec_with_gates(TWO_GATES);
         let shown = exec.show_item("@/gate/cargo-ci").unwrap();
         assert_eq!(shown.item.self_id, "cargo-ci");
-        // Minted qualified ids are still kindless (`@/<self-id>`) until 182aa0d5
-        // flips minting to include the kind segment — transitional, not the
-        // contract under test (that's the kind-segmented address above).
-        assert_eq!(shown.item.qualified_id, "@/cargo-ci");
+        // The minted qualified id carries the kind segment, so it round-trips with
+        // the kind-segmented address it resolved from.
+        assert_eq!(shown.item.qualified_id, "@/gate/cargo-ci");
         assert_eq!(shown.item.kind, "gate");
         assert_eq!(shown.item.scope, "@");
         assert_eq!(
@@ -1491,21 +1480,23 @@ stage = \"postcheck\"
     fn test_show_item_rule_and_gate_share_self_id_resolve_to_distinct_items() {
         // Load-bearing cross-kind collision (jit:42898915): `coverage-preview` is
         // BOTH a rule and a gate. Per-(scope, kind) uniqueness
-        // (`domain::item::derive_scope_items`) keeps them distinct even though both
-        // derive the same kindless qualified-id string `@/coverage-preview` until
-        // 182aa0d5 flips minting to include the kind segment. Each kind-segmented
-        // address must resolve to its OWN item, never a silent first-match or a
-        // spurious `DuplicateSelfId`.
+        // (`domain::item::derive_scope_items`) keeps them distinct, and because the
+        // kind is a segment of the minted id they now derive DISTINCT qualified-id
+        // strings (`@/rule/coverage-preview` vs `@/gate/coverage-preview`). Each
+        // kind-segmented address must resolve to its OWN item, never a silent
+        // first-match or a spurious `DuplicateSelfId`.
         let exec = registry_exec_with_rules_and_gates(ONE_RULE, COVERAGE_PREVIEW_GATE);
 
         let rule = exec.show_item("@/rule/coverage-preview").unwrap();
         assert_eq!(rule.item.kind, "rule");
         assert_eq!(rule.item.self_id, "coverage-preview");
         assert_eq!(rule.item.text, "coverage-preview");
+        assert_eq!(rule.item.qualified_id, "@/rule/coverage-preview");
 
         let gate = exec.show_item("@/gate/coverage-preview").unwrap();
         assert_eq!(gate.item.kind, "gate");
         assert_eq!(gate.item.self_id, "coverage-preview");
+        assert_eq!(gate.item.qualified_id, "@/gate/coverage-preview");
         assert_eq!(
             gate.item.text,
             "Run scoped validation for the container resolved from the breakdown \
@@ -1513,6 +1504,7 @@ stage = \"postcheck\"
              plan time"
         );
         assert_ne!(rule.item.text, gate.item.text);
+        assert_ne!(rule.item.qualified_id, gate.item.qualified_id);
 
         // Both coexist in one unfiltered list with no DuplicateSelfId despite the
         // shared self-id (they differ by kind).
@@ -1526,7 +1518,7 @@ stage = \"postcheck\"
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
         assert_eq!(hits.count, 1);
-        assert_eq!(hits.items[0].qualified_id, "@/INV-01");
+        assert_eq!(hits.items[0].qualified_id, "@/invariant/INV-01");
     }
 
     #[test]
@@ -1551,8 +1543,8 @@ stage = \"postcheck\"
         // Only the two registry entries are invariants; the issue's INV-99 line is
         // NOT among them (no markdown index for invariants).
         assert_eq!(invariants.count, 2);
-        assert!(qids.contains(&"@/INV-01"));
-        assert!(qids.contains(&"@/INV-02"));
+        assert!(qids.contains(&"@/invariant/INV-01"));
+        assert!(qids.contains(&"@/invariant/INV-02"));
         assert!(!qids.iter().any(|q| q.ends_with("/INV-99")));
         assert!(!qids.iter().any(|q| q.contains("INV-99")));
     }
@@ -1620,8 +1612,8 @@ stage = \"postcheck\"
             .map(|i| i.qualified_id.as_str())
             .collect();
         assert_eq!(result.count, 2);
-        assert!(qids.contains(&"@/INV-01"));
-        assert!(qids.contains(&"@/INV-02"));
+        assert!(qids.contains(&"@/invariant/INV-01"));
+        assert!(qids.contains(&"@/invariant/INV-02"));
         // The issue's INV-99 line is NOT a project invariant (registry-first reads
         // only the toml, never a markdown section).
         assert!(!qids.iter().any(|q| q.contains("INV-99")));
@@ -1652,7 +1644,10 @@ stage = \"postcheck\"
         // No rejection: the kind resolves and indexes from the issue description.
         let result = exec.list_items(Some("invariant")).unwrap();
         assert_eq!(result.count, 1);
-        assert_eq!(result.items[0].qualified_id, format!("{short}/INV-99"));
+        assert_eq!(
+            result.items[0].qualified_id,
+            format!("@/issue/{short}/invariant/INV-99")
+        );
     }
 
     #[test]
@@ -1699,15 +1694,41 @@ stage = \"postcheck\"
     }
 
     #[test]
-    fn test_show_item_colon_in_legacy_project_form_self_id_surfaces_parser_error() {
-        // A colon-carrying `@/<self-id>` must not fall through the legacy
-        // kind-agnostic project-form fallback into a generic not-found; the
-        // parser's own InvalidAddress rejection (colon is the label separator,
-        // never valid inside an address) must surface instead.
+    fn test_show_item_colon_in_project_address_self_id_surfaces_parser_error() {
+        // A colon anywhere in an `@`-address surfaces the parser's own
+        // InvalidAddress rejection (colon is the label separator, never valid
+        // inside an address), not a generic not-found.
         let exec = executor_with(vec![]);
         let err = exec.show_item("@/rule/foo:bar").unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("colon"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_show_item_kindless_at_address_is_parse_error_not_self_id_match() {
+        // REQ-02: the legacy kind-agnostic resolution arm is gone. A kindless
+        // `@/<self-id>` is now just an address missing its kind segment, so it is a
+        // clear InvalidAddress parse error naming the input, never a self-id-only
+        // project match. The `.jit/rules.toml`-backed `coverage-preview` rule exists
+        // and DOES resolve via the kind-segmented `@/rule/coverage-preview`, proving
+        // the kindless form fails on grammar, not on a missing item.
+        let exec = registry_exec_with_rules(ONE_RULE);
+        let err = exec.show_item("@/coverage-preview").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("cannot resolve item address '@/coverage-preview'"),
+            "got: {msg}"
+        );
+        assert!(
+            msg.contains("not a valid kind-segmented address"),
+            "got: {msg}"
+        );
+        assert!(!msg.contains("no addressable item"), "got: {msg}");
+        // The kind-segmented address still resolves the same item.
+        assert_eq!(
+            exec.show_item("@/rule/coverage-preview").unwrap().item.kind,
+            "rule"
+        );
     }
 
     #[test]
@@ -1729,7 +1750,10 @@ stage = \"postcheck\"
         let label = format!("satisfies:{short}/REQ-01");
         let resolved = exec.resolve_link_label(&label).unwrap().expect("resolves");
         assert_eq!(resolved.item.self_id, "REQ-01");
-        assert_eq!(resolved.item.qualified_id, format!("{short}/REQ-01"));
+        assert_eq!(
+            resolved.item.qualified_id,
+            format!("@/issue/{short}/requirement/REQ-01")
+        );
     }
 
     #[test]
@@ -1768,7 +1792,10 @@ stage = \"postcheck\"
             .unwrap()
             .expect("satisfies resolves");
         assert_eq!(req.item.kind, "requirement");
-        assert_eq!(req.item.qualified_id, format!("{short}/REQ-01"));
+        assert_eq!(
+            req.item.qualified_id,
+            format!("@/issue/{short}/requirement/REQ-01")
+        );
 
         // decision / `per:` -> the decision item.
         let dec = exec
@@ -1776,7 +1803,10 @@ stage = \"postcheck\"
             .unwrap()
             .expect("per resolves");
         assert_eq!(dec.item.kind, "decision");
-        assert_eq!(dec.item.qualified_id, format!("{short}/D-01"));
+        assert_eq!(
+            dec.item.qualified_id,
+            format!("@/issue/{short}/decision/D-01")
+        );
 
         // risk / `mitigates:` and `resolves:` -> the risk item (both namespaces).
         let mit = exec
@@ -1784,20 +1814,23 @@ stage = \"postcheck\"
             .unwrap()
             .expect("mitigates resolves");
         assert_eq!(mit.item.kind, "risk");
-        assert_eq!(mit.item.qualified_id, format!("{short}/RISK-01"));
+        assert_eq!(
+            mit.item.qualified_id,
+            format!("@/issue/{short}/risk/RISK-01")
+        );
         let res = exec
             .resolve_link_label(&format!("resolves:{short}/RISK-01"))
             .unwrap()
             .expect("resolves resolves");
         assert_eq!(res.item.kind, "risk");
 
-        // invariant / `enforces:@/<id>` -> the registry-first invariant item.
+        // invariant / `enforces:@/<kind>/<id>` -> the registry-first invariant item.
         let inv = exec
-            .resolve_link_label("enforces:@/INV-01")
+            .resolve_link_label("enforces:@/invariant/INV-01")
             .unwrap()
             .expect("enforces resolves");
         assert_eq!(inv.item.kind, "invariant");
-        assert_eq!(inv.item.qualified_id, "@/INV-01");
+        assert_eq!(inv.item.qualified_id, "@/invariant/INV-01");
         assert_eq!(inv.item.scope, "@");
     }
 

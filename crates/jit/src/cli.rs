@@ -230,8 +230,9 @@ pub enum Commands {
     /// Addressable structured item commands
     ///
     /// Items are structured lines in issue descriptions (e.g. requirements) that
-    /// carry a self-id and are addressable by a qualified id `<issue>/<self-id>`.
-    /// Kinds are declared in `[item_kinds]` config; with no such table no kinds
+    /// carry a self-id and are addressable by a uniform kind-segmented qualified id
+    /// (`@/issue/<short-id>/<kind>/<self-id>` for an issue item, `@/<kind>/<self-id>`
+    /// for a project item). Kinds are declared in `[item_kinds]` config; with no such table no kinds
     /// are declared (`jit init` scaffolds the table). Markdown stays the source of
     /// truth — the index is a projection.
     #[command(subcommand)]
@@ -410,17 +411,20 @@ pub enum ItemCommands {
         json: bool,
     },
 
-    /// Show / resolve a single item by its qualified id `<scope>/<self-id>`
+    /// Show / resolve a single item by its qualified id
     ///
-    /// The scope is `@` for project scope, or an issue reference (full id, short
-    /// id, or unique prefix) just like `jit show`.
+    /// Accepts the uniform kind-segmented address (`@/<kind>/<self-id>` for a
+    /// project item, `@/issue/<short-id>/<kind>/<self-id>` for an issue item) and the
+    /// `<short-id>/<self-id>` input sugar (the kind is inferred from the self-id's
+    /// shape). An issue reference may be a full id, short id, or unique prefix.
     ///
     /// Examples:
-    ///   jit item show 56ab0224/REQ-01
-    ///   jit item show @/INV-01
+    ///   jit item show @/issue/56ab0224/requirement/REQ-01
+    ///   jit item show @/invariant/INV-01
     ///   jit item show 56ab0224/REQ-01 --json
     Show {
-        /// Qualified id of the item, `<scope>/<self-id>` (scope = issue or `@`)
+        /// Qualified id of the item (`@/<kind>/<self-id>`,
+        /// `@/issue/<short-id>/<kind>/<self-id>`, or `<short-id>/<self-id>` sugar)
         qualified_id: String,
 
         /// Output as JSON
@@ -433,7 +437,8 @@ pub enum ItemCommands {
     /// Provided as a distinct verb for orchestrators that think in terms of
     /// "resolve this qualified id"; behaves identically to `jit item show`.
     Resolve {
-        /// Qualified id of the item, `<scope>/<self-id>` (scope = issue or `@`)
+        /// Qualified id of the item (`@/<kind>/<self-id>`,
+        /// `@/issue/<short-id>/<kind>/<self-id>`, or `<short-id>/<self-id>` sugar)
         qualified_id: String,
 
         /// Output as JSON

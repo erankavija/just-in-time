@@ -675,7 +675,7 @@ fn print_item_show(result: &jit::commands::ItemShowResult, json: bool, quiet: bo
             (Some(full_id), Some(title)) => {
                 output_ctx.print_data(format!("Issue:        {full_id} | {title}"))?;
             }
-            // A project-scoped item (`@/<self-id>`) has no owning issue.
+            // A project-scoped item (`@/<kind>/<self-id>`) has no owning issue.
             _ => {
                 output_ctx.print_data("Scope:        @ (project)".to_string())?;
             }

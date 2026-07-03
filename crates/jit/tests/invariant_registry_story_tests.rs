@@ -8,7 +8,7 @@
 //!   optional `enforced-by` loads at config time via `JitConfig::load`.
 //! - REQ-02: invariants load on BOTH config-load return paths (with AND without
 //!   a sibling `config.toml`).
-//! - REQ-03: `jit item list --kind invariant` returns the invariant as `@/<self-id>`.
+//! - REQ-03: `jit item list --kind invariant` returns the invariant as `@/<kind>/<self-id>`.
 //! - REQ-04: an invalid invariant entry (missing field, bad `kind` token)
 //!   makes config load fail with a typed, descriptive error.
 //! - REQ-05: the registry is authoritative — an INV-looking line in an issue
@@ -220,13 +220,13 @@ fn req02_absent_invariants_toml_is_empty_on_both_paths() {
 }
 
 // ---------------------------------------------------------------------------
-// REQ-03: `jit item list --kind invariant` returns `@/<self-id>` addresses
+// REQ-03: `jit item list --kind invariant` returns `@/<kind>/<self-id>` addresses
 // ---------------------------------------------------------------------------
 
 #[test]
 fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
     // REQ-03: the real binary, given a `.jit/invariants.toml`, returns each
-    // invariant addressed as `@/<self-id>` under `--kind invariant`.
+    // invariant addressed as `@/<kind>/<self-id>` under `--kind invariant`.
     let temp = setup_cli_repo();
 
     let output = Command::new(jit_binary())
@@ -256,12 +256,12 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
         .collect();
 
     assert!(
-        qids.contains(&"@/INV-01"),
-        "INV-01 must be addressed as @/INV-01: {qids:?}"
+        qids.contains(&"@/invariant/INV-01"),
+        "INV-01 must be addressed as @/invariant/INV-01: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/INV-02"),
-        "INV-02 must be addressed as @/INV-02: {qids:?}"
+        qids.contains(&"@/invariant/INV-02"),
+        "INV-02 must be addressed as @/invariant/INV-02: {qids:?}"
     );
 
     // Structural checks on one item.
@@ -277,23 +277,26 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
 
 #[test]
 fn req03_item_show_at_qualified_id_resolves_invariant() {
-    // REQ-03 (show path): `jit item show @/INV-01` also resolves the invariant
+    // REQ-03 (show path): `jit item show @/invariant/INV-01` also resolves the invariant
     // from the registry rather than the issue store.
     let temp = setup_cli_repo();
 
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/INV-02", "--json"])
+        .args(["item", "show", "@/invariant/INV-02", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
         output.status.success(),
-        "item show @/INV-02 must resolve: {}",
+        "item show @/invariant/INV-02 must resolve: {}",
         String::from_utf8_lossy(&output.stdout)
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["item"]["qualified_id"].as_str().unwrap(), "@/INV-02");
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        "@/invariant/INV-02"
+    );
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
     assert_eq!(json["item"]["scope"].as_str().unwrap(), "@");
     assert!(
@@ -475,7 +478,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
         "INV-99 from the issue description must NOT appear as an invariant: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/INV-01") && qids.contains(&"@/INV-02"),
+        qids.contains(&"@/invariant/INV-01") && qids.contains(&"@/invariant/INV-02"),
         "the two registry entries must still be present: {qids:?}"
     );
 }
@@ -527,16 +530,17 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
 
     // Invariants from the registry must be present.
     assert!(
-        qids.contains(&"@/INV-01"),
-        "@/INV-01 must appear in the unfiltered list: {qids:?}"
+        qids.contains(&"@/invariant/INV-01"),
+        "@/invariant/INV-01 must appear in the unfiltered list: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/INV-02"),
-        "@/INV-02 must appear in the unfiltered list: {qids:?}"
+        qids.contains(&"@/invariant/INV-02"),
+        "@/invariant/INV-02 must appear in the unfiltered list: {qids:?}"
     );
 
-    // The requirement from the issue markdown must also be present.
-    let req_qid = format!("{issue_short}/REQ-01");
+    // The requirement from the issue markdown must also be present, minted in the
+    // uniform kind-segmented form.
+    let req_qid = format!("@/issue/{issue_short}/requirement/REQ-01");
     assert!(
         qids.contains(&req_qid.as_str()),
         "{req_qid} from issue markdown must appear: {qids:?}"
