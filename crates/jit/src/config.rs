@@ -13,6 +13,14 @@ use std::path::Path;
 pub struct JitConfig {
     /// Schema version for migrations (optional).
     pub version: Option<VersionConfig>,
+    /// Project identity configuration (optional `[project]` table).
+    ///
+    /// Declares the project's canonical, human-editable name: the `@<project>`
+    /// scope token used by the multi-jit addressing scheme. `jit init` seeds
+    /// this with a slug of the repository directory's basename when
+    /// `.jit/config.toml` does not already exist, and never touches an
+    /// existing `[project]` table on a later `init`. See [`ProjectConfig`].
+    pub project: Option<ProjectConfig>,
     /// Type hierarchy configuration (optional).
     pub type_hierarchy: Option<HierarchyConfigToml>,
     /// Validation behavior configuration (optional).
@@ -75,6 +83,151 @@ pub struct JitConfig {
 pub struct VersionConfig {
     /// Schema version number (default: 1).
     pub schema: u32,
+}
+
+/// Project identity configuration from the `[project]` TOML table.
+///
+/// The sole home for the project's canonical, human-editable name — not
+/// `index.json`, which carries only machine metadata
+/// (`schema_version`/`all_ids`/`deleted_ids`) and is not meant to be hand-edited.
+/// Resolve a present value with
+/// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ProjectConfig {
+    /// The project's canonical name: the `@<project>` scope token in the
+    /// multi-jit addressing scheme. `None` when the `[project]` table is
+    /// present but the `name` key is absent.
+    pub name: Option<ProjectName>,
+}
+
+/// Parse error for [`ProjectName`].
+///
+/// Returned by [`ProjectName::from_str`] and (via serde) by TOML
+/// deserialization when the value does not match `^[a-z][a-z0-9-]*$`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::ProjectName;
+/// let err = "Bad_Name".parse::<ProjectName>().unwrap_err();
+/// assert!(err.to_string().contains("Bad_Name"));
+/// ```
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ProjectNameError {
+    /// The value does not match `^[a-z][a-z0-9-]*$`.
+    #[error("invalid project name '{value}'; expected to match ^[a-z][a-z0-9-]*$")]
+    Invalid {
+        /// The unrecognised value.
+        value: String,
+    },
+}
+
+/// The project's canonical, human-editable identity: the `@<project>` scope
+/// token used by the multi-jit addressing scheme's project-qualified address
+/// form.
+///
+/// Parsed from a string matching `^[a-z][a-z0-9-]*$` (starts with a lowercase
+/// letter; digits and hyphens allowed thereafter) by both
+/// [`ProjectName::from_str`] and TOML deserialization, mirroring the
+/// [`WorktreeMode`] / [`EnforcementMode`] pattern: an invalid value is a
+/// descriptive parse error, not a silent fallback, so a misconfigured
+/// `[project] name` is rejected at [`JitConfig::load`] time and surfaces
+/// through `jit config validate`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::ProjectName;
+///
+/// let name: ProjectName = "my-project".parse().unwrap();
+/// assert_eq!(name.as_str(), "my-project");
+///
+/// assert!("Bad_Name".parse::<ProjectName>().is_err());
+/// assert!("1abc".parse::<ProjectName>().is_err());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectName(String);
+
+impl ProjectName {
+    /// The validated project name as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ProjectName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::str::FromStr for ProjectName {
+    type Err = ProjectNameError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut chars = s.chars();
+        let first_ok = matches!(chars.next(), Some(c) if c.is_ascii_lowercase());
+        let rest_ok = chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if first_ok && rest_ok {
+            Ok(ProjectName(s.to_string()))
+        } else {
+            Err(ProjectNameError::Invalid {
+                value: s.to_string(),
+            })
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ProjectName {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse::<ProjectName>().map_err(serde::de::Error::custom)
+    }
+}
+
+/// Slugify an arbitrary string into a valid [`ProjectName`] token.
+///
+/// Lowercases the input, collapses every run of characters outside `[a-z0-9]`
+/// into a single `-`, and trims leading/trailing `-`. Used by `jit init` to
+/// seed `[project] name` from the repository directory's basename — distinct
+/// from the underscore-style
+/// [`slugify_heading`](crate::document::parser::slugify_heading), which serves
+/// document section slugs, not the `ProjectName` pattern. Falls back to the
+/// fixed literal `"project"` when the result is empty or does not start with a
+/// lowercase letter (e.g. a basename starting with a digit), so the seeded
+/// value always satisfies [`ProjectName`]'s `^[a-z][a-z0-9-]*$` pattern.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::slugify_project_name;
+///
+/// assert_eq!(slugify_project_name("My Cool Project!"), "my-cool-project");
+/// assert_eq!(slugify_project_name("just-in-time"), "just-in-time");
+/// assert_eq!(slugify_project_name("123-repo"), "project");
+/// assert_eq!(slugify_project_name(""), "project");
+/// ```
+pub fn slugify_project_name(input: &str) -> String {
+    let mut slug = String::with_capacity(input.len());
+    let mut prev_dash = false;
+    for ch in input.trim().chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.extend(ch.to_lowercase());
+            prev_dash = false;
+        } else if !prev_dash && !slug.is_empty() {
+            slug.push('-');
+            prev_dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    let starts_with_lowercase_letter = slug.chars().next().is_some_and(|c| c.is_ascii_lowercase());
+    if starts_with_lowercase_letter {
+        slug
+    } else {
+        "project".to_string()
+    }
 }
 
 /// Type hierarchy configuration from TOML.
@@ -1454,6 +1607,7 @@ impl JitConfig {
             // No config file - return empty config (will use defaults)
             return Ok(JitConfig {
                 version: None,
+                project: None,
                 type_hierarchy: None,
                 validation: None,
                 documentation: None,
@@ -3229,5 +3383,122 @@ enforce_leases = "strict"
         let config = ConfigLoader::new().build();
         assert!(config.worktree_mode().is_err());
         std::env::remove_var("JIT_WORKTREE_MODE");
+    }
+
+    // ============================================================
+    // [project] table tests (TDD, jit:3d9e9222)
+    // ============================================================
+
+    #[test]
+    fn test_project_name_accepts_valid_tokens() {
+        assert_eq!("a".parse::<ProjectName>().unwrap().as_str(), "a");
+        assert_eq!(
+            "just-in-time".parse::<ProjectName>().unwrap().as_str(),
+            "just-in-time"
+        );
+        assert_eq!("a1-2b3".parse::<ProjectName>().unwrap().as_str(), "a1-2b3");
+    }
+
+    #[test]
+    fn test_project_name_rejects_uppercase() {
+        let err = "Bad_Name".parse::<ProjectName>().unwrap_err();
+        assert!(err.to_string().contains("Bad_Name"));
+    }
+
+    #[test]
+    fn test_project_name_rejects_leading_digit() {
+        let err = "1abc".parse::<ProjectName>().unwrap_err();
+        assert!(err.to_string().contains("1abc"));
+    }
+
+    #[test]
+    fn test_project_name_rejects_underscore() {
+        let err = "my_project".parse::<ProjectName>().unwrap_err();
+        assert!(err.to_string().contains("my_project"));
+    }
+
+    #[test]
+    fn test_project_name_rejects_empty() {
+        assert!("".parse::<ProjectName>().is_err());
+    }
+
+    #[test]
+    fn test_slugify_project_name_lowercases_and_dashes() {
+        assert_eq!(slugify_project_name("My Cool Project!"), "my-cool-project");
+        assert_eq!(slugify_project_name("Just_In_Time"), "just-in-time");
+        assert_eq!(slugify_project_name("just-in-time"), "just-in-time");
+    }
+
+    #[test]
+    fn test_slugify_project_name_falls_back_on_leading_digit() {
+        // A basename starting with a digit can never satisfy
+        // ^[a-z][a-z0-9-]*$, even after slugifying, so it falls back.
+        assert_eq!(slugify_project_name("123-repo"), "project");
+    }
+
+    #[test]
+    fn test_slugify_project_name_falls_back_on_empty_result() {
+        assert_eq!(slugify_project_name(""), "project");
+        assert_eq!(slugify_project_name("___"), "project");
+        assert_eq!(slugify_project_name("!!!"), "project");
+    }
+
+    #[test]
+    fn test_slugify_project_name_result_always_parses_as_project_name() {
+        for input in ["My Repo", "123-repo", "", "___", "café-repo", "a"] {
+            let slug = slugify_project_name(input);
+            assert!(
+                slug.parse::<ProjectName>().is_ok(),
+                "slug '{slug}' from input '{input}' must satisfy ProjectName's pattern"
+            );
+        }
+    }
+
+    #[test]
+    fn test_jitconfig_load_parses_valid_project_table() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[project]\nname = \"just-in-time\"\n",
+        )
+        .unwrap();
+
+        let config = JitConfig::load(dir.path()).unwrap();
+        assert_eq!(
+            config
+                .project
+                .as_ref()
+                .unwrap()
+                .name
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "just-in-time"
+        );
+    }
+
+    #[test]
+    fn test_jitconfig_load_rejects_invalid_project_name() {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[project]\nname = \"Bad_Name\"\n",
+        )
+        .unwrap();
+
+        let result = JitConfig::load(dir.path());
+        assert!(result.is_err());
+        let msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            msg.contains("Bad_Name"),
+            "error must name the offending value: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_jitconfig_load_project_absent_is_none() {
+        let dir = TempDir::new().unwrap();
+        let config = JitConfig::load(dir.path()).unwrap();
+        assert!(config.project.is_none());
     }
 }

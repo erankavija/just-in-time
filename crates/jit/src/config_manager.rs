@@ -158,6 +158,57 @@ impl ConfigManager {
         }
     }
 
+    /// Get the configured canonical project name.
+    ///
+    /// Returns the `[project] name` value from `.jit/config.toml`, or `None`
+    /// when the `[project]` table (or its `name` key) is absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `config.toml` exists but is malformed, including an
+    /// invalid `[project] name` (rejected at parse time by the typed
+    /// [`ProjectName`](crate::config::ProjectName) field).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::config_manager::ConfigManager;
+    ///
+    /// let config_mgr = ConfigManager::new(".jit");
+    /// let name = config_mgr.get_project_name().unwrap();
+    /// ```
+    pub fn get_project_name(&self) -> Result<Option<String>> {
+        let config = self.load()?;
+        Ok(self.project_name_from_config(&config))
+    }
+
+    /// Resolve the configured project name from an ALREADY-loaded config,
+    /// without re-reading `config.toml` from disk.
+    ///
+    /// Callers that already hold a parsed [`JitConfig`] should use this so a
+    /// single command parses `config.toml` at most once. Returns `None` when
+    /// the `[project]` table or its `name` key is absent.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config_manager::ConfigManager;
+    /// use jit::config::JitConfig;
+    ///
+    /// // A config with no `[project]` table has no configured name.
+    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
+    /// let mgr = ConfigManager::new(".jit");
+    /// assert_eq!(mgr.project_name_from_config(&config), None);
+    /// ```
+    pub fn project_name_from_config(&self, config: &JitConfig) -> Option<String> {
+        config
+            .project
+            .as_ref()?
+            .name
+            .as_ref()
+            .map(|name| name.as_str().to_string())
+    }
+
     /// Get resolved icons for the current hierarchy.
     ///
     /// Returns a map of type name to icon string. Icons are resolved using the
@@ -476,6 +527,69 @@ enforce_leases = "invalid"
         assert!(
             msg.contains("invalid"),
             "error chain must mention invalidity: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_get_project_name_default_when_missing() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(config_mgr.get_project_name().unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_project_name_from_config() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_toml = "[project]\nname = \"just-in-time\"\n";
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(
+            config_mgr.get_project_name().unwrap(),
+            Some("just-in-time".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_project_name_absent_name_key() {
+        // A `[project]` table present but without a `name` key still yields
+        // `None`, not an error.
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        fs::write(jit_dir.join("config.toml"), "[project]\n").unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(config_mgr.get_project_name().unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_project_name_invalid() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_toml = "[project]\nname = \"Bad_Name\"\n";
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let result = config_mgr.get_project_name();
+
+        // Invalid tokens are rejected at TOML parse time (via the typed
+        // ProjectName field), so the error propagates through load(), mirroring
+        // test_get_enforcement_mode_invalid.
+        assert!(result.is_err());
+        let msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            msg.contains("Bad_Name"),
+            "error chain must name the offending value: {msg}"
         );
     }
 }
