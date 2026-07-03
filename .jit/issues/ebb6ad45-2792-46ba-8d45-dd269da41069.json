@@ -2,7 +2,7 @@
   "id": "ebb6ad45-2792-46ba-8d45-dd269da41069",
   "title": "Rules and gates reference projection",
   "description": "Add a new rendering function that produces a rules/gates reference document from the rule and gate registries, following jit's existing projection pattern: the same projection-mode/projection-style configuration, region-splicing, and atomic-write mechanism that today renders the invariant reference into CLAUDE.md. This is a new, generically-typed render function, not a reuse of the existing invariant-specific renderer, which is typed specifically to the invariant registry and cannot render rules or gates directly.\n\nThe target file and heading/region for the rendered reference are config-declared via the existing projection-style configuration, so the exact destination is chosen when this item is implemented rather than hardcoded.\n\n## Success Criteria\n\n- [hard] REQ-01: a new render function produces a rules/gates reference document from the rule and gate registries, using the projection mechanism (projection mode/style, region splicing, atomic write), not the invariant-typed renderer.\n- [hard] REQ-02: the target file and projection style are config-declared; a render test produces the reference document from the registries.\n\nBlast radius: a new renderer module alongside the existing projection code; reuses the existing region-splicing function and the existing invariant-projection orchestration as a pattern, not by direct call.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -13,9 +13,28 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T21:55:10.758054799Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T21:59:05.306836277Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/reference/rules-and-gates.md",
+      "commit": null,
+      "label": "Rendered rules & gates reference (live projection target)",
+      "doc_type": "reference",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:task",
     "epic:addressing-v2",
@@ -23,5 +42,5 @@
     "satisfies:REQ-07"
   ],
   "created_at": "2026-07-01T23:19:51.146366789Z",
-  "updated_at": "2026-07-03T21:10:32.511614422Z"
+  "updated_at": "2026-07-03T22:01:51.546209612Z"
 }

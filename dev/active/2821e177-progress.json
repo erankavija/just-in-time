@@ -2,7 +2,7 @@
   "epic_id": "2821e177-2d2d-4b25-b64a-4f38723e7fe6",
   "epic_short_id": "2821e177",
   "scope_note": "Session 2: drive the epic to completion. Session-1 waves 1-8 (stories 37506c12, 0efbc594) done; see dev/active/2821e177-handoff.md. Bracket P (0b611ccf) and B (923e42fb) done.",
-  "current_wave": 13,
+  "current_wave": 14,
   "waves": [
     {
       "wave_number": 9,
@@ -156,8 +156,8 @@
           "title": "Rules and gates reference projection",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched",
-          "note": "worktree agent-ebb6ad45, anchored 2ba53ef9; lead decisions: target docs/reference/rules-and-gates.md, mirror invariant-projection pattern incl. CLI verb, dogfood live render"
+          "status": "done",
+          "note": "DONE 2026-07-04 session 3. 3 commits -> main (c372133a..359a307d); both gates passed first try. New generic renderer (validation/rules_gates_projection.rs), [rules_gates_projection] config, `jit reference render` verb, live docs/reference/rules-and-gates.md (9 rules, 13 gates) linked to issue."
         },
         {
           "id": "c01f66dd",

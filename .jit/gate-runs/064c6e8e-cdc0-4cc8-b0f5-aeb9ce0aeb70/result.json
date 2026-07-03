@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "064c6e8e-cdc0-4cc8-b0f5-aeb9ce0aeb70",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ebb6ad45-2792-46ba-8d45-dd269da41069",
+  "commit": "359a307d96af6295eb4162d1c808fd99f0c81d46",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T21:59:05.306836277Z",
+  "completed_at": "2026-07-03T22:01:29.689771969Z",
+  "duration_ms": 144382,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 met. New renderer lives in [rules_gates_projection.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/rules_gates_projection.rs:94), renders rules plus gates directly, reuses `splice_region`, and writes through `IssueStore::write_repo_file`.\n\nREQ-02 met. Config is declared in [config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:1315) and live `.jit/config.toml`; CLI/render tests cover separate-file and region mode in [reference_render_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/reference_render_cli_tests.rs:27).\n\n**Architecture**\nNo blocking boundary violations found. Command orchestration is in [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/reference.rs:80), CLI dispatch/output is in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:862), and persistence goes through storage.\n\n**Correctness**\nAtomic writes are preserved via `write_repo_file` in [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:778). Region splicing preserves content outside markers. Dependencies `71ebd1e8` and `bb7d57a2` are done.\n\n**Testing**\nDid not rerun cargo tests because the issue has a passed `cargo-ci` gate: `fmt`, `clippy`, and `test: 3001 passed, 0 failed`. Ran `./scripts/jit-validate.sh`: passed.\n\n**Safety**\n`#![deny(unsafe_code)]` remains enforced. No new unsafe or PID-signal code found.\n\n**CLI Contract**\n`jit reference render --json` is implemented and covered by integration tests.\n\n**Documentation**\nNew public projection APIs have doc comments with examples. Rendered reference doc exists at [rules-and-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:1).\n\n**Findings**\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
