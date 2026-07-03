@@ -92,7 +92,7 @@
           "title": "Keep the label-format regex and generated JSON Schema in lockstep",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_review"
+          "status": "done"
         },
         {
           "id": "7a2bbe4f",
@@ -100,7 +100,7 @@
           "title": "Audit label-value re-split sites against the widened grammar",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "dispatched",
           "note": "7a2bbe4f serialized after 542f8b6d (dep edge)"
         }
       ]
