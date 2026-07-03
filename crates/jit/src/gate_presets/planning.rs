@@ -324,6 +324,8 @@ pub fn preview_coverage_rule(closure: &Rule, breakdown_type: &str) -> Result<Rul
 
     Ok(Rule {
         name: format!("{}-preview", closure.name),
+        // Inherit the closure rule's provenance, if any.
+        origin: closure.origin.clone(),
         // Keyed on the breakdown type (config-driven), at any state — `B` is
         // the transient node the preview fires on.
         when: Selector {

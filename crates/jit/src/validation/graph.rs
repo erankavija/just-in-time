@@ -3423,7 +3423,7 @@ source-of-truth = "markdown-first"
         // HierarchyConfig is injected by `evaluate_graph`. A leaf task with no
         // parent association label is flagged as an orphan.
         let rule = rule_from(
-            "[[rules]]\nname = \"default:orphan-leaf\"\nseverity = \"warn\"\n\
+            "[[rules]]\nname = \"orphan-leaf-fixture\"\nseverity = \"warn\"\n\
              assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
         );
         let rules = vec![&rule];
@@ -3437,7 +3437,7 @@ source-of-truth = "markdown-first"
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
-        assert_eq!(findings[0].finding.rule, "default:orphan-leaf");
+        assert_eq!(findings[0].finding.rule, "orphan-leaf-fixture");
         assert_eq!(findings[0].issue_id.as_deref(), Some(task.id.as_str()));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
     }

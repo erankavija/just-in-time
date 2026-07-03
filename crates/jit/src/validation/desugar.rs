@@ -341,6 +341,7 @@ mod tests {
     fn rule_for_schema(name: &str, schema: Value) -> Rule {
         Rule {
             name: name.to_string(),
+            origin: None,
             when: Selector::default(),
             severity: Severity::Error,
             enforce: false,
