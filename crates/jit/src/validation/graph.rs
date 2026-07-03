@@ -45,6 +45,7 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Utc};
 
 use crate::document::content_parser_for;
+use crate::domain::item::{parse_kind_segmented_address, AddressScope, PROJECT_SCOPE_SENTINEL};
 use crate::domain::{project, ContentFormat, Issue};
 use crate::graph::DependencyGraph;
 use crate::type_hierarchy::{
@@ -90,9 +91,11 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///    [`crate::commands::CommandExecutor::show_item`] (via
 ///    `resolve_item_address`), `resolve_link_label`'s qualified check (now
 ///    [`crate::domain::item::is_qualified_reference`]), `dangling_link_findings`,
-///    and [`label_credits_id`] below — which deliberately performs its OWN
-///    two-segment split per decision D10 rather than routing through the
-///    parser (see its doc comment).
+///    and [`label_credits_id`] below — which routes an `@`-prefixed value
+///    through [`crate::domain::item::parse_kind_segmented_address`] and keeps
+///    its own two-segment split ONLY for the non-`@` `<short-id>/<self-id>`
+///    sugar shape (its doc comment explains why `expand_sugar_address` is not
+///    used there).
 /// 3. **Slash-splitters unrelated to qualified ids — confirmed OUT OF SCOPE,
 ///    no change needed.** These never see a label value:
 ///    [`crate::storage::memory::InMemoryStorage`]'s repo-relative path-segment
@@ -121,6 +124,15 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///   part (after the `/`) equals `id` AND `scope` matches `scope_short_id`. The
 ///   scope is the criteria-owning issue's short id, so a qualified label pointing
 ///   at a DIFFERENT scope does not spuriously credit coverage.
+/// - **`@`-address** `<namespace>:@…` — routed through
+///   [`parse_kind_segmented_address`]: only the issue form
+///   `@/issue/<short-id>/<kind>/<self-id>` can credit, and only when its
+///   short-id matches `scope_short_id` and its self-id equals `id`. The KIND
+///   segment is parsed but IGNORED (binding decision D10 + f4b5e3f4 REQ-04):
+///   crediting turns on scope + self-id alone, never on kind. The project
+///   (`@/<kind>/<self-id>`) and named-project (`@<name>/<kind>/<self-id>`) forms
+///   address project-scoped items, which are never issue criteria, so they never
+///   credit. A parse error never credits (and never panics).
 ///
 /// `scope_short_id` is the short id of the issue that owns the criterion (the
 /// container for `label-coverage`, the issue itself for `criteria-to-check`).
@@ -128,14 +140,30 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
     };
-    // The `satisfies:<scope>/<self-id>` coverage form is a two-segment split on
-    // scope + self-id and is deliberately kind-agnostic (binding decision D10): it
-    // credits on scope + self-id equality alone, so it splits directly here rather
-    // than routing through the kind-segmented address parser.
+    // An `@`-prefixed value is a structural address: route it through the
+    // kind-segmented address parser so the credit decision reads the PARSED
+    // (scope, self-id) components rather than re-splitting the raw string. Only
+    // the issue-scoped form credits, and only on scope + self-id equality — the
+    // kind is parsed but ignored (D10 + f4b5e3f4 REQ-04). Project / named-project
+    // forms address project-scoped items (never issue criteria), and a parse
+    // error never credits.
+    if value.starts_with(PROJECT_SCOPE_SENTINEL) {
+        return match parse_kind_segmented_address(value) {
+            Ok(addr) => match addr.scope {
+                AddressScope::Issue(short_id) => short_id == scope_short_id && addr.self_id == id,
+                AddressScope::Project | AddressScope::NamedProject(_) => false,
+            },
+            Err(_) => false,
+        };
+    }
+    // A non-`@` value keeps its own two-segment `<short-id>/<self-id>` split: this
+    // IS the structural handling for the sugar shape here. `expand_sugar_address`
+    // is deliberately NOT used — it needs the configured kind list and would add
+    // kind semantics D10 forbids at this crediting site.
     match value.split_once('/') {
         // Qualified `<scope>/<self-id>`: scope must match and self-id must equal id.
         Some((scope, self_id)) => scope == scope_short_id && self_id == id,
-        // Unqualified `<id>`: legacy exact match.
+        // Unqualified `<id>`: legacy exact match (bare form).
         None => value == id,
     }
 }
@@ -1734,28 +1762,62 @@ mod tests {
     }
 
     #[test]
-    fn test_label_credits_id_widened_grammar_forms_never_mis_credit() {
-        // Audit (jit:7a2bbe4f) REQ-02: `label_credits_id` deliberately performs
-        // its OWN two-segment `<scope>/<self-id>` split (decision D10) rather
-        // than routing through the kind-segmented address parser. Confirm the
-        // widened grammar's deeper `@`-prefixed forms — which carry MORE than
-        // one `/` — never mis-split into an accidental credit: splitting on the
-        // FIRST `/` always leaves a self-id fragment that still contains a `/`,
-        // so it can never equal a bare criterion id, by design (not a bug).
-        assert!(!label_credits_id(
-            "satisfies:@/rule/REQ-01",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
-        assert!(!label_credits_id(
+    fn test_label_credits_id_at_form_routes_through_parser() {
+        // Audit (jit:7a2bbe4f) REQ-02: an `@`-prefixed value routes through
+        // `parse_kind_segmented_address`, and the credit decision reads the
+        // PARSED (scope, self-id) components — the kind segment is parsed but
+        // IGNORED (D10 + f4b5e3f4 REQ-04).
+
+        // Canonical issue form with a MATCHING short-id credits. Two different
+        // kind segments (`requirement`, `rule`) credit the SAME id, proving the
+        // kind is ignored.
+        assert!(label_credits_id(
             "satisfies:@/issue/abc12345/requirement/REQ-01",
             "satisfies",
             "REQ-01",
             "abc12345"
         ));
+        assert!(label_credits_id(
+            "satisfies:@/issue/abc12345/rule/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+
+        // A non-matching short-id in the issue form does not credit.
+        assert!(!label_credits_id(
+            "satisfies:@/issue/deadbeef/requirement/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+
+        // The project form `@/<kind>/<self-id>` addresses a project-scoped item,
+        // never an issue criterion, so it never credits.
+        assert!(!label_credits_id(
+            "satisfies:@/requirement/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+
+        // The named-project form `@<name>/<kind>/<self-id>` likewise never credits.
         assert!(!label_credits_id(
             "satisfies:@acme/requirement/REQ-01",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+
+        // A malformed `@`-address never credits (and, importantly, never panics).
+        assert!(!label_credits_id(
+            "satisfies:@/issue/abc12345/requirement",
+            "satisfies",
+            "REQ-01",
+            "abc12345"
+        ));
+        assert!(!label_credits_id(
+            "satisfies:@bogus",
             "satisfies",
             "REQ-01",
             "abc12345"

@@ -474,10 +474,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }),
                 // Named-project resolution is later work (task a1b6b3da): until it
                 // lands, a named-project address matches nothing rather than
-                // resolving to a local item or aborting a whole validate run.
+                // resolving to a local item or aborting a whole validate run. The
+                // error carries every PARSED component (project, kind, self-id), so
+                // a caller can confirm the value was structurally routed — not
+                // mis-split — even though resolution is deferred.
                 AddressScope::NamedProject(name) => Err(anyhow!(
-                    "named-project address '{qualified}' references project '{name}', \
-                     whose resolution is not yet supported"
+                    "named-project address '{qualified}' (project '{name}', kind '{}', \
+                     self-id '{}') is not resolvable: only the local project resolves; \
+                     named-project resolution is later work (a1b6b3da)",
+                    addr.kind,
+                    addr.self_id,
                 )),
             },
             // The one well-formed `@`-address the kind-segmented grammar does not
@@ -884,9 +890,15 @@ source-of-truth = \"registry-first\"
         // mis-splitting into the legacy bare-`@` project form or panicking.
         let exec = executor_with(vec![]);
         let err = exec.show_item("@acme/requirement/REQ-01").unwrap_err();
-        let msg = err.to_string();
+        let msg = format!("{err:#}");
         assert!(msg.contains("named-project"), "got: {msg}");
-        assert!(msg.contains("acme"), "got: {msg}");
+        // The error carries the three PARSED components in distinct phrasing
+        // (`project 'acme'`, `kind 'requirement'`, `self-id 'REQ-01'`), proving the
+        // value was structurally routed into (project, kind, self-id) rather than
+        // mis-split. These phrases cannot come from the raw address verbatim.
+        assert!(msg.contains("project 'acme'"), "got: {msg}");
+        assert!(msg.contains("kind 'requirement'"), "got: {msg}");
+        assert!(msg.contains("self-id 'REQ-01'"), "got: {msg}");
     }
 
     #[test]
@@ -962,7 +974,18 @@ source-of-truth = \"registry-first\"
         let err = exec
             .resolve_link_label("satisfies:@acme/requirement/REQ-01")
             .unwrap_err();
-        assert!(err.to_string().contains("unresolvable qualified item id"));
+        // The top-level context marks it unresolvable; the wrapped cause (rendered
+        // with the alternate `{:#}` chain) carries the three PARSED components,
+        // proving the named-project value was structurally routed to (project,
+        // kind, self-id) rather than mis-split before it was deemed unresolvable.
+        let chain = format!("{err:#}");
+        assert!(
+            chain.contains("unresolvable qualified item id"),
+            "got: {chain}"
+        );
+        assert!(chain.contains("project 'acme'"), "got: {chain}");
+        assert!(chain.contains("kind 'requirement'"), "got: {chain}");
+        assert!(chain.contains("self-id 'REQ-01'"), "got: {chain}");
     }
 
     #[test]

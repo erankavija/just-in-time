@@ -2271,6 +2271,17 @@ source-of-truth = \"registry-first\"
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("dangling item link"));
+        // The dangling classification comes from `resolve_link_label` erroring on
+        // the SAME value. Assert that error's chain carries the three PARSED
+        // components in distinct phrasing, proving the named-project value was
+        // structurally routed to (project, kind, self-id) rather than mis-split.
+        let err = exec
+            .resolve_link_label("enforces:@acme/invariant/INV-01")
+            .unwrap_err();
+        let chain = format!("{err:#}");
+        assert!(chain.contains("project 'acme'"), "got: {chain}");
+        assert!(chain.contains("kind 'invariant'"), "got: {chain}");
+        assert!(chain.contains("self-id 'INV-01'"), "got: {chain}");
     }
 
     #[test]
