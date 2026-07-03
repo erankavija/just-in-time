@@ -121,7 +121,15 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "date": "2026-07-03",
+      "issue": "f4b5e3f4",
+      "category": "architectural decision / plan-decision amendment",
+      "summary": "D3 premise false (requirement catch-all id-pattern makes non-REQ sugar pattern-ambiguous). Invoker approved: D3-A item-backed fallback semantics; D11-A legacy kindless resolution removed in 7f22d6cf (scope extended with REQ-04), not in f4b5e3f4.",
+      "resolution": "approved-both-recommendations"
+    }
+  ],
   "rework_counts": {
     "5222aa47": 2
   },
