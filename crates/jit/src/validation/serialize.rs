@@ -88,7 +88,7 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 
     let mut schema_files: Vec<SchemaFile> = Vec::new();
     // Track the schema file STEMS already used so two rule names that sanitize to
-    // the same stem (e.g. `default:label` and `default/label` both -> `default-label`)
+    // the same stem (e.g. `a:b` and `a/b` both -> `a-b`)
     // do not silently overwrite each other's `schemas/<stem>.json` (a rule would
     // then validate against the wrong schema). Collisions get a numeric suffix.
     let mut used_stems: HashSet<String> = HashSet::new();
@@ -415,8 +415,7 @@ fn toml_value_to_edit(value: &toml::Value) -> toml_edit::Value {
 
 /// Sanitize a schema identity into a safe schema file stem: lowercase
 /// identifier-ish characters preserved, everything else (`:`, `/`, etc.)
-/// replaced with `-`. Keeps `default:namespace-values-type` ->
-/// `default-namespace-values-type`.
+/// replaced with `-`. Keeps `a:b/c` -> `a-b-c`.
 fn sanitize_rule_name(name: &str) -> String {
     name.chars()
         .map(|c| {

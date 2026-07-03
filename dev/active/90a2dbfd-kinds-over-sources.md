@@ -224,6 +224,9 @@ non-existent `dag-no-cycles` rule.
 - **`:` in rule names** (`default:namespace-unique:type`) collides with the
   label namespace separator. Only blocks the optional rule/gate-as-item path;
   decide grammar-widen vs remap before pursuing it.
+  *(Since resolved by epic 2821e177: rule origin moved out of the self-id — rule
+  names are colon-free, addressed `@/rule/<name>` — and the label-value grammar
+  was widened for `@`-paths; `:` stays reserved for the label separator.)*
 - **Decompose trigger.** This is filed as one story per the owner's choice; if
   the field-mapping work (step 2-3) grows, split steps 1 / 2-4 / 5-6 into
   sibling tasks via `jit-breakdown`.

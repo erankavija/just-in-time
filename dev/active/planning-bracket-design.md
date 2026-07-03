@@ -225,7 +225,7 @@ consumes both). The waves are coarse buckets; the per-task `→` edges are autho
 - **R5 Type declaration has THREE synced sources when `.jit/rules.toml` exists.**
   Discovered while dogfooding: adding a type to `config.toml [type_hierarchy].types`
   updates the domain/graph hierarchy (`get_type_hierarchy`, so `jit validate` graph rules
-  pass) but NOT the write-path `default:type-hierarchy-known` rule, which reads a *baked*
+  pass) but NOT the write-path `type-hierarchy-known` rule (origin `default`), which reads a *baked*
   enum in `.jit/schemas/default-type-hierarchy-known.json` (rules.toml is "the SOLE source
   when present"). So a new `type:planning`/`type:breakdown` must be added to BOTH the config
   hierarchy AND that frozen schema, or the write path warns. **T1 must make this fix

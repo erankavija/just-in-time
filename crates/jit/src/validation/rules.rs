@@ -2321,12 +2321,12 @@ assert = { require-section = { heading = "A" } }
         // Provenance belongs in the separate `origin` field, not a `prefix:`.
         let toml = r#"
 [[rules]]
-name = "default:my-rule"
+name = "my:rule"
 assert = { require-section = { heading = "A" } }
 "#;
         let err = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap_err();
         match err {
-            RuleConfigError::InvalidRuleName { name } => assert_eq!(name, "default:my-rule"),
+            RuleConfigError::InvalidRuleName { name } => assert_eq!(name, "my:rule"),
             other => panic!("expected InvalidRuleName, got {other:?}"),
         }
     }
