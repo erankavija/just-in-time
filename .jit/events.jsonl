@@ -5154,3 +5154,5 @@
 {"type":"issue_completed","id":"930584dc-5a58-4704-ba5b-9d24184535f5","issue_id":"ebb6ad45-2792-46ba-8d45-dd269da41069","timestamp":"2026-07-03T22:01:51.546467022Z"}
 {"type":"issue_state_changed","id":"07c04e15-75da-4123-9b71-fccf7071c33f","issue_id":"637764ef-534a-4ee5-a4ad-331f0f23fb62","timestamp":"2026-07-03T22:02:39.643576028Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"6d64f2f4-46b0-44c4-a63e-9d2fedb685f6","issue_id":"637764ef-534a-4ee5-a4ad-331f0f23fb62","timestamp":"2026-07-03T22:02:39.646518410Z","assignee":"agent:claude"}
+{"type":"issue_created","id":"80961ca0-1da0-4900-95f1-0afd45ffab9d","issue_id":"8d2c5ff3-0804-47b1-beff-583fb5323123","timestamp":"2026-07-03T22:16:43.860796422Z","title":"Rule descriptions: schema field, seeded texts, item text-field flip, richer reference rendering","priority":"normal"}
+{"type":"issue_updated","id":"2c394040-7a67-4878-b6e5-34edf439b10e","issue_id":"8d2c5ff3-0804-47b1-beff-583fb5323123","timestamp":"2026-07-03T22:16:52.279397354Z","updated_by":"dependency-add","fields":["dependencies"]}
