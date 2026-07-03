@@ -71,7 +71,7 @@ fn test_validate_reports_drift_without_opt_in_rule() {
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"Acyclic deps.\"\nkind = \"enforced\"\n\
-         enforced-by = \"ghost-rule\"\n",
+         enforced-by = \"@/rule/ghost-rule\"\n",
     )
     .unwrap();
 
@@ -102,7 +102,7 @@ fn test_validate_fails_on_declared_but_unenforced_drift() {
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"ghost-rule\"\n",
+         enforced-by = \"@/rule/ghost-rule\"\n",
     )
     .unwrap();
 
@@ -133,7 +133,7 @@ fn test_validate_reports_unloadable_target_drift_not_parse_error() {
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"bad-rule\"\n",
+         enforced-by = \"@/rule/bad-rule\"\n",
     )
     .unwrap();
 
@@ -214,9 +214,9 @@ fn test_validate_clean_when_invariants_fully_consistent() {
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"only-rule\"\n\
+         enforced-by = \"@/rule/only-rule\"\n\
          [[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"only-gate\"\n",
+         enforced-by = \"@/gate/only-gate\"\n",
     )
     .unwrap();
 

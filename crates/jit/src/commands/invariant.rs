@@ -67,7 +67,7 @@ pub struct InvariantRenderResult {
 /// let result = InvariantCheckResult {
 ///     findings: vec![DriftFinding {
 ///         invariant_id: "INV-01".to_string(),
-///         subject: "ghost-rule".to_string(),
+///         subject: "@/rule/ghost-rule".to_string(),
 ///         unloadable: false,
 ///     }],
 ///     count: 1,
@@ -76,7 +76,7 @@ pub struct InvariantRenderResult {
 /// let json = serde_json::to_value(&result).unwrap();
 /// assert_eq!(json["count"], 1);
 /// assert_eq!(json["findings"][0]["invariant_id"], "INV-01");
-/// assert_eq!(json["findings"][0]["subject"], "ghost-rule");
+/// assert_eq!(json["findings"][0]["subject"], "@/rule/ghost-rule");
 /// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantCheckResult {
@@ -230,7 +230,7 @@ mod tests {
     fn test_check_reports_declared_but_unenforced() {
         // INV-01 binds to a rule/gate that does not exist -> the sole drift.
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                   enforced-by = \"ghost-rule\"\n";
+                   enforced-by = \"@/rule/ghost-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &[]);
@@ -238,7 +238,7 @@ mod tests {
         assert!(result.has_drift());
         assert_eq!(result.findings.len(), 1, "{:?}", result.findings);
         assert_eq!(result.findings[0].invariant_id, "INV-01");
-        assert_eq!(result.findings[0].subject, "ghost-rule");
+        assert_eq!(result.findings[0].subject, "@/rule/ghost-rule");
     }
 
     #[test]
@@ -247,7 +247,7 @@ mod tests {
         // single resolving binding leaves the check clean despite the unclaimed
         // `real-rule` and `code-review` gate.
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                   enforced-by = \"real-rule\"\n";
+                   enforced-by = \"@/rule/real-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &["code-review"]);
@@ -260,9 +260,9 @@ mod tests {
     fn test_check_clean_when_consistent() {
         // Two invariants claim exactly the one rule and the one gate present.
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                   enforced-by = \"real-rule\"\n\
+                   enforced-by = \"@/rule/real-rule\"\n\
                    [[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                   enforced-by = \"code-review\"\n";
+                   enforced-by = \"@/gate/code-review\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &["code-review"]);
@@ -276,7 +276,7 @@ mod tests {
         // INV-01's `ghost` binding dangles -> one declared-but-unenforced finding;
         // the unclaimed real rule `other` is NOT drift (REQ-05).
         let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-                   enforced-by = \"ghost\"\n";
+                   enforced-by = \"@/rule/ghost\"\n";
         let rules = "[[rules]]\nname = \"other\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
         let executor = exec(inv, rules, &[]);
@@ -286,6 +286,6 @@ mod tests {
         let findings = json["findings"].as_array().unwrap();
         assert_eq!(findings.len(), 1, "{json}");
         assert_eq!(findings[0]["invariant_id"], "INV-01");
-        assert_eq!(findings[0]["subject"], "ghost");
+        assert_eq!(findings[0]["subject"], "@/rule/ghost");
     }
 }

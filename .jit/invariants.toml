@@ -13,25 +13,25 @@
 id = "INV-LABEL-FORMAT"
 statement = "Every label is namespace:value (namespace lowercase-kebab, value non-empty)."
 kind = "enforced"
-enforced-by = "default:label-format"
+enforced-by = "@/rule/label-format"
 
 [[invariants]]
 id = "INV-NAMESPACE-REGISTRY"
 statement = "Every label namespace is declared in the namespace registry."
 kind = "enforced"
-enforced-by = "default:namespace-registry"
+enforced-by = "@/rule/namespace-registry"
 
 [[invariants]]
 id = "INV-DAG-ACYCLIC"
 statement = "Cycle detection runs before every dependency operation; the graph stays acyclic."
 kind = "enforced"
-enforced-by = "cargo-ci"
+enforced-by = "@/gate/cargo-ci"
 
 [[invariants]]
 id = "INV-GATE-SEMANTICS"
 statement = "An issue cannot reach Ready or Done with pending or failed gates."
 kind = "enforced"
-enforced-by = "cargo-ci"
+enforced-by = "@/gate/cargo-ci"
 
 [[invariants]]
 id = "INV-EVENT-LOG"

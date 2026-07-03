@@ -49,7 +49,7 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"ghost-rule\"\n",
+         enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -68,7 +68,7 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     assert!(
         findings
             .iter()
-            .any(|f| f["invariant_id"] == "INV-01" && f["subject"] == "ghost-rule"),
+            .any(|f| f["invariant_id"] == "INV-01" && f["subject"] == "@/rule/ghost-rule"),
         "missing declared-but-unenforced finding: {json}"
     );
     // The unclaimed `real-rule` is NOT reported (no enforced-but-undeclared).
@@ -93,7 +93,7 @@ fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"claimed-rule\"\n",
+         enforced-by = \"@/rule/claimed-rule\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -125,7 +125,7 @@ fn test_check_exits_zero_when_consistent() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"real-rule\"\n",
+         enforced-by = \"@/rule/real-rule\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -156,7 +156,7 @@ fn test_check_human_output_names_declared_direction() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"ghost-rule\"\n",
+         enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -192,7 +192,7 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"bad-rule\"\n",
+         enforced-by = \"@/rule/bad-rule\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -213,7 +213,7 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
     assert!(
         findings
             .iter()
-            .any(|f| f["subject"] == "bad-rule" && f["unloadable"] == true),
+            .any(|f| f["subject"] == "@/rule/bad-rule" && f["unloadable"] == true),
         "missing unloadable declared-but-unenforced finding: {json}"
     );
 }
@@ -231,7 +231,7 @@ fn test_check_reports_unloadable_gate_registry() {
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-         enforced-by = \"some-gate\"\n",
+         enforced-by = \"@/gate/some-gate\"\n",
     );
 
     let output = Command::new(jit_binary())
@@ -247,7 +247,7 @@ fn test_check_reports_unloadable_gate_registry() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|f| f["subject"] == "some-gate" && f["unloadable"] == true),
+            .any(|f| f["subject"] == "@/gate/some-gate" && f["unloadable"] == true),
         "missing unloadable gate finding: {json}"
     );
 }
