@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c4197e5e-a42d-40f0-944b-efff3f956b5d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c",
+  "commit": "9b525bd583323e15f2a28b4c1bd8e51686535e31",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-03T09:47:11.296015126Z",
+  "completed_at": "2026-07-03T09:48:48.323586212Z",
+  "duration_ms": 97027,
+  "exit_code": 0,
+  "stdout": "**Architecture And Scope**\n\nNo boundary violations found. Parsing remains in `crates/jit/src/domain/item.rs`; orchestration is in `crates/jit/src/commands/item.rs` and `crates/jit/src/commands/validate.rs`; `crates/jit/src/validation/graph.rs:86-99` remains pure and keeps kind-agnostic coverage crediting.\n\n**Acceptance Criteria**\n\nREQ-01 through REQ-05 are satisfied. `show_item` resolves explicit project, explicit issue, and sugar forms via `resolve_item_address` and filters explicit/inferred kinds by both kind and self-id at `crates/jit/src/commands/item.rs:384-387`. D3-A fallback now defers ambiguous/unmatched sugar to actual indexed items and errors on multi-kind collisions at `crates/jit/src/commands/item.rs:389-412`. `split_qualified_id` is removed from source; only historical planning docs still mention it.\n\n**Tests And Gates**\n\nI did not rerun cargo because the issue has a succeeded `cargo-ci` gate from `2026-07-03T09:42:54.512104119+00:00`. I ran `./scripts/jit-validate.sh`; it passed. The prior review finding is addressed by the invoker-approved D3-A amendment and the current resolver behavior.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

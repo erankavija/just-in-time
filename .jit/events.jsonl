@@ -4890,3 +4890,10 @@
 {"type":"gate_passed","id":"23a9b489-73f8-4acf-8cb2-f52dd9df3027","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:44:25.476649246Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"2a00c594-4fc1-4c11-abd9-ed3985ee339b","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:45:51.514824481Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_updated","id":"845eb5b0-c19b-4074-ae15-501864b4a5fa","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:47:05.895255809Z","updated_by":"issue-update","fields":["description"]}
+{"type":"gate_passed","id":"93cc430c-8cda-4176-8424-3fd1e52e365e","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:48:48.324008363Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"a87d4e97-c9c2-47c0-afb9-918c4a8b0bf8","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:49:45.319559978Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"8ce71e80-6b26-4cdb-bc71-bab3e68f4c59","issue_id":"f4b5e3f4-065c-4bb3-bfad-7c85fc9f250c","timestamp":"2026-07-03T09:49:45.319583038Z"}
+{"type":"issue_state_changed","id":"b8e92cf3-9d5d-48f8-a3f1-0cfb44afd3c6","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.414610258Z","from":"backlog","to":"ready"}
+{"type":"issue_updated","id":"affe3365-9771-42b1-a211-bba4ef690271","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.708089241Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_state_changed","id":"1d98a08c-6c21-456e-a3fe-4a9bef67e875","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.724563553Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"87d5b50e-57f2-4203-85a9-6db20c604b67","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.724752263Z","assignee":"agent:jit-execution-lead"}
