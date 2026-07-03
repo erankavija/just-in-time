@@ -815,23 +815,30 @@ applies_to  = ["epic"]
 }
 
 #[test]
-fn test_repo_gates_json_declares_repo_validate_whole_repo_checker() {
+fn test_repo_gates_toml_declares_repo_validate_whole_repo_checker() {
     // REQ-13 (issue 552ff75c): `repo-validate` is CONFIG-DECLARED in the repo's
-    // own `.jit/gates.json` (not a built-in preset), with a whole-repo checker —
+    // own `.jit/gates.toml` (not a built-in preset), with a whole-repo checker —
     // `jit validate` with NO issue id — distinct from the per-issue `jit-validate`
-    // gate (`jit validate "$JIT_ISSUE_ID"`).
-    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.json");
+    // gate (`jit validate "$JIT_ISSUE_ID"`). Gates persist as a `[[gates]]`
+    // array-of-tables (jit:f5d35048), so each entry is found by scanning for its
+    // `key` field rather than indexing a JSON object by key.
+    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
     let raw = std::fs::read_to_string(&gates_path)
         .unwrap_or_else(|e| panic!("reading {}: {e}", gates_path.display()));
-    let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    let toml: toml::Value = toml::from_str(&raw).unwrap();
+    let gates = toml["gates"]
+        .as_array()
+        .expect(".jit/gates.toml must persist gates as a [[gates]] array");
+    let find_gate = |key: &str| -> &toml::Value {
+        gates
+            .iter()
+            .find(|g| g.get("key").and_then(toml::Value::as_str) == Some(key))
+            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
+    };
 
-    let gate = &json["gates"]["repo-validate"];
-    assert!(
-        gate.is_object(),
-        ".jit/gates.json must declare the `repo-validate` gate"
-    );
-    assert_eq!(gate["stage"], "postcheck");
-    assert_eq!(gate["mode"], "auto");
+    let gate = find_gate("repo-validate");
+    assert_eq!(gate["stage"].as_str(), Some("postcheck"));
+    assert_eq!(gate["mode"].as_str(), Some("auto"));
 
     let command = gate["checker"]["command"]
         .as_str()
@@ -847,8 +854,8 @@ fn test_repo_gates_json_declares_repo_validate_whole_repo_checker() {
 
     // Sanity: the per-issue jit-validate gate is the distinct, id-scoped one.
     assert_eq!(
-        json["gates"]["jit-validate"]["checker"]["command"],
-        "jit validate \"$JIT_ISSUE_ID\""
+        find_gate("jit-validate")["checker"]["command"].as_str(),
+        Some("jit validate \"$JIT_ISSUE_ID\"")
     );
 }
 

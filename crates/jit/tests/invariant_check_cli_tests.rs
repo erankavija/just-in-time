@@ -225,7 +225,9 @@ fn test_check_reports_unloadable_gate_registry() {
     let temp = setup_test_repo();
     // Loadable (empty) rules so only the gate source is unloadable.
     write_rules(&temp, "\n");
-    std::fs::write(temp.path().join(".jit/gates.json"), "not valid json {").unwrap();
+    // The gate registry is `.jit/gates.toml` (jit:f5d35048); malformed TOML here
+    // exercises the same unloadable-source path malformed JSON did previously.
+    std::fs::write(temp.path().join(".jit/gates.toml"), "not valid toml {").unwrap();
     write_invariants(
         &temp,
         "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
