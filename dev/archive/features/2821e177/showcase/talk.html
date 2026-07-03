@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Addressing v2 — uniform path-based addresses in jit</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- reveal.js core only (no reveal theme — base.css + the theme token file own all appearance) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<!-- KaTeX (synchronous math; deterministic heights for the fit-checker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- 1 TITLE -->
+<section class="title">
+  <h1>Addressing&nbsp;v2</h1>
+  <p class="tagline">One uniform, colon-free address scheme — and rules &amp; gates become first-class addressable items</p>
+  <p>jit epic 2821e177 &nbsp;·&nbsp; showcase &nbsp;·&nbsp; 2026-07-04</p>
+  <p class="caption">6 stories · 22 tasks · 15 waves · all gates green</p>
+</section>
+
+<!-- 2 AGENDA -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 16</span></span>
+  <h2>Agenda</h2>
+  <ol>
+    <li>The problem: two grammars fighting over a colon</li>
+    <li>The scheme: one address form for every knowledge item</li>
+    <li>Rules and gates as addressable items</li>
+    <li>Links, bindings, and the rendered reference</li>
+    <li>Use cases today</li>
+    <li>What comes next</li>
+  </ol>
+</section>
+
+<!-- 3 PROBLEM -->
+<section>
+  <span class="seclabel">Problem <span class="num">· 3 / 16</span></span>
+  <h2>Two grammars fighting over a colon</h2>
+  <ul>
+    <li>Labels are <code>namespace:value</code> — the colon is the load-bearing separator.</li>
+    <li>Rule ids <em>also</em> carried colons: <code>default:namespace-unique:type</code>.</li>
+    <li><code>@</code> was not even a legal label-value character — a project-scoped link like <code>enforces:@/…</code> could not be authored at all.</li>
+    <li>Old addresses were kindless (<code>@/INV-01</code>): ambiguous the moment two kinds share a self-id.</li>
+  </ul>
+  <div class="note">Epic 90a2dbfd (declarative kinds) had to defer "rule/gate as items" for exactly this collision. Addressing v2 is that thread, reopened and finished.</div>
+</section>
+
+<!-- 4 SCHEME -->
+<section>
+  <span class="seclabel">Scheme <span class="num">· 4 / 16</span></span>
+  <h2>One uniform, kind-segmented scheme</h2>
+  <div class="item-decl">@[&lt;project&gt;]/&lt;kind&gt;/&lt;self-id&gt; &nbsp;&nbsp;|&nbsp;&nbsp; @/issue/&lt;short-id&gt;/&lt;kind&gt;/&lt;self-id&gt;</div>
+  <ul>
+    <li><strong>Project items:</strong> <code>@/invariant/INV-DAG-ACYCLIC</code>, <code>@/rule/coverage-preview</code>, <code>@/gate/cargo-ci</code></li>
+    <li><strong>Issue items:</strong> <code>@/issue/0597febe/requirement/REQ-01</code></li>
+    <li><strong>Input sugar:</strong> <code>0597febe/REQ-01</code> — kind inferred from the self-id shape</li>
+    <li><strong>Colon:</strong> reserved solely for the label separator; never overloaded inside a value</li>
+  </ul>
+</section>
+
+<!-- 5 SCHEME CORE LANDED -->
+<section>
+  <span class="seclabel">Scheme <span class="num">· 5 / 16</span></span>
+  <h2>What the core required</h2>
+  <ul>
+    <li>A structural parser with per-<code>(scope, kind)</code> uniqueness and strict sugar expansion</li>
+    <li>The label-value grammar widened to admit <code>@</code>-prefixed <code>/</code>-paths — with every value re-split site audited</li>
+    <li>Resolver rewired to the kind-segmented form; the legacy kindless arm removed in a clean cut (decision D11: no compatibility shim)</li>
+    <li>Minted output flipped together with resolution: every id <code>jit item list</code> prints round-trips through <code>jit item show</code></li>
+  </ul>
+</section>
+
+<!-- 6 RULES -->
+<section>
+  <span class="seclabel">Items <span class="num">· 6 / 16</span></span>
+  <h2>Rules become addressable items</h2>
+  <ul>
+    <li>Origin split out of the self-id: <code>default:label</code> → name <code>label</code>, <code>origin&nbsp;=&nbsp;"default"</code></li>
+    <li>Colon-bearing rule names are now rejected at load time</li>
+    <li>Registry-first kind over <code>.jit/rules.toml</code> — declared in config, zero new engine code</li>
+  </ul>
+<pre><code class="language-toml" data-trim>[item_kinds.rule]
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name" }
+# ⇒ addressable at @/rule/&lt;name&gt;</code></pre>
+</section>
+
+<!-- 7 GATES -->
+<section>
+  <span class="seclabel">Items <span class="num">· 7 / 16</span></span>
+  <h2>Gates follow — on a migrated store</h2>
+  <ul>
+    <li><code>gates.json</code> → <code>gates.toml</code> with schema parity; a dedicated store mirrors the ruleset store; no consumer reads the old file</li>
+    <li>Gate registry mutations are event-logged (INV-EVENT-LOG) — define, remove, and preset application all leave an audit trail</li>
+    <li><code>jit init</code> scaffolds the empty registry; every gate is addressable at <code>@/gate/&lt;key&gt;</code></li>
+  </ul>
+  <div class="example"><code>jit item show @/gate/cargo-ci</code> resolves to the gate definition — same mechanism as invariants and requirements.</div>
+</section>
+
+<!-- 8 LINKS -->
+<section>
+  <span class="seclabel">Links <span class="num">· 8 / 16</span></span>
+  <h2>Bindings and links resolve to real items</h2>
+  <ul>
+    <li>Every invariant <code>enforced-by</code> binding now names a real <code>@/rule/…</code> or <code>@/gate/…</code>; a resolution check fails on any dangling binding</li>
+    <li>Work links via <code>enforces:@/rule/&lt;name&gt;</code> — resolved by the same generic scan as <code>satisfies:</code>, <code>per:</code>, <code>mitigates:</code></li>
+    <li><code>[namespaces.enforces]</code> registered in live config and the init template</li>
+  </ul>
+<pre><code class="language-bash" data-trim>jit issue create -t "tighten label checks" \
+  -l enforces:@/rule/label-format -l enforces:@/gate/cargo-ci</code></pre>
+</section>
+
+<!-- 9 REFERENCE -->
+<section>
+  <span class="seclabel">Projection <span class="num">· 9 / 16</span></span>
+  <h2>A rendered rules &amp; gates reference</h2>
+  <ul>
+    <li>New generically-typed renderer over both registries — the invariant projection pattern, not the invariant renderer</li>
+    <li>Config-declared target and style; region-spliced, atomically written</li>
+    <li>Live in this repo: <code>docs/reference/rules-and-gates.md</code> — 9 rules, 13 gates</li>
+  </ul>
+<pre><code class="language-toml" data-trim>[rules_gates_projection]
+mode = "region"
+target = "docs/reference/rules-and-gates.md"
+style = "full"</code></pre>
+  <p><code>jit reference render</code> refreshes it from the registries.</p>
+</section>
+
+<!-- 10 MIGRATION -->
+<section>
+  <span class="seclabel">Migration <span class="num">· 10 / 16</span></span>
+  <h2>The repo migrated itself</h2>
+  <ul>
+    <li>All five kinds re-addressed uniformly: invariant, requirement, decision, risk, definition</li>
+    <li>Live data, config examples, CLI help, and prior-epic docs swept to the new forms</li>
+    <li>Coverage crediting untouched: 95 bare <code>satisfies:REQ-NN</code> labels, zero qualified-form — exactly as designed (D10)</li>
+    <li><code>jit validate</code> green; operative surfaces grep-clean of every legacy form</li>
+  </ul>
+  <div class="note">Historical records — plans, handoffs, session notes, archives — keep their original wording by design. The past is quoted, not rewritten.</div>
+</section>
+
+<!-- 11 MULTI-JIT -->
+<section>
+  <span class="seclabel">Multi-jit <span class="num">· 11 / 16</span></span>
+  <h2>The multi-jit address form (identity now, federation later)</h2>
+  <ul>
+    <li>Projects gain a canonical name: <code>[project] name</code>, seeded by <code>jit init</code>, validated on every config write</li>
+    <li>Bare <code>@</code> = local shorthand; <code>@&lt;own-name&gt;</code> also resolves locally</li>
+    <li><code>@&lt;other-project&gt;</code> is parse-valid and returns a typed <em>not-resolvable</em> error — no network, no registry, no guessing</li>
+  </ul>
+  <div class="example"><code>jit item show @gf2/invariant/INV-01</code> → "project 'gf2' is not the local project; only local resolution is available."</div>
+</section>
+
+<!-- 12 USE CASES -->
+<section>
+  <span class="seclabel">Today <span class="num">· 12 / 16</span></span>
+  <h2>Use cases, live today</h2>
+  <div class="tool-list">
+    <span class="tool-name">cite an invariant</span><span class="tool-desc">jit item show @/invariant/INV-ATOMIC-WRITES</span>
+    <span class="tool-name">cite a criterion</span><span class="tool-desc">jit item show 0597febe/REQ-01 (sugar in, canonical out)</span>
+    <span class="tool-name">link work to a rule</span><span class="tool-desc">-l enforces:@/rule/coverage-preview — validate catches dangling links</span>
+    <span class="tool-name">browse a kind</span><span class="tool-desc">jit item list --kind gate</span>
+    <span class="tool-name">render the reference</span><span class="tool-desc">jit reference render → docs/reference/rules-and-gates.md</span>
+  </div>
+</section>
+
+<!-- 13 WHY IT MATTERS -->
+<section>
+  <span class="seclabel">Impact <span class="num">· 13 / 16</span></span>
+  <h2>How this enhances jit</h2>
+  <ul>
+    <li><strong>One grammar for all knowledge:</strong> invariants, requirements, decisions, risks, definitions, rules, gates — one address shape, one resolver</li>
+    <li><strong>Traceability:</strong> work items cite the exact rule or gate they enforce; bindings are checked, not prose</li>
+    <li><strong>No more grammar collisions:</strong> colon-free values end the label/id conflict that blocked a prior epic</li>
+    <li><strong>Config over code:</strong> new addressable kinds are declared in TOML — the engine bakes in none</li>
+    <li><strong>Dogfooded:</strong> this repo runs on the scheme it shipped</li>
+  </ul>
+</section>
+
+<!-- 14 FUTURE -->
+<section>
+  <span class="seclabel">Future <span class="num">· 14 / 16</span></span>
+  <h2>What to expect next</h2>
+  <ul>
+    <li><strong>Cross-jit resolution:</strong> the <code>@&lt;project&gt;</code> grammar is in place; a project registry and remote resolution can land without another address migration</li>
+    <li><strong>Rule descriptions (8d2c5ff3, filed):</strong> an optional <code>description</code> field so rules render like gates — real text in <code>item show</code> and the reference doc</li>
+    <li><strong>Decision &amp; risk kinds await data:</strong> the kinds resolve today; the first issue to author a decisions/risks section lights them up</li>
+    <li><strong>More projections:</strong> the generic renderer pattern invites further registry-backed reference docs</li>
+  </ul>
+</section>
+
+<!-- 15 NUMBERS -->
+<section>
+  <span class="seclabel">Numbers <span class="num">· 15 / 16</span></span>
+  <h2>The epic, by the numbers</h2>
+  <table>
+    <thead><tr><th>metric</th><th>value</th></tr></thead>
+    <tbody>
+      <tr><td>issues completed</td><td>30 (6 stories, 22 tasks, 2 bracket nodes)</td></tr>
+      <tr><td>execution waves</td><td>15, across 3 lead sessions</td></tr>
+      <tr><td>hard criteria</td><td>9 / 9 delivered <span class="badge green">all gates green</span></td></tr>
+      <tr><td>rework cycles</td><td>17 recorded (deepest: config-layering, 6 review rounds)</td></tr>
+      <tr><td>invoker amendments</td><td>8 — every scope change escalated, none improvised</td></tr>
+      <tr><td>legacy forms in operative tree</td><td>0</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 16 CLOSING -->
+<section class="title">
+  <h1>@/kind/self-id</h1>
+  <p class="tagline">Everything the project knows now has an address.</p>
+  <p class="caption">Epic 2821e177 · design brief: dev/studies/addressing-v2-rule-gate-items.md · reference: docs/reference/rules-and-gates.md</p>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  // fitcheck.py waits on these flags before measuring.
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  // KaTeX scripts are deferred; run once they (and the DOM) are available.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      // give deferred KaTeX a tick to attach renderMathInElement
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
