@@ -4897,3 +4897,6 @@
 {"type":"issue_updated","id":"affe3365-9771-42b1-a211-bba4ef690271","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.708089241Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_state_changed","id":"1d98a08c-6c21-456e-a3fe-4a9bef67e875","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.724563553Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"87d5b50e-57f2-4203-85a9-6db20c604b67","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:49:45.724752263Z","assignee":"agent:jit-execution-lead"}
+{"type":"gate_passed","id":"d7215f0c-b448-4321-bd17-69bdd85b84c2","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:51:18.841489845Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"b1556621-7b01-4c9b-bc6f-c4d699c27292","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:53:10.945855995Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"507de6fb-3f9d-4d5a-8966-85897474b625","issue_id":"37506c12-ecb2-45be-bb85-e99d92e52855","timestamp":"2026-07-03T09:54:53.766194573Z","updated_by":"issue-update","fields":["description"]}
