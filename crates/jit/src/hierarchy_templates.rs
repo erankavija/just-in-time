@@ -211,6 +211,18 @@ scope = "project"
 source = {{ toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }}
 source-of-truth = "registry-first"
 
+# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
+# source, scaffolded above); the rule kind projects each entry's `name` as both
+# its self-id and its display text, addressed at `@/rule/<name>`.
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = {{ toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }}
+source-of-truth = "registry-first"
+
 # =============================================================================
 # ADVANCED (uncomment to enable)
 # =============================================================================
@@ -503,6 +515,18 @@ link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
+
+# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
+# source, scaffolded above); the rule kind projects each entry's `name` as both
+# its self-id and its display text, addressed at `@/rule/<name>`.
+[item_kinds.rule]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = []
+scope = \"project\"
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source-of-truth = \"registry-first\"
 ";
         assert!(
             toml.contains(expected_block),
@@ -514,7 +538,7 @@ source-of-truth = \"registry-first\"
     fn test_generated_config_item_kinds_resolve_with_no_built_ins() {
         // REQ-04: a repo whose ONLY config is the emitted one indexes kinds purely
         // from the table (the engine bakes in no defaults). Resolving the emitted
-        // table yields the four kinds in name order; resolving NO table yields none.
+        // table yields the five kinds in name order; resolving NO table yields none.
         use crate::domain::item::resolve_item_kinds;
         let toml = HierarchyTemplate::default().generate_config_toml();
         let cfg: crate::config::JitConfig =
@@ -522,7 +546,10 @@ source-of-truth = \"registry-first\"
         let kinds = resolve_item_kinds(cfg.item_kinds.as_ref())
             .expect("emitted [item_kinds] table resolves");
         let names: Vec<&str> = kinds.iter().map(|k| k.name()).collect();
-        assert_eq!(names, vec!["decision", "invariant", "requirement", "risk"]);
+        assert_eq!(
+            names,
+            vec!["decision", "invariant", "requirement", "risk", "rule"]
+        );
         // With no table at all there are no kinds — proving the table, not a baked
         // default, is what makes these kinds index.
         assert!(resolve_item_kinds(None).unwrap().is_empty());

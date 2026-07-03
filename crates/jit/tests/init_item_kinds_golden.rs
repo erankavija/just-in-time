@@ -6,8 +6,9 @@
 //! the SHIPPED binary, that:
 //!
 //! 1. `jit init` emits an editable `[item_kinds]` table carrying the complete
-//!    default set (`requirement`/`decision`/`risk`/`invariant`) — golden block.
-//! 2. A repo whose ONLY config is that emitted one indexes all four kinds (the
+//!    default set (`requirement`/`decision`/`risk`/`invariant`/`rule`) — golden
+//!    block.
+//! 2. A repo whose ONLY config is that emitted one indexes all five kinds (the
 //!    table, not a baked default, is what makes them index).
 //! 3. A repo with NO `[item_kinds]` table indexes NOTHING — proving there are no
 //!    baked built-ins.
@@ -85,6 +86,18 @@ link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
+
+# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
+# source, scaffolded above); the rule kind projects each entry's `name` as both
+# its self-id and its display text, addressed at `@/rule/<name>`.
+[item_kinds.rule]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = []
+scope = \"project\"
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source-of-truth = \"registry-first\"
 ";
 
 #[test]
@@ -102,7 +115,10 @@ fn test_init_emits_golden_item_kinds_table() {
 #[test]
 fn test_init_authored_table_indexes_all_kinds() {
     // REQ-04, clause 2: a repo whose ONLY config is the emitted one indexes all
-    // four kinds — the table, not a baked default, makes them index.
+    // five kinds — the table, not a baked default, makes them index. `rule`
+    // items come for free here: `jit init` also scaffolds `.jit/rules.toml`
+    // with its default ruleset (jit:cdc33a0f), unlike `invariants.toml` below,
+    // which this test writes by hand.
     let temp = setup_test_repo();
 
     let issue_body = "\
@@ -133,7 +149,7 @@ fn test_init_authored_table_indexes_all_kinds() {
         .iter()
         .map(|i| i["kind"].as_str().unwrap())
         .collect();
-    for expected in ["requirement", "decision", "risk", "invariant"] {
+    for expected in ["requirement", "decision", "risk", "invariant", "rule"] {
         assert!(
             kinds.contains(&expected),
             "the init-authored table must index a {expected} item: {kinds:?}"

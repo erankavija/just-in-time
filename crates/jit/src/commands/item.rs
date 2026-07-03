@@ -614,6 +614,15 @@ link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
+
+[item_kinds.rule]
+section = \"success_criteria\"
+id-pattern = \"[a-z][a-z0-9-]*\"
+markers = []
+link-namespaces = []
+scope = \"project\"
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source-of-truth = \"registry-first\"
 ";
 
     fn executor_with(issues: Vec<Issue>) -> CommandExecutor<InMemoryStorage> {
@@ -1172,6 +1181,19 @@ statement = \"Every dependency edge stays acyclic.\"
         CommandExecutor::new(storage)
     }
 
+    /// Build an executor whose synthetic repo carries `.jit/rules.toml` with
+    /// `rules_toml` and the canonical `[item_kinds]` table (the set `jit init`
+    /// authors, now including `rule`), exercising the registry-first rule path —
+    /// the same pattern [`registry_exec`] establishes for invariants.
+    fn registry_exec_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
+        let storage = InMemoryStorage::new();
+        storage.init().unwrap();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), CANONICAL_ITEM_KINDS).unwrap();
+        storage.add_repo_file(".jit/rules.toml", rules_toml);
+        CommandExecutor::new(storage)
+    }
+
     const TWO_INVARIANTS: &str = "\
 [[invariants]]
 id = \"INV-01\"
@@ -1217,6 +1239,37 @@ kind = \"advisory\"
         assert_eq!(shown.item.qualified_id, "@/INV-02");
         assert_eq!(shown.item.kind, "invariant");
         assert_eq!(shown.item.scope, "@");
+        // No owning issue for a project-scope item.
+        assert_eq!(shown.issue_full_id, None);
+        assert_eq!(shown.issue_title, None);
+    }
+
+    /// A single migrated colon-free rule entry (`name`, no `default:`-style
+    /// prefix), mirroring a real `.jit/rules.toml` row well enough to exercise
+    /// the `rule` item kind's toml projection without pulling in the full
+    /// `RawRule` schema (irrelevant here: `load_toml_scope_items` reads this as a
+    /// generic `toml::Table`, never through the strict rule-engine parser).
+    const ONE_RULE: &str = "\
+[[rules]]
+name = \"coverage-preview\"
+origin = \"bracket\"
+severity = \"error\"
+enforce = true
+";
+
+    #[test]
+    fn test_show_item_resolves_rule_by_qualified_id() {
+        // REQ-03 (cdc33a0f): the generic resolver returns a migrated colon-free
+        // rule id (e.g. `coverage-preview`) as a project-scope `rule` item via
+        // its `@/<self-id>` address, mirroring the invariant kind's resolution
+        // path above but sourced from `.jit/rules.toml`'s `rules` table.
+        let exec = registry_exec_with_rules(ONE_RULE);
+        let shown = exec.show_item("@/coverage-preview").unwrap();
+        assert_eq!(shown.item.self_id, "coverage-preview");
+        assert_eq!(shown.item.qualified_id, "@/coverage-preview");
+        assert_eq!(shown.item.kind, "rule");
+        assert_eq!(shown.item.scope, "@");
+        assert!(!shown.item.text.is_empty());
         // No owning issue for a project-scope item.
         assert_eq!(shown.issue_full_id, None);
         assert_eq!(shown.issue_title, None);

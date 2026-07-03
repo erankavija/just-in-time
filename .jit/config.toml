@@ -98,8 +98,8 @@ examples = ["satisfies:REQ-01"]
 # ITEM KINDS
 # =============================================================================
 # Addressable structured items. The engine bakes in NO kinds; this table is the
-# sole source. `jit init` scaffolds the first four (requirement/decision/risk/
-# invariant); this repo also dogfoods a `definition` kind over the glossary.
+# sole source. `jit init` scaffolds the first five (requirement/decision/risk/
+# invariant/rule); this repo also dogfoods a `definition` kind over the glossary.
 
 [item_kinds.requirement]
 section = "success_criteria"
@@ -132,6 +132,19 @@ markers = []
 link-namespaces = ["enforces"]
 scope = "project"
 source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+
+# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
+# source); the rule kind projects each entry's `name` as both its self-id and
+# its display text (rules carry no separate free-text field), addressed at
+# `@/rule/<name>` (e.g. `@/rule/coverage-preview`).
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = []
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }
 source-of-truth = "registry-first"
 
 # Dogfood: glossary terms (under `## Core Concepts`) as addressable definitions,

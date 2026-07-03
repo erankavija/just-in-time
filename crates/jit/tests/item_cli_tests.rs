@@ -48,8 +48,10 @@ fn test_item_list_indexes_requirements() {
     let body = "## Success Criteria\n\n- [hard] REQ-01: first\n- [hard] REQ-02: second\n";
     let short = create_issue(temp.path(), "Foundational", body);
 
+    // Scoped to `requirement`: an unfiltered list also carries the project-scope
+    // `rule` items `jit init` scaffolds via `.jit/rules.toml` (jit:cdc33a0f).
     let output = Command::new(jit_binary())
-        .args(["item", "list", "--json"])
+        .args(["item", "list", "--kind", "requirement", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
@@ -115,8 +117,10 @@ fn test_item_graceful_degradation() {
     let body = "## Success Criteria\n\n- [hard] REQ-01: real\n- [hard] just prose, no id here\n";
     create_issue(temp.path(), "Mixed", body);
 
+    // Scoped to `requirement`: an unfiltered list also carries the project-scope
+    // `rule` items `jit init` scaffolds via `.jit/rules.toml` (jit:cdc33a0f).
     let output = Command::new(jit_binary())
-        .args(["item", "list", "--json"])
+        .args(["item", "list", "--kind", "requirement", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();

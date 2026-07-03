@@ -1,11 +1,13 @@
-//! Acceptance test for cross-substrate generality across all four item kinds that
-//! `jit init` scaffolds (JIT issue 72cdf315, REQ-04).
+//! Acceptance test for cross-substrate generality across four representative item
+//! kinds among those `jit init` scaffolds (JIT issue 72cdf315, REQ-04). A fifth
+//! scaffolded kind, `rule` (jit:cdc33a0f, registry-first over `.jit/rules.toml`),
+//! is covered by its own resolution test and is not this fixture's concern.
 //!
 //! ## What this file proves
 //!
-//! All four item kinds are declared by the `[item_kinds]` table `jit init` emits
-//! (the engine bakes in none) and route through ONE generic engine (`list_items` /
-//! `search_items` / `show_item` in `commands/item.rs`):
+//! These four item kinds are declared by the `[item_kinds]` table `jit init`
+//! emits (the engine bakes in none) and route through ONE generic engine
+//! (`list_items` / `search_items` / `show_item` in `commands/item.rs`):
 //!
 //! - **issue-scope, markdown-first** — `requirement` (`## Success Criteria`,
 //!   `REQ-NN`), `decision` (`## Decisions`, `D-NN`), and `risk` (`## Risks`,
@@ -38,8 +40,8 @@ fn jit_binary() -> &'static str {
 }
 
 /// Bootstrap a default-initialized repo (whose `jit init`-emitted `[item_kinds]`
-/// table declares all four kinds) and return the temp dir so the caller owns the
-/// lifetime.
+/// table declares this fixture's four kinds, among five total) and return the
+/// temp dir so the caller owns the lifetime.
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let output = Command::new(jit_binary())
