@@ -190,3 +190,14 @@ source-of-truth = "markdown-first"
 mode = "region"
 target = "CLAUDE.md"
 style = "id-anchor"
+
+[rules_gates_projection]
+# Region mode: replace only the delimited region inside the reference doc.
+# The markers <!-- jit:rules-and-gates:begin --> and <!-- jit:rules-and-gates:end -->
+# wrap the rendered `## Rules` / `## Gates` sections; `jit reference render` keeps
+# everything outside those markers byte-exact and writes atomically through storage.
+# full style: section headings + metadata bullets, addressed by the canonical
+# kind-segmented forms @/rule/<name> and @/gate/<key>.
+mode = "region"
+target = "docs/reference/rules-and-gates.md"
+style = "full"
