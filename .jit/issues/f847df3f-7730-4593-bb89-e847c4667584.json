@@ -6,14 +6,28 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [],
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.805676251Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.805710491Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
     "type:bug",
     "epic:core-maintenance"
   ],
-  "created_at": "2026-06-15T18:38:54.897545192+00:00",
-  "updated_at": "2026-06-16T18:30:52.040445457+00:00"
+  "created_at": "2026-06-15T18:38:54.897545192Z",
+  "updated_at": "2026-07-04T23:25:14.805726561Z"
 }
