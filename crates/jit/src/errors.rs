@@ -66,8 +66,14 @@ impl ActionableError {
     }
 
     /// Convert to a formatted error message suitable for display.
+    ///
+    /// Renders the error text verbatim, with no "Error: " prefix: the single
+    /// prefix is added exactly once, by the top-level CLI printer
+    /// (`main::main`), so wrapping this in another error type (as
+    /// [`ClaimRequiresGitError`] and [`LeaseNotFoundError`] do) never produces
+    /// a doubled "Error: Error: " line.
     pub fn to_error_message(&self) -> String {
-        let mut msg = format!("Error: {}\n", self.error);
+        let mut msg = format!("{}\n", self.error);
 
         if !self.causes.is_empty() {
             msg.push_str("\nPossible causes:\n");
@@ -328,6 +334,23 @@ impl LeaseNotFoundError {
     }
 }
 
+/// Which git precondition is unmet for a claim or lease command.
+///
+/// A worktree identity needs a resolvable `HEAD`, which fails for two
+/// distinct reasons that call for different fixes: there may be no git
+/// repository at all (fix: `git init`), or there may be a git repository with
+/// zero commits so far, in which `HEAD` doesn't resolve to a branch yet (fix:
+/// an initial commit, not `git init` again). [`ClaimRequiresGitError::new`]
+/// takes one of these so its remediation hint matches the actual gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitRequirementGap {
+    /// The current directory is not inside a git repository at all.
+    NoRepository,
+    /// The directory is a git repository, but it has no commits yet, so
+    /// `HEAD` does not resolve to a branch.
+    NoCommits,
+}
+
 /// Error returned when a claim or lease command is run outside a git repository.
 ///
 /// Claims and leases require git for worktree identity and branch tracking.
@@ -338,9 +361,9 @@ impl LeaseNotFoundError {
 /// # Examples
 ///
 /// ```
-/// use jit::errors::ClaimRequiresGitError;
+/// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
 ///
-/// let err = ClaimRequiresGitError::new();
+/// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
 /// let msg = err.to_string();
 /// assert!(msg.contains("git repository"));
 /// assert!(msg.to_lowercase().contains("claim"));
@@ -356,24 +379,45 @@ pub struct ClaimRequiresGitError {
 }
 
 impl ClaimRequiresGitError {
-    /// Build a [`ClaimRequiresGitError`] with the standard remediation message.
+    /// Build a [`ClaimRequiresGitError`] for the given [`GitRequirementGap`],
+    /// with a remediation hint tailored to that specific gap (REQ-04): a
+    /// missing repository hints `git init`; a repository with no commits
+    /// hints making an initial commit instead.
     ///
     /// # Examples
     ///
     /// ```
-    /// use jit::errors::ClaimRequiresGitError;
+    /// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
     ///
-    /// let err = ClaimRequiresGitError::new();
+    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
     /// assert!(err.message().contains("git repository"));
     /// assert!(err.message().contains("git init"));
+    ///
+    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoCommits);
+    /// assert!(err.message().contains("commit"));
+    /// assert!(!err.message().contains("git init"));
     /// ```
-    pub fn new() -> Self {
-        let msg = ActionableError::new("Claims and leases require a git repository")
-            .with_cause("Claim tracking records the git worktree identity and current branch")
-            .with_remedy("Initialize a git repository: git init")
-            .with_remedy("Change to a directory that is inside a git repository")
-            .to_error_message();
-        Self { message: msg }
+    pub fn new(gap: GitRequirementGap) -> Self {
+        let base = ActionableError::new("Claims and leases require a git repository")
+            .with_cause("Claim tracking records the git worktree identity and current branch");
+        let actionable = match gap {
+            GitRequirementGap::NoRepository => base
+                .with_cause("Current directory is not inside a git repository")
+                .with_remedy("Initialize a git repository: git init")
+                .with_remedy("Change to a directory that is inside a git repository"),
+            GitRequirementGap::NoCommits => base
+                .with_cause(
+                    "Current directory is a git repository, but it has no commits yet, \
+                     so HEAD does not resolve to a branch",
+                )
+                .with_remedy("Create an initial commit: git commit --allow-empty -m \"init\"")
+                .with_remedy(
+                    "Change to a directory inside a git repository that has at least one commit",
+                ),
+        };
+        Self {
+            message: actionable.to_error_message(),
+        }
     }
 
     /// The fully-rendered, user-facing message.
@@ -381,19 +425,13 @@ impl ClaimRequiresGitError {
     /// # Examples
     ///
     /// ```
-    /// use jit::errors::ClaimRequiresGitError;
+    /// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
     ///
-    /// let err = ClaimRequiresGitError::new();
+    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
     /// assert_eq!(err.message(), err.to_string());
     /// ```
     pub fn message(&self) -> &str {
         &self.message
-    }
-}
-
-impl Default for ClaimRequiresGitError {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -953,7 +991,11 @@ mod tests {
 
         let msg = error.to_error_message();
 
-        assert!(msg.contains("Error: Test error"));
+        // `to_error_message` renders the text verbatim; the top-level CLI
+        // printer is the sole place that adds the "Error: " prefix (REQ-01),
+        // so no prefix should appear here.
+        assert!(!msg.contains("Error:"));
+        assert!(msg.contains("Test error"));
         assert!(msg.contains("Possible causes:"));
         assert!(msg.contains("• First cause"));
         assert!(msg.contains("• Second cause"));
@@ -968,7 +1010,8 @@ mod tests {
 
         let msg = error.to_error_message();
 
-        assert!(msg.contains("Error: Simple error"));
+        assert!(!msg.contains("Error:"));
+        assert!(msg.contains("Simple error"));
         assert!(!msg.contains("Possible causes:"));
         assert!(msg.contains("To fix:"));
         assert!(msg.contains("• Just fix it"));
@@ -980,7 +1023,8 @@ mod tests {
 
         let msg = error.to_error_message();
 
-        assert!(msg.contains("Error: Diagnostic only"));
+        assert!(!msg.contains("Error:"));
+        assert!(msg.contains("Diagnostic only"));
         assert!(msg.contains("Possible causes:"));
         assert!(msg.contains("• Something went wrong"));
         assert!(!msg.contains("To fix:"));

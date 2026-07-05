@@ -10,14 +10,32 @@ use anyhow::{Context, Result};
 use std::process::Command;
 use std::time::Duration;
 
+/// True when the current directory is inside a git working tree, regardless
+/// of whether any commit exists yet.
+///
+/// Used by [`get_current_branch`] to tell apart "no git repository" from "git
+/// repository with no commits" when `git rev-parse --abbrev-ref HEAD` fails —
+/// both fail identically, but only `--is-inside-work-tree` still succeeds in
+/// the latter case (it doesn't need a resolvable `HEAD`).
+fn is_inside_git_work_tree() -> bool {
+    Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
 /// Get current git branch name.
 ///
 /// # Errors
 ///
 /// Returns [`crate::errors::ClaimRequiresGitError`] when the current directory
-/// is not inside a git repository, or when git is not available. This typed
-/// error allows callers to classify the failure as an external dependency
-/// failure (exit code 10) rather than a generic error.
+/// is not inside a git repository, when git is not available, or when the
+/// directory is a git repository with no commits yet (so `HEAD` doesn't
+/// resolve to a branch) — the error's [`GitRequirementGap`](crate::errors::GitRequirementGap)
+/// distinguishes the two so the hint matches the actual gap (REQ-04). This
+/// typed error allows callers to classify the failure as an external
+/// dependency failure (exit code 10) rather than a generic error.
 fn get_current_branch() -> Result<String> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
@@ -25,7 +43,12 @@ fn get_current_branch() -> Result<String> {
         .context("Failed to execute git command for branch detection")?;
 
     if !output.status.success() {
-        return Err(crate::errors::ClaimRequiresGitError::new().into());
+        let gap = if is_inside_git_work_tree() {
+            crate::errors::GitRequirementGap::NoCommits
+        } else {
+            crate::errors::GitRequirementGap::NoRepository
+        };
+        return Err(crate::errors::ClaimRequiresGitError::new(gap).into());
     }
 
     Ok(String::from_utf8(output.stdout)?.trim().to_string())
@@ -1620,4 +1643,12 @@ mod tests {
             "get_current_branch() should error in non-git directory, not return fallback"
         );
     }
+
+    // REQ-04's "git repository with no commits" gap is covered at the CLI
+    // level in `claim_integration_tests.rs`
+    // (`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`
+    // and its `--json` counterpart), not here: those spawn `jit` as a
+    // subprocess with its own `current_dir`, so they don't race with this
+    // module's other tests over the process-wide working directory the way a
+    // unit-level `std::env::set_current_dir` test would.
 }

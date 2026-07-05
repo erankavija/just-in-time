@@ -2106,14 +2106,23 @@ mod tests {
 
         #[test]
         fn test_is_secondary_worktree_detection() {
-            // Main worktree: .git is a directory
-            let main_temp = TempDir::new().unwrap();
-            let main_storage = JsonFileStorage::new(main_temp.path());
+            // Main worktree: .git is a directory, one level above the .jit
+            // root. The git repository must live in a directory this test
+            // owns, not in a bare `TempDir::new()`'s parent: that parent is
+            // the shared, process-wide temp directory (every `TempDir` is
+            // created directly under it), so `git init` there would leave a
+            // stray `.git` at the root of the shared temp directory — silently
+            // polluting it as an ancestor "repository" for every other test
+            // that creates a `TempDir` for the rest of the process's lifetime.
+            let outer = TempDir::new().unwrap();
+            let main_dir = outer.path().join("jit-root");
+            fs::create_dir_all(&main_dir).unwrap();
+            let main_storage = JsonFileStorage::new(&main_dir);
 
-            // Initialize git
+            // Initialize git at the outer, privately-owned directory.
             Command::new("git")
                 .arg("init")
-                .current_dir(main_temp.path().parent().unwrap())
+                .current_dir(outer.path())
                 .output()
                 .unwrap();
 

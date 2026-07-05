@@ -824,7 +824,9 @@ fn test_claim_acquire_outside_git_repo_emits_git_requirement_error() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("git repository"))
-        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")));
+        .stderr(predicate::str::contains("claim").or(predicate::str::contains("lease")))
+        // REQ-04 (jit:30a3b5c1): no git repository at all hints `git init`.
+        .stderr(predicate::str::contains("git init"));
 }
 
 #[test]
@@ -902,5 +904,210 @@ fn test_claim_list_json_outside_git_repo_exits_10_with_git_requirement() {
     assert!(
         message.contains("git repository"),
         "message must name the git requirement, got: {message}"
+    );
+}
+
+/// REQ-01 (jit:30a3b5c1): the already-claimed error is an
+/// [`jit::errors::ActionableError`] rendered through the top-level CLI
+/// printer; the printer must add the "Error: " prefix exactly once, never a
+/// doubled "Error: Error: ".
+#[test]
+fn test_claim_acquire_already_claimed_error_has_single_error_prefix() {
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Test Issue");
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+        ])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        stderr.matches("Error:").count(),
+        1,
+        "expected exactly one 'Error:' prefix, got: {stderr}"
+    );
+}
+
+/// Setup a jit repository inside a git repository that has been `git init`ed
+/// but has no commits yet, to test the "git repo without commits" branch of
+/// the claims-require-git failure (REQ-04, jit:30a3b5c1). Distinct from
+/// [`setup_non_git_jit_repo`], which has no `.git` directory at all.
+fn setup_git_repo_without_commits() -> TempDir {
+    let temp = TempDir::new().unwrap();
+
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["init"])
+        .status()
+        .unwrap();
+
+    // Initialize jit only — deliberately no commit yet, so HEAD never resolves.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .arg("init")
+        .assert()
+        .success();
+
+    temp
+}
+
+/// REQ-04 (jit:30a3b5c1): a git repository with zero commits fails
+/// `--abbrev-ref HEAD` exactly like a directory with no git repository at
+/// all, but the hint must point at making a commit rather than `git init`
+/// (the repository already exists).
+#[test]
+fn test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init() {
+    let temp = setup_git_repo_without_commits();
+    let issue_id = create_issue(temp.path(), "Test Issue No Commits");
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+        ])
+        .assert()
+        .failure()
+        .code(10)
+        .stderr(predicate::str::contains("git repository"))
+        .stderr(predicate::str::contains("commit"))
+        .stderr(predicate::str::contains("git init").not());
+}
+
+/// JSON-mode counterpart of
+/// [`test_claim_acquire_in_git_repo_without_commits_hints_commit_not_git_init`]:
+/// same exit code and error code as the no-repository case, but the message
+/// hints a commit instead of `git init`.
+#[test]
+fn test_claim_acquire_json_in_git_repo_without_commits_hints_commit_not_git_init() {
+    let temp = setup_git_repo_without_commits();
+    let issue_id = create_issue(temp.path(), "Test Issue No Commits JSON");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:test-1",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(10));
+
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "CLAIM_REQUIRES_GIT");
+    let message = json["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("commit"),
+        "message must hint at making a commit, got: {message}"
+    );
+    assert!(
+        !message.contains("git init"),
+        "must not suggest `git init` for a repository that already exists, got: {message}"
+    );
+}
+
+// ============================================================================
+// REQ-03 (jit:30a3b5c1): assignment-command help and lease-command help each
+// cross-reference the other, since `issue claim`/`release` and `claim
+// acquire`/`release` share verbs but are different mechanisms (assignee
+// bookkeeping vs. an exclusive, time-boxed lease).
+// ============================================================================
+
+fn help_text(args: &[&str]) -> String {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .args(args)
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+#[test]
+fn test_issue_assign_help_cross_references_lease_commands() {
+    let help = help_text(&["issue", "assign", "--help"]);
+    assert!(
+        help.contains("jit claim acquire"),
+        "issue assign --help should cross-reference jit claim acquire, got: {help}"
+    );
+}
+
+#[test]
+fn test_issue_claim_help_cross_references_lease_commands() {
+    let help = help_text(&["issue", "claim", "--help"]);
+    assert!(
+        help.contains("jit claim acquire"),
+        "issue claim --help should cross-reference jit claim acquire, got: {help}"
+    );
+}
+
+#[test]
+fn test_issue_release_help_cross_references_lease_commands() {
+    let help = help_text(&["issue", "release", "--help"]);
+    assert!(
+        help.contains("jit claim acquire"),
+        "issue release --help should cross-reference jit claim acquire, got: {help}"
+    );
+}
+
+#[test]
+fn test_issue_unassign_help_cross_references_lease_commands() {
+    let help = help_text(&["issue", "unassign", "--help"]);
+    assert!(
+        help.contains("jit claim acquire"),
+        "issue unassign --help should cross-reference jit claim acquire, got: {help}"
+    );
+}
+
+#[test]
+fn test_claim_acquire_help_cross_references_assignment_commands() {
+    let help = help_text(&["claim", "acquire", "--help"]);
+    assert!(
+        help.contains("jit issue claim"),
+        "claim acquire --help should cross-reference jit issue claim, got: {help}"
+    );
+}
+
+#[test]
+fn test_claim_release_help_cross_references_assignment_commands() {
+    let help = help_text(&["claim", "release", "--help"]);
+    assert!(
+        help.contains("jit issue claim"),
+        "claim release --help should cross-reference jit issue claim, got: {help}"
     );
 }

@@ -72,6 +72,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     exit codes (`3` / `10`) and the human line on stderr. Previously `--json`
     produced an empty stdout for these.
 
+### Fixed
+
+- **Doubled "Error: Error:" prefix on `ActionableError` paths.** Any command
+  surfacing an `ActionableError`-derived failure (e.g. an already-claimed
+  lease, a missing acting identity, the claims-require-git failure) now prints
+  exactly one `Error:` prefix. `ActionableError::to_error_message()` no longer
+  embeds its own prefix; the top-level CLI printer is the sole place that adds
+  it.
+- **`jit issue claim` on an issue already assigned to a different assignee**
+  now names the current assignee and states that re-claiming as that same
+  assignee succeeds (and promotes it to `in_progress`), instead of the bare
+  "Issue is already assigned".
+- **`jit claim acquire`/`jit claim release` outside a git repository** now
+  distinguishes two causes instead of always suggesting `git init`: no git
+  repository at all (still hints `git init`) vs. a git repository with no
+  commits yet, so `HEAD` doesn't resolve to a branch (hints making an initial
+  commit instead). Same typed error and exit code (`10`) for both; only the
+  message differs.
+- **Help text cross-references between assignment and lease commands.**
+  `jit issue assign`/`claim`/`release`/`unassign` (assignee bookkeeping) and
+  `jit claim acquire`/`release` (exclusive, time-boxed leases) share verbs but
+  are different mechanisms; each command's `--help` now names its counterpart.
+
 ### Migration
 
 - **BREAKING — exit codes for prefix and batch-usage errors changed from `1` to

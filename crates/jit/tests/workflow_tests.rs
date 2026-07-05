@@ -447,6 +447,17 @@ fn test_workflow_error_scenarios() {
 
     let output = run_jit(&temp, &["issue", "claim", &id, "agent:worker-2"]);
     assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // REQ-02 (jit:30a3b5c1): the already-assigned error names the current
+    // holder and states that re-claiming as that same holder succeeds.
+    assert!(
+        stderr.contains("agent:worker-1"),
+        "must name the current holder, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("re-claiming as agent:worker-1 succeeds"),
+        "must hint that re-claiming as the same holder succeeds, got: {stderr}"
+    );
 }
 
 // ============================================================================

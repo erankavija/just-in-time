@@ -902,6 +902,9 @@ pub enum IssueCommands {
     },
 
     /// Assign issue to someone
+    ///
+    /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
+    /// work lease, see `jit claim acquire` / `jit claim release`.
     Assign {
         /// Issue ID
         id: String,
@@ -914,6 +917,9 @@ pub enum IssueCommands {
     },
 
     /// Claim an unassigned issue (atomic)
+    ///
+    /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
+    /// work lease, see `jit claim acquire` / `jit claim release`.
     Claim {
         /// Issue ID
         id: String,
@@ -930,6 +936,9 @@ pub enum IssueCommands {
     },
 
     /// Unassign an issue
+    ///
+    /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
+    /// work lease, see `jit claim acquire` / `jit claim release`.
     Unassign {
         /// Issue ID
         id: String,
@@ -952,6 +961,9 @@ pub enum IssueCommands {
     },
 
     /// Release an issue from its assignee (for timeout recovery)
+    ///
+    /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
+    /// work lease, see `jit claim acquire` / `jit claim release`.
     Release {
         /// Issue ID
         id: String,
@@ -2153,6 +2165,10 @@ pub enum ClaimCommands {
     /// Acquires an exclusive lease to work on an issue. Only one agent can hold
     /// a lease on an issue at a time, preventing conflicting edits.
     ///
+    /// A work lease, not issue assignment — for simple assignee bookkeeping,
+    /// see `jit issue assign` / `jit issue claim` / `jit issue release` /
+    /// `jit issue unassign`.
+    ///
     /// Examples:
     ///   jit claim acquire abc123 --ttl 600        # 10-minute lease
     ///   jit claim acquire abc123 --ttl 3600       # 1-hour lease
@@ -2183,6 +2199,10 @@ pub enum ClaimCommands {
     /// Resolves the issue's active lease and releases it WITHOUT requiring the
     /// lease UUID, regardless of which agent owns it. The acting identity is
     /// recorded in the audit trail. Errors if the issue has no active lease.
+    ///
+    /// A work lease, not issue assignment — for simple assignee bookkeeping,
+    /// see `jit issue assign` / `jit issue claim` / `jit issue release` /
+    /// `jit issue unassign`.
     ///
     /// Examples:
     ///   jit claim release abc123          # release whatever lease is active on issue abc123

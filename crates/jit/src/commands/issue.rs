@@ -776,7 +776,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let claimant: crate::domain::Assignee = assignee.parse()?;
         if let Some(existing) = &issue.assignee {
             if existing != &claimant {
-                return Err(anyhow!("Issue is already assigned"));
+                return Err(anyhow!(
+                    "Issue {full_id} is already assigned to {existing}; refusing to claim as \
+                     {claimant} (re-claiming as {existing} succeeds and promotes it to in_progress)"
+                ));
             }
         }
 
@@ -1294,7 +1297,9 @@ enforce_leases = "off"
     }
 
     /// REQ-02: claiming an issue already assigned to a DIFFERENT assignee must
-    /// still hard-fail exactly as before the idempotency fix.
+    /// still hard-fail exactly as before the idempotency fix. The message must
+    /// also name the current holder and state that re-claiming as that same
+    /// holder succeeds (jit:30a3b5c1 error message polish).
     #[test]
     fn test_claim_rejects_different_assignee_when_already_assigned() {
         let executor = setup();
@@ -1313,7 +1318,16 @@ enforce_leases = "off"
             result.is_err(),
             "claim by a different assignee must still be rejected"
         );
-        assert!(result.unwrap_err().to_string().contains("already assigned"));
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("already assigned"));
+        assert!(
+            msg.contains("agent:first"),
+            "must name the current holder, got: {msg}"
+        );
+        assert!(
+            msg.contains("re-claiming as agent:first succeeds"),
+            "must state that re-claiming as the same holder succeeds, got: {msg}"
+        );
 
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
