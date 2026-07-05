@@ -109,8 +109,12 @@ macro_rules! output_json {
 macro_rules! handle_json_error {
     ($json:expr, $err:expr, $json_error:expr) => {
         if $json {
-            println!("{}", $json_error.to_json_string()?);
-            std::process::exit($json_error.exit_code().code());
+            // Refine the call-site fallback when the underlying failure is a typed
+            // id-resolution error (ambiguous / too-short prefix), so those carry
+            // their distinguishing code and exit 2 at every call site.
+            let json_error = jit::output::refine_id_error(&$err, $json_error);
+            println!("{}", json_error.to_json_string()?);
+            std::process::exit(json_error.exit_code().code());
         } else {
             return Err($err);
         }

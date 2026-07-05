@@ -42,8 +42,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   in `--json` output it is now identified by `key` and its state by `status`,
   matching `issue show`'s existing `gates[].key` — the larger, pre-existing
   surface. See the Migration section below for the renamed fields.
+- **Typed exit codes for prefix and batch-usage errors; JSON envelope for
+  startup failures.** Argument-class failures that previously fell through to the
+  generic exit `1` are now classified:
+  - An **ambiguous id prefix** (matches multiple issues) and a **too-short id
+    prefix** (fewer than 4 characters) are argument errors (exit `2`), carrying
+    the distinguishing `code` `AMBIGUOUS_ID` / `INVALID_ID_PREFIX` under
+    `--json`. Human messages are unchanged.
+  - The **batch-mode usage guards** on `jit issue update --filter` (mutually
+    exclusive id/filter, and the `--content-format` / `--type` / description-flag
+    rejections) now exit `2`, matching clap's own usage errors, and emit a JSON
+    envelope under `--json`.
+  - `jit dep rm <from> <target>` now validates **both** id arguments identically:
+    a too-short or ambiguous prefix in either position is the same argument error
+    (exit `2`), where previously a short `<target>` was silently reported as "not
+    found" (exit `0`) while a short `<from>` exited `1`.
+  - **Startup failures under `--json`** (repository not found, repository format
+    too new) now emit a structured error object on stdout (`code`
+    `REPOSITORY_NOT_FOUND` / `REPOSITORY_FORMAT_TOO_NEW`) while keeping their
+    exit codes (`3` / `10`) and the human line on stderr. Previously `--json`
+    produced an empty stdout for these.
 
 ### Migration
+
+- **BREAKING — exit codes for prefix and batch-usage errors changed from `1` to
+  `2`.** Scripts that branch on the exit code of an ambiguous/too-short id prefix,
+  a `jit issue update --filter` usage guard, or `jit dep rm` with a bad id must
+  treat `2` (invalid argument) as the failure code for these cases. A short
+  `<target>` to `jit dep rm` that previously succeeded (exit `0`, reported under
+  `not_found`) now fails with exit `2`; pass a ≥4-character prefix or the full id.
+  Consumers on `--json` can branch on the new `code` values (`AMBIGUOUS_ID`,
+  `INVALID_ID_PREFIX`) instead of the exit code. No human-readable messages
+  changed.
+- **Additive — startup failures emit JSON on stdout under `--json`.** Callers of
+  any command with `--json` in an uninitialized repository, or against a
+  repository whose on-disk format is newer than the binary, now receive a parsable
+  `{"error": {...}}` object on stdout (previously stdout was empty). Exit codes
+  (`3` / `10`) and stderr are unchanged; consumers that only read the exit code
+  are unaffected.
 
 - **BREAKING — `jit issue show <id> <id> …` with `--json`.** Passing two or more
   ids previously emitted a bare JSON array (`[ {…}, {…} ]`). It now emits the

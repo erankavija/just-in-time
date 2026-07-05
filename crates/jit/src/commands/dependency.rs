@@ -407,37 +407,40 @@ impl<S: IssueStore> CommandExecutor<S> {
             let stored_match = if let Some(exact) = exact {
                 Some(exact)
             } else {
-                // Otherwise match by normalized prefix (≥4 chars). Collect ALL
-                // matches so an ambiguous prefix is rejected the way
-                // `resolve_issue_id` rejects it, rather than silently removing
-                // whichever edge happens to appear first (jit:f847df3f).
-                let matches: Vec<String> = if normalized.len() >= 4 {
-                    issue
-                        .dependencies
-                        .iter()
-                        .filter(|stored| {
-                            stored
-                                .to_lowercase()
-                                .replace('-', "")
-                                .starts_with(&normalized)
-                        })
-                        .cloned()
-                        .collect()
-                } else {
-                    Vec::new()
-                };
+                // No exact match: validate the target id the SAME way
+                // `resolve_issue_id` validates `<from>`, so both id arguments of
+                // `dep rm` are checked identically (jit:a05b87ae). A sub-4-char
+                // prefix is a typed argument error (exit 2), not a silent
+                // "not found" (exit 0).
+                if normalized.len() < 4 {
+                    return Err(crate::storage::InvalidIdPrefixError::new(dep_id.clone()).into());
+                }
+
+                // Match by normalized prefix, collecting ALL matches so an
+                // ambiguous prefix is rejected the way `resolve_issue_id` rejects
+                // it, rather than silently removing whichever edge happens to
+                // appear first (jit:f847df3f).
+                let matches: Vec<String> = issue
+                    .dependencies
+                    .iter()
+                    .filter(|stored| {
+                        stored
+                            .to_lowercase()
+                            .replace('-', "")
+                            .starts_with(&normalized)
+                    })
+                    .cloned()
+                    .collect();
 
                 match matches.as_slice() {
                     [] => None,
                     [only] => Some(only.clone()),
                     _ => {
-                        return Err(anyhow!(
-                            "Ambiguous dependency id '{}': matches {} stored dependencies ({}). \
-                             Use a longer id.",
-                            dep_id,
-                            matches.len(),
-                            matches.join(", ")
-                        ));
+                        return Err(crate::storage::AmbiguousIdError::dependency(
+                            dep_id.clone(),
+                            matches,
+                        )
+                        .into());
                     }
                 }
             };

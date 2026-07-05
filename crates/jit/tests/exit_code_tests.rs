@@ -1125,3 +1125,276 @@ fn test_exit_code_gate_preset_create_missing_registry_gate() {
         "stderr was: {stderr}"
     );
 }
+
+// ============================================================================
+// Prefix-resolution argument errors (issue a05b87ae)
+//
+// Ambiguous-prefix and too-short-prefix id lookups are argument errors (exit 2),
+// carrying a distinguishing `code` in `--json` output. Previously both fell
+// through to the generic exit 1.
+// ============================================================================
+
+/// Craft two issue files that share the `aaaabbbb` id prefix and register them in
+/// the on-disk index, so a lookup of that prefix is genuinely ambiguous. Returns
+/// the shared prefix. Uses a real issue's JSON as a template so every required
+/// field is present.
+fn make_ambiguous_prefix(temp_dir: &TempDir) -> &'static str {
+    let template_id = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(temp_dir)
+            .args(["issue", "create", "--title", "Template", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let issues_dir = temp_dir.path().join(".jit").join("issues");
+    let template_path = issues_dir.join(format!("{}.json", template_id));
+    let template: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&template_path).unwrap()).unwrap();
+
+    let crafted_ids = [
+        "aaaabbbb-1111-4111-8111-111111111111",
+        "aaaabbbb-2222-4222-8222-222222222222",
+    ];
+    for id in crafted_ids {
+        let mut issue = template.clone();
+        issue["id"] = serde_json::json!(id);
+        fs::write(
+            issues_dir.join(format!("{}.json", id)),
+            serde_json::to_string_pretty(&issue).unwrap(),
+        )
+        .unwrap();
+    }
+
+    // Register the crafted ids in the local index so resolve_issue_id sees them.
+    let index_path = temp_dir.path().join(".jit").join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    let all_ids = index["all_ids"].as_array_mut().unwrap();
+    for id in crafted_ids {
+        all_ids.push(serde_json::json!(id));
+    }
+    fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+
+    "aaaabbbb"
+}
+
+#[test]
+fn test_exit_code_ambiguous_prefix() {
+    let temp_dir = setup_test_env();
+    let prefix = make_ambiguous_prefix(&temp_dir);
+
+    // Human path: ambiguous prefix is an argument error (exit 2), preserving the
+    // original "Ambiguous ID" phrasing.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", prefix])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Ambiguous ID"), "stderr was: {stderr}");
+
+    // --json path: same exit code, distinguishing AMBIGUOUS_ID code on stdout.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", prefix, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Ambiguous ID"));
+}
+
+#[test]
+fn test_exit_code_too_short_prefix() {
+    let temp_dir = setup_test_env();
+
+    // Human path: a sub-4-char prefix is an argument error (exit 2), preserving
+    // the original phrasing.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", "ab"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("at least 4 characters"),
+        "stderr was: {stderr}"
+    );
+
+    // --json path: same exit code, distinguishing INVALID_ID_PREFIX code.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["issue", "show", "ab", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("at least 4 characters"));
+}
+
+/// REQ-02: the batch-mode description guard is a usage error (exit 2), matching
+/// clap usage errors and the other batch-mode rejections.
+#[test]
+fn test_exit_code_batch_description_guard() {
+    let temp_dir = setup_test_env();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args([
+            "issue",
+            "update",
+            "--filter",
+            "state:backlog",
+            "--append-description",
+            "a note",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not supported with --filter"));
+}
+
+/// REQ-03: `jit dep rm <from> <target>` validates both id arguments identically.
+/// A too-short prefix in either position is the same argument error (exit 2),
+/// where previously a short `<target>` was silently treated as "not found"
+/// (exit 0) while a short `<from>` exited 1.
+#[test]
+fn test_exit_code_dep_rm_both_args_symmetric() {
+    let temp_dir = setup_test_env();
+
+    let dependent = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Dependent", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let dependency = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Dependency", "--json"])
+            .output()
+            .unwrap(),
+    );
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap()
+        .success());
+
+    // Short `<from>`: argument error (exit 2).
+    let short_from = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "rm", "ab", &dependency])
+        .output()
+        .unwrap();
+    assert_eq!(
+        short_from.status.code(),
+        Some(2),
+        "short <from> should exit 2"
+    );
+    assert!(String::from_utf8_lossy(&short_from.stderr).contains("at least 4 characters"));
+
+    // Short `<target>`: SAME argument error (exit 2), not a silent no-op.
+    let short_target = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "rm", &dependent, "ab"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        short_target.status.code(),
+        Some(2),
+        "short <target> should exit 2 identically to short <from>"
+    );
+    assert!(String::from_utf8_lossy(&short_target.stderr).contains("at least 4 characters"));
+}
+
+// ============================================================================
+// Startup-failure JSON envelope (issue a05b87ae, REQ-04)
+//
+// With --json, startup failures that abort before a command handler runs
+// (repository not found, repository format too new) emit a structured error
+// object on stdout while keeping their exit codes (3 and 10).
+// ============================================================================
+
+#[test]
+fn test_exit_code_startup_repo_not_found_json_envelope() {
+    // Uninitialized directory: `--json` must produce a structured envelope on
+    // stdout AND keep exit code 3, with the human line still on stderr.
+    let temp_dir = TempDir::new().unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "all", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(3));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("startup failure should emit JSON on stdout under --json");
+    assert_eq!(json["error"]["code"], "REPOSITORY_NOT_FOUND");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("not found"));
+    // Human line stays on stderr.
+    assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
+}
+
+#[test]
+fn test_exit_code_startup_repo_not_found_non_json_stdout_empty() {
+    // Without --json the behavior is unchanged: bare stderr line, empty stdout.
+    let temp_dir = TempDir::new().unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "all"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty(), "non-json stdout must stay empty");
+    assert!(String::from_utf8_lossy(&output.stderr).contains(".jit"));
+}
+
+#[test]
+fn test_exit_code_startup_format_too_new_json_envelope() {
+    let temp_dir = setup_test_env();
+
+    // Bump the on-disk index schema version beyond what this binary supports.
+    let index_path = temp_dir.path().join(".jit").join("index.json");
+    let mut index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+    index["schema_version"] = serde_json::json!(9999);
+    fs::write(&index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "all", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(10));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("format-too-new failure should emit JSON on stdout under --json");
+    assert_eq!(json["error"]["code"], "REPOSITORY_FORMAT_TOO_NEW");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("newer than this jit"));
+    // Human line stays on stderr.
+    assert!(String::from_utf8_lossy(&output.stderr).contains("newer than this jit"));
+}

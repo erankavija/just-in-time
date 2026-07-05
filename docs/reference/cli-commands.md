@@ -2311,11 +2311,41 @@ echo "Completed Today: $DONE_TODAY"
 
 ### Exit Codes
 
-JIT uses standard exit codes for scripting:
+JIT uses a standardized exit-code taxonomy for scripting:
 
-- `0` - Success
-- `1` - Error (invalid input, file not found, etc.)
-- `2` - Validation error (cycle detected, gate failed, etc.)
+| Code | Meaning |
+|------|---------|
+| `0`  | Success |
+| `1`  | Generic error (unclassified failure) |
+| `2`  | Invalid argument / usage error |
+| `3`  | Resource not found (issue, gate, repository) |
+| `4`  | Validation failed (cycle detected, gate not passed, broken references) |
+| `5`  | Permission denied |
+| `6`  | Resource already exists |
+| `10` | External dependency failed (git, filesystem, repository format too new) |
+
+Argument-class failures that resolve an id prefix are exit `2`, each with a
+distinguishing `code` under `--json`:
+
+- **Ambiguous prefix** — a prefix matching more than one issue: `code`
+  `AMBIGUOUS_ID`. Human message begins `Ambiguous ID '<prefix>' matches multiple
+  issues:`.
+- **Too-short prefix** — a prefix shorter than the 4-character minimum: `code`
+  `INVALID_ID_PREFIX`. Human message is `Issue ID prefix must be at least 4
+  characters`.
+
+`jit dep rm <from> <target>` validates **both** id arguments identically: a
+too-short or ambiguous prefix in either position is the same argument error
+(exit `2`), rather than a short `<target>` being silently reported as "not
+found".
+
+**Startup failures under `--json`.** A failure that aborts before a command
+handler runs still prints its human line on stderr, and with `--json` also emits
+a structured error object on stdout while keeping its exit code:
+
+- **Repository not found** (exit `3`): `code` `REPOSITORY_NOT_FOUND`.
+- **Repository format too new** (exit `10`): `code` `REPOSITORY_FORMAT_TOO_NEW`
+  (the binary is older than the repository's on-disk format; upgrade `jit`).
 
 ```bash
 # Check exit codes

@@ -363,6 +363,14 @@ impl ErrorCode {
     pub const PARSE_ERROR: &'static str = "PARSE_ERROR";
     /// A claim/lease command was run outside a git repository (exit code 10).
     pub const CLAIM_REQUIRES_GIT: &'static str = "CLAIM_REQUIRES_GIT";
+    /// An id prefix matched more than one candidate (exit code 2).
+    pub const AMBIGUOUS_ID: &'static str = "AMBIGUOUS_ID";
+    /// An id prefix was shorter than the 4-character minimum (exit code 2).
+    pub const INVALID_ID_PREFIX: &'static str = "INVALID_ID_PREFIX";
+    /// No `.jit` repository exists at the resolved data directory (exit code 3).
+    pub const REPOSITORY_NOT_FOUND: &'static str = "REPOSITORY_NOT_FOUND";
+    /// The repository's on-disk format is newer than this binary supports (exit code 10).
+    pub const REPOSITORY_FORMAT_TOO_NEW: &'static str = "REPOSITORY_FORMAT_TOO_NEW";
 }
 
 impl ErrorCode {
@@ -373,12 +381,69 @@ impl ErrorCode {
             Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::BLOCKED | Self::GATE_FAILED => {
                 ExitCode::ValidationFailed
             }
-            Self::INVALID_ARGUMENT | Self::INVALID_STATE => ExitCode::InvalidArgument,
+            Self::INVALID_ARGUMENT
+            | Self::INVALID_STATE
+            | Self::AMBIGUOUS_ID
+            | Self::INVALID_ID_PREFIX => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
-            Self::IO_ERROR | Self::CLAIM_REQUIRES_GIT => ExitCode::ExternalError,
+            Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
+            Self::IO_ERROR | Self::CLAIM_REQUIRES_GIT | Self::REPOSITORY_FORMAT_TOO_NEW => {
+                ExitCode::ExternalError
+            }
             _ => ExitCode::GenericError,
         }
     }
+}
+
+/// Refine a fallback JSON error when the underlying failure is a typed
+/// id-resolution error.
+///
+/// The generic `--json` error path at each command hands in a call-site fallback
+/// (e.g. `ISSUE_NOT_FOUND`). When the actual failure is an ambiguous-prefix or
+/// too-short-prefix id lookup, that fallback misreports both the code and the
+/// exit class, so this replaces it with the matching argument error
+/// (`AMBIGUOUS_ID` / `INVALID_ID_PREFIX`, exit code 2) carrying the offending
+/// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
+/// is a no-op for the vast majority of call sites.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::{refine_id_error, ErrorCode, JsonError};
+/// use jit::storage::InvalidIdPrefixError;
+///
+/// let err: anyhow::Error = InvalidIdPrefixError::new("ab").into();
+/// let fallback = JsonError::new(ErrorCode::ISSUE_NOT_FOUND, "Issue not found: ab", "issue show");
+/// let refined = refine_id_error(&err, fallback);
+/// assert_eq!(refined.exit_code(), jit::ExitCode::InvalidArgument);
+///
+/// // A non-prefix error keeps the fallback untouched.
+/// let other = anyhow::anyhow!("something else");
+/// let fallback = JsonError::new(ErrorCode::ISSUE_NOT_FOUND, "Issue not found", "issue show");
+/// let kept = refine_id_error(&other, fallback);
+/// assert_eq!(kept.exit_code(), jit::ExitCode::NotFound);
+/// ```
+pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
+    if let Some(prefix_error) = error.downcast_ref::<crate::storage::InvalidIdPrefixError>() {
+        return JsonError::new(
+            ErrorCode::INVALID_ID_PREFIX,
+            prefix_error.to_string(),
+            String::new(),
+        )
+        .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
+    }
+    if let Some(ambiguous) = error.downcast_ref::<crate::storage::AmbiguousIdError>() {
+        return JsonError::new(
+            ErrorCode::AMBIGUOUS_ID,
+            ambiguous.to_string(),
+            String::new(),
+        )
+        .with_details(serde_json::json!({
+            "prefix": ambiguous.prefix(),
+            "matches": ambiguous.matches(),
+        }));
+    }
+    fallback
 }
 
 /// Helper to create common error responses

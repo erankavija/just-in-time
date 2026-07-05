@@ -159,6 +159,18 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // subprocess/git output (`String::from_utf8` / `str::from_utf8`, possibly
     // behind a `.context(...)` describing which output) all map to exit code 2 by
     // downcast against their concrete types.
+    // An ambiguous or too-short id prefix is an argument error (exit 2): the
+    // caller gave an id that does not uniquely (or legally) resolve. Classified
+    // by downcast against the typed storage errors, never by message text.
+    if error
+        .downcast_ref::<jit::storage::AmbiguousIdError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::storage::InvalidIdPrefixError>()
+            .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
     if error
         .downcast_ref::<jit::errors::InvalidArgumentError>()
         .is_some()
@@ -1130,12 +1142,50 @@ fn main() {
         Ok(()) => ExitCode::Success,
         Err(e) => {
             eprintln!("Error: {}", e);
+            emit_startup_json_error(&e);
             error_to_exit_code(&e)
         }
     };
 
     if exit_code != ExitCode::Success {
         std::process::exit(exit_code.code());
+    }
+}
+
+/// Under `--json`, emit a structured error envelope on stdout for the startup
+/// failures that abort before any command handler runs: repository-not-found
+/// (exit 3) and repository-format-too-new (exit 10).
+///
+/// The human-readable line always goes to stderr (via `main`) and the exit code
+/// is unchanged; this only ADDS the machine-readable object so `--json` callers
+/// can branch on the error class instead of parsing an empty stdout. The `--json`
+/// flag is read from argv because these failures occur during repository
+/// discovery/validation, before a parsed command-level `json` field exists. A
+/// no-op unless the error is one of the two startup conditions AND `--json` was
+/// requested, so command handlers (which already render their own JSON) never
+/// double-print.
+fn emit_startup_json_error(error: &anyhow::Error) {
+    if !std::env::args().any(|arg| arg == "--json") {
+        return;
+    }
+
+    use jit::output::{ErrorCode, JsonError};
+    let json_error = if error
+        .downcast_ref::<jit::storage::RepositoryNotFoundError>()
+        .is_some()
+    {
+        JsonError::new(ErrorCode::REPOSITORY_NOT_FOUND, error.to_string(), "")
+    } else if error
+        .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
+        .is_some()
+    {
+        JsonError::new(ErrorCode::REPOSITORY_FORMAT_TOO_NEW, error.to_string(), "")
+    } else {
+        return;
+    };
+
+    if let Ok(rendered) = json_error.to_json_string() {
+        println!("{}", rendered);
     }
 }
 
@@ -1703,28 +1753,42 @@ fn run() -> Result<()> {
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
 
+                    // Batch-mode argument guards are usage errors (exit 2), the
+                    // same class as clap's own usage errors — routed through the
+                    // json-aware `invalid_argument` helper so `--json` callers get
+                    // a machine-readable envelope instead of a bare stderr line.
+
                     // Validate: exactly one of ID or filter must be provided
                     if id.is_none() && filter.is_none() {
-                        return Err(anyhow!(
-                            "Must specify either issue ID or --filter for batch mode"
+                        return Err(invalid_argument(
+                            "Must specify either issue ID or --filter for batch mode".to_string(),
+                            "issue update",
+                            json,
                         ));
                     }
                     if id.is_some() && filter.is_some() {
-                        return Err(anyhow!(
-                            "Cannot specify both ID and --filter (mutually exclusive)"
+                        return Err(invalid_argument(
+                            "Cannot specify both ID and --filter (mutually exclusive)".to_string(),
+                            "issue update",
+                            json,
                         ));
                     }
                     // --content-format is a per-issue field; batch mode does not
                     // support it (would set the same format on every match).
                     if filter.is_some() && content_format.is_some() {
-                        return Err(anyhow!(
-                            "--content-format is not supported with --filter (batch mode); set it per issue"
+                        return Err(invalid_argument(
+                            "--content-format is not supported with --filter (batch mode); set it per issue".to_string(),
+                            "issue update",
+                            json,
                         ));
                     }
                     // --type is a per-issue field; batch mode does not support it.
                     if filter.is_some() && issue_type.is_some() {
-                        return Err(anyhow!(
+                        return Err(invalid_argument(
                             "--type is not supported with --filter (batch mode); set it per issue"
+                                .to_string(),
+                            "issue update",
+                            json,
                         ));
                     }
                     // Description edits are per-issue (a replace/append against
@@ -1737,8 +1801,10 @@ fn run() -> Result<()> {
                             || append_description.is_some()
                             || append_description_file.is_some())
                     {
-                        return Err(anyhow!(
-                            "description flags (--description/--description-file/--append-description/--append-description-file) are not supported with --filter (batch mode); update descriptions per issue"
+                        return Err(invalid_argument(
+                            "description flags (--description/--description-file/--append-description/--append-description-file) are not supported with --filter (batch mode); update descriptions per issue".to_string(),
+                            "issue update",
+                            json,
                         ));
                     }
 
@@ -2417,16 +2483,19 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let error_str = e.to_string();
-                            let json_error =
-                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep rm");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
+                        // `handle_json_error!` refines the fallback when the
+                        // failure is a typed id-resolution error (ambiguous /
+                        // too-short prefix), so those carry their distinguishing
+                        // code and exit 2 instead of the generic DEPENDENCY_ERROR.
+                        handle_json_error!(
+                            json,
+                            e,
+                            jit::output::JsonError::new(
+                                "DEPENDENCY_ERROR",
+                                e.to_string(),
+                                "dep rm",
+                            )
+                        );
                     }
                 }
             }

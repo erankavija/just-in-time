@@ -5,7 +5,8 @@
 
 use crate::domain::{Event, Issue};
 use crate::storage::{
-    GateRegistry, GateRunNotFoundError, IssueNotFoundError, IssueStore, PresetNotFoundError,
+    AmbiguousIdError, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
+    IssueStore, PresetNotFoundError,
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -147,7 +148,7 @@ impl IssueStore for InMemoryStorage {
 
         // Minimum length check
         if normalized.len() < 4 {
-            return Err(anyhow!("Issue ID prefix must be at least 4 characters"));
+            return Err(InvalidIdPrefixError::new(partial_id).into());
         }
 
         // Find matching issues
@@ -171,11 +172,7 @@ impl IssueStore for InMemoryStorage {
                             .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
                     })
                     .collect();
-                Err(anyhow!(
-                    "Ambiguous ID '{}' matches multiple issues:\n  {}",
-                    partial_id,
-                    issue_list.join("\n  ")
-                ))
+                Err(AmbiguousIdError::issue(partial_id, issue_list).into())
             }
         }
     }

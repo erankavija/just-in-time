@@ -353,6 +353,125 @@ impl RepositoryFormatTooNewError {
     }
 }
 
+/// Error raised when an id prefix is too short to resolve (fewer than 4 chars).
+///
+/// Returned by the storage layer's [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id)
+/// and by `jit dep rm`'s per-target prefix matching. The CLI downcasts to this
+/// type to classify the failure as an argument error (exit code `2`) and to
+/// render an `INVALID_ID_PREFIX` JSON error, rather than scanning the message
+/// text. `Display` reproduces the previous `anyhow!` phrasing verbatim; the
+/// offending prefix is carried separately for the JSON `details` field.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::InvalidIdPrefixError;
+///
+/// let err = InvalidIdPrefixError::new("ab");
+/// assert_eq!(err.to_string(), "Issue ID prefix must be at least 4 characters");
+/// assert_eq!(err.prefix(), "ab");
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error("Issue ID prefix must be at least 4 characters")]
+pub struct InvalidIdPrefixError {
+    prefix: String,
+}
+
+impl InvalidIdPrefixError {
+    /// Build an [`InvalidIdPrefixError`] carrying the too-short prefix.
+    pub fn new(prefix: impl Into<String>) -> Self {
+        Self {
+            prefix: prefix.into(),
+        }
+    }
+
+    /// The offending (too-short) prefix.
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+}
+
+/// Error raised when an id prefix matches more than one candidate.
+///
+/// Two origins share this type: resolving an issue-id prefix against the repo
+/// index ([`Issue`](Self::Issue)) and removing a dependency edge by prefix
+/// against an issue's own stored dependencies ([`Dependency`](Self::Dependency)).
+/// The CLI downcasts to this type to classify the failure as an argument error
+/// (exit code `2`) and to render an `AMBIGUOUS_ID` JSON error. Each variant's
+/// `Display` reproduces the exact phrasing of the call site it replaced.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::AmbiguousIdError;
+///
+/// let issue = AmbiguousIdError::issue("aaaa", ["aaaa1111 | One".to_string()]);
+/// assert!(issue.to_string().starts_with("Ambiguous ID 'aaaa' matches multiple issues:"));
+/// assert_eq!(issue.prefix(), "aaaa");
+///
+/// let dep = AmbiguousIdError::dependency("bbbb", ["bbbb1", "bbbb2"].map(String::from));
+/// assert!(dep.to_string().starts_with("Ambiguous dependency id 'bbbb':"));
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum AmbiguousIdError {
+    /// An issue-id prefix matched multiple issues in the repository index.
+    #[error("Ambiguous ID '{prefix}' matches multiple issues:\n  {}", .matches.join("\n  "))]
+    Issue {
+        /// The prefix that resolved ambiguously.
+        prefix: String,
+        /// Human-readable descriptions of the matched issues ("short_id | title").
+        matches: Vec<String>,
+    },
+    /// A dependency-edge prefix matched multiple of an issue's stored dependencies.
+    #[error(
+        "Ambiguous dependency id '{prefix}': matches {} stored dependencies ({}). \
+         Use a longer id.",
+        .matches.len(),
+        .matches.join(", ")
+    )]
+    Dependency {
+        /// The prefix that resolved ambiguously.
+        prefix: String,
+        /// The matched stored dependency ids.
+        matches: Vec<String>,
+    },
+}
+
+impl AmbiguousIdError {
+    /// Build an [`AmbiguousIdError::Issue`] for an ambiguous issue-id prefix.
+    pub fn issue(prefix: impl Into<String>, matches: impl IntoIterator<Item = String>) -> Self {
+        Self::Issue {
+            prefix: prefix.into(),
+            matches: matches.into_iter().collect(),
+        }
+    }
+
+    /// Build an [`AmbiguousIdError::Dependency`] for an ambiguous dependency prefix.
+    pub fn dependency(
+        prefix: impl Into<String>,
+        matches: impl IntoIterator<Item = String>,
+    ) -> Self {
+        Self::Dependency {
+            prefix: prefix.into(),
+            matches: matches.into_iter().collect(),
+        }
+    }
+
+    /// The prefix that resolved ambiguously.
+    pub fn prefix(&self) -> &str {
+        match self {
+            Self::Issue { prefix, .. } | Self::Dependency { prefix, .. } => prefix,
+        }
+    }
+
+    /// The matched candidate descriptions.
+    pub fn matches(&self) -> &[String] {
+        match self {
+            Self::Issue { matches, .. } | Self::Dependency { matches, .. } => matches,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,5 +593,44 @@ mod tests {
         let typed = err.downcast_ref::<RepositoryFormatTooNewError>();
         assert!(typed.is_some());
         assert_eq!(typed.unwrap().repository_version(), 3);
+    }
+
+    #[test]
+    fn test_invalid_id_prefix_message_accessor_and_downcast() {
+        let err = InvalidIdPrefixError::new("ab");
+        // Message preserved verbatim from the previous `anyhow!` origin.
+        assert_eq!(
+            err.to_string(),
+            "Issue ID prefix must be at least 4 characters"
+        );
+        assert_eq!(err.prefix(), "ab");
+        let any: anyhow::Error = err.into();
+        assert!(any.downcast_ref::<InvalidIdPrefixError>().is_some());
+    }
+
+    #[test]
+    fn test_ambiguous_id_issue_variant_message_and_accessors() {
+        let err = AmbiguousIdError::issue(
+            "aaaa",
+            ["aaaa1111 | One".to_string(), "aaaa2222 | Two".to_string()],
+        );
+        assert_eq!(
+            err.to_string(),
+            "Ambiguous ID 'aaaa' matches multiple issues:\n  aaaa1111 | One\n  aaaa2222 | Two"
+        );
+        assert_eq!(err.prefix(), "aaaa");
+        assert_eq!(err.matches().len(), 2);
+        let any: anyhow::Error = err.into();
+        assert!(any.downcast_ref::<AmbiguousIdError>().is_some());
+    }
+
+    #[test]
+    fn test_ambiguous_id_dependency_variant_message() {
+        let err = AmbiguousIdError::dependency("bbbb", ["bbbb1", "bbbb2"].map(String::from));
+        assert_eq!(
+            err.to_string(),
+            "Ambiguous dependency id 'bbbb': matches 2 stored dependencies (bbbb1, bbbb2). \
+             Use a longer id."
+        );
     }
 }

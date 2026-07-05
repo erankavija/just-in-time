@@ -8,8 +8,8 @@
 
 use crate::domain::{Event, Issue};
 use crate::storage::{
-    FileLocker, GateRegistry, GateRunNotFoundError, IssueNotFoundError, IssueStore,
-    RepositoryFormatTooNewError, RepositoryNotFoundError,
+    AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
+    IssueNotFoundError, IssueStore, RepositoryFormatTooNewError, RepositoryNotFoundError,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -611,7 +611,7 @@ impl IssueStore for JsonFileStorage {
 
         // Minimum length check
         if normalized.len() < 4 {
-            return Err(anyhow!("Issue ID prefix must be at least 4 characters"));
+            return Err(InvalidIdPrefixError::new(partial_id).into());
         }
 
         // Load aggregated index to search across all sources
@@ -636,11 +636,7 @@ impl IssueStore for JsonFileStorage {
                             .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
                     })
                     .collect();
-                Err(anyhow!(
-                    "Ambiguous ID '{}' matches multiple issues:\n  {}",
-                    partial_id,
-                    issue_list.join("\n  ")
-                ))
+                Err(AmbiguousIdError::issue(partial_id, issue_list).into())
             }
         }
     }

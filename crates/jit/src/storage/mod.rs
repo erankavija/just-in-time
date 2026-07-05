@@ -36,8 +36,9 @@ pub mod worktree_paths;
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
-    GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError, IssueNotFoundError,
-    PresetNotFoundError, RepositoryFormatTooNewError, RepositoryNotFoundError,
+    AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,
+    InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
+    RepositoryNotFoundError,
 };
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
