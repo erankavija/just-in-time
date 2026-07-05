@@ -6,9 +6,9 @@
   "priority": "normal",
   "assignee": null,
   "dependencies": [
-    "fbe0a401-ac86-47f8-a87f-b0760d06283b",
-    "96f0c39f-bd6f-44a0-9dac-5b366ada1999",
     "73d98a98-1ab9-4a5b-9022-5e34298ec6d4",
+    "8b293a0b-39ab-4cd2-9f7f-78c3376bd1ff",
+    "fbe0a401-ac86-47f8-a87f-b0760d06283b",
     "241a0c03-7299-4ca0-a7f5-1f56cbdd02b2"
   ],
   "gates_required": [
@@ -50,6 +50,6 @@
     "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:01:10.263513476Z",
-  "updated_at": "2026-07-05T19:51:13.033788260Z",
+  "updated_at": "2026-07-05T21:45:38.967774253Z",
   "done_at": "2026-06-27T01:17:15.720700845Z"
 }

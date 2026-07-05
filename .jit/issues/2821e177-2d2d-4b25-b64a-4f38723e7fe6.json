@@ -6,10 +6,10 @@
   "priority": "normal",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
-    "d30695e4-3148-4c65-9b65-faad637829b3",
     "ebb6ad45-2792-46ba-8d45-dd269da41069",
     "7f22d6cf-e2d6-4103-b941-690f602734c1",
-    "9a7106ae-e935-4e10-a76b-c0674a4d1642"
+    "d30695e4-3148-4c65-9b65-faad637829b3",
+    "cd1da611-c869-4d7b-968e-4ea20ff4481f"
   ],
   "gates_required": [
     "cargo-ci",
@@ -17,6 +17,11 @@
     "repo-validate"
   ],
   "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T22:59:36.756254060Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -26,11 +31,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T22:59:36.983360485Z"
-    },
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T22:59:36.756254060Z"
     }
   },
   "context": {},
@@ -168,7 +168,7 @@
     "type:epic"
   ],
   "created_at": "2026-06-28T11:52:45.519022826Z",
-  "updated_at": "2026-07-05T19:51:12.929195154Z",
+  "updated_at": "2026-07-05T21:45:38.896250661Z",
   "first_ready_at": "2026-07-03T22:55:41.459749658Z",
   "done_at": "2026-07-03T23:04:34.850621637Z"
 }

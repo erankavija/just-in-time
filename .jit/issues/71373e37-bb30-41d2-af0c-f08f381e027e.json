@@ -6,12 +6,13 @@
   "priority": "high",
   "assignee": "agent:copilot-cli",
   "dependencies": [
+    "b323dfc0-7d69-4ed0-bf11-d0668a66ab39",
     "6f6b842a-67cd-4032-91ba-253dab6f9754",
-    "a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139",
     "ac99db8b-85a8-4865-8199-a1ea76017650",
     "165cf162-1cb1-491d-8c92-b2fb571e7f4c",
-    "b323dfc0-7d69-4ed0-bf11-d0668a66ab39",
-    "ed5241de-d5b7-47ea-b156-58d978b42eeb"
+    "a8f2f04b-f5e4-4cf7-9af4-7d714a2f7139",
+    "ed5241de-d5b7-47ea-b156-58d978b42eeb",
+    "9112af40-3d32-4b21-8eda-51d65f5ce405"
   ],
   "gates_required": [
     "code-review"
@@ -51,7 +52,7 @@
     "component:docs"
   ],
   "created_at": "2025-12-28T01:16:19.961532900Z",
-  "updated_at": "2026-07-05T19:51:13.003101637Z",
+  "updated_at": "2026-07-05T21:45:52.141524723Z",
   "first_ready_at": "2025-12-28T00:07:42.436180506Z",
   "claimed_at": "2025-12-28T01:16:19.942378785Z",
   "done_at": "2025-12-28T01:16:20.027436271Z"

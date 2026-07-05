@@ -6,7 +6,9 @@
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [
-    "d4db778e-0c07-4c86-b2a3-7d3f04ece84e"
+    "d4db778e-0c07-4c86-b2a3-7d3f04ece84e",
+    "3323ceb5-c5c6-4c10-a322-bbb8b979b96c",
+    "c02e7ca8-6989-4368-aae4-f0bac23705da"
   ],
   "gates_required": [
     "code-review"
@@ -36,7 +38,7 @@
     "story:modular-document-rendering"
   ],
   "created_at": "2026-05-06T13:08:56.649016226Z",
-  "updated_at": "2026-07-05T19:51:13.126663507Z",
+  "updated_at": "2026-07-05T21:45:52.208877882Z",
   "first_ready_at": "2026-05-06T15:17:52.044076660Z",
   "claimed_at": "2026-05-06T15:18:09.160882437Z",
   "done_at": "2026-05-06T15:27:27.795574303Z"
