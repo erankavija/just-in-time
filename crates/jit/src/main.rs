@@ -1961,13 +1961,42 @@ fn run() -> Result<()> {
                     // projected from the same enriched show response so the unmet
                     // dependency set stays byte-for-byte consistent with
                     // `issue show --json`.
-                    let statuses = ids
-                        .iter()
-                        .map(|id| {
-                            build_issue_show_response(&executor, id)
-                                .map(|resp| jit::output::IssueStatusResponse::from_show(&resp))
-                        })
-                        .collect::<Result<Vec<_>>>()?;
+                    //
+                    // Resolve each id inline (not via `build_issue_show_response`,
+                    // which wraps the lookup error in `.with_context` and would
+                    // hide the typed id-resolution error from `refine_id_error`'s
+                    // downcast). A bad id is routed through `handle_json_error!`
+                    // exactly like `issue show`: under `--json` it prints the
+                    // refined error envelope (ISSUE_NOT_FOUND / INVALID_ID_PREFIX /
+                    // AMBIGUOUS_ID with the matching exit code) and exits, so a
+                    // multi-id run fails fast on the first bad id.
+                    let mut statuses = Vec::with_capacity(ids.len());
+                    for id in &ids {
+                        match executor.show_issue(id) {
+                            Ok(issue) => {
+                                let enriched_deps = executor.get_dependencies_enriched(&issue);
+                                let gate_runs = executor
+                                    .list_gate_runs(&issue.id, None)
+                                    .with_context(|| {
+                                        format!("Failed to load gate runs for issue {}", issue.id)
+                                    })?;
+                                let response = jit::output::IssueShowResponse::from_issue(
+                                    issue,
+                                    enriched_deps,
+                                    &gate_runs,
+                                );
+                                statuses
+                                    .push(jit::output::IssueStatusResponse::from_show(&response));
+                            }
+                            Err(e) => {
+                                handle_json_error!(
+                                    json,
+                                    e,
+                                    jit::output::JsonError::issue_not_found(id, "issue status")
+                                );
+                            }
+                        }
+                    }
 
                     if json {
                         if statuses.len() == 1 {

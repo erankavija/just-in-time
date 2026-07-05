@@ -327,3 +327,79 @@ fn test_status_unknown_id_fails() {
         .assert()
         .failure();
 }
+
+/// Under `--json`, a non-matching (but long-enough) id yields the JSON error
+/// envelope with `ISSUE_NOT_FOUND` and exit code 3 — the same contract as
+/// `issue show`, routed through `handle_json_error!`. Pins that id failures do
+/// not escape to bare human stderr when `--json` is requested.
+#[test]
+fn test_status_unknown_id_json_error_envelope() {
+    let temp = setup();
+    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "status", "deadbeef", "--json"])
+        .assert()
+        .failure()
+        .code(3);
+    let out = assert.get_output().stdout.clone();
+    let json: serde_json::Value = serde_json::from_slice(&out)
+        .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {out:?}"));
+    assert_eq!(json["error"]["code"].as_str(), Some("ISSUE_NOT_FOUND"));
+}
+
+/// A too-short prefix (< 4 chars) refines to `INVALID_ID_PREFIX` with exit code
+/// 2, distinct from the not-found code — proving `refine_id_error` runs on the
+/// status path exactly as on `issue show`.
+#[test]
+fn test_status_short_prefix_json_error_envelope() {
+    let temp = setup();
+    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "status", "ab", "--json"])
+        .assert()
+        .failure()
+        .code(2);
+    let out = assert.get_output().stdout.clone();
+    let json: serde_json::Value = serde_json::from_slice(&out)
+        .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {out:?}"));
+    assert_eq!(json["error"]["code"].as_str(), Some("INVALID_ID_PREFIX"));
+}
+
+/// Multi-id `--json` where one id is bad fails fast on the whole command with a
+/// JSON error envelope (no partial `{count, issues}` success), matching
+/// `issue show`'s multi-id semantics.
+#[test]
+fn test_status_multi_id_one_bad_fails_fast_json() {
+    let temp = setup();
+    let good = create_issue(&temp, "Good");
+
+    let assert = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "status", &good, "deadbeef", "--json"])
+        .assert()
+        .failure()
+        .code(3);
+    let out = assert.get_output().stdout.clone();
+    let text = String::from_utf8_lossy(&out);
+    let json: serde_json::Value = serde_json::from_slice(&out)
+        .unwrap_or_else(|_| panic!("--json failure must be a JSON envelope: {text:?}"));
+    assert_eq!(json["error"]["code"].as_str(), Some("ISSUE_NOT_FOUND"));
+    // Fail-fast: no partial success envelope for the good id leaked out.
+    assert!(
+        !text.contains("\"count\""),
+        "must not emit a partial list envelope: {text:?}"
+    );
+}
+
+/// Non-`--json` multi-id with one bad id also fails the whole command (human
+/// stderr path), so text and JSON modes agree on fail-fast.
+#[test]
+fn test_status_multi_id_one_bad_fails_fast_text() {
+    let temp = setup();
+    let good = create_issue(&temp, "Good");
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "status", &good, "deadbeef"])
+        .assert()
+        .failure();
+}
