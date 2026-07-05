@@ -2,7 +2,7 @@
   "id": "30a3b5c1-ef01-472d-9b38-52a18ffb8b5b",
   "title": "Error message polish: prefixes, assignee context, claim cross-references",
   "description": "Live-confirmed rough edges in error and help text that misdirect agents.\n\n## Background\n\nActionableError messages print a doubled \"Error: Error:\" prefix; \"Issue is already assigned\" names neither the holder nor that same-assignee re-claim succeeds; the assignment commands (issue claim/release/unassign) and the lease commands (claim acquire/release) share verbs without cross-referencing each other in help; the claims-require-git failure suggests \"git init\" even when the actual condition is a git repository with no commits yet.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Error output carries exactly one \"Error:\" prefix on every error path.\n- [ ] [hard] REQ-02: The already-assigned error names the current assignee and states that re-claim by the same assignee succeeds.\n- [ ] [hard] REQ-03: Assignment-command help and lease-command help each carry a one-line cross-reference distinguishing assignment from lease.\n- [ ] [hard] REQ-04: The claims-require-git failure distinguishes a missing git repository from a repository with no commits and hints accordingly.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T14:04:29.582728616Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T14:05:29.231100151Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -19,5 +30,5 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:03:08.353777752Z",
-  "updated_at": "2026-07-05T13:14:35.869031119Z"
+  "updated_at": "2026-07-05T14:07:35.580419850Z"
 }

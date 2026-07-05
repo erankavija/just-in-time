@@ -2,7 +2,7 @@
   "epic_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "epic_short_id": "6eb585bc",
   "batch": "usability-maintenance-2026-07-05 (15 children filed from usability audit + session mining; prior 8-child batch complete, see dev/active/6eb585bc-batch-report-2026-07-05.md)",
-  "current_wave": 5,
+  "current_wave": 6,
   "note": "15 open leaf children, no inter-sibling deps. Serial waves (invoker directive + main.rs/cli.rs contention). Order: output-shape conventions first (envelope, gate fields) so later features emit final shapes; doc/help sweeps last. Worker model per difficulty: sonnet easy, opus hard (invoker directive). Workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit binary (cargo install --path crates/jit) after waves changing output/storage shapes before running gates that consume them. DOGFOOD (invoker directive): after each wave lands + reinstall, the lead's own orchestration commands must use the newly landed features (envelope keys, gate status fields, repeatable --label, issue status projection, children rollup, config get, --full export); log friction found while dogfooding here and file candidates at batch end.",
   "waves": [
     {
@@ -61,7 +61,7 @@
           "title": "Error message polish: prefixes, assignee context, claim cross-references",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -189,6 +189,9 @@
   "created_during_execution": [
     {
       "note": "dogfood friction: installed binary lags workspace during a wave; lead must use ./target/debug/jit for post-wave checks until reinstall (hit on b1586c0d gate check-all)."
+    },
+    {
+      "note": "30a3b5c1 worker root-caused + fixed the shared-TMPDIR .git leak from test_is_secondary_worktree_detection (the prior batch's test-hygiene follow-up observation); leak fixture corrected and dev cache cleaned."
     }
   ],
   "escalations": [],
