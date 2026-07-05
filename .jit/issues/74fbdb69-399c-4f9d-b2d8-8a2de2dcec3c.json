@@ -1,0 +1,23 @@
+{
+  "id": "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c",
+  "title": "Uniform JSON list envelope across query and list commands",
+  "description": "List-emitting commands return differing top-level JSON shapes; agents guessed bare arrays, got silently empty jq projections, and settled on a defensive dual-path parser repeated verbatim across sessions (~29 occurrences mined, plus fallback command chains).\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Every list- and query-family command's JSON output uses one documented envelope with the collection under a single stable key.\n- [ ] [hard] REQ-02: The envelope is stated in each command's help and in the CLI reference.\n- [ ] [hard] REQ-03: Any shape change is called out in a migration note in the changelog or release notes.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:03:08.382534643Z",
+  "updated_at": "2026-07-05T10:03:08.383868874Z"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "7fe5c743-47b4-4b14-b745-7b4d507bc317",
+  "title": "Container child rollup and state aggregation queries",
+  "description": "Progress over a container (epic or story) is computed client-side today: agents loop a per-child show command or run counter scripts over query output. Transcript mining found ~30 such loops and rollups, and an external tool reimplemented the same aggregation from raw storage files.\n\n## Background\n\nShowing a container lists its dependencies but offers no aggregate; repository status is global only. The needed views are per-child status and counts by state for a container or label bucket.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A command lists a container's children with short id, state, title, and gate rollup per child, in text and JSON.\n- [ ] [hard] REQ-02: An aggregation form reports counts by state and done/total for a container or any label filter.\n- [ ] [hard] REQ-03: Semantics over both containment expressions (dependency edges and membership labels) are documented, including which is authoritative for the rollup.\n- [ ] [hard] REQ-04: Documented in the CLI reference with the JSON shapes.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:02:41.480659421Z",
+  "updated_at": "2026-07-05T10:02:41.482132832Z"
+}

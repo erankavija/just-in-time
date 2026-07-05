@@ -1,0 +1,23 @@
+{
+  "id": "dc3bef62-523a-4528-b86c-a576b8c97ed0",
+  "title": "Repeatable AND-combined label filters across query commands",
+  "description": "The query family accepts the label filter only once (`--label a --label b` fails with \"cannot be used multiple times\") while issue search AND-combines repeated labels. Orchestrators cannot express \"ready work in epic X with component Y\" through the commands built for that purpose; the failure was confirmed live.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: query all/available/blocked and the issue list command accept a repeated label flag, AND-combined, matching issue search semantics.\n- [ ] [hard] REQ-02: Help text states the AND semantics on every command taking the label filter.\n- [ ] [hard] REQ-03: Single-label invocations behave exactly as before.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:03:08.296004900Z",
+  "updated_at": "2026-07-05T10:03:08.297509881Z"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
+  "title": "Hierarchy resolution in core shared by CLI and web UI",
+  "description": "Parent, child, and cluster resolution — containment derived from dependency edges plus membership labels, nearest-dominator parent, cluster assignment — exists only in the web UI's TypeScript. An external tool had to port that logic to another language to match jit's semantics, and divergence between label membership and DAG membership has no canonical resolver.\n\n## Background\n\nContainment is expressed two ways (membership labels and dependency edges) and they can disagree. The canonical resolution belongs in the core library where the CLI, the web UI, and exports can share it.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Hierarchy resolution (parent, children, cluster membership) lives in the core library with a documented authoritative membership model.\n- [ ] [hard] REQ-02: A CLI view exposes the resolved hierarchy (parent and children per node) in JSON, and the full export carries resolved membership.\n- [ ] [hard] REQ-03: The web UI consumes the core resolution, or its clustering is verified equivalent by shared test vectors.\n- [ ] [hard] REQ-04: Divergence between label membership and DAG membership is reportable via a validate warning or query.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:03:40.097447586Z",
+  "updated_at": "2026-07-05T10:03:40.098884337Z"
+}

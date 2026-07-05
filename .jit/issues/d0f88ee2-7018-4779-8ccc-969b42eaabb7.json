@@ -1,0 +1,23 @@
+{
+  "id": "d0f88ee2-7018-4779-8ccc-969b42eaabb7",
+  "title": "CLI verb alias sweep for observed wrong guesses",
+  "description": "Session mining captured live wrong-guess invocations that each cost a failed command plus retry: `dep remove` (3 sessions), `issue complete`, `issue edit`, a three-step guess chain for adding a label to an issue, and cross-group removal-verb guesses (issue delete vs dep rm vs gate remove vs doc remove).\n\n## Background\n\nRemoval and edit verbs are spelled differently per command group and natural synonyms are not absorbed. Policy: one canonical spelling per verb in help, synonyms accepted quietly or answered with an actionable hint.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: The removal verb accepts the same synonyms (rm, remove, delete) in the issue, dep, gate, and doc groups, with one canonical spelling shown in help.\n- [ ] [hard] REQ-02: `issue complete` and `issue edit` either work as sugar for the state-done update and the update command, or fail with a hint naming the canonical command.\n- [ ] [hard] REQ-03: Adding a label to an issue via the naturally guessed label-command spelling either works or the error redirects to the update command's label flag; the label command's help disambiguates namespace management from issue labeling.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:02:41.559978499Z",
+  "updated_at": "2026-07-05T10:02:41.561623280Z"
+}

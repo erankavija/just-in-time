@@ -1,0 +1,23 @@
+{
+  "id": "27338abc-2be0-42e7-af28-4617fe505acb",
+  "title": "Structured gate findings in machine output",
+  "description": "Gate checker results are consumed as a freetext stdout blob; agents grep for anchors like \"Total findings\" or \"VERDICT\" with varying context windows (~48 occurrences mined), often truncating findings mid-list during rework loops.\n\n## Background\n\nGate check and status JSON return checker stdout as one string. Rework needs the verdict and individual findings as data. The checker interface is pluggable, so the structured form must be an opt-in contract any checker can implement, with graceful degradation for plain-text checkers.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Gate results in JSON carry structured fields — verdict, a findings array (at minimum id/severity/summary per finding), and a one-line summary — populated when the checker emits a machine-readable block; raw stdout remains available alongside.\n- [ ] [hard] REQ-02: The checker contract for emitting structured findings is documented so any checker can opt in.\n- [ ] [hard] REQ-03: A text-mode flag prints only the findings and verdict section.\n- [ ] [hard] REQ-04: Output from non-conforming checkers degrades gracefully: structured fields absent, no error, existing behavior unchanged.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:gates"
+  ],
+  "created_at": "2026-07-05T10:02:41.507168410Z",
+  "updated_at": "2026-07-05T10:02:41.508882131Z"
+}

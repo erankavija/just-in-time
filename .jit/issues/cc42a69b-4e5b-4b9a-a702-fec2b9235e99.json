@@ -1,0 +1,23 @@
+{
+  "id": "cc42a69b-4e5b-4b9a-a702-fec2b9235e99",
+  "title": "Compact issue status projection with unmet dependencies",
+  "description": "Agents repeatedly reconstruct a one-line \"where does this issue stand\" view (state, per-gate status, unmet dependencies) by piping full issue JSON through jq/python; transcript mining over four days of sessions found ~125 such hand-rolled projections, including 14 client-side recomputations of unmet dependencies.\n\n## Background\n\nThe single-issue show command emits the full record; nothing emits the compact orchestration view. The dependency list carries each dependency's state, but the \"which dependencies are still unmet\" filter is left to the caller even though readiness logic already computes it.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A single invocation (new subcommand or a brief flag on the show command) prints state, per-gate status, and unmet dependencies for an issue as one line of text and as one small JSON object.\n- [ ] [hard] REQ-02: Single-issue JSON output exposes an explicit unmet-dependency projection (e.g. an `unmet_dependencies` array) consistent with readiness semantics.\n- [ ] [hard] REQ-03: Accepts multiple issue ids in one invocation, emitting one row/object per issue.\n- [ ] [hard] REQ-04: The compact view and its JSON shape are documented in the CLI reference.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T10:02:10.642483976Z",
+  "updated_at": "2026-07-05T10:02:10.643940367Z"
+}
