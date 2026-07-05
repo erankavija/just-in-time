@@ -1153,11 +1153,26 @@ fn run() -> Result<()> {
 
     let current_dir = env::current_dir()?;
 
-    // Determine jit data directory: JIT_DATA_DIR env var or default to .jit/
+    // Determine the jit data directory.
+    //
+    // `JIT_DATA_DIR` always wins (highest precedence, checked first). Absent an
+    // override, `jit init` always targets the current directory — like `git
+    // init`, it never searches upward, so initializing inside an existing
+    // repository creates a nested `.jit/` rather than reinitializing an
+    // ancestor. Every other command discovers the repository root by walking
+    // up from the current directory the way git discovers `.git`: stopping at
+    // the first ancestor containing `.jit/`, and never crossing a `.git`
+    // boundary or the filesystem root. When no `.jit/` is found within that
+    // boundary, fall back to `<cwd>/.jit` so the "repository not found" error
+    // from `storage.validate()` below names a sensible path and still
+    // suggests `jit init`.
     let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
         current_dir.join(custom_dir)
-    } else {
+    } else if matches!(command, Commands::Init { .. }) {
         current_dir.join(".jit")
+    } else {
+        jit::storage::discovery::discover_jit_dir(&current_dir)
+            .unwrap_or_else(|| current_dir.join(".jit"))
     };
 
     let storage = JsonFileStorage::new(&jit_dir);

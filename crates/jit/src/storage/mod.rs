@@ -14,6 +14,7 @@ pub mod claim_coordinator;
 pub mod claims_log;
 pub mod config_store;
 pub mod control_plane;
+pub mod discovery;
 pub mod errors;
 pub mod gate_runs;
 pub mod gate_store;
