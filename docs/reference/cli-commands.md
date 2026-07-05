@@ -900,6 +900,49 @@ jit --version
 
 Use `jit version` when you need the full provenance record.
 
+## Repository Commands
+
+### `jit init`
+
+Initialize (or re-initialize) the `.jit/` repository in the current directory.
+Idempotent: re-running over an existing repository never overwrites
+`config.toml` or `rules.toml`, and leaves `index.json`/`events.jsonl` intact.
+
+```bash
+jit init [--hierarchy-template <name>] [--json]
+```
+
+`--hierarchy-template` selects the type hierarchy seeded into `config.toml`
+(`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
+(exit `2`). Inside a git repository, init also creates a worktree identity
+(`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination.
+
+`--json` reports what this run actually did rather than the full idempotent
+set init always ensures — `created_paths` is empty on a re-init:
+
+```json
+{
+  "repository_root": "/path/to/repo",
+  "data_dir": "/path/to/repo/.jit",
+  "repository_id": "wt:d5f301ab",
+  "hierarchy_template": "default",
+  "created_paths": [
+    ".jit/index.json",
+    ".jit/gates.toml",
+    ".jit/events.jsonl",
+    ".jit/config.toml",
+    ".jit/rules.toml"
+  ],
+  "message": "Initialized jit repository (worktree: wt:d5f301ab)"
+}
+```
+
+`repository_id` is `null` outside a git repository. The unknown-template
+failure and the repository-format-too-new startup failure (see **Scripting
+and Automation § Exit Codes** below) both emit the standard `--json` error
+envelope (`INVALID_ARGUMENT` / exit `2`, `REPOSITORY_FORMAT_TOO_NEW` / exit
+`10`).
+
 ## Version and Provenance
 
 ### `jit version`
@@ -2532,19 +2575,27 @@ never changes the validate exit status.
 Export the whole-repository dependency graph.
 
 ```
-jit graph export [--format dot|mermaid|json] [--full] [--output <file>]
+jit graph export [--format dot|mermaid|json] [--json] [--full] [--output <file>]
 ```
 
 | Flag | Description |
 |------|-------------|
 | `--format` | Output format: `dot` (default), `mermaid`, or `json`. |
-| `--full` | Emit complete issue records per node. **JSON only** — combining it with `dot`/`mermaid` is a usage error (exit 2). |
+| `--json` | Sugar for `--format json`. Combining it with an explicit `--format dot`/`--format mermaid` is a usage error (exit 2); combining it with `--format json` is redundant but not an error. |
+| `--full` | Emit complete issue records per node. **JSON only** (`--format json` or `--json`) — combining it with `dot`/`mermaid` is a usage error (exit 2). |
 | `--output` | Write to a file instead of stdout. |
 
-`dot` and `mermaid` render the graph for Graphviz / Mermaid. `json` emits a
-`{ "nodes": [...], "edges": [...] }` document for programmatic consumers, in one
-of two node shapes; the `edges` list (`{ "from": <id>, "to": <dep-id> }`, one per
-dependency edge) is identical in both.
+`dot` and `mermaid` render the graph for Graphviz / Mermaid. `json` (or
+`--json`) emits a `{ "nodes": [...], "edges": [...] }` document for
+programmatic consumers, in one of two node shapes; the `edges` list
+(`{ "from": <id>, "to": <dep-id> }`, one per dependency edge) is identical in
+both.
+
+```bash
+jit graph export --json                # == --format json
+jit graph export --json --full         # composes with --full
+jit graph export --json --format dot   # usage error (exit 2): conflicting formats
+```
 
 **Summary shape (default `--format json`)** — lean nodes for orchestration
 loops:
@@ -2584,9 +2635,8 @@ This lets a bulk consumer read every node's full record **and** its canonical
 placement in one call instead of globbing the issue files or re-deriving
 containment. The `edges` list is the same as the summary shape.
 
-The default (no `--full`) output is unchanged from prior releases: bulk loops
-that parse the summary shape are unaffected, and the two hierarchy fields appear
-only in the `--full` shape. See
+The default (no `--full`) output stays in the lean summary shape; the two
+hierarchy fields appear only in the `--full` shape. See
 [storage-format § Issue JSON Schema](storage-format.md#issue-json-schema) for the
 full field reference.
 
@@ -3005,6 +3055,15 @@ JIT uses a standardized exit-code taxonomy for scripting:
 | `5`  | Permission denied |
 | `6`  | Resource already exists |
 | `10` | External dependency failed (git, filesystem, repository format too new) |
+
+This table matches `jit --schema`'s top-level `exit_codes` array, the
+machine-readable source of the same taxonomy.
+
+Exit `4` covers several validation failures that share the code but carry a
+distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would
+create a cycle), `BLOCKED` (a state transition blocked by incomplete
+dependencies), `GATE_FAILED` (a gate-blocked transition), and the generic
+`VALIDATION_FAILED` (e.g. a redundant dependency edge).
 
 Argument-class failures that resolve an id prefix are exit `2`, each with a
 distinguishing `code` under `--json`:

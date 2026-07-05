@@ -1559,18 +1559,37 @@ fn run() -> Result<()> {
     let mut executor = CommandExecutor::new(storage.clone());
 
     match &command {
-        Commands::Init { hierarchy_template } => {
-            let output_ctx = OutputContext::new(quiet, false);
+        Commands::Init {
+            hierarchy_template,
+            json,
+        } => {
+            let output_ctx = OutputContext::new(quiet, *json);
 
-            // Resolve the template before init so we can error early on bad names
+            // Resolve the template before init so we can error early on bad names.
+            // Routed through the json-aware `invalid_argument` helper (rather than
+            // a bare `anyhow!`) so `--json` callers get a machine-readable envelope
+            // instead of a silently-empty stdout.
             let template = if let Some(template_name) = hierarchy_template {
-                Some(
-                    jit::hierarchy_templates::HierarchyTemplate::get(template_name)
-                        .ok_or_else(|| anyhow!("Unknown hierarchy template: {}", template_name))?,
-                )
+                match jit::hierarchy_templates::HierarchyTemplate::get(template_name) {
+                    Some(t) => Some(t),
+                    None => {
+                        return Err(invalid_argument(
+                            format!("Unknown hierarchy template: {}", template_name),
+                            "init",
+                            *json,
+                        ));
+                    }
+                }
             } else {
                 None
             };
+
+            // Snapshot which core repository files already exist so the `--json`
+            // envelope can report exactly what THIS run created, rather than the
+            // full idempotent set `executor.init()` always ensures.
+            let index_existed = jit_dir.join("index.json").exists();
+            let gates_existed = jit_dir.join("gates.toml").exists();
+            let events_existed = jit_dir.join("events.jsonl").exists();
 
             let (worktree_identity, init_warnings) = executor.init()?;
             for warning in &init_warnings {
@@ -1594,7 +1613,8 @@ fn run() -> Result<()> {
             // orchestration — existence check, default-name computation, and the
             // store write — and is idempotent, so a re-init leaves an existing
             // `[project]` table untouched.
-            executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?;
+            let project_name =
+                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?;
 
             // Scaffold .jit/rules.toml (the operative single source of truth) with
             // the FIXED default ruleset derived from the repo's namespace registry
@@ -1605,16 +1625,45 @@ fn run() -> Result<()> {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
 
-            if let Some(ref t) = template {
-                let _ = output_ctx
-                    .print_success(format!("Initialized with '{}' hierarchy template", t.name));
-            } else if let Some(identity) = worktree_identity {
-                let _ = output_ctx.print_success(format!(
+            let message = if let Some(ref t) = template {
+                format!("Initialized with '{}' hierarchy template", t.name)
+            } else if let Some(ref identity) = worktree_identity {
+                format!(
                     "Initialized jit repository (worktree: {})",
                     identity.worktree_id
-                ));
+                )
             } else {
-                let _ = output_ctx.print_success("Initialized jit repository");
+                "Initialized jit repository".to_string()
+            };
+            let _ = output_ctx.print_success(&message);
+
+            if *json {
+                let mut created_paths = Vec::new();
+                if !index_existed {
+                    created_paths.push(".jit/index.json".to_string());
+                }
+                if !gates_existed {
+                    created_paths.push(".jit/gates.toml".to_string());
+                }
+                if !events_existed {
+                    created_paths.push(".jit/events.jsonl".to_string());
+                }
+                if project_name.is_some() {
+                    created_paths.push(".jit/config.toml".to_string());
+                }
+                if scaffolded {
+                    created_paths.push(".jit/rules.toml".to_string());
+                }
+
+                let payload = serde_json::json!({
+                    "repository_root": current_dir.display().to_string(),
+                    "data_dir": jit_dir.display().to_string(),
+                    "repository_id": worktree_identity.map(|identity| identity.worktree_id),
+                    "hierarchy_template": chosen.name,
+                    "created_paths": created_paths,
+                });
+                let output = JsonOutput::success(payload, "init").with_message(message);
+                println!("{}", output.to_json_string()?);
             }
         }
         _ => {
@@ -4254,13 +4303,32 @@ fn run() -> Result<()> {
             }
             GraphCommands::Export {
                 format,
+                json,
                 full,
                 output,
             } => {
+                use jit::commands::GraphExportFormat;
+
+                // `--json` is sugar for `--format json`; combining it with an
+                // explicit conflicting `--format` (dot/mermaid) is a usage error
+                // (exit 2), classified by the typed InvalidArgumentError.
+                if json && matches!(format, Some(f) if f != GraphExportFormat::Json) {
+                    return Err(jit::errors::InvalidArgumentError::new(
+                        "--json conflicts with --format dot/mermaid; use one or the other",
+                    )
+                    .into());
+                }
+                let format = if json {
+                    GraphExportFormat::Json
+                } else {
+                    format.unwrap_or(GraphExportFormat::Dot)
+                };
+
                 // `--full` selects the complete-record JSON node shape and applies
-                // only to `--format json`; pairing it with dot/mermaid is a usage
-                // error (exit 2), classified by the typed InvalidArgumentError.
-                if full && format != jit::commands::GraphExportFormat::Json {
+                // only to `--format json` (or `--json`); pairing it with
+                // dot/mermaid is a usage error (exit 2), classified by the typed
+                // InvalidArgumentError.
+                if full && format != GraphExportFormat::Json {
                     return Err(jit::errors::InvalidArgumentError::new(
                         "--full is only valid with --format json",
                     )

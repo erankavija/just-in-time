@@ -1138,6 +1138,30 @@ fn test_issue_claim_help_cross_references_lease_commands() {
     );
 }
 
+// ============================================================================
+// REQ-01 (jit:1a63ef75): `issue claim --help` documents the idempotent
+// same-assignee re-claim and the in_progress promotion, replacing the stale
+// "Claim an unassigned issue" wording (same-assignee re-claim was already
+// idempotent by the time of this sweep — jit:30a3b5c1 landed the behavior).
+// ============================================================================
+
+#[test]
+fn test_issue_claim_help_documents_promotion_and_reclaim_idempotency() {
+    let help = help_text(&["issue", "claim", "--help"]);
+    assert!(
+        help.contains("in_progress"),
+        "issue claim --help should document promotion to in_progress, got: {help}"
+    );
+    assert!(
+        help.to_lowercase().contains("re-claiming"),
+        "issue claim --help should document idempotent same-assignee re-claim, got: {help}"
+    );
+    assert!(
+        !help.contains("Claim an unassigned issue"),
+        "issue claim --help should not claim the target must be unassigned, got: {help}"
+    );
+}
+
 #[test]
 fn test_issue_release_help_cross_references_lease_commands() {
     let help = help_text(&["issue", "release", "--help"]);

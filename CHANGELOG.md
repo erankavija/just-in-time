@@ -191,6 +191,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   occurrence). This matches `jit issue search --label`'s existing repeatable
   AND semantics. A single `--label` occurrence behaves exactly as before.
 
+- **`jit init --json` and `jit graph export --json`.** `jit init` accepts
+  `--json`, reporting `{repository_root, data_dir, repository_id,
+  hierarchy_template, created_paths, message}` — `repository_id` is the git
+  worktree id (`null` outside a git repository), and `created_paths` lists
+  only the files this run created (empty on a re-init). An unknown
+  `--hierarchy-template` name emits the standard `--json` error envelope
+  (`INVALID_ARGUMENT`, exit `2`). `jit graph export` gains `--json`, sugar for
+  `--format json` on stdout; combining it with an explicit `--format
+  dot`/`--format mermaid` is a usage error (exit `2`), and it composes with
+  `--full`.
+
 ### Changed
 
 - **Uniform JSON list envelope across list- and query-family commands.** Every
@@ -279,6 +290,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   commits yet, so `HEAD` doesn't resolve to a branch (hints making an initial
   commit instead). Same typed error and exit code (`10`) for both; only the
   message differs.
+- **`jit issue claim --help`** documents the idempotent same-assignee
+  re-claim and the in_progress promotion.
 - **Help text cross-references between assignment and lease commands.**
   `jit issue assign`/`claim`/`release`/`unassign` (assignee bookkeeping) and
   `jit claim acquire`/`release` (exclusive, time-boxed leases) share verbs but

@@ -121,3 +121,92 @@ fn test_graph_roots_json_output() {
     assert_eq!(json["count"], 1);
     assert_eq!(json["roots"][0]["id"], id1);
 }
+
+// ============================================================================
+// REQ-03 (jit:1a63ef75): `jit graph export --json` is sugar for `--format
+// json` on stdout, composes with `--full`, and conflicts with an explicit
+// non-json `--format`.
+// ============================================================================
+
+#[test]
+fn test_graph_export_json_is_sugar_for_format_json() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+    Command::new(jit)
+        .args(["issue", "create", "-t", "A", "--orphan"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let via_json_flag = Command::new(jit)
+        .args(["graph", "export", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let via_format_flag = Command::new(jit)
+        .args(["graph", "export", "--format", "json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(via_json_flag.status.success());
+    assert!(via_format_flag.status.success());
+    let a: serde_json::Value = serde_json::from_slice(&via_json_flag.stdout).unwrap();
+    let b: serde_json::Value = serde_json::from_slice(&via_format_flag.stdout).unwrap();
+    assert_eq!(
+        a, b,
+        "--json should produce the same output as --format json"
+    );
+}
+
+#[test]
+fn test_graph_export_json_composes_with_full() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+    Command::new(jit)
+        .args(["issue", "create", "-t", "A", "--orphan"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["graph", "export", "--json", "--full"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "--json --full failed: {output:?}");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // The full shape carries resolved-hierarchy fields absent from the summary shape.
+    assert!(json["nodes"][0]
+        .as_object()
+        .unwrap()
+        .contains_key("resolved_parent"));
+}
+
+#[test]
+fn test_graph_export_json_conflicts_with_explicit_dot_format() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(jit)
+        .args(["graph", "export", "--json", "--format", "dot"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
+fn test_graph_export_json_conflicts_with_explicit_mermaid_format() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(jit)
+        .args(["graph", "export", "--json", "--format", "mermaid"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(2));
+}

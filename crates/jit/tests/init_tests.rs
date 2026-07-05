@@ -268,6 +268,117 @@ fn test_init_template_unknown_errors() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// REQ-03 (jit:1a63ef75): `--json` machine output
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
+    let temp = TempDir::new().unwrap();
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "jit init --json failed: {:?}", out);
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        json["repository_root"],
+        temp.path().to_string_lossy().as_ref()
+    );
+    assert_eq!(
+        json["data_dir"],
+        temp.path().join(".jit").to_string_lossy().as_ref()
+    );
+    assert_eq!(json["hierarchy_template"], "default");
+    assert!(
+        json["repository_id"].is_null(),
+        "repository_id should be null outside a git repository, got: {json}"
+    );
+
+    let created: Vec<&str> = json["created_paths"]
+        .as_array()
+        .expect("created_paths should be an array")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    for path in [
+        ".jit/index.json",
+        ".jit/gates.toml",
+        ".jit/events.jsonl",
+        ".jit/config.toml",
+        ".jit/rules.toml",
+    ] {
+        assert!(
+            created.contains(&path),
+            "created_paths should report {path} on a fresh init, got: {created:?}"
+        );
+    }
+}
+
+#[test]
+fn test_init_json_reports_repository_id_inside_git() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "jit init --json failed: {:?}", out);
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let repository_id = json["repository_id"]
+        .as_str()
+        .expect("repository_id should be a string inside a git repository");
+    assert!(
+        repository_id.starts_with("wt:"),
+        "repository_id should be a worktree id, got: {repository_id}"
+    );
+}
+
+#[test]
+fn test_init_json_idempotent_reports_empty_created_paths() {
+    let temp = TempDir::new().unwrap();
+    let first = jit_init(temp.path(), &["--json"]);
+    assert!(first.status.success());
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(
+        out.status.success(),
+        "second jit init --json failed: {:?}",
+        out
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let created = json["created_paths"]
+        .as_array()
+        .expect("created_paths should be an array");
+    assert!(
+        created.is_empty(),
+        "a re-init should create nothing, got: {created:?}"
+    );
+}
+
+#[test]
+fn test_init_json_unknown_template_emits_json_error() {
+    let temp = TempDir::new().unwrap();
+    let out = jit_init(
+        temp.path(),
+        &["--hierarchy-template", "nonexistent", "--json"],
+    );
+    assert!(!out.status.success());
+    assert_eq!(out.status.code(), Some(2));
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .expect("--json should emit a structured error object on stdout");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Unknown hierarchy template"));
+}
+
 #[test]
 fn test_init_template_idempotent_does_not_overwrite() {
     let temp = TempDir::new().unwrap();

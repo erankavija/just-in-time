@@ -43,6 +43,9 @@ pub enum Commands {
         /// Hierarchy template to use (default, extended, agile, minimal)
         #[arg(long)]
         hierarchy_template: Option<String>,
+
+        #[arg(long)]
+        json: bool,
     },
 
     /// Issue management commands
@@ -1060,7 +1063,12 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Claim an unassigned issue (atomic)
+    /// Claim an issue: assign it and promote it to in_progress
+    ///
+    /// Claiming an unassigned issue assigns it to `assignee`; a Ready issue is
+    /// promoted to in_progress. Re-claiming as the current assignee succeeds
+    /// and promotes it the same way. Claiming an issue already assigned to
+    /// someone else fails, naming the current holder.
     ///
     /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
     /// work lease, see `jit claim acquire` / `jit claim release`.
@@ -2061,14 +2069,22 @@ pub enum GraphCommands {
     /// Export dependency graph in various formats
     Export {
         /// Output format (dot, mermaid, json)
-        #[arg(short, long, value_enum, default_value_t = crate::commands::GraphExportFormat::Dot)]
-        format: crate::commands::GraphExportFormat,
+        #[arg(short, long, value_enum)]
+        format: Option<crate::commands::GraphExportFormat>,
+
+        /// Emit JSON to stdout — sugar for `--format json`.
+        ///
+        /// Equivalent to `--format json`; combining it with an explicit
+        /// `--format dot`/`--format mermaid` is a usage error. Composes with
+        /// `--full`.
+        #[arg(long)]
+        json: bool,
 
         /// Emit complete issue records for each node (JSON only).
         ///
-        /// Only valid with `--format json`; combining it with `dot`/`mermaid`
-        /// is a usage error. Without this flag the JSON output keeps the lean
-        /// summary node shape.
+        /// Only valid with `--format json` (or `--json`); combining it with
+        /// `dot`/`mermaid` is a usage error. Without this flag the JSON
+        /// output keeps the lean summary node shape.
         #[arg(long)]
         full: bool,
 
