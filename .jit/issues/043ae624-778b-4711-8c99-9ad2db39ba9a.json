@@ -2,9 +2,9 @@
   "id": "043ae624-778b-4711-8c99-9ad2db39ba9a",
   "title": "Config value accessor command",
   "description": "Agents grep and sed the raw config file for type hierarchy, development root, archive root, and managed paths (~10 mined occurrences, including hand-rolled awk in skill scripts) because config introspection covers only part of the surface.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A config accessor takes a dotted key path and prints the value raw and as JSON, covering the whole configuration surface (type hierarchy, label associations, documentation paths, validation settings).\n- [ ] [hard] REQ-02: An unknown key fails nonzero with a typed error listing the valid top-level sections.\n- [ ] [hard] REQ-03: Documented in the CLI reference.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -19,5 +19,5 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:03:39.993054440Z",
-  "updated_at": "2026-07-05T10:03:39.994713511Z"
+  "updated_at": "2026-07-05T15:39:47.092670123Z"
 }
