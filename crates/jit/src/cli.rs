@@ -1478,8 +1478,8 @@ pub enum GateCommands {
     /// With `--json`, stdout/stderr are omitted from passing runs by default;
     /// pass `--full` to include them. Failing runs always include stdout/stderr.
     ///
-    /// JSON output uses the list envelope `{"count": N, "gate_statuses": [...]}`,
-    /// where `count` is the number of required gates (one `gate_statuses` entry
+    /// JSON output uses the list envelope `{"count": N, "gates": [...]}`,
+    /// where `count` is the number of required gates (one `gates` entry
     /// each). The `results` / `not_run` / `total` / `passed` tallies remain
     /// alongside; `total` / `passed` are readiness counts, not the collection
     /// size.
