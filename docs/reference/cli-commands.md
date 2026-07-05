@@ -915,10 +915,15 @@ jit init [--hierarchy-template <name>] [--json]
 `--hierarchy-template` selects the type hierarchy seeded into `config.toml`
 (`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
 (exit `2`). Inside a git repository, init also creates a worktree identity
-(`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination.
+(`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
+sets up `.gitattributes` merge drivers for `.jit/events.jsonl` and
+`.jit/claims.jsonl` (union merge, so concurrent worktrees' event/claim log
+appends don't conflict) — creating the file if absent, or appending the jit
+block to an existing one that doesn't already carry it.
 
 `--json` reports what this run actually did rather than the full idempotent
-set init always ensures — `created_paths` is empty on a re-init:
+set init always ensures — `created_paths` and `modified_paths` are both empty
+on a re-init:
 
 ```json
 {
@@ -931,11 +936,19 @@ set init always ensures — `created_paths` is empty on a re-init:
     ".jit/gates.toml",
     ".jit/events.jsonl",
     ".jit/config.toml",
-    ".jit/rules.toml"
+    ".jit/rules.toml",
+    ".gitattributes"
   ],
+  "modified_paths": [],
   "message": "Initialized jit repository (worktree: wt:d5f301ab)"
 }
 ```
+
+`created_paths` lists files that did not exist before this run; `.gitattributes`
+appears there only when it didn't exist and was created fresh. If it already
+existed without the jit merge-driver block, this run instead appends to it and
+lists it under `modified_paths`; if it already carried the block, neither list
+mentions it.
 
 `repository_id` is `null` outside a git repository. The unknown-template
 failure and the repository-format-too-new startup failure (see **Scripting

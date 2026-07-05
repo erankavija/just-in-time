@@ -337,6 +337,147 @@ fn test_init_json_reports_repository_id_inside_git() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Review follow-up (jit:1a63ef75 F1/F2): `.gitattributes` created/modified
+// reporting, and the atomic-write path it now goes through.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_init_json_inside_git_reports_gitattributes_created() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "jit init --json failed: {:?}", out);
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let created: Vec<&str> = json["created_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        created.contains(&".gitattributes"),
+        "created_paths should report .gitattributes on a fresh init inside git, got: {created:?}"
+    );
+    let modified = json["modified_paths"]
+        .as_array()
+        .expect("modified_paths should be an array");
+    assert!(
+        modified.is_empty(),
+        "a fresh .gitattributes is created, not modified, got: {modified:?}"
+    );
+
+    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    assert!(content.contains("# JIT merge drivers"));
+}
+
+#[test]
+fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let first = jit_init(temp.path(), &["--json"]);
+    assert!(first.status.success());
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success());
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let created: Vec<&str> = json["created_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let modified: Vec<&str> = json["modified_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        !created.contains(&".gitattributes"),
+        "an already-configured .gitattributes should not be reported as created, got: {created:?}"
+    );
+    assert!(
+        !modified.contains(&".gitattributes"),
+        "an already-configured .gitattributes should not be reported as modified, got: {modified:?}"
+    );
+}
+
+#[test]
+fn test_init_json_appends_to_existing_gitattributes_reports_modified() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    // Pre-existing .gitattributes without the jit merge-driver block.
+    fs::write(temp.path().join(".gitattributes"), "*.txt text\n").unwrap();
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "jit init --json failed: {:?}", out);
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let created: Vec<&str> = json["created_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let modified: Vec<&str> = json["modified_paths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        !created.contains(&".gitattributes"),
+        "an appended .gitattributes should not be reported as created, got: {created:?}"
+    );
+    assert!(
+        modified.contains(&".gitattributes"),
+        "an appended .gitattributes should be reported as modified, got: {modified:?}"
+    );
+
+    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    assert!(content.contains("*.txt text"), "original content preserved");
+    assert!(
+        content.contains("# JIT merge drivers"),
+        "jit block appended"
+    );
+
+    // Atomic-write regression: no stray temp sibling left behind.
+    let stray: Vec<_> = fs::read_dir(temp.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.contains(".gitattributes.") && name.ends_with(".tmp"))
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "no .gitattributes.*.tmp sibling should remain, got: {stray:?}"
+    );
+}
+
 #[test]
 fn test_init_json_idempotent_reports_empty_created_paths() {
     let temp = TempDir::new().unwrap();

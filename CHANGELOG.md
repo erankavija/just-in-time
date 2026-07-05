@@ -193,14 +193,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **`jit init --json` and `jit graph export --json`.** `jit init` accepts
   `--json`, reporting `{repository_root, data_dir, repository_id,
-  hierarchy_template, created_paths, message}` — `repository_id` is the git
-  worktree id (`null` outside a git repository), and `created_paths` lists
-  only the files this run created (empty on a re-init). An unknown
-  `--hierarchy-template` name emits the standard `--json` error envelope
-  (`INVALID_ARGUMENT`, exit `2`). `jit graph export` gains `--json`, sugar for
-  `--format json` on stdout; combining it with an explicit `--format
-  dot`/`--format mermaid` is a usage error (exit `2`), and it composes with
-  `--full`.
+  hierarchy_template, created_paths, modified_paths, message}` —
+  `repository_id` is the git worktree id (`null` outside a git repository),
+  `created_paths` lists only the files this run created (empty on a
+  re-init), and `modified_paths` covers the one file init can update in
+  place: an existing `.gitattributes` without the jit merge-driver block
+  gets the block appended and is reported there rather than in
+  `created_paths`. An unknown `--hierarchy-template` name emits the standard
+  `--json` error envelope (`INVALID_ARGUMENT`, exit `2`). `jit graph export`
+  gains `--json`, sugar for `--format json` on stdout; combining it with an
+  explicit `--format dot`/`--format mermaid` is a usage error (exit `2`), and
+  it composes with `--full`.
 
 ### Changed
 

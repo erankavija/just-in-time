@@ -563,9 +563,26 @@ fn print_apply_result(
     Ok(())
 }
 
+/// What `setup_gitattributes` did to `.gitattributes` this run. Lets the
+/// caller (`jit init --json`) report it precisely instead of guessing: a
+/// fresh file is a `created_paths` entry, an appended one is a
+/// `modified_paths` entry, and an already-configured or absent-git-repo run
+/// reports nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GitattributesOutcome {
+    /// Not in a git repository; nothing done.
+    NotGitRepo,
+    /// `.gitattributes` did not exist; created with the jit merge-driver block.
+    Created,
+    /// `.gitattributes` existed without the jit merge-driver block; appended.
+    Modified,
+    /// `.gitattributes` already had the jit merge-driver block; no-op.
+    AlreadyConfigured,
+}
+
 /// Set up .gitattributes with merge drivers for jit files.
 /// Only runs if we're in a git repository.
-fn setup_gitattributes() -> Result<()> {
+fn setup_gitattributes() -> Result<GitattributesOutcome> {
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -577,7 +594,7 @@ fn setup_gitattributes() -> Result<()> {
 
     let repo_root = match output {
         Ok(o) if o.status.success() => String::from_utf8(o.stdout)?.trim().to_string(),
-        _ => return Ok(()), // Not in a git repo, skip
+        _ => return Ok(GitattributesOutcome::NotGitRepo),
     };
 
     let gitattributes_path = Path::new(&repo_root).join(".gitattributes");
@@ -592,22 +609,23 @@ fn setup_gitattributes() -> Result<()> {
 
         // Check if already configured (idempotent)
         if content.contains(jit_marker) {
-            return Ok(());
+            return Ok(GitattributesOutcome::AlreadyConfigured);
         }
 
-        // Append to existing file
+        // Append to existing file, through the atomic temp-file + rename
+        // primitive (INV-ATOMIC-WRITES) so a concurrent reader never observes
+        // a partially written file.
         let new_content = if content.ends_with('\n') {
             format!("{}\n{}", content, jit_config)
         } else {
             format!("{}\n\n{}", content, jit_config)
         };
-        fs::write(&gitattributes_path, new_content)?;
+        jit::storage::atomic_write::write_file_atomic(&gitattributes_path, &new_content)?;
+        Ok(GitattributesOutcome::Modified)
     } else {
-        // Create new file
-        fs::write(&gitattributes_path, jit_config)?;
+        jit::storage::atomic_write::write_file_atomic(&gitattributes_path, &jit_config)?;
+        Ok(GitattributesOutcome::Created)
     }
-
-    Ok(())
 }
 
 /// Resolve the gate key from the CLI's positional-or-flag pair (REQ-03).
@@ -1596,10 +1614,16 @@ fn run() -> Result<()> {
                 output_ctx.print_warning(warning)?;
             }
 
-            // Set up .gitattributes for merge drivers (if in git repo)
-            if let Err(e) = setup_gitattributes() {
-                eprintln!("Warning: Could not set up .gitattributes: {}", e);
-            }
+            // Set up .gitattributes for merge drivers (if in git repo). A
+            // failure here is non-fatal (warning only); `None` means "nothing
+            // to report" for the `--json` created/modified path lists below.
+            let gitattributes_outcome = match setup_gitattributes() {
+                Ok(outcome) => Some(outcome),
+                Err(e) => {
+                    eprintln!("Warning: Could not set up .gitattributes: {}", e);
+                    None
+                }
+            };
 
             // The chosen template defines the on-disk config.toml (namespace
             // registry + type hierarchy) from which the fixed default rules.toml
@@ -1654,6 +1678,14 @@ fn run() -> Result<()> {
                 if scaffolded {
                     created_paths.push(".jit/rules.toml".to_string());
                 }
+                if gitattributes_outcome == Some(GitattributesOutcome::Created) {
+                    created_paths.push(".gitattributes".to_string());
+                }
+
+                let mut modified_paths = Vec::new();
+                if gitattributes_outcome == Some(GitattributesOutcome::Modified) {
+                    modified_paths.push(".gitattributes".to_string());
+                }
 
                 let payload = serde_json::json!({
                     "repository_root": current_dir.display().to_string(),
@@ -1661,6 +1693,7 @@ fn run() -> Result<()> {
                     "repository_id": worktree_identity.map(|identity| identity.worktree_id),
                     "hierarchy_template": chosen.name,
                     "created_paths": created_paths,
+                    "modified_paths": modified_paths,
                 });
                 let output = JsonOutput::success(payload, "init").with_message(message);
                 println!("{}", output.to_json_string()?);
