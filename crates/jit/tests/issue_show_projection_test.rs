@@ -1,7 +1,7 @@
 //! Verify field projection and multi-id support for `jit issue show`:
 //! - `--field <name>` prints a single top-level field as plain text
 //! - `--fields a,b` prints those fields as a single compact JSON object
-//! - multiple ids with `--json` return a JSON array of issue objects
+//! - multiple ids with `--json` return the list envelope `{count, issues}`
 //! - unknown fields and mutually-exclusive / multi-id projection combos error
 
 use assert_cmd::prelude::*;
@@ -102,14 +102,17 @@ fn test_fields_prints_compact_json_object() {
 }
 
 #[test]
-fn test_two_ids_json_returns_array() {
+fn test_two_ids_json_returns_envelope() {
     let temp = setup();
     let a = create_issue(&temp, "First");
     let b = create_issue(&temp, "Second");
 
     let out = jit_ok(&temp, &["issue", "show", &a, &b, "--json"]);
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    let arr = json.as_array().expect("two-id --json must be an array");
+    assert_eq!(json["count"].as_u64(), Some(2), "envelope carries count");
+    let arr = json["issues"]
+        .as_array()
+        .expect("two-id --json must wrap issues in the list envelope");
     assert_eq!(arr.len(), 2);
     assert_eq!(arr[0]["id"].as_str(), Some(a.as_str()));
     assert_eq!(arr[1]["id"].as_str(), Some(b.as_str()));

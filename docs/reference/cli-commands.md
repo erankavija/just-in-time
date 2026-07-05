@@ -1067,8 +1067,8 @@ jit issue show abc123 --field title          # -> Implement login
 # Project several fields as one COMPACT JSON object (requested key order preserved)
 jit issue show abc123 --fields state,title   # -> {"state":"ready","title":"Implement login"}
 
-# Show multiple issues as a JSON array (argument order preserved)
-jit issue show abc123 def456 --json          # -> [ {...}, {...} ]
+# Show multiple issues as the list envelope (argument order preserved)
+jit issue show abc123 def456 --json          # -> {"count":2,"issues":[ {...}, {...} ]}
 ```
 
 **Field projection (`--field` / `--fields`):**
@@ -2136,20 +2136,48 @@ jit query available --json --quiet | jq -r 'issues[0].id'
 jit status --json --quiet | jq -r 'summary.by_state'
 ```
 
-List-style JSON responses use a named collection plus `count` at the top level:
+### List envelope
+
+Every list- and query-family command wraps its collection in a uniform
+envelope: a numeric top-level `count` and a plural, collection-typed key holding
+the array. `count` always equals the length of that array, so a single parse
+path works for every command — no bare-array or dual-shape fallback is needed.
 
 ```json
 {
-  "issues": [],
   "count": 0,
+  "issues": [],
   "message": "Found 0 issue(s)"
 }
 ```
 
-The standardized collection names are command-specific: `issues`, `gates`,
-`namespaces`, `results`, or `worktrees`. Top-level `search` uses `count` rather
-than `total`, and `label namespaces --json` returns only `namespaces`, `count`,
-and the optional `message` field instead of internal configuration details.
+The collection key is command-specific:
+
+| Command | Collection key |
+| --- | --- |
+| `issue list`, `list`, `query all`/`available`(`ready`)/`blocked`/`strategic`/`closed`, `issue search`, `issue show <id> <id> …` | `issues` |
+| `search` | `results` |
+| `gate list` | `gates` |
+| `gate preset list` | `presets` |
+| `events tail`, `events query` | `events` |
+| `doc list` | `documents` |
+| `doc assets list` | `assets` |
+| `claim list`, `claim status` | `leases` |
+| `label namespaces` | `namespaces` |
+| `label values` | `values` |
+| `config list-templates` | `templates` |
+| `item list`, `item search` | `items` |
+| `worktree list` | `worktrees` |
+| `graph roots` | `roots` |
+| `graph rdeps`, `rdeps` | `dependents` |
+| `invariant check` | `findings` |
+
+Some envelopes carry additional metadata keys alongside `count` and the
+collection (for example `query`/`namespace` context, `issue_id`, or a `warnings`
+array), but `count` and the collection key are always present. Top-level
+`search` uses `count` rather than `total`, and `label namespaces --json` returns
+only `namespaces`, `count`, and the optional `message` field instead of internal
+configuration details.
 
 ### Graceful Pipe Handling
 

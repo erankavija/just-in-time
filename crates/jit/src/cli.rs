@@ -52,6 +52,8 @@ pub enum Commands {
     ///
     /// Convenience first-guess spelling that routes to the canonical
     /// `jit issue list`. Accepts the same filters and behaves identically.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
         /// Filter by state
         #[arg(short = 's', long)]
@@ -163,6 +165,8 @@ pub enum Commands {
     ///
     /// Convenience first-guess spelling that routes to the canonical
     /// `jit graph rdeps <id>`: shows the issues that depend on `<id>`.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "dependents": [...]}`.
     Rdeps {
         /// Issue ID
         id: String,
@@ -182,6 +186,8 @@ pub enum Commands {
     /// Filters (`--state`, `--assignee`, `--priority`, `--label`) narrow the
     /// default listing. Use `jit query ready` (alias of `available`) for
     /// unassigned, unblocked ready issues.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Query {
         /// Subcommand — omit to list all issues
         #[command(subcommand)]
@@ -271,6 +277,8 @@ pub enum Commands {
     Reference(ReferenceCommands),
 
     /// Search issues and documents
+    ///
+    /// JSON output uses the list envelope `{"count": N, "results": [...]}`.
     Search {
         /// Search query string
         query: String,
@@ -424,6 +432,8 @@ pub enum ItemCommands {
     ///   jit item list                       # All items, every kind
     ///   jit item list --kind requirement    # Only requirement items
     ///   jit item list --json                # Machine-readable
+    ///
+    /// JSON output uses the list envelope `{"count": N, "items": [...]}`.
     List {
         /// Filter to one item kind by name (e.g. "requirement")
         #[arg(long)]
@@ -476,6 +486,8 @@ pub enum ItemCommands {
     /// Examples:
     ///   jit item search atomic
     ///   jit item search "" --kind requirement   # Empty query: filter by kind
+    ///
+    /// JSON output uses the list envelope `{"count": N, "items": [...]}`.
     Search {
         /// Search query (matches self-id, qualified id, and item text). Empty
         /// matches all, so `--kind` can be used alone.
@@ -527,6 +539,8 @@ pub enum InvariantCommands {
     /// Examples:
     ///   jit invariant check           # Human-readable drift report
     ///   jit invariant check --json    # Machine-readable result
+    ///
+    /// JSON output uses the list envelope `{"count": N, "findings": [...]}`.
     Check {
         /// Output as JSON
         #[arg(long)]
@@ -679,6 +693,8 @@ pub enum IssueCommands {
     ///   jit issue search --label type:epic          # label filter, no query
     ///   jit issue search --label a:b --label c:d     # must carry BOTH labels
     ///   jit issue search task --state ready          # query + filter
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Search {
         /// Search query (searches title, description, and ID). Optional when any
         /// filter flag is provided.
@@ -714,16 +730,17 @@ pub enum IssueCommands {
     ///                    fall back to compact JSON for that field)
     ///   --fields a,b,c   print those fields as one compact JSON object
     ///
-    /// Pass two or more ids with `--json` to get a JSON array of issue objects
-    /// in argument order. Projection flags (`--field`/`--fields`) require exactly
-    /// one id.
+    /// Pass two or more ids with `--json` to get the list envelope
+    /// `{"count": N, "issues": [...]}` with issue objects in argument order.
+    /// Projection flags (`--field`/`--fields`) require exactly one id.
     ///
     /// Examples:
     ///   jit issue show abc123 --field state          # -> ready
     ///   jit issue show abc123 --fields state,title    # -> {"state":"ready",...}
-    ///   jit issue show abc123 def456 --json           # -> [ {...}, {...} ]
+    ///   jit issue show abc123 def456 --json           # -> {"count":2,"issues":[...]}
     Show {
-        /// Issue id(s). Two or more ids with `--json` produce a JSON array.
+        /// Issue id(s). Two or more ids with `--json` produce the
+        /// `{"count": N, "issues": [...]}` list envelope.
         #[arg(required = true)]
         ids: Vec<String>,
 
@@ -955,6 +972,8 @@ pub enum IssueCommands {
     },
 
     /// List issues (equivalent to `jit query all`)
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     List {
         /// Filter by state
         #[arg(short = 's', long)]
@@ -1353,6 +1372,8 @@ pub enum GateCommands {
 
     // ===== Inspection: report definitions or run results, no side effects =====
     /// List all gate definitions
+    ///
+    /// JSON output uses the list envelope `{"count": N, "gates": [...]}`.
     List {
         #[arg(long)]
         json: bool,
@@ -1470,6 +1491,8 @@ pub enum GateCommands {
 #[derive(Subcommand)]
 pub enum PresetCommands {
     /// List available gate presets
+    ///
+    /// JSON output uses the list envelope `{"count": N, "presets": [...]}`.
     List {
         #[arg(long)]
         json: bool,
@@ -1574,6 +1597,8 @@ pub enum DocCommands {
     },
 
     /// List document references for an issue
+    ///
+    /// JSON output uses the list envelope `{"count": N, "documents": [...]}`.
     List {
         /// Issue ID
         id: String,
@@ -1685,6 +1710,8 @@ pub enum DocCommands {
 #[derive(Subcommand)]
 pub enum AssetCommands {
     /// List assets for a document
+    ///
+    /// JSON output uses the list envelope `{"count": N, "assets": [...]}`.
     List {
         /// Issue ID
         id: String,
@@ -1742,6 +1769,8 @@ pub enum GraphCommands {
     ///   Shows: epic-123, milestone-789 (they depend on this task)
     ///
     /// Note: This shows dependency relationships, not label hierarchy.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "dependents": [...]}`.
     #[command(alias = "downstream")]
     Rdeps {
         /// Issue ID
@@ -1756,6 +1785,8 @@ pub enum GraphCommands {
     },
 
     /// Show root issues (no dependencies)
+    ///
+    /// JSON output uses the list envelope `{"count": N, "roots": [...]}`.
     Roots {
         #[arg(long)]
         json: bool,
@@ -1776,6 +1807,8 @@ pub enum GraphCommands {
 #[derive(Subcommand)]
 pub enum EventCommands {
     /// Tail recent events
+    ///
+    /// JSON output uses the list envelope `{"count": N, "events": [...]}`.
     Tail {
         #[arg(short, long, default_value = "10")]
         n: usize,
@@ -1785,6 +1818,8 @@ pub enum EventCommands {
     },
 
     /// Query events by type or issue
+    ///
+    /// JSON output uses the list envelope `{"count": N, "events": [...]}`.
     Query {
         #[arg(short, long)]
         event_type: Option<String>,
@@ -1803,6 +1838,8 @@ pub enum EventCommands {
 #[derive(Subcommand)]
 pub enum QueryCommands {
     /// Query all issues with optional filters
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     All {
         /// Filter by state
         #[arg(short = 's', long)]
@@ -1829,6 +1866,8 @@ pub enum QueryCommands {
     },
 
     /// Query available issues (unassigned, state=ready, unblocked)
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     #[command(visible_alias = "ready")]
     Available {
         /// Filter by priority
@@ -1848,6 +1887,8 @@ pub enum QueryCommands {
     },
 
     /// Query blocked issues with reasons
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Blocked {
         /// Filter by priority
         #[arg(short = 'p', long)]
@@ -1866,6 +1907,8 @@ pub enum QueryCommands {
     },
 
     /// Query strategic issues (those with labels from strategic namespaces)
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Strategic {
         /// Filter by priority
         #[arg(short = 'p', long)]
@@ -1884,6 +1927,8 @@ pub enum QueryCommands {
     },
 
     /// Query closed issues (Done or Rejected states)
+    ///
+    /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Closed {
         /// Filter by priority
         #[arg(short = 'p', long)]
@@ -1905,12 +1950,16 @@ pub enum QueryCommands {
 #[derive(Subcommand)]
 pub enum LabelCommands {
     /// List all label namespaces
+    ///
+    /// JSON output uses the list envelope `{"count": N, "namespaces": [...]}`.
     Namespaces {
         #[arg(long)]
         json: bool,
     },
 
     /// List all values used in a namespace
+    ///
+    /// JSON output uses the list envelope `{"count": N, "values": [...]}`.
     Values {
         /// Namespace to query (e.g., 'milestone', 'epic')
         namespace: String,
@@ -1990,6 +2039,8 @@ pub enum ConfigCommands {
     },
 
     /// List available hierarchy templates
+    ///
+    /// JSON output uses the list envelope `{"count": N, "templates": [...]}`.
     ListTemplates {
         #[arg(long)]
         json: bool,
@@ -2163,6 +2214,8 @@ pub enum ClaimCommands {
     ///   jit claim status --issue 01ABC          # Check who has issue
     ///   jit claim status --agent agent:copilot  # Show copilot's leases
     ///   jit claim status --json
+    ///
+    /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
     Status {
         /// Filter by issue ID
         #[arg(long)]
@@ -2185,6 +2238,8 @@ pub enum ClaimCommands {
     /// Examples:
     ///   jit claim list             # Show all leases
     ///   jit claim list --json      # JSON output
+    ///
+    /// JSON output uses the list envelope `{"count": N, "leases": [...]}`.
     List {
         /// Output as JSON
         #[arg(long)]
@@ -2239,6 +2294,8 @@ pub enum WorktreeCommands {
     /// Examples:
     ///   jit worktree list          # List all worktrees
     ///   jit worktree list --json   # JSON output
+    ///
+    /// JSON output uses the list envelope `{"count": N, "worktrees": [...]}`.
     List {
         /// Output as JSON
         #[arg(long)]

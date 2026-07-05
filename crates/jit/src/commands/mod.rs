@@ -133,6 +133,8 @@ pub struct DocumentHistory {
 pub struct AssetListResult {
     pub issue_id: String,
     pub document_path: String,
+    /// Number of assets in `assets` (list envelope `count`; equals `assets.len()`).
+    pub count: usize,
     pub assets: Vec<crate::document::Asset>,
     pub summary: AssetSummary,
     pub warnings: Vec<String>,

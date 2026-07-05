@@ -1539,7 +1539,8 @@ fn run() -> Result<()> {
                         .into());
                     }
 
-                    // Multi-id: return a JSON array of full issue objects in
+                    // Multi-id: return the uniform list envelope
+                    // `{"count": N, "issues": [...]}` with full issue objects in
                     // argument order. Without --json, fall through to printing
                     // each issue's human view in order.
                     if ids.len() > 1 && json {
@@ -1547,7 +1548,13 @@ fn run() -> Result<()> {
                             .iter()
                             .map(|id| build_issue_show_response(&executor, id))
                             .collect::<Result<Vec<_>>>()?;
-                        let output = jit::output::JsonOutput::success(responses, "issue show");
+                        let output = jit::output::JsonOutput::success(
+                            serde_json::json!({
+                                "count": responses.len(),
+                                "issues": responses,
+                            }),
+                            "issue show",
+                        );
                         println!("{}", output.to_json_string()?);
                         return Ok(());
                     }
@@ -3376,7 +3383,10 @@ fn run() -> Result<()> {
                             if json {
                                 let msg = format!("{} preset(s)", presets.len());
                                 let output = JsonOutput::success(
-                                    serde_json::json!({ "presets": presets }),
+                                    serde_json::json!({
+                                        "count": presets.len(),
+                                        "presets": presets,
+                                    }),
                                     "gate preset list",
                                 )
                                 .with_message(msg);

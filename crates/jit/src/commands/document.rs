@@ -747,6 +747,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::commands::AssetListResult {
             issue_id: full_id,
             document_path: path.to_string(),
+            count: total,
             assets,
             summary: crate::commands::AssetSummary {
                 total,
