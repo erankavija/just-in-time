@@ -181,7 +181,7 @@
           "title": "Sweep stale help text and machine-output parity gaps",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "rework-1"
         }
       ]
     },
@@ -192,8 +192,9 @@
           "short_id": "b3a54e25",
           "title": "Refresh README to the current agent-first surface",
           "classification": "documentation",
-          "model": "sonnet",
-          "status": "pending"
+          "model": "lead-direct",
+          "status": "pending",
+          "note": "invoker directive: lead authors the README refresh directly; gates still apply"
         }
       ]
     },
@@ -203,6 +204,30 @@
         {
           "short_id": "c291e95c",
           "title": "Refresh MCP curated tool set",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 18,
+      "issues": [
+        {
+          "short_id": "1d59070d",
+          "title": "gate define checker implies auto",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 19,
+      "issues": [
+        {
+          "short_id": "0daba57d",
+          "title": "refused delete exits nonzero",
           "classification": "implementation",
           "model": "sonnet",
           "status": "pending"
@@ -233,7 +258,8 @@
     "cc42a69b": 1,
     "7fe5c743": 2,
     "0ab468ba": 1,
-    "31e12d2b": 2
+    "31e12d2b": 2,
+    "1a63ef75": 1
   },
   "started_at": "2026-07-05T10:30:00Z"
 }

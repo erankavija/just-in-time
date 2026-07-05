@@ -1,0 +1,24 @@
+{
+  "id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
+  "title": "Refused issue deletion exits nonzero",
+  "description": "Deleting an issue without the confirmation environment variable prints a refusal and exits 0, so scripts treat the refusal as success. Hit live during tracker hygiene: a cleanup step believed a deletion had happened when it had not.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A deletion refused for missing confirmation exits nonzero (invalid-argument family, exit 2) in both text and JSON modes.\n- [ ] [hard] REQ-02: Under --json the refusal emits the structured error envelope with a distinguishing code and the confirmation hint in suggestions.\n- [ ] [hard] REQ-03: A confirmed deletion's exit code and output are unchanged.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "epic:core-maintenance",
+    "component:cli"
+  ],
+  "created_at": "2026-07-05T22:41:02.663869625Z",
+  "updated_at": "2026-07-05T22:41:02.670199390Z",
+  "first_ready_at": "2026-07-05T22:41:02.663883645Z"
+}

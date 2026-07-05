@@ -5537,3 +5537,6 @@
 {"type":"gate_removed","id":"73e18951-5339-48ae-92df-5a3aae632bf2","issue_id":"bbaedb0f-952b-4578-8e25-9a394f926fe7","timestamp":"2026-07-05T22:34:57.255760229Z","gate_key":"tests"}
 {"type":"gate_removed","id":"a2c6c9c3-7042-4ddf-88b7-c51d73a29a78","issue_id":"bbaedb0f-952b-4578-8e25-9a394f926fe7","timestamp":"2026-07-05T22:34:57.255778859Z","gate_key":"fmt"}
 {"type":"gate_removed","id":"b637fbeb-cb67-4603-b397-4e2f2b91eb20","issue_id":"bbaedb0f-952b-4578-8e25-9a394f926fe7","timestamp":"2026-07-05T22:34:57.255797549Z","gate_key":"clippy"}
+{"type":"issue_created","id":"fcd1b84d-21ea-434d-b67d-b29e37743843","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-05T22:41:02.603829312Z","title":"Checker command on gate define implies automated mode","priority":"normal"}
+{"type":"issue_created","id":"c7abc005-c943-4a21-bd13-4035752273ee","issue_id":"0daba57d-4cb8-4494-a825-22b286bc02c6","timestamp":"2026-07-05T22:41:02.671026431Z","title":"Refused issue deletion exits nonzero","priority":"normal"}
+{"type":"issue_updated","id":"3ff2eb4e-7553-4cdd-9eb3-c859a7a1499e","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T22:41:02.816107576Z","updated_by":"dependency-add","fields":["dependencies"]}

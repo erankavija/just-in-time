@@ -6,37 +6,39 @@
   "priority": "normal",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
-    "cc42a69b-4e5b-4b9a-a702-fec2b9235e99",
-    "dc3bef62-523a-4528-b86c-a576b8c97ed0",
-    "f847df3f-7730-4593-bb89-e847c4667584",
-    "62f3bebd-ed7f-4a8f-903c-06c11aac7608",
-    "27338abc-2be0-42e7-af28-4617fe505acb",
-    "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
-    "c8518f2a-20d7-4564-a31c-bd8fb5908953",
     "03d54a9f-922c-40fd-864d-2796b08bfd35",
-    "7a50e021-0740-4f1b-a46b-caa5f41664e3",
-    "7fe5c743-47b4-4b14-b745-7b4d507bc317",
-    "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
-    "1a63ef75-f411-4c77-a837-45a2b649623e",
-    "82b8a519-d35a-4ebd-a3ac-82845729aa31",
-    "0ab468ba-681e-4660-8ffb-21944c554bc0",
-    "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
-    "4af511fd-bc58-4bea-beb9-3237876d8075",
-    "8a15088a-5907-4b24-9c67-8388eefaeb6e",
-    "c291e95c-82f0-437f-8b58-264ac73e27b2",
-    "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
-    "043ae624-778b-4711-8c99-9ad2db39ba9a",
-    "30a3b5c1-ef01-472d-9b38-52a18ffb8b5b",
-    "d0f88ee2-7018-4779-8ccc-969b42eaabb7",
-    "a05b87ae-3af8-4874-8a39-bb2a0b80a914",
     "eff11282-af65-4a82-b591-439a184dbc10",
-    "b2f9f390-912f-45fe-920f-3f196948be25",
-    "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+    "1a63ef75-f411-4c77-a837-45a2b649623e",
+    "7fe5c743-47b4-4b14-b745-7b4d507bc317",
+    "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
     "ff9925af-c394-4960-948d-5009f5dedaa4",
-    "b1586c0d-6f8e-451b-a46b-dedc2f16bb0f",
+    "8a15088a-5907-4b24-9c67-8388eefaeb6e",
+    "cc42a69b-4e5b-4b9a-a702-fec2b9235e99",
+    "d0f88ee2-7018-4779-8ccc-969b42eaabb7",
+    "62f3bebd-ed7f-4a8f-903c-06c11aac7608",
     "df0b551f-c60e-4c6f-951c-5a796a1c5635",
+    "30a3b5c1-ef01-472d-9b38-52a18ffb8b5b",
+    "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
+    "b1586c0d-6f8e-451b-a46b-dedc2f16bb0f",
+    "c8518f2a-20d7-4564-a31c-bd8fb5908953",
+    "043ae624-778b-4711-8c99-9ad2db39ba9a",
+    "0ab468ba-681e-4660-8ffb-21944c554bc0",
     "def64ac4-cb41-4b57-a9b3-572787f4074b",
-    "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c"
+    "dc3bef62-523a-4528-b86c-a576b8c97ed0",
+    "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
+    "c291e95c-82f0-437f-8b58-264ac73e27b2",
+    "a05b87ae-3af8-4874-8a39-bb2a0b80a914",
+    "f847df3f-7730-4593-bb89-e847c4667584",
+    "27338abc-2be0-42e7-af28-4617fe505acb",
+    "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+    "4af511fd-bc58-4bea-beb9-3237876d8075",
+    "0cce1a44-34d5-47e1-b1bb-8da3679f894a",
+    "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c",
+    "0daba57d-4cb8-4494-a825-22b286bc02c6",
+    "7a50e021-0740-4f1b-a46b-caa5f41664e3",
+    "82b8a519-d35a-4ebd-a3ac-82845729aa31",
+    "b2f9f390-912f-45fe-920f-3f196948be25",
+    "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4"
   ],
   "gates_required": [
     "cargo-ci",
@@ -44,15 +46,15 @@
     "repo-validate"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846112271Z"
-    },
     "repo-validate": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.846127671Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.846112271Z"
     },
     "cargo-ci": {
       "status": "pending",
@@ -82,6 +84,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-05T22:01:24.097170049Z",
+  "updated_at": "2026-07-05T22:41:02.814860695Z",
   "first_ready_at": "2026-07-05T08:08:20.123562836Z"
 }
