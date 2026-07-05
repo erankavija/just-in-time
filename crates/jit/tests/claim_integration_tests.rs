@@ -99,6 +99,68 @@ fn test_claim_acquire_happy_path() {
 }
 
 #[test]
+fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Test Issue");
+
+    let acquire = |agent: &str| {
+        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .args([
+                "claim",
+                "acquire",
+                &issue_id,
+                "--ttl",
+                "600",
+                "--agent-id",
+                agent,
+            ])
+            .assert()
+            .success();
+    };
+
+    acquire("agent:test-1");
+
+    // The lease-acquire path stamped claimed_at on the issue record.
+    let show = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .output()
+        .unwrap();
+    let show_json: Value = serde_json::from_slice(&show.stdout).unwrap();
+    let first_claimed = show_json["claimed_at"]
+        .as_str()
+        .expect("claimed_at must be set after claim acquire")
+        .to_string();
+
+    // INV-EVENT-LOG: an issue_claimed event was appended.
+    let events = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["events", "query", "--event-type", "issue_claimed", "--json"])
+        .output()
+        .unwrap();
+    let events_json: Value = serde_json::from_slice(&events.stdout).unwrap();
+    assert_eq!(events_json["count"].as_u64().unwrap(), 1);
+
+    // First-occurrence: re-acquiring as the same agent (release then re-acquire)
+    // must not move claimed_at.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["claim", "release", &issue_id])
+        .assert()
+        .success();
+    acquire("agent:test-1");
+
+    let show2 = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["issue", "show", &issue_id, "--json"])
+        .output()
+        .unwrap();
+    let show2_json: Value = serde_json::from_slice(&show2.stdout).unwrap();
+    assert_eq!(show2_json["claimed_at"].as_str().unwrap(), first_claimed);
+}
+
+#[test]
 fn test_claim_acquire_json_output() {
     let temp = setup_repo();
     let issue_id = create_issue(temp.path(), "Test Issue");

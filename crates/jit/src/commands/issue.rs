@@ -908,11 +908,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         if issue.assignee.as_ref() == Some(&assignee) {
             return Ok(warnings);
         }
-        issue.assignee = Some(assignee);
+        issue.assignee = Some(assignee.clone());
         // Record the first assignment time (first-occurrence only; re-assigning an
         // already-claimed issue leaves the original stamp intact).
         issue.mark_claimed(chrono::Utc::now());
+        let issue_id = issue.id.clone();
         self.storage.save_issue(issue)?;
+        // The assignee (and `claimed_at`) mutation above appends an
+        // `issue_claimed` event so the change is auditable (INV-EVENT-LOG) and the
+        // lifecycle-timestamp backfill can fold it back into `claimed_at` (see
+        // `derive_lifecycle_timestamps`), matching the `claim`/lease-acquire paths.
+        self.storage
+            .append_event(&Event::new_issue_claimed(issue_id, assignee))?;
         Ok(warnings)
     }
 
@@ -997,7 +1004,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(actor.clone());
         // Record the first claim time (first-occurrence only; a re-claim by the
-        // same assignee leaves the original stamp intact).
+        // same assignee leaves the original stamp intact). This stamp and the
+        // `issue_claimed` event below are coupled: the mutation persists together
+        // with the event (INV-EVENT-LOG), and the event feeds the
+        // lifecycle-timestamp backfill (`derive_lifecycle_timestamps`).
         issue.mark_claimed(chrono::Utc::now());
 
         let issue_id = issue.id.clone();

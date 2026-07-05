@@ -155,8 +155,16 @@ pub fn execute_claim_acquire<S: IssueStore>(
     let agent: crate::domain::Assignee = agent.parse()?;
     let mut issue = storage.load_issue(&full_id)?;
     if issue.assignee.as_ref() != Some(&agent) {
-        issue.assignee = Some(agent);
+        issue.assignee = Some(agent.clone());
+        // Record the first claim time (first-occurrence only). The stamp and the
+        // `issue_claimed` event below are the coupled record of this claim: the
+        // mutation never persists without an event (INV-EVENT-LOG), and the event
+        // is what the lifecycle-timestamp backfill folds to reconstruct
+        // `claimed_at` (see `derive_lifecycle_timestamps`).
+        issue.mark_claimed(chrono::Utc::now());
+        let issue_id = issue.id.clone();
         storage.save_issue(issue)?;
+        storage.append_event(&crate::domain::Event::new_issue_claimed(issue_id, agent))?;
     }
 
     Ok((lease.lease_id, warnings))

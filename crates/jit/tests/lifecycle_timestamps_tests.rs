@@ -127,9 +127,11 @@ fn test_claim_stamps_claimed_at() {
     assert_eq!(issue.state, State::InProgress);
 }
 
-/// Assigning an issue (without claiming) stamps `claimed_at`.
+/// Assigning an issue (without claiming) stamps `claimed_at` and logs an
+/// `issue_claimed` event (INV-EVENT-LOG) so the mutation is auditable and the
+/// backfill can fold it.
 #[test]
-fn test_assign_stamps_claimed_at() {
+fn test_assign_stamps_claimed_at_and_logs_event() {
     let h = TestHarness::new();
     let id = h.create_ready_issue("Assignable");
 
@@ -138,6 +140,15 @@ fn test_assign_stamps_claimed_at() {
         .unwrap();
 
     assert!(h.get_issue(&id).claimed_at.is_some());
+
+    let claimed = h
+        .storage
+        .read_events()
+        .unwrap()
+        .into_iter()
+        .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+        .count();
+    assert_eq!(claimed, 1);
 }
 
 /// Transitioning an issue to Done stamps `done_at`.

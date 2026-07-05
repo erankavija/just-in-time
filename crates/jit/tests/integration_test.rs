@@ -284,6 +284,45 @@ fn test_export_json_full_emits_complete_records() {
 }
 
 #[test]
+fn test_export_output_writes_complete_file() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(jit)
+        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let out_path = temp.path().join("graph.json");
+    let output = Command::new(jit)
+        .args([
+            "graph",
+            "export",
+            "--format",
+            "json",
+            "--output",
+            out_path.to_str().unwrap(),
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    // The atomically written file is complete and parses as the full document;
+    // no partial/temp residue is left beside it.
+    let contents = std::fs::read_to_string(&out_path).unwrap();
+    let doc: serde_json::Value = serde_json::from_str(&contents).unwrap();
+    assert!(doc["nodes"].is_array());
+    assert!(doc["edges"].is_array());
+    let temp_residue = std::fs::read_dir(temp.path())
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .any(|e| e.file_name().to_string_lossy().contains(".graph.json."));
+    assert!(!temp_residue, "atomic write left a temp file behind");
+}
+
+#[test]
 fn test_export_full_requires_json_format() {
     let temp = setup_test_repo();
     let jit = jit_binary();

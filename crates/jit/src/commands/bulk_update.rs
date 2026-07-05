@@ -243,6 +243,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Pending state-change event: captured here, emitted AFTER save_issue so a
         // failed write never leaves a ghost event in the log.
         let mut pending_state_event: Option<Event> = None;
+        // Pending claim event for a first assignee set on this update, emitted with
+        // the same deferred-after-save discipline. Coupled to the `claimed_at`
+        // stamp below (INV-EVENT-LOG) and folded by the lifecycle-timestamp
+        // backfill (`derive_lifecycle_timestamps`), matching the claim/assign paths.
+        let mut pending_claim_event: Option<Event> = None;
 
         // Apply state change
         //
@@ -327,7 +332,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(ref assignee) = operations.assignee {
             let assignee: crate::domain::Assignee = assignee.parse()?;
             if updated.assignee.as_ref() != Some(&assignee) {
-                updated.assignee = Some(assignee);
+                updated.assignee = Some(assignee.clone());
+                // Stamp the first claim time (first-occurrence only) and defer the
+                // coupled `issue_claimed` event, so this bulk assignment records
+                // `claimed_at` exactly like the single-issue claim/assign paths.
+                updated.mark_claimed(chrono::Utc::now());
+                pending_claim_event = Some(Event::new_issue_claimed(updated.id.clone(), assignee));
                 modified_fields.push("assignee".to_string());
             }
         } else if operations.unassign && updated.assignee.is_some() {
@@ -350,6 +360,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Emit the deferred state-change event AFTER the save commits, so a
             // failed write never leaves a ghost event in the event log.
             if let Some(event) = pending_state_event {
+                self.storage.append_event(&event)?;
+            }
+
+            // Emit the deferred claim event (first assignee set) after the save,
+            // same ordering discipline, so `claimed_at` never persists unaudited.
+            if let Some(event) = pending_claim_event {
                 self.storage.append_event(&event)?;
             }
 
@@ -702,6 +718,50 @@ mod tests {
 
         let changes = executor.compute_changes(&issue, &ops).unwrap();
         assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_apply_bulk_update_assignee_stamps_claimed_at_and_logs_event() {
+        use crate::query_engine::QueryFilter;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let storage = InMemoryStorage::new();
+        storage
+            .save_issue(create_test_issue("test-1", State::Ready, vec!["type:task"]))
+            .unwrap();
+        // A clone shares the in-memory state, so we can read events after the
+        // executor takes ownership of `storage`.
+        let reader = storage.clone();
+
+        let mut executor = crate::commands::CommandExecutor::new(storage);
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            assignee: Some("agent:worker-1".to_string()),
+            ..Default::default()
+        };
+        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        // claimed_at stamped by the bulk assignment.
+        let updated = executor.get_issue("test-1").unwrap();
+        assert!(updated.claimed_at.is_some());
+
+        // INV-EVENT-LOG: the assignee mutation appended an issue_claimed event.
+        let claimed = reader
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .filter(|e| matches!(e, Event::IssueClaimed { .. }))
+            .count();
+        assert_eq!(claimed, 1);
+
+        // First-occurrence: a second assignee change does not move claimed_at.
+        let first = updated.claimed_at;
+        let ops2 = UpdateOperations {
+            assignee: Some("agent:worker-2".to_string()),
+            ..Default::default()
+        };
+        executor.apply_bulk_update(&filter, &ops2, false).unwrap();
+        assert_eq!(executor.get_issue("test-1").unwrap().claimed_at, first);
     }
 
     #[test]

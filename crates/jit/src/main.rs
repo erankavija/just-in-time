@@ -4229,7 +4229,13 @@ fn run() -> Result<()> {
                 let graph_output = executor.export_graph(format, full)?;
 
                 if let Some(path) = output {
-                    std::fs::write(&path, graph_output)?;
+                    // Write through the shared atomic primitive (temp file +
+                    // rename) so a reader never observes a partially written
+                    // export file (INV-ATOMIC-WRITES), matching every storage write.
+                    jit::storage::atomic_write::write_file_atomic(
+                        std::path::Path::new(&path),
+                        &graph_output,
+                    )?;
                     let _ = output_ctx.print_success(format!("Graph exported to: {}", path));
                 } else {
                     println!("{}", graph_output);

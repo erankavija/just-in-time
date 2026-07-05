@@ -52,3 +52,43 @@ pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
         .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_file_atomic_writes_full_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.json");
+        write_file_atomic(&path, "{\"nodes\":[]}").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{\"nodes\":[]}");
+    }
+
+    #[test]
+    fn test_write_file_atomic_leaves_no_temp_file() {
+        // The rename consumes the temp file, so a completed write leaves ONLY the
+        // target in the directory — evidence the temp-file + rename path ran and
+        // no partial `.tmp` sibling lingers.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.txt");
+        write_file_atomic(&path, "hello").unwrap();
+
+        let entries: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries, vec!["out.txt".to_string()]);
+    }
+
+    #[test]
+    fn test_write_file_atomic_overwrites_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.txt");
+        write_file_atomic(&path, "first").unwrap();
+        write_file_atomic(&path, "second").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
+        // Still exactly one file: the overwrite left no temp residue.
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+}
