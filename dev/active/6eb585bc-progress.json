@@ -1,0 +1,100 @@
+{
+  "epic_id": "6eb585bc",
+  "epic_short_id": "6eb585bc",
+  "current_wave": 1,
+  "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "short_id": "ff9925af",
+          "title": "repo-root discovery walk-up",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "short_id": "8a15088a",
+          "title": "idempotent same-assignee claim",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "short_id": "b2f9f390",
+          "title": "append-description + file/stdin",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "short_id": "f847df3f",
+          "title": "delete removes dangling dep edges",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "7a50e021",
+          "title": "dep add rejects redundant edges (--reduce)",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "short_id": "4af511fd",
+          "title": "expose linked docs to gate checkers",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "short_id": "def64ac4",
+          "title": "single-version fail-fast format guard",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "03d54a9f",
+          "title": "deflake lease/heartbeat via injected clock",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-05T00:00:00Z"
+}

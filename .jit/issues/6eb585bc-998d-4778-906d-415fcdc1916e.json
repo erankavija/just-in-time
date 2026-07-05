@@ -4,7 +4,7 @@
   "description": "Umbrella for standalone jit core maintenance and bug-fix work that is not part of a feature epic.\n\n## Success Criteria\n\n- [ ] Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
   "state": "backlog",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [
     "df0b551f-c60e-4c6f-951c-5a796a1c5635",
     "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
@@ -27,11 +27,6 @@
     "repo-validate"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846078381Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -41,6 +36,11 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.846127671Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.846078381Z"
     }
   },
   "context": {},
@@ -51,5 +51,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-04T23:37:57.714715491Z"
+  "updated_at": "2026-07-05T00:08:31.727593061Z"
 }
