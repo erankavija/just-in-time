@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "9c6ddd39-62b5-4689-8295-5df2761dbeb7",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "ff9925af-c394-4960-948d-5009f5dedaa4",
+  "commit": "6cf0eb6aca96075a95808201bb81ad4b742bd892",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T00:19:48.102125305Z",
+  "completed_at": "2026-07-05T00:19:57.410444293Z",
+  "duration_ms": 9308,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest test_exit_code_io_error ... FAILED\ntest result: FAILED. 25 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s\n---- test_exit_code_io_error stdout ----\n\nthread 'test_exit_code_io_error' (3022315) panicked at crates/jit/tests/exit_code_tests.rs:182:5:\nassertion `left == right` failed\n  left: Some(1)\n right: Some(3)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
