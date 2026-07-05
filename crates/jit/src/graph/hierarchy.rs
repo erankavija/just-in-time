@@ -116,6 +116,23 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// node to a level via the [`HierarchyConfig`]. Implemented for
 /// [`Issue`](crate::domain::Issue); a test double need only return its type
 /// value.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::graph::hierarchy::HierarchyNode;
+///
+/// let mut epic = Issue::new("Auth".into(), String::new());
+/// epic.labels = vec!["type:epic".into()];
+/// let task = Issue::new("Login".into(), String::new());
+/// epic.dependencies = vec![task.id.clone()];
+///
+/// assert_eq!(epic.id(), epic.id.as_str());
+/// assert_eq!(epic.type_name(), Some("epic"));
+/// assert_eq!(epic.dependencies(), &[task.id.clone()]);
+/// assert_eq!(task.type_name(), None); // no type label
+/// ```
 pub trait HierarchyNode {
     /// Unique identifier for this node.
     fn id(&self) -> &str;
@@ -145,6 +162,22 @@ impl HierarchyNode for crate::domain::Issue {
 /// The resolved hierarchy facts for one node.
 ///
 /// See the [module docs](self) for how each field is derived from the DAG.
+///
+/// # Examples
+///
+/// ```
+/// use jit::graph::hierarchy::NodeHierarchy;
+///
+/// let facts = NodeHierarchy {
+///     parent: Some("epic-1".into()),
+///     children: vec!["task-a".into(), "task-b".into()],
+///     cluster: Some("milestone-1".into()),
+///     rank: 2,
+/// };
+/// assert_eq!(facts.parent.as_deref(), Some("epic-1"));
+/// assert_eq!(facts.children.len(), 2);
+/// assert_eq!(facts.rank, 2);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeHierarchy {
     /// The nearest dominating container's id, or `None` for a root node.
@@ -188,17 +221,65 @@ pub struct HierarchyResolution {
 
 impl HierarchyResolution {
     /// The full [`NodeHierarchy`] for `id`, if the node was in the input.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// assert_eq!(r.get(&task.id).unwrap().parent.as_deref(), Some(epic.id.as_str()));
+    /// assert!(r.get("no-such-id").is_none());
+    /// ```
     pub fn get(&self, id: &str) -> Option<&NodeHierarchy> {
         self.nodes.get(id)
     }
 
     /// The nearest dominating container's id for `id`, or `None` when the node
     /// is a root (or absent).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// assert_eq!(r.parent(&task.id), Some(epic.id.as_str()));
+    /// assert_eq!(r.parent(&epic.id), None); // a root
+    /// ```
     pub fn parent(&self, id: &str) -> Option<&str> {
         self.nodes.get(id).and_then(|n| n.parent.as_deref())
     }
 
     /// The ids of `id`'s resolved children (empty when it has none, or is absent).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// assert_eq!(r.children(&epic.id), [task.id.clone()]);
+    /// assert!(r.children(&task.id).is_empty());
+    /// ```
     pub fn children(&self, id: &str) -> &[String] {
         self.nodes
             .get(id)
@@ -208,26 +289,95 @@ impl HierarchyResolution {
 
     /// The strategic root container's id for `id`, or `None` for an orphan leaf
     /// (or absent node).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// // The epic is the strategic root, so the task clusters to it.
+    /// assert_eq!(r.cluster(&task.id), Some(epic.id.as_str()));
+    /// ```
     pub fn cluster(&self, id: &str) -> Option<&str> {
         self.nodes.get(id).and_then(|n| n.cluster.as_deref())
     }
 
     /// The longest-path rank for `id`, or `None` when the node is absent.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// assert_eq!(r.rank(&epic.id), Some(1));
+    /// assert_eq!(r.rank(&task.id), Some(0));
+    /// assert_eq!(r.rank("no-such-id"), None);
+    /// ```
     pub fn rank(&self, id: &str) -> Option<u32> {
         self.nodes.get(id).map(|n| n.rank)
     }
 
     /// Iterate over every resolved node as `(id, facts)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let mut epic = Issue::new("Epic".into(), String::new());
+    /// epic.labels = vec!["type:epic".into()];
+    /// let task = Issue::new("Task".into(), String::new());
+    /// epic.dependencies = vec![task.id.clone()];
+    ///
+    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
+    /// assert_eq!(r.iter().count(), 2);
+    /// ```
     pub fn iter(&self) -> impl Iterator<Item = (&String, &NodeHierarchy)> {
         self.nodes.iter()
     }
 
     /// Number of resolved nodes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let task = Issue::new("Task".into(), String::new());
+    /// let r = resolve_hierarchy(&[&task], &HierarchyConfig::default());
+    /// assert_eq!(r.len(), 1);
+    /// ```
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     /// Whether the resolution is empty (no input nodes).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use jit::domain::Issue;
+    /// # use jit::graph::hierarchy::resolve_hierarchy;
+    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// let empty = resolve_hierarchy::<Issue>(&[], &HierarchyConfig::default());
+    /// assert!(empty.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
@@ -279,19 +429,27 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
             .and_then(|n| n.type_name())
             .and_then(|t| config.get_level(t))
     };
-    let is_container = |id: &str| -> bool {
-        matches!((level_of(id), leaf_level), (Some(l), Some(max)) if l < max)
+    // The container level of `id`, i.e. `Some(level)` only when the node is a
+    // container (its level is strictly above a leaf). Returning the level and the
+    // container-ness together lets the loop below extract the level with no
+    // fallible re-lookup — the "container has a level" fact is proven by the
+    // `Some` rather than asserted with a panic.
+    let container_level = |id: &str| -> Option<u8> {
+        match (level_of(id), leaf_level) {
+            (Some(l), Some(max)) if l < max => Some(l),
+            _ => None,
+        }
     };
+    let is_container = |id: &str| -> bool { container_level(id).is_some() };
 
     // Nearest containing container per node: id -> (container level, distance, container id).
     // A higher level, then a shorter distance, then a smaller id wins.
     let mut best: HashMap<&str, (u8, usize, &str)> = HashMap::new();
     for &container in nodes {
         let cid = container.id();
-        if !is_container(cid) {
+        let Some(clevel) = container_level(cid) else {
             continue;
-        }
-        let clevel = level_of(cid).expect("a container has a configured level");
+        };
 
         // BFS over the container's dependency closure; BFS order gives the
         // shortest hop distance to each reachable node.
@@ -757,5 +915,195 @@ mod tests {
         task.labels = vec!["type:task".into(), "epic:ghost".into()];
         let divergences = detect_membership_divergences(&[&task], &config);
         assert!(divergences.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    //! Property-based coverage for hierarchy resolution over arbitrary DAGs,
+    //! mirroring the graph proptest suite in [`crate::type_hierarchy`].
+    use super::*;
+    use crate::type_hierarchy::HierarchyConfig;
+    use proptest::prelude::*;
+    use std::collections::{HashMap, HashSet};
+
+    /// A minimal [`HierarchyNode`] for generated graphs.
+    struct PropNode {
+        id: String,
+        deps: Vec<String>,
+        type_name: Option<String>,
+    }
+
+    impl HierarchyNode for PropNode {
+        fn id(&self) -> &str {
+            &self.id
+        }
+        fn dependencies(&self) -> &[String] {
+            &self.deps
+        }
+        fn type_name(&self) -> Option<&str> {
+            self.type_name.as_deref()
+        }
+    }
+
+    /// Generate an arbitrary acyclic graph: `n` nodes where node `k` may only
+    /// depend on lower-indexed nodes (guaranteeing acyclicity). Each node gets an
+    /// arbitrary type from the default hierarchy, or none.
+    fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<&'static str>, Vec<usize>)>> {
+        (1usize..=7)
+            .prop_flat_map(|n| {
+                (
+                    Just(n),
+                    prop::collection::vec(0u8..5, n),
+                    prop::collection::vec(any::<u8>(), n),
+                )
+            })
+            .prop_map(|(n, types, masks)| {
+                (0..n)
+                    .map(|k| {
+                        let ty = match types[k] {
+                            0 => Some("milestone"),
+                            1 => Some("epic"),
+                            2 => Some("story"),
+                            3 => Some("task"),
+                            _ => None,
+                        };
+                        // Depend on a subset of the strictly-lower indices.
+                        let deps = (0..k).filter(|&i| masks[k] & (1u8 << i) != 0).collect();
+                        (ty, deps)
+                    })
+                    .collect()
+            })
+    }
+
+    fn build(spec: &[(Option<&'static str>, Vec<usize>)]) -> Vec<PropNode> {
+        spec.iter()
+            .enumerate()
+            .map(|(k, (ty, deps))| PropNode {
+                id: format!("n{k}"),
+                deps: deps.iter().map(|i| format!("n{i}")).collect(),
+                type_name: ty.map(str::to_string),
+            })
+            .collect()
+    }
+
+    /// Independent longest-path recomputation (the resolution's `rank` oracle).
+    fn longest_path(
+        id: &str,
+        by_id: &HashMap<&str, &PropNode>,
+        memo: &mut HashMap<String, u32>,
+    ) -> u32 {
+        if let Some(v) = memo.get(id) {
+            return *v;
+        }
+        let mut best = 0;
+        if let Some(node) = by_id.get(id) {
+            for dep in &node.deps {
+                if by_id.contains_key(dep.as_str()) {
+                    best = best.max(1 + longest_path(dep, by_id, memo));
+                }
+            }
+        }
+        memo.insert(id.to_string(), best);
+        best
+    }
+
+    /// Ids `start` transitively depends on (excluding `start`).
+    fn dependency_closure(start: &str, by_id: &HashMap<&str, &PropNode>) -> HashSet<String> {
+        let mut result = HashSet::new();
+        let mut stack = vec![start];
+        let mut seen = HashSet::new();
+        seen.insert(start);
+        while let Some(cur) = stack.pop() {
+            if let Some(node) = by_id.get(cur) {
+                for dep in &node.deps {
+                    let dep = dep.as_str();
+                    if by_id.contains_key(dep) && seen.insert(dep) {
+                        result.insert(dep.to_string());
+                        stack.push(dep);
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    proptest! {
+        /// Resolution never panics on arbitrary acyclic input, and each resolved
+        /// fact satisfies its definition: every parent is a container that
+        /// transitively depends on the node; children invert parent; and rank
+        /// equals the independently-computed longest path.
+        #[test]
+        fn prop_resolution_invariants(spec in arbitrary_dag()) {
+            let config = HierarchyConfig::default();
+            let nodes = build(&spec);
+            let refs: Vec<&PropNode> = nodes.iter().collect();
+            let resolution = resolve_hierarchy(&refs, &config);
+
+            // Every input node is resolved.
+            prop_assert_eq!(resolution.len(), nodes.len());
+
+            let by_id: HashMap<&str, &PropNode> = nodes.iter().map(|n| (n.id(), n)).collect();
+            let leaf_level = config.types().map(|(_, l)| *l).max().unwrap();
+            let is_container = |id: &str| -> bool {
+                matches!(
+                    by_id.get(id).and_then(|n| n.type_name()).and_then(|t| config.get_level(t)),
+                    Some(l) if l < leaf_level
+                )
+            };
+
+            for node in &nodes {
+                let facts = resolution.get(node.id()).unwrap();
+
+                // A resolved parent is a container whose closure includes the node.
+                if let Some(parent) = &facts.parent {
+                    prop_assert!(is_container(parent), "parent {} is not a container", parent);
+                    prop_assert!(
+                        dependency_closure(parent, &by_id).contains(node.id()),
+                        "parent {} does not transitively depend on {}",
+                        parent,
+                        node.id()
+                    );
+                }
+
+                // Rank equals the longest dependency path.
+                let mut memo = HashMap::new();
+                prop_assert_eq!(facts.rank, longest_path(node.id(), &by_id, &mut memo));
+
+                // Children invert parent, and are sorted.
+                for child in &facts.children {
+                    prop_assert_eq!(resolution.parent(child), Some(node.id()));
+                }
+                let mut sorted = facts.children.clone();
+                sorted.sort();
+                prop_assert_eq!(&facts.children, &sorted);
+            }
+
+            // Every parented node appears under its parent's children.
+            for node in &nodes {
+                if let Some(parent) = resolution.parent(node.id()) {
+                    prop_assert!(resolution.children(parent).iter().any(|c| c == node.id()));
+                }
+            }
+        }
+
+        /// Resolution is invariant under input reordering: the tie-break is by
+        /// node id, not vector position, so a reversed input yields identical
+        /// facts for every node.
+        #[test]
+        fn prop_resolution_is_order_invariant(spec in arbitrary_dag()) {
+            let config = HierarchyConfig::default();
+            let nodes = build(&spec);
+            let refs: Vec<&PropNode> = nodes.iter().collect();
+            let forward = resolve_hierarchy(&refs, &config);
+
+            let mut reversed = refs.clone();
+            reversed.reverse();
+            let backward = resolve_hierarchy(&reversed, &config);
+
+            for node in &nodes {
+                prop_assert_eq!(forward.get(node.id()), backward.get(node.id()));
+            }
+        }
     }
 }
