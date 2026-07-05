@@ -55,10 +55,10 @@ Cargo workspace with three crates plus Node.js and React components:
 2. **Commands** (`commands/`) — Business logic per command: `issue.rs`, `gate.rs`, `dependency.rs`, `claim.rs`, `document.rs`, `query.rs`, `validate.rs`, etc.
 3. **Domain** (`domain/types.rs`, `domain/queries.rs`) — Core types (`Issue`, `State`, `Priority`, `GateStatus`) and pure query functions (`query_ready`, `query_blocked`, `query_by_assignee`).
 4. **Storage** (`storage/`) — `IssueStore` trait with `JsonFileStorage` (file-based, `.jit/` directory) and `InMemoryStorage` (testing). Also contains `claim_coordinator.rs` (lease system), `lock.rs` (file locking).
-5. **Graph** (`graph.rs`) — DAG construction, cycle detection, blocking analysis, transitive reduction.
+5. **Graph** (`graph/`) — DAG construction, cycle detection, blocking analysis, transitive reduction, and DAG-authoritative hierarchy resolution (`graph/hierarchy.rs`).
 6. **Output** (`output.rs`) — JSON serialization and structured output formatting.
 
-`main.rs` contains the `CommandExecutor` which orchestrates commands—it is large (~176KB) and monolithic.
+`commands/mod.rs` hosts the `CommandExecutor` that orchestrates commands. `main.rs` is CLI dispatch and output rendering — large and monolithic.
 
 ### Issue Lifecycle States
 
@@ -72,14 +72,33 @@ Cargo workspace with three crates plus Node.js and React components:
 
 ```
 .jit/
-├── index.json          # Repository metadata
-├── config.toml         # Configuration (type hierarchy, validation strictness)
+├── index.json          # Repository metadata (incl. format version)
+├── config.toml         # Configuration
 ├── gates.toml          # Gate registry
+├── templates.toml      # Graph templates (plan bracket)
+├── rules.toml          # Validation rules
+├── invariants.toml     # Invariants registry (rendered into CLAUDE.md)
 ├── issues/{id}.json    # Individual issue files
 ├── events.jsonl        # Append-only event log
-├── claims.jsonl        # Claim/lease log
-└── claims/             # Active lease files
+├── gate-runs/          # Recorded gate runs (+ structured findings)
+└── schemas/            # JSON schemas
 ```
+
+Advisory work leases live in `.git/jit/`, not `.jit/`.
+
+## Agent Workflow Quick Reference
+
+All commands support `--json`; list output uses `{"count": N, "<collection>": [...]}`.
+
+- `jit issue status <id>...` — state + gates + unmet deps, one line per issue
+- `jit issue children` / `jit issue progress <id>` — per-child rollup, counts by state
+- `jit query available --label a:b --label c:d` — ready work; labels AND
+- `jit query count --by state [--label ...]` — aggregate over a bucket
+- `jit graph tree [--json]` / `jit query divergence` — resolved hierarchy; label-vs-DAG report
+- `jit gate evaluate <id> <gate>` runs a checker; `jit gate status` reads results; `--findings` prints structured findings
+- `jit config get <dotted.key>` — config values
+- `jit graph export --format json --full` — full records incl. lifecycle timestamps
+- `jit schema` — JSON shapes + exit-code taxonomy
 
 ## Testing Strategy
 
@@ -117,7 +136,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **No unsafe code** — `#![deny(unsafe_code)]` enforced.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
-- **CLI commands must support `--json`** for machine-readable output.
+- **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it. Exception: claim and lease commands (`jit claim acquire/release/renew/heartbeat/status/list`) require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
 ### Domain Invariants
