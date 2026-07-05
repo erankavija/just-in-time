@@ -138,10 +138,14 @@ Cycles are rejected up front, redundant edges are refused (or reduced with `--re
 Gates are checkpoints that must pass before an issue can start, progress, or complete.
 
 ```bash
-# Require gates at creation
-jit issue create --title "Add feature" --gate unit-tests --gate code-review
+# Register an automated gate in this repository's gate registry
+jit gate define unit-tests --title "Unit tests" --description "Test suite passes" \
+  --mode auto --checker-command "cargo test"
 
-# Run an automated gate and read the results
+# Require it at creation
+jit issue create --title "Add feature" --gate unit-tests
+
+# Run the gate and read the results
 jit gate evaluate <issue> unit-tests      # executes the checker
 jit gate status <issue> unit-tests        # latest recorded run
 jit gate status <issue> unit-tests --all        # run history
@@ -158,7 +162,7 @@ jit gate status <issue> unit-tests --findings   # structured findings view
 
 ### Built for Orchestration
 
-Every command supports `--json`; list output uses one envelope: `{"count": N, "<collection>": [...]}`. Exit codes are typed (invalid argument, not found, validation/gates, requires-git) and `jit --schema` documents every command's JSON shape and the full exit-code taxonomy.
+Machine output is first-class: `--json` throughout the day-to-day command surface, with list output in one envelope: `{"count": N, "<collection>": [...]}`. Exit codes are typed (invalid argument, not found, validation/gates, requires-git) and `jit --schema` documents each command's JSON shape and the full exit-code taxonomy.
 
 ```bash
 jit issue status <id>...                 # state + gates + unmet deps, one line per issue
