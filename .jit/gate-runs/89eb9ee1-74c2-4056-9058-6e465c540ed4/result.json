@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "89eb9ee1-74c2-4056-9058-6e465c540ed4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "def64ac4-cb41-4b57-a9b3-572787f4074b",
+  "commit": "b4df04ca086edddcbbee0d8e5ee6986395fe174a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T07:22:12.608027514Z",
+  "completed_at": "2026-07-05T07:23:13.844283074Z",
+  "duration_ms": 61236,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 is satisfied: `.jit/index.json` `schema_version` is documented as the single repository-format marker, and new indexes use `SUPPORTED_INDEX_SCHEMA_VERSION` in `crates/jit/src/storage/json.rs:22`.\n\nREQ-02 is satisfied: startup validation now loads the index for all non-init commands in `crates/jit/src/storage/json.rs:117`, and `init` now checks an existing index before writing in `crates/jit/src/storage/json.rs:462`. CLI coverage includes `status`, `gate list`, and the prior `init` bypass in `crates/jit/tests/format_compat_cli_tests.rs:56`, `:68`, and `:82`.\n\nREQ-03 is satisfied: equal and older repository versions are covered in `crates/jit/src/storage/json.rs:2406` and `:2416`.\n\n**Architecture And Separation**\n\nThe compatibility logic remains in storage, with CLI only classifying the typed error for exit code handling in `crates/jit/src/main.rs:89`. No domain I/O, command parsing leakage, or storage bypass was introduced.\n\n**Functional Paradigm**\n\nNo blocking functional-style issues found. The new aggregation helper in `crates/jit/src/storage/json.rs:220` keeps the previous behavior while propagating the format error.\n\n**Correctness And Invariants**\n\nAtomic writes, event logging, gate transition semantics, assignee/label validation, PID safety, and unsafe-code policy are not materially changed. The repository-format invariant is now enforced before non-init command execution and before re-initializing an existing repo.\n\n**Testing**\n\nProvided evidence shows `cargo-ci` passed at `2026-07-05T07:13:45Z` with exit code 0, so I did not run cargo tests. I ran `./scripts/jit-validate.sh`; it passed. Prior code-review findings for `gate list` and `init` startup bypasses are addressed by the current changes.\n\n**Error Handling**\n\n`RepositoryFormatTooNewError` is typed, contextual, downcastable, single-line, and includes both versions in `crates/jit/src/storage/errors.rs:270`. The CLI maps it to exit code 10 in `crates/jit/src/main.rs:89`.\n\n**CLI Contract**\n\nNo new command surface was added. The required fail-fast error behavior is covered at the CLI level, including the direct-registry `gate list` path.\n\n**Documentation**\n\n`docs/reference/storage-format.md:133` documents `index.json` `schema_version` as the authoritative repository-format marker and describes newer-repo refusal behavior.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passes. Label warnings were not blocking.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

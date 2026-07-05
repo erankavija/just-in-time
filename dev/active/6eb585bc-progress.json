@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 7,
+  "current_wave": 8,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -77,7 +77,7 @@
           "short_id": "def64ac4",
           "title": "single-version fail-fast format guard",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -104,7 +104,8 @@
     "ff9925af": 1,
     "b2f9f390": 1,
     "f847df3f": 1,
-    "7a50e021": 1
+    "7a50e021": 1,
+    "def64ac4": 2
   },
   "started_at": "2026-07-05T00:00:00Z"
 }

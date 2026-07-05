@@ -2,7 +2,7 @@
   "id": "def64ac4-cb41-4b57-a9b3-572787f4074b",
   "title": "Stale jit binary misreads newer repo data instead of failing fast on format mismatch",
   "description": "An installed `jit` binary older than the repository's data produces opaque, misleading failures instead of a version-mismatch diagnosis. The repository already carries a single `schema_version` in `index.json`; the guard extends that one marker so an outdated binary fails fast and legibly.\n\n## Background\n\nFriction observed while lead-driving epic 2821e177 (2026-07-03, session 2). Two incidents in one session while dogfooding storage/validation changes:\n\n1. After the live repo migrated `gates.json` -> `gates.toml`, the stale PATH binary failed every command touching the registry with \"Failed to read file: .jit/gates.json\" (exit 4) — nothing hinted that the data had moved on and the binary was behind.\n2. After `invariants.toml` bindings moved to `@/rule/...`/`@/gate/...` addresses, the stale binary's string-matching drift check reported 4 phantom enforcement-drift findings on a perfectly green repo.\n\nBoth read as repo corruption or regressions; the fix each time was `cargo install --path crates/jit`. `index.json` already carries `schema_version`, but the gates-file relocation and the binding-format change did not bump anything a binary checks.\n\n## Success Criteria\n\n- [hard] REQ-01: a single repository-format version (the existing `index.json` `schema_version`, or a marker extending it) is the authoritative on-disk compatibility marker, and it is bumped whenever an on-disk layout or interpretation changes.\n- [hard] REQ-02: on startup, a binary whose supported format version is lower than the repository's refuses to operate and emits a single-line, nonzero error naming both the repository's format version and the version the binary supports, instead of a file-read error or a wrong validation verdict. Covered by a test pairing a newer-format repo with an older supported version.\n- [hard] REQ-03: a binary whose supported version is greater than or equal to the repository's operates normally; writing with a newer binary may migrate or bump the marker as today.\n\n## Notes\n\nGuard is a single version check, not per-store schema versions.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.821981083Z"
-    },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.821944993Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T07:13:45.928222249Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T07:22:12.608027514Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T16:51:06.609405819Z",
-  "updated_at": "2026-07-05T07:02:13.385675019Z"
+  "updated_at": "2026-07-05T07:23:38.007967335Z"
 }
