@@ -2014,6 +2014,26 @@ pub enum GraphCommands {
         json: bool,
     },
 
+    /// Show the DAG-resolved containment hierarchy (parent/children per node)
+    ///
+    /// Resolution treats the dependency DAG as authoritative (membership labels
+    /// are advisory and not consulted): a container depends on the work it
+    /// contains, so each node's parent is the nearest dominating container, its
+    /// children are the inverse, its cluster is the strategic root container, and
+    /// its rank is the longest dependency-path depth.
+    ///
+    /// With no id the whole repository is shown; with a root id the view is that
+    /// node plus its transitive containment subtree.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "nodes": [...]}`.
+    Tree {
+        /// Optional root id to scope the tree to (its containment subtree).
+        root: Option<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Export dependency graph in various formats
     Export {
         /// Output format (dot, mermaid, json)
@@ -2235,6 +2255,20 @@ pub enum QueryCommands {
         #[arg(short = 'l', long)]
         label: Vec<String>,
 
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Report membership labels that disagree with DAG-resolved containment
+    ///
+    /// Advisory: lists each issue that carries a membership label (`epic:foo`,
+    /// `milestone:v1.0`, …) while the dependency DAG does not place it inside the
+    /// container that owns that label — i.e. the label claims a membership the
+    /// authoritative DAG does not back. The dependency DAG is the source of
+    /// truth; membership labels are advisory grouping.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
+    Divergence {
         #[arg(long)]
         json: bool,
     },

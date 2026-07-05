@@ -818,6 +818,77 @@ pub struct GraphRootsResponse {
     pub count: usize,
 }
 
+/// One node's resolved hierarchy facts, as rendered by `graph tree`.
+///
+/// The `type` key is the value of the node's `type:` label (absent when it has
+/// none). `parent`, `cluster`, `children`, and `rank` are the DAG-authoritative
+/// resolution from [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct HierarchyNodeView {
+    /// Full issue id.
+    pub id: String,
+    /// Short id (first 8 chars).
+    pub short_id: String,
+    /// Issue title.
+    pub title: String,
+    /// The node's `type:` label value, if any.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub type_name: Option<String>,
+    /// Nearest dominating container id, or `null` for a root node.
+    pub parent: Option<String>,
+    /// Ids of nodes whose resolved parent is this node, sorted ascending.
+    pub children: Vec<String>,
+    /// Strategic root container id, or `null` for an orphan leaf.
+    pub cluster: Option<String>,
+    /// Longest dependency-path length to an in-set sink.
+    pub rank: u32,
+}
+
+/// Response for `graph tree` command.
+///
+/// List envelope: `count` is the number of entries in `nodes`. `root` echoes the
+/// optional root id the view was scoped to (`null` for the whole repository).
+/// Each node carries its DAG-resolved parent, children, cluster, and rank.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphTreeResponse {
+    /// The root id the tree was scoped to, or `null` for the whole repository.
+    pub root: Option<String>,
+    /// Number of entries in `nodes`.
+    pub count: usize,
+    /// Resolved hierarchy per node, ordered by ascending short id.
+    pub nodes: Vec<HierarchyNodeView>,
+}
+
+/// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DivergenceView {
+    /// Full id of the issue carrying the unsupported membership label.
+    pub id: String,
+    /// Short id (first 8 chars).
+    pub short_id: String,
+    /// Issue title.
+    pub title: String,
+    /// The full `namespace:value` membership label.
+    pub label: String,
+    /// The label namespace.
+    pub namespace: String,
+    /// The label value.
+    pub value: String,
+}
+
+/// Response for `query divergence` command.
+///
+/// List envelope: `count` is the number of entries in `divergences`. Each entry
+/// is a membership label whose claim the dependency DAG does not back (the issue
+/// carries the label but is not in the closure of the container that owns it).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DivergenceResponse {
+    /// Number of entries in `divergences`.
+    pub count: usize,
+    /// The reported divergences, ordered by `(issue_id, label)`.
+    pub divergences: Vec<DivergenceView>,
+}
+
 // ============================================================================
 // Issue Show Response
 // ============================================================================

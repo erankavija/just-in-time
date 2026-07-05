@@ -2422,6 +2422,7 @@ are ANDed: an issue is returned only if it matches every pattern given.
 | `jit query strategic` | — | Issues carrying labels from strategic namespaces |
 | `jit query closed` | — | Issues in Done or Rejected state |
 | `jit query count` | — | Counts by a dimension over a label bucket, with a done/total rollup |
+| `jit query divergence` | — | Membership labels not backed by the DAG (advisory) |
 
 ### State aggregation (`jit query count`)
 
@@ -2470,6 +2471,51 @@ header:
   the `done`/`rejected`/`open`/`percent` terminal-state semantics are identical
   to `issue progress` (done and rejected distinct; open = non-terminal;
   `done/total` measures delivery).
+
+### Membership divergence (`jit query divergence`)
+
+`jit query divergence [--json]` reports each issue that carries a membership
+label (`epic:foo`, `milestone:v1.0`, …) while the dependency DAG does **not**
+place it inside the container that owns that label — i.e. the label claims a
+membership the [authoritative DAG](../concepts/hierarchy-resolution.md) does not
+back. This is the canonical resolver for the label-vs-DAG disagreement that
+`jit validate` also surfaces as an advisory count.
+
+It is advisory and read-only: only the "label claims membership, DAG disagrees"
+direction is flagged. A DAG descendant that does not repeat its container's label
+is **not** reported (labels are advisory; children normally rely on the DAG), and
+a label with no owning container is left to
+[membership-reference validation](validation-rules.md).
+
+```bash
+jit query divergence
+# -> 2 membership label(s) not backed by the DAG:
+# ->   027d7cbf | milestone:v1.0 | Declare the gate contract ...
+
+jit query divergence --json
+```
+
+**JSON shape:** the list envelope `{"count": N, "divergences": [...]}`:
+
+```json
+{
+  "count": 1,
+  "divergences": [
+    {
+      "id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce",
+      "short_id": "027d7cbf",
+      "title": "Issue title",
+      "label": "milestone:v1.0",
+      "namespace": "milestone",
+      "value": "v1.0"
+    }
+  ]
+}
+```
+
+`jit validate --json` also carries `divergence_count` and a
+`membership_divergences` array (the same entries); the count is **advisory** and
+never changes the validate exit status.
 
 ## Document Commands
 
@@ -2524,14 +2570,63 @@ record, byte-for-byte the fields of the on-disk `issues/<id>.json` file
 (`id`, `title`, `description`, `state`, `priority`, `assignee`, `dependencies`,
 `gates_required`, `gates_status` with each gate's `status`/`updated_by`/
 `updated_at`, `context`, `documents`, `labels`, `created_at`, `updated_at`, and
-the lifecycle timestamps `first_ready_at`/`claimed_at`/`done_at` when present).
-This lets a bulk consumer read every node's full record in one call instead of
-globbing the issue files. The `edges` list is the same as the summary shape.
+the lifecycle timestamps `first_ready_at`/`claimed_at`/`done_at` when present),
+**plus two additive resolved-hierarchy fields**:
+
+| Field | Meaning |
+|-------|---------|
+| `resolved_parent` | The node's nearest dominating container id (the [DAG-resolved](../concepts/hierarchy-resolution.md) parent), or `null` for a root. |
+| `cluster` | The node's strategic root container id, or `null` for an orphan leaf. |
+
+This lets a bulk consumer read every node's full record **and** its canonical
+placement in one call instead of globbing the issue files or re-deriving
+containment. The `edges` list is the same as the summary shape.
 
 The default (no `--full`) output is unchanged from prior releases: bulk loops
-that parse the summary shape are unaffected. See
+that parse the summary shape are unaffected, and the two hierarchy fields appear
+only in the `--full` shape. See
 [storage-format § Issue JSON Schema](storage-format.md#issue-json-schema) for the
 full field reference.
+
+### `jit graph tree`
+
+Show the DAG-resolved containment hierarchy — the parent, children, cluster, and
+rank of each node — as computed by the canonical
+[hierarchy resolver](../concepts/hierarchy-resolution.md). The dependency DAG is
+authoritative; membership labels are advisory and are not consulted.
+
+```
+jit graph tree [<root-id>] [--json]
+```
+
+With no id the whole repository is resolved; with a root id the view is the root
+plus its transitive dependency closure (the DAG subtree it contains). Each node
+still carries its repository-wide resolution, so a scoped node's `parent` may
+reference a container outside the listed subtree.
+
+JSON uses the list envelope `{"count": N, "root": <id|null>, "nodes": [...]}`,
+where each node is:
+
+```json
+{
+  "id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+  "short_id": "003f9f83",
+  "title": "Issue title",
+  "type": "task",
+  "parent": "<container-uuid|null>",
+  "children": ["<child-uuid>", "..."],
+  "cluster": "<strategic-root-uuid|null>",
+  "rank": 0
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `parent` | Nearest dominating container (deepest level, then fewest hops, then smallest id), or `null` for a root. |
+| `children` | Ids whose resolved `parent` is this node, sorted ascending (the inverse of `parent`). |
+| `cluster` | Strategic root of the parent chain, or `null` for an orphan leaf. |
+| `rank` | Longest dependency-path length to an in-set sink (sinks are `0`). |
+| `type` | The node's `type:` label value; omitted when it has none. |
 
 ## Status and Validation
 

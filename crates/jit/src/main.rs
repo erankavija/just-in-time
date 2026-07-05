@@ -1418,6 +1418,7 @@ fn reject_parent_query_filters(
         QueryCommands::Strategic { .. } => "strategic",
         QueryCommands::Closed { .. } => "closed",
         QueryCommands::Count { .. } => "count",
+        QueryCommands::Divergence { .. } => "divergence",
     };
 
     // A misplaced pre-subcommand filter is a usage error (exit 2), the same class
@@ -4211,6 +4212,42 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            GraphCommands::Tree { root, json } => {
+                let output_ctx = OutputContext::new(quiet, json);
+                let response = executor.resolve_hierarchy_tree(root.as_deref())?;
+
+                if json {
+                    use jit::output::JsonOutput;
+                    let msg = format!("{} nodes", response.count);
+                    let output = JsonOutput::success(response, "graph tree").with_message(msg);
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    let scope = match &response.root {
+                        Some(id) => format!("subtree of {}", &id[..8.min(id.len())]),
+                        None => "repository".to_string(),
+                    };
+                    let _ = output_ctx.print_info(format!("Resolved hierarchy ({}):", scope));
+                    if response.nodes.is_empty() {
+                        println!("  (none)");
+                    } else {
+                        for node in &response.nodes {
+                            let parent = node
+                                .parent
+                                .as_deref()
+                                .map(|p| &p[..8.min(p.len())])
+                                .unwrap_or("-");
+                            println!(
+                                "  {} | parent={} children={} rank={} | {}",
+                                node.short_id,
+                                parent,
+                                node.children.len(),
+                                node.rank,
+                                node.title
+                            );
+                        }
+                    }
+                }
+            }
             GraphCommands::Export {
                 format,
                 full,
@@ -5019,6 +5056,28 @@ fn run() -> Result<()> {
                         } else {
                             for line in rollup.to_lines() {
                                 println!("{}", line);
+                            }
+                        }
+                    }
+                    jit::cli::QueryCommands::Divergence { json } => {
+                        let output_ctx = OutputContext::new(quiet, json);
+                        let report = executor.detect_divergences()?;
+
+                        if json {
+                            let msg = format!("{} divergence(s)", report.count);
+                            let output =
+                                jit::output::JsonOutput::success(report, "query divergence")
+                                    .with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else if report.divergences.is_empty() {
+                            let _ = output_ctx.print_success("No membership/DAG divergences");
+                        } else {
+                            let _ = output_ctx.print_info(format!(
+                                "{} membership label(s) not backed by the DAG:",
+                                report.count
+                            ));
+                            for d in &report.divergences {
+                                println!("  {} | {} | {}", d.short_id, d.label, d.title);
                             }
                         }
                     }
@@ -6018,6 +6077,18 @@ fn run() -> Result<()> {
                     .filter(|f| !f.is_error())
                     .collect();
 
+                // Membership-vs-DAG divergences are advisory: they surface here as
+                // a warning-severity count but never change the exit status (a repo
+                // with real labels must not start failing `jit validate`). A
+                // resolution error degrades to an empty report rather than failing
+                // the whole validate run.
+                let divergence_report = executor.detect_divergences().unwrap_or_else(|_| {
+                    jit::output::DivergenceResponse {
+                        count: 0,
+                        divergences: Vec::new(),
+                    }
+                });
+
                 if json {
                     use jit::output::JsonOutput;
                     use serde_json::json;
@@ -6054,12 +6125,15 @@ fn run() -> Result<()> {
                     } else {
                         "Repository validation passed".to_string()
                     };
+                    let divergences_json = serde_json::to_value(&divergence_report.divergences)?;
                     let output = JsonOutput::success(
                         json!({
                             "valid": !validation_failed,
                             "integrity_error": integrity_message,
                             "warnings": warnings_json,
                             "warning_count": warnings_json.len(),
+                            "membership_divergences": divergences_json,
+                            "divergence_count": divergence_report.count,
                             "rule_findings": findings_json,
                             "error_count": rule_report.error_count(),
                             "message": message
@@ -6095,6 +6169,15 @@ fn run() -> Result<()> {
 
                     if !warning_findings.is_empty() {
                         println!("\nWarnings: {}", warning_findings.len());
+                    }
+
+                    // Advisory only — does not affect the exit status.
+                    if divergence_report.count > 0 {
+                        println!(
+                            "⚠ {} membership label(s) not backed by the DAG \
+                             (run `jit query divergence` for details)",
+                            divergence_report.count
+                        );
                     }
                 }
 

@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Canonical hierarchy resolution in the core, shared by the CLI and web UI.**
+  Parent, children, cluster, and rank per node are now resolved once in the core
+  library (`jit::graph::hierarchy`) treating the **dependency DAG as
+  authoritative and membership labels as advisory** — the model previously lived
+  only in the web UI's TypeScript, forcing external tools to re-port it. A
+  container is any type below the configured leaf level; a node's parent is the
+  nearest dominating container, its cluster is the strategic root, and its rank is
+  the longest dependency-path depth. New surfaces:
+  - **`jit graph tree [<root-id>] --json`** emits the resolved parent/children/
+    cluster/rank per node (`{count, root, nodes}` envelope); a root id scopes the
+    view to that node's dependency closure.
+  - **`jit graph export --format json --full`** nodes gain two additive fields,
+    `resolved_parent` and `cluster`. The default summary shape is byte-for-byte
+    unchanged.
+  - **`jit query divergence [--json]`** reports membership labels the DAG does not
+    back (an issue labeled `epic:foo` that the `foo` epic does not depend on).
+    `jit validate` surfaces the same as an advisory `divergence_count` that never
+    changes its exit status.
+
+  The web UI shares the canonical resolver (`web/src/utils/hierarchyResolution.ts`),
+  pinned to the core by a shared fixture (`test-vectors/hierarchy_resolution.json`)
+  asserted from both Rust and vitest. See
+  [Hierarchy Resolution](docs/concepts/hierarchy-resolution.md).
+
 - **Full-record bulk graph export (`jit graph export --format json --full`) and
   issue lifecycle timestamps.** The JSON graph export gains a `--full` flag that
   emits the complete issue record for each node — every field of the on-disk

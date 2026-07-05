@@ -1,0 +1,26 @@
+{
+  "description": "Shared test vectors for canonical DAG-authoritative hierarchy resolution. Consumed by the Rust core test (crates/jit/src/graph/hierarchy.rs, via tests/hierarchy_vectors_test.rs) and the web port (web/src/utils/hierarchyResolution.test.ts). Both implementations must produce `expected` from `nodes` under `hierarchy`. See docs/concepts/hierarchy-resolution.md for the model.",
+  "hierarchy": { "milestone": 1, "epic": 2, "story": 3, "task": 4 },
+  "nodes": [
+    { "id": "m", "type": "milestone", "dependencies": ["e1", "tA"] },
+    { "id": "e1", "type": "epic", "dependencies": ["tA"] },
+    { "id": "tA", "type": "task", "dependencies": [] },
+    { "id": "d-aaa", "type": "epic", "dependencies": ["dt"] },
+    { "id": "d-bbb", "type": "epic", "dependencies": ["dt"] },
+    { "id": "dt", "type": "task", "dependencies": [] },
+    { "id": "orphan", "type": "task", "dependencies": [] },
+    { "id": "untyped", "type": null, "dependencies": ["orphan2"] },
+    { "id": "orphan2", "type": "task", "dependencies": [] }
+  ],
+  "expected": {
+    "m": { "parent": null, "children": ["e1"], "cluster": "m", "rank": 2 },
+    "e1": { "parent": "m", "children": ["tA"], "cluster": "m", "rank": 1 },
+    "tA": { "parent": "e1", "children": [], "cluster": "m", "rank": 0 },
+    "d-aaa": { "parent": null, "children": ["dt"], "cluster": "d-aaa", "rank": 1 },
+    "d-bbb": { "parent": null, "children": [], "cluster": "d-bbb", "rank": 1 },
+    "dt": { "parent": "d-aaa", "children": [], "cluster": "d-aaa", "rank": 0 },
+    "orphan": { "parent": null, "children": [], "cluster": null, "rank": 0 },
+    "untyped": { "parent": null, "children": [], "cluster": null, "rank": 1 },
+    "orphan2": { "parent": null, "children": [], "cluster": null, "rank": 0 }
+  }
+}

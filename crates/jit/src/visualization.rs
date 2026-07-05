@@ -179,25 +179,62 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// present. This gives bulk consumers complete records in one call without
 /// globbing `.jit/issues/*.json`.
 ///
+/// Two additive fields carry the DAG-authoritative hierarchy from `resolution`:
+/// `resolved_parent` (the node's nearest dominating container id, or `null`) and
+/// `cluster` (its strategic root container id, or `null`). These appear only in
+/// the `--full` shape; the default summary shape is untouched.
+///
 /// # Example
 /// ```
 /// use jit::visualization;
+/// use jit::graph::hierarchy::resolve_hierarchy;
+/// use jit::type_hierarchy::HierarchyConfig;
 /// use jit::{graph::DependencyGraph, Issue};
 ///
-/// let issue = Issue::new("Design".to_string(), "Design API".to_string());
-/// let issues = vec![&issue];
+/// let mut epic = Issue::new("Epic".to_string(), String::new());
+/// epic.labels = vec!["type:epic".to_string()];
+/// let mut task = Issue::new("Task".to_string(), String::new());
+/// task.labels = vec!["type:task".to_string()];
+/// epic.dependencies.push(task.id.clone());
+///
+/// let issues = vec![&epic, &task];
 /// let graph = DependencyGraph::new(&issues);
-/// let json = visualization::export_json_full(&graph);
+/// let resolution = resolve_hierarchy(&issues, &HierarchyConfig::default());
+/// let json = visualization::export_json_full(&graph, &resolution);
 /// assert!(json.contains("\"description\""));
-/// assert!(json.contains("\"gates_status\""));
+/// assert!(json.contains("\"resolved_parent\""));
+/// assert!(json.contains("\"cluster\""));
 /// ```
-pub fn export_json_full(graph: &DependencyGraph<Issue>) -> String {
+pub fn export_json_full(
+    graph: &DependencyGraph<Issue>,
+    resolution: &crate::graph::hierarchy::HierarchyResolution,
+) -> String {
     let mut all_nodes = Vec::new();
     collect_all_nodes(graph, &mut all_nodes);
 
     let nodes: Vec<serde_json::Value> = all_nodes
         .iter()
-        .map(|issue| serde_json::to_value(issue).unwrap_or(serde_json::Value::Null))
+        .map(|issue| {
+            let mut value = serde_json::to_value(issue).unwrap_or(serde_json::Value::Null);
+            if let Some(obj) = value.as_object_mut() {
+                let facts = resolution.get(&issue.id);
+                obj.insert(
+                    "resolved_parent".to_string(),
+                    facts
+                        .and_then(|f| f.parent.clone())
+                        .map(serde_json::Value::String)
+                        .unwrap_or(serde_json::Value::Null),
+                );
+                obj.insert(
+                    "cluster".to_string(),
+                    facts
+                        .and_then(|f| f.cluster.clone())
+                        .map(serde_json::Value::String)
+                        .unwrap_or(serde_json::Value::Null),
+                );
+            }
+            value
+        })
         .collect();
 
     render_graph_json(nodes, &all_nodes)
@@ -366,7 +403,12 @@ mod tests {
 
         let issues = vec![&issue];
         let graph = DependencyGraph::new(&issues);
-        let doc: serde_json::Value = serde_json::from_str(&export_json_full(&graph)).unwrap();
+        let resolution = crate::graph::hierarchy::resolve_hierarchy(
+            &issues,
+            &crate::type_hierarchy::HierarchyConfig::default(),
+        );
+        let doc: serde_json::Value =
+            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
         let node = &doc["nodes"][0];
 
         assert_eq!(node["description"], "Body text");
@@ -390,11 +432,59 @@ mod tests {
 
         let issues = vec![&dep, &issue];
         let graph = DependencyGraph::new(&issues);
+        let resolution = crate::graph::hierarchy::resolve_hierarchy(
+            &issues,
+            &crate::type_hierarchy::HierarchyConfig::default(),
+        );
 
         let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
-        let full: serde_json::Value = serde_json::from_str(&export_json_full(&graph)).unwrap();
+        let full: serde_json::Value =
+            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
         assert_eq!(summary["edges"], full["edges"]);
         assert_eq!(summary["edges"][0]["from"], issue.id);
         assert_eq!(summary["edges"][0]["to"], dep.id);
+    }
+
+    /// The `--full` node carries the additive DAG-resolved hierarchy fields
+    /// (`resolved_parent`, `cluster`); the summary node never does.
+    #[test]
+    fn test_export_json_full_carries_resolved_hierarchy_fields() {
+        let mut epic = Issue::new("Epic".to_string(), String::new());
+        epic.labels = vec!["type:epic".to_string()];
+        let mut task = Issue::new("Task".to_string(), String::new());
+        task.labels = vec!["type:task".to_string()];
+        epic.dependencies.push(task.id.clone());
+
+        let issues = vec![&epic, &task];
+        let graph = DependencyGraph::new(&issues);
+        let resolution = crate::graph::hierarchy::resolve_hierarchy(
+            &issues,
+            &crate::type_hierarchy::HierarchyConfig::default(),
+        );
+
+        let full: serde_json::Value =
+            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
+        let task_node = full["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["id"] == serde_json::Value::String(task.id.clone()))
+            .unwrap();
+        assert_eq!(task_node["resolved_parent"], epic.id);
+        // The epic is a root container, so the whole subtree clusters to it.
+        assert_eq!(task_node["cluster"], epic.id);
+
+        let epic_node = full["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["id"] == serde_json::Value::String(epic.id.clone()))
+            .unwrap();
+        assert_eq!(epic_node["resolved_parent"], serde_json::Value::Null);
+
+        // The summary shape stays free of the hierarchy fields.
+        let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
+        assert!(summary["nodes"][0].get("resolved_parent").is_none());
+        assert!(summary["nodes"][0].get("cluster").is_none());
     }
 }

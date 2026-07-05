@@ -9,6 +9,8 @@
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
+pub mod hierarchy;
+
 /// Trait for types that can participate in a dependency graph
 ///
 /// Types implementing this trait can be used with `DependencyGraph` to enforce

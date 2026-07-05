@@ -228,8 +228,174 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(match format {
             GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
             GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
-            GraphExportFormat::Json if full => crate::visualization::export_json_full(&graph),
+            GraphExportFormat::Json if full => {
+                // The full node shape carries the DAG-resolved parent + cluster;
+                // resolution reads the repo's configured type hierarchy.
+                let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+                let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+                crate::visualization::export_json_full(&graph, &resolution)
+            }
             GraphExportFormat::Json => crate::visualization::export_json(&graph),
+        })
+    }
+
+    /// Resolve the canonical hierarchy for `graph tree`, optionally scoped to a
+    /// container's subtree.
+    ///
+    /// With `root = None` every issue is included; with `root = Some(id)` the
+    /// view is the root plus its transitive dependency closure (the DAG subtree
+    /// it contains). Each node still carries its repository-wide resolved
+    /// parent/children/cluster/rank — scoping filters which nodes are listed, not
+    /// how they resolve — so a scoped node's `parent` may point at a container
+    /// outside the subtree. Nodes are ordered by ascending short id. Membership
+    /// follows the dependency DAG only (labels are advisory), via
+    /// [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::CommandExecutor;
+    /// use jit::domain::Priority;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// let executor = CommandExecutor::new(storage);
+    /// let new = |title: &str, labels: Vec<String>| {
+    ///     executor
+    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///             vec![], labels, None, None, false)
+    ///         .unwrap()
+    ///         .0
+    /// };
+    ///
+    /// let epic = new("Epic", vec!["type:epic".into()]);
+    /// let task = new("Task", vec!["type:task".into()]);
+    /// executor.add_dependency(&epic, &task).unwrap();
+    ///
+    /// let response = executor.resolve_hierarchy_tree(None).unwrap();
+    /// assert_eq!(response.count, 2);
+    /// let epic_view = response.nodes.iter().find(|n| n.id == epic).unwrap();
+    /// assert_eq!(epic_view.children, vec![task.clone()]);
+    /// assert_eq!(epic_view.parent, None);
+    /// ```
+    pub fn resolve_hierarchy_tree(
+        &self,
+        root: Option<&str>,
+    ) -> Result<crate::output::GraphTreeResponse> {
+        use crate::output::{GraphTreeResponse, HierarchyNodeView};
+
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+        let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+
+        // When scoped to a root, keep the root plus its transitive dependency
+        // closure (the DAG subtree it contains). Resolution itself stays
+        // repository-wide; only the listed node set is filtered.
+        let root_id = match root {
+            Some(r) => Some(self.storage.resolve_issue_id(r)?),
+            None => None,
+        };
+        let scope: Option<std::collections::HashSet<String>> = root_id.as_deref().map(|root_id| {
+            let graph = DependencyGraph::new(&issue_refs);
+            let mut set: std::collections::HashSet<String> = graph
+                .get_transitive_dependencies(root_id)
+                .into_iter()
+                .map(|i| i.id.clone())
+                .collect();
+            set.insert(root_id.to_string());
+            set
+        });
+        let in_scope = |id: &str| -> bool { scope.as_ref().is_none_or(|set| set.contains(id)) };
+
+        let mut nodes: Vec<HierarchyNodeView> = issues
+            .iter()
+            .filter(|issue| in_scope(&issue.id))
+            .map(|issue| {
+                let facts = resolution.get(&issue.id);
+                HierarchyNodeView {
+                    short_id: issue.short_id(),
+                    id: issue.id.clone(),
+                    title: issue.title.clone(),
+                    type_name: crate::labels::type_label_value(&issue.labels).map(str::to_string),
+                    parent: facts.and_then(|f| f.parent.clone()),
+                    children: facts.map(|f| f.children.clone()).unwrap_or_default(),
+                    cluster: facts.and_then(|f| f.cluster.clone()),
+                    rank: facts.map(|f| f.rank).unwrap_or(0),
+                }
+            })
+            .collect();
+        nodes.sort_by(|a, b| a.short_id.cmp(&b.short_id));
+
+        Ok(GraphTreeResponse {
+            root: root_id,
+            count: nodes.len(),
+            nodes,
+        })
+    }
+
+    /// Report membership labels that disagree with DAG-resolved containment
+    /// (`query divergence`).
+    ///
+    /// Thin orchestration over
+    /// [`detect_membership_divergences`](crate::graph::hierarchy::detect_membership_divergences):
+    /// loads every issue and the repo's type hierarchy, then projects each
+    /// divergence to the display shape (adding the issue's short id and title).
+    /// The result is ordered by `(issue_id, label)`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::CommandExecutor;
+    /// use jit::domain::Priority;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// let executor = CommandExecutor::new(storage);
+    /// // An epic that contains nothing, plus a task that claims to belong to it.
+    /// executor
+    ///     .create_issue("Auth".into(), String::new(), Priority::Normal, vec![],
+    ///         vec!["type:epic".into(), "epic:auth".into()], None, None, false)
+    ///     .unwrap();
+    /// executor
+    ///     .create_issue("Stray".into(), String::new(), Priority::Normal, vec![],
+    ///         vec!["type:task".into(), "epic:auth".into()], None, None, false)
+    ///     .unwrap();
+    ///
+    /// let report = executor.detect_divergences().unwrap();
+    /// assert_eq!(report.count, 1);
+    /// assert_eq!(report.divergences[0].label, "epic:auth");
+    /// ```
+    pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
+        use crate::output::{DivergenceResponse, DivergenceView};
+
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+        let divergences =
+            crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
+
+        let by_id: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+        let views = divergences
+            .into_iter()
+            .map(|d| {
+                let issue = by_id.get(d.issue_id.as_str());
+                DivergenceView {
+                    short_id: d.issue_id.chars().take(8).collect(),
+                    title: issue.map(|i| i.title.clone()).unwrap_or_default(),
+                    id: d.issue_id,
+                    label: d.label,
+                    namespace: d.namespace,
+                    value: d.value,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        Ok(DivergenceResponse {
+            count: views.len(),
+            divergences: views,
         })
     }
 }
