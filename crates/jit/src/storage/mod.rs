@@ -19,6 +19,7 @@ pub mod discovery;
 pub mod errors;
 pub mod gate_runs;
 pub mod gate_store;
+pub mod gitattributes;
 pub mod heartbeat;
 pub mod json;
 pub mod lease;

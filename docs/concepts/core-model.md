@@ -1088,14 +1088,14 @@ T4                           claim abc123 ✓  ← Duplicate work!
 
 Claiming uses atomic file operations (rename is atomic in POSIX):
 1. Read issue file
-2. Verify no assignee exists
+2. Verify the issue is unassigned, or already assigned to the same claimant
 3. Write temp file with new assignee
 4. **Atomic rename** (succeeds for one agent, fails for others)
 
 ```bash
-# Both agents try simultaneously
+# Both agents try simultaneously, for two DIFFERENT assignees
 Agent 1: jit issue claim abc123 agent:worker-1  # ✓ Succeeds
-Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed
+Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed by agent:worker-1
 ```
 
 ### Claim vs Assign
@@ -1115,7 +1115,7 @@ Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed
 ```bash
 # Agent claims (atomic, safe)
 jit issue claim abc123 agent:worker-1
-# Error if already claimed
+# Error if claimed by a DIFFERENT assignee; re-claiming as agent:worker-1 itself succeeds
 
 # Human reassigns (force, override)
 jit issue assign abc123 human:alice

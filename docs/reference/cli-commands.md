@@ -274,7 +274,7 @@ jit_issue_create({
 }
 ```
 
-**`jit_issue_claim`** - Atomically claim unassigned issue
+**`jit_issue_claim`** - Claim an issue: assign it and promote to in_progress (idempotent for the current assignee)
 ```javascript
 {
   id: string,
@@ -1370,8 +1370,10 @@ There are two ways to put an assignee on an issue:
 - **`jit issue assign <id> <assignee>`** sets the assignee and makes no state
   change. The issue stays in whatever state it is in (`backlog`, `ready`, ...).
 - **`jit issue claim <id> <assignee>`** assigns the issue *and* transitions a
-  `ready` issue to `in_progress` (the "start work" path). It is atomic and
-  refuses an already-assigned issue.
+  `ready` issue to `in_progress` (the "start work" path). Claiming an
+  unassigned issue assigns and promotes it; re-claiming as the current
+  assignee is idempotent and succeeds, promoting it the same way. Claiming an
+  issue assigned to a *different* assignee fails, naming the current holder.
 
 ```bash
 # Assign without starting work (no state change)

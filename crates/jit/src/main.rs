@@ -563,71 +563,6 @@ fn print_apply_result(
     Ok(())
 }
 
-/// What `setup_gitattributes` did to `.gitattributes` this run. Lets the
-/// caller (`jit init --json`) report it precisely instead of guessing: a
-/// fresh file is a `created_paths` entry, an appended one is a
-/// `modified_paths` entry, and an already-configured or absent-git-repo run
-/// reports nothing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GitattributesOutcome {
-    /// Not in a git repository; nothing done.
-    NotGitRepo,
-    /// `.gitattributes` did not exist; created with the jit merge-driver block.
-    Created,
-    /// `.gitattributes` existed without the jit merge-driver block; appended.
-    Modified,
-    /// `.gitattributes` already had the jit merge-driver block; no-op.
-    AlreadyConfigured,
-}
-
-/// Set up .gitattributes with merge drivers for jit files.
-/// Only runs if we're in a git repository.
-fn setup_gitattributes() -> Result<GitattributesOutcome> {
-    use std::fs;
-    use std::path::Path;
-    use std::process::Command;
-
-    // Check if we're in a git repository
-    let output = Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .output();
-
-    let repo_root = match output {
-        Ok(o) if o.status.success() => String::from_utf8(o.stdout)?.trim().to_string(),
-        _ => return Ok(GitattributesOutcome::NotGitRepo),
-    };
-
-    let gitattributes_path = Path::new(&repo_root).join(".gitattributes");
-    let jit_marker = "# JIT merge drivers";
-    let jit_config = format!(
-        "{}\n.jit/events.jsonl merge=union\n.jit/claims.jsonl merge=union\n",
-        jit_marker
-    );
-
-    if gitattributes_path.exists() {
-        let content = fs::read_to_string(&gitattributes_path)?;
-
-        // Check if already configured (idempotent)
-        if content.contains(jit_marker) {
-            return Ok(GitattributesOutcome::AlreadyConfigured);
-        }
-
-        // Append to existing file, through the atomic temp-file + rename
-        // primitive (INV-ATOMIC-WRITES) so a concurrent reader never observes
-        // a partially written file.
-        let new_content = if content.ends_with('\n') {
-            format!("{}\n{}", content, jit_config)
-        } else {
-            format!("{}\n\n{}", content, jit_config)
-        };
-        jit::storage::atomic_write::write_file_atomic(&gitattributes_path, &new_content)?;
-        Ok(GitattributesOutcome::Modified)
-    } else {
-        jit::storage::atomic_write::write_file_atomic(&gitattributes_path, &jit_config)?;
-        Ok(GitattributesOutcome::Created)
-    }
-}
-
 /// Resolve the gate key from the CLI's positional-or-flag pair (REQ-03).
 ///
 /// Exactly one of `positional` and `flag` must be `Some`. Supplying both or
@@ -1614,10 +1549,13 @@ fn run() -> Result<()> {
                 output_ctx.print_warning(warning)?;
             }
 
-            // Set up .gitattributes for merge drivers (if in git repo). A
-            // failure here is non-fatal (warning only); `None` means "nothing
-            // to report" for the `--json` created/modified path lists below.
-            let gitattributes_outcome = match setup_gitattributes() {
+            // Set up .gitattributes for merge drivers (if in git repo). The
+            // git-subprocess detection and file read/append/create live in
+            // the storage layer (`jit::storage::gitattributes`); this call
+            // site only handles the outcome. A failure here is non-fatal
+            // (warning only); `None` means "nothing to report" for the
+            // `--json` created/modified path lists below.
+            let gitattributes_outcome = match jit::storage::gitattributes::setup_gitattributes() {
                 Ok(outcome) => Some(outcome),
                 Err(e) => {
                     eprintln!("Warning: Could not set up .gitattributes: {}", e);
@@ -1678,6 +1616,7 @@ fn run() -> Result<()> {
                 if scaffolded {
                     created_paths.push(".jit/rules.toml".to_string());
                 }
+                use jit::storage::gitattributes::GitattributesOutcome;
                 if gitattributes_outcome == Some(GitattributesOutcome::Created) {
                     created_paths.push(".gitattributes".to_string());
                 }
