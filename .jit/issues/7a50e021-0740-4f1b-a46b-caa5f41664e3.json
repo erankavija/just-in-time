@@ -2,24 +2,24 @@
   "id": "7a50e021-0740-4f1b-a46b-caa5f41664e3",
   "title": "jit dep add allows silently creating transitively redundant edges",
   "description": "`jit dep add` silently creates a transitively redundant edge, but `jit validate` treats transitive-reduction violations as errors — so the write succeeds now and the repository fails validation later, wherever the next validate happens to run.\n\n## Background\n\nFriction observed while lead-driving epic 2821e177 (2026-07-03, session 2). Adding `a1b6b3da -> 3d9e9222` silently made the pre-existing `9a7106ae -> 3d9e9222` edge redundant; the violation surfaced inside an unrelated issue's code-review gate (which runs validation), costing that issue a review round and a re-run.\n\nThe asymmetry is the root friction: acyclicity is enforced at write time (cycle detection runs before every dependency operation, INV-DAG-ACYCLIC), while the transitive-reduction property is enforced only at read/validate time.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit dep add` rejects, with a nonzero exit, an edge that shadows an existing direct edge or is itself made redundant by existing edges, and the error names the offending edge pair. Covered by a test adding such an edge.\n- [hard] REQ-02: passing an explicit `--reduce` flag to the same operation makes the add succeed by dropping the now-redundant edge in the same operation, leaving the graph transitively reduced. Covered by a test asserting the shadowed edge is gone and the new edge present.\n- [hard] REQ-03: after any `jit dep add`, the repository contains no transitive-reduction violation that a later `jit validate` would report — a silent write followed by a distant validation error is no longer possible.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.790077100Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.790109980Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.790077100Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T16:51:06.586502402Z",
-  "updated_at": "2026-07-05T00:00:57.822733702Z"
+  "updated_at": "2026-07-05T06:21:04.004411763Z"
 }
