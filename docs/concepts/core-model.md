@@ -785,7 +785,7 @@ JIT has two terminal states that represent different outcomes:
 - Common reasons: duplicate, won't-fix, invalid, out-of-scope
 - Optional `resolution:*` label provides closure reason
 
-Once an issue reaches a terminal state (Done or Rejected), it cannot re-enter the active lifecycle; archiving remains available for parking it out of views.
+Done and Rejected do not transition directly to active states. Archiving is available from every state, and an archived issue revives into an active state via `jit issue update --state <state>`.
 
 ### State Transitions
 
@@ -798,6 +798,8 @@ Once an issue reaches a terminal state (Done or Rejected), it cannot re-enter th
 - `In Progress → Done`: Via `jit issue update --state done` (if gates allow)
 - `In Progress → Gated`: Automatic when transitioning to Done with unmet gates
 - `Any State → Rejected`: Via `jit issue reject` (bypasses gates)
+- `Any State → Archived`: Via `jit issue update --state archived` (parks the issue; bypasses gates)
+- `Archived → any active state`: Via `jit issue update --state <state>` (revives the issue into the lifecycle)
 
 ### Gate Bypass for Rejected
 
