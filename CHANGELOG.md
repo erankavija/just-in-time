@@ -8,6 +8,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit issue children <id>` — a container's direct children at a glance.**
+  Lists the container's immediate dependencies (depth 1), each rendered exactly
+  like `issue status` (one greppable line, ascending short-id order), or as the
+  `{container: {short_id, title, state}, count, issues: [...]}` envelope with
+  `--json` (`issues` is the same compact status projection). Containment follows
+  the dependency DAG — a container's children are the issues it directly
+  depends on; membership labels are advisory and not consulted. A non-container
+  leaf simply lists nothing; for a deep rollup use `jit graph deps <id>
+  --depth`. Replaces the per-child `show`/`status` loop agents ran to see where
+  each child stands.
+
+- **`jit issue progress <id>` — counts by state and a done/total rollup over a
+  container's direct children.** Text prints the container line then `by state:
+  backlog=… …` and `done <done>/<total> (<percent>%)  open …  rejected …`;
+  `--json` emits `{container, count, by_state:[{state,count}], total, done,
+  rejected, open, percent}`. `by_state` lists every lifecycle state (zero-count
+  states included). Terminal-state semantics: `done` and `rejected` are counted
+  distinctly (a rejected child is terminal but not delivered), `open` is every
+  non-terminal child (`total − done − rejected`), and `done/total`/`percent`
+  measure delivery. Membership follows the dependency DAG, as for
+  `issue children`.
+
+- **`jit query count --by state [--label ns:v ...]` — the same state rollup over
+  a label bucket.** Aggregates every issue matching all `--label` patterns
+  (ANDed; none given aggregates the whole repository) into the same
+  `{count, by_state, total, done, rejected, open, percent}` shape as
+  `issue progress`, minus the `container` header. This is the advisory-grouping
+  counterpart to `issue progress`: DAG containment for the former, shared labels
+  for the latter. `--by` is typed (`state` today); an unknown value is a usage
+  error (exit 2). State counts enumerate the domain `State` enum, so the shape
+  stays complete and stable.
+
 - **`jit issue status <id>...` — the compact "where does this issue stand"
   view.** Prints state, per-gate status, and still-unmet dependencies as one
   greppable line per issue (`<short_id> [<state>] gates: <key>=<status>,...

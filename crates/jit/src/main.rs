@@ -1345,6 +1345,7 @@ fn reject_parent_query_filters(
         QueryCommands::Blocked { .. } => "blocked",
         QueryCommands::Strategic { .. } => "strategic",
         QueryCommands::Closed { .. } => "closed",
+        QueryCommands::Count { .. } => "count",
     };
 
     // A misplaced pre-subcommand filter is a usage error (exit 2), the same class
@@ -1974,19 +1975,7 @@ fn run() -> Result<()> {
                     for id in &ids {
                         match executor.show_issue(id) {
                             Ok(issue) => {
-                                let enriched_deps = executor.get_dependencies_enriched(&issue);
-                                let gate_runs = executor
-                                    .list_gate_runs(&issue.id, None)
-                                    .with_context(|| {
-                                        format!("Failed to load gate runs for issue {}", issue.id)
-                                    })?;
-                                let response = jit::output::IssueShowResponse::from_issue(
-                                    issue,
-                                    enriched_deps,
-                                    &gate_runs,
-                                );
-                                statuses
-                                    .push(jit::output::IssueStatusResponse::from_show(&response));
+                                statuses.push(executor.issue_status_response(issue)?);
                             }
                             Err(e) => {
                                 handle_json_error!(
@@ -2017,6 +2006,100 @@ fn run() -> Result<()> {
                     } else {
                         for status in &statuses {
                             println!("{}", status.to_line());
+                        }
+                    }
+                }
+                IssueCommands::Children { id, json } => {
+                    // Containment follows the dependency DAG: a container's direct
+                    // children are the issues it directly depends on (depth 1);
+                    // membership labels are advisory and not consulted here. Each
+                    // child is projected to the same compact status shape as
+                    // `issue status`. A dependency id that no longer resolves is
+                    // skipped, matching `get_dependencies_enriched` (`issue show`
+                    // is where dangling ids surface).
+                    match executor.show_issue(&id) {
+                        Ok(container) => {
+                            let mut children = Vec::with_capacity(container.dependencies.len());
+                            for dep_id in &container.dependencies {
+                                if let Ok(child) = executor.show_issue(dep_id) {
+                                    children.push(executor.issue_status_response(child)?);
+                                }
+                            }
+                            // Stored dependency order is not meaningful (set-derived),
+                            // so sort by short id for a stable, greppable listing.
+                            children.sort_by(|a, b| a.short_id.cmp(&b.short_id));
+
+                            if json {
+                                let output = jit::output::JsonOutput::success(
+                                    serde_json::json!({
+                                        "container":
+                                            jit::output::ContainerHeader::from(&container),
+                                        "count": children.len(),
+                                        "issues": children,
+                                    }),
+                                    "issue children",
+                                );
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                for child in &children {
+                                    println!("{}", child.to_line());
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            handle_json_error!(
+                                json,
+                                e,
+                                jit::output::JsonError::issue_not_found(&id, "issue children")
+                            );
+                        }
+                    }
+                }
+                IssueCommands::Progress { id, json } => {
+                    // Aggregate the container's DIRECT children (depth 1) by state.
+                    // Membership follows the dependency DAG, as for `issue
+                    // children`; a dependency id that no longer resolves is
+                    // skipped.
+                    match executor.show_issue(&id) {
+                        Ok(container) => {
+                            let children: Vec<jit::domain::Issue> = container
+                                .dependencies
+                                .iter()
+                                .filter_map(|dep_id| executor.show_issue(dep_id).ok())
+                                .collect();
+                            let rollup = jit::output::StateRollup::from_issues(&children);
+
+                            if json {
+                                let mut value = serde_json::to_value(&rollup)?;
+                                if let serde_json::Value::Object(map) = &mut value {
+                                    map.insert(
+                                        "container".to_string(),
+                                        serde_json::to_value(jit::output::ContainerHeader::from(
+                                            &container,
+                                        ))?,
+                                    );
+                                }
+                                let output =
+                                    jit::output::JsonOutput::success(value, "issue progress");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!(
+                                    "{} [{}] title: {}",
+                                    container.short_id(),
+                                    container.state.as_str(),
+                                    container.title
+                                );
+                                for line in rollup.to_lines() {
+                                    println!("{}", line);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            handle_json_error!(
+                                json,
+                                e,
+                                jit::output::JsonError::issue_not_found(&id, "issue progress")
+                            );
                         }
                     }
                 }
@@ -4785,6 +4868,32 @@ fn run() -> Result<()> {
                                 println!("  {} | {} | {:?}", issue.id, issue.title, issue.state);
                             }
                             let _ = output_ctx.print_info(format!("\nTotal: {}", issues.len()));
+                        }
+                    }
+                    jit::cli::QueryCommands::Count { by, label, json } => {
+                        // The bucket is every issue matching all --label patterns
+                        // (AND-combined; none given aggregates the whole repo).
+                        // Membership is by label here, the advisory-grouping
+                        // counterpart to the DAG-authoritative `issue progress`.
+                        let issues = executor.query_by_labels(&label)?;
+                        let rollup = match by {
+                            jit::cli::CountDimension::State => {
+                                jit::output::StateRollup::from_issues(&issues)
+                            }
+                        };
+
+                        if json {
+                            let msg = format!(
+                                "{}/{} done ({}%)",
+                                rollup.done, rollup.total, rollup.percent
+                            );
+                            let output = jit::output::JsonOutput::success(&rollup, "query count")
+                                .with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            for line in rollup.to_lines() {
+                                println!("{}", line);
+                            }
                         }
                     }
                 } // end match query_cmd

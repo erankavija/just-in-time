@@ -83,6 +83,34 @@ impl State {
             State::Archived => "archived",
         }
     }
+
+    /// Every `State` variant, in canonical lifecycle order.
+    ///
+    /// Use this to enumerate the state space exhaustively instead of hardcoding
+    /// a state list at a call site (INV-DOMAIN-AGNOSTIC): a counts-by-state
+    /// rollup, for instance, must list every state so its shape stays stable
+    /// and complete as the enum evolves.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::State;
+    ///
+    /// assert_eq!(State::all().len(), 7);
+    /// assert_eq!(State::all()[0], State::Backlog);
+    /// assert!(State::all().contains(&State::Done));
+    /// ```
+    pub const fn all() -> [State; 7] {
+        [
+            State::Backlog,
+            State::Ready,
+            State::InProgress,
+            State::Gated,
+            State::Done,
+            State::Rejected,
+            State::Archived,
+        ]
+    }
 }
 
 impl FromStr for State {

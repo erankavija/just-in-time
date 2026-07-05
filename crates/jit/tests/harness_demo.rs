@@ -344,3 +344,105 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
     // The default link namespace of the requirement kind is `satisfies`.
     assert_eq!(kind.link_namespaces(), &["satisfies".to_string()]);
 }
+
+// ========== Container Rollup Tests (jit:7fe5c743) ==========
+
+/// Build a container whose direct children span several states, wired as
+/// dependencies, then aggregate those children with `StateRollup::from_issues`
+/// (the composition `issue progress` performs). Verifies the terminal-state
+/// semantics: done/rejected counted distinctly, open = non-terminal.
+#[test]
+fn test_harness_container_state_rollup() {
+    use jit::output::StateRollup;
+
+    let h = TestHarness::new();
+    let epic = h.create_issue("Epic");
+    let done = h.create_issue("Done child");
+    let wip = h.create_issue("WIP child");
+    let rejected = h.create_issue("Rejected child");
+    let ready = h.create_issue("Ready child");
+
+    for child in [&done, &wip, &rejected, &ready] {
+        h.executor.add_dependency(&epic, child).unwrap();
+    }
+    let set_state = |id: &str, state: State| {
+        h.executor
+            .update_issue(
+                id,
+                None,
+                None,
+                None,
+                Some(state),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+    };
+    set_state(&done, State::Done);
+    set_state(&wip, State::InProgress);
+    set_state(&rejected, State::Rejected);
+
+    let container = h.get_issue(&epic);
+    let children: Vec<_> = container
+        .dependencies
+        .iter()
+        .map(|id| h.get_issue(id))
+        .collect();
+
+    let rollup = StateRollup::from_issues(&children);
+    assert_eq!(rollup.total, 4);
+    assert_eq!(rollup.done, 1);
+    assert_eq!(rollup.rejected, 1);
+    assert_eq!(rollup.open, 2); // in_progress + ready
+    assert_eq!(rollup.percent, 25);
+    // Every state present, zero-count states included.
+    assert_eq!(rollup.by_state.len(), State::all().len());
+    let done_bucket = rollup
+        .by_state
+        .iter()
+        .find(|c| c.state == State::Done)
+        .unwrap();
+    assert_eq!(done_bucket.count, 1);
+    let gated_bucket = rollup
+        .by_state
+        .iter()
+        .find(|c| c.state == State::Gated)
+        .unwrap();
+    assert_eq!(gated_bucket.count, 0);
+}
+
+/// `issue_status_response` (the per-child projection reused by `issue children`)
+/// carries the child's state, per-gate status, and unmet dependencies.
+#[test]
+fn test_harness_issue_status_response_projection() {
+    let h = TestHarness::new();
+    let dep = h.create_issue("Upstream");
+    let child = h.create_issue_with_gates("Gated child", vec!["tests".into()]);
+    h.executor.add_dependency(&child, &dep).unwrap();
+
+    let issue = h.get_issue(&child);
+    let status = h.executor.issue_status_response(issue).unwrap();
+
+    assert_eq!(status.title, "Gated child");
+    assert_eq!(status.gates.len(), 1);
+    assert_eq!(status.gates[0].key, "tests");
+    // The upstream dependency is not terminal, so it is unmet.
+    assert_eq!(status.unmet_dependencies.len(), 1);
+    assert_eq!(status.unmet_dependencies[0], dep[0..8]);
+}
+
+/// An empty container aggregates to total 0 with percent 0 (no divide-by-zero)
+/// and still enumerates every state.
+#[test]
+fn test_harness_empty_container_rollup() {
+    use jit::output::StateRollup;
+
+    let rollup = StateRollup::from_issues(&[]);
+    assert_eq!(rollup.total, 0);
+    assert_eq!(rollup.percent, 0);
+    assert_eq!(rollup.by_state.len(), State::all().len());
+    assert!(rollup.by_state.iter().all(|c| c.count == 0));
+}

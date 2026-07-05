@@ -1,6 +1,6 @@
 //! Command-line interface definitions using clap.
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
 
@@ -798,6 +798,59 @@ pub enum IssueCommands {
         /// Issue id(s). One object/line per id, in argument order.
         #[arg(required = true)]
         ids: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List a container's direct children — its immediate dependencies (depth 1)
+    /// — each rendered exactly like `issue status`.
+    ///
+    /// Containment follows the dependency DAG: a container's children are the
+    /// issues it directly depends on (membership labels are advisory grouping,
+    /// not consulted here). A non-container issue simply has no dependencies and
+    /// lists nothing. For a deep rollup use `jit graph deps <id> --depth`.
+    ///
+    /// Text form is one `issue status` line per child (state, per-gate status,
+    /// unmet deps), in the container's stored dependency order; an empty
+    /// container prints nothing.
+    ///
+    /// `--json` emits `{container: {short_id, title, state}, count, issues: [...]}`
+    /// where `issues` is one compact status object per child and `count` is their
+    /// number.
+    ///
+    /// Examples:
+    ///   jit issue children epic123
+    ///   jit issue children epic123 --json
+    Children {
+        /// Container id whose direct children (dependencies) to list.
+        id: String,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Summarize a container's direct children (depth 1) as counts by state plus
+    /// a done/total delivery rollup.
+    ///
+    /// Membership follows the dependency DAG (direct dependencies are the
+    /// children; labels are advisory and not consulted). `by state` lists every
+    /// lifecycle state, zero-count states included. `done` and `rejected` are
+    /// counted distinctly — a rejected child is terminal but not delivered — and
+    /// `open` is every non-terminal child; the `done/total` ratio and percent
+    /// measure delivery. For a deep rollup use `jit graph deps <id> --depth`; to
+    /// aggregate a label bucket use `jit query count --by state --label ns:v`.
+    ///
+    /// `--json` emits `{container: {short_id, title, state}, count, by_state:
+    /// [{state, count}], total, done, rejected, open, percent}` (`count` is the
+    /// number of state buckets).
+    ///
+    /// Examples:
+    ///   jit issue progress epic123
+    ///   jit issue progress epic123 --json
+    Progress {
+        /// Container id whose direct children to aggregate.
+        id: String,
 
         #[arg(long)]
         json: bool,
@@ -2106,6 +2159,45 @@ pub enum QueryCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Aggregate issues into counts by a dimension over a label bucket (or the
+    /// whole repo), with a done/total delivery rollup.
+    ///
+    /// The bucket is every issue matching all `--label` patterns (AND-combined;
+    /// none given means the whole repository); membership is by label here, the
+    /// advisory grouping counterpart to the DAG-authoritative `issue progress`
+    /// over a container's children. `--by state` lists every lifecycle state,
+    /// zero-count states included. `done` and `rejected` are counted distinctly
+    /// (a rejected issue is terminal but not delivered) and `open` is every
+    /// non-terminal issue; the `done/total` ratio and percent measure delivery.
+    ///
+    /// `--json` emits `{count, by_state: [{state, count}], total, done, rejected,
+    /// open, percent}` where `count` is the number of state buckets.
+    ///
+    /// Examples:
+    ///   jit query count --by state
+    ///   jit query count --by state --label milestone:m1 --json
+    Count {
+        /// Aggregation dimension.
+        #[arg(long, value_name = "DIMENSION")]
+        by: CountDimension,
+
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given. None given aggregates the whole repo.
+        #[arg(short = 'l', long)]
+        label: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Dimension to aggregate by in `jit query count --by <DIMENSION>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub enum CountDimension {
+    /// Count by lifecycle state.
+    State,
 }
 
 #[derive(Subcommand)]

@@ -1193,6 +1193,104 @@ met). A single id yields a bare object; two or more wrap in the
 `jit issue status` does not accept the `--field`/`--fields` projection flags;
 those belong to `issue show`. Passing one is a usage error (exit code `2`).
 
+### Container children (`jit issue children`)
+
+`jit issue children <id>` lists a container's **direct children** — its
+immediate dependencies (depth 1) — each rendered exactly like `issue status`.
+This replaces the loop where an agent reads a container, then runs a per-child
+`show`/`status` to see where each child stands.
+
+**Containment follows the dependency DAG.** A container's children are the
+issues it directly depends on; the dependency edges are authoritative for
+membership. Membership labels (e.g. an `epic:*` or `milestone:*` grouping label)
+are advisory and are **not** consulted here — to aggregate a label bucket use
+[`jit query count`](#state-aggregation-jit-query-count). Any issue can be a
+"container": a non-container leaf simply has no dependencies and lists nothing.
+This depth-1 view lists only immediate children; for a deep rollup use
+`jit graph deps <id> --depth <n>`.
+
+```bash
+# Text (default): one `issue status` line per child, ascending short-id order
+jit issue children epic123
+# -> aa11bb22 [done] gates: none unmet: none title: Parser
+# -> cc33dd44 [in_progress] gates: tests=pending unmet: none title: Lexer
+
+# JSON: container header + the list envelope over compact status objects
+jit issue children epic123 --json
+```
+
+**JSON shape:**
+
+```json
+{
+  "container": { "short_id": "ep1c2345", "title": "Auth epic", "state": "in_progress" },
+  "count": 2,
+  "issues": [
+    { "short_id": "aa11bb22", "state": "done", "gates": [], "unmet_dependencies": [], "title": "Parser" },
+    { "short_id": "cc33dd44", "state": "in_progress", "gates": [{ "key": "tests", "status": "pending" }], "unmet_dependencies": [], "title": "Lexer" }
+  ]
+}
+```
+
+- `container` is `{short_id, title, state}` for the queried issue.
+- `issues` is the same compact projection as `issue status` (one object per
+  child), and `count` equals its length (the standard `{count, issues}` list
+  envelope, plus the `container` header). Children are ordered by ascending
+  short id.
+- A bad id under `--json` returns the refined error envelope
+  (`ISSUE_NOT_FOUND` / `INVALID_ID_PREFIX` / `AMBIGUOUS_ID`) and the matching
+  exit code, exactly like `issue show`.
+
+### Container progress (`jit issue progress`)
+
+`jit issue progress <id>` aggregates a container's **direct children** (depth 1)
+into counts by state plus a done/total delivery rollup — the numbers agents
+otherwise compute by looping a per-child `show` and tallying by hand.
+
+Membership follows the dependency DAG, exactly as for `issue children` (labels
+are advisory; use `jit query count` for a label bucket). For a deep rollup use
+`jit graph deps <id> --depth <n>`.
+
+```bash
+jit issue progress epic123
+# -> ep1c2345 [in_progress] title: Auth epic
+# -> by state: backlog=0 ready=1 in_progress=1 gated=0 done=2 rejected=1 archived=0
+# -> done 2/5 (40%)  open 2  rejected 1
+
+jit issue progress epic123 --json
+```
+
+**JSON shape:**
+
+```json
+{
+  "container": { "short_id": "ep1c2345", "title": "Auth epic", "state": "in_progress" },
+  "count": 7,
+  "by_state": [
+    { "state": "backlog", "count": 0 },
+    { "state": "ready", "count": 1 },
+    { "state": "in_progress", "count": 1 },
+    { "state": "gated", "count": 0 },
+    { "state": "done", "count": 2 },
+    { "state": "rejected", "count": 1 },
+    { "state": "archived", "count": 0 }
+  ],
+  "total": 5, "done": 2, "rejected": 1, "open": 2, "percent": 40
+}
+```
+
+- `by_state` has **one entry per lifecycle state**, in canonical order, with a
+  zero count for any state no child is in — a stable, complete shape. `count` is
+  the number of state buckets (the `{count, by_state}` list envelope).
+- **Terminal-state semantics** (tied to `State::is_terminal`, i.e.
+  `done`/`rejected`): `done` and `rejected` are reported separately because a
+  rejected child is terminal but **not delivered**. `open` is every non-terminal
+  child (`total − done − rejected`; `archived`, which is not terminal, counts as
+  open). The `done/total` ratio and `percent` (rounded; `0` when `total` is `0`)
+  measure delivery — `done` against `total`.
+- A bad id under `--json` returns the refined error envelope and matching exit
+  code, like `issue show`.
+
 ### Assigning and Claiming Issues
 
 There are two ways to put an assignee on an issue:
@@ -2278,6 +2376,55 @@ are ANDed: an issue is returned only if it matches every pattern given.
 | `jit query blocked` | — | Blocked issues with blocking reasons |
 | `jit query strategic` | — | Issues carrying labels from strategic namespaces |
 | `jit query closed` | — | Issues in Done or Rejected state |
+| `jit query count` | — | Counts by a dimension over a label bucket, with a done/total rollup |
+
+### State aggregation (`jit query count`)
+
+`jit query count --by state [--label ns:v ...]` aggregates a **label bucket**
+into counts by state plus a done/total delivery rollup — the same rollup
+[`jit issue progress`](#container-progress-jit-issue-progress) produces over a
+container's children, but with membership defined by labels instead of the DAG.
+
+The bucket is every issue matching **all** `--label` patterns (repeatable and
+ANDed, as everywhere in the query family); with no `--label`, the whole
+repository is aggregated. This is the advisory-grouping counterpart to
+`issue progress`: use `issue progress` when containment is a dependency edge,
+`query count` when it is a shared label.
+
+```bash
+jit query count --by state
+# -> by state: backlog=3 ready=4 in_progress=2 gated=0 done=8 rejected=1 archived=0
+# -> done 8/18 (44%)  open 6  rejected 1
+
+jit query count --by state --label milestone:m1 --json
+```
+
+**JSON shape:** the same rollup as `issue progress`, without the `container`
+header:
+
+```json
+{
+  "count": 7,
+  "by_state": [
+    { "state": "backlog", "count": 3 },
+    { "state": "ready", "count": 4 },
+    { "state": "in_progress", "count": 2 },
+    { "state": "gated", "count": 0 },
+    { "state": "done", "count": 8 },
+    { "state": "rejected", "count": 1 },
+    { "state": "archived", "count": 0 }
+  ],
+  "total": 18, "done": 8, "rejected": 1, "open": 6, "percent": 44
+}
+```
+
+- `--by` is required and typed: `state` is the only dimension today; an unknown
+  value is a usage error (exit code `2`).
+- `by_state` lists every lifecycle state (zero-count states included), `count`
+  is the number of state buckets (the `{count, by_state}` list envelope), and
+  the `done`/`rejected`/`open`/`percent` terminal-state semantics are identical
+  to `issue progress` (done and rejected distinct; open = non-terminal;
+  `done/total` measures delivery).
 
 ## Document Commands
 
@@ -2480,7 +2627,8 @@ The collection key is command-specific:
 
 | Command | Collection key |
 | --- | --- |
-| `issue list`, `list`, `query all`/`available`(`ready`)/`blocked`/`strategic`/`closed`, `issue search`, `issue show <id> <id> …`, `issue status <id> <id> …` | `issues` |
+| `issue list`, `list`, `query all`/`available`(`ready`)/`blocked`/`strategic`/`closed`, `issue search`, `issue show <id> <id> …`, `issue status <id> <id> …`, `issue children` (plus a `container` header) | `issues` |
+| `issue progress` (plus a `container` header), `query count` | `by_state` |
 | `search` | `results` |
 | `gate list` | `gates` |
 | `gate preset list` | `presets` |

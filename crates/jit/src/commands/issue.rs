@@ -260,6 +260,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect()
     }
 
+    /// Build the compact [`IssueStatusResponse`](crate::output::IssueStatusResponse)
+    /// for one already-loaded issue.
+    ///
+    /// Loads the issue's enriched dependencies and gate runs, builds the full
+    /// [`IssueShowResponse`](crate::output::IssueShowResponse), and projects it
+    /// down to the compact status shape — so the projection is byte-for-byte the
+    /// same one `jit issue show`/`jit issue status` produce. Shared by
+    /// `issue status` and `issue children` (the latter is this projection over a
+    /// container's direct dependencies).
+    pub fn issue_status_response(
+        &self,
+        issue: Issue,
+    ) -> Result<crate::output::IssueStatusResponse> {
+        let enriched_deps = self.get_dependencies_enriched(&issue);
+        let gate_runs = self.list_gate_runs(&issue.id, None)?;
+        let show = crate::output::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
+        Ok(crate::output::IssueStatusResponse::from_show(&show))
+    }
+
     fn blocking_dependencies(
         &self,
         issue: &Issue,

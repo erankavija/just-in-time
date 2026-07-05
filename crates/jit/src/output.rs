@@ -1169,6 +1169,148 @@ impl IssueStatusResponse {
     }
 }
 
+/// One `(state, count)` bucket in a [`StateRollup`].
+///
+/// Every [`State`] variant is represented, so `count` is `0` for a state with
+/// no issues rather than the entry being omitted (see [`StateRollup`]).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct StateCount {
+    pub state: State,
+    pub count: usize,
+}
+
+/// Counts-by-state aggregation with a terminal-state rollup over a set of
+/// issues, shared by `jit issue progress` (over a container's direct children)
+/// and `jit query count --by state` (over a label bucket or the whole repo).
+///
+/// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
+/// order, zero-count states included, so the shape is stable and complete
+/// (INV-DOMAIN-AGNOSTIC — the state list is enumerated, never hardcoded).
+/// `count` is `by_state.len()` (the list-envelope count, one entry per state).
+///
+/// Terminal-state semantics, tied to [`State::is_terminal`] (`Done`/`Rejected`):
+/// `done` and `rejected` are reported separately because a rejected issue is
+/// terminal but not delivered; `open` is every non-terminal issue
+/// (`total − done − rejected`, so `Archived` — which is not terminal — counts
+/// as open). The `done`/`total` ratio and `percent` (rounded, `0` when `total`
+/// is `0`) measure delivery, i.e. `done` against `total`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{Issue, State};
+/// use jit::output::StateRollup;
+///
+/// let mut done = Issue::new("Shipped".into(), String::new());
+/// done.state = State::Done;
+/// let mut rejected = Issue::new("Dropped".into(), String::new());
+/// rejected.state = State::Rejected;
+/// let open = Issue::new("Todo".into(), String::new()); // Backlog: non-terminal
+///
+/// let rollup = StateRollup::from_issues(&[done, rejected, open]);
+/// assert_eq!(rollup.total, 3);
+/// assert_eq!(rollup.done, 1);
+/// assert_eq!(rollup.rejected, 1);
+/// assert_eq!(rollup.open, 1);
+/// assert_eq!(rollup.percent, 33); // round(100 * 1 / 3)
+/// assert_eq!(rollup.count, State::all().len());
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct StateRollup {
+    /// Length of `by_state` (list-envelope count); equals the number of
+    /// [`State`] variants.
+    pub count: usize,
+    /// One entry per state, zero-count states included, in [`State::all`] order.
+    pub by_state: Vec<StateCount>,
+    /// Total issues aggregated.
+    pub total: usize,
+    /// Issues in `Done`.
+    pub done: usize,
+    /// Issues in `Rejected` (terminal but not delivered).
+    pub rejected: usize,
+    /// Non-terminal issues (`total − done − rejected`).
+    pub open: usize,
+    /// `round(100 * done / total)`, or `0` when `total` is `0`.
+    pub percent: u32,
+}
+
+impl StateRollup {
+    /// Aggregate a slice of issues into the counts-by-state rollup.
+    pub fn from_issues(issues: &[Issue]) -> Self {
+        let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
+            .into_iter()
+            .map(|(state, count)| StateCount { state, count })
+            .collect();
+
+        let total = issues.len();
+        let done = issues.iter().filter(|i| i.state == State::Done).count();
+        let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
+        let open = total - done - rejected;
+        let percent = if total == 0 {
+            0
+        } else {
+            ((done as f64 / total as f64) * 100.0).round() as u32
+        };
+
+        Self {
+            count: by_state.len(),
+            by_state,
+            total,
+            done,
+            rejected,
+            open,
+            percent,
+        }
+    }
+
+    /// Render the two-line greppable text form:
+    ///
+    /// ```text
+    /// by state: backlog=0 ready=1 in_progress=1 gated=0 done=2 rejected=1 archived=0
+    /// done 2/5 (40%)  open 1  rejected 1
+    /// ```
+    ///
+    /// The `by state:` line lists every state as `<state>=<count>` in canonical
+    /// order (states enumerated from the domain, not hardcoded), so its columns
+    /// are fixed regardless of which states are populated.
+    pub fn to_lines(&self) -> Vec<String> {
+        let by_state = self
+            .by_state
+            .iter()
+            .map(|c| format!("{}={}", c.state.as_str(), c.count))
+            .collect::<Vec<_>>()
+            .join(" ");
+        vec![
+            format!("by state: {by_state}"),
+            format!(
+                "done {}/{} ({}%)  open {}  rejected {}",
+                self.done, self.total, self.percent, self.open, self.rejected
+            ),
+        ]
+    }
+}
+
+/// Compact container header — `{short_id, title, state}` — carried at the top of
+/// `jit issue children` and `jit issue progress` JSON so a consumer sees which
+/// container the child listing or rollup is for without a second lookup.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ContainerHeader {
+    /// Short ID (first 8 chars of the full UUID).
+    pub short_id: String,
+    pub title: String,
+    pub state: State,
+}
+
+impl From<&Issue> for ContainerHeader {
+    fn from(issue: &Issue) -> Self {
+        Self {
+            short_id: issue.short_id(),
+            title: issue.title.clone(),
+            state: issue.state,
+        }
+    }
+}
+
 /// Render a single top-level field of a serialized issue value as plain text.
 ///
 /// `value` must be the JSON object produced by serializing an
