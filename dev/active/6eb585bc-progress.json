@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 6,
+  "current_wave": 7,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -66,7 +66,7 @@
           "short_id": "4af511fd",
           "title": "expose linked docs to gate checkers",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
