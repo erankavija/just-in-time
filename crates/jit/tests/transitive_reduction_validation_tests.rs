@@ -293,3 +293,181 @@ fn test_multiple_issues_with_redundancies() {
     assert_eq!(fixed_d.dependencies.len(), 1);
     assert!(fixed_d.dependencies.contains(&e));
 }
+
+// ============================================================================
+// Write-time redundancy guard on `jit dep add` (jit:7a50e021)
+// ============================================================================
+//
+// Cycle detection is enforced at write time (INV-DAG-ACYCLIC); these tests pin
+// the same treatment for the transitive-reduction property: a `dep add` that
+// would shadow an existing edge (or is itself redundant) is rejected by default
+// and only applied under an explicit `--reduce`, so a silent write can never
+// surface as a distant `jit validate` failure.
+
+use jit::commands::RedundancyPolicy;
+
+/// REQ-01: adding an edge that makes a PRE-EXISTING edge redundant is rejected
+/// under the default (Reject) policy, with the offending edge pair named.
+#[test]
+fn test_dep_add_rejects_edge_that_shadows_existing_edge() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+
+    // A → C and A → B exist (no redundancy yet).
+    h.executor.add_dependency(&a, &c).unwrap();
+    h.executor.add_dependency(&a, &b).unwrap();
+
+    // Adding B → C makes A → C redundant (A reaches C via A → B → C).
+    let err = h
+        .executor
+        .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reject)
+        .expect_err("redundant add must be rejected");
+    let msg = err.to_string();
+    // The offending edge pair (A → C) must be named.
+    assert!(
+        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        "error must name the shadowed edge A→C, got: {msg}"
+    );
+    assert!(
+        err.downcast_ref::<jit::errors::RedundantDependencyError>()
+            .is_some(),
+        "must be a typed RedundantDependencyError"
+    );
+
+    // Nothing was written: A still directly depends on C, B does not depend on C.
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert!(loaded_a.dependencies.contains(&c));
+    let loaded_b = h.storage.load_issue(&b).unwrap();
+    assert!(!loaded_b.dependencies.contains(&c));
+}
+
+/// REQ-01: adding an edge that is ITSELF already reachable through existing
+/// edges is rejected under the default policy, naming the pair.
+#[test]
+fn test_dep_add_rejects_self_redundant_edge() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+
+    // B → C and A → B exist.
+    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.add_dependency(&a, &b).unwrap();
+
+    // A → C is itself redundant (A reaches C via A → B → C).
+    let err = h
+        .executor
+        .add_dependency_with_policy(&a, &c, RedundancyPolicy::Reject)
+        .expect_err("self-redundant add must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains(&a[..8]) && msg.contains(&c[..8]),
+        "error must name the redundant edge A→C, got: {msg}"
+    );
+
+    // A must NOT have gained the redundant direct edge to C.
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert!(!loaded_a.dependencies.contains(&c));
+    assert!(loaded_a.dependencies.contains(&b));
+}
+
+/// REQ-02: `--reduce` makes the add succeed and drops the now-redundant edge in
+/// the same operation, leaving the graph transitively reduced.
+#[test]
+fn test_dep_add_reduce_drops_shadowed_edge() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+
+    h.executor.add_dependency(&a, &c).unwrap();
+    h.executor.add_dependency(&a, &b).unwrap();
+
+    // Add B → C with --reduce: succeeds and drops the shadowed A → C.
+    let (result, _warnings) = h
+        .executor
+        .add_dependency_with_policy(&b, &c, RedundancyPolicy::Reduce)
+        .expect("reduce add must succeed");
+    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+
+    // The new edge B → C is present.
+    let loaded_b = h.storage.load_issue(&b).unwrap();
+    assert!(
+        loaded_b.dependencies.contains(&c),
+        "new edge B→C must be present"
+    );
+
+    // The shadowed edge A → C is gone; A still depends on B.
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert!(
+        !loaded_a.dependencies.contains(&c),
+        "shadowed edge A→C must be dropped"
+    );
+    assert!(loaded_a.dependencies.contains(&b));
+
+    // Graph is transitively reduced.
+    assert!(
+        h.executor.validate_silent().is_ok(),
+        "graph must be transitively reduced after --reduce add"
+    );
+}
+
+/// REQ-03 (Background scenario): X → Y and X → Z exist; adding Y → Z makes
+/// X → Z redundant. With --reduce the add succeeds, X → Z is dropped, and a
+/// later `jit validate` reports no transitive-reduction violation.
+#[test]
+fn test_dep_add_reduce_background_scenario_leaves_validate_clean() {
+    let h = TestHarness::new();
+    let x = h.create_issue("X");
+    let y = h.create_issue("Y");
+    let z = h.create_issue("Z");
+
+    h.executor.add_dependency(&x, &y).unwrap();
+    h.executor.add_dependency(&x, &z).unwrap();
+
+    // Adding Y → Z makes the pre-existing X → Z redundant (X reaches Z via X→Y→Z).
+    let (result, _warnings) = h
+        .executor
+        .add_dependency_with_policy(&y, &z, RedundancyPolicy::Reduce)
+        .expect("reduce add must succeed");
+    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+
+    let loaded_x = h.storage.load_issue(&x).unwrap();
+    assert!(
+        !loaded_x.dependencies.contains(&z),
+        "redundant X→Z must be dropped"
+    );
+    assert!(loaded_x.dependencies.contains(&y));
+    let loaded_y = h.storage.load_issue(&y).unwrap();
+    assert!(
+        loaded_y.dependencies.contains(&z),
+        "new edge Y→Z must be present"
+    );
+
+    // A later validate must be clean — no distant violation possible.
+    assert!(
+        h.executor.validate_silent().is_ok(),
+        "validate must be clean after the reduce add"
+    );
+}
+
+/// REQ-03: a plain, non-redundant `dep add` still succeeds and leaves validate
+/// clean (existing behavior preserved for non-redundant edges).
+#[test]
+fn test_dep_add_non_redundant_edge_still_added_and_validate_clean() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+
+    let (result, _warnings) = h
+        .executor
+        .add_dependency_with_policy(&a, &b, RedundancyPolicy::Reject)
+        .expect("non-redundant add must succeed even under Reject");
+    assert_eq!(result, jit::commands::DependencyAddResult::Added);
+
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert!(loaded_a.dependencies.contains(&b));
+    assert!(h.executor.validate_silent().is_ok());
+}

@@ -407,6 +407,48 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
 
         vec![]
     }
+
+    /// Find every direct edge that violates transitive reduction.
+    ///
+    /// Returns each edge `(from, to)` that is redundant because `to` is already
+    /// reachable from `from` through another of `from`'s dependencies. This is
+    /// exactly the property `jit validate` enforces at read time (built on
+    /// [`compute_transitive_reduction`](Self::compute_transitive_reduction)),
+    /// exposed as a pure query so the write path can reject a redundant edge
+    /// before persisting it instead of surfacing the violation at a later
+    /// `jit validate`. The result is sorted for deterministic reporting.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::DependencyGraph;
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    /// c.dependencies.push(a.id.clone()); // redundant: C→A already via C→B→A
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let redundant = graph.find_redundant_edges();
+    /// assert_eq!(redundant, vec![(c.id.clone(), a.id.clone())]);
+    /// ```
+    pub fn find_redundant_edges(&self) -> Vec<(String, String)> {
+        let mut redundant: Vec<(String, String)> = Vec::new();
+        for node in self.nodes.values() {
+            let id = node.id();
+            let reduced = self.compute_transitive_reduction(id);
+            for dep in node.dependencies() {
+                if !reduced.contains(dep) {
+                    redundant.push((id.to_string(), dep.clone()));
+                }
+            }
+        }
+        redundant.sort();
+        redundant
+    }
 }
 
 #[cfg(test)]

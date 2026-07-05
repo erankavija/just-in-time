@@ -541,14 +541,23 @@ A → C  ← redundant          (A → C removed, still reachable via B)
 # (Testing still blocked by Design transitively)
 ```
 
-### Detect Redundant Edges
+### Redundant Edges
 
-JIT doesn't automatically prevent redundant edges (they're technically valid):
+`jit dep add` rejects a transitively-redundant edge by default — one that shadows
+an existing direct edge, or is itself already reachable through other edges. The
+add fails with a nonzero exit naming the offending pair, so a redundant edge never
+silently enters the graph to fail a later `jit validate`:
 
 ```bash
-# Both valid:
-jit dep add $TESTING $IMPLEMENTATION
-jit dep add $TESTING $DESIGN  # Redundant but allowed
+jit dep add $TESTING $IMPLEMENTATION   # ok
+jit dep add $TESTING $DESIGN           # rejected: redundant given TESTING → IMPLEMENTATION → DESIGN
+```
+
+Pass `--reduce` to add the edge anyway and drop the now-redundant edge(s) in the
+same operation, leaving the graph transitively reduced:
+
+```bash
+jit dep add $TESTING $DESIGN --reduce  # adds the edge, drops the shadowed one
 ```
 
 **Manual detection:**
@@ -561,21 +570,16 @@ jit graph deps $TESTING --depth 0
 # → Edge is redundant
 ```
 
-### When to Keep Explicit Edges
+### Redundant Edges Are Not Retained
 
-**Sometimes redundancy improves documentation:**
+The dependency graph is kept transitively reduced: a redundant edge is rejected at
+`jit dep add` time and reported as a violation by `jit validate`, so it cannot be
+kept "for documentation". Reachability is unchanged by dropping it — if `Epic →
+Task3 → Task2 → Task1`, then `Epic` still (transitively) depends on `Task1` without
+a direct `Epic → Task1` edge.
 
-```bash
-# Epic → Task1, Task2, Task3
-# Task3 → Task2 → Task1
-
-# Epic → Task1 is redundant (via Task3)
-# But keep it for clarity: "Epic needs ALL tasks"
-```
-
-**Use judgment:**
-- **Keep:** When explicit edge clarifies intent
-- **Remove:** When edge is truly redundant and confusing
+To document that a parent needs *all* of its children, express it in the issue's
+description or labels rather than in a redundant edge.
 
 ### Simplify Complex Graphs
 

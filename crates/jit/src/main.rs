@@ -54,6 +54,9 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         || error
             .downcast_ref::<jit::errors::ValidationFailedError>()
             .is_some()
+        || error
+            .downcast_ref::<jit::errors::RedundantDependencyError>()
+            .is_some()
     {
         return ExitCode::ValidationFailed;
     }
@@ -2234,13 +2237,25 @@ fn run() -> Result<()> {
             DepCommands::Add {
                 from_id,
                 to_ids,
+                reduce,
                 json,
             } => {
+                use jit::commands::RedundancyPolicy;
+                let policy = if reduce {
+                    RedundancyPolicy::Reduce
+                } else {
+                    RedundancyPolicy::Reject
+                };
                 let output_ctx = OutputContext::new(quiet, json);
-                match executor.add_dependencies(&from_id, &to_ids) {
+                match executor.add_dependencies_with_policy(&from_id, &to_ids, policy) {
                     Ok(mut result) => {
-                        // If all dependencies failed, return error
-                        if result.added.is_empty() && !result.errors.is_empty() {
+                        // Any per-edge failure fails the whole command with a
+                        // nonzero exit, even when other edges were added: a
+                        // rejected redundant edge (REQ-01) — or a cycle/not-found
+                        // in a variadic add — must never be masked by a sibling
+                        // success. Edges added before the failure remain
+                        // persisted; the first typed error classifies the exit.
+                        if !result.errors.is_empty() {
                             // Classify the first failure by its TYPED error, not by
                             // scanning the message. `typed_errors` mirrors `errors`
                             // 1:1, so it is guaranteed non-empty here.
@@ -2256,6 +2271,17 @@ fn run() -> Result<()> {
                                     typed.downcast_ref::<GraphError>()
                                 {
                                     JsonError::cycle_detected(&from_id, &dep_id, "dep add")
+                                } else if typed
+                                    .downcast_ref::<jit::errors::RedundantDependencyError>()
+                                    .is_some()
+                                {
+                                    // A transitive-reduction violation is the same
+                                    // condition `jit validate` reports (exit 4).
+                                    JsonError::new(
+                                        jit::output::ErrorCode::VALIDATION_FAILED,
+                                        typed.to_string(),
+                                        "dep add",
+                                    )
                                 } else if typed
                                     .downcast_ref::<jit::storage::IssueNotFoundError>()
                                     .is_some()

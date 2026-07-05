@@ -397,6 +397,95 @@ impl Default for ClaimRequiresGitError {
     }
 }
 
+/// A `jit dep add` rejected because the edge would break transitive reduction.
+///
+/// Cycle detection is a write-time guard (INV-DAG-ACYCLIC); this error makes the
+/// transitive-reduction property a write-time guard too. `jit dep add` refuses,
+/// by default, any edge that shadows an existing direct edge or is itself already
+/// reachable through other dependencies — the exact property `jit validate`
+/// enforces — so a silent write can no longer resurface as a distant validation
+/// error. Downcastable in `error_to_exit_code` (→ `ExitCode::ValidationFailed`,
+/// exit 4), matching both cycle detection and the read-time validator. Re-run
+/// `jit dep add --reduce` to drop the now-redundant edge(s) in the same operation.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::RedundantDependencyError;
+///
+/// let err = RedundantDependencyError::new(
+///     ("aaaa1111".into(), "cccc3333".into()),
+///     vec![("aaaa1111".into(), "cccc3333".into())],
+/// );
+/// let msg = err.to_string();
+/// assert!(msg.contains("aaaa1111"));
+/// assert!(msg.contains("cccc3333"));
+/// assert!(msg.contains("--reduce"));
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<RedundantDependencyError>().is_some());
+/// ```
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct RedundantDependencyError {
+    message: String,
+}
+
+impl RedundantDependencyError {
+    /// Build a [`RedundantDependencyError`] for an `attempted = (from, to)` edge
+    /// that would leave `redundant_edges` (each a `(from, to)` pair) redundant.
+    /// When the attempted edge is itself the redundant one it appears in
+    /// `redundant_edges`. Ids are shortened to [`SHORT_ID_LENGTH`] in the message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::RedundantDependencyError;
+    ///
+    /// let err = RedundantDependencyError::new(
+    ///     ("bbbb2222".into(), "cccc3333".into()),
+    ///     vec![("aaaa0000".into(), "cccc3333".into())],
+    /// );
+    /// // Names both the attempted edge and the edge it makes redundant.
+    /// assert!(err.to_string().contains("bbbb2222"));
+    /// assert!(err.to_string().contains("aaaa0000"));
+    /// ```
+    pub fn new(attempted: (String, String), redundant_edges: Vec<(String, String)>) -> Self {
+        let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
+        let (from, to) = (short(&attempted.0), short(&attempted.1));
+        let pairs = redundant_edges
+            .iter()
+            .map(|(f, t)| format!("{}→{}", short(f), short(t)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let message = format!(
+            "Refusing to add dependency {from}→{to}: it would leave the graph not \
+             transitively reduced. Redundant edge(s): {pairs}. Re-run with \
+             `jit dep add --reduce` to drop the now-redundant edge(s) in the same \
+             operation, or run `jit validate --fix`."
+        );
+        Self { message }
+    }
+
+    /// The user-facing rejection message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::RedundantDependencyError;
+    ///
+    /// let err = RedundantDependencyError::new(
+    ///     ("aaaa1111".into(), "cccc3333".into()),
+    ///     vec![("aaaa1111".into(), "cccc3333".into())],
+    /// );
+    /// assert_eq!(err.message(), err.to_string());
+    /// ```
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A state-transition failure with structured blocker details.
 ///
 /// Command logic uses this error to report why an issue cannot move to the

@@ -999,6 +999,11 @@ pub enum DepCommands {
         #[arg(required = true)]
         to_ids: Vec<String>,
 
+        /// Drop any edge the add would make transitively redundant, in the same
+        /// operation, instead of rejecting. Leaves the graph transitively reduced.
+        #[arg(long)]
+        reduce: bool,
+
         #[arg(long)]
         json: bool,
     },

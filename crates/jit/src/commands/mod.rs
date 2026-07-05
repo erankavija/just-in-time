@@ -287,6 +287,31 @@ pub enum DependencyAddResult {
     AlreadyExists,
 }
 
+/// How `jit dep add` treats an edge that would break transitive reduction.
+///
+/// Cycle detection is a write-time guard (INV-DAG-ACYCLIC); this policy makes the
+/// transitive-reduction property a write-time guard too, closing the asymmetry
+/// where a redundant edge was written silently and only rejected at a later
+/// `jit validate`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::RedundancyPolicy;
+///
+/// // The CLI default rejects a redundant edge; `--reduce` opts into fixing it.
+/// assert_eq!(RedundancyPolicy::default(), RedundancyPolicy::Reject);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RedundancyPolicy {
+    /// Reject the add, naming the offending edge pair (nonzero exit). Default.
+    #[default]
+    Reject,
+    /// Add the edge and drop the now-redundant edge(s) in the same operation,
+    /// leaving the graph transitively reduced.
+    Reduce,
+}
+
 /// Outcome of the unified write-time validation pass.
 ///
 /// Produced by the executor's `validate_for_write` entry point BEFORE an issue
