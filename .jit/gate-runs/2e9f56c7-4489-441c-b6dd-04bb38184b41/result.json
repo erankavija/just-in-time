@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2e9f56c7-4489-441c-b6dd-04bb38184b41",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+  "commit": "f12fb23bdfbc6c512fbb32c81b996bb42df2fe10",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T23:50:17.481607870Z",
+  "completed_at": "2026-07-05T23:52:06.028032082Z",
+  "duration_ms": 108546,
+  "exit_code": 0,
+  "stdout": "**Architecture and Separation of Concerns**\n\nSubstantive changes are documentation-only in `README.md` and `docs/concepts/core-model.md`; no domain, storage, commands, CLI, or output code changed.\n\n**Functional Paradigm**\n\nNo Rust implementation changed, so no new imperative logic or side effects were introduced.\n\n**Correctness and Invariants**\n\nNo persistence, atomic write, event logging, gate transition, assignee/label parsing, or PID-handling code changed. README command examples were spot-checked against `target/debug/jit`; the quickstart, sibling `dep add --reduce`, and gate examples execute successfully in a disposable repo.\n\n**Safety**\n\nNo Rust code changed. `#![deny(unsafe_code)]` remains unaffected.\n\n**Testing**\n\nUsed provided evidence for test/lint status: `cargo-ci` passed at `2026-07-05T23:46:18.770797305+00:00`; I did not rerun tests. I ran `./scripts/jit-validate.sh`, which passed.\n\n**Acceptance Criteria**\n\nREQ-01 through REQ-05 are satisfied. README command/flag forms exist and shell examples work; lifecycle docs include archived; the feature story covers the current agent-first surface; legacy `graph show` and broad JSON overclaims are absent; referenced docs validate.\n\n**Prior Review Feedback**\n\nThe most recent failure about `Done` contradicting archive behavior is addressed in `docs/concepts/core-model.md:768`: Done no longer claims it cannot transition out at all, and the transition section still documents archiving/revival.\n\n**Jit Issue Management**\n\n`issue.dependencies` and `unmet_dependencies` are empty. Repository validation passed.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"README and core-model lifecycle docs now satisfy the issue criteria; no blocking findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "README and core-model lifecycle docs now satisfy the issue criteria; no blocking findings remain.",
+    "findings": []
+  }
+}

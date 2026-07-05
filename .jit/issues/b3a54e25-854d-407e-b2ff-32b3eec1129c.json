@@ -2,7 +2,7 @@
   "id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
   "title": "Refresh README to the current agent-first surface",
   "description": "The README's quickstart and feature story lag the shipped CLI. The usability batch delivered compact projections, rollups, structured gate findings, hierarchy views, and full export, none of which the README reflects, and its examples contain defects.\n\n## Background\n\nConfirmed defects: the Basic Usage capture `EPIC=$(jit issue create --title ...)` stores a human-readable line, not an id, so the subsequent `dep add` is broken as written; `jit graph show` does not exist (the family is deps/tree/export/roots/rdeps); the lifecycle diagram omits the archived state. The feature bullets predate the current orchestration surface.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Every command and flag shown in the README exists in the current CLI, and every shell example works as written (id captures use --json or an equivalent working form).\n- [ ] [hard] REQ-02: The lifecycle section reflects the full state set including archived, consistent with the core-model reference.\n- [ ] [hard] REQ-03: The feature story presents the current agent-first surface: compact status projection, container rollups, structured gate findings, DAG-authoritative hierarchy views, uniform JSON list envelope, full export with lifecycle timestamps, and config introspection.\n- [ ] [hard] REQ-04: Text describes current behavior only; legacy-behavior narration is absent throughout.\n- [ ] [hard] REQ-05: All referenced files and doc links resolve (INSTALL.md, tutorials, reference pages).",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T23:44:21.914793390Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T23:40:24.926324458Z"
+      "updated_at": "2026-07-05T23:46:18.770797305Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T23:50:17.481607870Z"
     }
   },
   "context": {},
@@ -29,7 +29,8 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-07-05T21:40:21.535481264Z",
-  "updated_at": "2026-07-05T23:45:28.240844741Z",
+  "updated_at": "2026-07-05T23:52:38.983376337Z",
   "first_ready_at": "2026-07-05T21:40:21.535666454Z",
-  "claimed_at": "2026-07-05T23:01:48.164838804Z"
+  "claimed_at": "2026-07-05T23:01:48.164838804Z",
+  "done_at": "2026-07-05T23:52:38.983375767Z"
 }
