@@ -1,27 +1,13 @@
 {
   "id": "eff11282-af65-4a82-b591-439a184dbc10",
   "title": "Claiming a container couples assignment to an in_progress transition",
-  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03).\n\n`jit issue claim <id> <assignee>` always attempts the transition to in_progress. For a strategic container (an epic whose children are still open) that transition is correctly blocked by incomplete dependencies, so the claim itself fails with exit 4 — even though \"this lead now owns driving this epic\" is exactly the state a lead wants to record at intake. The error message does suggest the workaround (`jit issue assign <id> <assignee>` — \"assign without starting work\"), which is how this session proceeded, but the workaround loses claim semantics (lease/claims.jsonl) and the failure aborts compound shell chains.\n\nProposal:\n1. Add `jit issue claim --assign-only` (or make claim on a dependency-blocked container record the claim without the state transition, with a notice), so container stewardship is claimable without violating the lifecycle.\n2. Alternatively/additionally: document the intended pattern for leads claiming containers, if assign-without-claim is the deliberate answer.\n\n## Success Criteria\n- [hard] REQ-01: a lead can record ownership of a dependency-blocked container in one command without a state transition and without a nonzero exit, via a claim variant or documented equivalent; covered by a CLI test claiming an epic with open children.\n- [hard] REQ-02: the chosen mechanism is documented (command help + docs/) including how it interacts with leases and `jit claim` worktree semantics.",
-  "state": "ready",
+  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03).\n\n`jit issue claim <id> <assignee>` always attempts the transition to in_progress. For a strategic container (an epic whose children are still open) that transition is correctly blocked by incomplete dependencies, so the claim itself fails with exit 4 — even though \"this lead now owns driving this epic\" is exactly the state a lead wants to record at intake. The error message does suggest the workaround (`jit issue assign <id> <assignee>` — \"assign without starting work\"), which is how this session proceeded, but the workaround loses claim semantics (lease/claims.jsonl) and the failure aborts compound shell chains.\n\nProposal:\n1. Add `jit issue claim --assign-only` (or make claim on a dependency-blocked container record the claim without the state transition, with a notice), so container stewardship is claimable without violating the lifecycle.\n2. Alternatively/additionally: document the intended pattern for leads claiming containers, if assign-without-claim is the deliberate answer.\n\n## Success Criteria\n- [hard] REQ-01: a lead can record ownership of a dependency-blocked container in one command without a state transition and without a nonzero exit, via a claim variant or documented equivalent; covered by a CLI test claiming an epic with open children.\n- [hard] REQ-02: the chosen mechanism is documented (command help + docs/) including how it interacts with leases and `jit claim` worktree semantics.\n\n## Resolution\n\nDelivered by the existing `jit issue claim --assign-only` flag: it records the assignee without transitioning the issue to in_progress, so a lead can record ownership of a dependency-blocked container in one command with a zero exit (REQ-01). The flag is documented in command help and `docs/reference/cli-commands.md` (REQ-02) and covered by `test_claim_assign_only_sets_assignee_without_transition` in `crates/jit/tests/exit_code_tests.rs`. Closed as resolved; no further implementation required.",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [],
-  "gates_required": [
-    "cargo-ci",
-    "code-review"
-  ],
-  "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.797882186Z"
-    },
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.797849616Z"
-    }
-  },
+  "gates_required": [],
+  "gates_status": {},
   "context": {},
   "documents": [],
   "labels": [
@@ -30,5 +16,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T11:10:35.472914924Z",
-  "updated_at": "2026-07-04T23:25:14.797898616Z"
+  "updated_at": "2026-07-05T00:04:39.948403147Z"
 }

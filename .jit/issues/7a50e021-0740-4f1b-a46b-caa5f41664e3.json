@@ -1,7 +1,7 @@
 {
   "id": "7a50e021-0740-4f1b-a46b-caa5f41664e3",
   "title": "jit dep add allows silently creating transitively redundant edges",
-  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03, session 2).\n\n`jit dep add` happily creates a transitively redundant edge, but `jit validate` treats transitive-reduction violations as ERRORS — the write succeeds now and the repo fails validation later, wherever the next validate happens to run. In this session, adding `a1b6b3da -> 3d9e9222` silently made the pre-existing `9a7106ae -> 3d9e9222` edge redundant; the violation surfaced inside an UNRELATED issue's code-review gate (which runs jit-validate.sh), costing that issue a review round and a re-run.\n\nThe asymmetry is the friction: acyclicity is enforced at write time (cycle detection runs before every dependency operation, INV-DAG-ACYCLIC), while the reduction property is enforced only at read/validate time.\n\nProposal (either satisfies the intent):\n1. `jit dep add` detects that the new edge makes an existing edge redundant (or is itself redundant) and reports which edge, failing unless `--reduce` is passed to drop the now-redundant edge in the same operation; or\n2. at minimum, `jit dep add` prints a warning naming the redundant edge so the operator can fix it before a distant validate fails.\n\nAcceptance: adding an edge that shadows an existing direct edge either fails with the offending pair named, auto-reduces under an explicit flag, or warns — a silent success followed by a later validate error is no longer possible.",
+  "description": "`jit dep add` silently creates a transitively redundant edge, but `jit validate` treats transitive-reduction violations as errors — so the write succeeds now and the repository fails validation later, wherever the next validate happens to run.\n\n## Background\n\nFriction observed while lead-driving epic 2821e177 (2026-07-03, session 2). Adding `a1b6b3da -> 3d9e9222` silently made the pre-existing `9a7106ae -> 3d9e9222` edge redundant; the violation surfaced inside an unrelated issue's code-review gate (which runs validation), costing that issue a review round and a re-run.\n\nThe asymmetry is the root friction: acyclicity is enforced at write time (cycle detection runs before every dependency operation, INV-DAG-ACYCLIC), while the transitive-reduction property is enforced only at read/validate time.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit dep add` rejects, with a nonzero exit, an edge that shadows an existing direct edge or is itself made redundant by existing edges, and the error names the offending edge pair. Covered by a test adding such an edge.\n- [hard] REQ-02: passing an explicit `--reduce` flag to the same operation makes the add succeed by dropping the now-redundant edge in the same operation, leaving the graph transitively reduced. Covered by a test asserting the shadowed edge is gone and the new edge present.\n- [hard] REQ-03: after any `jit dep add`, the repository contains no transitive-reduction violation that a later `jit validate` would report — a silent write followed by a distant validation error is no longer possible.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.790109980Z"
-    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.790077100Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-04T23:25:14.790109980Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T16:51:06.586502402Z",
-  "updated_at": "2026-07-04T23:25:14.790127050Z"
+  "updated_at": "2026-07-05T00:00:57.822733702Z"
 }

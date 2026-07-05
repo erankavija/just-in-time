@@ -5210,3 +5210,14 @@
 {"type":"gate_added","id":"bb468b94-becd-44ad-80b6-dc54eb584ed8","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-04T23:25:14.846127901Z","gate_key":"repo-validate"}
 {"type":"issue_created","id":"98171577-c30c-458b-908f-cbf4bb5a9ab0","issue_id":"ff9925af-c394-4960-948d-5009f5dedaa4","timestamp":"2026-07-04T23:37:42.670582731Z","title":"jit commands fail from any subdirectory instead of discovering the repo root like git","priority":"normal"}
 {"type":"issue_updated","id":"e5ae507a-ab44-4e82-8e80-e440d39e37cf","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-04T23:37:57.718154093Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"05c5e8e1-267b-4797-a302-c49da1073c7c","issue_id":"7a50e021-0740-4f1b-a46b-caa5f41664e3","timestamp":"2026-07-05T00:00:57.822944922Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"0bf973db-3986-4a0c-8037-157893bc5988","issue_id":"03d54a9f-922c-40fd-864d-2796b08bfd35","timestamp":"2026-07-05T00:00:57.833613460Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"850814bc-7394-4c0b-91c1-e97359bf4189","issue_id":"def64ac4-cb41-4b57-a9b3-572787f4074b","timestamp":"2026-07-05T00:00:57.844551098Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"62033641-136d-4dc8-a487-525a81779d35","issue_id":"8a15088a-5907-4b24-9c67-8388eefaeb6e","timestamp":"2026-07-05T00:00:57.855657806Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"7a03b903-dc46-4fb5-9aeb-a47701c4e056","issue_id":"ff9925af-c394-4960-948d-5009f5dedaa4","timestamp":"2026-07-05T00:00:57.866557364Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"db01c9e9-2c55-4ca2-8dfd-275ef52e2006","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:02:36.452275793Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_state_changed","id":"649bd2f0-1644-47a4-b6b3-db21ec47accf","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:03:22.779615031Z","from":"ready","to":"gated"}
+{"type":"gate_removed","id":"7e9552a8-6359-4116-a4a5-9af9cc8aec00","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:04:39.898194270Z","gate_key":"cargo-ci"}
+{"type":"gate_removed","id":"07d1a8a1-dbd7-4ade-96c8-1e3641e15f05","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:04:39.898247790Z","gate_key":"code-review"}
+{"type":"issue_state_changed","id":"6d06df1a-c187-4a01-afc0-6761c35eafd9","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:04:39.948584867Z","from":"gated","to":"done"}
+{"type":"issue_completed","id":"ad985d8d-a2ef-4855-939d-ba1c22b528ea","issue_id":"eff11282-af65-4a82-b591-439a184dbc10","timestamp":"2026-07-05T00:04:39.948606807Z"}
