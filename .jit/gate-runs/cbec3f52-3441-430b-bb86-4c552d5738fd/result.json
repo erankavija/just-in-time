@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "cbec3f52-3441-430b-bb86-4c552d5738fd",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7a50e021-0740-4f1b-a46b-caa5f41664e3",
+  "commit": "e75e512c59002e51bad2d881f938a40c3ad57992",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T06:46:02.065272178Z",
+  "completed_at": "2026-07-05T06:47:27.086893183Z",
+  "duration_ms": 85021,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, and REQ-03 are satisfied. The prior batch-add failure was addressed: [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2258) now treats any per-edge error from variadic `jit dep add` as command failure, including JSON mode at [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2267). Tests cover single-edge rejection, JSON rejection, `--reduce`, and the prior variadic partial-success case in [crates/jit/tests/dep_add_redundancy_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/dep_add_redundancy_cli_tests.rs:140).\n\n**Architecture And Separation**\n\nNo blocking boundary violations found. Redundancy detection remains graph/domain logic in [crates/jit/src/graph.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/graph.rs:438), persistence remains behind `IssueStore`, command orchestration is in [crates/jit/src/commands/dependency.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:83), and CLI policy/output handling stays in [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2237).\n\n**Functional Paradigm**\n\nNo blocking issue found. The new graph query is pure and deterministic. Command code uses mutation for accumulated command results and persistence, consistent with surrounding code.\n\n**Correctness And Invariants**\n\nNo blocking invariant issue found. Reject mode checks the candidate graph before persistence. Reduce mode applies transitive reduction and logs dependency reductions via [crates/jit/src/commands/dependency.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:248). Writes still go through storage, and `save_issue` uses the storage write path at [crates/jit/src/storage/json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:437).\n\n**Safety**\n\nNo unsafe code introduced in the reviewed surface. `#![deny(unsafe_code)]` remains enforced.\n\n**Testing**\n\nI did not run cargo tests because the issue has a passed `cargo-ci` gate. Provided evidence at `.jit/gate-runs/33899cfd-855c-40f2-9ac5-74366992d9e2/result.json` reports fmt ok, clippy ok, and `3065 passed, 0 failed, 12 ignored`.\n\nI did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo blocking issue found. `RedundantDependencyError` is typed and downcastable, and CLI exit mapping treats it as validation failure.\n\n**CLI Contract**\n\nNo blocking issue found. `jit dep add` supports `--json`, and redundant dependency failures now emit JSON errors with nonzero exit instead of success envelopes.\n\n**Documentation**\n\nNo blocking issue found. Docs were updated to describe default rejection and `--reduce` behavior in `docs/how-to/dependency-management.md` and `docs/reference/jit-content-standards.md`.\n\n**Prior Review Feedback**\n\nThe prior finding is resolved. The old behavior only failed when all batch targets failed; current code fails on any collected per-edge error.\n\n**Jit Issue Management**\n\nThe issue has no dependencies. `./scripts/jit-validate.sh` passed. Label warnings were not present in the validation output.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

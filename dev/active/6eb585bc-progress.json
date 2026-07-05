@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 5,
+  "current_wave": 6,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -55,7 +55,7 @@
           "short_id": "7a50e021",
           "title": "dep add rejects redundant edges (--reduce)",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -103,7 +103,8 @@
   "rework_counts": {
     "ff9925af": 1,
     "b2f9f390": 1,
-    "f847df3f": 1
+    "f847df3f": 1,
+    "7a50e021": 1
   },
   "started_at": "2026-07-05T00:00:00Z"
 }
