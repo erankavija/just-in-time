@@ -5314,3 +5314,4 @@
 {"type":"issue_updated","id":"925ea2dd-d7d0-4a70-9892-ce3cee901519","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T10:03:52.705102474Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"2159cbe1-fde6-41f3-9307-080cf65f53ab","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T10:03:52.727436470Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"7c10f734-c16a-4f1f-a40e-06c9f50660a6","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T10:03:52.747676015Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"55a02241-875b-48d1-9f77-206dd3eb8f37","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T10:04:34.760089235Z","updated_by":"doc-add","fields":["documents"]}
