@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "a6d43271-95a7-448e-b18f-ac2f18286c7e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cc42a69b-4e5b-4b9a-a702-fec2b9235e99",
+  "commit": "268ebeb0a877958ad25b833302b2c96769e30623",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T16:50:45.255032217Z",
+  "completed_at": "2026-07-05T16:52:57.496408790Z",
+  "duration_ms": 132241,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01 through REQ-04 are implemented for the successful path: `jit issue status <id>...` exists, emits text/JSON, supports multiple ids, `issue show --json` exposes `unmet_dependencies`, and docs were updated.\n\n**Prior Feedback**\n`run_history` is empty, so there was no prior review feedback to verify.\n\n**Jit Management**\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed. The provided `cargo-ci` gate passed at `2026-07-05T16:47:58Z`; I did not rerun tests.\n\n**Architecture / Separation**\nThe successful projection path reuses `IssueShowResponse` and storage access remains behind `CommandExecutor`/`IssueStore`. No direct file I/O was added outside storage.\n\n**Functional Paradigm**\nThe new code uses iterator projections for status rows, gates, and unmet dependencies. No blocking imperative debt found.\n\n**Correctness / Invariants**\nNo state mutation is added, so atomic writes, event logging, gate transitions, assignee/label validation, and PID safety are not directly affected. `unsafe` is not introduced.\n\n**Testing**\nCoverage exists for text output, JSON output, multi-id output, unmet dependency semantics, `issue show --json`, and flag rejection. One missing JSON error-path test is tied to the finding below.\n\n**Error Handling / CLI Contract**\nSuccessful `--json` output is machine-readable, but the new command does not preserve that contract on id-resolution failures.\n\n**Documentation**\nCLI reference and changelog document the new compact status view and `unmet_dependencies`.\n\n1. **Blocking: `jit issue status --json` does not emit JSON errors for id failures.** In [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1964), the status command maps ids through `build_issue_show_response(...).collect::<Result<Vec<_>>>()?`; any missing, ambiguous, or invalid id escapes directly to `main`. `main` only emits JSON for startup repository errors ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1393)), while adjacent `issue show` uses `handle_json_error!` for issue lookup failures ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1951)). This means `jit issue status deadbeef --json` can fail with human stderr and no machine-readable JSON payload, violating the CLI contract that every command supports `--json`. The new tests only cover non-JSON unknown-id failure ([issue_status_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/issue_status_projection_tests.rs:320)), so this regression is unpinned.\n\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6687 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3330-8631-7c43-b992-4a8a9e7e5976\n--------\nuser\n--- 6674 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

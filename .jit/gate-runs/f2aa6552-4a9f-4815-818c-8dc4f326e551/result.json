@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f2aa6552-4a9f-4815-818c-8dc4f326e551",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "cc42a69b-4e5b-4b9a-a702-fec2b9235e99",
+  "commit": "906020b87c3cea3436e4a2c80e96e9011b5f4d5d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T17:02:05.573512509Z",
+  "completed_at": "2026-07-05T17:03:59.773651322Z",
+  "duration_ms": 114200,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met. `jit issue status <id>...` emits the compact text and JSON views, supports multiple ids, and uses the documented JSON shapes in `docs/reference/cli-commands.md:1146`. `issue show --json` exposes `unmet_dependencies` in `crates/jit/src/output.rs:953`.\n\n**Prior Feedback**\n\nThe prior blocker is addressed. `issue status --json` now routes id lookup failures through `handle_json_error!` at `crates/jit/src/main.rs:1991`, with regression coverage for unknown ids, short prefixes, and mixed good/bad multi-id calls in `crates/jit/tests/issue_status_projection_tests.rs:331`.\n\n**Architecture / Functional / Correctness**\n\nNo boundary violations found. The CLI layer orchestrates output in `main.rs`; persistence remains behind `CommandExecutor`/storage. The feature is read-only, so atomic writes, event logging, gate transitions, assignee/label validation, and PID safety are not regressed. No unsafe code was introduced.\n\n**Testing**\n\nLatest provided `cargo-ci` evidence passed for current `HEAD` `906020b8` at `2026-07-05T17:02:05Z`; I did not rerun cargo tests. I ran `./scripts/jit-validate.sh`, and it passed.\n\n**CLI / Error Handling / Docs**\n\nThe `--json` contract is now preserved on status id failures. Docs cover both compact status output and full `issue show --json` unmet dependency semantics in `docs/reference/cli-commands.md:1124` and `docs/reference/cli-commands.md:1186`.\n\n1. No findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
