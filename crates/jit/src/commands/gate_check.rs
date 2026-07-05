@@ -86,6 +86,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             checker,
             &working_dir,
             context.as_ref(),
+            &issue.documents,
         )?;
 
         // Save run result
@@ -1388,6 +1389,116 @@ enforce_leases = "off"
         assert_eq!(result.status, GateRunStatus::Passed);
         // JIT_CONTEXT_FILE should not be set when pass_context is false
         assert!(result.stdout.contains("CTX=unset"));
+    }
+
+    #[test]
+    fn test_check_gate_exposes_linked_documents_via_env_var() {
+        // REQ-01 (jit:4af511fd): a gate checker process receives the issue's
+        // linked-document list (paths + doc types + labels) via JIT_ISSUE_DOCS,
+        // wired end to end through `check_gate` from `issue.documents`.
+        let executor = setup();
+
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "test-gate".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "test-gate".to_string(),
+                title: "Test Gate".to_string(),
+                description: "Test gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "echo \"$JIT_ISSUE_DOCS\"".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "test-gate".to_string())
+            .unwrap();
+
+        // Link a document via the same accessor `jit doc add` uses.
+        executor
+            .add_document_reference(
+                &issue_id,
+                "dev/active/my-plan.md",
+                None,
+                Some("Implementation Plan"),
+                Some("design"),
+                true, // skip_scan: the path need not exist on disk for this test
+            )
+            .unwrap();
+
+        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+
+        let docs: serde_json::Value = serde_json::from_str(result.stdout.trim())
+            .expect("JIT_ISSUE_DOCS should be valid JSON");
+        let entries = docs.as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["path"], "dev/active/my-plan.md");
+        assert_eq!(entries[0]["doc_type"], "design");
+        assert_eq!(entries[0]["label"], "Implementation Plan");
+    }
+
+    #[test]
+    fn test_check_gate_empty_documents_yields_empty_json_array() {
+        // REQ-01 empty case: an issue with no linked documents still gets
+        // JIT_ISSUE_DOCS set, to an empty JSON array (never absent/unset).
+        let executor = setup();
+
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "test-gate".to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: "test-gate".to_string(),
+                title: "Test Gate".to_string(),
+                description: "Test gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "echo \"$JIT_ISSUE_DOCS\"".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "test-gate".to_string())
+            .unwrap();
+
+        let result = executor.check_gate(&issue_id, "test-gate").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert_eq!(result.stdout.trim(), "[]");
     }
 
     #[test]

@@ -6,7 +6,9 @@
 //! - Git commit/branch tracking
 //! - Result storage for audit trail
 
-use crate::domain::{GateChecker, GateContext, GateRunResult, GateRunStatus, GateStage};
+use crate::domain::{
+    DocumentReference, GateChecker, GateContext, GateRunResult, GateRunStatus, GateStage,
+};
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::path::Path;
@@ -16,7 +18,8 @@ use std::time::{Duration, Instant};
 /// Execute a gate checker and return the result (without context).
 ///
 /// Convenience wrapper around [`execute_gate_checker_with_context`] that passes `None`
-/// for context. Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`) are still set.
+/// for context and no linked documents. Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`,
+/// `JIT_STAGE`, `JIT_ISSUE_DOCS`) are still set.
 pub fn execute_gate_checker(
     gate_key: &str,
     issue_id: &str,
@@ -24,7 +27,58 @@ pub fn execute_gate_checker(
     checker: &GateChecker,
     working_dir: &Path,
 ) -> Result<GateRunResult> {
-    execute_gate_checker_with_context(gate_key, issue_id, stage, checker, working_dir, None)
+    execute_gate_checker_with_context(gate_key, issue_id, stage, checker, working_dir, None, &[])
+}
+
+/// One entry in the `JIT_ISSUE_DOCS` env var: the fields a checker needs to
+/// inline a linked document into a review prompt.
+#[derive(serde::Serialize)]
+struct IssueDocEnvEntry<'a> {
+    path: &'a str,
+    doc_type: Option<&'a str>,
+    label: Option<&'a str>,
+}
+
+/// Build the JSON value of the `JIT_ISSUE_DOCS` env var from an issue's linked
+/// documents.
+///
+/// Every gate checker process receives `JIT_ISSUE_DOCS` (alongside
+/// `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`) so a checker script — e.g.
+/// `scripts/ai-review.sh` — can inline linked design/plan docs into its
+/// review prompt without hand-pasting them into the issue description first.
+///
+/// Each entry keeps only the fields a checker needs: `path`, `doc_type`, and
+/// `label` (each `null` when the source [`DocumentReference`] leaves it
+/// unset). The result is always a valid JSON array — `"[]"` when `documents`
+/// is empty — so a checker can parse the variable unconditionally instead of
+/// special-casing an absent or missing value.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::DocumentReference;
+/// use jit::gate_execution::build_issue_docs_env;
+///
+/// let docs = vec![DocumentReference::new("dev/plan.md".to_string())];
+/// let json = build_issue_docs_env(&docs);
+/// assert_eq!(json, r#"[{"path":"dev/plan.md","doc_type":null,"label":null}]"#);
+///
+/// assert_eq!(build_issue_docs_env(&[]), "[]");
+/// ```
+pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
+    let entries: Vec<IssueDocEnvEntry> = documents
+        .iter()
+        .map(|doc| IssueDocEnvEntry {
+            path: &doc.path,
+            doc_type: doc.doc_type.as_deref(),
+            label: doc.label.as_deref(),
+        })
+        .collect();
+
+    // `Vec<IssueDocEnvEntry>` serialization cannot fail (plain strings and
+    // options, no map keys, no floats); fall back to an empty array
+    // defensively rather than panicking in library code.
+    serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string())
 }
 
 /// Execute a gate checker with optional structured context.
@@ -32,9 +86,11 @@ pub fn execute_gate_checker(
 /// This function runs the specified checker and captures all execution details
 /// including exit code, output, timing, and git context if available.
 ///
-/// Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`) are always set.
-/// When `context` is `Some`, a temporary JSON file is written containing the
-/// structured context and made available via the `JIT_CONTEXT_FILE` env var.
+/// Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS`) are
+/// always set. `JIT_ISSUE_DOCS` is built from `documents` via
+/// [`build_issue_docs_env`]. When `context` is `Some`, a temporary JSON file is
+/// written containing the structured context and made available via the
+/// `JIT_CONTEXT_FILE` env var.
 pub fn execute_gate_checker_with_context(
     gate_key: &str,
     issue_id: &str,
@@ -42,6 +98,7 @@ pub fn execute_gate_checker_with_context(
     checker: &GateChecker,
     working_dir: &Path,
     context: Option<&GateContext>,
+    documents: &[DocumentReference],
 ) -> Result<GateRunResult> {
     let start_time = Instant::now();
     let started_at = chrono::Utc::now();
@@ -53,6 +110,10 @@ pub fn execute_gate_checker_with_context(
     base_env.insert("JIT_ISSUE_ID".to_string(), issue_id.to_string());
     base_env.insert("JIT_GATE_KEY".to_string(), gate_key.to_string());
     base_env.insert("JIT_STAGE".to_string(), stage.as_str().to_string());
+    base_env.insert(
+        "JIT_ISSUE_DOCS".to_string(),
+        build_issue_docs_env(documents),
+    );
 
     // Write context file if context is provided; otherwise explicitly clear
     // JIT_CONTEXT_FILE so it is never inherited from the parent environment
@@ -153,9 +214,10 @@ fn execute_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    // Add base env vars (JIT_ISSUE_ID, JIT_GATE_KEY, JIT_STAGE, JIT_CONTEXT_FILE)
-    // Clear JIT_CONTEXT_FILE if not explicitly set, to prevent leaking from the
-    // parent environment (e.g. when tests run inside a gate checker).
+    // Add base env vars (JIT_ISSUE_ID, JIT_GATE_KEY, JIT_STAGE, JIT_ISSUE_DOCS,
+    // JIT_CONTEXT_FILE). Clear JIT_CONTEXT_FILE if not explicitly set, to
+    // prevent leaking from the parent environment (e.g. when tests run inside
+    // a gate checker).
     if !base_env.contains_key("JIT_CONTEXT_FILE") {
         cmd.env_remove("JIT_CONTEXT_FILE");
     }
@@ -538,6 +600,114 @@ mod tests {
     }
 
     #[test]
+    fn test_build_issue_docs_env_empty_when_no_documents() {
+        assert_eq!(build_issue_docs_env(&[]), "[]");
+    }
+
+    #[test]
+    fn test_build_issue_docs_env_serializes_path_type_and_label() {
+        let docs = vec![
+            DocumentReference {
+                path: "dev/active/plan.md".to_string(),
+                commit: None,
+                label: Some("Implementation Plan".to_string()),
+                doc_type: Some("design".to_string()),
+                format: None,
+                assets: Vec::new(),
+            },
+            // A doc with no label/doc_type still serializes, as explicit nulls.
+            DocumentReference::new("NOTES.md".to_string()),
+        ];
+
+        let json = build_issue_docs_env(&docs);
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let entries = parsed.as_array().unwrap();
+        assert_eq!(entries.len(), 2);
+
+        assert_eq!(entries[0]["path"], "dev/active/plan.md");
+        assert_eq!(entries[0]["doc_type"], "design");
+        assert_eq!(entries[0]["label"], "Implementation Plan");
+
+        assert_eq!(entries[1]["path"], "NOTES.md");
+        assert!(entries[1]["doc_type"].is_null());
+        assert!(entries[1]["label"].is_null());
+    }
+
+    #[test]
+    fn test_issue_docs_env_var_set_with_linked_documents() {
+        // REQ-01: a gate checker process receives JIT_ISSUE_DOCS as a
+        // machine-readable list of {path, doc_type, label} for the issue's
+        // linked documents.
+        let documents = vec![DocumentReference {
+            path: "dev/active/my-plan.md".to_string(),
+            commit: None,
+            label: Some("Plan".to_string()),
+            doc_type: Some("design".to_string()),
+            format: None,
+            assets: Vec::new(),
+        }];
+
+        let checker = GateChecker::Exec {
+            command: "echo \"$JIT_ISSUE_DOCS\"".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let result = execute_gate_checker_with_context(
+            "my-gate",
+            "issue-123",
+            GateStage::Postcheck,
+            &checker,
+            &temp_dir,
+            None,
+            &documents,
+        )
+        .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+        let parsed: serde_json::Value = serde_json::from_str(result.stdout.trim())
+            .expect("JIT_ISSUE_DOCS should be valid JSON");
+        let entries = parsed.as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["path"], "dev/active/my-plan.md");
+        assert_eq!(entries[0]["doc_type"], "design");
+        assert_eq!(entries[0]["label"], "Plan");
+    }
+
+    #[test]
+    fn test_issue_docs_env_var_empty_array_when_no_linked_documents() {
+        // REQ-01 empty case: no linked docs -> JIT_ISSUE_DOCS is present and
+        // set to an empty JSON array, never absent or unset.
+        let checker = GateChecker::Exec {
+            command: "echo \"$JIT_ISSUE_DOCS\"".to_string(),
+            timeout_seconds: 10,
+            working_dir: None,
+            env: HashMap::new(),
+            pass_context: false,
+            prompt: None,
+            prompt_file: None,
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let result = execute_gate_checker(
+            "my-gate",
+            "issue-123",
+            GateStage::Postcheck,
+            &checker,
+            &temp_dir,
+        )
+        .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert_eq!(result.stdout.trim(), "[]");
+    }
+
+    #[test]
     fn test_context_file_written_when_context_provided() {
         use crate::domain::GateContext;
 
@@ -568,6 +738,7 @@ mod tests {
             &checker,
             &temp_dir,
             Some(&context),
+            &[],
         )
         .unwrap();
 
@@ -614,6 +785,7 @@ mod tests {
             &checker,
             &temp_dir,
             Some(&context),
+            &[],
         )
         .unwrap();
 
@@ -649,6 +821,7 @@ mod tests {
             &checker,
             &temp_dir,
             None,
+            &[],
         )
         .unwrap();
 
@@ -706,6 +879,7 @@ mod tests {
             &checker,
             &temp_dir,
             Some(&context),
+            &[],
         )
         .unwrap();
 

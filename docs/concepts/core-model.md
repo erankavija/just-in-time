@@ -572,7 +572,7 @@ in_progress → [POSTCHECK: tests, clippy, code-review] → gated → done
 - Run automatically: `jit gate evaluate $ISSUE tests`
 - Used for objective, repeatable verification
 - Require checker command and timeout configuration
-- All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE` env vars
+- All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS` env vars — see [Environment Variables](../how-to/custom-gates.md#environment-variables) for the full contract, including `JIT_ISSUE_DOCS`'s JSON schema
 - **Context-aware mode** (`--pass-context`): checker also receives `JIT_CONTEXT_FILE` with issue data, gate definition, prompt, and run history as JSON
 
 ### Gate Status Tracking

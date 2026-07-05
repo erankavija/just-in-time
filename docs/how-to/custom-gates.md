@@ -126,7 +126,43 @@ Every gate checker receives these environment variables:
 | `JIT_ISSUE_ID` | Full issue ID being checked |
 | `JIT_GATE_KEY` | Gate key (e.g., `tests`) |
 | `JIT_STAGE` | `precheck` or `postcheck` |
+| `JIT_ISSUE_DOCS` | JSON array of the issue's linked documents (see below) |
 | `JIT_CONTEXT_FILE` | Path to context JSON (only when `--pass-context` is set) |
+
+### `JIT_ISSUE_DOCS`
+
+Every gate checker receives `JIT_ISSUE_DOCS`, a JSON array describing the
+issue's linked documents (the same set `jit doc list <issue>` shows) — so a
+checker script can inline a plan, design doc, or amendment into its review
+prompt instead of relying on the description alone.
+
+Each element has three fields, all string or `null`:
+
+```json
+[
+  { "path": "dev/active/my-plan.md", "doc_type": "design", "label": "Implementation Plan" },
+  { "path": "NOTES.md", "doc_type": null, "label": null }
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `path` | Document path, relative to the repository root |
+| `doc_type` | Document type hint (e.g. `design`, `implementation`, `notes`), or `null` if unset |
+| `label` | Human-readable label, or `null` if unset |
+
+When the issue has no linked documents, `JIT_ISSUE_DOCS` is still set, to the
+empty array `[]` — never absent or unset — so a checker can parse it
+unconditionally:
+
+```bash
+#!/bin/bash
+# Inline every linked document's path into a review prompt
+echo "$JIT_ISSUE_DOCS" | jq -r '.[].path'
+```
+
+Doc selection or filtering (e.g. only `doc_type == "design"`) is checker
+policy — `JIT_ISSUE_DOCS` lists every linked document unfiltered.
 
 Custom environment variables can be set with `--env` when defining a gate:
 
