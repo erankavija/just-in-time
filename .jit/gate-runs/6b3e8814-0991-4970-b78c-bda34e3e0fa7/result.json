@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "6b3e8814-0991-4970-b78c-bda34e3e0fa7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+  "commit": "4fe795c79abe01b18e316e6c1b860dd6f6b57826",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T23:12:21.938410969Z",
+  "completed_at": "2026-07-05T23:15:05.215089490Z",
+  "duration_ms": 163276,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nDocs-only change in [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:1). No domain/storage/commands/CLI/output code was modified, so no new boundary violations found.\n\n**Functional Paradigm, Correctness, Safety, Error Handling, Public API Docs**\n\nNo Rust code changes in this commit. No new unsafe code, file writes, event logging paths, gate transition logic, PID handling, error types, or public APIs were introduced.\n\n**Acceptance Criteria**\n\nREQ-02, REQ-03, REQ-04, and REQ-05 are mostly addressed: archived is listed in the lifecycle, the README now covers compact projections, rollups, structured gate findings, hierarchy views, JSON envelopes, full export, and config introspection, and the checked local doc links/anchors resolve.\n\nREQ-01 is not fully met. The gate example documents behavior that does not work as written.\n\n**CLI Contract**\n\nMost README command forms exist. The broad `Every command supports --json` statement is still too strong for the current CLI surface.\n\n**Testing and Validation**\n\nUsed the provided issue evidence: `cargo-ci` passed at `2026-07-05T23:08:29Z`; I did not rerun tests. I ran `./scripts/jit-validate.sh`, which passed. I also executed the README quickstart in a disposable `/tmp` git repo; the quickstart block completed, with only the expected warning for missing `auth-design.md`.\n\n**Prior Review Feedback**\n\n`run_history` is empty; no prior findings to verify.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty and `unmet_dependencies` is empty, so no prerequisite work is blocking this change. `./scripts/jit-validate.sh` passed.\n\n1. **High:** The README gate example does not work as described. [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:145) says `jit gate evaluate <issue> unit-tests` “executes the checker,” and [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:146) says `jit gate status <issue> unit-tests` shows the “latest recorded run.” In a fresh repo, `.jit/gates.toml` starts with `gates = []`; creating an issue with `--gate unit-tests` then evaluating it marks the issue gate passed manually, but `jit gate status <issue> unit-tests` reports that the gate has not been run yet. This violates REQ-01 because the shell example’s described behavior is false.\n2. **Medium:** The README overstates the JSON contract. [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:161) says “Every command supports `--json`,” but current top-level command families such as `jit hooks`, `jit migrate`, and `jit worktree` do not accept `--json` at the family level according to their help output. Narrow the wording to output-producing commands/subcommands or add parent-level JSON support.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"README still documents gate and JSON behavior that does not match the current CLI.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README gate example says evaluate executes a checker and status shows a recorded run, but fresh repos have no unit-tests checker and status reports no run.\",\"file\":\"README.md\",\"line\":145},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"README says every command supports --json, but top-level command families such as hooks, migrate, and worktree do not accept --json.\",\"file\":\"README.md\",\"line\":161}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8581 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f348d-e5bf-7ce1-abfe-ab98b5bff025\n--------\nuser\n--- 8568 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "README still documents gate and JSON behavior that does not match the current CLI.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README gate example says evaluate executes a checker and status shows a recorded run, but fresh repos have no unit-tests checker and status reports no run.",
+        "file": "README.md",
+        "line": 145
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "README says every command supports --json, but top-level command families such as hooks, migrate, and worktree do not accept --json.",
+        "file": "README.md",
+        "line": 161
+      }
+    ]
+  }
+}

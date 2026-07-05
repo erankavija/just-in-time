@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "7993bf21-3929-4da4-b20c-a75a5180cd40",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+  "commit": "f334e5545b48467efbdc85b3dac7990a71a84e00",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T23:29:38.004461362Z",
+  "completed_at": "2026-07-05T23:32:19.035895940Z",
+  "duration_ms": 161031,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nDocs-only change in [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:1). No domain, storage, command, CLI, or output code changed, so no new boundary violations were introduced.\n\n**Functional Paradigm**\n\nNo Rust implementation changed. No new imperative logic or side effects were introduced.\n\n**Correctness and Invariants**\n\nNo persistence, event logging, gate transition, assignee/label parsing, PID, or atomic write code changed. The README examples were spot-checked against `target/debug/jit`; the quickstart block and the prior sibling-ordering fix now execute successfully in a fresh git repo.\n\n**Safety**\n\nNo Rust code changed. `#![deny(unsafe_code)]` scope is unaffected.\n\n**Testing**\n\nUsed the provided gate evidence: `cargo-ci` is passed for this issue at `2026-07-05T23:25:30.527135702+00:00`, so I did not rerun the full test suite. I ran `./scripts/jit-validate.sh`, which passed. I also spot-checked the README quickstart, gate example, and orchestration command forms in disposable repos.\n\n**Error Handling**\n\nNo fallible Rust code changed. No new `unwrap()` / `expect()` usage was introduced in library code.\n\n**CLI Contract**\n\nThe prior broad “every command supports `--json`” README claim has been removed/narrowed. The README command forms I checked exist in the current CLI help, including `jit dep add --reduce`, `jit gate status --all`, `jit gate status --findings`, `jit graph tree --json`, `jit graph export --json --full`, and `jit config get`.\n\n**Documentation**\n\nREADME now covers the current agent-first surface and fixes the prior command examples. One documentation consistency issue remains: README links readers to the core-model state reference for transition rules, but that reference still omits `archived` from the state model.\n\n**Prior Review Feedback**\n\nPrior F1 is addressed: the gate example defines `unit-tests` before evaluation, and the status/evaluation forms work. Prior F2 is addressed in README: the “like every command” JSON overclaim was removed from the quickstart, and the orchestration wording is narrower.\n\n**Jit Issue Management**\n\n`issue.dependencies` and `unmet_dependencies` are empty. `./scripts/jit-validate.sh` passed.\n\n1. **High:** REQ-02 is not fully met because the README’s lifecycle section now documents `archived`, but the referenced core-model state page does not. [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:121) sends readers to `docs/concepts/core-model.md#states` for transition rules; that target starts at [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:738) and lists Backlog, Ready, In Progress, Gated, Done, and Rejected, but not Archived. It also says only Done and Rejected are terminal and describes `Any State -> Rejected`, while the shipped domain model includes `State::Archived` and allows archiving from existing states. The README and its cited reference are therefore inconsistent.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"README fixes the prior examples, but its lifecycle section now conflicts with the referenced core-model state documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README links to the core-model States reference for transition rules, but that reference omits the archived state documented in README.\",\"file\":\"docs/concepts/core-model.md\",\"line\":738}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10001 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f349d-b4d3-7ad1-b832-04153b3cedfc\n--------\nuser\n--- 9988 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "README fixes the prior examples, but its lifecycle section now conflicts with the referenced core-model state documentation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README links to the core-model States reference for transition rules, but that reference omits the archived state documented in README.",
+        "file": "docs/concepts/core-model.md",
+        "line": 738
+      }
+    ]
+  }
+}

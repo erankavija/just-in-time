@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "9331db91-8cad-4b0a-af2f-4b4c3b7e8756",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+  "commit": "2fcf3787ed53d5f024c24deea4363d53574b7d0e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T23:22:55.418343211Z",
+  "completed_at": "2026-07-05T23:24:38.631522245Z",
+  "duration_ms": 103213,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nDocs-only change in [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:1). No domain, storage, command, CLI, or output code changed, so no new boundary violations found.\n\n**Functional Paradigm, Correctness, Safety, Error Handling, Public API Docs**\n\nNo Rust code changed. No new unsafe code, persistence paths, event logging, gate transition logic, PID handling, error types, or public APIs were introduced.\n\n**Acceptance Criteria**\n\nREQ-02, REQ-03, REQ-04, and REQ-05 are satisfied by the README content I checked: archived is documented, the current orchestration surface is described, legacy `graph show` narration is absent, and the referenced local docs/anchors resolve.\n\nREQ-01 is not fully met. One README command using quickstart variables fails as written, and a broad `--json` claim remains inaccurate.\n\n**CLI Contract**\n\nThe prior broad JSON claim was narrowed in the orchestration section, but the quickstart still says `--json` is supported “like every command.” Current command families such as `jit issue`, `jit hooks`, `jit migrate`, and `jit worktree` reject parent-level `--json`.\n\n**Testing and Validation**\n\nI used the provided issue evidence for tests: `cargo-ci` passed at `2026-07-05T23:18:49.134831829+00:00`, so I did not rerun tests. I ran `./scripts/jit-validate.sh`, which passed.\n\n**Prior Review Feedback**\n\nPrior F1 is addressed: the gate example now defines `unit-tests` before evaluating it. Prior F2 is only partially addressed because the README still contains an “every command” JSON claim in the quickstart.\n\n**Jit Issue Management**\n\n`issue.dependencies` and `unmet_dependencies` are empty, so no prerequisite work is blocking this change. Repository validation passed.\n\n1. **High:** The sibling-ordering command shown after the quickstart fails in the quickstart’s own graph. [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:88) says ordering siblings is `jit dep add $TASK2 $TASK1`, but after the previous `jit dep add $EPIC $TASK1 $TASK2`, that edge makes `$EPIC -> $TASK1` redundant. The CLI rejects it with exit code 4 and tells the user to rerun with `jit dep add --reduce`. The README should show `jit dep add $TASK2 $TASK1 --reduce` for that context or move the example out of the already-connected graph.\n2. **Medium:** The quickstart still overstates the JSON contract. [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:63) says `jit init` supports `--json` “like every command,” but current command families such as `jit issue --json --help`, `jit hooks --json --help`, `jit migrate --json --help`, and `jit worktree --json --help` all reject `--json` at that level. This leaves the prior JSON-contract finding partially unresolved.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"README still contains one failing dependency example and one inaccurate --json contract claim.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Sibling-ordering command fails after the quickstart graph unless --reduce is included.\",\"file\":\"README.md\",\"line\":88},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"Quickstart still says --json works like every command, but several command families reject parent-level --json.\",\"file\":\"README.md\",\"line\":63}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1502 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3497-908a-77a3-89b7-3b24cf754911\n--------\nuser\n--- 1489 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "README still contains one failing dependency example and one inaccurate --json contract claim.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Sibling-ordering command fails after the quickstart graph unless --reduce is included.",
+        "file": "README.md",
+        "line": 88
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "Quickstart still says --json works like every command, but several command families reject parent-level --json.",
+        "file": "README.md",
+        "line": 63
+      }
+    ]
+  }
+}

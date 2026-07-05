@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "df093f09-be1e-42b3-aa21-9cc4a5ab10b4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3a54e25-854d-407e-b2ff-32b3eec1129c",
+  "commit": "4ff0427945dcf49286a9ca9130458102c68c21c6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T23:44:21.914793390Z",
+  "completed_at": "2026-07-05T23:45:28.240649531Z",
+  "duration_ms": 66325,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nDocs-only changes in `README.md` and `docs/concepts/core-model.md`. No domain, storage, commands, CLI, or output code changed, so no new architectural boundary violation was introduced.\n\n**Functional Paradigm**\n\nNo Rust implementation changed. No new imperative logic or side effects were introduced.\n\n**Correctness and Invariants**\n\nNo persistence, atomic write, event logging, gate transition, assignee/label parsing, or PID-handling code changed. The README command forms I spot-checked exist, and the prior gate/`--json`/`--reduce` examples appear corrected.\n\n**Safety**\n\nNo Rust code changed. `#![deny(unsafe_code)]` scope is unaffected.\n\n**Testing**\n\nUsed the provided issue evidence: `cargo-ci` passed at `2026-07-05T23:40:24.926324458+00:00`, so I did not run the test suite. I ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo fallible Rust code changed. No new `unwrap()` / `expect()` usage introduced in library code.\n\n**CLI Contract**\n\nThe README no longer claims every command supports parent-level `--json`. The shown day-to-day examples I checked have matching CLI help.\n\n**Documentation**\n\nThe latest prior finding is mostly addressed: `docs/concepts/core-model.md` now lists `Any State → Archived` and `Archived → any active state`. One lifecycle contradiction remains in the same section.\n\n**Prior Review Feedback**\n\nThe explicit archive/revive transition list was added, but the state description still says `Done` cannot transition out, while the same reference says archiving is available from every state and the CLI does allow `done -> archived`.\n\n**Jit Issue Management**\n\n`issue.dependencies` and `unmet_dependencies` are empty. `./scripts/jit-validate.sh` passed.\n\n1. **High:** The core-model lifecycle reference still contradicts current behavior for `Done`. `docs/concepts/core-model.md:768` says `Done` is terminal and “Issue cannot transition out of this state,” but `docs/concepts/core-model.md:788` and `docs/concepts/core-model.md:801` say archiving is available from every state. The shipped CLI accepts `jit issue update <done-id> --state archived`, so the README’s linked transition reference remains internally inconsistent for REQ-02.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Core-model lifecycle docs still contradict current archive behavior for Done issues.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Core-model says Done issues cannot transition out, but the same transition reference and CLI allow Done -> Archived.\",\"file\":\"docs/concepts/core-model.md\",\"line\":768}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3549 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f34ab-31ee-74f1-8ac5-4910929d611a\n--------\nuser\n--- 3536 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Core-model lifecycle docs still contradict current archive behavior for Done issues.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Core-model says Done issues cannot transition out, but the same transition reference and CLI allow Done -> Archived.",
+        "file": "docs/concepts/core-model.md",
+        "line": 768
+      }
+    ]
+  }
+}
