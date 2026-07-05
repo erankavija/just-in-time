@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "804f1c45-33d1-4aaa-ad4b-b30b580b3f07",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b2f9f390-912f-45fe-920f-3f196948be25",
+  "commit": "3109aad9ce910c666f989825f672f311dc87a4eb",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T05:47:49.071163856Z",
+  "completed_at": "2026-07-05T05:49:14.306592847Z",
+  "duration_ms": 85235,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01/REQ-02 are only met for single-issue updates. The new description flags are accepted in `issue update --filter` batch mode but ignored, so the command can report success without applying the requested description change. REQ-03 is covered for help text and single-issue event logging.\n\n**Architecture And Separation**\n\nThe command-layer description operation is in `commands/issue.rs`, while file/stdin reading is in `main.rs`. That keeps storage and domain boundaries intact.\n\n**Functional Paradigm**\n\nNo blocking concern. The new code is small and mostly expression-oriented; the existing command dispatch is imperative CLI orchestration.\n\n**Correctness And Invariants**\n\nSingle-issue writes continue through `IssueStore::save_issue` and append `issue_updated` events when the description changes. No PID or unsafe-code concern was introduced. The batch-mode ignored-flag behavior is the main correctness failure.\n\n**Testing**\n\nI did not run cargo tests because the provided `cargo-ci` gate is passed: `fmt: ok`, `clippy: ok`, `test: 3039 passed, 0 failed, 12 ignored`. I did run `./scripts/jit-validate.sh`, which passed. The new tests cover single-issue CLI behavior well, but they do not cover `--filter` with the new flags.\n\n**Error Handling**\n\nFile/stdin read errors include context. No new library `unwrap()`/`expect()` outside tests was found.\n\n**CLI Contract**\n\n`--json` remains available for `issue update`, but in batch mode it can return machine-readable success while silently ignoring the new description flags.\n\n**Documentation**\n\nHelp text documents replace vs append semantics. One new public API lacks the required `# Examples` doc section.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\n1. `crates/jit/src/main.rs:1669`-`1673`, `crates/jit/src/main.rs:1700`-`1712`, `crates/jit/src/main.rs:1847`-`1868`: `issue update --filter ... --append-description/--description-file/--append-description-file` is accepted but ignored. The description flags are only resolved in the single-issue branch at `1726`-`1737`; the batch branch builds `UpdateOperations` without any description operation and has no rejection for these flags. This violates the CLI contract for the new flags and leaves REQ-01/REQ-02 incomplete for a supported mode of `issue update`.\n2. `crates/jit/src/commands/issue.rs:7`-`19`: `DescriptionUpdate` is a new public enum exported through `commands/mod.rs`, but its public API docs do not include a `# Examples` section. That violates the project documentation requirement for public APIs.\n\nTotal findings: 2\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2815 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f30d1-9528-7c21-b50f-f2b92a8b49be\n--------\nuser\n--- 2802 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

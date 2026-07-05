@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "222f0008-7774-4a1d-88d0-bcb6ca4d0190",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b2f9f390-912f-45fe-920f-3f196948be25",
+  "commit": "3109aad9ce910c666f989825f672f311dc87a4eb",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T05:54:37.547385250Z",
+  "completed_at": "2026-07-05T05:56:09.187289868Z",
+  "duration_ms": 91639,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 are met. Append updates preserve existing text with blank-line separation, empty descriptions are covered, file/stdin replace and append variants are implemented and tested, help text documents semantics, and description mutations log `issue_updated`.\n\n**Architecture And Separation**\n\nNo boundary violations found. File/stdin reading stays in CLI orchestration, description mutation is in `commands/issue.rs`, and persistence remains behind `IssueStore`.\n\n**Functional Paradigm**\n\nNo blocking concern. The new logic is small and consistent with the surrounding CLI/command style.\n\n**Correctness And Invariants**\n\nThe prior batch-mode issue is addressed: description flags are rejected with `--filter` before bulk update execution. Description changes persist through `save_issue` and append an event. No new PID, unsafe-code, gate-transition, assignee, or label-format issue found.\n\n**Testing**\n\nI did not run cargo tests because the supplied `cargo-ci` gate passed. The provided evidence reports fmt/clippy/test passing: `3039 passed, 0 failed, 12 ignored`. I ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nFile/stdin read errors include context. No new library `unwrap()`/`expect()` outside tests found.\n\n**CLI Contract**\n\n`issue update` continues to support `--json`. Batch mode no longer reports success while ignoring description flags.\n\n**Documentation**\n\nThe prior `DescriptionUpdate` rustdoc finding is resolved: the public enum and its public `apply` method now include `# Examples`.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\n\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

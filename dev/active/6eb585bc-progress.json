@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 3,
+  "current_wave": 4,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -33,7 +33,7 @@
           "short_id": "b2f9f390",
           "title": "append-description + file/stdin",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -101,7 +101,8 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "ff9925af": 1
+    "ff9925af": 1,
+    "b2f9f390": 1
   },
   "started_at": "2026-07-05T00:00:00Z"
 }
