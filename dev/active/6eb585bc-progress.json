@@ -88,7 +88,7 @@
           "short_id": "03d54a9f",
           "title": "deflake lease/heartbeat via injected clock",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -105,7 +105,8 @@
     "b2f9f390": 1,
     "f847df3f": 1,
     "7a50e021": 1,
-    "def64ac4": 2
+    "def64ac4": 2,
+    "03d54a9f": 1
   },
   "started_at": "2026-07-05T00:00:00Z"
 }

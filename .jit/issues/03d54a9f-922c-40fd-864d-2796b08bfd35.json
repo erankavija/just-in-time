@@ -2,7 +2,7 @@
   "id": "03d54a9f-922c-40fd-864d-2796b08bfd35",
   "title": "Deflake timing-sensitive lease and heartbeat tests",
   "description": "Two timing-sensitive tests fail under parallel build load and pass in isolation, each costing a diagnosis cycle during gate batteries. They encode wall-clock margins that assume an unloaded machine; the fix is to remove the dependence on real time by injecting a mockable clock.\n\n## Background\n\nFriction observed while lead-driving epic 2821e177 (2026-07-03, session 2):\n\n- `test_worktree_list_excludes_expired_leases` (crates/jit/tests/worktree_cli_tests.rs:436): \"both live leases should be counted before expiry: left 1, right 2\" — the lease TTL elapsed before the assertion because concurrent worker builds slowed the host. Failed a cargo-ci gate run for issue 3d9e9222.\n- `storage::heartbeat::tests::test_background_thread_updates_heartbeat` (crates/jit/src/storage/heartbeat.rs): failed a cargo-ci gate run for story bb7d57a2 under the same conditions.\n\nBoth assert against real elapsed time, so a slow host races them to failure.\n\n## Success Criteria\n\n- [hard] REQ-01: lease expiry and heartbeat freshness read the current time from an injectable clock abstraction rather than directly from the system clock, so a test can advance time deterministically.\n- [hard] REQ-02: `test_worktree_list_excludes_expired_leases` drives expiry through the injected clock and passes reliably with the full workspace suite running alongside a parallel `cargo build` on the same host.\n- [hard] REQ-03: `test_background_thread_updates_heartbeat` verifies heartbeat updates without dependence on real wall-clock margins and passes reliably under the same concurrent-load conditions.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.813895277Z"
-    },
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.813936867Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T08:06:14.639292497Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T07:46:18.260686459Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:bug"
   ],
   "created_at": "2026-07-03T16:51:06.562851955Z",
-  "updated_at": "2026-07-05T07:23:56.295670444Z"
+  "updated_at": "2026-07-05T08:08:20.072935279Z"
 }

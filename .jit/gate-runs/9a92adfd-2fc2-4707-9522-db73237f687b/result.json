@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "9a92adfd-2fc2-4707-9522-db73237f687b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "03d54a9f-922c-40fd-864d-2796b08bfd35",
+  "commit": "34a802dd7337ee90e9f5e3bc34d778205e01e97f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T08:06:14.639292497Z",
+  "completed_at": "2026-07-05T08:07:53.502591848Z",
+  "duration_ms": 98863,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, and REQ-03 are met. `execute_worktree_list` now delegates to an injected-clock core path at `crates/jit/src/commands/worktree.rs:238`, expiry uses `clock.now()` once at `crates/jit/src/commands/worktree.rs:290`, and counting uses `Lease::is_expired(now)` at `crates/jit/src/commands/worktree.rs:148`. Heartbeat construction, update, and freshness now take a clock at `crates/jit/src/storage/heartbeat.rs:109`, `crates/jit/src/storage/heartbeat.rs:143`, and `crates/jit/src/storage/heartbeat.rs:169`. The background heartbeat test uses `FixedClock` plus a pumpable ticker at `crates/jit/src/storage/heartbeat.rs:819`.\n\n**Architecture / Separation**\n\nNo blocking boundary violations found. Storage owns persistence and clock abstractions; commands orchestrate storage plus git command execution; CLI/output concerns are not mixed into the changed command/storage code.\n\n**Functional Paradigm**\n\nNo blocking issues found. The worktree claim counting path remains iterator-based at `crates/jit/src/commands/worktree.rs:145`.\n\n**Correctness / Invariants**\n\nAtomic writes are preserved for heartbeat files via temp-file plus rename at `crates/jit/src/storage/heartbeat.rs:274` and `crates/jit/src/storage/heartbeat.rs:289`. Claim index writes continue using temp plus rename. The patch does not regress event logging, gate semantics, assignee/label formats, PID handling, or unsafe-code policy.\n\n**Testing**\n\nI did not run cargo tests because the issue has a succeeded `cargo-ci` gate. Recorded evidence in `.jit/gate-runs/6aff9ca3-96ff-4cef-94ff-fdbcf4a15701/result.json` shows `fmt`, `clippy`, and `test` passed: `3093 passed, 0 failed, 12 ignored`.\n\nThe prior review findings are addressed: the worktree expiry regression now exercises `execute_worktree_list_at` with an injected `FixedClock` at `crates/jit/src/commands/worktree.rs:637`; heartbeat freshness APIs no longer call `Utc::now()` directly; and `test_background_thread_updates_heartbeat` no longer waits for real one-second heartbeat intervals.\n\n**Error Handling**\n\nNo blocking error-handling regression found in the changed production code.\n\n**CLI Contract**\n\nNo CLI `--json` contract regression found. The integration test still exercises `worktree list --json` and `claim list --json` agreement for live leases at `crates/jit/tests/worktree_cli_tests.rs:411`.\n\n**Documentation**\n\nNo blocking public API documentation issue found in the changed public APIs. The new `Clock` abstraction and updated heartbeat APIs include doc comments and examples.\n\n**Jit Issue Management**\n\n`./scripts/jit-validate.sh` passed. `issue.dependencies` is empty, so there is no prerequisite issue work to verify.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
