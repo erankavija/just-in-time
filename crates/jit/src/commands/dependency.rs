@@ -433,21 +433,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .map(|(_, to)| to.as_str())
                 .collect();
 
-            let mut rejected_texts: HashSet<&str> = HashSet::new();
             for (dep_id_text, full_dep_id) in &new_edges {
                 if self_redundant.contains(full_dep_id.as_str()) {
                     match policy {
-                        RedundancyPolicy::Reject => {
-                            rejected.push((
-                                dep_id_text.clone(),
-                                RedundantDependencyError::new(
-                                    (full_issue_id.clone(), full_dep_id.clone()),
-                                    redundant.clone(),
-                                )
-                                .into(),
-                            ));
-                            rejected_texts.insert(dep_id_text.as_str());
-                        }
+                        RedundancyPolicy::Reject => rejected.push((
+                            dep_id_text.clone(),
+                            RedundantDependencyError::new(
+                                (full_issue_id.clone(), full_dep_id.clone()),
+                                redundant.clone(),
+                            )
+                            .into(),
+                        )),
                         RedundancyPolicy::Reduce => skipped.push((
                             dep_id_text.clone(),
                             "transitive (already reachable via other dependencies)".to_string(),
@@ -456,33 +452,54 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
 
-            // Any OTHER redundant pair — this batch's edge(s) shadow a
-            // pre-existing edge on a DIFFERENT node (jit:7a50e021's original
-            // "shadows an existing edge" case, e.g. a new Y -> Z edge making a
-            // pre-existing X -> Z edge redundant via X -> Y -> Z). Under
-            // `Reject` this rejects the whole batch too: attribute it to
-            // every new edge not already accounted for above, since (unlike
-            // the self-redundant case) the specific edge responsible cannot
-            // always be isolated from a shared alternate path. Under
-            // `Reduce`, nothing needs doing here: `apply_batch_dependency_add`
-            // drops the shadowed edge from the OTHER node automatically.
-            let shadows_existing_edge = redundant.iter().any(|(from, to)| {
-                !(from == &full_issue_id && self_redundant.contains(to.as_str()))
-            });
-            if policy == RedundancyPolicy::Reject && shadows_existing_edge {
+            // Shadowing a PRE-EXISTING edge on a DIFFERENT node (or a
+            // pre-existing edge of `full_issue_id` itself that isn't one of
+            // our new edges) — jit:7a50e021's original "shadows an existing
+            // edge" case, e.g. a new Y -> Z edge making a pre-existing X -> Z
+            // edge redundant via X -> Y -> Z. Unlike the self-redundant case
+            // above, this needs precise per-edge attribution (REQ-02): only
+            // Y -> Z is at fault here, a sibling Y -> W in the same batch must
+            // NOT be named just because the batch as a whole gets rejected.
+            //
+            // A shadow path can only ever leave `full_issue_id` through ONE
+            // outgoing edge — once a path exits via edge A, a DAG can never
+            // route it back through `full_issue_id` to also use edge B — so
+            // testing each new edge ALONE (against the graph as it stood
+            // before this call, ignoring every sibling) precisely identifies
+            // which edge(s) independently introduce a given shadow. This is
+            // deliberately NOT the combined graph: the self-redundant check
+            // above needs the combination to catch a redundancy that only
+            // emerges from two new edges together, but a shadow of a
+            // pre-existing edge elsewhere never does (its cause is always a
+            // single new edge, checkable in isolation).
+            if policy == RedundancyPolicy::Reject {
                 for (dep_id_text, full_dep_id) in &new_edges {
-                    if !rejected_texts.contains(dep_id_text.as_str()) {
+                    if self_redundant.contains(full_dep_id.as_str()) {
+                        continue; // already attributed above
+                    }
+                    let mut singleton_issues = issues.clone();
+                    if let Some(from) = singleton_issues.iter_mut().find(|i| i.id == full_issue_id)
+                    {
+                        from.dependencies.push(full_dep_id.clone());
+                    }
+                    let singleton_refs: Vec<&Issue> = singleton_issues.iter().collect();
+                    let singleton_redundant =
+                        DependencyGraph::new(&singleton_refs).find_redundant_edges();
+                    if !singleton_redundant.is_empty() {
                         rejected.push((
                             dep_id_text.clone(),
                             RedundantDependencyError::new(
                                 (full_issue_id.clone(), full_dep_id.clone()),
-                                redundant.clone(),
+                                singleton_redundant,
                             )
                             .into(),
                         ));
                     }
                 }
             }
+            // Under `Reduce`, a shadow of a pre-existing edge elsewhere needs
+            // no handling here: `apply_batch_dependency_add`'s "other nodes"
+            // loop drops the shadowed edge automatically.
 
             reduced_from = candidate_graph.compute_transitive_reduction(&full_issue_id);
         }

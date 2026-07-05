@@ -103,6 +103,51 @@ fn test_multiple_invalid_edges_are_all_named() {
     assert!(loaded_a.dependencies.is_empty());
 }
 
+/// REQ-02 precision: a shadow-type redundancy must be attributed ONLY to the
+/// specific edge responsible, never to an innocent sibling in the same batch.
+/// Existing X -> Y and X -> Z; `dep add Y Z W` adds Y -> Z (shadows the
+/// pre-existing X -> Z, since X now reaches Z via X -> Y -> Z) and Y -> W (an
+/// entirely unrelated, perfectly valid edge with no shadow of its own). The
+/// whole batch is still rejected (all-or-nothing: W does not get applied
+/// either), but `rejected()` must name ONLY Z, not W.
+#[test]
+fn test_shadow_redundancy_attributed_only_to_responsible_edge_not_innocent_sibling() {
+    let h = TestHarness::new();
+    let x = h.create_issue("X");
+    let y = h.create_issue("Y");
+    let z = h.create_issue("Z");
+    let w = h.create_issue("W");
+
+    h.executor.add_dependency(&x, &y).unwrap();
+    h.executor.add_dependency(&x, &z).unwrap();
+
+    let result = h.executor.add_dependencies_with_policy(
+        &y,
+        &[z.clone(), w.clone()],
+        jit::commands::RedundancyPolicy::Reject,
+    );
+
+    let err = result.expect_err("Y -> Z shadows the pre-existing X -> Z edge");
+    let batch = err
+        .downcast_ref::<DependencyBatchRejectedError>()
+        .expect("must be a typed DependencyBatchRejectedError");
+
+    let named: Vec<&str> = batch.rejected().iter().map(|(to, _)| to.as_str()).collect();
+    assert_eq!(
+        named,
+        vec![z.as_str()],
+        "only the responsible edge (Z) may be named; the innocent sibling (W) must NOT appear: {named:?}"
+    );
+
+    // All-or-nothing: W was not applied either, even though it has no shadow
+    // of its own.
+    let loaded_y = h.storage.load_issue(&y).unwrap();
+    assert!(
+        loaded_y.dependencies.is_empty(),
+        "W must not be persisted when its sibling Z is rejected"
+    );
+}
+
 /// REQ-01 combination case: A -> B and A -> C are each fine in isolation
 /// against the pre-existing graph, but adding them TOGETHER makes A -> C
 /// redundant (A now reaches C via A -> B -> C, since B -> C already exists).

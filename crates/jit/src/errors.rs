@@ -565,20 +565,17 @@ impl RedundantDependencyError {
 /// let any: anyhow::Error = err.into();
 /// assert!(any.downcast_ref::<DependencyBatchRejectedError>().is_some());
 /// ```
-#[derive(Debug)]
+/// Not `Clone` like most typed errors in this module ([`anyhow::Error`] isn't
+/// `Clone`), so it holds the pre-rendered `message` (thiserror's `#[error]`
+/// attribute, same as [`RedundantDependencyError`]) alongside the raw
+/// `rejected` list for downstream downcast-based classification.
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
 pub struct DependencyBatchRejectedError {
     message: String,
     from_id: String,
     rejected: Vec<(String, anyhow::Error)>,
 }
-
-impl std::fmt::Display for DependencyBatchRejectedError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for DependencyBatchRejectedError {}
 
 impl DependencyBatchRejectedError {
     /// Build the aggregate rejection from every failing target: the as-supplied
@@ -616,12 +613,42 @@ impl DependencyBatchRejectedError {
     }
 
     /// The issue the batch targeted (the `<from>` of `jit dep add`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::DependencyBatchRejectedError;
+    ///
+    /// let err = DependencyBatchRejectedError::new(
+    ///     "aaaa1111",
+    ///     vec![("bbbb2222".to_string(), anyhow::anyhow!("bad prefix"))],
+    /// );
+    /// assert_eq!(err.from_id(), "aaaa1111");
+    /// ```
     pub fn from_id(&self) -> &str {
         &self.from_id
     }
 
     /// Every rejected edge: the as-supplied target id text paired with the
     /// typed error that rejected it, in request order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::DependencyBatchRejectedError;
+    ///
+    /// let err = DependencyBatchRejectedError::new(
+    ///     "aaaa1111",
+    ///     vec![
+    ///         ("bbbb2222".to_string(), anyhow::anyhow!("bad prefix")),
+    ///         ("cccc3333".to_string(), anyhow::anyhow!("cycle detected")),
+    ///     ],
+    /// );
+    /// let rejected = err.rejected();
+    /// assert_eq!(rejected.len(), 2);
+    /// assert_eq!(rejected[0].0, "bbbb2222");
+    /// assert_eq!(rejected[1].0, "cccc3333");
+    /// ```
     pub fn rejected(&self) -> &[(String, anyhow::Error)] {
         &self.rejected
     }
