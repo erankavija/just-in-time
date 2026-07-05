@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "c2fff954-f28e-4b4c-a2bd-3e5f06ca01b4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
+  "commit": "ae047708e6a3f516c1291172bec59214309ee401",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T20:46:39.985322119Z",
+  "completed_at": "2026-07-05T20:48:38.602746965Z",
+  "duration_ms": 118617,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 is mostly met: `jit::graph::hierarchy` contains the canonical DAG-authoritative resolver and docs state labels are advisory.\n\nREQ-02 is met: `graph tree --json` exposes parent/children/cluster/rank, and full JSON export adds resolved membership fields.\n\nREQ-03 is not met. The actual web graph UI still renders through the older `prepareClusteredGraphForReactFlow`/`subgraphClustering` path, while the shared-vector test only verifies a separate `resolveHierarchy` TypeScript port that is not consumed by `GraphView`.\n\nREQ-04 is met: divergence is exposed through `query divergence` and advisory validate output.\n\n**Architecture And Separation**\n\nNo Rust domain/storage/commands/CLI boundary violation found. The core resolver is pure graph/domain logic; command code orchestrates storage and output projection.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found in the reviewed Rust feature path.\n\n**Correctness And Invariants**\n\nNo new atomic-write, event-log, gate-transition, assignee/label-format, PID-safety, or unsafe-code regression found. Export writes use `write_file_atomic`.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains enforced. No unsafe code found in the reviewed changes.\n\n**Testing**\n\nI did not run cargo tests because the issue has a succeeded `cargo-ci` gate for commit `ae047708`: fmt ok, clippy ok, `3386 passed, 0 failed, 12 ignored`.\n\nI ran `./scripts/jit-validate.sh`; it passed.\n\nPrior failed findings were addressed: the production `expect()` was removed, hierarchy proptests were added, and `graph/hierarchy.rs` public docs now include examples.\n\n**Error Handling**\n\nNo new `unwrap()`/`expect()` in non-test Rust library code found in the reviewed hierarchy path.\n\n**CLI Contract**\n\nThe new `graph tree` and `query divergence` commands support `--json`.\n\n**Documentation**\n\nThe hierarchy model docs are present, but newly public output API types still lack required `# Examples`.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `jit-validate` passed.\n\n1. `web/src/components/Graph/GraphView.tsx:681`: REQ-03 is not satisfied because the actual web UI still calls `prepareClusteredGraphForReactFlow`, which delegates to the older `subgraphClustering` path. That path explicitly prefers level 2 epic clustering and treats milestones as visible nodes (`web/src/utils/subgraphClustering.ts:76`), while the core resolver’s canonical model clusters to the strategic root. The shared fixture only verifies the unused `resolveHierarchy` port (`web/src/utils/hierarchyResolution.test.ts:38`), so it does not prove the UI clustering is equivalent.\n2. `crates/jit/src/output.rs:827`: newly public response types `HierarchyNodeView`, `GraphTreeResponse`, `DivergenceView`, and `DivergenceResponse` have doc comments but no `# Examples`, violating the public API documentation requirement.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-03 is not met because the actual web graph UI still uses the old clustering path, and new public output APIs lack required examples.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Actual web graph UI does not consume the core-equivalent resolver, and the exercised clustering path is not verified by shared vectors.\",\"file\":\"web/src/components/Graph/GraphView.tsx\",\"line\":681},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"New public hierarchy/divergence output API types lack required # Examples documentation.\",\"file\":\"crates/jit/src/output.rs\",\"line\":827}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5764 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3408-805c-7c02-b557-45299177aeca\n--------\nuser\n--- 5751 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-03 is not met because the actual web graph UI still uses the old clustering path, and new public output APIs lack required examples.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Actual web graph UI does not consume the core-equivalent resolver, and the exercised clustering path is not verified by shared vectors.",
+        "file": "web/src/components/Graph/GraphView.tsx",
+        "line": 681
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "New public hierarchy/divergence output API types lack required # Examples documentation.",
+        "file": "crates/jit/src/output.rs",
+        "line": 827
+      }
+    ]
+  }
+}

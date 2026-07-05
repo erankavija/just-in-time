@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "86243146-9181-428c-968b-854fbf3131ad",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
+  "commit": "b7cc01e7ad2972c056bc9bbae1718aabda86f702",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T21:08:29.963988865Z",
+  "completed_at": "2026-07-05T21:10:28.179241078Z",
+  "duration_ms": 118215,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met. Core hierarchy resolution lives in `crates/jit/src/graph/hierarchy.rs`, with DAG-authoritative semantics documented in `docs/concepts/hierarchy-resolution.md`. `graph tree --json` and full JSON export expose resolved hierarchy data. The web UI path now reaches resolver-backed clustering through `web/src/utils/clusteredGraphLayout.ts:50` → `web/src/utils/subgraphClustering.ts:83`, and shared vectors cover the Rust/TS resolver plus clustering projection. Divergence is exposed by `query divergence` and `validate`.\n\n**Architecture And Separation**\n\nNo blocking boundary violation found. Domain graph logic remains pure in `crates/jit/src/graph/hierarchy.rs`; command orchestration is in `crates/jit/src/commands/graph.rs`; CLI/output rendering stays in `crates/jit/src/main.rs` and `crates/jit/src/output.rs`.\n\n**Functional Paradigm**\n\nNo blocking functional-style regression found. The changed resolver/projection paths are deterministic and side-effect free apart from expected CLI/storage boundaries.\n\n**Correctness And Invariants**\n\nNo new atomic-write, event-log, gate-transition, assignee/label-format, PID-safety, or unsafe-code regression found in the reviewed changes. Full export writes still use `write_file_atomic` at `crates/jit/src/main.rs:4272`.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains enforced in `crates/jit/src/lib.rs:6` and `crates/jit/src/main.rs:14`. No unsafe code found in the reviewed paths.\n\n**Testing**\n\nI did not run cargo tests because the issue has a succeeded `cargo-ci` gate for current commit `b7cc01e7`: fmt ok, clippy ok, `3391 passed, 0 failed, 12 ignored`. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo new `unwrap()`/`expect()` in non-test Rust library implementation was found in the reviewed hierarchy/output paths. The prior production `expect()` finding remains fixed.\n\n**CLI Contract**\n\nThe new `graph tree` and `query divergence` commands support `--json`. Full JSON graph export carries `resolved_parent` and `cluster`.\n\n**Documentation**\n\nThe hierarchy model is documented, and the previously missing public output API examples are now present for `HierarchyNodeView`, `GraphTreeResponse`, `DivergenceView`, and `DivergenceResponse` in `crates/jit/src/output.rs:821`.\n\n**Prior Review Feedback**\n\nBoth most recent findings are addressed. The web graph path now consumes resolver-backed clustering and has shared-vector projection coverage in `web/src/utils/subgraphClustering.hierarchy.test.ts:45`; the public output APIs now include `# Examples`.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed. Label warnings are not blocking.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria and prior review findings are addressed; cargo-ci and jit-validate evidence are clean.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria and prior review findings are addressed; cargo-ci and jit-validate evidence are clean.",
+    "findings": []
+  }
+}

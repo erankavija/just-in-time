@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "48d9b084-d784-40bf-a47e-8297e7964ea0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "31e12d2b-9bf7-4c60-951f-7a283b9fd5e0",
+  "commit": "a5f79f0e29933fe63edd83ce190786956ff72f08",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T20:33:19.668681128Z",
+  "completed_at": "2026-07-05T20:35:40.237334606Z",
+  "duration_ms": 140568,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are implemented: core resolver exists in `jit::graph::hierarchy`, `graph tree --json` and full JSON export expose resolved hierarchy fields, the web port is checked by shared vectors, and divergence is reportable through `query divergence` plus `validate`.\n\n**Architecture And Separation**\n\nNo domain/storage/commands/CLI boundary violation found. The resolver is pure domain/graph logic; command code orchestrates storage and projection; CLI/output handle rendering.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found in the feature flow.\n\n**Correctness And Invariants**\n\nAtomic export writes use `write_file_atomic` at `crates/jit/src/main.rs:4272`. No event-log, gate-transition, assignee/label, PID, or unsafe-code regression found in this diff.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains present at `crates/jit/src/main.rs:14`. No unsafe code found in the reviewed changes.\n\n**Testing**\n\nI did not run cargo tests because the issue has a succeeded `cargo-ci` gate. Provided evidence for commit `a5f79f0e`: fmt ok, clippy ok, `3374 passed, 0 failed, 12 ignored`.\n\nI did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nBlocking issue: production library code contains a new `expect()`.\n\n**CLI Contract**\n\nThe new `graph tree` and `query divergence` commands support `--json`. Full JSON export carries `resolved_parent` and `cluster`.\n\n**Documentation**\n\nThe hierarchy model is documented in `docs/concepts/hierarchy-resolution.md`, but some newly public APIs do not meet the project’s `# Examples` requirement.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there was no prior review feedback to verify.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty, so there are no prerequisite issues to validate. `jit-validate` passed.\n\n1. `crates/jit/src/graph/hierarchy.rs:294`: `resolve_hierarchy` uses `expect(\"a container has a configured level\")` in production library code. The project standard explicitly forbids `unwrap()`/`expect()` in library code outside tests; this should be rewritten as total control flow even if the invariant is believed to hold.\n2. `crates/jit/src/graph/hierarchy.rs:269`: `resolve_hierarchy` is a new graph algorithm, but the new coverage is unit/integration/shared-vector based and does not include property-based `proptest` coverage for graph-operation invariants.\n3. `crates/jit/src/graph/hierarchy.rs:119`: newly public hierarchy APIs such as `HierarchyNode`, `NodeHierarchy`, and `MembershipDivergence` have doc comments but no `# Examples`, violating the public API documentation requirement.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The feature meets the functional requirements, but production library code uses expect(), graph-operation proptest coverage is missing, and new public APIs lack required examples.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Production library code uses expect() inside resolve_hierarchy.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":294},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"New hierarchy graph operation lacks property-based proptest coverage.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":269},{\"id\":\"F3\",\"severity\":\"medium\",\"summary\":\"New public hierarchy APIs lack required # Examples documentation.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":119}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 17301 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f33fc-4a84-7e93-b7a9-432fd40782c6\n--------\nuser\n--- 17288 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The feature meets the functional requirements, but production library code uses expect(), graph-operation proptest coverage is missing, and new public APIs lack required examples.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Production library code uses expect() inside resolve_hierarchy.",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "line": 294
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "New hierarchy graph operation lacks property-based proptest coverage.",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "line": 269
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "summary": "New public hierarchy APIs lack required # Examples documentation.",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "line": 119
+      }
+    ]
+  }
+}
