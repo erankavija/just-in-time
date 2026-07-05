@@ -823,6 +823,27 @@ pub struct GraphRootsResponse {
 /// The `type` key is the value of the node's `type:` label (absent when it has
 /// none). `parent`, `cluster`, `children`, and `rank` are the DAG-authoritative
 /// resolution from [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::HierarchyNodeView;
+///
+/// let view = HierarchyNodeView {
+///     id: "epic-1234".into(),
+///     short_id: "epic-123".into(),
+///     title: "Auth epic".into(),
+///     type_name: Some("epic".into()),
+///     parent: None,
+///     children: vec!["task-a".into()],
+///     cluster: Some("epic-1234".into()),
+///     rank: 1,
+/// };
+/// let json = serde_json::to_value(&view).unwrap();
+/// // `type_name` serializes under the `type` key.
+/// assert_eq!(json["type"], "epic");
+/// assert_eq!(json["children"][0], "task-a");
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct HierarchyNodeView {
     /// Full issue id.
@@ -849,6 +870,31 @@ pub struct HierarchyNodeView {
 /// List envelope: `count` is the number of entries in `nodes`. `root` echoes the
 /// optional root id the view was scoped to (`null` for the whole repository).
 /// Each node carries its DAG-resolved parent, children, cluster, and rank.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::{GraphTreeResponse, HierarchyNodeView};
+///
+/// let response = GraphTreeResponse {
+///     root: None,
+///     count: 1,
+///     nodes: vec![HierarchyNodeView {
+///         id: "task-1234".into(),
+///         short_id: "task-123".into(),
+///         title: "A task".into(),
+///         type_name: Some("task".into()),
+///         parent: Some("epic-1".into()),
+///         children: vec![],
+///         cluster: Some("epic-1".into()),
+///         rank: 0,
+///     }],
+/// };
+/// let json = serde_json::to_value(&response).unwrap();
+/// assert_eq!(json["count"], 1);
+/// assert_eq!(json["root"], serde_json::Value::Null);
+/// assert_eq!(json["nodes"][0]["parent"], "epic-1");
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphTreeResponse {
     /// The root id the tree was scoped to, or `null` for the whole repository.
@@ -860,6 +906,24 @@ pub struct GraphTreeResponse {
 }
 
 /// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::DivergenceView;
+///
+/// let view = DivergenceView {
+///     id: "task-1234".into(),
+///     short_id: "task-123".into(),
+///     title: "Stray task".into(),
+///     label: "epic:auth".into(),
+///     namespace: "epic".into(),
+///     value: "auth".into(),
+/// };
+/// let json = serde_json::to_value(&view).unwrap();
+/// assert_eq!(json["label"], "epic:auth");
+/// assert_eq!(json["namespace"], "epic");
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceView {
     /// Full id of the issue carrying the unsupported membership label.
@@ -881,6 +945,27 @@ pub struct DivergenceView {
 /// List envelope: `count` is the number of entries in `divergences`. Each entry
 /// is a membership label whose claim the dependency DAG does not back (the issue
 /// carries the label but is not in the closure of the container that owns it).
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::{DivergenceResponse, DivergenceView};
+///
+/// let response = DivergenceResponse {
+///     count: 1,
+///     divergences: vec![DivergenceView {
+///         id: "task-1234".into(),
+///         short_id: "task-123".into(),
+///         title: "Stray task".into(),
+///         label: "epic:auth".into(),
+///         namespace: "epic".into(),
+///         value: "auth".into(),
+///     }],
+/// };
+/// let json = serde_json::to_value(&response).unwrap();
+/// assert_eq!(json["count"], 1);
+/// assert_eq!(json["divergences"][0]["label"], "epic:auth");
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceResponse {
     /// Number of entries in `divergences`.

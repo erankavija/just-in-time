@@ -11,8 +11,10 @@
  *
  * A type is a *container* iff its level is strictly less than the deepest
  * configured level. For each node the resolver produces:
- * - `parent`: the nearest dominating container (deepest level, then fewest hops,
- *   then smallest id), or `null` for a root.
+ * - `parent`: the nearest dominating container — a direct container edge (the
+ *   container lists the node among its dependencies) outranks one that only
+ *   reaches the node transitively through a cross-cutting dependency, then
+ *   deepest level, then fewest hops, then smallest id; `null` for a root.
  * - `children`: the inverse of `parent`, sorted by id.
  * - `cluster`: the strategic root of the parent chain, or `null` for an orphan.
  * - `rank`: the longest dependency-path length to an in-set sink.
@@ -68,6 +70,9 @@ export function resolveHierarchy(
   type Candidate = [number, number, string];
   const best = new Map<string, Candidate>();
   const isBetter = (a: Candidate, b: Candidate): boolean => {
+    const aDirect = a[1] === 1;
+    const bDirect = b[1] === 1;
+    if (aDirect !== bDirect) return aDirect; // a direct container edge wins
     if (a[0] !== b[0]) return a[0] > b[0]; // deeper level wins
     if (a[1] !== b[1]) return a[1] < b[1]; // fewer hops wins
     return a[2] < b[2]; // smaller id wins

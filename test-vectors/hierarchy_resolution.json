@@ -10,7 +10,11 @@
     { "id": "dt", "type": "task", "dependencies": [] },
     { "id": "orphan", "type": "task", "dependencies": [] },
     { "id": "untyped", "type": null, "dependencies": ["orphan2"] },
-    { "id": "orphan2", "type": "task", "dependencies": [] }
+    { "id": "orphan2", "type": "task", "dependencies": [] },
+    { "id": "cx", "type": "epic", "dependencies": ["tx"] },
+    { "id": "sy", "type": "story", "dependencies": ["ty"] },
+    { "id": "ty", "type": "task", "dependencies": ["tx"] },
+    { "id": "tx", "type": "task", "dependencies": [] }
   ],
   "expected": {
     "m": { "parent": null, "children": ["e1"], "cluster": "m", "rank": 2 },
@@ -21,6 +25,10 @@
     "dt": { "parent": "d-aaa", "children": [], "cluster": "d-aaa", "rank": 0 },
     "orphan": { "parent": null, "children": [], "cluster": null, "rank": 0 },
     "untyped": { "parent": null, "children": [], "cluster": null, "rank": 1 },
-    "orphan2": { "parent": null, "children": [], "cluster": null, "rank": 0 }
+    "orphan2": { "parent": null, "children": [], "cluster": null, "rank": 0 },
+    "cx": { "parent": null, "children": ["tx"], "cluster": "cx", "rank": 1 },
+    "sy": { "parent": null, "children": ["ty"], "cluster": "sy", "rank": 2 },
+    "ty": { "parent": "sy", "children": [], "cluster": "sy", "rank": 1 },
+    "tx": { "parent": "cx", "children": [], "cluster": "cx", "rank": 0 }
   }
 }

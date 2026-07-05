@@ -1,11 +1,33 @@
 import type { GraphNode, GraphEdge } from '../types/models';
-import type { 
-  HierarchyLevelMap, 
-  SubgraphCluster, 
+import type {
+  HierarchyLevelMap,
+  SubgraphCluster,
   ClusteredGraph,
   ExpansionState,
-  VirtualEdge 
+  VirtualEdge
 } from '../types/subgraphCluster';
+import { resolveHierarchy, type HierarchyInputNode } from './hierarchyResolution';
+
+/**
+ * Adapt the web graph (nodes + a separate edge list) into the input shape the
+ * canonical resolver consumes: each node carries its `type:` value and its
+ * outgoing dependency ids (edge `from → to` means "from depends on to").
+ * `resolveHierarchy` ignores dep ids outside the node set, so passing every
+ * edge target is safe.
+ */
+function toHierarchyInput(nodes: GraphNode[], edges: GraphEdge[]): HierarchyInputNode[] {
+  const depsByNode = new Map<string, string[]>();
+  for (const edge of edges) {
+    const deps = depsByNode.get(edge.from);
+    if (deps) deps.push(edge.to);
+    else depsByNode.set(edge.from, [edge.to]);
+  }
+  return nodes.map((node) => ({
+    id: node.id,
+    type: extractNodeType(node),
+    dependencies: depsByNode.get(node.id) ?? [],
+  }));
+}
 
 /**
  * Get all unique hierarchy levels present in the graph, sorted from strategic to tactical.
@@ -85,16 +107,17 @@ export function assignNodesToSubgraphs(
 
 /**
  * Assign nodes to clusters at a specific hierarchy level.
- * Generic clustering algorithm that works for any hierarchy level.
- * 
- * Algorithm:
- * 1. Find all nodes at containerLevel to use as cluster containers
- * 2. For each container, recursively follow dependencies
- * 3. Include all nodes with HIGHER level numbers (more tactical)
- * 4. Stop when encountering SAME or LOWER level (cluster boundaries)
- * 
+ *
+ * Presentation as a pure projection of the canonical resolution: cluster
+ * membership is DERIVED from {@link resolveHierarchy} (the single source of
+ * containment facts, itself verified against the jit core), not from a parallel
+ * traversal. A node belongs to the container it reaches by walking up its
+ * canonical parent chain to the nearest ancestor at exactly `containerLevel`
+ * (e.g. the nearest epic-level ancestor). Nodes with no such ancestor are
+ * orphans; the container node itself owns its own cluster.
+ *
  * @param nodes - Nodes to cluster
- * @param edges - Edges between these nodes
+ * @param edges - Edges between these nodes (`from → to` = "from depends on to")
  * @param hierarchy - Hierarchy level mapping
  * @param containerLevel - The hierarchy level to use as containers (e.g., 2 for epic, 3 for story)
  * @returns Clustered graph with containers and their children
@@ -105,131 +128,67 @@ export function assignNodesToClusters(
   hierarchy: HierarchyLevelMap,
   containerLevel: number
 ): ClusteredGraph {
-  // Find all nodes at the container level (e.g., stories)
+  // Find all nodes at the container level (e.g., stories/epics).
   const containerNodes = nodes.filter(n => getNodeLevel(n, hierarchy) === containerLevel);
-  
+
   if (containerNodes.length === 0) {
     return { clusters: new Map(), crossClusterEdges: [], orphanNodes: nodes };
   }
-  
-  // Build adjacency map for efficient traversal
-  const nodeMap = new Map<string, GraphNode>();
-  nodes.forEach(n => nodeMap.set(n.id, n));
-  
-  const edgesByNode = new Map<string, GraphEdge[]>();
-  edges.forEach(edge => {
-    if (!edgesByNode.has(edge.from)) {
-      edgesByNode.set(edge.from, []);
+
+  // Canonical containment facts for the whole set.
+  const resolution = resolveHierarchy(toHierarchyInput(nodes, edges), hierarchy);
+  const levelById = new Map(nodes.map(n => [n.id, getNodeLevel(n, hierarchy)]));
+
+  // The container that owns `id` at this level: walk up the canonical parent
+  // chain to the nearest ancestor whose level equals `containerLevel`.
+  const ownerAtLevel = (id: string): string | null => {
+    let cur: string | null = id;
+    const seen = new Set<string>();
+    while (cur !== null && !seen.has(cur)) {
+      if (levelById.get(cur) === containerLevel) return cur;
+      seen.add(cur);
+      cur = resolution.get(cur)?.parent ?? null;
     }
-    edgesByNode.get(edge.from)!.push(edge);
-  });
-  
-  // Assign nodes to clusters
-  const clusters = new Map<string, SubgraphCluster>();
-  const assignedNodes = new Set<string>();
-  
-  // Mark direct children of all containers first (prevents stealing)
-  const directChildrenMap = new Map<string, Set<string>>();
-  for (const container of containerNodes) {
-    const directChildren = new Set<string>();
-    const containerEdges = edgesByNode.get(container.id) || [];
-    
-    for (const edge of containerEdges) {
-      const childNode = nodeMap.get(edge.to);
-      if (childNode && getNodeLevel(childNode, hierarchy) > containerLevel) {
-        directChildren.add(edge.to);
-      }
+    return null;
+  };
+
+  // Group nodes by owning container. Seed every container (container first) so a
+  // childless container still forms a cluster.
+  const members = new Map<string, GraphNode[]>();
+  for (const container of containerNodes) members.set(container.id, [container]);
+  const assignment = new Map<string, string>(); // node id -> cluster id
+  for (const node of nodes) {
+    const owner = ownerAtLevel(node.id);
+    if (owner !== null && members.has(owner)) {
+      if (node.id !== owner) members.get(owner)!.push(node);
+      assignment.set(node.id, owner);
     }
-    
-    directChildrenMap.set(container.id, directChildren);
   }
-  
-  // Now assign nodes to clusters with traversal
+
+  const clusters = new Map<string, SubgraphCluster>();
   for (const container of containerNodes) {
-    const clusterNodes: GraphNode[] = [container];
-    const visited = new Set<string>();
-    const queue: string[] = [container.id];
-    // directChildren used below for assignment priority
-    
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      
-      if (visited.has(current)) {
-        continue;
-      }
-      visited.add(current);
-      
-      const currentNode = nodeMap.get(current);
-      if (!currentNode) continue;
-      
-      const currentLevel = getNodeLevel(currentNode, hierarchy);
-      
-      // Add this node to cluster if it's more tactical than container
-      if (current !== container.id && currentLevel > containerLevel) {
-        // Check if it's not already a direct child of another container
-        const isDirectChildOfAnother = [...directChildrenMap.entries()].some(
-          ([otherId, children]) => otherId !== container.id && children.has(current)
-        );
-        
-        if (!isDirectChildOfAnother && !assignedNodes.has(current)) {
-          clusterNodes.push(currentNode);
-          assignedNodes.add(current);
-        }
-      }
-      
-      // Traverse dependencies
-      const nodeEdges = edgesByNode.get(current) || [];
-      for (const edge of nodeEdges) {
-        const targetNode = nodeMap.get(edge.to);
-        if (!targetNode) continue;
-        
-        const targetLevel = getNodeLevel(targetNode, hierarchy);
-        
-        // Continue traversal if target is more tactical
-        if (targetLevel > containerLevel && !visited.has(edge.to)) {
-          queue.push(edge.to);
-        }
-        
-        // Stop at same or more strategic levels (cluster boundaries)
-      }
-    }
-    
-    // Create cluster (even if only contains the container itself)
+    const clusterNodes = members.get(container.id)!;
     const clusterNodeIds = new Set(clusterNodes.map(n => n.id));
-    const internalEdges = edges.filter(e => clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-    const outgoingEdges = edges.filter(e => clusterNodeIds.has(e.from) && !clusterNodeIds.has(e.to));
-    const incomingEdges = edges.filter(e => !clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to));
-    
     clusters.set(container.id, {
       containerId: container.id,
       containerLevel,
       parentClusterId: null, // Top-level cluster, no parent
       nodes: clusterNodes,
-      internalEdges,
-      outgoingEdges,
-      incomingEdges,
+      internalEdges: edges.filter(e => clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to)),
+      outgoingEdges: edges.filter(e => clusterNodeIds.has(e.from) && !clusterNodeIds.has(e.to)),
+      incomingEdges: edges.filter(e => !clusterNodeIds.has(e.from) && clusterNodeIds.has(e.to)),
     });
-    
-    assignedNodes.add(container.id);
   }
-  
-  // Find cross-cluster edges
+
+  // An edge crosses clusters when both endpoints are assigned to different ones.
   const crossClusterEdges = edges.filter(edge => {
-    const fromCluster = [...clusters.values()].find(c => 
-      c.nodes.some(n => n.id === edge.from)
-    );
-    const toCluster = [...clusters.values()].find(c => 
-      c.nodes.some(n => n.id === edge.to)
-    );
-    
-    return fromCluster !== toCluster && fromCluster && toCluster;
+    const from = assignment.get(edge.from);
+    const to = assignment.get(edge.to);
+    return from !== undefined && to !== undefined && from !== to;
   });
-  
-  // Find orphan nodes (containers without children)
-  const orphanNodes = nodes.filter(n => 
-    !assignedNodes.has(n.id)
-  );
-  
+
+  const orphanNodes = nodes.filter(n => !assignment.has(n.id));
+
   return {
     clusters,
     crossClusterEdges,
@@ -238,9 +197,13 @@ export function assignNodesToClusters(
 }
 
 /**
- * Build child-parent map for efficient lookup of which containers own which nodes.
- * Uses dependency edges where from → to means "from contains/owns to" in the hierarchy.
- * Prefers the most strategic parent (lowest hierarchy level) when multiple parents exist.
+ * Build a node → parent-container map for collapse-time edge aggregation.
+ *
+ * Derived from {@link resolveHierarchy}: each node's parent is its nearest
+ * dominating container (the canonical containment chain). Only containers can be
+ * collapsed, so this chain is exactly what {@link aggregateEdgesForCollapsed}
+ * walks up to find a hidden node's visible representative.
+ *
  * @param nodes - All nodes in the graph
  * @param edges - All edges in the graph
  * @param hierarchy - Hierarchy level mapping
@@ -251,40 +214,12 @@ function buildContainerMap(
   edges: GraphEdge[],
   hierarchy: HierarchyLevelMap
 ): Map<string, string> {
+  const resolution = resolveHierarchy(toHierarchyInput(nodes, edges), hierarchy);
   const containerMap = new Map<string, string>();
-  const nodeMap = new Map(nodes.map(n => [n.id, n]));
-  const nodeIds = new Set(nodes.map(n => n.id));
-  
-  // In a dependency graph, edge from→to means "from depends on to"
-  // For containment, we want the REVERSE: if epic→story, then story's parent is epic
-  edges.forEach(edge => {
-    // Only process edges where BOTH nodes exist (ignore external dependencies)
-    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-      return;
-    }
-    
-    const currentParent = containerMap.get(edge.to);
-    
-    if (!currentParent) {
-      // No parent yet, use this one
-      containerMap.set(edge.to, edge.from);
-    } else {
-      // Compare hierarchy levels - keep the more strategic parent (lower level number)
-      const currentParentNode = nodeMap.get(currentParent);
-      const newParentNode = nodeMap.get(edge.from);
-      
-      if (currentParentNode && newParentNode) {
-        const currentLevel = getNodeLevel(currentParentNode, hierarchy);
-        const newLevel = getNodeLevel(newParentNode, hierarchy);
-        
-        if (newLevel < currentLevel) {
-          // New parent is more strategic, use it
-          containerMap.set(edge.to, edge.from);
-        }
-      }
-    }
-  });
-  
+  for (const node of nodes) {
+    const parent = resolution.get(node.id)?.parent;
+    if (parent) containerMap.set(node.id, parent);
+  }
   return containerMap;
 }
 

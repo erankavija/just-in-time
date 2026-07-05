@@ -38,10 +38,14 @@
 //! For every node the resolver produces a [`NodeHierarchy`]:
 //!
 //! - **parent** — the *nearest dominating container*: among all containers whose
-//!   dependency closure includes the node, the one with the deepest level (the
-//!   most-tactical container that still contains it). Ties are broken
-//!   deterministically: fewer hops from container to node, then the
-//!   lexicographically smallest container id.
+//!   dependency closure includes the node, the one that most directly contains
+//!   it. A container linked by a **direct** dependency edge (it lists the node
+//!   among its own dependencies) outranks one that only reaches the node
+//!   transitively through a cross-cutting dependency — so a task stays under the
+//!   epic that directly owns it even when a deeper container elsewhere reaches it
+//!   via a cross edge. Among equally-direct candidates the deepest level wins,
+//!   then the fewest hops from container to node, then the lexicographically
+//!   smallest container id.
 //! - **children** — the inverse of `parent`: the nodes whose resolved parent is
 //!   this node, sorted by id. A node that is a direct dependency of a container
 //!   but resolves to a *nearer* container is that nearer container's child, so
@@ -526,11 +530,17 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     HierarchyResolution { nodes: resolved }
 }
 
-/// Whether parent candidate `a` beats `b`: deeper level, then fewer hops, then
-/// smaller id.
+/// Whether parent candidate `a` beats `b`.
+///
+/// A **direct** container edge (distance 1 — the container lists the node among
+/// its own dependencies) is genuine containment and outranks a container that
+/// only reaches the node transitively through a cross-cutting dependency. Among
+/// equally-direct candidates: deeper level, then fewer hops, then smaller id.
 fn is_better_parent(a: (u8, usize, &str), b: (u8, usize, &str)) -> bool {
     use std::cmp::Reverse;
-    (a.0, Reverse(a.1), Reverse(a.2)) > (b.0, Reverse(b.1), Reverse(b.2))
+    // Key order: direct edge (distance 1) first, then deeper level, then fewer
+    // hops, then smaller id.
+    (a.1 == 1, a.0, Reverse(a.1), Reverse(a.2)) > (b.1 == 1, b.0, Reverse(b.1), Reverse(b.2))
 }
 
 /// Longest dependency-path length from `id` to an in-set sink (memoized).
@@ -806,6 +816,26 @@ mod tests {
         assert_eq!(r.parent("t"), Some("e"));
         assert_eq!(r.children("e"), ["t".to_string()]);
         assert_eq!(r.children("m"), ["e".to_string()]);
+    }
+
+    #[test]
+    fn test_direct_container_wins_over_transitive_cross_edge() {
+        // Epic `ex` directly contains `tx` (ex→tx). A deeper story `sy` only
+        // reaches `tx` transitively through a cross-cutting dependency
+        // (sy→ty→tx). The direct container wins even though the story is deeper.
+        let ex = TestNode::new("ex", Some("epic"), &["tx"]);
+        let sy = TestNode::new("sy", Some("story"), &["ty"]);
+        let ty = TestNode::new("ty", Some("task"), &["tx"]);
+        let tx = TestNode::new("tx", Some("task"), &[]);
+        let r = resolve_hierarchy(&[&ex, &sy, &ty, &tx], &default_config());
+
+        assert_eq!(
+            r.parent("tx"),
+            Some("ex"),
+            "direct epic beats transitive story"
+        );
+        assert_eq!(r.parent("ty"), Some("sy"));
+        assert_eq!(r.children("ex"), ["tx".to_string()]);
     }
 
     #[test]
