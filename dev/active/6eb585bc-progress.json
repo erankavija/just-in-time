@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 1,
+  "current_wave": 2,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -11,7 +11,7 @@
           "short_id": "ff9925af",
           "title": "repo-root discovery walk-up",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -93,8 +93,15 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "note": "test-hygiene: stray bare .jit at persistent cargo-ci TMPDIR root (~/.cache/jit-cargo-ci-tmp/.jit) + tests writing .jit-shaped state into the shared temp root. Exposed by ff9925af upward discovery. Candidate follow-up issue.",
+      "status": "observed"
+    }
+  ],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "ff9925af": 1
+  },
   "started_at": "2026-07-05T00:00:00Z"
 }
