@@ -5459,3 +5459,5 @@
 {"type":"issue_completed","id":"6fd73387-9831-42d4-ad16-c17b95b20318","issue_id":"62f3bebd-ed7f-4a8f-903c-06c11aac7608","timestamp":"2026-07-05T22:01:23.967874855Z"}
 {"type":"issue_created","id":"27a8e694-d99d-4231-9fd2-da1b420edca1","issue_id":"c291e95c-82f0-437f-8b58-264ac73e27b2","timestamp":"2026-07-05T22:01:24.042912289Z","title":"Refresh MCP curated tool set for the expanded CLI surface","priority":"normal"}
 {"type":"issue_updated","id":"964bbc9c-b7c3-47dd-bbda-3c80e9fd9cd5","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T22:01:24.097350909Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"b20cac50-fd54-4152-9587-4e272b7f8e9c","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T22:01:52.142510452Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"7e44b324-94ac-4fc9-b0c0-6bdacc17cfc7","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T22:01:52.142692683Z","assignee":"agent:claude"}
