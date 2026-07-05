@@ -2379,7 +2379,18 @@ fn run() -> Result<()> {
                                 {
                                     JsonError::issue_not_found(&dep_id, "dep add")
                                 } else {
-                                    JsonError::new("DEPENDENCY_ERROR", typed.to_string(), "dep add")
+                                    // A too-short / ambiguous id prefix (in either
+                                    // the <from> or a <target> position) is refined
+                                    // to its INVALID_ID_PREFIX / AMBIGUOUS_ID code
+                                    // (exit 2); anything else keeps DEPENDENCY_ERROR.
+                                    jit::output::refine_id_error(
+                                        &typed,
+                                        JsonError::new(
+                                            "DEPENDENCY_ERROR",
+                                            typed.to_string(),
+                                            "dep add",
+                                        ),
+                                    )
                                 };
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
@@ -2435,16 +2446,19 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        if json {
-                            use jit::output::JsonError;
-                            let error_str = e.to_string();
-                            let json_error =
-                                JsonError::new("DEPENDENCY_ERROR", error_str, "dep add");
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        } else {
-                            return Err(e);
-                        }
+                        // `handle_json_error!` refines the fallback when the
+                        // failure is a typed id-resolution error (ambiguous /
+                        // too-short prefix), consistent with the per-edge path
+                        // above and with `dep rm`.
+                        handle_json_error!(
+                            json,
+                            e,
+                            jit::output::JsonError::new(
+                                "DEPENDENCY_ERROR",
+                                e.to_string(),
+                                "dep add",
+                            )
+                        );
                     }
                 }
             }

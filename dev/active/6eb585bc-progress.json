@@ -49,7 +49,7 @@
           "title": "Typed exit codes for prefix and usage errors, JSON envelope for startup failures",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "rework-1"
         }
       ]
     },
@@ -193,7 +193,8 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "74fbdb69": 1
+    "74fbdb69": 1,
+    "a05b87ae": 1
   },
   "started_at": "2026-07-05T10:30:00Z"
 }

@@ -1357,6 +1357,119 @@ fn test_exit_code_dep_rm_both_args_symmetric() {
     assert!(String::from_utf8_lossy(&short_target.stderr).contains("at least 4 characters"));
 }
 
+/// REQ-01 for `jit dep add`: a too-short id prefix in EITHER the `<from>` or a
+/// `<target>` position (including the variadic case) is an argument error (exit
+/// 2), carrying the distinguishing INVALID_ID_PREFIX code under --json. Both id
+/// arguments resolve inside the per-edge add, so both flow through the same
+/// classifier.
+#[test]
+fn test_exit_code_dep_add_too_short_prefix_both_positions() {
+    let temp_dir = setup_test_env();
+
+    let a = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "A", "--json"])
+            .output()
+            .unwrap(),
+    );
+    let b = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "B", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    // Short `<from>`.
+    let short_from = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", "ab", &b])
+        .output()
+        .unwrap();
+    assert_eq!(
+        short_from.status.code(),
+        Some(2),
+        "short <from> should exit 2"
+    );
+    assert!(String::from_utf8_lossy(&short_from.stderr).contains("at least 4 characters"));
+
+    let short_from_json = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", "ab", &b, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(short_from_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&short_from_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+
+    // Short `<target>`.
+    let short_target = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &a, "ab"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        short_target.status.code(),
+        Some(2),
+        "short <target> should exit 2"
+    );
+
+    let short_target_json = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &a, "ab", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(short_target_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&short_target_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+
+    // Variadic: a short target among valid ones fails the whole command (exit 2).
+    let variadic_json = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &a, &b, "ab", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(variadic_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&variadic_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+}
+
+/// REQ-01 for `jit dep add`: an ambiguous id prefix in either position is an
+/// argument error (exit 2) carrying the AMBIGUOUS_ID code under --json.
+#[test]
+fn test_exit_code_dep_add_ambiguous_prefix_both_positions() {
+    let temp_dir = setup_test_env();
+    let prefix = make_ambiguous_prefix(&temp_dir);
+    let other = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Other", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    // Ambiguous `<from>`.
+    let from_json = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", prefix, &other, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(from_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&from_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
+
+    // Ambiguous `<target>`.
+    let target_json = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["dep", "add", &other, prefix, "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(target_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&target_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "AMBIGUOUS_ID");
+}
+
 // ============================================================================
 // Startup-failure JSON envelope (issue a05b87ae, REQ-04)
 //

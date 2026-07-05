@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "be545ac7-2aa1-44ca-b03e-b1b53011631a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a05b87ae-3af8-4874-8a39-bb2a0b80a914",
+  "commit": "2c200a71e6195f3bf6bf14e5081911f9276a2350",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T13:01:57.836731086Z",
+  "completed_at": "2026-07-05T13:04:00.244966579Z",
+  "duration_ms": 122408,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nStorage now exposes typed prefix-resolution errors, and CLI/output classify/render them. That split is reasonable. No domain/storage/command CLI-boundary violation found in the reviewed diff.\n\n**Functional Paradigm**\n\nNo blocking new imperative complexity in production code. The existing `dep rm` loop remains local command orchestration and predates this shape.\n\n**Correctness and Invariants**\n\nREQ-02, REQ-03, and the tested REQ-04 startup paths are covered. REQ-01 is not fully met: one JSON path still emits generic dependency errors for typed prefix failures.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains present in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:14). No unsafe code found in the diff.\n\n**Testing**\n\nI did not rerun tests because the supplied issue context shows `cargo-ci` passed on 2026-07-05T12:59:18Z. `./scripts/jit-validate.sh` passed locally. Coverage is incomplete for `dep add --json` typed prefix failures.\n\n**Error Handling**\n\nTyped errors were added for ambiguous and too-short prefixes, but JSON classification is not consistently applied across command paths.\n\n**CLI Contract**\n\nThe new startup JSON envelope satisfies the covered `--json` startup cases. The `dep add --json` prefix-error path violates the machine-readable error-code requirement.\n\n**Documentation**\n\nNew public error APIs include doc comments and examples.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty, so no prerequisite issue blocks this change. Repository validation passed.\n\n1. [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2354): `dep add --json` still bypasses `refine_id_error` when a typed prefix-resolution failure is collected in `typed_errors`. `add_dependency_with_policy` resolves both ids at [dependency.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:90), and `add_dependencies_with_policy` stores any resulting `InvalidIdPrefixError`/`AmbiguousIdError` at [dependency.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:355). The JSON renderer then only special-cases cycle, redundant dependency, and not-found errors before falling back to `DEPENDENCY_ERROR` at [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2382), which maps to generic exit 1 and lacks the required `INVALID_ID_PREFIX`/`AMBIGUOUS_ID` code. This leaves commands like `jit dep add ab <id> --json` or `jit dep add <ambiguous-prefix> <id> --json` failing REQ-01.\nTotal findings: 1\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8620 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.137.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f325f-0e9a-7073-9a67-3c9e65ab0adf\n--------\nuser\n--- 8607 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

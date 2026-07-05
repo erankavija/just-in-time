@@ -61,6 +61,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     a too-short or ambiguous prefix in either position is the same argument error
     (exit `2`), where previously a short `<target>` was silently reported as "not
     found" (exit `0`) while a short `<from>` exited `1`.
+  - `jit dep add <from> <target>...` now emits the refined `INVALID_ID_PREFIX` /
+    `AMBIGUOUS_ID` code (exit `2`) under `--json` for a too-short or ambiguous
+    prefix in either the `<from>` or any `<target>` position, instead of the
+    generic `DEPENDENCY_ERROR` (exit `1`). The non-`--json` exit code was already
+    `2`; this aligns the `--json` code with it.
   - **Startup failures under `--json`** (repository not found, repository format
     too new) now emit a structured error object on stdout (`code`
     `REPOSITORY_NOT_FOUND` / `REPOSITORY_FORMAT_TOO_NEW`) while keeping their
@@ -76,9 +81,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   treat `2` (invalid argument) as the failure code for these cases. A short
   `<target>` to `jit dep rm` that previously succeeded (exit `0`, reported under
   `not_found`) now fails with exit `2`; pass a ≥4-character prefix or the full id.
-  Consumers on `--json` can branch on the new `code` values (`AMBIGUOUS_ID`,
-  `INVALID_ID_PREFIX`) instead of the exit code. No human-readable messages
-  changed.
+  `jit dep add` with a too-short/ambiguous prefix already exited `2`, but its
+  `--json` `code` changes from `DEPENDENCY_ERROR` to `INVALID_ID_PREFIX` /
+  `AMBIGUOUS_ID`. Consumers on `--json` can branch on the new `code` values
+  (`AMBIGUOUS_ID`, `INVALID_ID_PREFIX`) instead of the exit code. No
+  human-readable messages changed.
 - **Additive — startup failures emit JSON on stdout under `--json`.** Callers of
   any command with `--json` in an uninitialized repository, or against a
   repository whose on-disk format is newer than the binary, now receive a parsable
