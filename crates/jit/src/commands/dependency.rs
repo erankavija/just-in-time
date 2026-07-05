@@ -411,15 +411,41 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|(text, _)| text.as_str())
             .collect();
 
-        // Redundancy check, only meaningful once the candidate graph is
-        // acyclic: a cyclic candidate graph makes "redundant" undefined, and
-        // any cycle failure above already dooms the whole batch, so skip it
-        // when one occurred.
+        // Redundancy analysis needs an ACYCLIC graph to be well-defined, so it
+        // runs over `valid_new_edges` (every new edge EXCEPT the ones that
+        // just failed the cycle check above) rather than skipping entirely
+        // when any edge fails that check — a batch mixing a cycle-failing
+        // edge with an independently redundant one must still name BOTH
+        // (REQ-02), not just the cycle edge.
+        let valid_new_edges: Vec<(String, String)> = new_edges
+            .iter()
+            .filter(|(text, _)| !cycle_failed.contains(text.as_str()))
+            .cloned()
+            .collect();
+
         let mut skipped: Vec<(String, String)> = Vec::new();
         let mut reduced_from = from_deps.clone();
 
-        if cycle_failed.is_empty() && !new_edges.is_empty() {
-            let redundant = candidate_graph.find_redundant_edges();
+        if !valid_new_edges.is_empty() {
+            // Built from `valid_new_edges` only, so this candidate graph is
+            // guaranteed acyclic even when a sibling cycle-failing edge was
+            // excluded above (cycle validity never depends on OTHER pending
+            // edges from the same `full_issue_id` — see the cycle-check
+            // comment above — so dropping just the cycle-failing edges here
+            // cannot itself introduce a cycle).
+            let mut acyclic_candidate_issues = issues.clone();
+            if let Some(from) = acyclic_candidate_issues
+                .iter_mut()
+                .find(|i| i.id == full_issue_id)
+            {
+                for (_, full_dep_id) in &valid_new_edges {
+                    from.dependencies.push(full_dep_id.clone());
+                }
+            }
+            let acyclic_candidate_refs: Vec<&Issue> = acyclic_candidate_issues.iter().collect();
+            let acyclic_candidate_graph = DependencyGraph::new(&acyclic_candidate_refs);
+
+            let redundant = acyclic_candidate_graph.find_redundant_edges();
 
             // Self-redundant: one of OUR new edges is itself already reachable
             // via `full_issue_id`'s other dependencies. Precisely attributable
@@ -428,12 +454,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             let self_redundant: HashSet<&str> = redundant
                 .iter()
                 .filter(|(from, to)| {
-                    from == &full_issue_id && new_edges.iter().any(|(_, full_id)| full_id == to)
+                    from == &full_issue_id
+                        && valid_new_edges.iter().any(|(_, full_id)| full_id == to)
                 })
                 .map(|(_, to)| to.as_str())
                 .collect();
 
-            for (dep_id_text, full_dep_id) in &new_edges {
+            for (dep_id_text, full_dep_id) in &valid_new_edges {
                 if self_redundant.contains(full_dep_id.as_str()) {
                     match policy {
                         RedundancyPolicy::Reject => rejected.push((
@@ -465,15 +492,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             // outgoing edge — once a path exits via edge A, a DAG can never
             // route it back through `full_issue_id` to also use edge B — so
             // testing each new edge ALONE (against the graph as it stood
-            // before this call, ignoring every sibling) precisely identifies
-            // which edge(s) independently introduce a given shadow. This is
-            // deliberately NOT the combined graph: the self-redundant check
-            // above needs the combination to catch a redundancy that only
-            // emerges from two new edges together, but a shadow of a
-            // pre-existing edge elsewhere never does (its cause is always a
-            // single new edge, checkable in isolation).
+            // before this call, ignoring every sibling — cycle-failing ones
+            // included, since `valid_new_edges` already excludes them)
+            // precisely identifies which edge(s) independently introduce a
+            // given shadow. This is deliberately NOT the combined graph: the
+            // self-redundant check above needs the combination to catch a
+            // redundancy that only emerges from two new edges together, but a
+            // shadow of a pre-existing edge elsewhere never does (its cause is
+            // always a single new edge, checkable in isolation).
             if policy == RedundancyPolicy::Reject {
-                for (dep_id_text, full_dep_id) in &new_edges {
+                for (dep_id_text, full_dep_id) in &valid_new_edges {
                     if self_redundant.contains(full_dep_id.as_str()) {
                         continue; // already attributed above
                     }
@@ -501,7 +529,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // no handling here: `apply_batch_dependency_add`'s "other nodes"
             // loop drops the shadowed edge automatically.
 
-            reduced_from = candidate_graph.compute_transitive_reduction(&full_issue_id);
+            reduced_from = acyclic_candidate_graph.compute_transitive_reduction(&full_issue_id);
         }
 
         if !rejected.is_empty() {
@@ -509,6 +537,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // ---- Nothing rejected: apply. ---------------------------------------
+        // Reaching here means `rejected` was empty, so `cycle_failed` was
+        // empty too (any cycle failure is pushed into `rejected` above) —
+        // `valid_new_edges` therefore equals `new_edges` exactly, and
+        // `candidate_issues` (built from ALL of `new_edges`) is the same
+        // candidate graph `acyclic_candidate_graph` was built from. Using the
+        // original `new_edges`/`candidate_issues` below is thus equivalent,
+        // not a divergent view of the batch.
         if reduced_from == from_deps {
             // Every requested edge reduced away (all skipped, or there was
             // nothing new to add): the dependency set is unchanged, so there is

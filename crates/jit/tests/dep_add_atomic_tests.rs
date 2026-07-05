@@ -148,6 +148,93 @@ fn test_shadow_redundancy_attributed_only_to_responsible_edge_not_innocent_sibli
     );
 }
 
+/// REQ-02: a cycle-failing edge must NOT suppress redundancy analysis for its
+/// siblings. Existing A -> B -> C and D -> A; `dep add A D C` tries to add
+/// A -> D (cycle: D already depends on A) and A -> C (self-redundant: A
+/// already reaches C via A -> B). Both must be named, not just the cycle.
+#[test]
+fn test_cycle_failure_does_not_suppress_sibling_redundancy_check() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+    let d = h.create_issue("D");
+
+    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.add_dependency(&d, &a).unwrap();
+
+    let result = h.executor.add_dependencies_with_policy(
+        &a,
+        &[d.clone(), c.clone()],
+        jit::commands::RedundancyPolicy::Reject,
+    );
+
+    let err = result.expect_err("a cycle-failing edge must not mask a sibling's redundancy");
+    let batch = err
+        .downcast_ref::<DependencyBatchRejectedError>()
+        .expect("must be a typed DependencyBatchRejectedError");
+
+    let named: Vec<&str> = batch.rejected().iter().map(|(to, _)| to.as_str()).collect();
+    assert!(
+        named.contains(&d.as_str()),
+        "the cycle edge (D) must be named: {named:?}"
+    );
+    assert!(
+        named.contains(&c.as_str()),
+        "the redundant edge (C) must ALSO be named, not suppressed by the cycle: {named:?}"
+    );
+    assert_eq!(
+        named.len(),
+        2,
+        "exactly these two edges are rejected: {named:?}"
+    );
+
+    // All-or-nothing: nothing persisted.
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert_eq!(loaded_a.dependencies, vec![b.clone()]);
+}
+
+/// REQ-02 (no false positives): when the ONLY failure in a batch is a cycle,
+/// the redundancy pass for the other, perfectly valid sibling edge still runs
+/// and finds nothing — the valid edge must not be spuriously rejected.
+#[test]
+fn test_cycle_only_failure_runs_redundancy_pass_without_spurious_rejection() {
+    let h = TestHarness::new();
+    let a = h.create_issue("A");
+    let b = h.create_issue("B");
+    let c = h.create_issue("C");
+    let d = h.create_issue("D");
+    let e = h.create_issue("E");
+
+    h.executor.add_dependency(&a, &b).unwrap();
+    h.executor.add_dependency(&b, &c).unwrap();
+    h.executor.add_dependency(&d, &a).unwrap();
+
+    // D -> A would cycle (D already depends on A); E is a fresh, unrelated
+    // issue with no redundancy of its own.
+    let result = h.executor.add_dependencies_with_policy(
+        &a,
+        &[d.clone(), e.clone()],
+        jit::commands::RedundancyPolicy::Reject,
+    );
+
+    let err = result.expect_err("the cycle edge must still fail the batch");
+    let batch = err
+        .downcast_ref::<DependencyBatchRejectedError>()
+        .expect("must be a typed DependencyBatchRejectedError");
+
+    let named: Vec<&str> = batch.rejected().iter().map(|(to, _)| to.as_str()).collect();
+    assert_eq!(
+        named,
+        vec![d.as_str()],
+        "only the cycle edge (D) is rejected; the valid sibling (E) must not be spuriously flagged: {named:?}"
+    );
+
+    let loaded_a = h.storage.load_issue(&a).unwrap();
+    assert_eq!(loaded_a.dependencies, vec![b.clone()]);
+}
+
 /// REQ-01 combination case: A -> B and A -> C are each fine in isolation
 /// against the pre-existing graph, but adding them TOGETHER makes A -> C
 /// redundant (A now reaches C via A -> B -> C, since B -> C already exists).
