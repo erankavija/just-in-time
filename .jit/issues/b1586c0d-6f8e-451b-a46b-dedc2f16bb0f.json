@@ -1,7 +1,7 @@
 {
   "id": "b1586c0d-6f8e-451b-a46b-dedc2f16bb0f",
   "title": "Unify gate field naming across JSON outputs",
-  "description": "Single-issue JSON emits gates with a `key` field while the per-issue gate status command emits `gate_statuses` entries with `gate_key`; agents wrote fallback lookups guessing both names, and one projection printed a null gate name when the guess missed.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: One canonical field name identifies a gate, and one names its status, everywhere gates appear in JSON output.\n- [ ] [hard] REQ-02: The unified shape is documented; any renamed field is called out in a migration note.",
+  "description": "Single-issue JSON emits gates with a `key` field while the per-issue gate status command emits `gate_statuses` entries with `gate_key`; agents wrote fallback lookups guessing both names, and one projection printed a null gate name when the guess missed.\n\n## Background\n\nDecided convention: `key` and `status` are canonical, matching the issue record's `gates[].key` — the larger existing surface. The per-issue gate status command migrates `gate_key` to `key` and its collection key `gate_statuses` to `gates`.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Everywhere gates appear in JSON output, the gate is identified by `key` and its state by `status`; gate collections use the key `gates`.\n- [ ] [hard] REQ-02: The unified shape is documented; the renamed fields are called out in a migration note.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -19,5 +19,5 @@
     "component:gates"
   ],
   "created_at": "2026-07-05T10:03:08.409951843Z",
-  "updated_at": "2026-07-05T10:03:08.411356424Z"
+  "updated_at": "2026-07-05T10:12:33.809442248Z"
 }

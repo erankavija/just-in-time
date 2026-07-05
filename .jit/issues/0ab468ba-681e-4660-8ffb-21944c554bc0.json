@@ -1,7 +1,7 @@
 {
   "id": "0ab468ba-681e-4660-8ffb-21944c554bc0",
   "title": "Full-record bulk export behind a --full flag",
-  "description": "An external-tooling session bypassed the CLI entirely, globbing raw issue files and streaming the event log, because the JSON graph export emits only id, short id, title, state, priority, and labels, and lifecycle timing exists nowhere on the issue record.\n\n## Background\n\nBulk consumers need complete node records; default outputs stay lean for orchestration loops. Convention for this epic: single-issue commands stay full-fidelity, bulk-emitting commands default to the summary shape and take an explicit `--full` opt-in for complete records.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Graph export in JSON format with `--full` emits complete issue records — assignee, labels, gates with statuses, created/updated, dependencies — plus the edge list.\n- [ ] [hard] REQ-02: Lifecycle timestamps (first ready, claimed, done) are available per issue in the full export, derived from the event log or stored at transition time.\n- [ ] [hard] REQ-03: Export output without the flag is byte-compatible with the current summary shape.\n- [ ] [hard] REQ-04: The export schema, both shapes, is documented.",
+  "description": "An external-tooling session bypassed the CLI entirely, globbing raw issue files and streaming the event log, because the JSON graph export emits only id, short id, title, state, priority, and labels, and lifecycle timing exists nowhere on the issue record.\n\n## Background\n\nBulk consumers need complete node records; default outputs stay lean for orchestration loops. Convention for this epic: single-issue commands stay full-fidelity, bulk-emitting commands default to the summary shape and take an explicit `--full` opt-in for complete records. Decided: lifecycle timestamps are stored on the issue record at transition time (first ready, claimed, done), with a one-time backfill derived from the event log for existing issues.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Graph export in JSON format with `--full` emits complete issue records — assignee, labels, gates with statuses, created/updated, dependencies — plus the edge list.\n- [ ] [hard] REQ-02: The issue record stores lifecycle timestamps (first ready, claimed, done) written at state-transition time; existing issues are backfilled from the event log by a one-time migration.\n- [ ] [hard] REQ-03: Export output without the flag is byte-compatible with the current summary shape.\n- [ ] [hard] REQ-04: The export schema, both shapes, is documented.\n\n## Notes\n\nThe timestamp fields are additive; assess whether the storage format version needs a bump under the fail-fast policy before shipping.",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -19,5 +19,5 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:02:41.533658649Z",
-  "updated_at": "2026-07-05T10:02:41.535412511Z"
+  "updated_at": "2026-07-05T10:12:33.820120286Z"
 }
