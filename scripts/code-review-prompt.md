@@ -75,6 +75,19 @@ Provide a structured review in markdown with sections for each area above. Be sp
 
 Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
 
+Then emit a machine-readable findings block so jit can consume the findings as data. It is two line-exact fence markers wrapping a single JSON object:
+
+```
+<<<JIT-FINDINGS-JSON
+{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"crates/jit/src/x.rs","line":42}]}
+JIT-FINDINGS-JSON>>>
+```
+
+- `verdict` is `"pass"` or `"fail"` and must match the VERDICT line below.
+- `findings` lists every finding from the numbered list above, in order; use an empty array when there are none.
+- `severity` is `"high"`, `"medium"`, or `"low"`. `file`/`line` are optional; omit them for findings not tied to a specific location.
+- The JSON must be valid and on a single line. Do not wrap the block itself in a code fence.
+
 End your response with exactly one of these lines:
 VERDICT: PASS
 VERDICT: FAIL

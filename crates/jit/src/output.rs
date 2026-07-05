@@ -12,7 +12,7 @@ use std::io::{self, Write};
 use thiserror::Error;
 
 use crate::domain::{
-    GateMode, GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
+    GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, GateState, GateStatus, Issue,
     MinimalBlockedIssue, MinimalIssue, Priority, State,
 };
 use crate::errors::{
@@ -1734,6 +1734,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     command: "cargo test".into(),
 ///     by: None,
 ///     message: None,
+///     findings: None,
 /// };
 /// // Lean form drops stdout/stderr for passing runs.
 /// let lean = GateRunSummary::lean(&run);
@@ -1768,11 +1769,18 @@ pub struct GateRunSummary {
     pub stdout: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stderr: Option<String>,
+    /// Structured findings parsed from the checker's machine-readable block, if
+    /// one was emitted. Kept even in the lean form (which drops the raw
+    /// stdout/stderr blob), so rework loops read verdict + findings as data
+    /// without re-grepping a report that a passing lean summary omits entirely.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub findings: Option<GateFindings>,
 }
 
 impl GateRunSummary {
     /// Build a summary that drops stdout/stderr for passing runs but keeps
-    /// them for failed/error runs so diagnostics survive.
+    /// them for failed/error runs so diagnostics survive. Structured findings
+    /// are retained regardless of status.
     pub fn lean(r: &GateRunResult) -> Self {
         let include_output = !matches!(r.status, GateRunStatus::Passed);
         Self::build(r, include_output)
@@ -1800,6 +1808,7 @@ impl GateRunSummary {
             message: r.message.clone(),
             stdout: include_output.then(|| r.stdout.clone()),
             stderr: include_output.then(|| r.stderr.clone()),
+            findings: r.findings.clone(),
         }
     }
 }
@@ -1910,6 +1919,48 @@ pub struct GateFlatReportResponse {
     pub stdout: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stderr: Option<String>,
+}
+
+/// JSON payload of `jit gate status <id> <gate> --findings`.
+///
+/// The structured-findings view of a single gate's latest run. `verdict`,
+/// `summary`, and `findings` come straight from the checker's machine-readable
+/// block ([`GateFindings`](crate::domain::GateFindings)); they are present only
+/// when that run carried a block. `has_findings` is `false` for a plain-text
+/// checker (no block emitted) so a consumer can distinguish "ran, no structured
+/// findings" from "no findings recorded", without inspecting the optional
+/// fields.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::GateFindingsResponse;
+///
+/// let payload = GateFindingsResponse {
+///     key: "code-review".into(),
+///     run_id: "r1".into(),
+///     has_findings: false,
+///     verdict: None,
+///     summary: None,
+///     findings: vec![],
+/// };
+/// assert!(!payload.has_findings);
+/// assert!(payload.findings.is_empty());
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateFindingsResponse {
+    pub key: String,
+    pub run_id: String,
+    /// Whether the latest run carried a machine-readable findings block.
+    pub has_findings: bool,
+    /// Checker-declared verdict; `None` when no block was emitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
+    /// One-line run summary; `None` when no block was emitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// Individual findings; empty when no block was emitted.
+    pub findings: Vec<crate::domain::GateFinding>,
 }
 
 // ============================================================================
@@ -2151,6 +2202,7 @@ mod tests {
             command: "cargo test".to_string(),
             by: None,
             message: None,
+            findings: None,
         };
 
         let resp = IssueShowResponse::from_issue(issue, vec![], std::slice::from_ref(&run));

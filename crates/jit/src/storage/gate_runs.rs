@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+    use crate::domain::{GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStage};
     use crate::storage::{IssueStore, JsonFileStorage};
     use chrono::Utc;
     use tempfile::TempDir;
@@ -36,6 +36,17 @@ mod tests {
             command: "cargo test".to_string(),
             by: Some("auto:executor".to_string()),
             message: None,
+            findings: Some(GateFindings {
+                verdict: "pass".to_string(),
+                summary: "all green".to_string(),
+                findings: vec![GateFinding {
+                    id: "F1".to_string(),
+                    severity: "low".to_string(),
+                    summary: "nit".to_string(),
+                    file: Some("src/x.rs".to_string()),
+                    line: Some(7),
+                }],
+            }),
         };
 
         // Save result
@@ -47,6 +58,42 @@ mod tests {
         assert_eq!(loaded.gate_key, "unit-tests");
         assert_eq!(loaded.status, GateRunStatus::Passed);
         assert_eq!(loaded.exit_code, Some(0));
+        // Structured findings survive the persistence round-trip.
+        let findings = loaded.findings.expect("findings should persist");
+        assert_eq!(findings.verdict, "pass");
+        assert_eq!(findings.findings.len(), 1);
+        assert_eq!(findings.findings[0].id, "F1");
+        assert_eq!(findings.findings[0].line, Some(7));
+    }
+
+    #[test]
+    fn test_load_gate_run_without_findings_field_defaults_to_none() {
+        // A run recorded before the findings field existed must still load: the
+        // serde default fills `findings` with None rather than erroring.
+        let (_temp, storage) = setup_storage();
+        storage.init().unwrap();
+
+        let legacy = serde_json::json!({
+            "schema_version": 1,
+            "run_id": "legacy-run",
+            "gate_key": "tests",
+            "stage": "postcheck",
+            "issue_id": "issue-legacy",
+            "commit": null,
+            "branch": null,
+            "status": "passed",
+            "started_at": Utc::now().to_rfc3339(),
+            "completed_at": null,
+            "duration_ms": null,
+            "exit_code": 0,
+            "stdout": "ok",
+            "stderr": "",
+            "command": "true",
+            "by": null,
+            "message": null
+        });
+        let loaded: GateRunResult = serde_json::from_value(legacy).unwrap();
+        assert!(loaded.findings.is_none());
     }
 
     #[test]
@@ -78,6 +125,7 @@ mod tests {
                 command: "cargo test".to_string(),
                 by: Some("auto:executor".to_string()),
                 message: None,
+                findings: None,
             };
             storage.save_gate_run_result(&result).unwrap();
         }
@@ -134,6 +182,7 @@ mod tests {
             command: "cargo clippy".to_string(),
             by: Some("auto:executor".to_string()),
             message: None,
+            findings: None,
         };
 
         storage.save_gate_run_result(&result).unwrap();

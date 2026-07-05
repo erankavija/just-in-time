@@ -3,6 +3,7 @@
 //! This module defines the fundamental data structures used throughout the system:
 //! issues, gates, events, and their associated states and priorities.
 
+use crate::domain::gate_findings::GateFindings;
 use crate::errors::InvalidArgumentError;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -1158,6 +1159,12 @@ pub struct GateRunResult {
     pub by: Option<String>,
     /// Optional message
     pub message: Option<String>,
+    /// Structured findings parsed from the checker's machine-readable block, if
+    /// one was emitted. `None` for plain-text checkers and for runs recorded
+    /// before this field existed; the raw [`stdout`](Self::stdout) is always
+    /// kept alongside. See [`parse_gate_findings`](crate::domain::parse_gate_findings).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub findings: Option<GateFindings>,
 }
 
 /// Gate run status

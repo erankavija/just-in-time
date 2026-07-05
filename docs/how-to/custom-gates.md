@@ -209,6 +209,90 @@ else
 fi
 ```
 
+### Structured Findings (Machine-Readable Output)
+
+By default a checker's stdout is stored and shown as one freetext blob. A
+checker can *additionally* emit its verdict and individual findings as
+structured data by appending a **findings block** to stdout. jit parses the
+block once, when it records the run, and surfaces it as data across the gate
+views (`gate status`, `gate status --all`, `gate status-all`, and the
+gate-blocked transition error), while keeping the raw stdout available
+alongside.
+
+This is an **opt-in contract**: a checker that emits no block keeps working
+exactly as before — the structured fields are simply absent.
+
+**The block.** Two line-exact fence markers wrap a single JSON object:
+
+```
+<<<JIT-FINDINGS-JSON
+{"verdict":"fail","summary":"2 issues found","findings":[
+  {"id":"F1","severity":"high","summary":"missing error context","file":"src/x.rs","line":42},
+  {"id":"F2","severity":"low","summary":"prefer iterator combinator"}
+]}
+JIT-FINDINGS-JSON>>>
+```
+
+**Schema of the JSON object:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `verdict` | string | Checker-declared verdict, typically `"pass"` / `"fail"`. Any string is accepted. |
+| `summary` | string | One-line summary of the run. |
+| `findings` | array | Zero or more findings (below). |
+
+**Each finding:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | string | Finding identifier, e.g. `"F1"`. |
+| `severity` | string | Checker-defined, e.g. `"high"` / `"medium"` / `"low"`. |
+| `summary` | string | One-line description. |
+| `file` | string, optional | Path the finding refers to. Omit when not location-specific. |
+| `line` | integer, optional | Line within `file`. |
+
+**Rules:**
+
+- The markers must each be **alone on their own line** (surrounding whitespace
+  is trimmed). The JSON payload between them may span multiple lines, and the
+  whole block may sit inside a markdown code fence — the fence lines are
+  ignored.
+- If several complete blocks appear, the **last** one wins. Emit the real block
+  at the very end of your report so an example quoted earlier never shadows it.
+- **Graceful degradation:** no block, a begin marker with no matching end, or
+  malformed JSON inside the fence all resolve to *no structured findings* — the
+  run is recorded normally with the field simply absent. A malformed block is
+  never an error, so a typo in your JSON silently drops the structured view
+  rather than failing the gate; validate your JSON while developing a checker.
+- Missing optional fields inside a well-formed block default to empty strings
+  (`id`, `severity`, `summary`) rather than rejecting the whole block.
+- The block does **not** change the exit-code contract. The verdict inside the
+  block is advisory metadata; the gate's pass/fail is still decided by the
+  process exit code.
+
+**Minimal conforming checker:**
+
+```bash
+#!/bin/bash
+# Emit a findings block, then fail the gate.
+cat <<'BLOCK'
+<<<JIT-FINDINGS-JSON
+{"verdict":"fail","summary":"1 issue","findings":[{"id":"F1","severity":"high","summary":"bug","file":"src/x.rs","line":10}]}
+JIT-FINDINGS-JSON>>>
+BLOCK
+exit 1
+```
+
+Inspect the parsed findings with:
+
+```bash
+jit gate status <ISSUE_ID> <GATE_KEY> --findings          # findings + verdict, one per line
+jit gate status <ISSUE_ID> <GATE_KEY> --findings --json   # structured JSON
+```
+
+The bundled `scripts/ai-review.sh` is a conforming checker: it instructs the
+review agent to append this block after the human-readable findings list.
+
 ### Best Practices
 
 **1. Make checkers fast** (target: under 5 minutes)

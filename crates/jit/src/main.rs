@@ -819,6 +819,66 @@ fn render_report_stream(text: &str, tail: Option<usize>) -> String {
     }
 }
 
+/// Render the structured-findings text view of a single gate run (`gate status
+/// --findings`).
+///
+/// One header line carries the gate key, verdict, one-line summary, and finding
+/// count; each finding follows on its own line as `<id> [<severity>] <summary>`
+/// with an optional ` (<file>:<line>)` locator. The format is stable and
+/// greppable (severity via `[high]`, verdict via the header), mirroring the
+/// `issue status` one-line convention. A run with no machine-readable block
+/// renders a single header line with `verdict: n/a` and `findings: 0`, so a
+/// plain-text checker degrades cleanly instead of erroring.
+///
+/// The returned string always ends with a newline.
+fn render_gate_findings_text(result: &GateRunResult) -> String {
+    match &result.findings {
+        Some(f) => {
+            let mut out = format!(
+                "{} verdict: {} summary: {} findings: {}\n",
+                result.gate_key,
+                if f.verdict.is_empty() {
+                    "unknown"
+                } else {
+                    &f.verdict
+                },
+                if f.summary.is_empty() {
+                    "-"
+                } else {
+                    &f.summary
+                },
+                f.findings.len(),
+            );
+            for finding in &f.findings {
+                let id = if finding.id.is_empty() {
+                    "-"
+                } else {
+                    &finding.id
+                };
+                let severity = if finding.severity.is_empty() {
+                    "-"
+                } else {
+                    &finding.severity
+                };
+                let locator = match (&finding.file, finding.line) {
+                    (Some(file), Some(line)) => format!(" ({}:{})", file, line),
+                    (Some(file), None) => format!(" ({})", file),
+                    _ => String::new(),
+                };
+                out.push_str(&format!(
+                    "{} [{}] {}{}\n",
+                    id, severity, finding.summary, locator
+                ));
+            }
+            out
+        }
+        None => format!(
+            "{} verdict: n/a findings: 0 (no machine-readable findings block)\n",
+            result.gate_key
+        ),
+    }
+}
+
 fn print_gate_run_details(result: &GateRunResult) {
     let status_str = match result.status {
         jit::domain::GateRunStatus::Passed => "passed",
@@ -847,6 +907,17 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
+    }
+    if let Some(f) = &result.findings {
+        println!(
+            "  Findings: {} (verdict: {})",
+            f.findings.len(),
+            if f.verdict.is_empty() {
+                "unknown"
+            } else {
+                &f.verdict
+            }
+        );
     }
     if !result.stdout.is_empty() {
         let lines: Vec<&str> = result.stdout.lines().collect();
@@ -3176,23 +3247,31 @@ fn run() -> Result<()> {
                 stdout,
                 stderr,
                 tail,
+                findings,
                 json,
             } => {
                 let output_ctx = OutputContext::new(quiet, json);
 
-                // Three views share one inspection surface (REQ-08, decision D11):
-                //   - history: list prior runs (`--all` / `--limit`),
-                //   - flat:    verbatim report text (`--stdout` / `--stderr` / `--tail`),
-                //   - default: the latest run for one gate (unchanged behaviour).
+                // Four views share one inspection surface (REQ-08, decision D11):
+                //   - history:  list prior runs (`--all` / `--limit`),
+                //   - flat:     verbatim report text (`--stdout` / `--stderr` / `--tail`),
+                //   - findings: structured findings + verdict (`--findings`),
+                //   - default:  the latest run for one gate (unchanged behaviour).
                 let history_mode = all || limit.is_some();
                 let flat_mode = stdout || stderr || tail.is_some();
+                let findings_mode = findings;
 
-                // History and flat views answer different questions (a list of
-                // runs vs one run's report text); combining them is ambiguous.
-                if history_mode && flat_mode {
+                // These views answer different questions; combining them is
+                // ambiguous, so at most one non-default view may be selected.
+                if [history_mode, flat_mode, findings_mode]
+                    .iter()
+                    .filter(|on| **on)
+                    .count()
+                    > 1
+                {
                     return Err(invalid_argument(
-                        "history flags (--all/--limit) cannot be combined with \
-                         flat-output flags (--stdout/--stderr/--tail)."
+                        "history (--all/--limit), flat-output (--stdout/--stderr/--tail), and \
+                         findings (--findings) views are mutually exclusive."
                             .to_string(),
                         "gate status",
                         json,
@@ -3208,7 +3287,67 @@ fn run() -> Result<()> {
                     ));
                 }
 
-                if history_mode {
+                if findings_mode {
+                    // Findings view selects exactly one gate's latest run and
+                    // reports only its structured findings + verdict.
+                    let gate_key = resolve_gate_key_for(gate_key, gate_flag, "gate status", json)?;
+                    match executor.get_last_gate_run(&id, &gate_key) {
+                        Ok(Some(result)) => {
+                            if json {
+                                use jit::output::{GateFindingsResponse, JsonOutput};
+                                let response = match &result.findings {
+                                    Some(f) => GateFindingsResponse {
+                                        key: gate_key.clone(),
+                                        run_id: result.run_id.clone(),
+                                        has_findings: true,
+                                        verdict: Some(f.verdict.clone()),
+                                        summary: Some(f.summary.clone()),
+                                        findings: f.findings.clone(),
+                                    },
+                                    None => GateFindingsResponse {
+                                        key: gate_key.clone(),
+                                        run_id: result.run_id.clone(),
+                                        has_findings: false,
+                                        verdict: None,
+                                        summary: None,
+                                        findings: vec![],
+                                    },
+                                };
+                                let output = JsonOutput::success(response, "gate status");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                print!("{}", render_gate_findings_text(&result));
+                            }
+                        }
+                        Ok(None) => {
+                            let msg = format!(
+                                "Gate '{}' has not been run yet for issue {}. Use 'jit gate evaluate' to run it.",
+                                gate_key, id
+                            );
+                            if json {
+                                use jit::output::JsonOutput;
+                                let output = JsonOutput::<Option<()>>::success(None, "gate status")
+                                    .with_message(msg);
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                println!("{}", msg);
+                            }
+                        }
+                        Err(e) => {
+                            if json {
+                                use jit::output::JsonError;
+                                let json_error = JsonError::new(
+                                    "GATE_CHECK_ERROR",
+                                    e.to_string(),
+                                    "gate status",
+                                );
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(json_error.exit_code().code());
+                            }
+                            return Err(e);
+                        }
+                    }
+                } else if history_mode {
                     // Gate key is an optional filter here (positional or --gate).
                     let gate_filter =
                         resolve_optional_gate_key(gate_key, gate_flag, "gate status", json)?;

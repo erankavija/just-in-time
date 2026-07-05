@@ -143,6 +143,11 @@ pub fn execute_gate_checker_with_context(
     let duration = start_time.elapsed();
     let completed_at = chrono::Utc::now();
 
+    // Parse the checker's machine-readable findings block (if any) once, at
+    // record time, so every downstream view reads structured data instead of
+    // re-grepping stdout. Absent or malformed blocks degrade to `None`.
+    let findings = crate::domain::parse_gate_findings(&execution_result.stdout);
+
     let status = match execution_result.exit_code {
         Some(0) => GateRunStatus::Passed,
         // Shell could not execute the command: 127 = command not found,
@@ -170,6 +175,7 @@ pub fn execute_gate_checker_with_context(
         command: execution_result.command,
         by: Some("auto:executor".to_string()),
         message: None,
+        findings,
     })
 }
 
@@ -851,6 +857,7 @@ mod tests {
             command: "review-checker".to_string(),
             by: Some("auto:executor".to_string()),
             message: None,
+            findings: None,
         };
 
         let context = GateContext {

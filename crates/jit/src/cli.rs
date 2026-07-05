@@ -1588,8 +1588,14 @@ pub enum GateCommands {
     ///   jit gate status <ISSUE_ID> <GATE_KEY> --stdout
     ///   jit gate status <ISSUE_ID> <GATE_KEY> --stderr --tail 40
     ///
-    /// History flags and flat-output flags are mutually exclusive. Every view
-    /// supports `--json`.
+    /// Findings view (`--findings`) prints only the latest run's structured
+    /// findings and verdict, one finding per line in a stable greppable format.
+    /// The gate key is required here:
+    ///
+    ///   jit gate status <ISSUE_ID> <GATE_KEY> --findings
+    ///
+    /// History, flat-output, and findings flags are mutually exclusive. Every
+    /// view supports `--json`.
     ///
     /// The history view (`--all` / `--limit`) emits the list envelope
     /// `{"count": N, "results": [...]}`, where `count` is the number of runs
@@ -1631,6 +1637,11 @@ pub enum GateCommands {
         /// Flat view: keep only the last N lines of the printed report text
         #[arg(long, value_name = "N")]
         tail: Option<usize>,
+
+        /// Findings view: print only the latest run's structured findings and
+        /// verdict, one finding per line. Requires a gate key.
+        #[arg(long)]
+        findings: bool,
 
         #[arg(long)]
         json: bool,

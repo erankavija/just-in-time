@@ -1239,6 +1239,7 @@ mod tests {
             command: "true".to_string(),
             by: None,
             message: None,
+            findings: None,
         };
 
         storage.save_gate_run_result(&result).unwrap();

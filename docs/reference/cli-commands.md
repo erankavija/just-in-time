@@ -1616,12 +1616,12 @@ Gate: tests
 ### `jit gate status`
 
 The unified gate-run inspection surface (inspection only, non-mutating). Legacy
-alias: `check`. It offers three views over the stored run records: the latest
-run (default), prior runs (history), and the raw report text (flat). All three
-are read-only and reuse already-recorded runs; none executes a checker or
-mutates gate state. Unlike [`status-all`](#jit-gate-status-all), the singular
-`status` never exits nonzero on a pending or failed gate — it is pure
-inspection.
+alias: `check`. It offers four views over the stored run records: the latest
+run (default), prior runs (history), the raw report text (flat), and the
+structured findings (findings). All are read-only and reuse already-recorded
+runs; none executes a checker or mutates gate state. Unlike
+[`status-all`](#jit-gate-status-all), the singular `status` never exits nonzero
+on a pending or failed gate — it is pure inspection.
 
 **Usage:**
 ```bash
@@ -1636,6 +1636,9 @@ jit gate status <ISSUE_ID> --limit <N> [--gate <GATE_KEY>] [--status <STATUS>] [
 # Flat view: the latest run's stored report text, verbatim
 jit gate status <ISSUE_ID> <GATE_KEY> --stdout [--tail <N>] [--json]
 jit gate status <ISSUE_ID> <GATE_KEY> --stderr [--tail <N>] [--json]
+
+# Findings view: the latest run's structured findings + verdict, one per line
+jit gate status <ISSUE_ID> <GATE_KEY> --findings [--json]
 ```
 
 For the latest-run and flat views the gate key may be supplied as a positional
@@ -1654,16 +1657,38 @@ present, filters the listing to that gate.
 - `--stdout` - Flat view: print the latest run's stored stdout verbatim.
 - `--stderr` - Flat view: print the latest run's stored stderr verbatim.
 - `--tail <N>` - Flat view: keep only the last `N` lines of the printed text.
-- `--json` - Machine-readable output (supported by all three views).
+- `--findings` - Findings view: print only the latest run's structured findings
+  and verdict (requires a gate key).
+- `--json` - Machine-readable output (supported by every view).
 
 The history view (`--all` / `--limit`) emits the list envelope
 `{"count": N, "results": [...]}`, where `count` is the number of runs returned
 after filtering. (The latest-run and flat views return a single run object.)
 
-History flags (`--all` / `--limit`) and flat-output flags
-(`--stdout` / `--stderr` / `--tail`) are mutually exclusive, and `--status`
-applies only to the history view. Each violation is reported as an
-`INVALID_ARGUMENT` error (machine-readable under `--json`).
+**Structured findings.** When a run's checker emitted a machine-readable
+findings block (see
+[Structured Findings](../how-to/custom-gates.md#structured-findings-machine-readable-output)),
+its parsed form rides along as a `findings` object on the run in the latest-run,
+history, and `status-all` JSON. The object has `verdict`, `summary`, and a
+`findings` array of `{id, severity, summary, file?, line?}`. It is retained even
+in the lean (passing) `status-all` projection that drops raw stdout, and it is
+absent for plain-text checkers. Raw stdout is always kept alongside.
+
+The `--findings` view reports only this structure for the latest run:
+
+- Text: a header line `<gate> verdict: <v> summary: <s> findings: <N>` followed
+  by one finding per line, `<id> [<severity>] <summary> (<file>:<line>)`. A run
+  with no block renders `verdict: n/a findings: 0 (no machine-readable findings
+  block)`.
+- `--json`: `{"key", "run_id", "has_findings", "verdict", "summary",
+  "findings":[...]}`. `has_findings` is `false` (and `verdict`/`summary` absent,
+  `findings` empty) when the run carried no block.
+
+History flags (`--all` / `--limit`), flat-output flags
+(`--stdout` / `--stderr` / `--tail`), and the findings flag (`--findings`) are
+mutually exclusive, and `--status` applies only to the history view. Each
+violation is reported as an `INVALID_ARGUMENT` error (machine-readable under
+`--json`).
 
 **Examples:**
 ```bash
@@ -1680,6 +1705,12 @@ jit gate status abc123 --limit 5 --gate tests --status failed
 
 # Flat view: the latest 'clippy' run's stderr, last 40 lines, undecorated
 jit gate status abc123 clippy --stderr --tail 40
+
+# Findings view: the latest 'code-review' run's structured findings + verdict
+jit gate status abc123 code-review --findings
+# code-review verdict: fail summary: 2 issues found findings: 2
+# F1 [high] missing error context (src/x.rs:42)
+# F2 [low] prefer iterator combinator
 ```
 
 ### `jit gate status-all`

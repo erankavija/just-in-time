@@ -81,6 +81,18 @@ ${CONTEXT_JSON}
 
 Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
 
+Then emit a machine-readable findings block so jit can consume the findings as data. The block is two line-exact fence markers wrapping a single JSON object:
+
+<<<JIT-FINDINGS-JSON
+{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"path/to/file.rs","line":42}]}
+JIT-FINDINGS-JSON>>>
+
+Rules for the block:
+- \`verdict\` is "pass" or "fail" and MUST match the VERDICT line below.
+- \`findings\` lists every finding from the numbered list above, in order. Use "pass" with an empty findings array when there are none.
+- \`severity\` is one of "high", "medium", "low". \`file\` and \`line\` are optional; omit them when a finding is not tied to a specific location.
+- Emit valid JSON on a single line. Do not wrap the block in a code fence.
+
 You MUST end your response with exactly one of these lines:
 VERDICT: PASS
 VERDICT: FAIL

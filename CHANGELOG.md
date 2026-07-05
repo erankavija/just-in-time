@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Structured gate findings in machine output.** An automated checker can
+  append a machine-readable block to its stdout, fenced by the line-exact markers
+  `<<<JIT-FINDINGS-JSON` / `JIT-FINDINGS-JSON>>>`, carrying
+  `{verdict, summary, findings:[{id, severity, summary, file?, line?}]}`. jit
+  parses it once at gate-run record time and surfaces the parsed structure as a
+  `findings` object on the run across the gate views (`gate status` latest-run
+  and `--all` history, `gate status-all`, and the gate-blocked transition error
+  envelope's `checker_result`). Raw stdout is kept alongside it, and the
+  structure is retained even in the lean `status-all` projection that drops raw
+  stdout for passing runs. A new findings view, `jit gate status <id> <gate>
+  --findings`, prints only the verdict and findings — one greppable finding per
+  line as text, or `{key, run_id, has_findings, verdict, summary, findings}`
+  with `--json`. The contract is opt-in and degrades gracefully: a checker that
+  emits no block, or a malformed block, yields no `findings` field and no error,
+  leaving existing plain-text behaviour unchanged. Documented in
+  [custom-gates.md](docs/how-to/custom-gates.md#structured-findings-machine-readable-output);
+  the bundled `scripts/ai-review.sh` is the first conforming checker.
+
 - **`jit issue children <id>` — a container's direct children at a glance.**
   Lists the container's immediate dependencies (depth 1), each rendered exactly
   like `issue status` (one greppable line, ascending short-id order), or as the
