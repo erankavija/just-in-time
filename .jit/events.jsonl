@@ -5564,3 +5564,4 @@
 {"type":"gate_passed","id":"6d2937d6-4b67-4d49-8d80-a0b103ead995","issue_id":"b3a54e25-854d-407e-b2ff-32b3eec1129c","timestamp":"2026-07-05T23:52:06.028421632Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"373ac6b3-6c9c-4a29-9d66-bfce98d60cbd","issue_id":"b3a54e25-854d-407e-b2ff-32b3eec1129c","timestamp":"2026-07-05T23:52:38.983566257Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"4baba7b8-23c0-4563-9756-95c54c783de4","issue_id":"b3a54e25-854d-407e-b2ff-32b3eec1129c","timestamp":"2026-07-05T23:52:38.983590567Z"}
+{"type":"issue_updated","id":"b0c486d6-f06f-49c6-9ce2-95c1a8f2e315","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T23:53:45.317271743Z","updated_by":"doc-add","fields":["documents"]}
