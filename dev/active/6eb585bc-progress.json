@@ -108,5 +108,6 @@
     "def64ac4": 2,
     "03d54a9f": 1
   },
-  "started_at": "2026-07-05T00:00:00Z"
+  "started_at": "2026-07-05T00:00:00Z",
+  "epic_disposition": "OPEN \u2014 retained as a living container for ongoing core-maintenance work (invoker decision 2026-07-05). This batch of 8 open children complete; epic NOT closed."
 }
