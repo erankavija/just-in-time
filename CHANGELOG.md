@@ -53,6 +53,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     exclusive id/filter, and the `--content-format` / `--type` / description-flag
     rejections) now exit `2`, matching clap's own usage errors, and emit a JSON
     envelope under `--json`.
+  - The **misplaced query-filter guard** (`--state`/`--assignee`/`--priority`/
+    `--label`/`--full`/`--json` given before a `jit query` subcommand, where they
+    would be silently dropped) now exits `2` and emits a JSON envelope under
+    `--json`, matching the other query-family usage guards.
   - `jit dep rm <from> <target>` now validates **both** id arguments identically:
     a too-short or ambiguous prefix in either position is the same argument error
     (exit `2`), where previously a short `<target>` was silently reported as "not
@@ -67,7 +71,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **BREAKING — exit codes for prefix and batch-usage errors changed from `1` to
   `2`.** Scripts that branch on the exit code of an ambiguous/too-short id prefix,
-  a `jit issue update --filter` usage guard, or `jit dep rm` with a bad id must
+  a `jit issue update --filter` usage guard, a misplaced pre-subcommand `jit
+  query` filter, or `jit dep rm` with a bad id must
   treat `2` (invalid argument) as the failure code for these cases. A short
   `<target>` to `jit dep rm` that previously succeeded (exit `0`, reported under
   `not_found`) now fails with exit `2`; pass a ≥4-character prefix or the full id.

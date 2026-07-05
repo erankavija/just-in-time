@@ -1266,6 +1266,41 @@ fn test_exit_code_batch_description_guard() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("not supported with --filter"));
 }
 
+/// A query filter placed before a subcommand (where it would be silently
+/// dropped) is a usage error (exit 2), matching the other query-family and
+/// batch-mode usage guards. Under --json it carries an INVALID_ARGUMENT
+/// envelope; the message text is unchanged.
+#[test]
+fn test_exit_code_query_parent_filter_before_subcommand() {
+    let temp_dir = setup_test_env();
+
+    // Human path: exit 2, original phrasing preserved.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "--state", "ready", "available"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("were given before the `available` subcommand"));
+
+    // --json path: same exit code, machine-readable envelope on stdout. The
+    // parent-level `--json` (and `--state`) precede the subcommand — that is the
+    // misplacement the guard rejects, and it also selects JSON rendering.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .args(["query", "--state", "ready", "--json", "available"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("were given before"));
+}
+
 /// REQ-03: `jit dep rm <from> <target>` validates both id arguments identically.
 /// A too-short prefix in either position is the same argument error (exit 2),
 /// where previously a short `<target>` was silently treated as "not found"

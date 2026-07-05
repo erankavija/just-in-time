@@ -1128,12 +1128,19 @@ fn reject_parent_query_filters(
         QueryCommands::Closed { .. } => "closed",
     };
 
-    Err(anyhow!(
-        "filter(s) {flags} were given before the `{sub}` subcommand, where they \
-         are ignored. Put them after the subcommand (e.g. `jit query {sub} {flags}`), \
-         or drop the subcommand to use the bare form (e.g. `jit query {flags}`).",
-        flags = offending.join(" "),
-        sub = sub,
+    // A misplaced pre-subcommand filter is a usage error (exit 2), the same class
+    // as clap's own usage errors — routed through the json-aware
+    // `invalid_argument` helper so `--json` callers get a machine-readable
+    // envelope instead of a bare stderr line. Message text unchanged.
+    let flags = offending.join(" ");
+    Err(invalid_argument(
+        format!(
+            "filter(s) {flags} were given before the `{sub}` subcommand, where they \
+             are ignored. Put them after the subcommand (e.g. `jit query {sub} {flags}`), \
+             or drop the subcommand to use the bare form (e.g. `jit query {flags}`)."
+        ),
+        "query",
+        json,
     ))
 }
 

@@ -2071,7 +2071,7 @@ jit query --state in_progress --json         # combine with --json
 ```
 
 These filters belong to the bare form only. Supplying one before a subcommand
-(e.g. `jit query --state ready available`) is a usage error (exit code `1`)
+(e.g. `jit query --state ready available`) is a usage error (exit code `2`)
 rather than a silent no-op, because the parent-level filter would otherwise be
 dropped. Put the filter on the subcommand (`jit query available --priority high`)
 or drop the subcommand to use the bare form.
