@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "d833f1fc-f9b1-4061-901c-e3a3deafcd67",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "dc3bef62-523a-4528-b86c-a576b8c97ed0",
+  "commit": "2f1fb5f7d9ecb1fcb2fc0b665f9472e4b3a0bf39",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T12:25:52.489526007Z",
+  "completed_at": "2026-07-05T12:28:16.730543046Z",
+  "duration_ms": 144241,
+  "exit_code": 0,
+  "stdout": "  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 3138 passed, 0 failed, 12 ignored\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "83ac0a4a-4211-4825-970d-2e7b5260c4de",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "dc3bef62-523a-4528-b86c-a576b8c97ed0",
+  "commit": "2f1fb5f7d9ecb1fcb2fc0b665f9472e4b3a0bf39",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T12:28:16.761281548Z",
+  "completed_at": "2026-07-05T12:30:06.542957559Z",
+  "duration_ms": 109781,
+  "exit_code": 0,
+  "stdout": "**Architecture and Separation of Concerns**\n\nNo blocking issues found. CLI argument shape lives in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:70), orchestration and storage access stay in [commands/query.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/query.rs:48), and pure label matching is in [domain/queries.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/queries.rs:195).\n\n**Functional Paradigm**\n\nNo blocking issues found. The new domain query uses iterator combinators and `all()` for AND semantics.\n\n**Correctness and Invariants**\n\nREQ-01 is met: `query all`, `query available`, `query blocked`, `issue list`, top-level `list`, and bare `query` all accept repeated `--label` via `Vec<String>` and pass all labels through AND-combined filtering.\n\nREQ-02 is met: generated help for each label-filtered command states repeatable AND semantics.\n\nREQ-03 is met: single-label regression coverage exists and the implementation reuses the same validation path.\n\nNo changes touched atomic writes, event logging, gate transitions, assignee parsing, label format enforcement, or PID handling.\n\n**Safety**\n\nNo unsafe code introduced. `#![deny(unsafe_code)]` remains in place.\n\n**Testing**\n\nThe provided `cargo-ci` gate passed for commit `2f1fb5f7d9ecb1fcb2fc0b665f9472e4b3a0bf39`: fmt ok, clippy ok, tests `3138 passed, 0 failed, 12 ignored`.\n\nI did not rerun the test suite because the issue has a succeeded cargo-ci gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo blocking issues found. Invalid label pattern behavior is preserved through the shared validation helper.\n\n**CLI Contract**\n\nNo blocking issues found. Affected commands retain `--json`.\n\n**Documentation**\n\nNo blocking issues found for the CLI help contract. Changelog and CLI reference were updated.\n\n**Prior Review Feedback**\n\nNo prior review feedback was provided in `run_history`.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty, so there is no prerequisite work to verify. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\nTotal findings: 0\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
