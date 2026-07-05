@@ -97,6 +97,9 @@ mod tests {
             content_format: None,
             created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
             updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+            first_ready_at: None,
+            claimed_at: None,
+            done_at: None,
         }
     }
 

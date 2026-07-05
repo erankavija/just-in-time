@@ -23,6 +23,9 @@ fn make_issue(id: &str, title: &str, state: State) -> Issue {
         content_format: None,
         created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
         updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+        first_ready_at: None,
+        claimed_at: None,
+        done_at: None,
     }
 }
 
@@ -43,6 +46,9 @@ fn make_issue_with_deps(id: &str, title: &str, state: State, deps: Vec<String>) 
         content_format: None,
         created_at: "2024-01-01T00:00:00Z".parse().unwrap(),
         updated_at: "2024-01-01T00:00:00Z".parse().unwrap(),
+        first_ready_at: None,
+        claimed_at: None,
+        done_at: None,
     }
 }
 

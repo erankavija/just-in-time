@@ -136,11 +136,15 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     output
 }
 
-/// Export Issue dependency graph as JSON for programmatic analysis
+/// Export Issue dependency graph as JSON for programmatic analysis (summary shape)
 ///
 /// Emits `{ "nodes": [...], "edges": [...] }` where each node includes
 /// `id`, `short_id`, `title`, `state`, `priority`, and `labels`, and each
 /// edge is `{ "from": source_id, "to": dep_id }`.
+///
+/// This is the default `jit graph export --format json` shape, kept lean for
+/// orchestration loops. For complete node records use [`export_json_full`]
+/// (`--full`); the two share an identical `edges` list.
 pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
     let mut all_nodes = Vec::new();
     collect_all_nodes(graph, &mut all_nodes);
@@ -160,6 +164,50 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
         })
         .collect();
 
+    render_graph_json(nodes, &all_nodes)
+}
+
+/// Export Issue dependency graph as JSON with COMPLETE node records (`--full`).
+///
+/// Emits `{ "nodes": [...], "edges": [...] }` with the same `edges` list as
+/// [`export_json`], but each node is the full serialized [`Issue`] record —
+/// every field the on-disk issue file carries: `id`, `title`, `description`,
+/// `state`, `priority`, `assignee`, `dependencies`, `gates_required`,
+/// `gates_status` (each gate's key mapped to its `status`/`updated_by`/
+/// `updated_at`), `context`, `documents`, `labels`, `created_at`, `updated_at`,
+/// and the lifecycle timestamps (`first_ready_at`, `claimed_at`, `done_at`) when
+/// present. This gives bulk consumers complete records in one call without
+/// globbing `.jit/issues/*.json`.
+///
+/// # Example
+/// ```
+/// use jit::visualization;
+/// use jit::{graph::DependencyGraph, Issue};
+///
+/// let issue = Issue::new("Design".to_string(), "Design API".to_string());
+/// let issues = vec![&issue];
+/// let graph = DependencyGraph::new(&issues);
+/// let json = visualization::export_json_full(&graph);
+/// assert!(json.contains("\"description\""));
+/// assert!(json.contains("\"gates_status\""));
+/// ```
+pub fn export_json_full(graph: &DependencyGraph<Issue>) -> String {
+    let mut all_nodes = Vec::new();
+    collect_all_nodes(graph, &mut all_nodes);
+
+    let nodes: Vec<serde_json::Value> = all_nodes
+        .iter()
+        .map(|issue| serde_json::to_value(issue).unwrap_or(serde_json::Value::Null))
+        .collect();
+
+    render_graph_json(nodes, &all_nodes)
+}
+
+/// Assemble the `{ "nodes", "edges" }` document, pretty-printed.
+///
+/// The `edges` list is derived from the same node set both export shapes share,
+/// so the two shapes differ ONLY in node contents (summary vs. full record).
+fn render_graph_json(nodes: Vec<serde_json::Value>, all_nodes: &[&Issue]) -> String {
     let edges: Vec<serde_json::Value> = all_nodes
         .iter()
         .flat_map(|issue| {
@@ -268,5 +316,85 @@ mod tests {
 
         assert!(dot.contains("\\\""));
         assert!(!dot.contains("Title with \"quotes\""));
+    }
+
+    /// REQ-03 byte-compat guard: the DEFAULT (summary) JSON node exposes exactly
+    /// the six documented keys and nothing else — no full-record fields leak in.
+    #[test]
+    fn test_export_json_summary_node_has_exactly_summary_keys() {
+        let issue = Issue::new("Summary".to_string(), "Body text".to_string());
+        let issues = vec![&issue];
+        let graph = DependencyGraph::new(&issues);
+
+        let doc: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
+        let node = &doc["nodes"][0];
+        let keys: std::collections::BTreeSet<&str> = node
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|s| s.as_str())
+            .collect();
+
+        let expected: std::collections::BTreeSet<&str> =
+            ["id", "short_id", "title", "state", "priority", "labels"]
+                .into_iter()
+                .collect();
+        assert_eq!(keys, expected);
+        // Full-record fields are absent from the summary shape.
+        assert!(node.get("description").is_none());
+        assert!(node.get("gates_status").is_none());
+    }
+
+    /// `--full` node is the complete issue record: it carries the fields the
+    /// summary shape omits, including the lifecycle timestamps when present.
+    #[test]
+    fn test_export_json_full_node_is_complete_record() {
+        use crate::domain::{GateState, GateStatus, State};
+        let mut issue = Issue::new("Full".to_string(), "Body text".to_string());
+        issue.state = State::Done;
+        issue.gates_required.push("tests".to_string());
+        issue.gates_status.insert(
+            "tests".to_string(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: None,
+                updated_at: chrono::Utc::now(),
+            },
+        );
+        issue.mark_first_ready(chrono::Utc::now());
+        issue.mark_done(chrono::Utc::now());
+
+        let issues = vec![&issue];
+        let graph = DependencyGraph::new(&issues);
+        let doc: serde_json::Value = serde_json::from_str(&export_json_full(&graph)).unwrap();
+        let node = &doc["nodes"][0];
+
+        assert_eq!(node["description"], "Body text");
+        assert_eq!(node["gates_required"][0], "tests");
+        assert_eq!(node["gates_status"]["tests"]["status"], "passed");
+        assert!(node.get("created_at").is_some());
+        assert!(node.get("updated_at").is_some());
+        assert!(node.get("first_ready_at").is_some());
+        assert!(node.get("done_at").is_some());
+        // Absent lifecycle fields stay omitted (skip_serializing_if).
+        assert!(node.get("claimed_at").is_none());
+    }
+
+    /// Both shapes emit an identical `edges` list — `--full` only changes node
+    /// contents.
+    #[test]
+    fn test_export_json_shapes_share_edges() {
+        let dep = Issue::new("Dep".to_string(), String::new());
+        let mut issue = Issue::new("Root".to_string(), String::new());
+        issue.dependencies.push(dep.id.clone());
+
+        let issues = vec![&dep, &issue];
+        let graph = DependencyGraph::new(&issues);
+
+        let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
+        let full: serde_json::Value = serde_json::from_str(&export_json_full(&graph)).unwrap();
+        assert_eq!(summary["edges"], full["edges"]);
+        assert_eq!(summary["edges"][0]["from"], issue.id);
+        assert_eq!(summary["edges"][0]["to"], dep.id);
     }
 }

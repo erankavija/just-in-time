@@ -255,6 +255,76 @@ fn test_export_mermaid_format() {
     assert!(stdout.contains("classDef"));
 }
 
+#[test]
+fn test_export_json_full_emits_complete_records() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(jit)
+        .args(["issue", "create", "-t", "Task", "-d", "Full body"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["graph", "export", "--format", "json", "--full"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let node = &doc["nodes"][0];
+    // Complete-record fields the summary shape omits.
+    assert_eq!(node["description"], "Full body");
+    assert!(node.get("gates_status").is_some());
+    assert!(node.get("created_at").is_some());
+    assert!(doc.get("edges").is_some());
+}
+
+#[test]
+fn test_export_full_requires_json_format() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    let output = Command::new(jit)
+        .args(["graph", "export", "--format", "dot", "--full"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    // Usage error: --full with a non-JSON format exits 2.
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--full is only valid with --format json"));
+}
+
+#[test]
+fn test_migrate_lifecycle_timestamps_runs() {
+    let temp = setup_test_repo();
+    let jit = jit_binary();
+
+    Command::new(jit)
+        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    let output = Command::new(jit)
+        .args(["migrate", "lifecycle-timestamps", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    // Raw-data envelope carries scan/update counts at the top level.
+    assert!(doc["issues_scanned"].as_u64().is_some());
+    assert!(doc["issues_updated"].as_u64().is_some());
+}
+
 // Test issue lifecycle
 #[test]
 fn test_issue_create_list_show() {

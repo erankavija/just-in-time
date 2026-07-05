@@ -50,7 +50,12 @@ Each issue is stored as `issues/<uuid>.json`:
       "label": "Design Doc"
     }
   ],
-  "context": {}
+  "context": {},
+  "created_at": "2026-01-15T09:00:00Z",
+  "updated_at": "2026-01-15T10:30:00Z",
+  "first_ready_at": "2026-01-15T09:05:00Z",
+  "claimed_at": "2026-01-15T09:30:00Z",
+  "done_at": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -70,6 +75,38 @@ Each issue is stored as `issues/<uuid>.json`:
 | `labels` | string[] | Format: `namespace:value` |
 | `documents` | object[] | Linked document references |
 | `context` | object | Arbitrary metadata |
+| `created_at` | timestamp | When the issue was created (RFC 3339) |
+| `updated_at` | timestamp | When the issue was last modified (RFC 3339) |
+| `first_ready_at` | timestamp? | When the issue FIRST entered `ready` (see below) |
+| `claimed_at` | timestamp? | When the issue was FIRST claimed/assigned |
+| `done_at` | timestamp? | When the issue FIRST reached `done` |
+
+#### Lifecycle timestamps
+
+`first_ready_at`, `claimed_at`, and `done_at` record when an issue first passed
+each lifecycle milestone. They are written **once**, at the transition:
+
+- `first_ready_at` — set the first time the issue enters `ready`, including the
+  auto-promotion of a dependency-free issue at creation.
+- `claimed_at` — set at the first claim or assignment.
+- `done_at` — set the first time the issue reaches `done`. **Re-opening and
+  re-completing does not overwrite it** ("first occurrence" semantics apply to
+  all three).
+
+Each field is **optional** and omitted from the JSON when unset (an issue that
+never reached the milestone, or one predating these fields). Backfill the fields
+for pre-existing issues from the event log with
+[`jit migrate lifecycle-timestamps`](cli-commands.md#jit-migrate-lifecycle-timestamps);
+issues whose event log carries no relevant transition stay unset.
+
+**Compatibility.** These three fields (like `content_format` before them) are
+**additive and optional**: the issue record does not use serde
+`deny_unknown_fields`, so an older `jit` binary reading a newer repository
+ignores keys it does not know, and a newer binary reads an older issue file by
+defaulting the missing fields to unset. Because a stale binary neither drops nor
+misreads them, adding these fields does **not** bump the repository
+`schema_version` (still `2`); the [format-version guard](#versioning) is
+reserved for changes that would make a stale binary misinterpret existing data.
 
 ## Configuration File
 

@@ -43,6 +43,7 @@ pub mod invariant;
 mod issue;
 pub mod item;
 mod labels;
+pub mod migrate;
 pub mod plan_doc;
 mod query;
 pub mod reference;
@@ -71,6 +72,7 @@ pub use graph::GraphExportFormat;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
+pub use migrate::LifecycleBackfillResult;
 pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;
 pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE};
@@ -673,6 +675,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Enforcement passed (or was bypassed/skipped): land the new state.
         issue.state = target;
+
+        // Stamp the lifecycle timestamp for this transition (first-occurrence
+        // only; see `Issue::mark_*`). Done HERE, at the single chokepoint every
+        // state change flows through, so no Ready/Done path can forget it —
+        // including `persist = false` callers, which carry this mutated issue
+        // into their own combined save. Claim/assignment stamps `claimed_at`
+        // separately (assignment is not a state transition).
+        match target {
+            State::Ready => issue.mark_first_ready(Utc::now()),
+            State::Done => issue.mark_done(Utc::now()),
+            _ => {}
+        }
 
         if persist {
             pre_save(issue);

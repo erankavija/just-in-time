@@ -519,7 +519,8 @@ jit_issue_create({
 **`jit_graph_export`** - Export graph in various formats
 ```javascript
 {
-  format: string,             // "dot" | "mermaid"
+  format: string,             // "dot" | "mermaid" | "json"
+  full?: boolean,             // Complete issue records per node (json only)
   output?: string             // File path (optional)
 }
 ```
@@ -2476,11 +2477,93 @@ header:
 
 ## Graph Commands
 
-<!-- jit graph deps/export/roots/downstream -->
+<!-- jit graph deps/roots/downstream -->
+
+### `jit graph export`
+
+Export the whole-repository dependency graph.
+
+```
+jit graph export [--format dot|mermaid|json] [--full] [--output <file>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--format` | Output format: `dot` (default), `mermaid`, or `json`. |
+| `--full` | Emit complete issue records per node. **JSON only** — combining it with `dot`/`mermaid` is a usage error (exit 2). |
+| `--output` | Write to a file instead of stdout. |
+
+`dot` and `mermaid` render the graph for Graphviz / Mermaid. `json` emits a
+`{ "nodes": [...], "edges": [...] }` document for programmatic consumers, in one
+of two node shapes; the `edges` list (`{ "from": <id>, "to": <dep-id> }`, one per
+dependency edge) is identical in both.
+
+**Summary shape (default `--format json`)** — lean nodes for orchestration
+loops:
+
+```json
+{
+  "nodes": [
+    {
+      "id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+      "short_id": "003f9f83",
+      "title": "Issue title",
+      "state": "ready",
+      "priority": "normal",
+      "labels": ["type:task", "epic:auth"]
+    }
+  ],
+  "edges": [
+    { "from": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17", "to": "<dep-uuid>" }
+  ]
+}
+```
+
+**Full shape (`--format json --full`)** — each node is the complete issue
+record, byte-for-byte the fields of the on-disk `issues/<id>.json` file
+(`id`, `title`, `description`, `state`, `priority`, `assignee`, `dependencies`,
+`gates_required`, `gates_status` with each gate's `status`/`updated_by`/
+`updated_at`, `context`, `documents`, `labels`, `created_at`, `updated_at`, and
+the lifecycle timestamps `first_ready_at`/`claimed_at`/`done_at` when present).
+This lets a bulk consumer read every node's full record in one call instead of
+globbing the issue files. The `edges` list is the same as the summary shape.
+
+The default (no `--full`) output is unchanged from prior releases: bulk loops
+that parse the summary shape are unaffected. See
+[storage-format § Issue JSON Schema](storage-format.md#issue-json-schema) for the
+full field reference.
 
 ## Status and Validation
 
 <!-- jit status, jit validate -->
+
+## Maintenance Commands
+
+### `jit migrate lifecycle-timestamps`
+
+One-time backfill of the issue [lifecycle
+timestamps](storage-format.md#lifecycle-timestamps) (`first_ready_at`,
+`claimed_at`, `done_at`) for issues created before those fields were written at
+transition time.
+
+```
+jit migrate lifecycle-timestamps [--json]
+```
+
+For every issue missing one of the fields, the value is derived from
+`.jit/events.jsonl`: the first `issue_state_changed` into `ready`, the first
+`issue_claimed`, and the first `issue_state_changed` into `done`, respectively.
+Only still-absent fields are filled — an existing timestamp is never overwritten,
+preserving first-occurrence semantics. Updated issues are written atomically and
+a single `lifecycle_timestamps_backfilled` event records the count.
+
+The migration is **idempotent**: a second run over an already-migrated
+repository writes nothing, appends no event, and reports `issues_updated: 0`.
+Issues whose event log carries no relevant transition (predating event coverage,
+or auto-promoted straight to `ready` at creation, which logs no transition) keep
+their fields unset — the timestamps are unrecoverable, not defaulted.
+
+`--json` prints `{ "issues_scanned": N, "issues_updated": M }`.
 
 ## Configuration
 

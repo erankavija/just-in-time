@@ -8,6 +8,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Full-record bulk graph export (`jit graph export --format json --full`) and
+  issue lifecycle timestamps.** The JSON graph export gains a `--full` flag that
+  emits the complete issue record for each node — every field of the on-disk
+  `issues/<id>.json` file, including `assignee`, `labels`, `gates_status` (each
+  gate's key/status/`updated_by`/`updated_at`), `dependencies`, `description`,
+  `created_at`/`updated_at`, and the new lifecycle timestamps — alongside the
+  same `edges` list. This lets a bulk consumer read every node's full record in
+  one call instead of globbing the issue files and streaming the event log.
+  Without `--full` the output is byte-identical to the previous summary shape
+  (`id`, `short_id`, `title`, `state`, `priority`, `labels` + edges); `--full`
+  applies only to `--format json` (combining it with `dot`/`mermaid` is a usage
+  error, exit 2).
+
+  The issue record now stores three lifecycle timestamps written **once**, at
+  the transition: `first_ready_at` (first time the issue enters `ready`,
+  including the dependency-free auto-promotion at creation), `claimed_at` (first
+  claim/assignment), and `done_at` (first time it reaches `done` — re-opening and
+  re-completing does not overwrite it). All three are optional and omitted from
+  JSON when unset. They are carried on the stored issue record and surface in the
+  full-fidelity single-issue view `jit issue show --json` and in the `--full`
+  graph export; the compact `issue status` projection stays lean and omits them.
+
+  These fields are additive and optional, so they do **not** bump the repository
+  `schema_version` (still `2`): the issue record does not use serde
+  `deny_unknown_fields`, so an older binary ignores the unknown keys and a newer
+  binary defaults them when reading an older file. Documented in
+  [cli-commands.md § `jit graph export`](docs/reference/cli-commands.md#jit-graph-export)
+  and [storage-format.md § lifecycle timestamps](docs/reference/storage-format.md#lifecycle-timestamps).
+
+  **Migration for existing repositories:** run `jit migrate lifecycle-timestamps`
+  once to backfill the timestamps for pre-existing issues from `.jit/events.jsonl`
+  (first Ready transition, first claim, first Done transition). It is idempotent
+  (a second run writes nothing) and fills only still-absent fields. Issues whose
+  event log carries no relevant transition stay unset. `--json` reports
+  `{issues_scanned, issues_updated}`.
+
 - **Structured gate findings in machine output.** An automated checker can
   append a machine-readable block to its stdout, fenced by the line-exact markers
   `<<<JIT-FINDINGS-JSON` / `JIT-FINDINGS-JSON>>>`, carrying

@@ -386,6 +386,13 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Run one-time data migrations
+    ///
+    /// Migrations are idempotent: re-running one over an already-migrated
+    /// repository changes nothing and is safe.
+    #[command(subcommand)]
+    Migrate(MigrateCommands),
+
     /// Start the JIT API and web UI server as a background process
     ///
     /// Launches `jit-server` as a daemon (detached from the terminal).
@@ -2013,9 +2020,38 @@ pub enum GraphCommands {
         #[arg(short, long, value_enum, default_value_t = crate::commands::GraphExportFormat::Dot)]
         format: crate::commands::GraphExportFormat,
 
+        /// Emit complete issue records for each node (JSON only).
+        ///
+        /// Only valid with `--format json`; combining it with `dot`/`mermaid`
+        /// is a usage error. Without this flag the JSON output keeps the lean
+        /// summary node shape.
+        #[arg(long)]
+        full: bool,
+
         /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]
         output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum MigrateCommands {
+    /// Backfill lifecycle timestamps from the event log
+    ///
+    /// Fills `first_ready_at`, `claimed_at`, and `done_at` on issues that
+    /// predate the transition-time write points, deriving each value from
+    /// `.jit/events.jsonl` (first Ready transition, first claim, first Done
+    /// transition). Only still-absent fields are filled; existing stamps are
+    /// never overwritten. One-time and idempotent — a second run over an
+    /// already-migrated repository writes nothing.
+    ///
+    /// Issues with no relevant events (predating event coverage) keep their
+    /// fields unset.
+    ///
+    /// JSON output: `{"issues_scanned": N, "issues_updated": M}`.
+    LifecycleTimestamps {
+        #[arg(long)]
+        json: bool,
     },
 }
 

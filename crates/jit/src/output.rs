@@ -968,6 +968,15 @@ pub struct IssueShowResponse {
     pub content_format: Option<crate::domain::ContentFormat>,
     pub created_at: String,
     pub updated_at: String,
+    /// When the issue FIRST entered `ready` (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_ready_at: Option<String>,
+    /// When the issue was FIRST claimed/assigned (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_at: Option<String>,
+    /// When the issue FIRST reached `done` (RFC 3339); absent when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub done_at: Option<String>,
 }
 
 impl IssueShowResponse {
@@ -1059,6 +1068,9 @@ impl IssueShowResponse {
             content_format: issue.content_format,
             created_at: issue.created_at.to_rfc3339(),
             updated_at: issue.updated_at.to_rfc3339(),
+            first_ready_at: issue.first_ready_at.map(|t| t.to_rfc3339()),
+            claimed_at: issue.claimed_at.map(|t| t.to_rfc3339()),
+            done_at: issue.done_at.map(|t| t.to_rfc3339()),
         }
     }
 }
@@ -2077,6 +2089,30 @@ mod tests {
         // A clean issue has no dangling deps, so the field is omitted from
         // the JSON entirely (`skip_serializing_if = "Vec::is_empty"`).
         assert!(v.get("dangling_dependency_ids").is_none());
+        // Unset lifecycle timestamps are omitted from the show shape.
+        assert!(v.get("first_ready_at").is_none());
+        assert!(v.get("claimed_at").is_none());
+        assert!(v.get("done_at").is_none());
+    }
+
+    #[test]
+    fn test_show_response_surfaces_lifecycle_timestamps() {
+        use crate::domain::Issue;
+        let mut issue = Issue::new("T".to_string(), "B".to_string());
+        let at = chrono::Utc::now();
+        issue.mark_first_ready(at);
+        issue.mark_claimed(at);
+        issue.mark_done(at);
+
+        let resp = IssueShowResponse::from_issue(issue, vec![], &[]);
+        let v = serde_json::to_value(&resp).unwrap();
+
+        assert_eq!(
+            v["first_ready_at"],
+            serde_json::Value::String(at.to_rfc3339())
+        );
+        assert_eq!(v["claimed_at"], serde_json::Value::String(at.to_rfc3339()));
+        assert_eq!(v["done_at"], serde_json::Value::String(at.to_rfc3339()));
     }
 
     #[test]

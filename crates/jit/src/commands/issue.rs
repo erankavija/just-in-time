@@ -155,6 +155,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // below covers create-time validation.
         if issue.dependencies.is_empty() {
             issue.state = State::Ready;
+            // This direct write is the issue's INITIAL Ready state, so it does not
+            // pass through the `apply_state_transition` chokepoint that stamps
+            // `first_ready_at` for later transitions. Stamp it here so a
+            // dependency-free issue that is born Ready still records when it
+            // became workable (first-occurrence semantics via `mark_first_ready`).
+            issue.mark_first_ready(chrono::Utc::now());
         }
 
         // REQ-02: when `--type` was explicitly provided, hard-reject an undeclared
@@ -903,6 +909,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(warnings);
         }
         issue.assignee = Some(assignee);
+        // Record the first assignment time (first-occurrence only; re-assigning an
+        // already-claimed issue leaves the original stamp intact).
+        issue.mark_claimed(chrono::Utc::now());
         self.storage.save_issue(issue)?;
         Ok(warnings)
     }
@@ -987,6 +996,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let actor = claimant;
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(actor.clone());
+        // Record the first claim time (first-occurrence only; a re-claim by the
+        // same assignee leaves the original stamp intact).
+        issue.mark_claimed(chrono::Utc::now());
 
         let issue_id = issue.id.clone();
         self.storage.save_issue(issue)?;

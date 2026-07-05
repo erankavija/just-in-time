@@ -199,7 +199,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(roots.into_iter().cloned().collect())
     }
 
-    pub fn export_graph(&self, format: GraphExportFormat) -> Result<String> {
+    /// Render the whole-repository dependency graph in `format`.
+    ///
+    /// `full` selects the complete-record JSON node shape
+    /// ([`export_json_full`](crate::visualization::export_json_full)) instead of
+    /// the default summary shape; it applies ONLY to
+    /// [`GraphExportFormat::Json`]. The caller (CLI) rejects `full` with a
+    /// non-JSON format as a usage error before reaching here, so the `dot`/
+    /// `mermaid` arms ignore it.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use jit::commands::{CommandExecutor, GraphExportFormat};
+    /// # use jit::storage::JsonFileStorage;
+    /// # fn run(executor: &CommandExecutor<JsonFileStorage>) -> anyhow::Result<()> {
+    /// // Complete issue records plus the edge list.
+    /// let json = executor.export_graph(GraphExportFormat::Json, true)?;
+    /// # let _ = json;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn export_graph(&self, format: GraphExportFormat, full: bool) -> Result<String> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -207,6 +228,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(match format {
             GraphExportFormat::Dot => crate::visualization::export_dot(&graph),
             GraphExportFormat::Mermaid => crate::visualization::export_mermaid(&graph),
+            GraphExportFormat::Json if full => crate::visualization::export_json_full(&graph),
             GraphExportFormat::Json => crate::visualization::export_json(&graph),
         })
     }

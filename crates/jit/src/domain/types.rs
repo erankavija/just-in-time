@@ -491,6 +491,32 @@ pub struct Issue {
     pub created_at: DateTime<Utc>,
     /// When the issue was last updated (serialized as an RFC 3339 timestamp)
     pub updated_at: DateTime<Utc>,
+    /// When the issue FIRST entered [`State::Ready`] (RFC 3339 timestamp).
+    ///
+    /// Set once, at the first Ready transition (including the auto-promotion of a
+    /// dependency-free issue at creation); a later cycle back through Ready leaves
+    /// the original value intact ("first occurrence" semantics). Absent (`None`)
+    /// for an issue that never reached Ready, and for issues predating this field
+    /// whose event log carries no `issue_state_changed` into Ready. Skipped on
+    /// serialize when absent, so old issue files round-trip unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_ready_at: Option<DateTime<Utc>>,
+    /// When the issue was FIRST claimed/assigned (RFC 3339 timestamp).
+    ///
+    /// Set once, at the first assignment (`jit issue claim`/`assign`); a later
+    /// re-assignment leaves the original value intact. Absent (`None`) for an
+    /// unclaimed issue and for pre-existing issues with no claim in the event log.
+    /// Skipped on serialize when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claimed_at: Option<DateTime<Utc>>,
+    /// When the issue FIRST reached [`State::Done`] (RFC 3339 timestamp).
+    ///
+    /// Set once, at the first Done transition; re-opening and re-completing does
+    /// NOT overwrite it ("first occurrence" semantics). Absent (`None`) for an
+    /// issue never completed and for pre-existing issues with no completion in the
+    /// event log. Skipped on serialize when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at: Option<DateTime<Utc>>,
 }
 
 impl Issue {
@@ -513,6 +539,9 @@ impl Issue {
             content_format: None,
             created_at: now,
             updated_at: now,
+            first_ready_at: None,
+            claimed_at: None,
+            done_at: None,
         }
     }
 
@@ -544,6 +573,9 @@ impl Issue {
             content_format: None,
             created_at: now,
             updated_at: now,
+            first_ready_at: None,
+            claimed_at: None,
+            done_at: None,
         }
     }
 
@@ -592,6 +624,68 @@ impl Issue {
     /// A Gated issue transitions to Done when all required gates pass
     pub fn should_auto_transition_to_done(&self) -> bool {
         self.state == State::Gated && !self.has_unpassed_gates()
+    }
+
+    /// Stamp [`first_ready_at`](Self::first_ready_at) at the FIRST Ready
+    /// transition; a later cycle back through Ready is a no-op.
+    ///
+    /// Uses [`Option::get_or_insert`], so it records `at` only when the field is
+    /// still absent — the "first occurrence" semantics the lifecycle timestamps
+    /// require. Call at every path that lands [`State::Ready`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{TimeZone, Utc};
+    /// use jit::domain::Issue;
+    ///
+    /// let mut issue = Issue::new("t".into(), String::new());
+    /// let first = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    /// let later = Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
+    /// issue.mark_first_ready(first);
+    /// issue.mark_first_ready(later); // no-op: already stamped
+    /// assert_eq!(issue.first_ready_at, Some(first));
+    /// ```
+    pub fn mark_first_ready(&mut self, at: DateTime<Utc>) {
+        self.first_ready_at.get_or_insert(at);
+    }
+
+    /// Stamp [`claimed_at`](Self::claimed_at) at the FIRST claim/assignment; a
+    /// later re-assignment is a no-op.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::Utc;
+    /// use jit::domain::Issue;
+    ///
+    /// let mut issue = Issue::new("t".into(), String::new());
+    /// let now = Utc::now();
+    /// issue.mark_claimed(now);
+    /// assert_eq!(issue.claimed_at, Some(now));
+    /// ```
+    pub fn mark_claimed(&mut self, at: DateTime<Utc>) {
+        self.claimed_at.get_or_insert(at);
+    }
+
+    /// Stamp [`done_at`](Self::done_at) at the FIRST Done transition; re-opening
+    /// and re-completing does NOT overwrite it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{TimeZone, Utc};
+    /// use jit::domain::Issue;
+    ///
+    /// let mut issue = Issue::new("t".into(), String::new());
+    /// let first = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    /// let later = Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
+    /// issue.mark_done(first);
+    /// issue.mark_done(later); // no-op: already completed once
+    /// assert_eq!(issue.done_at, Some(first));
+    /// ```
+    pub fn mark_done(&mut self, at: DateTime<Utc>) {
+        self.done_at.get_or_insert(at);
     }
 }
 
@@ -1443,6 +1537,22 @@ pub enum Event {
         /// Registry key of the gate that was removed
         gate_key: String,
     },
+    /// The one-time lifecycle-timestamp backfill migration ran
+    /// (`jit migrate lifecycle-timestamps`).
+    ///
+    /// Repository-scoped, like [`Event::DocumentArchived`]: it carries no issue
+    /// id because it records a whole-repository migration rather than a single
+    /// issue's change. `issues_updated` is the number of issue files the run
+    /// wrote (issues that gained at least one derived timestamp); a re-run over an
+    /// already-migrated repository writes nothing and appends no event.
+    LifecycleTimestampsBackfilled {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Number of issues whose lifecycle timestamps were backfilled
+        issues_updated: usize,
+    },
 }
 
 impl Event {
@@ -1824,6 +1934,25 @@ impl Event {
         }
     }
 
+    /// Create a lifecycle-timestamp backfill event recording how many issues the
+    /// one-time migration updated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Event;
+    ///
+    /// let event = Event::new_lifecycle_timestamps_backfilled(3);
+    /// assert_eq!(event.get_type(), "lifecycle_timestamps_backfilled");
+    /// ```
+    pub fn new_lifecycle_timestamps_backfilled(issues_updated: usize) -> Self {
+        Event::LifecycleTimestampsBackfilled {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            issues_updated,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1846,6 +1975,7 @@ impl Event {
             Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
+            Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
         }
     }
 
@@ -1871,6 +2001,7 @@ impl Event {
             Event::GateDefinitionUpdated { .. } => "gate_definition_updated",
             Event::GateDefinitionCreated { .. } => "gate_definition_created",
             Event::GateDefinitionRemoved { .. } => "gate_definition_removed",
+            Event::LifecycleTimestampsBackfilled { .. } => "lifecycle_timestamps_backfilled",
         }
     }
 }
@@ -1893,6 +2024,80 @@ mod tests {
         assert!(issue.gates_status.is_empty());
         assert!(issue.context.is_empty());
         assert!(!issue.id.is_empty());
+        assert_eq!(issue.first_ready_at, None);
+        assert_eq!(issue.claimed_at, None);
+        assert_eq!(issue.done_at, None);
+    }
+
+    #[test]
+    fn test_mark_lifecycle_timestamps_are_first_occurrence_only() {
+        let mut issue = Issue::new("t".to_string(), String::new());
+        let first = Utc::now();
+        let later = first + chrono::Duration::hours(1);
+
+        issue.mark_first_ready(first);
+        issue.mark_first_ready(later);
+        issue.mark_claimed(first);
+        issue.mark_claimed(later);
+        issue.mark_done(first);
+        issue.mark_done(later);
+
+        assert_eq!(issue.first_ready_at, Some(first));
+        assert_eq!(issue.claimed_at, Some(first));
+        assert_eq!(issue.done_at, Some(first));
+    }
+
+    #[test]
+    fn test_old_issue_file_without_timestamps_loads_and_roundtrips() {
+        // An issue file written before the lifecycle-timestamp fields existed has
+        // none of the three keys. It must deserialize (fields default to None)
+        // and re-serialize WITHOUT introducing the keys, so old files round-trip
+        // byte-stable (skip_serializing_if = Option::is_none).
+        let json = r#"{
+            "id": "11111111-2222-3333-4444-555555555555",
+            "title": "Legacy",
+            "description": "",
+            "state": "ready",
+            "priority": "normal",
+            "assignee": null,
+            "dependencies": [],
+            "gates_required": [],
+            "gates_status": {},
+            "context": {},
+            "documents": [],
+            "labels": [],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z"
+        }"#;
+
+        let issue: Issue = serde_json::from_str(json).unwrap();
+        assert_eq!(issue.first_ready_at, None);
+        assert_eq!(issue.claimed_at, None);
+        assert_eq!(issue.done_at, None);
+
+        let reserialized = serde_json::to_string(&issue).unwrap();
+        assert!(!reserialized.contains("first_ready_at"));
+        assert!(!reserialized.contains("claimed_at"));
+        assert!(!reserialized.contains("done_at"));
+    }
+
+    #[test]
+    fn test_issue_with_timestamps_serializes_the_fields() {
+        let mut issue = Issue::new("t".to_string(), String::new());
+        let at = Utc::now();
+        issue.mark_first_ready(at);
+        issue.mark_claimed(at);
+        issue.mark_done(at);
+
+        let json = serde_json::to_string(&issue).unwrap();
+        assert!(json.contains("first_ready_at"));
+        assert!(json.contains("claimed_at"));
+        assert!(json.contains("done_at"));
+
+        let roundtripped: Issue = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtripped.first_ready_at, Some(at));
+        assert_eq!(roundtripped.claimed_at, Some(at));
+        assert_eq!(roundtripped.done_at, Some(at));
     }
 
     #[test]

@@ -4,8 +4,100 @@
 //! without requiring storage access. These are pure functions that can be used
 //! independently of the CLI orchestration layer.
 
-use crate::domain::{GateStatus, Issue, Priority, State};
+use crate::domain::{Event, GateStatus, Issue, Priority, State};
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+
+/// Lifecycle timestamps for an issue, derived from its event stream.
+///
+/// The three fields mirror the same-named [`Issue`] fields written at
+/// transition time; this value type is what the one-time backfill migration
+/// computes for issues that predate those write points. A field is `None` when
+/// the event log carries no corresponding signal for the issue.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LifecycleTimestamps {
+    /// First `issue_state_changed` into [`State::Ready`], if any.
+    pub first_ready_at: Option<DateTime<Utc>>,
+    /// First `issue_claimed`, if any.
+    pub claimed_at: Option<DateTime<Utc>>,
+    /// First `issue_state_changed` into [`State::Done`], if any.
+    pub done_at: Option<DateTime<Utc>>,
+}
+
+/// Derive an issue's lifecycle timestamps by folding its event stream.
+///
+/// Pure over `events`: it scans them in log order (`.jit/events.jsonl` is
+/// append-only and chronological) and, for events belonging to `issue_id`,
+/// takes the FIRST occurrence of each lifecycle signal:
+///
+/// - `first_ready_at` — the first `issue_state_changed` whose `to` is
+///   [`State::Ready`],
+/// - `claimed_at` — the first `issue_claimed`,
+/// - `done_at` — the first `issue_state_changed` whose `to` is [`State::Done`].
+///
+/// Events for other issues are ignored. A signal absent from the log yields
+/// `None`, so an issue predating event coverage (or one that never reached the
+/// state) keeps that field unset. An issue auto-promoted straight to Ready at
+/// creation emits no `issue_state_changed` into Ready, so its `first_ready_at`
+/// is not recoverable from events and stays `None`.
+///
+/// # Examples
+///
+/// ```
+/// use chrono::{TimeZone, Utc};
+/// use jit::domain::{Event, State};
+/// use jit::domain::queries::derive_lifecycle_timestamps;
+///
+/// let ready = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+/// let done = Utc.with_ymd_and_hms(2026, 1, 3, 0, 0, 0).unwrap();
+/// let events = vec![
+///     Event::IssueStateChanged {
+///         id: "e1".into(),
+///         issue_id: "abc".into(),
+///         timestamp: ready,
+///         from: State::Backlog,
+///         to: State::Ready,
+///     },
+///     Event::IssueStateChanged {
+///         id: "e2".into(),
+///         issue_id: "abc".into(),
+///         timestamp: done,
+///         from: State::InProgress,
+///         to: State::Done,
+///     },
+/// ];
+///
+/// let ts = derive_lifecycle_timestamps("abc", &events);
+/// assert_eq!(ts.first_ready_at, Some(ready));
+/// assert_eq!(ts.done_at, Some(done));
+/// assert_eq!(ts.claimed_at, None);
+/// ```
+pub fn derive_lifecycle_timestamps(issue_id: &str, events: &[Event]) -> LifecycleTimestamps {
+    let mut ts = LifecycleTimestamps::default();
+    for event in events.iter().filter(|e| e.get_issue_id() == issue_id) {
+        match event {
+            Event::IssueStateChanged {
+                to: State::Ready,
+                timestamp,
+                ..
+            } => {
+                ts.first_ready_at.get_or_insert(*timestamp);
+            }
+            Event::IssueStateChanged {
+                to: State::Done,
+                timestamp,
+                ..
+            } => {
+                ts.done_at.get_or_insert(*timestamp);
+            }
+            Event::IssueClaimed { timestamp, .. } => {
+                ts.claimed_at.get_or_insert(*timestamp);
+            }
+            _ => {}
+        }
+    }
+    ts
+}
 
 /// Build a HashMap of issue ID to issue reference for dependency resolution.
 ///
@@ -421,6 +513,82 @@ pub fn bracket_scope_ids(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
+
+    fn at(day: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 1, day, 0, 0, 0).unwrap()
+    }
+
+    fn state_changed(issue_id: &str, to: State, ts: DateTime<Utc>) -> Event {
+        Event::IssueStateChanged {
+            id: uuid::Uuid::new_v4().to_string(),
+            issue_id: issue_id.to_string(),
+            timestamp: ts,
+            from: State::Backlog,
+            to,
+        }
+    }
+
+    #[test]
+    fn test_derive_lifecycle_timestamps_all_three_signals() {
+        let claimed: crate::domain::Assignee = "agent:worker-1".parse().unwrap();
+        let events = vec![
+            state_changed("i1", State::Ready, at(1)),
+            Event::IssueClaimed {
+                id: "c".into(),
+                issue_id: "i1".into(),
+                timestamp: at(2),
+                assignee: claimed,
+            },
+            state_changed("i1", State::Done, at(3)),
+        ];
+
+        let ts = derive_lifecycle_timestamps("i1", &events);
+        assert_eq!(ts.first_ready_at, Some(at(1)));
+        assert_eq!(ts.claimed_at, Some(at(2)));
+        assert_eq!(ts.done_at, Some(at(3)));
+    }
+
+    #[test]
+    fn test_derive_lifecycle_timestamps_first_occurrence_only() {
+        // A re-opened, re-readied, re-completed issue keeps its FIRST timestamps.
+        let events = vec![
+            state_changed("i1", State::Ready, at(1)),
+            state_changed("i1", State::Done, at(3)),
+            state_changed("i1", State::Ready, at(5)), // re-opened then re-readied
+            state_changed("i1", State::Done, at(7)),  // re-completed
+        ];
+
+        let ts = derive_lifecycle_timestamps("i1", &events);
+        assert_eq!(ts.first_ready_at, Some(at(1)));
+        assert_eq!(ts.done_at, Some(at(3)));
+    }
+
+    #[test]
+    fn test_derive_lifecycle_timestamps_ignores_other_issues() {
+        let events = vec![
+            state_changed("other", State::Ready, at(1)),
+            state_changed("i1", State::Ready, at(2)),
+        ];
+
+        let ts = derive_lifecycle_timestamps("i1", &events);
+        assert_eq!(ts.first_ready_at, Some(at(2)));
+    }
+
+    #[test]
+    fn test_derive_lifecycle_timestamps_missing_signals_stay_none() {
+        // Only a Ready transition: claimed and done remain None.
+        let events = vec![state_changed("i1", State::Ready, at(1))];
+
+        let ts = derive_lifecycle_timestamps("i1", &events);
+        assert_eq!(ts.first_ready_at, Some(at(1)));
+        assert_eq!(ts.claimed_at, None);
+        assert_eq!(ts.done_at, None);
+
+        // No events at all: everything None.
+        let empty = derive_lifecycle_timestamps("i1", &[]);
+        assert_eq!(empty, LifecycleTimestamps::default());
+    }
 
     #[test]
     fn test_build_issue_map() {

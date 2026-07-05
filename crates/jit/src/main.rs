@@ -20,7 +20,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ReferenceCommands,
+    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
+    ReferenceCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
@@ -4210,9 +4211,22 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GraphCommands::Export { format, output } => {
+            GraphCommands::Export {
+                format,
+                full,
+                output,
+            } => {
+                // `--full` selects the complete-record JSON node shape and applies
+                // only to `--format json`; pairing it with dot/mermaid is a usage
+                // error (exit 2), classified by the typed InvalidArgumentError.
+                if full && format != jit::commands::GraphExportFormat::Json {
+                    return Err(jit::errors::InvalidArgumentError::new(
+                        "--full is only valid with --format json",
+                    )
+                    .into());
+                }
                 let output_ctx = OutputContext::new(quiet, false);
-                let graph_output = executor.export_graph(format)?;
+                let graph_output = executor.export_graph(format, full)?;
 
                 if let Some(path) = output {
                     std::fs::write(&path, graph_output)?;
@@ -6151,6 +6165,32 @@ fn run() -> Result<()> {
                 }
             }
         }
+        Commands::Migrate(migrate_cmd) => match migrate_cmd {
+            MigrateCommands::LifecycleTimestamps { json } => {
+                let result = executor.backfill_lifecycle_timestamps()?;
+                if json {
+                    use jit::output::JsonOutput;
+                    let output = JsonOutput::success(
+                        serde_json::json!({
+                            "issues_scanned": result.issues_scanned,
+                            "issues_updated": result.issues_updated,
+                        }),
+                        "migrate lifecycle-timestamps",
+                    )
+                    .with_message(format!(
+                        "Backfilled lifecycle timestamps on {} of {} issue(s)",
+                        result.issues_updated, result.issues_scanned
+                    ));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    let output_ctx = OutputContext::new(quiet, false);
+                    let _ = output_ctx.print_success(format!(
+                        "Backfilled lifecycle timestamps on {} of {} issue(s)",
+                        result.issues_updated, result.issues_scanned
+                    ));
+                }
+            }
+        },
         Commands::Serve {
             port,
             stop,
