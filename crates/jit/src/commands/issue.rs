@@ -236,7 +236,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.load_issue(&full_id)
     }
 
-    /// Get enriched dependency information for an issue
+    /// Get enriched dependency information for an issue.
+    ///
+    /// Only ids that resolve to a stored issue are returned; a dependency id
+    /// that no longer resolves (e.g. a dangling reference left by raw storage
+    /// mutation or legacy data — normal deletion no longer produces one, see
+    /// `delete_issue`) is left out here. That is not a loss of information:
+    /// [`IssueShowResponse::from_issue`](crate::output::IssueShowResponse::from_issue)
+    /// diffs its own `enriched_deps` argument against the issue's full
+    /// `dependencies` list to recover any id missing here and surfaces it via
+    /// `dangling_dependency_ids`, so `jit issue show --json` never silently
+    /// hides one (jit:f847df3f).
     pub fn get_dependencies_enriched(&self, issue: &Issue) -> Vec<crate::domain::MinimalIssue> {
         issue
             .dependencies
@@ -542,6 +552,23 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Delete an issue.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
+    ///
+    /// Also strips `id` from the `dependencies` array of every issue that
+    /// referenced it (jit:f847df3f). Without this cascade a deleted issue left
+    /// a dangling edge behind: `jit validate` rejected it, and the normal `jit
+    /// dep rm <from> <id>` path could not repair it because removing a
+    /// dependency resolved the target id first, and a deleted target no longer
+    /// resolves. The cascade is an automatic invariant-maintaining side effect
+    /// of deletion, not a user-initiated edit to the dependent — like
+    /// `add_dependency`'s Ready-to-Backlog demotion, it intentionally bypasses
+    /// the active-lease check on the dependents; only the issue actually being
+    /// deleted is lease-checked (above). Each dependent's rewrite is its own
+    /// atomic (temp+rename) file write with its own `issue_updated` event, so a
+    /// crash mid-cascade cannot corrupt an individual file, only leave later
+    /// dependents stale. `jit dep rm` (which matches a raw stored dependency id
+    /// without requiring target resolution) and `jit issue show --json`'s
+    /// `dangling_dependency_ids` field remain as defense-in-depth for that case
+    /// and for any legacy data that predates this fix.
     pub fn delete_issue(&self, id: &str) -> Result<Vec<String>> {
         let full_id = self.storage.resolve_issue_id(id)?;
 
@@ -557,6 +584,28 @@ impl<S: IssueStore> CommandExecutor<S> {
         // failed delete never leaves a ghost event (event-logging invariant).
         let event = Event::new_issue_deleted(full_id.clone());
         self.storage.append_event(&event)?;
+
+        // Cascade: strip the deleted id from every dependent so the deletion
+        // never leaves a dangling edge in the graph.
+        for mut dependent in self.storage.list_issues()? {
+            if !dependent.dependencies.iter().any(|d| d == &full_id) {
+                continue;
+            }
+            dependent.dependencies.retain(|d| d != &full_id);
+            let dependent_id = dependent.id.clone();
+            self.storage.save_issue(dependent)?;
+            let event = Event::new_issue_updated(
+                dependent_id,
+                "dependency-cascade-delete".to_string(),
+                vec!["dependencies".to_string()],
+            );
+            self.storage.append_event(&event)?;
+        }
+
+        // Removing an edge can unblock a dependent stuck in Backlog, mirroring
+        // the readiness check `remove_dependency(_ies)` runs after an edge is
+        // removed.
+        self.check_auto_transitions()?;
 
         Ok(warnings)
     }
@@ -1964,6 +2013,227 @@ enforce_leases = "off"
             events_before,
             "a no-op dependency removal must not append an event"
         );
+    }
+
+    // --- jit:f847df3f: delete must not leave dangling dependency edges -----
+
+    #[test]
+    fn test_delete_issue_strips_id_from_dependent_dependencies() {
+        // A depends on B. Deleting B must remove B's id from A's stored
+        // `dependencies`, not just B's own file — otherwise A is left with a
+        // dangling edge that corrupts the graph (jit:f847df3f).
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+        assert!(executor.storage.load_issue(&a_id).unwrap().dependencies == vec![b_id.clone()]);
+
+        let events_before = executor.storage.read_events().unwrap().len();
+        executor.delete_issue(&b_id).unwrap();
+
+        let a_after = executor.storage.load_issue(&a_id).unwrap();
+        assert!(
+            !a_after.dependencies.contains(&b_id),
+            "B's id must be gone from A's dependencies after B is deleted, got: {:?}",
+            a_after.dependencies
+        );
+
+        // The cascade edit is itself event-logged (in addition to the
+        // `issue_deleted` event for B), preserving INV-EVENT-LOG.
+        let events = executor.storage.read_events().unwrap();
+        assert!(
+            events.len() > events_before,
+            "the delete cascade must append at least the deletion event"
+        );
+        let cascade_event = events
+            .iter()
+            .skip(events_before)
+            .find(|e| e.get_type() == "issue_updated" && e.get_issue_id() == a_id)
+            .expect("the cascade cleanup of A's dependencies must be event-logged");
+        match cascade_event {
+            Event::IssueUpdated { fields, .. } => assert!(
+                fields.iter().any(|f| f == "dependencies"),
+                "cascade event must record the dependencies edit, got: {fields:?}"
+            ),
+            other => panic!("expected IssueUpdated, got {other:?}"),
+        }
+        let delete_event = events
+            .iter()
+            .skip(events_before)
+            .find(|e| e.get_type() == "issue_deleted" && e.get_issue_id() == b_id)
+            .expect("deleting B must still log its own issue_deleted event");
+        assert!(matches!(delete_event, Event::IssueDeleted { .. }));
+    }
+
+    #[test]
+    fn test_delete_issue_then_validate_reports_no_dangling_dependency() {
+        // After deleting a dependency through the executor, `jit validate`
+        // must not report "depends on ... which does not exist" (jit:f847df3f).
+        let executor = setup();
+
+        let (a_id, _) = executor
+            .create_issue(
+                "A".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        let (b_id, _) = executor
+            .create_issue(
+                "B".to_string(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+        assert!(
+            executor.validate_silent().is_ok(),
+            "validation should pass before deletion"
+        );
+
+        executor.delete_issue(&b_id).unwrap();
+
+        let result = executor.validate_silent();
+        assert!(
+            result.is_ok(),
+            "validate must report no dangling dependency after delete, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_remove_dependencies_removes_dangling_edge_by_raw_id() {
+        // Reproduces a pre-existing dangling edge the way legacy data (or a raw
+        // `IssueStore::delete_issue` bypassing the executor's cascade) could:
+        // A depends on B, then B's file disappears without A's `dependencies`
+        // being cleaned up. `jit dep rm` (the plural `remove_dependencies`)
+        // must still remove the edge by matching A's raw stored id, even
+        // though B can no longer be resolved through the repo index
+        // (jit:f847df3f).
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+
+        // Bypass the executor's cascading delete to reproduce a dangling edge.
+        executor.storage.delete_issue(&b_id).unwrap();
+        assert!(
+            executor.storage.resolve_issue_id(&b_id).is_err(),
+            "the deleted id must no longer resolve, matching the reported bug"
+        );
+
+        let result = executor
+            .remove_dependencies(&a_id, std::slice::from_ref(&b_id))
+            .unwrap();
+
+        assert_eq!(result.removed, vec![b_id.clone()]);
+        assert!(
+            result.not_found.is_empty(),
+            "a dangling edge must be reported as removed, not not_found: {:?}",
+            result.not_found
+        );
+        let issue = executor.storage.load_issue(&a_id).unwrap();
+        assert!(
+            !issue.dependencies.contains(&b_id),
+            "the dangling edge must actually be gone from A's dependencies"
+        );
+    }
+
+    #[test]
+    fn test_remove_dependencies_removes_dangling_edge_by_short_prefix() {
+        // Same as above but the CLI caller supplies a short prefix of the
+        // dangling id (as `jit dep rm` accepts for live ids); matching must
+        // work against the raw stored id, not via global resolution.
+        let executor = setup();
+
+        let a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+        let b = crate::domain::Issue::new("B".to_string(), "Test".to_string());
+        let b_id = b.id.clone();
+        executor.storage.save_issue(b).unwrap();
+        executor.add_dependency(&a_id, &b_id).unwrap();
+        executor.storage.delete_issue(&b_id).unwrap();
+
+        let prefix = b_id[..8].to_string();
+        let result = executor
+            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
+            .unwrap();
+
+        assert_eq!(result.removed, vec![prefix]);
+        let issue = executor.storage.load_issue(&a_id).unwrap();
+        assert!(!issue.dependencies.contains(&b_id));
+    }
+
+    #[test]
+    fn test_remove_dependencies_ambiguous_prefix_errors_and_removes_nothing() {
+        // Two stored dependency ids share a normalized prefix. `jit dep rm`
+        // with that prefix must error (mirroring resolve_issue_id's ambiguity
+        // rejection) instead of silently removing whichever appears first, and
+        // neither edge is removed (jit:f847df3f review).
+        let executor = setup();
+
+        let mut a = crate::domain::Issue::new("A".to_string(), "Test".to_string());
+        let dep1 = "abcd1234-0000-0000-0000-000000000001".to_string();
+        let dep2 = "abcd1234-0000-0000-0000-000000000002".to_string();
+        a.dependencies = vec![dep1.clone(), dep2.clone()];
+        let a_id = a.id.clone();
+        executor.storage.save_issue(a).unwrap();
+
+        let prefix = "abcd1234".to_string();
+        let err = executor
+            .remove_dependencies(&a_id, std::slice::from_ref(&prefix))
+            .unwrap_err();
+        assert!(
+            err.to_string().to_lowercase().contains("ambiguous"),
+            "expected an ambiguity error, got: {err}"
+        );
+
+        let issue = executor.storage.load_issue(&a_id).unwrap();
+        assert!(
+            issue.dependencies.contains(&dep1) && issue.dependencies.contains(&dep2),
+            "an ambiguous dep rm must remove nothing"
+        );
+    }
+
+    #[test]
+    fn test_get_dependencies_enriched_omits_dangling_id_from_resolved_list() {
+        // `get_dependencies_enriched` itself only returns resolvable
+        // dependencies (dangling ids are recovered downstream by
+        // `IssueShowResponse::from_issue`, see its doc comment and tests in
+        // `output.rs`). This pins that contract so the two stay in sync.
+        let executor = setup();
+
+        let dep = crate::domain::Issue::new("Dep".to_string(), "Test".to_string());
+        let dep_id = dep.id.clone();
+        executor.storage.save_issue(dep).unwrap();
+
+        let mut issue = crate::domain::Issue::new("Parent".to_string(), "Test".to_string());
+        issue.dependencies = vec![dep_id.clone(), "missing-id".to_string()];
+
+        let resolved = executor.get_dependencies_enriched(&issue);
+        assert_eq!(resolved.len(), 1, "only the resolvable dep must appear");
+        assert_eq!(resolved[0].id, dep_id);
     }
 
     /// REQ-02: an explicit `--type` whose kind IS declared in the configured

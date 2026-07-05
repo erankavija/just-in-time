@@ -1083,6 +1083,13 @@ jit issue show abc123 def456 --json          # -> [ {...}, {...} ]
 - An unknown field name (or any unknown name in `--fields`) is a usage error
   (exit code `2`).
 
+**Dangling dependencies:** the response includes a `dangling_dependency_ids`
+array listing any ids in the issue's stored `dependencies` whose target issue
+no longer exists. It is omitted when empty. Deleting an issue strips its id
+from every dependent, so this array is normally absent; it surfaces only
+pre-existing corruption (e.g. a repository hand-edited or written by an older
+binary) rather than silently hiding those ids from the `dependencies` view.
+
 **Flag rules:**
 - `--field` and `--fields` are mutually exclusive.
 - `--field`/`--fields` require **exactly one** issue id; passing them with two or

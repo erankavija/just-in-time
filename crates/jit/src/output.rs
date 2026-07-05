@@ -824,6 +824,17 @@ pub struct IssueShowResponse {
     pub assignee: Option<String>,
     /// Enriched dependency list with full metadata
     pub dependencies: Vec<MinimalIssue>,
+    /// Dependency ids from the issue's stored `dependencies` array that did
+    /// NOT resolve to an existing issue (e.g. a stale reference left by raw
+    /// storage mutation or legacy data predating the delete-cascade fix in
+    /// `CommandExecutor::delete_issue`, jit:f847df3f). Deleting an issue
+    /// through the CLI strips its own id from every dependent's
+    /// `dependencies`, so this is empty in a repository touched only through
+    /// the CLI; when non-empty, it means a dangling id exists and — unlike
+    /// `dependencies`, which silently omits ids it cannot resolve — is not
+    /// hidden.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling_dependency_ids: Vec<String>,
     /// Per-gate view, one entry per required gate, enriched from each gate's
     /// latest run.
     pub gates: Vec<GateView>,
@@ -844,6 +855,15 @@ impl IssueShowResponse {
     /// latest run per required gate enriches that gate's `last_run_at` and
     /// `exit_code`. Pass an empty slice when no runs exist.
     ///
+    /// `enriched_deps` normally holds one [`MinimalIssue`] per entry in
+    /// `issue.dependencies`, but an id that no longer resolves to a stored
+    /// issue is left out of it by
+    /// [`get_dependencies_enriched`](crate::commands::CommandExecutor::get_dependencies_enriched).
+    /// This constructor recovers any such id by diffing `enriched_deps`
+    /// against `issue.dependencies` and reports it via
+    /// `dangling_dependency_ids` instead of dropping it silently
+    /// (jit:f847df3f).
+    ///
     /// # Examples
     ///
     /// ```
@@ -855,6 +875,15 @@ impl IssueShowResponse {
     /// let response = IssueShowResponse::from_issue(issue.clone(), vec![], &[]);
     /// assert_eq!(response.id, issue.id);
     /// assert!(response.gates.is_empty());
+    /// assert!(response.dangling_dependency_ids.is_empty());
+    ///
+    /// // A stored dependency id that isn't among `enriched_deps` (e.g. its
+    /// // target no longer exists) surfaces in `dangling_dependency_ids`
+    /// // rather than being silently dropped.
+    /// let mut orphaned = Issue::new("Parent".into(), "".into());
+    /// orphaned.dependencies = vec!["missing-id".to_string()];
+    /// let response = IssueShowResponse::from_issue(orphaned, vec![], &[]);
+    /// assert_eq!(response.dangling_dependency_ids, vec!["missing-id".to_string()]);
     /// ```
     pub fn from_issue(
         issue: crate::domain::Issue,
@@ -865,6 +894,17 @@ impl IssueShowResponse {
             .gates_required
             .iter()
             .map(|key| GateView::build(key, issue.gates_status.get(key), gate_runs))
+            .collect();
+
+        // See the doc comment above: recover ids `enriched_deps` couldn't
+        // resolve so they surface instead of vanishing from the response.
+        let resolved_ids: std::collections::HashSet<&str> =
+            enriched_deps.iter().map(|dep| dep.id.as_str()).collect();
+        let dangling_dependency_ids: Vec<String> = issue
+            .dependencies
+            .iter()
+            .filter(|dep_id| !resolved_ids.contains(dep_id.as_str()))
+            .cloned()
             .collect();
 
         Self {
@@ -879,6 +919,7 @@ impl IssueShowResponse {
                 .as_ref()
                 .map(crate::domain::Assignee::to_string),
             dependencies: enriched_deps,
+            dangling_dependency_ids,
             gates,
             context: issue.context,
             documents: issue.documents,
@@ -1398,6 +1439,42 @@ mod tests {
         );
         assert_eq!(v["labels"].as_array().unwrap().len(), 0);
         assert_eq!(v["dependencies"].as_array().unwrap().len(), 0);
+        // A clean issue has no dangling deps, so the field is omitted from
+        // the JSON entirely (`skip_serializing_if = "Vec::is_empty"`).
+        assert!(v.get("dangling_dependency_ids").is_none());
+    }
+
+    #[test]
+    fn test_show_response_surfaces_dangling_dependency_ids_not_silently() {
+        // jit:f847df3f: a dependency id that never resolved to a MinimalIssue
+        // (constructed directly here via storage-level state, standing in for
+        // a dangling reference left by raw storage mutation or legacy data)
+        // must surface in `dangling_dependency_ids` rather than vanish when
+        // `enriched_deps` only contains the resolvable ones.
+        use crate::domain::Issue;
+
+        let mut issue = Issue::new("Parent".to_string(), "Body".to_string());
+        issue.dependencies = vec!["resolved-id".to_string(), "dangling-id".to_string()];
+
+        // Simulate what `get_dependencies_enriched` would produce: only the
+        // resolvable dependency's MinimalIssue, the dangling one absent.
+        let mut resolved_dep = Issue::new("Dep".to_string(), "".to_string());
+        resolved_dep.id = "resolved-id".to_string();
+        let enriched_deps = vec![MinimalIssue::from(&resolved_dep)];
+
+        let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
+        let v = serde_json::to_value(&resp).unwrap();
+
+        assert_eq!(
+            v["dependencies"].as_array().unwrap().len(),
+            1,
+            "only the resolvable dependency appears in the enriched list"
+        );
+        assert_eq!(
+            v["dangling_dependency_ids"],
+            serde_json::json!(["dangling-id"]),
+            "the dangling id must be reported, not silently dropped"
+        );
     }
 
     #[test]

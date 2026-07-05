@@ -197,7 +197,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
-    /// Remove multiple dependencies from an issue
+    /// Remove multiple dependencies from an issue.
+    ///
+    /// This is what `jit dep rm <from> <id>...` calls. Each `dep_id` is
+    /// matched directly against `issue`'s OWN stored `dependencies` (by exact
+    /// id, or by normalized prefix once at least 4 characters are given) —
+    /// NOT resolved through the repo-wide index first. A dependency whose
+    /// target issue was deleted no longer resolves there, which previously
+    /// made a dangling edge permanently unremovable via the CLI (jit:f847df3f);
+    /// matching the raw stored id sidesteps that resolution step entirely and
+    /// works whether the target is alive or gone. An exact stored id always
+    /// wins; a prefix that matches more than one stored dependency is rejected
+    /// as ambiguous rather than removing an arbitrary one.
     pub fn remove_dependencies(
         &self,
         issue_id: &str,
@@ -215,17 +226,57 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut not_found = Vec::new();
 
         for dep_id in dep_ids {
-            // Resolve the dependency ID
-            match self.storage.resolve_issue_id(dep_id) {
-                Ok(full_dep_id) => {
-                    if issue.dependencies.contains(&full_dep_id) {
-                        issue.dependencies.retain(|d| d != &full_dep_id);
-                        removed.push(dep_id.clone());
-                    } else {
-                        not_found.push(dep_id.clone());
+            let normalized = dep_id.to_lowercase().replace('-', "");
+
+            // An exact stored id is always unambiguous, even when it is also a
+            // prefix of another stored id.
+            let exact = issue
+                .dependencies
+                .iter()
+                .find(|stored| stored.as_str() == dep_id.as_str())
+                .cloned();
+
+            let stored_match = if let Some(exact) = exact {
+                Some(exact)
+            } else {
+                // Otherwise match by normalized prefix (≥4 chars). Collect ALL
+                // matches so an ambiguous prefix is rejected the way
+                // `resolve_issue_id` rejects it, rather than silently removing
+                // whichever edge happens to appear first (jit:f847df3f).
+                let matches: Vec<String> = if normalized.len() >= 4 {
+                    issue
+                        .dependencies
+                        .iter()
+                        .filter(|stored| {
+                            stored.to_lowercase().replace('-', "").starts_with(&normalized)
+                        })
+                        .cloned()
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+
+                match matches.as_slice() {
+                    [] => None,
+                    [only] => Some(only.clone()),
+                    _ => {
+                        return Err(anyhow!(
+                            "Ambiguous dependency id '{}': matches {} stored dependencies ({}). \
+                             Use a longer id.",
+                            dep_id,
+                            matches.len(),
+                            matches.join(", ")
+                        ));
                     }
                 }
-                Err(_) => {
+            };
+
+            match stored_match {
+                Some(full_dep_id) => {
+                    issue.dependencies.retain(|d| d != &full_dep_id);
+                    removed.push(dep_id.clone());
+                }
+                None => {
                     not_found.push(dep_id.clone());
                 }
             }
