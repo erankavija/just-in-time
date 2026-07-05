@@ -27,29 +27,36 @@
     "repo-validate"
   ],
   "gates_status": {
-    "cargo-ci": {
+    "repo-validate": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846078381Z"
+      "updated_at": "2026-07-04T23:25:14.846127671Z"
     },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.846112271Z"
     },
-    "repo-validate": {
+    "cargo-ci": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-07-04T23:25:14.846127671Z"
+      "updated_at": "2026-07-04T23:25:14.846078381Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/6eb585bc-batch-report-2026-07-05.md",
+      "commit": null,
+      "label": "Maintenance batch report 2026-07-05",
+      "doc_type": "report"
+    }
+  ],
   "labels": [
     "type:epic",
     "epic:core-maintenance",
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-05T08:08:20.123398846Z"
+  "updated_at": "2026-07-05T08:09:53.271807511Z"
 }
