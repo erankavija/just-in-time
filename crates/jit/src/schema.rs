@@ -671,8 +671,16 @@ mod tests {
             .expect("GraphDepsTreeResponse properties should be present in schema");
 
         assert!(
-            props.get("tree").is_some(),
-            "schema should contain 'tree' property (from GraphDepsTreeResponse)"
+            props.get("nodes").is_some(),
+            "schema should contain 'nodes' property (the node collection, renamed from 'tree')"
+        );
+        assert!(
+            props.get("count").is_some(),
+            "schema should contain 'count' property (list envelope)"
+        );
+        assert!(
+            props.get("tree").is_none(),
+            "schema must not contain the old 'tree' property (renamed to 'nodes')"
         );
         assert!(
             props.get("summary").is_some(),

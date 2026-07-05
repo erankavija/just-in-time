@@ -700,14 +700,22 @@ impl DependencyTreeNode {
     }
 }
 
-/// Response for `graph deps` with tree structure
+/// Response for `graph deps` with tree structure.
+///
+/// List envelope: `count` is the number of top-level entries in `nodes` (the
+/// immediate dependency nodes; each may carry nested `children`). This differs
+/// from `summary.total`, which counts every unique dependency across the whole
+/// tree. The node collection was renamed from `tree` to `nodes` when the
+/// envelope landed.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GraphDepsTreeResponse {
     pub issue_id: String,
     /// Depth of traversal (1 = immediate, 0 = unlimited)
     pub depth: u32,
-    /// Tree of dependencies
-    pub tree: Vec<DependencyTreeNode>,
+    /// Number of top-level entries in `nodes` (list envelope `count`).
+    pub count: usize,
+    /// Dependency nodes, each of which may carry nested `children`.
+    pub nodes: Vec<DependencyTreeNode>,
     /// Summary statistics
     pub summary: DependencySummary,
 }
@@ -1248,12 +1256,17 @@ pub struct GateStatusEntry {
 /// `passed` how many are green, and `not_run` the keys still pending.
 /// `all_passed` mirrors the strict exit contract (0 iff true, else 4).
 ///
+/// List envelope: `count` is the length of the `gate_statuses` collection (one
+/// entry per required gate). It equals `total` whenever every required gate has
+/// a status entry; `total`/`passed` remain the readiness tallies.
+///
 /// # Examples
 ///
 /// ```
 /// use jit::output::GateCheckAllResponse;
 ///
 /// let payload = GateCheckAllResponse {
+///     count: 0,
 ///     results: vec![],
 ///     passed: 0,
 ///     total: 2,
@@ -1265,6 +1278,8 @@ pub struct GateStatusEntry {
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateCheckAllResponse {
+    /// Length of `gate_statuses` (list envelope `count`).
+    pub count: usize,
     pub results: Vec<GateRunSummary>,
     pub passed: usize,
     pub total: usize,

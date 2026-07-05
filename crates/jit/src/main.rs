@@ -3096,6 +3096,7 @@ fn run() -> Result<()> {
                         })
                         .collect();
                     let response = GateCheckAllResponse {
+                        count: gate_status_entries.len(),
                         results: summaries,
                         passed: passed_count,
                         total,
@@ -3613,7 +3614,8 @@ fn run() -> Result<()> {
                     let response = GraphDepsTreeResponse {
                         issue_id: id.clone(),
                         depth,
-                        tree,
+                        count: tree.len(),
+                        nodes: tree,
                         summary,
                     };
                     let msg = format!("{} dependencies", response.summary.total);

@@ -1418,6 +1418,10 @@ pub enum GateCommands {
     ///
     /// History flags and flat-output flags are mutually exclusive. Every view
     /// supports `--json`.
+    ///
+    /// The history view (`--all` / `--limit`) emits the list envelope
+    /// `{"count": N, "results": [...]}`, where `count` is the number of runs
+    /// returned after filtering.
     #[command(visible_alias = "check")]
     Status {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1473,6 +1477,12 @@ pub enum GateCommands {
     ///
     /// With `--json`, stdout/stderr are omitted from passing runs by default;
     /// pass `--full` to include them. Failing runs always include stdout/stderr.
+    ///
+    /// JSON output uses the list envelope `{"count": N, "gate_statuses": [...]}`,
+    /// where `count` is the number of required gates (one `gate_statuses` entry
+    /// each). The `results` / `not_run` / `total` / `passed` tallies remain
+    /// alongside; `total` / `passed` are readiness counts, not the collection
+    /// size.
     #[command(visible_alias = "check-all")]
     StatusAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1742,6 +1752,11 @@ pub enum GraphCommands {
     ///
     /// "Dependencies" = what this issue needs (upstream in work flow).
     /// "Dependents" = what needs this issue (downstream in work flow).
+    ///
+    /// JSON output uses the list envelope `{"count": N, "nodes": [...]}`; `count`
+    /// is the number of top-level `nodes`, distinct from `summary.total` (the
+    /// unique-dependency count across the whole tree). The node collection was
+    /// renamed from `tree` to `nodes` when the envelope landed.
     #[command(alias = "dependencies")]
     Deps {
         /// Issue ID

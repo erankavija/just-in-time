@@ -331,3 +331,73 @@ fn test_issue_show_multi_id_envelope() {
     let value = run_json(&temp, &["issue", "show", &id, &id, "--json"]);
     assert_envelope(&value, "issues", &["issue", "show", "<id>", "<id>"]);
 }
+
+/// Run `jit <args>` and parse stdout as JSON regardless of exit code (some
+/// readiness commands emit their envelope while exiting nonzero).
+fn run_json_any_exit(dir: &TempDir, args: &[&str]) -> Value {
+    let output = Command::new(jit_binary())
+        .current_dir(dir.path())
+        .args(args)
+        .output()
+        .unwrap();
+    serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|e| panic!("command {:?} did not emit JSON: {e}", args))
+}
+
+#[test]
+fn test_graph_deps_envelope() {
+    let (temp, id) = setup_repo();
+    // Make `id` depend on the other issue so the tree has a node.
+    let all = run_json(&temp, &["query", "all", "--json"]);
+    let other = all["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|i| i["id"].as_str())
+        .find(|s| *s != id.as_str())
+        .expect("a second issue")
+        .to_string();
+    Command::new(jit_binary())
+        .current_dir(temp.path())
+        .args(["dep", "add", &id, &other])
+        .output()
+        .unwrap();
+
+    let value = run_json(&temp, &["graph", "deps", &id, "--json"]);
+    assert_envelope(&value, "nodes", &["graph", "deps"]);
+    assert!(
+        value["count"].as_u64().unwrap() >= 1,
+        "graph deps count should be >= 1 after adding a dependency"
+    );
+}
+
+#[test]
+fn test_gate_status_all_envelope() {
+    let (temp, id) = setup_repo();
+    // Register and require a manual gate; unattested it stays pending, so
+    // status-all exits 4 while still emitting the envelope.
+    let jit = |args: &[&str]| {
+        Command::new(jit_binary())
+            .current_dir(temp.path())
+            .args(args)
+            .output()
+            .unwrap();
+    };
+    jit(&[
+        "gate",
+        "define",
+        "envtest-gate",
+        "--title",
+        "Env Test",
+        "--description",
+        "gate for envelope test",
+    ]);
+    jit(&["gate", "add", &id, "envtest-gate"]);
+
+    let value = run_json_any_exit(&temp, &["gate", "status-all", &id, "--json"]);
+    assert_envelope(&value, "gate_statuses", &["gate", "status-all"]);
+    assert!(
+        value["count"].as_u64().unwrap() >= 1,
+        "gate status-all count should be >= 1 after requiring a gate"
+    );
+}
