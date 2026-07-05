@@ -130,6 +130,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **INV-EVENT-LOG** — Every state change appends an event to events.jsonl.
 - **INV-ATOMIC-WRITES** — All file writes use the temp-file + atomic-rename pattern.
 - **INV-ASSIGNEE-FORMAT** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
+- **INV-DOMAIN-AGNOSTIC** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
 <!-- jit:invariants:end -->
 
 ## Commit Conventions
