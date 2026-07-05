@@ -68,6 +68,7 @@ pub use gate::{
 };
 pub use graph::GraphExportFormat;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
+pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
 pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;

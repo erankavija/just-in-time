@@ -64,7 +64,9 @@ fn test_issue_lifecycle_works_without_coordinator() {
         .update_issue(
             &id,
             Some("Updated".to_string()),
-            Some("Updated desc".to_string()),
+            Some(jit::commands::DescriptionUpdate::Replace(
+                "Updated desc".to_string(),
+            )),
             None,
             None,
             vec![],

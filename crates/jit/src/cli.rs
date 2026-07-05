@@ -751,6 +751,26 @@ pub enum IssueCommands {
     /// Update an issue or multiple issues. Returns a lightweight confirmation
     /// (id, short_id, state, updated_at); run `jit issue show` to fetch the
     /// full updated body.
+    ///
+    /// Description flags — exactly one may be given (they are all mutually
+    /// exclusive), and each has a replace form and an append form:
+    ///   --description TEXT               replace with TEXT
+    ///   --description-file PATH          replace with the contents of PATH
+    ///   --append-description TEXT        append TEXT to the existing description
+    ///   --append-description-file PATH   append the contents of PATH
+    ///
+    /// The `-file` forms accept `-` for PATH to read from stdin instead, and
+    /// exist so large descriptions don't have to fit in argv or survive shell
+    /// quoting. File/stdin content is used verbatim (including any trailing
+    /// newline). Appending separates the existing and new text with exactly
+    /// one blank line; appending to an empty/absent description produces just
+    /// the new text, with no leading blank line.
+    ///
+    /// Examples:
+    ///   jit issue update abc123 --description "New text"
+    ///   jit issue update abc123 --append-description "Follow-up note"
+    ///   jit issue update abc123 --append-description-file notes.txt
+    ///   cat notes.txt | jit issue update abc123 --append-description-file -
     Update {
         /// Issue ID (for single issue mode, mutually exclusive with --filter)
         id: Option<String>,
@@ -762,8 +782,43 @@ pub enum IssueCommands {
         #[arg(short, long)]
         title: Option<String>,
 
-        #[arg(short = 'd', long = "description")]
+        /// Replace the entire description with TEXT. Mutually exclusive with
+        /// the other description flags; see `--append-description` to add
+        /// text instead of replacing it.
+        #[arg(
+            short = 'd',
+            long = "description",
+            value_name = "TEXT",
+            conflicts_with_all = ["description_file", "append_description", "append_description_file"]
+        )]
         description: Option<String>,
+
+        /// Replace the entire description with the contents of PATH (`-` for
+        /// stdin), used verbatim. Avoids argv length limits and shell-quoting
+        /// hazards for large text. Mutually exclusive with the other
+        /// description flags.
+        #[arg(
+            long = "description-file",
+            value_name = "PATH",
+            conflicts_with_all = ["append_description", "append_description_file"]
+        )]
+        description_file: Option<String>,
+
+        /// Append TEXT to the end of the existing description, separated by
+        /// exactly one blank line (no leading blank line when the description
+        /// is empty). Mutually exclusive with the other description flags.
+        #[arg(
+            long = "append-description",
+            value_name = "TEXT",
+            conflicts_with = "append_description_file"
+        )]
+        append_description: Option<String>,
+
+        /// Append the contents of PATH (`-` for stdin), used verbatim, to the
+        /// end of the existing description, separated by exactly one blank
+        /// line. Mutually exclusive with the other description flags.
+        #[arg(long = "append-description-file", value_name = "PATH")]
+        append_description_file: Option<String>,
 
         #[arg(short, long)]
         priority: Option<String>,

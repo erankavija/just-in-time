@@ -22,7 +22,7 @@ use jit::cli::{
     ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
     GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ReferenceCommands,
 };
-use jit::commands::CommandExecutor;
+use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ExitCode, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -492,6 +492,22 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
         std::process::exit(json_error.exit_code().code());
     }
     jit::errors::InvalidArgumentError::new(message).into()
+}
+
+/// Read description content for `--description-file` / `--append-description-file`.
+///
+/// `path == "-"` reads stdin to completion instead of a file. Content is
+/// returned verbatim (no trimming), so multi-kilobyte descriptions and any
+/// deliberate trailing whitespace survive intact. Only one `-file` flag can
+/// be given per invocation (they are mutually exclusive via clap), so stdin
+/// is never read more than once.
+fn read_description_source(path: &str) -> Result<String> {
+    if path == "-" {
+        std::io::read_to_string(std::io::stdin()).context("Failed to read description from stdin")
+    } else {
+        std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read description file: {path}"))
+    }
 }
 
 /// Resolve the optional gate key from the positional-or-flag pair.
@@ -1652,6 +1668,9 @@ fn run() -> Result<()> {
                     filter,
                     title,
                     description,
+                    description_file,
+                    append_description,
+                    append_description_file,
                     priority,
                     state,
                     issue_type,
@@ -1691,6 +1710,20 @@ fn run() -> Result<()> {
                             "--type is not supported with --filter (batch mode); set it per issue"
                         ));
                     }
+                    // Description edits are per-issue (a replace/append against
+                    // one issue's existing text); batch mode does not apply
+                    // them. Reject rather than silently ignore, so the flags are
+                    // never a no-op.
+                    if filter.is_some()
+                        && (description.is_some()
+                            || description_file.is_some()
+                            || append_description.is_some()
+                            || append_description_file.is_some())
+                    {
+                        return Err(anyhow!(
+                            "description flags (--description/--description-file/--append-description/--append-description-file) are not supported with --filter (batch mode); update descriptions per issue"
+                        ));
+                    }
 
                     // Single issue mode
                     if let Some(id_str) = id {
@@ -1699,6 +1732,23 @@ fn run() -> Result<()> {
 
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;
+                        // Resolve the (mutually exclusive, clap-enforced) description
+                        // flags into a single operation. Replace forms take TEXT
+                        // directly; the `-file` forms read PATH (or stdin for `-`)
+                        // verbatim, so raciness/argv-limits/quoting never enter the
+                        // picture for large descriptions.
+                        let description_update: Option<DescriptionUpdate> =
+                            if let Some(text) = description {
+                                Some(DescriptionUpdate::Replace(text))
+                            } else if let Some(path) = description_file {
+                                Some(DescriptionUpdate::Replace(read_description_source(&path)?))
+                            } else if let Some(text) = append_description {
+                                Some(DescriptionUpdate::Append(text))
+                            } else if let Some(path) = append_description_file {
+                                Some(DescriptionUpdate::Append(read_description_source(&path)?))
+                            } else {
+                                None
+                            };
                         // Tri-state for the per-issue content_format override:
                         //   flag absent            -> None              (leave unchanged)
                         //   "inherit"/"default"    -> Some(None)        (clear to repo default)
@@ -1742,7 +1792,7 @@ fn run() -> Result<()> {
                         match executor.update_issue(
                             &full_id,
                             title,
-                            description,
+                            description_update,
                             prio,
                             st,
                             label,

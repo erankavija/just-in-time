@@ -4,6 +4,57 @@ use super::*;
 use crate::errors::{TransitionBlockedError, TransitionBlocker};
 use crate::storage::StorageWarning;
 
+/// How `update_issue` should apply a new description value.
+///
+/// `Replace` overwrites the existing description entirely (`--description` /
+/// `--description-file`). `Append` adds text to the end of whatever
+/// description already exists (`--append-description` /
+/// `--append-description-file`), separated by exactly one blank line; when
+/// the existing description is empty the result is just the new text, with
+/// no leading blank line.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::DescriptionUpdate;
+///
+/// // Replace overwrites the existing description entirely.
+/// assert_eq!(DescriptionUpdate::Replace("new".to_string()).apply("old"), "new");
+///
+/// // Append adds text after a single blank line...
+/// assert_eq!(
+///     DescriptionUpdate::Append("note".to_string()).apply("intro"),
+///     "intro\n\nnote"
+/// );
+/// // ...except against an empty description, where there is no leading blank line.
+/// assert_eq!(DescriptionUpdate::Append("first".to_string()).apply(""), "first");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DescriptionUpdate {
+    Replace(String),
+    Append(String),
+}
+
+impl DescriptionUpdate {
+    /// Apply this operation against an existing description, returning the
+    /// resulting description text.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::DescriptionUpdate;
+    ///
+    /// assert_eq!(DescriptionUpdate::Append("b".to_string()).apply("a"), "a\n\nb");
+    /// ```
+    pub fn apply(self, existing: &str) -> String {
+        match self {
+            DescriptionUpdate::Replace(text) => text,
+            DescriptionUpdate::Append(text) if existing.is_empty() => text,
+            DescriptionUpdate::Append(text) => format!("{existing}\n\n{text}"),
+        }
+    }
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Hard-reject an explicit `--type <kind>` whose kind is not declared in the
     /// configured `[type_hierarchy]`, deciding through the SAME rule engine the
@@ -228,7 +279,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         id: &str,
         title: Option<String>,
-        description: Option<String>,
+        description: Option<DescriptionUpdate>,
         priority: Option<Priority>,
         state: Option<State>,
         add_labels: Vec<String>,
@@ -263,8 +314,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(t) = title {
             issue.title = t;
         }
-        if let Some(d) = description {
-            issue.description = d;
+        if let Some(op) = description {
+            issue.description = op.apply(&issue.description);
         }
         if let Some(p) = priority {
             issue.priority = p;
@@ -1724,7 +1775,7 @@ enforce_leases = "off"
             .update_issue(
                 &issue_id,
                 None,
-                Some("new description".to_string()),
+                Some(DescriptionUpdate::Replace("new description".to_string())),
                 None,
                 None,
                 vec![],
