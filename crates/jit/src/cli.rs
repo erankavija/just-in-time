@@ -2194,6 +2194,26 @@ pub enum QueryCommands {
 }
 
 /// Dimension to aggregate by in `jit query count --by <DIMENSION>`.
+///
+/// A typed `--by` value: clap accepts only the declared variants (kebab-case on
+/// the CLI) and rejects anything else as a usage error, so a caller cannot
+/// silently request an unsupported aggregation. `state` is the only dimension
+/// today.
+///
+/// # Examples
+///
+/// ```
+/// use clap::ValueEnum;
+/// use jit::cli::CountDimension;
+///
+/// // The CLI token `state` parses to the `State` dimension.
+/// assert_eq!(
+///     CountDimension::from_str("state", true).unwrap(),
+///     CountDimension::State
+/// );
+/// // An unknown dimension is rejected (surfaces as a clap usage error).
+/// assert!(CountDimension::from_str("bogus", true).is_err());
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum CountDimension {
     /// Count by lifecycle state.

@@ -348,13 +348,12 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
 // ========== Container Rollup Tests (jit:7fe5c743) ==========
 
 /// Build a container whose direct children span several states, wired as
-/// dependencies, then aggregate those children with `StateRollup::from_issues`
-/// (the composition `issue progress` performs). Verifies the terminal-state
-/// semantics: done/rejected counted distinctly, open = non-terminal.
+/// dependencies, then drive `CommandExecutor::issue_progress` and
+/// `issue_children` (the orchestration behind the two commands). Verifies the
+/// terminal-state semantics (done/rejected distinct, open = non-terminal) and
+/// that children are the direct dependencies in ascending short-id order.
 #[test]
-fn test_harness_container_state_rollup() {
-    use jit::output::StateRollup;
-
+fn test_harness_container_progress_and_children() {
     let h = TestHarness::new();
     let epic = h.create_issue("Epic");
     let done = h.create_issue("Done child");
@@ -385,14 +384,11 @@ fn test_harness_container_state_rollup() {
     set_state(&wip, State::InProgress);
     set_state(&rejected, State::Rejected);
 
-    let container = h.get_issue(&epic);
-    let children: Vec<_> = container
-        .dependencies
-        .iter()
-        .map(|id| h.get_issue(id))
-        .collect();
-
-    let rollup = StateRollup::from_issues(&children);
+    // progress: the rollup over direct children, no dangling edges.
+    let progress = h.executor.issue_progress(&epic).unwrap();
+    assert_eq!(progress.container.title, "Epic");
+    assert!(progress.dangling.is_empty());
+    let rollup = &progress.rollup;
     assert_eq!(rollup.total, 4);
     assert_eq!(rollup.done, 1);
     assert_eq!(rollup.rejected, 1);
@@ -400,18 +396,23 @@ fn test_harness_container_state_rollup() {
     assert_eq!(rollup.percent, 25);
     // Every state present, zero-count states included.
     assert_eq!(rollup.by_state.len(), State::all().len());
-    let done_bucket = rollup
-        .by_state
+    let bucket = |s: State| rollup.by_state.iter().find(|c| c.state == s).unwrap().count;
+    assert_eq!(bucket(State::Done), 1);
+    assert_eq!(bucket(State::Gated), 0);
+
+    // children: one compact status per direct child, ascending short id, no
+    // dangling edges.
+    let children = h.executor.issue_children(&epic).unwrap();
+    assert_eq!(children.count, 4);
+    assert!(children.dangling.is_empty());
+    let short_ids: Vec<&str> = children
+        .issues
         .iter()
-        .find(|c| c.state == State::Done)
-        .unwrap();
-    assert_eq!(done_bucket.count, 1);
-    let gated_bucket = rollup
-        .by_state
-        .iter()
-        .find(|c| c.state == State::Gated)
-        .unwrap();
-    assert_eq!(gated_bucket.count, 0);
+        .map(|c| c.short_id.as_str())
+        .collect();
+    let mut sorted = short_ids.clone();
+    sorted.sort_unstable();
+    assert_eq!(short_ids, sorted, "children sorted by short id");
 }
 
 /// `issue_status_response` (the per-child projection reused by `issue children`)

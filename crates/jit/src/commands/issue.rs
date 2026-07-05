@@ -279,6 +279,75 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(crate::output::IssueStatusResponse::from_show(&show))
     }
 
+    /// Resolve a container's direct dependency edges (its depth-1 children) into
+    /// the resolvable child issues and the ids of any dangling edges.
+    ///
+    /// A dependency id resolving to no stored issue is a *dangling* edge and is
+    /// collected separately (following the `issue show`
+    /// [`dangling_dependency_ids`](crate::output::IssueShowResponse::dangling_dependency_ids)
+    /// precedent) rather than silently dropped. Only a not-found id is treated
+    /// as dangling: any genuine storage error (I/O, deserialization) propagates
+    /// via `?` instead of being swallowed. Dangling ids are returned sorted.
+    fn resolve_direct_children(&self, container: &Issue) -> Result<(Vec<Issue>, Vec<String>)> {
+        let mut children = Vec::new();
+        let mut dangling = Vec::new();
+        for dep_id in &container.dependencies {
+            match self.storage.load_issue_or_not_found(dep_id) {
+                Ok(child) => children.push(child),
+                Err(crate::storage::PathReadError::NotFound(_)) => dangling.push(dep_id.clone()),
+                // A real lookup failure is not a dangling edge — surface it.
+                Err(other) => return Err(other.into()),
+            }
+        }
+        dangling.sort();
+        Ok((children, dangling))
+    }
+
+    /// Build the `jit issue children` response: the container's direct children
+    /// (depth-1 dependencies), each projected to the compact `issue status`
+    /// shape, plus any dangling edges.
+    ///
+    /// Containment follows the dependency DAG (membership labels are advisory
+    /// and not consulted). The container id is resolved the same way as
+    /// `issue show`, so a bad id yields the typed id-resolution error unwrapped
+    /// (the caller routes it through `handle_json_error!`). Children are ordered
+    /// by ascending short id, since stored dependency order is set-derived and
+    /// not meaningful.
+    pub fn issue_children(&self, id: &str) -> Result<crate::output::IssueChildrenResponse> {
+        let container = self.show_issue(id)?;
+        let (children, dangling) = self.resolve_direct_children(&container)?;
+
+        let mut issues = children
+            .into_iter()
+            .map(|child| self.issue_status_response(child))
+            .collect::<Result<Vec<_>>>()?;
+        issues.sort_by(|a, b| a.short_id.cmp(&b.short_id));
+
+        Ok(crate::output::IssueChildrenResponse {
+            container: crate::output::ContainerHeader::from(&container),
+            count: issues.len(),
+            issues,
+            dangling,
+        })
+    }
+
+    /// Build the `jit issue progress` response: the counts-by-state rollup over
+    /// the container's direct children (depth 1), plus any dangling edges.
+    ///
+    /// Membership follows the dependency DAG, as for [`Self::issue_children`].
+    /// The rollup counts resolvable children only; dangling edges are surfaced
+    /// separately rather than counted or dropped.
+    pub fn issue_progress(&self, id: &str) -> Result<crate::output::ContainerProgressResponse> {
+        let container = self.show_issue(id)?;
+        let (children, dangling) = self.resolve_direct_children(&container)?;
+
+        Ok(crate::output::ContainerProgressResponse {
+            container: crate::output::ContainerHeader::from(&container),
+            rollup: crate::output::StateRollup::from_issues(&children),
+            dangling,
+        })
+    }
+
     fn blocking_dependencies(
         &self,
         issue: &Issue,

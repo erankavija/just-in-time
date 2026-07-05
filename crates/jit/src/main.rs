@@ -2010,39 +2010,22 @@ fn run() -> Result<()> {
                     }
                 }
                 IssueCommands::Children { id, json } => {
-                    // Containment follows the dependency DAG: a container's direct
-                    // children are the issues it directly depends on (depth 1);
-                    // membership labels are advisory and not consulted here. Each
-                    // child is projected to the same compact status shape as
-                    // `issue status`. A dependency id that no longer resolves is
-                    // skipped, matching `get_dependencies_enriched` (`issue show`
-                    // is where dangling ids surface).
-                    match executor.show_issue(&id) {
-                        Ok(container) => {
-                            let mut children = Vec::with_capacity(container.dependencies.len());
-                            for dep_id in &container.dependencies {
-                                if let Ok(child) = executor.show_issue(dep_id) {
-                                    children.push(executor.issue_status_response(child)?);
-                                }
-                            }
-                            // Stored dependency order is not meaningful (set-derived),
-                            // so sort by short id for a stable, greppable listing.
-                            children.sort_by(|a, b| a.short_id.cmp(&b.short_id));
-
+                    // Orchestration (child resolution, dangling classification)
+                    // lives in `CommandExecutor::issue_children`; this arm only
+                    // dispatches, renders, and routes an id failure through the
+                    // JSON error path.
+                    match executor.issue_children(&id) {
+                        Ok(response) => {
                             if json {
-                                let output = jit::output::JsonOutput::success(
-                                    serde_json::json!({
-                                        "container":
-                                            jit::output::ContainerHeader::from(&container),
-                                        "count": children.len(),
-                                        "issues": children,
-                                    }),
-                                    "issue children",
-                                );
+                                let output =
+                                    jit::output::JsonOutput::success(&response, "issue children");
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                for child in &children {
+                                for child in &response.issues {
                                     println!("{}", child.to_line());
+                                }
+                                if !response.dangling.is_empty() {
+                                    println!("dangling: {}", response.dangling.join(","));
                                 }
                             }
                         }
@@ -2056,41 +2039,27 @@ fn run() -> Result<()> {
                     }
                 }
                 IssueCommands::Progress { id, json } => {
-                    // Aggregate the container's DIRECT children (depth 1) by state.
-                    // Membership follows the dependency DAG, as for `issue
-                    // children`; a dependency id that no longer resolves is
-                    // skipped.
-                    match executor.show_issue(&id) {
-                        Ok(container) => {
-                            let children: Vec<jit::domain::Issue> = container
-                                .dependencies
-                                .iter()
-                                .filter_map(|dep_id| executor.show_issue(dep_id).ok())
-                                .collect();
-                            let rollup = jit::output::StateRollup::from_issues(&children);
-
+                    // Orchestration lives in `CommandExecutor::issue_progress`;
+                    // this arm dispatches, renders, and routes an id failure
+                    // through the JSON error path.
+                    match executor.issue_progress(&id) {
+                        Ok(response) => {
                             if json {
-                                let mut value = serde_json::to_value(&rollup)?;
-                                if let serde_json::Value::Object(map) = &mut value {
-                                    map.insert(
-                                        "container".to_string(),
-                                        serde_json::to_value(jit::output::ContainerHeader::from(
-                                            &container,
-                                        ))?,
-                                    );
-                                }
                                 let output =
-                                    jit::output::JsonOutput::success(value, "issue progress");
+                                    jit::output::JsonOutput::success(&response, "issue progress");
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 println!(
                                     "{} [{}] title: {}",
-                                    container.short_id(),
-                                    container.state.as_str(),
-                                    container.title
+                                    response.container.short_id,
+                                    response.container.state.as_str(),
+                                    response.container.title
                                 );
-                                for line in rollup.to_lines() {
+                                for line in response.rollup.to_lines() {
                                     println!("{}", line);
+                                }
+                                if !response.dangling.is_empty() {
+                                    println!("dangling: {}", response.dangling.join(","));
                                 }
                             }
                         }
@@ -4871,14 +4840,12 @@ fn run() -> Result<()> {
                         }
                     }
                     jit::cli::QueryCommands::Count { by, label, json } => {
-                        // The bucket is every issue matching all --label patterns
-                        // (AND-combined; none given aggregates the whole repo).
-                        // Membership is by label here, the advisory-grouping
-                        // counterpart to the DAG-authoritative `issue progress`.
-                        let issues = executor.query_by_labels(&label)?;
+                        // Aggregation lives in the executor; this arm dispatches
+                        // by dimension and renders. The bucket is every issue
+                        // matching all --label patterns (ANDed; none = whole repo).
                         let rollup = match by {
                             jit::cli::CountDimension::State => {
-                                jit::output::StateRollup::from_issues(&issues)
+                                executor.query_count_by_state(&label)?
                             }
                         };
 

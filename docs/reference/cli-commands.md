@@ -1235,8 +1235,14 @@ jit issue children epic123 --json
 - `container` is `{short_id, title, state}` for the queried issue.
 - `issues` is the same compact projection as `issue status` (one object per
   child), and `count` equals its length (the standard `{count, issues}` list
-  envelope, plus the `container` header). Children are ordered by ascending
-  short id.
+  envelope, plus the `container` header). `count`/`issues` cover **resolvable**
+  children only. Children are ordered by ascending short id.
+- `dangling` (optional) lists any dependency id that resolves to no stored
+  issue — a broken edge, e.g. from a raw storage mutation. Following the
+  `issue show` `dangling_dependency_ids` precedent, such an edge is surfaced
+  here rather than silently dropped; the key is omitted when there are none, and
+  text mode appends a `dangling: <id>,<id>` line. A genuine storage error (not a
+  missing id) is not treated as dangling — it propagates as a normal error.
 - A bad id under `--json` returns the refined error envelope
   (`ISSUE_NOT_FOUND` / `INVALID_ID_PREFIX` / `AMBIGUOUS_ID`) and the matching
   exit code, exactly like `issue show`.
@@ -1281,7 +1287,14 @@ jit issue progress epic123 --json
 
 - `by_state` has **one entry per lifecycle state**, in canonical order, with a
   zero count for any state no child is in — a stable, complete shape. `count` is
-  the number of state buckets (the `{count, by_state}` list envelope).
+  the number of state buckets (the `{count, by_state}` list envelope). The
+  rollup fields are flattened alongside the `container` header.
+- **Totals cover resolvable children only.** `total` and every count are over
+  the direct children that resolve to a stored issue. A dependency id pointing
+  at a missing issue is surfaced in `dangling` (optional, omitted when empty;
+  text appends a `dangling: <id>` line) rather than counted or dropped — the
+  same `issue show` precedent as `issue children`. A real storage error (not a
+  missing id) propagates normally.
 - **Terminal-state semantics** (tied to `State::is_terminal`, i.e.
   `done`/`rejected`): `done` and `rejected` are reported separately because a
   rejected child is terminal but **not delivered**. `open` is every non-terminal

@@ -17,7 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   depends on; membership labels are advisory and not consulted. A non-container
   leaf simply lists nothing; for a deep rollup use `jit graph deps <id>
   --depth`. Replaces the per-child `show`/`status` loop agents ran to see where
-  each child stands.
+  each child stands. A dependency edge pointing at a missing issue is surfaced
+  in an optional `dangling` array (text: a `dangling:` line) rather than
+  silently dropped, following the `issue show` `dangling_dependency_ids`
+  precedent; a real storage error still propagates.
 
 - **`jit issue progress <id>` — counts by state and a done/total rollup over a
   container's direct children.** Text prints the container line then `by state:
@@ -27,8 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   states included). Terminal-state semantics: `done` and `rejected` are counted
   distinctly (a rejected child is terminal but not delivered), `open` is every
   non-terminal child (`total − done − rejected`), and `done/total`/`percent`
-  measure delivery. Membership follows the dependency DAG, as for
-  `issue children`.
+  measure delivery. Totals cover resolvable children only; a broken dependency
+  edge is surfaced in `dangling` (as for `issue children`). Membership follows
+  the dependency DAG.
 
 - **`jit query count --by state [--label ns:v ...]` — the same state rollup over
   a label bucket.** Aggregates every issue matching all `--label` patterns

@@ -1173,9 +1173,23 @@ impl IssueStatusResponse {
 ///
 /// Every [`State`] variant is represented, so `count` is `0` for a state with
 /// no issues rather than the entry being omitted (see [`StateRollup`]).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::State;
+/// use jit::output::StateCount;
+///
+/// let bucket = StateCount { state: State::Done, count: 3 };
+/// let json = serde_json::to_value(&bucket).unwrap();
+/// assert_eq!(json["state"], "done");
+/// assert_eq!(json["count"], 3);
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StateCount {
+    /// The lifecycle state this bucket counts.
     pub state: State,
+    /// Number of issues in that state (`0` when the state is unpopulated).
     pub count: usize,
 }
 
@@ -1236,6 +1250,32 @@ pub struct StateRollup {
 
 impl StateRollup {
     /// Aggregate a slice of issues into the counts-by-state rollup.
+    ///
+    /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
+    /// (every variant, zero-count states kept); `done`/`rejected`/`open` and
+    /// `percent` follow the terminal-state semantics documented on the type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Issue, State};
+    /// use jit::output::StateRollup;
+    ///
+    /// let mut done = Issue::new("Shipped".into(), String::new());
+    /// done.state = State::Done;
+    /// let todo = Issue::new("Todo".into(), String::new()); // Backlog
+    ///
+    /// let rollup = StateRollup::from_issues(&[done, todo]);
+    /// assert_eq!(rollup.total, 2);
+    /// assert_eq!(rollup.done, 1);
+    /// assert_eq!(rollup.open, 1); // the Backlog issue is non-terminal
+    /// assert_eq!(rollup.percent, 50);
+    /// // An empty slice is well-defined: total 0, percent 0, all buckets 0.
+    /// let empty = StateRollup::from_issues(&[]);
+    /// assert_eq!(empty.total, 0);
+    /// assert_eq!(empty.percent, 0);
+    /// assert!(empty.by_state.iter().all(|b| b.count == 0));
+    /// ```
     pub fn from_issues(issues: &[Issue]) -> Self {
         let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
             .into_iter()
@@ -1273,6 +1313,22 @@ impl StateRollup {
     /// The `by state:` line lists every state as `<state>=<count>` in canonical
     /// order (states enumerated from the domain, not hardcoded), so its columns
     /// are fixed regardless of which states are populated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::{Issue, State};
+    /// use jit::output::StateRollup;
+    ///
+    /// let mut done = Issue::new("Shipped".into(), String::new());
+    /// done.state = State::Done;
+    /// let lines = StateRollup::from_issues(&[done]).to_lines();
+    ///
+    /// assert_eq!(lines.len(), 2);
+    /// assert!(lines[0].starts_with("by state: "));
+    /// assert!(lines[0].contains("done=1"));
+    /// assert_eq!(lines[1], "done 1/1 (100%)  open 0  rejected 0");
+    /// ```
     pub fn to_lines(&self) -> Vec<String> {
         let by_state = self
             .by_state
@@ -1293,11 +1349,28 @@ impl StateRollup {
 /// Compact container header — `{short_id, title, state}` — carried at the top of
 /// `jit issue children` and `jit issue progress` JSON so a consumer sees which
 /// container the child listing or rollup is for without a second lookup.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{Issue, State};
+/// use jit::output::ContainerHeader;
+///
+/// let mut epic = Issue::new("Auth epic".into(), String::new());
+/// epic.state = State::InProgress;
+/// let header = ContainerHeader::from(&epic);
+///
+/// assert_eq!(header.short_id, epic.id[..8]);
+/// assert_eq!(header.title, "Auth epic");
+/// assert_eq!(header.state, State::InProgress);
+/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ContainerHeader {
     /// Short ID (first 8 chars of the full UUID).
     pub short_id: String,
+    /// The container's title.
     pub title: String,
+    /// The container's own lifecycle state.
     pub state: State,
 }
 
@@ -1309,6 +1382,95 @@ impl From<&Issue> for ContainerHeader {
             state: issue.state,
         }
     }
+}
+
+/// Response for `jit issue children`: a container header plus one compact
+/// [`IssueStatusResponse`] per resolvable direct child (its immediate
+/// dependencies, depth 1), and the ids of any child edges that no longer
+/// resolve.
+///
+/// `issues` and `count` form the standard `{count, issues}` list envelope
+/// (`count == issues.len()`), with `container` added on top. `dangling` follows
+/// the [`IssueShowResponse::dangling_dependency_ids`] precedent: a dependency id
+/// that points at no stored issue is surfaced here rather than silently dropped,
+/// and is omitted from the JSON when empty. Children are ordered by ascending
+/// short id (stored dependency order is set-derived and not meaningful).
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::{ContainerHeader, IssueChildrenResponse};
+/// use jit::domain::{Issue, State};
+///
+/// let container = ContainerHeader::from(&Issue::new("Epic".into(), String::new()));
+/// let response = IssueChildrenResponse { container, count: 0, issues: vec![], dangling: vec![] };
+/// let json = serde_json::to_value(&response).unwrap();
+/// assert_eq!(json["count"], 0);
+/// assert!(json["issues"].as_array().unwrap().is_empty());
+/// // An empty `dangling` list is omitted from the JSON.
+/// assert!(json.get("dangling").is_none());
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueChildrenResponse {
+    /// `{short_id, title, state}` of the queried container.
+    pub container: ContainerHeader,
+    /// Number of resolvable direct children (equals `issues.len()`).
+    pub count: usize,
+    /// One compact status projection per resolvable direct child, ascending
+    /// short id.
+    pub issues: Vec<IssueStatusResponse>,
+    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
+    /// when empty. `count`/`issues` cover resolvable children only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling: Vec<String>,
+}
+
+/// Response for `jit issue progress`: a container header, the counts-by-state
+/// [`StateRollup`] over its resolvable direct children, and any dangling child
+/// edges.
+///
+/// The rollup fields (`count`, `by_state`, `total`, `done`, `rejected`, `open`,
+/// `percent`) are flattened to the top level, so the JSON is the `StateRollup`
+/// shape plus `container` (and `dangling` when non-empty). `total` and every
+/// count are over **resolvable** children only; a dependency id resolving to no
+/// stored issue is surfaced in `dangling` (the [`IssueShowResponse`] precedent)
+/// rather than counted or dropped.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::{ContainerHeader, ContainerProgressResponse, StateRollup};
+/// use jit::domain::{Issue, State};
+///
+/// let mut done = Issue::new("Child".into(), String::new());
+/// done.state = State::Done;
+/// let container = ContainerHeader::from(&Issue::new("Epic".into(), String::new()));
+/// let response = ContainerProgressResponse {
+///     container,
+///     rollup: StateRollup::from_issues(&[done]),
+///     dangling: vec![],
+/// };
+///
+/// let json = serde_json::to_value(&response).unwrap();
+/// // Rollup fields are flattened alongside `container`.
+/// assert_eq!(json["total"], 1);
+/// assert_eq!(json["done"], 1);
+/// assert_eq!(json["percent"], 100);
+/// assert_eq!(json["container"]["title"], "Epic");
+/// assert!(json.get("dangling").is_none());
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ContainerProgressResponse {
+    /// `{short_id, title, state}` of the queried container.
+    pub container: ContainerHeader,
+    /// The counts-by-state rollup over resolvable direct children, flattened to
+    /// the top level.
+    #[serde(flatten)]
+    pub rollup: StateRollup,
+    /// Dependency ids that resolve to no stored issue (dangling edges), omitted
+    /// when empty. The rollup counts resolvable children only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dangling: Vec<String>,
 }
 
 /// Render a single top-level field of a serialized issue value as plain text.

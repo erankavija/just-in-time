@@ -196,6 +196,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(issues)
     }
 
+    /// Aggregate a label bucket into the counts-by-state
+    /// [`StateRollup`](crate::output::StateRollup) behind `jit query count --by
+    /// state`.
+    ///
+    /// The bucket is every issue matching all `label_filters` (AND-combined; an
+    /// empty slice aggregates the whole repository), the advisory-grouping
+    /// counterpart to the DAG-authoritative
+    /// [`issue_progress`](Self::issue_progress). Patterns are validated with the
+    /// same rules as [`Self::query_by_labels`].
+    pub fn query_count_by_state(
+        &self,
+        label_filters: &[String],
+    ) -> Result<crate::output::StateRollup> {
+        let issues = self.query_by_labels(label_filters)?;
+        Ok(crate::output::StateRollup::from_issues(&issues))
+    }
+
     /// Query closed issues with optional filters
     ///
     /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].

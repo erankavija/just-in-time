@@ -88,6 +88,13 @@ fn add_dep(dir: &std::path::Path, from_id: &str, to_id: &str) {
     );
 }
 
+/// Plant a dangling dependency edge: delete a child's storage file directly
+/// (a raw mutation the CLI's delete-cascade would otherwise prevent), leaving
+/// the container's dependency pointing at a now-missing issue.
+fn delete_issue_file(dir: &std::path::Path, id: &str) {
+    std::fs::remove_file(dir.join(".jit/issues").join(format!("{id}.json"))).unwrap();
+}
+
 fn run_ok(dir: &std::path::Path, args: &[&str]) -> String {
     let out = Command::new(jit_binary())
         .current_dir(dir)
@@ -218,6 +225,45 @@ fn test_children_json_envelope_with_container_header() {
         .find(|e| e["title"] == "Child done")
         .expect("done child listed");
     assert_eq!(done["state"], "done");
+
+    // With no dangling edges, the `dangling` key is omitted entirely.
+    assert!(
+        json.get("dangling").is_none(),
+        "clean response omits dangling: {json}"
+    );
+}
+
+/// A dangling child edge (a dependency pointing at a missing issue) is surfaced
+/// in `dangling`, not silently dropped; resolvable children still list normally.
+#[test]
+fn test_children_dangling_edge_surfaced() {
+    let temp = setup();
+    let epic = create_issue(temp.path(), "Epic", &[]);
+    let alive = create_issue(temp.path(), "Alive", &[]);
+    let doomed = create_issue(temp.path(), "Doomed", &[]);
+    add_dep(temp.path(), &epic, &alive);
+    add_dep(temp.path(), &epic, &doomed);
+    delete_issue_file(temp.path(), &doomed);
+
+    let json = run_json(temp.path(), &["issue", "children", &epic, "--json"]);
+    // Only the resolvable child is counted/listed.
+    assert_eq!(json["count"], 1);
+    let listed: Vec<&str> = json["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(listed, vec!["Alive"]);
+    // The broken edge is visible in `dangling`.
+    assert_eq!(json["dangling"], serde_json::json!([doomed]));
+
+    // Text mode appends a `dangling:` line.
+    let text = run_ok(temp.path(), &["issue", "children", &epic]);
+    assert!(
+        text.lines().any(|l| l == format!("dangling: {doomed}")),
+        "text lists dangling: {text:?}"
+    );
 }
 
 /// An empty container (no dependencies) prints nothing and JSON has count 0.
@@ -359,6 +405,47 @@ fn test_progress_bad_id_json_error() {
     assert!(!out.status.success());
     let json: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
+}
+
+/// A dangling child edge is surfaced in `dangling`; the rollup counts only the
+/// resolvable children (documented resolvable-children `total` semantics).
+#[test]
+fn test_progress_dangling_edge_surfaced() {
+    let temp = setup();
+    let epic = create_issue(temp.path(), "Epic", &[]);
+    let alive = create_issue(temp.path(), "Alive", &[]);
+    let doomed = create_issue(temp.path(), "Doomed", &[]);
+    add_dep(temp.path(), &epic, &alive);
+    add_dep(temp.path(), &epic, &doomed);
+    set_state(temp.path(), &alive, "done");
+    delete_issue_file(temp.path(), &doomed);
+
+    let json = run_json(temp.path(), &["issue", "progress", &epic, "--json"]);
+    // Only the one resolvable child is counted.
+    assert_eq!(json["total"], 1);
+    assert_eq!(json["done"], 1);
+    assert_eq!(json["percent"], 100);
+    assert_eq!(json["dangling"], serde_json::json!([doomed]));
+
+    // Text mode appends a `dangling:` line after the rollup lines.
+    let text = run_ok(temp.path(), &["issue", "progress", &epic]);
+    assert!(
+        text.lines().any(|l| l == format!("dangling: {doomed}")),
+        "text lists dangling: {text:?}"
+    );
+}
+
+/// With no broken edges, `progress` omits the `dangling` key entirely.
+#[test]
+fn test_progress_clean_omits_dangling() {
+    let temp = setup();
+    let (epic, _children) = container_with_children(temp.path());
+
+    let json = run_json(temp.path(), &["issue", "progress", &epic, "--json"]);
+    assert!(
+        json.get("dangling").is_none(),
+        "clean response omits dangling: {json}"
+    );
 }
 
 // ── query count ──────────────────────────────────────────────────────────
