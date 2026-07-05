@@ -2,9 +2,9 @@
   "id": "62f3bebd-ed7f-4a8f-903c-06c11aac7608",
   "title": "Help cross-reference sweep for existing but undiscovered commands",
   "description": "Mining showed agents hand-rolling projections that existing commands already provide — the commands were never surfaced at the point of need. Evidence: 22 mid-task help probes, the per-issue gate status command and the gate run-history view going unused in favor of jq over full issue JSON, and event-log verification done by tailing the raw file.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Issue show help points at the per-issue gate status command; gate failure output points at the run-history view; issue and doc mutation help points at the events commands for verification.\n- [ ] [hard] REQ-02: Top-level help mentions the schema introspection command for JSON shapes and exit codes.\n- [ ] [hard] REQ-03: Issue show help summarizes its JSON field names, including the dependency and gate collections.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -19,5 +19,6 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:03:40.019513689Z",
-  "updated_at": "2026-07-05T10:03:40.021283580Z"
+  "updated_at": "2026-07-05T21:11:16.553252254Z",
+  "claimed_at": "2026-07-05T21:11:16.553252054Z"
 }
