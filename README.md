@@ -60,7 +60,7 @@ See [INSTALL.md](INSTALL.md) for all installation options.
 ### Basic Usage
 
 ```bash
-# Initialize in your project (supports --json like every command)
+# Initialize in your project
 jit init
 
 # Create work; -q prints just the issue id for capture
@@ -85,7 +85,7 @@ jit issue status $EPIC $TASK2        # one line each: state, gates, unmet deps
 jit issue progress $EPIC             # counts by state, done/total
 ```
 
-Ordering between siblings is also a dependency edge (`jit dep add $TASK2 $TASK1`). Edge operations are atomic and keep the graph transitively reduced; `--reduce` swaps a shortcut edge for the longer path in one step.
+Ordering between siblings is also a dependency edge: `jit dep add $TASK2 $TASK1 --reduce`. Edge operations are atomic and keep the graph transitively reduced — here `--reduce` drops the epic's now-shortcut edge to `$TASK1` in the same step.
 
 **See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
 
