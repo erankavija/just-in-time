@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "37b64b5c-7e99-4ce1-9cc0-51496c7c4499",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "62f3bebd-ed7f-4a8f-903c-06c11aac7608",
+  "commit": "efebe0aadcb201250c24fc91effa44ad07129922",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T21:58:31.933131045Z",
+  "completed_at": "2026-07-05T22:00:38.816128651Z",
+  "duration_ms": 126882,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01: Pass. `issue show --help` now points to `jit issue status`, `jit gate status-all`, and `jit gate status <id> <gate> --all` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:746). Issue/doc mutation help points to `jit events query --issue-id` and `jit events tail` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:603), [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:885), [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1791), and [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:1833). Gate failure output includes run history suggestions in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:473) and gate-blocked remediation includes the same in [errors.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:866).\n\nREQ-02: Pass. Top-level help points to `jit --schema` for JSON shapes and exit code documentation in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:24).\n\nREQ-03: Pass. `issue show --help` summarizes the JSON shape and explicitly names `dependencies`, `unmet_dependencies`, and `gates` in [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:749).\n\n**Architecture And Separation Of Concerns**\n\nPass. The change is confined to CLI help/remediation text, output-facing docs, and tests. No domain/storage persistence boundary violation found.\n\n**Functional Paradigm**\n\nPass. No new algorithmic or stateful core logic was introduced. The only production behavior change is presentation/remediation text.\n\n**Correctness And Invariants**\n\nPass. No new write path, state mutation path, PID handling, gate transition logic, assignee parsing, or label parsing was introduced. Gate-state remediation now better exposes existing inspection commands without changing gate semantics.\n\n**Safety**\n\nPass. No unsafe code introduced in the reviewed change surface.\n\n**Testing**\n\nPass. Provided cargo-ci evidence for this issue is successful at commit `efebe0aa`: fmt ok, clippy ok, and `3403 passed, 0 failed, 12 ignored`. Per instruction, I did not rerun cargo tests.\n\nNew regression coverage pins the hard requirements in [help_cross_reference_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/help_cross_reference_tests.rs:35), [gate_cli_integration_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_cli_integration_test.rs:315), and [exit_code_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/exit_code_tests.rs:475).\n\n**Error Handling**\n\nPass. Existing typed error paths are reused. The gate-blocked transition remediation array remains structured and now includes the run-history command in [errors.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:834).\n\n**CLI Contract**\n\nPass. No command lost `--json`; the added schema/help references point at existing JSON-capable command surfaces.\n\n**Documentation**\n\nPass. CLI reference and changelog were updated alongside the help-text changes. No new public Rust API was introduced.\n\n**Prior Review Feedback**\n\nNo prior review feedback was supplied in `run_history`.\n\n**JIT Issue Management**\n\nPass. `issue.dependencies` is empty. `./scripts/jit-validate.sh` passed with `Repository validation passed`.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No blocking issues found; acceptance criteria are met and provided cargo-ci plus jit validation are green.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No blocking issues found; acceptance criteria are met and provided cargo-ci plus jit validation are green.",
+    "findings": []
+  }
+}

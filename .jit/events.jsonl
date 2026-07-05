@@ -5453,3 +5453,9 @@
 {"type":"issue_updated","id":"503dab85-6b8a-48c9-a3c0-a10b230b2853","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-05T21:45:52.284127846Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"ca829014-99d4-4b90-837f-c496f88ca50b","issue_id":"313e01f6-7656-433f-abcf-1859eee91c99","timestamp":"2026-07-05T21:46:14.749576873Z","from":"rejected","to":"archived"}
 {"type":"issue_deleted","id":"75a69672-6af9-496d-8c76-198609637cfb","issue_id":"313e01f6-7656-433f-abcf-1859eee91c99","timestamp":"2026-07-05T21:47:17.009709417Z"}
+{"type":"gate_passed","id":"d92f0035-166f-4e81-ab30-9700e428d40f","issue_id":"62f3bebd-ed7f-4a8f-903c-06c11aac7608","timestamp":"2026-07-05T21:58:31.653870192Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"28fca739-02d2-4c22-8b53-69700f81dbcc","issue_id":"62f3bebd-ed7f-4a8f-903c-06c11aac7608","timestamp":"2026-07-05T22:00:38.816579492Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"1eeffbd5-75a2-4e00-8e02-5fca94667d34","issue_id":"62f3bebd-ed7f-4a8f-903c-06c11aac7608","timestamp":"2026-07-05T22:01:23.967850015Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"6fd73387-9831-42d4-ad16-c17b95b20318","issue_id":"62f3bebd-ed7f-4a8f-903c-06c11aac7608","timestamp":"2026-07-05T22:01:23.967874855Z"}
+{"type":"issue_created","id":"27a8e694-d99d-4231-9fd2-da1b420edca1","issue_id":"c291e95c-82f0-437f-8b58-264ac73e27b2","timestamp":"2026-07-05T22:01:24.042912289Z","title":"Refresh MCP curated tool set for the expanded CLI surface","priority":"normal"}
+{"type":"issue_updated","id":"964bbc9c-b7c3-47dd-bbda-3c80e9fd9cd5","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T22:01:24.097350909Z","updated_by":"dependency-add","fields":["dependencies"]}
