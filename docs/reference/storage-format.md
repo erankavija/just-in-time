@@ -130,11 +130,30 @@ timeout_seconds = 300
 
 ## Versioning
 
-The schema version is tracked in `config.toml`:
+The repository's on-disk **format version** is the `schema_version` field in
+`index.json`:
+
+```json
+{ "schema_version": 2, "all_ids": [], "deleted_ids": [] }
+```
+
+This single marker is the authoritative compatibility check, bumped whenever an
+on-disk layout or interpretation changes. On startup every command that opens
+the repository compares it against the format version the running `jit` binary
+supports:
+
+- Binary support **≥** repository version: operates normally. Writing with a
+  newer binary may migrate the data and bump the marker.
+- Binary support **<** repository version: the binary refuses to operate and
+  exits nonzero (exit code 10, external-dependency family) with a single-line
+  error naming both the repository's format version and the version the binary
+  supports. The fix is to upgrade `jit` (e.g. `cargo install --path crates/jit`)
+  rather than treating it as repository corruption.
+
+`config.toml` separately records a `[version] schema` describing the
+configuration-file layout:
 
 ```toml
 [version]
 schema = 2
 ```
-
-JIT validates schema compatibility on startup and provides migration guidance when needed.

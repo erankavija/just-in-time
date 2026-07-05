@@ -269,6 +269,90 @@ impl GateAlreadyExistsError {
     }
 }
 
+/// Error raised when a repository's on-disk format version is newer than the
+/// running `jit` binary supports.
+///
+/// The repository carries a single format marker (`schema_version` in
+/// `.jit/index.json`). On startup the storage layer compares that marker against
+/// the version this binary understands; if the repository's is greater, it fails
+/// fast with this typed error instead of letting a stale binary misread newer
+/// data (which previously surfaced as opaque file-read or phantom-validation
+/// failures). The CLI downcasts to this type to classify the failure as an
+/// external-dependency condition (exit code `10`): the binary, not the
+/// repository, is out of date, and the fix is upgrading `jit`. `Display` is a
+/// single line naming both the repository's version and the version the binary
+/// supports.
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::RepositoryFormatTooNewError;
+///
+/// let err = RepositoryFormatTooNewError::new(3, 2);
+/// assert_eq!(err.repository_version(), 3);
+/// assert_eq!(err.supported_version(), 2);
+/// // Single line naming both versions.
+/// assert!(!err.to_string().contains('\n'));
+/// assert!(err.to_string().contains('3'));
+/// assert!(err.to_string().contains('2'));
+/// ```
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[error(
+    "JIT repository format version {repository_version} is newer than this jit \
+     binary supports (max {supported_version}); upgrade jit (e.g. `cargo install \
+     --path crates/jit`) to operate on this repository."
+)]
+pub struct RepositoryFormatTooNewError {
+    repository_version: u32,
+    supported_version: u32,
+}
+
+impl RepositoryFormatTooNewError {
+    /// Build a [`RepositoryFormatTooNewError`] from the repository's on-disk
+    /// format version and the version this binary supports.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::RepositoryFormatTooNewError;
+    ///
+    /// let err = RepositoryFormatTooNewError::new(3, 2);
+    /// assert_eq!(err.repository_version(), 3);
+    /// ```
+    pub fn new(repository_version: u32, supported_version: u32) -> Self {
+        Self {
+            repository_version,
+            supported_version,
+        }
+    }
+
+    /// The repository's on-disk format version (the marker that was too new).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::RepositoryFormatTooNewError;
+    ///
+    /// assert_eq!(RepositoryFormatTooNewError::new(3, 2).repository_version(), 3);
+    /// ```
+    pub fn repository_version(&self) -> u32 {
+        self.repository_version
+    }
+
+    /// The maximum format version this binary understands.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::storage::RepositoryFormatTooNewError;
+    ///
+    /// assert_eq!(RepositoryFormatTooNewError::new(3, 2).supported_version(), 2);
+    /// ```
+    pub fn supported_version(&self) -> u32 {
+        self.supported_version
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,5 +453,26 @@ mod tests {
     fn test_gate_already_exists_downcasts_from_anyhow() {
         let err: anyhow::Error = GateAlreadyExistsError::new("lint").into();
         assert!(err.downcast_ref::<GateAlreadyExistsError>().is_some());
+    }
+
+    #[test]
+    fn test_repository_format_too_new_message_and_accessors() {
+        let err = RepositoryFormatTooNewError::new(3, 2);
+        assert_eq!(err.repository_version(), 3);
+        assert_eq!(err.supported_version(), 2);
+        let msg = err.to_string();
+        assert!(!msg.contains('\n'), "message must be single-line: {msg}");
+        assert!(
+            msg.contains('3') && msg.contains('2'),
+            "must name both versions: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_repository_format_too_new_downcasts_from_anyhow() {
+        let err: anyhow::Error = RepositoryFormatTooNewError::new(3, 2).into();
+        let typed = err.downcast_ref::<RepositoryFormatTooNewError>();
+        assert!(typed.is_some());
+        assert_eq!(typed.unwrap().repository_version(), 3);
     }
 }

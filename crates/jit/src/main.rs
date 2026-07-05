@@ -86,6 +86,18 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
+    // A repository whose on-disk format is newer than this binary supports is an
+    // external-dependency failure (exit 10): the binary, not the repository, is
+    // out of date, and the fix is upgrading jit — the same family as the git and
+    // filesystem dependency failures, and deliberately NOT NotFound (3), which
+    // would misread as "repository/resource missing".
+    if error
+        .downcast_ref::<jit::storage::RepositoryFormatTooNewError>()
+        .is_some()
+    {
+        return ExitCode::ExternalError;
+    }
+
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {

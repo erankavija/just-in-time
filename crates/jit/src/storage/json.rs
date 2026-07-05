@@ -9,7 +9,7 @@
 use crate::domain::{Event, Issue};
 use crate::storage::{
     FileLocker, GateRegistry, GateRunNotFoundError, IssueNotFoundError, IssueStore,
-    RepositoryNotFoundError,
+    RepositoryFormatTooNewError, RepositoryNotFoundError,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,16 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
+
+/// On-disk repository-format version this binary writes and understands.
+///
+/// This is the authoritative compatibility marker for the whole repository (a
+/// single index-level version, not per-store schema versions). New indexes are
+/// stamped with it, and a repository whose `index.json` `schema_version` exceeds
+/// it is refused by [`ensure_supported_index_version`] so a stale binary fails
+/// fast and legibly instead of misreading newer data. Bump this whenever an
+/// on-disk layout or interpretation changes.
+const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
 
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
@@ -41,11 +51,30 @@ struct Index {
 impl Default for Index {
     fn default() -> Self {
         Self {
-            schema_version: 2,
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             all_ids: Vec::new(),
             deleted_ids: Vec::new(),
         }
     }
+}
+
+/// Reject an index whose on-disk format version is newer than this binary
+/// supports; otherwise pass it through unchanged.
+///
+/// Applied on every index-load path (local, git HEAD, main worktree) so an
+/// outdated binary fails fast with a legible [`RepositoryFormatTooNewError`]
+/// instead of misinterpreting a newer layout. A version equal to or older than
+/// [`SUPPORTED_INDEX_SCHEMA_VERSION`] is accepted (older indexes deserialize via
+/// serde field defaults).
+fn ensure_supported_index_version(index: Index) -> Result<Index> {
+    if index.schema_version > SUPPORTED_INDEX_SCHEMA_VERSION {
+        return Err(RepositoryFormatTooNewError::new(
+            index.schema_version,
+            SUPPORTED_INDEX_SCHEMA_VERSION,
+        )
+        .into());
+    }
+    Ok(index)
 }
 
 /// JSON file-based storage for issues, gates, and events.
@@ -98,6 +127,14 @@ impl JsonFileStorage {
                 self.root.display()
             );
         }
+
+        // Fail fast at startup when the on-disk format is newer than this binary
+        // supports. `validate()` runs for every non-init command, so routing the
+        // version check through it (via `load_index`, which applies
+        // `ensure_supported_index_version`) guards even commands that never load
+        // the index themselves — e.g. `jit gate list`, which reads `gates.toml`
+        // directly — rather than letting them misread newer data (jit:def64ac4).
+        self.load_index()?;
 
         Ok(())
     }
@@ -152,7 +189,8 @@ impl JsonFileStorage {
 
     fn load_index(&self) -> Result<Index> {
         let index_path = self.root.join(INDEX_FILE);
-        self.read_json(&index_path)
+        let index = self.read_json(&index_path)?;
+        ensure_supported_index_version(index)
     }
 
     fn save_index(&self, index: &Index) -> Result<()> {
@@ -174,29 +212,44 @@ impl JsonFileStorage {
         let mut all_ids = HashSet::new();
         let mut deleted_ids = HashSet::new();
 
+        // A source whose format is newer than this binary supports must abort the
+        // whole aggregation (fail fast), never be silently skipped like a missing
+        // or non-git source. `merge_source` propagates that one typed error while
+        // swallowing benign absences, keeping the guard consistent across the
+        // local, git-HEAD, and main-worktree index paths.
+        let merge_source = |loaded: Result<Index>,
+                            all_ids: &mut HashSet<String>,
+                            deleted_ids: &mut HashSet<String>|
+         -> Result<()> {
+            match loaded {
+                Ok(index) => {
+                    all_ids.extend(index.all_ids);
+                    deleted_ids.extend(index.deleted_ids);
+                    Ok(())
+                }
+                Err(e) if e.is::<RepositoryFormatTooNewError>() => Err(e),
+                Err(_) => Ok(()), // missing/non-git source: ignore as before
+            }
+        };
+
         // 1. Load local index
-        if let Ok(local_index) = self.load_index() {
-            all_ids.extend(local_index.all_ids);
-            deleted_ids.extend(local_index.deleted_ids);
-        }
+        merge_source(self.load_index(), &mut all_ids, &mut deleted_ids)?;
 
         // 2. Try loading index from git
-        if let Ok(git_index) = self.load_index_from_git() {
-            all_ids.extend(git_index.all_ids);
-            deleted_ids.extend(git_index.deleted_ids);
-        }
+        merge_source(self.load_index_from_git(), &mut all_ids, &mut deleted_ids)?;
 
         // 3. Try loading index from main worktree
-        if let Ok(main_index) = self.load_index_from_main_worktree() {
-            all_ids.extend(main_index.all_ids);
-            deleted_ids.extend(main_index.deleted_ids);
-        }
+        merge_source(
+            self.load_index_from_main_worktree(),
+            &mut all_ids,
+            &mut deleted_ids,
+        )?;
 
         // Filter out deleted IDs from the aggregated set
         all_ids.retain(|id| !deleted_ids.contains(id));
 
         Ok(Index {
-            schema_version: 2,
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             all_ids: {
                 let mut ids: Vec<String> = all_ids.into_iter().collect();
                 ids.sort();
@@ -225,7 +278,9 @@ impl JsonFileStorage {
             bail!("Index not in git");
         }
 
-        serde_json::from_slice(&output.stdout).context("Failed to parse index from git")
+        let index =
+            serde_json::from_slice(&output.stdout).context("Failed to parse index from git")?;
+        ensure_supported_index_version(index)
     }
 
     /// Load index from main worktree.
@@ -275,7 +330,8 @@ impl JsonFileStorage {
             bail!("Index not in main worktree");
         }
 
-        self.read_json(&main_index_path)
+        let index = self.read_json(&main_index_path)?;
+        ensure_supported_index_version(index)
     }
 
     /// Load an issue from git HEAD.
@@ -404,12 +460,22 @@ impl JsonFileStorage {
 
 impl IssueStore for JsonFileStorage {
     fn init(&self) -> Result<()> {
+        // `init` is the one command that does not pass through `validate()`, so
+        // it must run the same format guard itself: re-initializing over an
+        // EXISTING repository whose `index.json` is newer than this binary
+        // supports must fail fast rather than scaffold/write into data it cannot
+        // safely read (jit:def64ac4 REQ-02). A fresh directory (no index yet) is
+        // a new repository and proceeds normally.
+        let index_path = self.root.join(INDEX_FILE);
+        if index_path.exists() {
+            self.load_index()?; // applies ensure_supported_index_version
+        }
+
         let issues_dir = self.root.join(ISSUES_DIR);
 
         fs::create_dir_all(&issues_dir).context("Failed to create issues directory")?;
 
         // Create index.json if it doesn't exist
-        let index_path = self.root.join(INDEX_FILE);
         if !index_path.exists() {
             let index = Index::default();
             self.write_json(&index_path, &index)?;
@@ -2252,5 +2318,108 @@ mod tests {
             matches!(result, Err(PathReadError::OutsideRepoRoot(_))),
             "symlink pointing outside repo root must be rejected with OutsideRepoRoot, got: {result:?}"
         );
+    }
+
+    /// Repository-format compatibility guard (issue def64ac4).
+    mod format_compat_tests {
+        use super::*;
+        use crate::storage::RepositoryFormatTooNewError;
+
+        /// Write a raw `index.json` carrying an explicit `schema_version` into a
+        /// freshly-created `.jit`, returning the storage handle.
+        fn storage_with_index_version(temp: &TempDir, version: u32) -> JsonFileStorage {
+            let storage = JsonFileStorage::new(temp.path());
+            storage.init().unwrap();
+            let index_path = temp.path().join(INDEX_FILE);
+            let raw = format!(
+                "{{\n  \"schema_version\": {version},\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}}"
+            );
+            fs::write(&index_path, raw).unwrap();
+            storage
+        }
+
+        // REQ-01: the constant is the single authoritative marker — a new index is
+        // stamped with SUPPORTED_INDEX_SCHEMA_VERSION.
+        #[test]
+        fn test_new_index_is_stamped_with_supported_version() {
+            assert_eq!(
+                Index::default().schema_version,
+                SUPPORTED_INDEX_SCHEMA_VERSION
+            );
+
+            let temp_dir = TempDir::new().unwrap();
+            let storage = JsonFileStorage::new(temp_dir.path());
+            storage.init().unwrap();
+            assert_eq!(
+                storage.load_index().unwrap().schema_version,
+                SUPPORTED_INDEX_SCHEMA_VERSION
+            );
+        }
+
+        // REQ-02: a repo whose format version exceeds the binary's support refuses
+        // to load, via a typed error naming BOTH versions on a single line, rather
+        // than a file-read/parse error.
+        #[test]
+        fn test_newer_repo_format_refused_on_direct_load() {
+            let temp_dir = TempDir::new().unwrap();
+            let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
+            let storage = storage_with_index_version(&temp_dir, newer);
+
+            let err = storage
+                .load_index()
+                .expect_err("newer format must be refused");
+            let typed = err
+                .downcast_ref::<RepositoryFormatTooNewError>()
+                .expect("must be the typed format-too-new error, not a parse/read error");
+            assert_eq!(typed.repository_version(), newer);
+            assert_eq!(typed.supported_version(), SUPPORTED_INDEX_SCHEMA_VERSION);
+
+            let line = typed.to_string();
+            assert!(!line.contains('\n'), "message must be single-line: {line}");
+            assert!(
+                line.contains(&newer.to_string()),
+                "must name repo version: {line}"
+            );
+            assert!(
+                line.contains(&SUPPORTED_INDEX_SCHEMA_VERSION.to_string()),
+                "must name supported version: {line}"
+            );
+        }
+
+        // REQ-02 (consistency): the aggregated read path (used by list/status) also
+        // surfaces the format-too-new error instead of swallowing it.
+        #[test]
+        fn test_newer_repo_format_refused_on_aggregated_read() {
+            let temp_dir = TempDir::new().unwrap();
+            let newer = SUPPORTED_INDEX_SCHEMA_VERSION + 1;
+            let storage = storage_with_index_version(&temp_dir, newer);
+
+            let err = storage
+                .list_issues()
+                .expect_err("aggregated read must be refused");
+            assert!(err.downcast_ref::<RepositoryFormatTooNewError>().is_some());
+        }
+
+        // REQ-03: a repo whose version EQUALS the binary's support operates normally
+        // (critical no-regression case: version == supported == today's repo).
+        #[test]
+        fn test_equal_version_operates_normally() {
+            let temp_dir = TempDir::new().unwrap();
+            let storage = storage_with_index_version(&temp_dir, SUPPORTED_INDEX_SCHEMA_VERSION);
+            assert!(storage.load_index().is_ok());
+            assert!(storage.list_issues().is_ok());
+        }
+
+        // REQ-03: a repo whose version is LESS than the binary's support also
+        // operates normally.
+        #[test]
+        fn test_older_version_operates_normally() {
+            let temp_dir = TempDir::new().unwrap();
+            let older = SUPPORTED_INDEX_SCHEMA_VERSION - 1;
+            let storage = storage_with_index_version(&temp_dir, older);
+            let index = storage.load_index().expect("older format must still load");
+            assert_eq!(index.schema_version, older);
+            assert!(storage.list_issues().is_ok());
+        }
     }
 }
