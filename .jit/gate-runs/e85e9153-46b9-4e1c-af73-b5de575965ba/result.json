@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "e85e9153-46b9-4e1c-af73-b5de575965ba",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d0f88ee2-7018-4779-8ccc-969b42eaabb7",
+  "commit": "3a56e27c62d06e852dc9f7092ab9906fffbdb372",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T15:37:39.315555167Z",
+  "completed_at": "2026-07-05T15:39:03.729769241Z",
+  "duration_ms": 84414,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 are met. Hidden wrong-verb stubs are added in [crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:909), routed to canonical hints via [crates/jit/src/main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:693), and covered by integration tests in [verb_hint_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/verb_hint_tests.rs:106). Label help disambiguation is covered at [verb_hint_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/verb_hint_tests.rs:181).\n\n**Architecture**\n\nThe change stays in CLI parsing/dispatch, output/error formatting, tests, and docs. No domain, storage, or command-layer boundary violation found. The feature is user-facing CLI behavior, so adding hidden Clap variants in `cli.rs` and dispatching them in `main.rs` is appropriate.\n\n**Functional Paradigm**\n\nNo concerning imperative logic was introduced. The hint lookup uses iterator combinators in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:731).\n\n**Correctness And Invariants**\n\nNo state changes are performed by the new wrong-verb paths. They return typed `INVALID_ARGUMENT` errors and exit 2. No new file writes, event-log mutations, gate transitions, assignee/label parsing, or PID usage were introduced.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains enforced in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:14). No unsafe code added.\n\n**Testing**\n\nI did not rerun cargo tests because the issue has a succeeded `cargo-ci` gate dated `2026-07-05T15:35:07Z`. I did run `./scripts/jit-validate.sh`, which passed. The new integration tests cover human and `--json` error behavior plus canonical-command non-regression.\n\n**Error Handling**\n\nWrong-verb failures use `InvalidArgumentError` and JSON error envelopes when `--json` is present, via [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:672). No library `unwrap()`/`expect()` added outside tests.\n\n**CLI Contract**\n\nThe wrong-verb stubs preserve machine-readable output by detecting trailing `--json` and emitting a JSON error envelope. Existing canonical commands remain unchanged.\n\n**Documentation**\n\nDocs were updated in [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:110), and the changelog documents the behavior. Public hidden enum variants have comments; no documentation blocker found for this CLI-internal surface.\n\n**Jit Issue Management**\n\n`./scripts/jit-validate.sh` passed. The issue has no dependencies. Existing evidence shows `cargo-ci` passed; `code-review` is pending as expected for this review.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
