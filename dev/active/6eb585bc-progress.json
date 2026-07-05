@@ -1,7 +1,7 @@
 {
   "epic_id": "6eb585bc",
   "epic_short_id": "6eb585bc",
-  "current_wave": 2,
+  "current_wave": 3,
   "note": "8 open leaf children, no inter-sibling deps. Serial sub-waves due to main.rs/cli.rs contention on a monolithic codebase.",
   "waves": [
     {
@@ -22,7 +22,7 @@
           "short_id": "8a15088a",
           "title": "idempotent same-assignee claim",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },

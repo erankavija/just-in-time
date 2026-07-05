@@ -2,7 +2,7 @@
   "id": "8a15088a-5907-4b24-9c67-8388eefaeb6e",
   "title": "Claim is not idempotent over an existing same-assignee assignment",
   "description": "`jit issue claim <id> <assignee>` hard-fails with \"Issue is already assigned\" even when the existing assignee is the claimant, so an assignment cannot be promoted into an in_progress claim.\n\n## Background\n\nFriction observed while lead-driving epic 2821e177 (2026-07-03, session 2). The assign-then-claim sequence is exactly what container stewardship produces: a lead assigns an issue while its dependencies are still open (a full claim would exit 4 on the blocked in_progress transition), and later — once dependencies complete — wants to promote that assignment into an in_progress claim. That promotion rejects, and the operator falls back to `jit issue update --state in_progress`.\n\nThis concerns claim being non-idempotent at promotion time over an existing same-assignee assignment, which is a separate lifecycle point from claim's behavior at intake time on a dependency-blocked container.\n\n`jit issue claim` is assignment (it sets `assignee` and transitions state); it is distinct from the advisory `claims.jsonl` lease that `jit claim acquire` records and that requires a git worktree.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit issue claim <id> <assignee>` on an issue already assigned to that same assignee proceeds rather than erroring — it retains the assignment and performs the Ready→InProgress transition once the issue is unblocked. Covered by a test: assign X while dependencies are open, complete the dependencies, then claim as X and assert the issue is InProgress with the assignee still X.\n- [hard] REQ-02: `jit issue claim <id> <assignee>` on an issue already assigned to a different assignee continues to fail as today. Covered by a test asserting the rejection.\n\n## Amendment A-8a15088a (invoker-approved, 2026-07-05)\n\nREQ-01 originally read \"records the lease ... assert in_progress with a live lease.\" `jit issue claim` does not record a `claims.jsonl` lease — that is the separate `jit claim acquire` command family (which requires git). The \"lease\" wording conflated the two subsystems. REQ-01 is reworded to describe what `jit issue claim` actually does: retain the assignment and promote to InProgress. Behavioral intent (idempotent same-assignee promotion) is unchanged.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -12,14 +12,14 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T00:59:37.541357858Z"
+      "updated_at": "2026-07-05T05:28:39.686545740Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T00:58:38.682102097Z"
+      "updated_at": "2026-07-05T05:27:08.917796396Z"
     }
   },
   "context": {},
@@ -30,5 +30,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T16:51:06.636583159Z",
-  "updated_at": "2026-07-05T05:26:53.195541903Z"
+  "updated_at": "2026-07-05T05:29:51.455213909Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "857d8fa1-0398-4fe0-b701-d3513d7c5bf6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8a15088a-5907-4b24-9c67-8388eefaeb6e",
+  "commit": "0b64ae2577542f64e49d8acf2447213e6f957e60",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T05:28:39.686545740Z",
+  "completed_at": "2026-07-05T05:29:30.320159700Z",
+  "duration_ms": 50633,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 is met: [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:676) parses the claimant once and permits an existing same assignee to proceed through the normal claim path, including the Ready -> InProgress transition at [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:711). The test covers assign while blocked, complete dependency, then claim as the same assignee at [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:1136).\n\nREQ-02 is met: a different existing assignee still fails at [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:677), with coverage at [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:1199).\n\n**Architecture And Separation**\nNo boundary violation found. The change stays in `commands/issue.rs`; storage access remains behind `IssueStore`; CLI dispatch remains in `main.rs`.\n\n**Functional Paradigm**\nNo blocking functional-style issue found in the changed path.\n\n**Correctness And Invariants**\nAssignee validation is preserved via `Assignee::parse`. Gate/dependency semantics are preserved through `update_issue_state`. State-changing claim behavior still saves through storage and appends `issue_claimed` at [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:737).\n\n**Safety**\nNo unsafe code introduced.\n\n**Testing**\nUsed provided gate evidence: `cargo-ci` passed. I did not rerun cargo tests per instruction. I ran `./scripts/jit-validate.sh`, and it passed.\n\n**Error Handling**\nNo new `unwrap()` or `expect()` in non-test changed code. Existing error behavior for different-assignee claims is preserved.\n\n**CLI Contract**\nThe `issue claim` dispatch continues to support `--json` at [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1983).\n\n**Documentation**\nThe updated claim-vs-assign text matches the amended issue semantics at [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1103).\n\n**Prior Review Feedback**\nThe prior failed review was based on the old REQ-01 lease wording. Amendment A-8a15088a explicitly states `jit issue claim` does not record a `claims.jsonl` lease, so that finding is obsolete.\n\n**Jit Issue Management**\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
