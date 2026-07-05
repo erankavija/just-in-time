@@ -7,13 +7,16 @@
   "assignee": null,
   "dependencies": [],
   "gates_required": [
-    "tdd-reminder",
-    "tests",
-    "fmt",
-    "clippy",
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-05T22:34:56.917972404Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -23,6 +26,6 @@
     "satisfies:REQ-5"
   ],
   "created_at": "2026-07-05T22:31:18.724369749Z",
-  "updated_at": "2026-07-05T22:31:18.724776889Z",
+  "updated_at": "2026-07-05T22:34:57.030322315Z",
   "first_ready_at": "2026-07-05T22:31:18.724370209Z"
 }

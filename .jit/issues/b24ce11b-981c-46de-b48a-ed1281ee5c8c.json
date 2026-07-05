@@ -9,13 +9,16 @@
     "d91ea408-3ed9-4021-9f9b-5ee736474c5f"
   ],
   "gates_required": [
-    "tdd-reminder",
-    "tests",
-    "fmt",
-    "clippy",
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-05T22:34:56.073116899Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -25,6 +28,6 @@
     "satisfies:REQ-1"
   ],
   "created_at": "2026-07-05T22:31:18.720015375Z",
-  "updated_at": "2026-07-05T22:31:18.984928018Z",
+  "updated_at": "2026-07-05T22:34:56.427655747Z",
   "first_ready_at": "2026-07-05T22:31:18.720015885Z"
 }
