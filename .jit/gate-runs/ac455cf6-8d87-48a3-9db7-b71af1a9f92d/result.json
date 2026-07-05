@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "ac455cf6-8d87-48a3-9db7-b71af1a9f92d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "27338abc-2be0-42e7-af28-4617fe505acb",
+  "commit": "15739507cd5d839f785ec85b0466a76354fcc3ea",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T18:37:57.604992439Z",
+  "completed_at": "2026-07-05T18:39:53.089447026Z",
+  "duration_ms": 115484,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nPass. REQ-01 is met: `crates/jit/src/gate_execution.rs:143-175` parses structured findings at record time, `crates/jit/src/domain/types.rs:1159-1167` persists them beside raw `stdout`, and `crates/jit/src/output.rs:1769-1811` keeps them in JSON projections. REQ-02 is met in `docs/how-to/custom-gates.md:209-289`. REQ-03 is met by `crates/jit/src/cli.rs:1638-1644` and `crates/jit/src/main.rs:819-879`. REQ-04 is met by `parse_gate_findings()` returning `None` on absent/malformed blocks at `crates/jit/src/domain/gate_findings.rs:149-171`.\n\n**Architecture And Separation Of Concerns**\nPass. Parsing is pure domain code in `crates/jit/src/domain/gate_findings.rs`; persistence stays in storage via `save_gate_run_result`; command/CLI code only orchestrates and renders in `crates/jit/src/main.rs:3287-3319`.\n\n**Functional Paradigm**\nPass. The implementation is mostly expression-oriented. The small parser scan loop in `crates/jit/src/domain/gate_findings.rs:157-168` is bounded, pure, and acceptable for marker pairing.\n\n**Correctness And Invariants**\nPass. Raw stdout remains available, structured findings are optional for legacy/plain-text checkers, writes still use existing storage paths, and event/gate semantics are unchanged. No new PID-handling code was introduced.\n\n**Safety**\nPass. No unsafe code was introduced; the workspace still enforces `#![deny(unsafe_code)]`.\n\n**Testing**\nPass. The supplied cargo-ci gate passed on `2026-07-05T18:35:18Z` with `fmt`, `clippy`, and `test: 3310 passed, 0 failed, 12 ignored`. New coverage exists in `crates/jit/tests/gate_findings_test.rs`, including JSON projections, `--findings`, non-conforming checkers, and error envelopes. I also ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\nPass. Malformed structured blocks degrade to `None` without failing the gate, and no new production `unwrap()`/`expect()` usage was added in the reviewed implementation.\n\n**CLI Contract**\nPass. The new `--findings` view supports `--json`, and existing JSON views continue to include raw output when appropriate.\n\n**Documentation**\nPass. New public APIs have doc comments and examples in `crates/jit/src/domain/gate_findings.rs` and `crates/jit/src/output.rs:1921-1964`.\n\n**Prior Review Feedback**\nNo prior review feedback was supplied for this issue (`run_history` empty).\n\n**JIT Issue Management**\nPass. `issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
