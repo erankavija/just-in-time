@@ -5,34 +5,35 @@
 [![jit coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/jit.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
 [![jit-server coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/jit-server.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
 [![workspace coverage](https://raw.githubusercontent.com/erankavija/just-in-time/badges/workspace.svg)](https://github.com/erankavija/just-in-time/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
 **Orchestrate, automate and supervise the work of AI agents.** A repository-local CLI issue tracker that enables defining complex workflows, quality control and project planning with AI agents.
 
 ## The Problem
 
-Working with AI agents on complex projects gives rise to a coordination problem: agents need to break down work, avoid conflicts, enforce quality, and track progress—both with and without human intervention. Traditional issue trackers are not designed for AI agents, making it difficult to manage multi-agent workflows effectively. 
+Working with AI agents on complex projects gives rise to a coordination problem: agents need to break down work, avoid conflicts, enforce quality, and track progress—both with and without human intervention. Traditional issue trackers are not designed for AI agents, making it difficult to manage multi-agent workflows effectively.
 
 ## Why JIT?
 
-JIT is built from the ground up to support AI agent workflows with features that address their unique needs:
+JIT is built from the ground up to support AI agent workflows:
 
-- ✅ **Quality Gates**: Enforce tests, linting, reviews, scans before work can proceed
-- 📝 **Document Lifecycle**: Link design docs, session notes, and context to issues with safe archival
-- 🔗 **Dependency DAG**: Express "Task B needs Task A" with automatic blocking and cycle detection  
-- 📁 **Git-Friendly**: All state in plain JSON—version, diff, merge and version like code
-- 🤖 **Agent-First Design** - JSON output, short hashes, atomic claims, event logs for observability
-- 🔒 **Multi-Agent Safe**: File locking prevents race conditions with concurrent agents
-- ⚙️ **Configurable**: Customize issue hierarchies and validation rules per repository
+- ✅ **Quality Gates** — Automated and manual checkpoints with recorded runs and structured, machine-readable findings
+- 📊 **Orchestration Views** — Compact status projections, per-container rollups, and state aggregations in one command each
+- 🔗 **Dependency DAG** — Cycle detection, transitive reduction, atomic edge operations, and DAG-authoritative hierarchy resolution
+- 📝 **Document Lifecycle** — Link design docs, session notes, and context to issues with safe archival
+- 📁 **Git-Friendly** — All state in plain JSON—version, diff, and merge like code
+- 🤖 **Agent-First Design** — Uniform JSON envelopes, typed exit codes, short hashes, lifecycle timestamps, append-only event log
+- 🔒 **Multi-Agent Safe** — File locking and advisory work leases prevent race conditions between concurrent agents
+- ⚙️ **Configurable** — Issue hierarchies, validation rules, gates, and graph templates are declared per repository
 
-All issue data lives in `.jit/` directory within your project, versioned with git like code. No external database, no cloud service, no API dependencies.
+All issue data lives in the `.jit/` directory within your project, versioned with git like code. No external database, no cloud service, no API dependencies.
 
 ## Use Cases
 
-- **Multi-agent software development** - Lead agent plans work and breaks it to smaller tasks, workers claim ready tasks, quality gates enforce tests before merge. 
-- **Research projects** - Break down analysis into parallel tasks, gate on peer review before publishing, preserve research context in linked documents.
-- **Content generation** - Writing tasks depend on outline approval, editing tasks depend on writing completion, publication gate requires editor review.
-- **Any workflow** where you want agents to discover and create work dynamically
+- **Multi-agent software development** — A lead agent plans work and breaks it into tasks, workers claim ready tasks, quality gates enforce tests and review before completion.
+- **Research projects** — Break analysis into parallel tasks, gate on peer review, preserve research context in linked documents.
+- **Content generation** — Writing tasks depend on outline approval, editing depends on writing, publication gates on editor review.
+- **Any workflow** where agents discover and create work dynamically.
 
 ## Quick Start
 
@@ -51,168 +52,168 @@ cargo install --path crates/jit
 ```
 
 **Optional components:**
-- `jit-server` - Web UI server (provides visualization at http://localhost:8080)
-- **MCP Server** - Model Context Protocol server for AI agents like Claude (see [mcp-server/](mcp-server/))
+- `jit-server` — Web UI server (visualization at http://localhost:8080)
+- **MCP Server** — Model Context Protocol server for AI agents like Claude (see [mcp-server/](mcp-server/))
 
 See [INSTALL.md](INSTALL.md) for all installation options.
 
 ### Basic Usage
 
 ```bash
-# Initialize in your project
+# Initialize in your project (supports --json like every command)
 jit init
 
-# Create work with dependencies
-EPIC=$(jit issue create --title "User authentication" --priority high)
-TASK1=$(jit issue create --title "Create user model" --priority high)
-TASK2=$(jit issue create --title "Implement login endpoint" --priority high)
+# Create work; -q prints just the issue id for capture
+EPIC=$(jit issue create --title "User authentication" --label type:epic --priority high -q)
+TASK1=$(jit issue create --title "Create user model" --priority high -q)
+TASK2=$(jit issue create --title "Implement login endpoint" --priority high -q)
 
-# Define dependencies (EPIC waits for both tasks)
-jit dep add $EPIC $TASK1
-jit dep add $EPIC $TASK2
+# Containment: the epic depends on its children
+jit dep add $EPIC $TASK1 $TASK2
 
-# Link design document for context
+# Link a design document for context
 jit doc add $EPIC auth-design.md --label "Design Document"
 
-# Agent claims and executes
+# An agent claims a ready task and completes it
 jit issue claim $TASK1 agent:worker-1
 # ... do work ...
 jit issue update $TASK1 --state done
 
-# Check what's ready to work on
-jit query available
+# Where does everything stand?
+jit query available                  # ready, unassigned work
+jit issue status $EPIC $TASK2        # one line each: state, gates, unmet deps
+jit issue progress $EPIC             # counts by state, done/total
 ```
 
-**See [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
+Ordering between siblings is also a dependency edge (`jit dep add $TASK2 $TASK1`). Edge operations are atomic and keep the graph transitively reduced; `--reduce` swaps a shortcut edge for the longer path in one step.
 
+**See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
 
 ## Core Concepts
 
-JIT's workflow revolves around **issues** (units of work) that progress through **states** (lifecycle stages) with **dependencies** (execution order) and **quality gates** (checkpoints). Labels provide optional organization.
+JIT's workflow revolves around **issues** (units of work) that progress through **states** (lifecycle stages) with **dependencies** (execution order and containment) and **quality gates** (checkpoints). Labels provide advisory organization; the dependency DAG is authoritative.
 
 ### Issue Lifecycle
 
-Issues progress through states with automated quality checks:
-
-```
-backlog → ready → in_progress → gated → done
-           ↑         ↓            ↓
-           └──── prechecks    postchecks
-              (validate)    (verify quality)
-
-From any state: → rejected (terminal, bypasses gates)
+```mermaid
+stateDiagram-v2
+    [*] --> backlog
+    backlog --> ready: dependencies complete
+    ready --> in_progress: claim (prechecks pass)
+    in_progress --> gated: work submitted
+    gated --> done: postchecks pass
+    done --> [*]
+    note right of gated
+        rejected (terminal) and archived (parked)
+        are reachable from any state
+    end note
 ```
 
 **States:**
-- **backlog**: Has incomplete dependencies
-- **ready**: Dependencies done, available to claim
-- **in_progress**: Work actively happening
-- **gated**: Work complete, awaiting quality gate approval
-- **done**: All gates passed, complete (terminal)
-- **rejected**: Closed without implementation (terminal, bypasses gates)
+- **backlog** — Has incomplete dependencies
+- **ready** — Dependencies done, available to claim
+- **in_progress** — Work actively happening
+- **gated** — Work complete, awaiting quality gate approval
+- **done** — All gates passed, complete (terminal)
+- **rejected** — Closed without implementation (terminal, bypasses gates)
+- **archived** — Parked out of active views; reachable from any state
 
-See [Core Model - States](docs/concepts/core-model.md#states) for detailed transition rules.
+Issues record lifecycle timestamps (first ready, claimed, done) as they transition. See [Core Model — States](docs/concepts/core-model.md#states) for transition rules.
 
 ### Dependencies Form a DAG
 
-Issues can depend on other issues. An issue is **blocked** until all its dependencies complete.
+Issues depend on other issues. An issue is **blocked** until all its dependencies complete, and containment (which epic a task belongs to) is derived from the same graph.
 
 ```bash
-jit dep add <blocked-issue> <dependency-issue>
-jit graph show <issue>           # Visualize dependency tree
-jit query blocked                # Find what's blocked and why
+jit dep add <blocked-issue> <dependency-issue...>   # atomic, all-or-nothing
+jit graph deps <issue>            # dependency tree with rollup summary
+jit graph tree --json             # resolved parent/children/cluster per node
+jit query blocked                 # what is blocked, and why
 ```
 
-JIT automatically detects cycles and prevents them.
+Cycles are rejected up front, redundant edges are refused (or reduced with `--reduce`), and `jit query divergence` reports any membership label that the DAG does not back.
 
 ### Quality Gates Enforce Standards
 
-Gates are checkpoints that must pass before an issue can progress or complete.
+Gates are checkpoints that must pass before an issue can start, progress, or complete.
 
 ```bash
-# Require a gate on an issue
-jit issue create --title "Add feature" --gate unit-tests
+# Require gates at creation
+jit issue create --title "Add feature" --gate unit-tests --gate code-review
 
-# Gate automatically checks when issue completes
-# Or manually evaluate/fail:
-jit gate evaluate <issue> unit-tests
+# Run an automated gate and read the results
+jit gate evaluate <issue> unit-tests      # executes the checker
+jit gate status <issue> unit-tests        # latest recorded run
+jit gate status <issue> unit-tests --all        # run history
+jit gate status <issue> unit-tests --findings   # structured findings view
 ```
 
 **Gate types:**
-- **Automated** - Run a command, gate passes if exit code is 0
-- **Manual** - Requires manual passing, works like a checklist item
+- **Automated** — Runs a configured checker command; the exit code decides pass/fail. Checkers can emit a machine-readable findings block (verdict, per-finding severity and file:line) that jit parses and stores with the run.
+- **Manual** — Passed explicitly by a human or agent, like a checklist item.
 
 **Gate stages:**
-- **Precheck** - Must pass before work can start (e.g., "Acknowledge TDD: write tests first")
-- **Postcheck** - Must pass before marking done (e.g., tests, linting, reviews)
+- **Precheck** — Must pass before work starts (e.g. "acknowledge TDD")
+- **Postcheck** — Must pass before completion (tests, linting, reviews)
+
+### Built for Orchestration
+
+Every command supports `--json`; list output uses one envelope: `{"count": N, "<collection>": [...]}`. Exit codes are typed (invalid argument, not found, validation/gates, requires-git) and `jit --schema` documents every command's JSON shape and the full exit-code taxonomy.
+
+```bash
+jit issue status <id>...                 # state + gates + unmet deps, one line per issue
+jit issue children <id>                  # per-child status rollup for a container
+jit query count --by state --label epic:auth   # aggregate over a label bucket
+jit config get type_hierarchy.types      # configuration by dotted key
+jit graph export --json --full           # complete records + edges for external tooling
+jit events tail                          # append-only event log, for verification
+```
+
+Structured lines in issue descriptions and project registries (requirements, invariants, definitions) are **addressable items** with stable qualified ids — `@/issue/<short-id>/<kind>/<self-id>` inside an issue, `@/<kind>/<self-id>` project-wide. `jit item list` and `jit item search` query them; markdown stays the source of truth, the index is a projection. Item kinds are declared in `[item_kinds]` config, and the project invariants registry (`.jit/invariants.toml`) renders into project docs via `jit invariant render`.
 
 ### Document Management
 
-JIT provides built-in document lifecycle management to preserve context and decisions alongside issues.
+Preserve context and decisions alongside issues.
 
 ```bash
-# Attach design docs to issues
 jit doc add <issue> design.md --label "Design Document"
-
-# Link session notes for work-in-progress
-jit doc add <issue> notes/session-2024-01-02.md --label "Session Notes"
-
-# Discover documents linked to an issue
-jit doc list <issue>
-
-# Validate links before archiving
-jit doc check-links --scope issue:<issue>
-
-# Archive completed documentation safely
-jit doc archive design.md --type features
+jit doc list <issue>                          # discover linked context
+jit doc check-links --scope issue:<issue>     # validate references
+jit doc archive design.md --type features     # safe archival with assets
 ```
 
-**Key features:**
-- **Document tracking** - Link markdown files, images, and assets to issues
-- **Discovery** - Query documents by issue to find relevant context
-- **Link validation** - Ensure references stay valid when documents move
-- **Safe archival** - Move completed docs with assets intact
-- **Git integration** - Documents version alongside code
-
-**Why this matters:** Agents can discover context from previous work, understand design decisions, and maintain institutional knowledge without relying on external systems.
-
-See [Document Commands Reference](docs/reference/cli-commands.md#document-commands) for full `jit doc` usage.
+Agents discover context from previous work, understand design decisions, and maintain institutional knowledge without external systems. See the [Document Commands Reference](docs/reference/cli-commands.md#document-commands).
 
 ### Organization with Labels
 
-Labels provide flexible organization without rigid hierarchies.
+Labels provide advisory grouping on top of the authoritative DAG.
 
 ```bash
-# Create strategic structure
-jit issue create --title "Q1 2024" --label "type:milestone"
-jit issue create --title "Auth System" --label "type:epic" --label "milestone:q1-2024"
-jit issue create --title "Login API" --label "type:task" --label "epic:auth"
+jit issue create --title "Q1 2026" --label "type:milestone"
+jit issue create --title "Auth System" --label "type:epic" --label "milestone:q1-2026"
 
-# Query by labels
-jit query strategic              # Only milestones and epics
-jit query all --label "epic:auth"      # All tasks in auth epic
-jit query all --label "milestone:*"    # All milestone-tagged work
+jit query strategic                              # milestones and epics
+jit query all --label "epic:auth" --label "component:api"   # repeated labels AND
+jit query all --label "milestone:*"              # wildcard per namespace
 ```
-
-Labels are **optional** - use them when you need organizational structure. Dependencies are always required.
 
 ## Documentation
 
-**→ [Full Documentation](docs/index.md)** - Tutorials, how-to guides, concepts, and reference.
+**→ [Full Documentation](docs/index.md)** — Tutorials, how-to guides, concepts, and reference.
 
 Quick links:
-- [Quickstart](docs/tutorials/quickstart.md) - Get started in 10 minutes
-- [CLI Commands](docs/reference/cli-commands.md) - Complete command reference
-- [Configuration](docs/reference/configuration.md) - Customization options
+- [Quickstart](docs/tutorials/quickstart.md) — Get started in 10 minutes
+- [CLI Commands](docs/reference/cli-commands.md) — Complete command reference
+- [Configuration](docs/reference/configuration.md) — Customization options
 
 ## Configuration
 
-JIT is configurable via `.jit/config.toml`. Key options:
+JIT is configurable via `.jit/config.toml`:
 
-- **Issue hierarchies** - Define type levels (milestone → epic → story → task)
-- **Validation rules** - Enforce or relax organizational requirements
-- **Strategic types** - Control what shows in high-level queries
-- **Documentation lifecycle** - Configure archival paths and categories
+- **Issue hierarchies** — Type levels (e.g. milestone → epic → story → task) drive strategic queries and hierarchy resolution
+- **Validation rules** — Enforce or relax organizational requirements
+- **Gates and templates** — Gate registry (`gates.toml`) and graph templates (`templates.toml`) live beside the config
+- **Documentation lifecycle** — Archival paths and categories
 
 ```toml
 [version]
@@ -226,7 +227,7 @@ strategic_types = ["milestone", "epic"]
 strictness = "loose"  # "strict", "loose", or "permissive"
 ```
 
-See [Configuration Reference](docs/reference/configuration.md) for complete options and [Example Config](docs/reference/example-config.toml) for a full template.
+See the [Configuration Reference](docs/reference/configuration.md) and [Example Config](docs/reference/example-config.toml).
 
 ## Project Status
 
