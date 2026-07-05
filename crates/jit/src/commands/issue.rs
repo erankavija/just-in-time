@@ -313,6 +313,35 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// (the caller routes it through `handle_json_error!`). Children are ordered
     /// by ascending short id, since stored dependency order is set-derived and
     /// not meaningful.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::CommandExecutor;
+    /// use jit::domain::Priority;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// let executor = CommandExecutor::new(storage);
+    /// let new = |title: &str| {
+    ///     executor
+    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///             vec![], vec![], None, None, false)
+    ///         .unwrap()
+    ///         .0
+    /// };
+    ///
+    /// let epic = new("Epic");
+    /// let child = new("Child");
+    /// executor.add_dependency(&epic, &child).unwrap();
+    ///
+    /// let response = executor.issue_children(&epic).unwrap();
+    /// assert_eq!(response.container.title, "Epic");
+    /// assert_eq!(response.count, 1);
+    /// assert_eq!(response.issues[0].title, "Child");
+    /// assert!(response.dangling.is_empty());
+    /// ```
     pub fn issue_children(&self, id: &str) -> Result<crate::output::IssueChildrenResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
@@ -337,6 +366,41 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Membership follows the dependency DAG, as for [`Self::issue_children`].
     /// The rollup counts resolvable children only; dangling edges are surfaced
     /// separately rather than counted or dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::CommandExecutor;
+    /// use jit::domain::{Priority, State};
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// let executor = CommandExecutor::new(storage);
+    /// let new = |title: &str| {
+    ///     executor
+    ///         .create_issue(title.into(), String::new(), Priority::Normal,
+    ///             vec![], vec![], None, None, false)
+    ///         .unwrap()
+    ///         .0
+    /// };
+    ///
+    /// let epic = new("Epic");
+    /// let done = new("Done child");
+    /// let todo = new("Todo child");
+    /// executor.add_dependency(&epic, &done).unwrap();
+    /// executor.add_dependency(&epic, &todo).unwrap();
+    /// executor
+    ///     .update_issue(&done, None, None, None, Some(State::Done),
+    ///         vec![], vec![], None, None, false)
+    ///     .unwrap();
+    ///
+    /// let progress = executor.issue_progress(&epic).unwrap();
+    /// assert_eq!(progress.rollup.total, 2);
+    /// assert_eq!(progress.rollup.done, 1);
+    /// assert_eq!(progress.rollup.percent, 50);
+    /// assert!(progress.dangling.is_empty());
+    /// ```
     pub fn issue_progress(&self, id: &str) -> Result<crate::output::ContainerProgressResponse> {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;

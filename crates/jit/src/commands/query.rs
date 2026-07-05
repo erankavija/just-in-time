@@ -205,6 +205,38 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// counterpart to the DAG-authoritative
     /// [`issue_progress`](Self::issue_progress). Patterns are validated with the
     /// same rules as [`Self::query_by_labels`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::commands::CommandExecutor;
+    /// use jit::domain::{Priority, State};
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    /// let executor = CommandExecutor::new(storage);
+    /// let (done, _) = executor
+    ///     .create_issue("Shipped".into(), String::new(), Priority::Normal,
+    ///         vec![], vec![], None, None, false)
+    ///     .unwrap();
+    /// executor
+    ///     .create_issue("Todo".into(), String::new(), Priority::Normal,
+    ///         vec![], vec![], None, None, false)
+    ///     .unwrap();
+    /// executor
+    ///     .update_issue(&done, None, None, None, Some(State::Done),
+    ///         vec![], vec![], None, None, false)
+    ///     .unwrap();
+    ///
+    /// // No label filter aggregates the whole repository.
+    /// let rollup = executor.query_count_by_state(&[]).unwrap();
+    /// assert_eq!(rollup.total, 2);
+    /// assert_eq!(rollup.done, 1);
+    /// assert_eq!(rollup.percent, 50);
+    /// // Every lifecycle state has a bucket, zero-count states included.
+    /// assert_eq!(rollup.by_state.len(), State::all().len());
+    /// ```
     pub fn query_count_by_state(
         &self,
         label_filters: &[String],

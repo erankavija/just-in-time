@@ -812,8 +812,8 @@ pub enum IssueCommands {
     /// lists nothing. For a deep rollup use `jit graph deps <id> --depth`.
     ///
     /// Text form is one `issue status` line per child (state, per-gate status,
-    /// unmet deps), in the container's stored dependency order; an empty
-    /// container prints nothing.
+    /// unmet deps), in ascending short-id order; an empty container prints
+    /// nothing.
     ///
     /// `--json` emits `{container: {short_id, title, state}, count, issues: [...]}`
     /// where `issues` is one compact status object per child and `count` is their
