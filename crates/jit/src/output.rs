@@ -401,7 +401,7 @@ impl JsonError {
             format!("Gate not found: {}", gate_key),
             command,
         )
-        .with_details(serde_json::json!({"gate_key": gate_key}))
+        .with_details(serde_json::json!({"key": gate_key}))
         .with_suggestion("Run 'jit gate list' to see available gates")
         .with_suggestion("Add the gate to the registry first with 'jit gate define'")
     }
@@ -515,7 +515,7 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
         }),
         TransitionBlocker::Gate { gate_key, status } => serde_json::json!({
             "type": "gate",
-            "gate_key": gate_key,
+            "key": gate_key,
             "status": gate_status_name(*status),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
@@ -1176,7 +1176,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunSummary {
     pub run_id: String,
-    pub gate_key: String,
+    pub key: String,
     pub stage: GateStage,
     pub status: GateRunStatus,
     pub started_at: String,
@@ -1217,7 +1217,7 @@ impl GateRunSummary {
     fn build(r: &GateRunResult, include_output: bool) -> Self {
         Self {
             run_id: r.run_id.clone(),
-            gate_key: r.gate_key.clone(),
+            key: r.gate_key.clone(),
             stage: r.stage,
             status: r.status,
             started_at: r.started_at.to_rfc3339(),
@@ -1243,20 +1243,20 @@ impl GateRunSummary {
 /// the single nonzero exit code of `gate status-all`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateStatusEntry {
-    pub gate_key: String,
+    pub key: String,
     pub status: GateStatus,
 }
 
 /// JSON payload of `jit gate status-all --json` (alias `gate check-all`).
 ///
 /// `results` contains one [`GateRunSummary`] per recorded AUTOMATED run;
-/// `gate_statuses` covers EVERY required gate (automated and manual) with its
+/// `gates` covers EVERY required gate (automated and manual) with its
 /// readiness status, so manual gates are represented too. `total`, `passed`,
 /// and `not_run` are computed over all required gates: `total` is their count,
 /// `passed` how many are green, and `not_run` the keys still pending.
 /// `all_passed` mirrors the strict exit contract (0 iff true, else 4).
 ///
-/// List envelope: `count` is the length of the `gate_statuses` collection (one
+/// List envelope: `count` is the length of the `gates` collection (one
 /// entry per required gate). It equals `total` whenever every required gate has
 /// a status entry; `total`/`passed` remain the readiness tallies.
 ///
@@ -1271,20 +1271,20 @@ pub struct GateStatusEntry {
 ///     passed: 0,
 ///     total: 2,
 ///     not_run: vec!["tests".into(), "clippy".into()],
-///     gate_statuses: vec![],
+///     gates: vec![],
 ///     all_passed: false,
 /// };
 /// assert_eq!(payload.not_run.len(), 2);
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateCheckAllResponse {
-    /// Length of `gate_statuses` (list envelope `count`).
+    /// Length of `gates` (list envelope `count`).
     pub count: usize,
     pub results: Vec<GateRunSummary>,
     pub passed: usize,
     pub total: usize,
     pub not_run: Vec<String>,
-    pub gate_statuses: Vec<GateStatusEntry>,
+    pub gates: Vec<GateStatusEntry>,
     pub all_passed: bool,
 }
 
@@ -1326,7 +1326,7 @@ pub struct GateRunHistoryResponse {
 /// use jit::output::GateFlatReportResponse;
 ///
 /// let payload = GateFlatReportResponse {
-///     gate_key: "tests".into(),
+///     key: "tests".into(),
 ///     run_id: "r1".into(),
 ///     stdout: Some("the report text".into()),
 ///     stderr: None,
@@ -1335,7 +1335,7 @@ pub struct GateRunHistoryResponse {
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFlatReportResponse {
-    pub gate_key: String,
+    pub key: String,
     pub run_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stdout: Option<String>,

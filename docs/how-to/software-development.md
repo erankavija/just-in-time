@@ -537,7 +537,7 @@ FAILED=$(jq -r '[.results[] | select(.status == "failed")] | length' gate-result
 
 if [ "$FAILED" -gt 0 ]; then
   echo "❌ $FAILED gate(s) failed"
-  jq -r '.results[] | select(.status == "failed") | "  - \(.gate_key): \(.stderr // .stdout)"' gate-results.json
+  jq -r '.results[] | select(.status == "failed") | "  - \(.key): \(.stderr // .stdout)"' gate-results.json
   exit 1
 else
   echo "✅ All gates passed"

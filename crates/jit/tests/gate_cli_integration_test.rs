@@ -275,7 +275,7 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(json["error"]["code"], "GATE_FAILED");
-    assert_eq!(json["error"]["details"]["gate_key"], "test-gate");
+    assert_eq!(json["error"]["details"]["key"], "test-gate");
     assert_eq!(json["error"]["details"]["status"], "failed");
     assert_eq!(
         json["error"]["details"]["checker_result"]["status"],
@@ -398,7 +398,7 @@ fn test_gate_check_json_output() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     assert!(json["run_id"].is_string(), "Missing run_id");
-    assert!(json["gate_key"].is_string(), "Missing gate_key");
+    assert!(json["key"].is_string(), "Missing key");
     assert!(json["status"].is_string(), "Missing status");
     assert!(!json["exit_code"].is_null(), "Missing exit_code");
     assert!(json["stdout"].is_string(), "Missing stdout");
@@ -892,7 +892,7 @@ fn test_gate_check_all_json_output_reports_not_run_gates() {
     assert_eq!(json["passed"].as_u64(), Some(1));
     assert_eq!(json["results"].as_array().map(Vec::len), Some(1));
     assert_eq!(
-        json["results"][0]["gate_key"].as_str(),
+        json["results"][0]["key"].as_str(),
         Some("gate-1"),
         "Expected only gate-1 to have a recorded run"
     );

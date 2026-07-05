@@ -121,7 +121,7 @@ Gate-blocked example:
       "blockers": [
         {
           "type": "gate",
-          "gate_key": "code-review",
+          "key": "code-review",
           "status": "pending"
         }
       ],
@@ -1495,11 +1495,11 @@ jit gate status-all <ISSUE_ID> [--json] [--full]
   and both map to the single nonzero code. This readiness contract is a single
   behaviour with no flag.
 - With `--json`, the output is the list envelope
-  `{"count": N, "gate_statuses": [...], …}`. `count` is the length of
-  `gate_statuses` (one entry per required gate); it is the collection size, not
+  `{"count": N, "gates": [...], …}`. `count` is the length of
+  `gates` (one entry per required gate); it is the collection size, not
   a readiness tally. `total` / `passed` / `not_run` count all required gates —
   `total` is their number, `passed` how many are green, `not_run` the keys still
-  pending. Each `gate_statuses` entry carries a required gate's status (`passed`
+  pending. Each `gates` entry carries a required gate's `key` and status (`passed`
   / `failed` / `pending`) so a caller can tell a failed gate from a pending one.
   `all_passed` mirrors the exit contract. `--full` includes stdout/stderr for
   passing automated runs (failing runs always include them).
@@ -1607,7 +1607,7 @@ verdicts, so they carry no `verdict` field.
 jit gate evaluate abc123 tests --json
 # {
 #   "issue_id": "abc123",
-#   "gate_key": "tests",
+#   "key": "tests",
 #   "status": "passed",
 #   "verdict": "pass",
 #   "message": "Passed gate 'tests' for issue abc123"
@@ -1644,9 +1644,9 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
-  per gate (`gate_key`, `status`, `verdict`, `already_passed`). On the first
+  per gate (`key`, `status`, `verdict`, `already_passed`). On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
-  `error.details.verdict` `fail` or `error` and `error.details.gate_key` naming
+  `error.details.verdict` `fail` or `error` and `error.details.key` naming
   the offending gate).
 
 ```bash
@@ -1657,8 +1657,8 @@ jit gate evaluate-all abc123 --json
 #   "status": "passed",
 #   "verdict": "pass",
 #   "gates": [
-#     { "gate_key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true },
-#     { "gate_key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false }
+#     { "key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true },
+#     { "key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false }
 #   ],
 #   "message": "Passed 2 required gate(s) for issue abc123"
 # }
@@ -2181,7 +2181,7 @@ The collection key is command-specific:
 | `graph rdeps`, `rdeps` | `dependents` |
 | `graph deps` | `nodes` |
 | `gate status --all`/`--limit` | `results` |
-| `gate status-all` | `gate_statuses` |
+| `gate status-all` | `gates` |
 | `invariant check` | `findings` |
 
 Some envelopes carry additional metadata keys alongside `count` and the
@@ -2194,7 +2194,7 @@ configuration details.
 For a few commands `count` is the size of the named collection while a separate
 aggregate lives elsewhere: `graph deps` counts the top-level `nodes` (whereas
 `summary.total` is the unique-dependency count across the whole tree), and `gate
-status-all` counts the `gate_statuses` entries (whereas `total` / `passed` are
+status-all` counts the `gates` entries (whereas `total` / `passed` are
 readiness tallies over all required gates).
 
 ### Graceful Pipe Handling

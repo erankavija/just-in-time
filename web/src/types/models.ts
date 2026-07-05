@@ -24,7 +24,7 @@ export interface GateDefinition {
 
 export interface GateRunSummary {
   run_id: string;
-  gate_key: string;
+  key: string;
   stage: 'precheck' | 'postcheck';
   status: 'passed' | 'failed' | 'error' | 'pending' | 'skipped';
   started_at: string;

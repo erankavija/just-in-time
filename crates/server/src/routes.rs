@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
-use jit::domain::{Gate, GateRunResult, Issue, Priority, State as IssueState};
+use jit::domain::{Gate, Issue, Priority, State as IssueState};
 use jit::output::GateRunSummary;
 use jit::search::{SearchOptions, SearchResult};
 use jit::storage::{IssueStore, PathReadError};
@@ -835,11 +835,11 @@ async fn list_gate_runs<S: IssueStore>(
 async fn get_gate_run<S: IssueStore>(
     Path((_id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
-) -> Result<Json<GateRunResult>, StatusCode> {
+) -> Result<Json<GateRunSummary>, StatusCode> {
     state
         .executor
         .get_gate_run_result(&run_id)
-        .map(Json)
+        .map(|r| Json(GateRunSummary::full(&r)))
         .map_err(|e| {
             tracing::error!("Failed to get gate run {}: {:?}", run_id, e);
             StatusCode::NOT_FOUND

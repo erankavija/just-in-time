@@ -183,8 +183,8 @@ fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
     let json_pos: serde_json::Value = serde_json::from_slice(&out_pos).unwrap();
     let json_flag: serde_json::Value = serde_json::from_slice(&out_flag).unwrap();
 
-    // gate_key and status must match between the two forms
-    assert_eq!(json_pos["gate_key"], json_flag["gate_key"]);
+    // key and status must match between the two forms
+    assert_eq!(json_pos["key"], json_flag["key"]);
     assert_eq!(json_pos["status"], json_flag["status"]);
     assert_eq!(json_pos["verdict"], json_flag["verdict"]);
 }
@@ -308,7 +308,7 @@ fn test_gate_check_flag_and_positional_produce_identical_outcome() {
     let json_pos: serde_json::Value = serde_json::from_slice(&out_pos).unwrap();
     let json_flag: serde_json::Value = serde_json::from_slice(&out_flag).unwrap();
 
-    assert_eq!(json_pos["gate_key"], json_flag["gate_key"]);
+    assert_eq!(json_pos["key"], json_flag["key"]);
     assert_eq!(json_pos["status"], json_flag["status"]);
 }
 

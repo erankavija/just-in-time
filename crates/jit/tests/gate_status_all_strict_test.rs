@@ -114,8 +114,8 @@ fn test_status_all_pending_auto_gate_exits_4() {
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["total"].as_u64(), Some(1));
     assert_eq!(json["passed"].as_u64(), Some(0));
-    let entry = &json["gate_statuses"][0];
-    assert_eq!(entry["gate_key"], "auto-gate");
+    let entry = &json["gates"][0];
+    assert_eq!(entry["key"], "auto-gate");
     assert_eq!(entry["status"], "pending");
 }
 
@@ -139,8 +139,8 @@ fn test_status_all_pending_manual_gate_exits_4() {
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["total"].as_u64(), Some(1));
     assert_eq!(json["passed"].as_u64(), Some(0));
-    let entry = &json["gate_statuses"][0];
-    assert_eq!(entry["gate_key"], "manual-gate");
+    let entry = &json["gates"][0];
+    assert_eq!(entry["key"], "manual-gate");
     assert_eq!(entry["status"], "pending");
     // Human output must still explain the pending gate.
     jit()
@@ -177,8 +177,8 @@ fn test_status_all_failed_gate_exits_4() {
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     assert_eq!(json["all_passed"], false);
     assert_eq!(json["passed"].as_u64(), Some(0));
-    let entry = &json["gate_statuses"][0];
-    assert_eq!(entry["gate_key"], "fail-gate");
+    let entry = &json["gates"][0];
+    assert_eq!(entry["key"], "fail-gate");
     // Failed is distinguished from pending in the per-gate JSON.
     assert_eq!(entry["status"], "failed");
     // A failed gate is not reported as "not run".
@@ -215,7 +215,7 @@ fn test_status_all_all_passed_exits_0() {
     assert_eq!(json["all_passed"], true);
     assert_eq!(json["total"].as_u64(), Some(2));
     assert_eq!(json["passed"].as_u64(), Some(2));
-    for entry in json["gate_statuses"].as_array().unwrap() {
+    for entry in json["gates"].as_array().unwrap() {
         assert_eq!(entry["status"], "passed");
     }
 }

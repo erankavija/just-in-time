@@ -469,7 +469,7 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
     assert_eq!(details["requested_state"], "done");
     assert_eq!(details["actual_state"], "gated");
     assert_eq!(details["blockers"][0]["type"], "gate");
-    assert_eq!(details["blockers"][0]["gate_key"], "tests");
+    assert_eq!(details["blockers"][0]["key"], "tests");
     assert_eq!(details["blockers"][0]["status"], "pending");
 
     let remediation = details["remediation"].as_array().unwrap();
@@ -744,7 +744,7 @@ fn test_exit_code_claim_blocked_by_precheck_gate_json() {
     assert_eq!(json["error"]["details"]["actual_state"], "ready");
     assert_eq!(json["error"]["details"]["blockers"][0]["type"], "gate");
     assert_eq!(
-        json["error"]["details"]["blockers"][0]["gate_key"],
+        json["error"]["details"]["blockers"][0]["key"],
         "tdd-reminder"
     );
 
@@ -805,7 +805,7 @@ fn test_exit_code_claim_next_blocked_by_precheck_gate_json() {
     assert_eq!(json["error"]["code"], "VALIDATION_FAILED");
     assert_eq!(json["error"]["details"]["issue_id"], issue);
     assert_eq!(
-        json["error"]["details"]["blockers"][0]["gate_key"],
+        json["error"]["details"]["blockers"][0]["key"],
         "tdd-reminder"
     );
 }

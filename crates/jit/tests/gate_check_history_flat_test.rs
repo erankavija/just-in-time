@@ -192,7 +192,7 @@ fn test_check_history_gate_filter() {
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
     let results = json["results"].as_array().unwrap();
     assert_eq!(results.len(), 1, "only the tests gate run is listed");
-    assert_eq!(results[0]["gate_key"], "tests");
+    assert_eq!(results[0]["key"], "tests");
 }
 
 #[test]
@@ -353,7 +353,7 @@ fn test_check_stdout_flat_json() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(json["gate_key"], "tests");
+    assert_eq!(json["key"], "tests");
     assert!(
         json["stdout"].as_str().unwrap().contains("JSONFLAT"),
         "flat json carries stdout text"

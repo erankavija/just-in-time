@@ -279,7 +279,7 @@ fn render_gate_pass_error(
         return Err(e);
     }
 
-    use jit::output::JsonError;
+    use jit::output::{GateRunSummary, JsonError};
     let json_error = if let Some(gate_failure) = e.downcast_ref::<jit::commands::GatePassFailed>() {
         // Distinguish a checker failure (verdict `fail`, exit 4) from a
         // runner/infra error (verdict `error`, exit 10). The error code drives
@@ -291,10 +291,10 @@ fn render_gate_pass_error(
         JsonError::new(error_code, e.to_string(), command)
             .with_details(serde_json::json!({
                 "issue_id": gate_failure.issue_id,
-                "gate_key": gate_failure.gate_key,
+                "key": gate_failure.gate_key,
                 "status": "failed",
                 "verdict": verdict,
-                "checker_result": gate_failure.result,
+                "checker_result": GateRunSummary::full(&gate_failure.result),
                 "warnings": gate_failure.warnings,
             }))
             .with_suggestion(format!(
@@ -311,7 +311,7 @@ fn render_gate_pass_error(
         JsonError::new("INVALID_ARGUMENT", e.to_string(), command)
             .with_details(serde_json::json!({
                 "issue_id": not_required.issue_id,
-                "gate_key": not_required.gate_key,
+                "key": not_required.gate_key,
             }))
             .with_suggestion(format!(
                 "Add the gate first: jit gate add {} {}",
@@ -2511,7 +2511,7 @@ fn run() -> Result<()> {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
-                                "gate_key": key,
+                                "key": key,
                                 "message": format!("Defined gate '{}'", key)
                             });
                             let output = JsonOutput::success(response, "gate define");
@@ -2771,7 +2771,7 @@ fn run() -> Result<()> {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
-                                "gate_key": key,
+                                "key": key,
                                 "message": format!("Removed gate '{}'", key)
                             });
                             let output = JsonOutput::success(response, "gate remove");
@@ -2908,7 +2908,7 @@ fn run() -> Result<()> {
                             if json {
                                 use jit::output::{GateFlatReportResponse, JsonOutput};
                                 let response = GateFlatReportResponse {
-                                    gate_key: gate_key.clone(),
+                                    key: gate_key.clone(),
                                     run_id: result.run_id.clone(),
                                     stdout: rendered_stdout,
                                     stderr: rendered_stderr,
@@ -2983,7 +2983,7 @@ fn run() -> Result<()> {
                                     JsonError::new("INVALID_ARGUMENT", message, "gate status")
                                         .with_details(serde_json::json!({
                                             "issue_id": gate_key,
-                                            "gate_key": id,
+                                            "key": id,
                                             "transposed": true,
                                         }))
                                         .with_suggestion(format!("Did you mean: {canonical}"));
@@ -3000,10 +3000,11 @@ fn run() -> Result<()> {
                     match executor.get_last_gate_run(&id, &gate_key) {
                         Ok(Some(result)) => {
                             if json {
-                                use jit::output::JsonOutput;
+                                use jit::output::{GateRunSummary, JsonOutput};
                                 let msg = format!("Gate '{}': {:?}", gate_key, result.status);
+                                let summary = GateRunSummary::full(&result);
                                 let output =
-                                    JsonOutput::success(result, "gate status").with_message(msg);
+                                    JsonOutput::success(summary, "gate status").with_message(msg);
                                 println!("{}", output.to_json_string()?);
                             } else {
                                 print_gate_run_details(&result);
@@ -3091,7 +3092,7 @@ fn run() -> Result<()> {
                     let gate_status_entries: Vec<GateStatusEntry> = gate_statuses
                         .iter()
                         .map(|(gate_key, status)| GateStatusEntry {
-                            gate_key: gate_key.clone(),
+                            key: gate_key.clone(),
                             status: *status,
                         })
                         .collect();
@@ -3101,7 +3102,7 @@ fn run() -> Result<()> {
                         passed: passed_count,
                         total,
                         not_run,
-                        gate_statuses: gate_status_entries,
+                        gates: gate_status_entries,
                         all_passed,
                     };
                     let output = JsonOutput::success(response, "gate status-all").with_message(msg);
@@ -3242,7 +3243,7 @@ fn run() -> Result<()> {
                             };
                             let response = serde_json::json!({
                                 "issue_id": id,
-                                "gate_key": gate_key,
+                                "key": gate_key,
                                 "status": "passed",
                                 "verdict": "pass",
                                 "already_passed": already_passed,
@@ -3290,7 +3291,7 @@ fn run() -> Result<()> {
                                 .iter()
                                 .map(|entry| {
                                     serde_json::json!({
-                                        "gate_key": entry.gate_key,
+                                        "key": entry.gate_key,
                                         "status": "passed",
                                         "verdict": "pass",
                                         "already_passed": entry.already_passed,
@@ -3350,7 +3351,7 @@ fn run() -> Result<()> {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
                                 "issue_id": id,
-                                "gate_key": gate_key,
+                                "key": gate_key,
                                 "status": "failed",
                                 "message": format!("Failed gate '{}' for issue {}", gate_key, id)
                             });

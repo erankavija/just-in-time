@@ -111,9 +111,9 @@ fn test_pass_all_all_gates_pass_exit_0() {
     assert_eq!(json["verdict"], "pass");
     let gates = json["gates"].as_array().unwrap();
     assert_eq!(gates.len(), 2);
-    assert_eq!(gates[0]["gate_key"], "g1");
+    assert_eq!(gates[0]["key"], "g1");
     assert_eq!(gates[0]["already_passed"], false);
-    assert_eq!(gates[1]["gate_key"], "g2");
+    assert_eq!(gates[1]["key"], "g2");
     assert_eq!(run_count(&root, "g1"), 1);
     assert_eq!(run_count(&root, "g2"), 1);
 }
@@ -141,7 +141,7 @@ fn test_pass_all_fail_fast_stops_at_first_failure_exit_4() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "GATE_FAILED");
     assert_eq!(json["error"]["details"]["verdict"], "fail");
-    assert_eq!(json["error"]["details"]["gate_key"], "g1");
+    assert_eq!(json["error"]["details"]["key"], "g1");
 
     // Fail-fast: the first gate ran, the later gate's checker never did.
     assert_eq!(run_count(&root, "g1"), 1);
@@ -203,12 +203,12 @@ fn test_pass_all_skips_already_passed_gate() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     let gates = json["gates"].as_array().unwrap();
     assert_eq!(gates.len(), 2);
-    assert_eq!(gates[0]["gate_key"], "g1");
+    assert_eq!(gates[0]["key"], "g1");
     assert_eq!(
         gates[0]["already_passed"], true,
         "g1 already passed at HEAD; must be skipped"
     );
-    assert_eq!(gates[1]["gate_key"], "g2");
+    assert_eq!(gates[1]["key"], "g2");
     assert_eq!(gates[1]["already_passed"], false);
 
     // g1's checker did NOT re-run; g2's ran once.

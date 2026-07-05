@@ -395,7 +395,7 @@ fn test_gate_status_all_envelope() {
     jit(&["gate", "add", &id, "envtest-gate"]);
 
     let value = run_json_any_exit(&temp, &["gate", "status-all", &id, "--json"]);
-    assert_envelope(&value, "gate_statuses", &["gate", "status-all"]);
+    assert_envelope(&value, "gates", &["gate", "status-all"]);
     assert!(
         value["count"].as_u64().unwrap() >= 1,
         "gate status-all count should be >= 1 after requiring a gate"
