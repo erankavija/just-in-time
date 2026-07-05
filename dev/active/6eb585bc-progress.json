@@ -2,27 +2,194 @@
   "epic_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "epic_short_id": "6eb585bc",
   "batch": "usability-maintenance-2026-07-05 (15 children filed from usability audit + session mining; prior 8-child batch complete, see dev/active/6eb585bc-batch-report-2026-07-05.md)",
-  "current_wave": 1,
+  "current_wave": 2,
   "note": "15 open leaf children, no inter-sibling deps. Serial waves (invoker directive + main.rs/cli.rs contention). Order: output-shape conventions first (envelope, gate fields) so later features emit final shapes; doc/help sweeps last. Worker model per difficulty: sonnet easy, opus hard (invoker directive). Workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit binary (cargo install --path crates/jit) after waves changing output/storage shapes before running gates that consume them. DOGFOOD (invoker directive): after each wave lands + reinstall, the lead's own orchestration commands must use the newly landed features (envelope keys, gate status fields, repeatable --label, issue status projection, children rollup, config get, --full export); log friction found while dogfooding here and file candidates at batch end.",
   "waves": [
-    {"wave_number": 1, "issues": [{"short_id": "74fbdb69", "title": "Uniform JSON list envelope across query and list commands", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 2, "issues": [{"short_id": "b1586c0d", "title": "Unify gate field naming across JSON outputs", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 3, "issues": [{"short_id": "dc3bef62", "title": "Repeatable AND-combined label filters across query commands", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 4, "issues": [{"short_id": "a05b87ae", "title": "Typed exit codes for prefix and usage errors, JSON envelope for startup failures", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 5, "issues": [{"short_id": "30a3b5c1", "title": "Error message polish: prefixes, assignee context, claim cross-references", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 6, "issues": [{"short_id": "c8518f2a", "title": "Atomic variadic dependency add", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 7, "issues": [{"short_id": "d0f88ee2", "title": "CLI verb alias sweep for observed wrong guesses", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 8, "issues": [{"short_id": "043ae624", "title": "Config value accessor command", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 9, "issues": [{"short_id": "cc42a69b", "title": "Compact issue status projection with unmet dependencies", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 10, "issues": [{"short_id": "7fe5c743", "title": "Container child rollup and state aggregation queries", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 11, "issues": [{"short_id": "27338abc", "title": "Structured gate findings in machine output", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 12, "issues": [{"short_id": "0ab468ba", "title": "Full-record bulk export behind a --full flag", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 13, "issues": [{"short_id": "31e12d2b", "title": "Hierarchy resolution in core shared by CLI and web UI", "classification": "implementation", "model": "opus", "status": "pending"}]},
-    {"wave_number": 14, "issues": [{"short_id": "62f3bebd", "title": "Help cross-reference sweep for existing but undiscovered commands", "classification": "implementation", "model": "sonnet", "status": "pending"}]},
-    {"wave_number": 15, "issues": [{"short_id": "1a63ef75", "title": "Sweep stale help text and machine-output parity gaps", "classification": "implementation", "model": "sonnet", "status": "pending"}]}
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "short_id": "74fbdb69",
+          "title": "Uniform JSON list envelope across query and list commands",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "short_id": "b1586c0d",
+          "title": "Unify gate field naming across JSON outputs",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "short_id": "dc3bef62",
+          "title": "Repeatable AND-combined label filters across query commands",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "short_id": "a05b87ae",
+          "title": "Typed exit codes for prefix and usage errors, JSON envelope for startup failures",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "30a3b5c1",
+          "title": "Error message polish: prefixes, assignee context, claim cross-references",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "short_id": "c8518f2a",
+          "title": "Atomic variadic dependency add",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "short_id": "d0f88ee2",
+          "title": "CLI verb alias sweep for observed wrong guesses",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "short_id": "043ae624",
+          "title": "Config value accessor command",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "short_id": "cc42a69b",
+          "title": "Compact issue status projection with unmet dependencies",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "short_id": "7fe5c743",
+          "title": "Container child rollup and state aggregation queries",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "short_id": "27338abc",
+          "title": "Structured gate findings in machine output",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {
+          "short_id": "0ab468ba",
+          "title": "Full-record bulk export behind a --full flag",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 13,
+      "issues": [
+        {
+          "short_id": "31e12d2b",
+          "title": "Hierarchy resolution in core shared by CLI and web UI",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 14,
+      "issues": [
+        {
+          "short_id": "62f3bebd",
+          "title": "Help cross-reference sweep for existing but undiscovered commands",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 15,
+      "issues": [
+        {
+          "short_id": "1a63ef75",
+          "title": "Sweep stale help text and machine-output parity gaps",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "74fbdb69": 1
+  },
   "started_at": "2026-07-05T10:30:00Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "5849389e-f788-4d05-9f23-693ad363f3cd",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c",
+  "commit": "40b54ba9df41ef0bde4e81af01ee26b80eb6c3d6",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T11:33:48.574681391Z",
+  "completed_at": "2026-07-05T11:35:38.252544636Z",
+  "duration_ms": 109677,
+  "exit_code": 0,
+  "stdout": "**Architecture and Separation of Concerns**\n\nNo boundary violations found. The JSON shape changes are confined to CLI/output/schema/test/docs surfaces.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found in the reviewed changes.\n\n**Correctness and Invariants**\n\nREQ-01 is met for the previously missed surfaces: `graph deps --json` now emits `count` plus `nodes`, and `gate status-all --json` now emits `count` plus `gate_statuses`.\n\n**Safety**\n\n`#![deny(unsafe_code)]` remains enforced. No unsafe code introduced.\n\n**Testing**\n\nUsed the provided `cargo-ci` gate evidence: passed at `2026-07-05T11:30:31Z`. Per instruction, I did not run the test suite. I ran `./scripts/jit-validate.sh`; it passed. `git diff --check HEAD^..HEAD` is clean.\n\n**Error Handling**\n\nNo new blocking error-handling issue found.\n\n**CLI Contract**\n\nREQ-02 is met for the reviewed surfaces: command help and CLI reference now state the envelopes for `graph deps`, `gate status --all/--limit`, `gate status-all`, and multi-id `issue show --json`.\n\n**Documentation**\n\nREQ-03 is met. `CHANGELOG.md` includes migration notes for multi-id `issue show`, `graph deps` `tree` to `nodes`, additive `count` fields, and the `gate status --all/--limit` documentation clarification.\n\n**Prior Review Feedback**\n\nThe four prior findings are addressed:\n`graph deps` envelope added, `gate status-all` count added, `gate status --all/--limit` docs updated, and the stale “JSON array” text for multi-id `issue show` removed.\n\n**Jit Issue Management**\n\nIssue dependencies are empty. `./scripts/jit-validate.sh` passed; label warnings were not present in the run output.\n\nNo findings to enumerate.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
