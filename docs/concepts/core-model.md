@@ -1101,9 +1101,9 @@ Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed
 ### Claim vs Assign
 
 **`jit issue claim`** - Atomic operation (race-safe)
-- Verifies issue is unassigned
+- Verifies the issue is unassigned, or already assigned to the same claimant
 - Claims for specified assignee
-- Returns error if already assigned
+- Returns an error only when the issue is already assigned to a *different* assignee; re-claiming as the current assignee is idempotent (it promotes the assignment, e.g. into an `in_progress` transition once dependencies complete)
 - Use for multi-agent coordination
 
 **`jit issue assign`** - Force assignment (overwrites)

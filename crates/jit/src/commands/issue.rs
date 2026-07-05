@@ -666,8 +666,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self.storage.resolve_issue_id(id)?;
         let issue = self.storage.load_issue(&full_id)?;
 
-        if issue.assignee.is_some() {
-            return Err(anyhow!("Issue is already assigned"));
+        // Parse the claimant up front so a pre-existing assignee can be compared
+        // against it. Claiming an issue already assigned to a DIFFERENT assignee
+        // still hard-fails exactly as before (REQ-02); claiming one already
+        // assigned to the SAME assignee is idempotent and falls through to the
+        // normal claim flow below (REQ-01) instead of erroring, so an assignment
+        // made while dependencies were still open can be promoted into a real
+        // claim once they complete.
+        let claimant: crate::domain::Assignee = assignee.parse()?;
+        if let Some(existing) = &issue.assignee {
+            if existing != &claimant {
+                return Err(anyhow!("Issue is already assigned"));
+            }
         }
 
         // Check for existing lease held by another agent.
@@ -716,10 +726,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // If we get here, prechecks passed (or issue wasn't Ready)
-        // Now assign the issue, validating through the one `Assignee` path. The
-        // parsed actor is reused for the event so it cannot diverge from the
-        // stored assignee.
-        let actor: crate::domain::Assignee = assignee.parse()?;
+        // Now assign the issue. `claimant` was already validated through the one
+        // `Assignee` path above and is reused here (and for the event below) so
+        // it cannot diverge from the stored assignee.
+        let actor = claimant;
         let mut issue = self.storage.load_issue(&full_id)?;
         issue.assignee = Some(actor.clone());
 
@@ -1115,6 +1125,107 @@ enforce_leases = "off"
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
         assert_eq!(issue.assignee, Some("agent:test".parse().unwrap()));
+    }
+
+    /// REQ-01: an issue assigned to X while its dependency was still open
+    /// (leaving the issue Backlog and blocked) must be claimable by that SAME
+    /// assignee once the dependency completes, instead of hard-failing with
+    /// "already assigned". This is the assign-then-claim promotion sequence
+    /// container stewardship produces.
+    #[test]
+    fn test_claim_promotes_existing_same_assignee_assignment_once_unblocked() {
+        let executor = setup();
+
+        let dependency = crate::domain::Issue::new("Dependency".to_string(), "".to_string());
+        let dependency_id = dependency.id.clone();
+        executor.storage.save_issue(dependency).unwrap();
+
+        let mut dependent = crate::domain::Issue::new("Dependent".to_string(), "".to_string());
+        dependent.dependencies.push(dependency_id.clone());
+        let dependent_id = dependent.id.clone();
+        executor.storage.save_issue(dependent).unwrap();
+
+        // Assign while the dependency is still open. The issue remains Backlog
+        // (a full claim here would exit 4 on the blocked in_progress transition).
+        executor
+            .assign_issue(&dependent_id, "agent:test".to_string())
+            .unwrap();
+        let assigned = executor.storage.load_issue(&dependent_id).unwrap();
+        assert_eq!(assigned.state, State::Backlog);
+        assert_eq!(assigned.assignee, Some("agent:test".parse().unwrap()));
+
+        // Complete the dependency: this auto-promotes the dependent to Ready.
+        executor
+            .update_issue(
+                &dependency_id,
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        let promoted = executor.storage.load_issue(&dependent_id).unwrap();
+        assert_eq!(
+            promoted.state,
+            State::Ready,
+            "dependent should auto-promote to Ready once its dependency completes"
+        );
+
+        // Claim as the SAME assignee: must proceed rather than erroring.
+        let result = executor.claim_issue(&dependent_id, "agent:test".to_string());
+        assert!(
+            result.is_ok(),
+            "same-assignee claim should promote the assignment, got: {:?}",
+            result.err()
+        );
+
+        let claimed = executor.storage.load_issue(&dependent_id).unwrap();
+        assert_eq!(claimed.state, State::InProgress);
+        assert_eq!(
+            claimed.assignee,
+            Some("agent:test".parse().unwrap()),
+            "assignee should remain a live claim after the promotion"
+        );
+    }
+
+    /// REQ-02: claiming an issue already assigned to a DIFFERENT assignee must
+    /// still hard-fail exactly as before the idempotency fix.
+    #[test]
+    fn test_claim_rejects_different_assignee_when_already_assigned() {
+        let executor = setup();
+
+        let mut issue = crate::domain::Issue::new("Task".to_string(), "".to_string());
+        issue.state = State::Ready;
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+
+        executor
+            .claim_issue(&issue_id, "agent:first".to_string())
+            .unwrap();
+
+        let result = executor.claim_issue(&issue_id, "agent:second".to_string());
+        assert!(
+            result.is_err(),
+            "claim by a different assignee must still be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("already assigned"));
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(
+            issue.state,
+            State::InProgress,
+            "rejected claim must not disturb the existing in-progress state"
+        );
+        assert_eq!(
+            issue.assignee,
+            Some("agent:first".parse().unwrap()),
+            "rejected claim must not disturb the original assignee"
+        );
     }
 
     #[test]
