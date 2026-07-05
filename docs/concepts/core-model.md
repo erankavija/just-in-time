@@ -720,14 +720,13 @@ Gates influence state transitions:
 
 **Current capabilities:**
 - Gates apply uniformly at state transitions
-- Checker commands run in shell with simple pass/fail
-- Gate status is binary: required/passed/failed
+- Checker commands run in shell; the exit code decides pass/fail
+- Checkers can emit a machine-readable findings block (verdict, per-finding severity and file:line) that is parsed and stored with the run
 
 **Potential future enhancements** (not yet implemented):
 - **Conditional gates**: Apply gates based on issue properties (e.g., only require security-scan for epic:auth issues)
 - **Gate dependencies**: Gates that must pass in specific order
 - **Parallel gate execution**: Run multiple automated gates concurrently for speed
-- **Rich gate output**: Structured results beyond exit codes (metrics, warnings, artifacts)
 - **Gate templates**: Pre-configured gate sets for common workflows
 - **Per-label gate policies**: Different gate requirements based on issue labels
 
@@ -741,37 +740,19 @@ Issues progress through a lifecycle with the following states:
 
 ### State Machine
 
-```
-       ┌─────────┐
-       │ Backlog │ (default initial state)
-       └────┬────┘
-            │
-            v
-       ┌─────────┐
-       │  Ready  │ (dependencies satisfied, no assignee)
-       └────┬────┘
-            │
-            v
-    ┌──────────────┐
-    │ In Progress  │ (assignee claimed)
-    └──────┬───────┘
-           │
-           v
-    ┌──────────┐
-    │  Gated   │ (waiting for gates to pass)
-    └────┬─────┘
-         │
-         v
-    ┌────────┐
-    │  Done  │ (terminal - successfully completed)
-    └────────┘
-    
-    From any state:
-         │
-         v
-    ┌──────────┐
-    │ Rejected │ (terminal - won't implement)
-    └──────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> Backlog: created
+    Backlog --> Ready: dependencies satisfied
+    Ready --> InProgress: claimed
+    InProgress --> Gated: completion attempted
+    Gated --> Done: all gates pass
+    Done --> [*]
+    note right of Gated
+        Rejected (terminal, won't implement) and
+        Archived (parked, out of active views)
+        are reachable from any state
+    end note
 ```
 
 ### State Descriptions
@@ -788,6 +769,8 @@ Issues progress through a lifecycle with the following states:
 
 **Rejected**: Terminal state indicating the issue was closed without implementation. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
+**Archived**: Parked out of active views. Reachable from any state and not terminal — an archived issue can be revived by transitioning it back into the lifecycle. Archived issues are excluded from readiness queries but still count as open in container rollups.
+
 ### Terminal States
 
 JIT has two terminal states that represent different outcomes:
@@ -802,7 +785,7 @@ JIT has two terminal states that represent different outcomes:
 - Common reasons: duplicate, won't-fix, invalid, out-of-scope
 - Optional `resolution:*` label provides closure reason
 
-Once an issue reaches a terminal state (Done or Rejected), it cannot transition to any other state.
+Once an issue reaches a terminal state (Done or Rejected), it cannot re-enter the active lifecycle; archiving remains available for parking it out of views.
 
 ### State Transitions
 
