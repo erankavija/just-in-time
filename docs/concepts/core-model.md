@@ -765,7 +765,7 @@ stateDiagram-v2
 
 **Gated**: Issue has attempted to transition to Done, but quality gates have not all passed. Issue auto-transitions to Done when all required gates pass.
 
-**Done**: Terminal state indicating successful completion. Issue cannot transition out of this state.
+**Done**: Terminal state indicating successful completion. Done issues do not transition to active states; archiving remains available for parking them out of views.
 
 **Rejected**: Terminal state indicating the issue was closed without implementation. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
