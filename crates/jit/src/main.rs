@@ -4956,15 +4956,30 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        handle_json_error!(
-                            json,
-                            e,
-                            JsonError::new(
-                                ErrorCode::INVALID_ARGUMENT,
-                                e.to_string(),
-                                "config get"
-                            )
-                        );
+                        // Only an unknown/missing dotted key (the typed,
+                        // shared `InvalidArgumentError` `get_config` converts
+                        // `ConfigKeyError` into) is an argument error. A
+                        // load/parse/filesystem failure (e.g. a malformed
+                        // `config.toml`) is NOT downcastable to it, so it
+                        // falls through to the normal error path and is
+                        // classified the same way every other config-load
+                        // failure in this codebase is — never misreported as
+                        // a bad CLI argument.
+                        if e.downcast_ref::<jit::errors::InvalidArgumentError>()
+                            .is_some()
+                        {
+                            handle_json_error!(
+                                json,
+                                e,
+                                JsonError::new(
+                                    ErrorCode::INVALID_ARGUMENT,
+                                    e.to_string(),
+                                    "config get"
+                                )
+                            );
+                        } else {
+                            return Err(e);
+                        }
                     }
                 }
             }

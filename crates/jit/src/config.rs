@@ -2073,6 +2073,45 @@ pub struct EffectiveConfig {
 }
 
 impl EffectiveConfig {
+    /// Load the system/user/repo-layered effective configuration for
+    /// `jit_root`, probing each source's existence and loading whichever are
+    /// present.
+    ///
+    /// Owns ALL filesystem interaction for this assembly — the `/etc/jit` and
+    /// `~/.config/jit` existence checks, home-directory resolution, and each
+    /// present source's [`JitConfig::load`] — so callers outside this module
+    /// (notably the `commands` layer) never touch `std::fs` / `dirs` directly
+    /// (CLAUDE.md "Separation of Concerns": config IO stays in the config
+    /// layer). Mirrors the system (`/etc/jit`) > user (`~/.config/jit`) > repo
+    /// priority `jit config show` has always used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::EffectiveConfig;
+    /// use std::path::Path;
+    ///
+    /// // A directory with no config.toml at all still loads (all fields
+    /// // resolve to their defaults).
+    /// let effective = EffectiveConfig::load(Path::new("/nonexistent-jit-root")).unwrap();
+    /// assert!(effective.full_snapshot().unwrap().get("worktree").is_some());
+    /// ```
+    pub fn load(jit_root: &Path) -> Result<Self> {
+        let mut loader = ConfigLoader::new();
+        let system_path = Path::new("/etc/jit");
+        if system_path.exists() {
+            loader = loader.with_system_config(system_path)?;
+        }
+        if let Some(home) = dirs::home_dir() {
+            let user_path = home.join(".config/jit");
+            if user_path.exists() {
+                loader = loader.with_user_config(&user_path)?;
+            }
+        }
+        loader = loader.with_repo_config(jit_root)?;
+        Ok(loader.build())
+    }
+
     /// Get the effective worktree mode.
     /// Priority: env var > repo > user > system > default
     ///

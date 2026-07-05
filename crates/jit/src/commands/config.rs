@@ -20,7 +20,7 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::{ConfigLoader, EffectiveConfig, ProjectName};
+use crate::config::{EffectiveConfig, ProjectName};
 use crate::errors::InvalidArgumentError;
 use crate::storage::config_store;
 use std::path::{Path, PathBuf};
@@ -349,14 +349,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// configuration surface (REQ-01 of jit:043ae624), returning the value the
     /// CLI needs to print.
     ///
-    /// Builds the same system/user/repo-layered [`EffectiveConfig`] `jit
-    /// config show` uses, snapshots it once via
-    /// [`EffectiveConfig::full_snapshot`], then walks `key` with
-    /// [`resolve_dotted_key`]. An unknown key (top-level or nested) surfaces
-    /// as the shared [`InvalidArgumentError`] (exit 2) — naming the valid
-    /// top-level sections for an unknown top-level key — rather than a bare
-    /// `anyhow!` string, so `--json` callers get a machine-readable
-    /// `INVALID_ARGUMENT` error and plain callers get exit code 2.
+    /// Loads the same system/user/repo-layered [`EffectiveConfig`] `jit
+    /// config show` uses via [`EffectiveConfig::load`] (which owns all the
+    /// filesystem probing — this command touches no `std::fs` / `dirs`
+    /// itself), snapshots it once via [`EffectiveConfig::full_snapshot`], then
+    /// walks `key` with [`resolve_dotted_key`]. An unknown key (top-level or
+    /// nested) surfaces as the shared [`InvalidArgumentError`] (exit 2) —
+    /// naming the valid top-level sections for an unknown top-level key —
+    /// rather than a bare `anyhow!` string, so `--json` callers get a
+    /// machine-readable `INVALID_ARGUMENT` error and plain callers get exit
+    /// code 2. A load/parse failure (e.g. a malformed `config.toml`) is left
+    /// unconverted, so it is classified the same way every other config-load
+    /// failure in this codebase is, not misreported as a bad argument.
     ///
     /// # Examples
     ///
@@ -371,25 +375,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// assert_eq!(outcome.key, "documentation.development_root");
     /// ```
     pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome> {
-        let jit_root = self.storage.root();
-
-        // Same system/user/repo layering `jit config show` builds (path
-        // derivation and existence checks only; loading is delegated to
-        // `JitConfig::load` via `ConfigLoader`).
-        let mut loader = ConfigLoader::new();
-        let system_path = Path::new("/etc/jit");
-        if system_path.exists() {
-            loader = loader.with_system_config(system_path)?;
-        }
-        if let Some(home) = dirs::home_dir() {
-            let user_path = home.join(".config/jit");
-            if user_path.exists() {
-                loader = loader.with_user_config(&user_path)?;
-            }
-        }
-        loader = loader.with_repo_config(jit_root)?;
-        let effective: EffectiveConfig = loader.build();
-
+        // All filesystem interaction (system/user/repo existence probing,
+        // home-directory resolution, each source's `JitConfig::load`) lives
+        // behind `EffectiveConfig::load` in the config layer — this command
+        // only orchestrates the already-assembled snapshot and the key walk.
+        let effective = EffectiveConfig::load(self.storage.root())?;
         let snapshot = effective.full_snapshot()?;
         let value = resolve_dotted_key(&snapshot, key)
             .map_err(|e| anyhow::Error::from(InvalidArgumentError::new(e.to_string())))?;

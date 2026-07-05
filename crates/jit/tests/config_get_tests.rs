@@ -253,6 +253,70 @@ fn test_get_unknown_nested_key_fails_exit_2() {
 }
 
 // ---------------------------------------------------------------------------
+// A malformed `config.toml` is a LOAD failure, not an unknown-key argument
+// error: it must NOT be reported as `INVALID_ARGUMENT` / exit 2, in either
+// mode, and `--json` must not force it into a JSON envelope it never had
+// before (matching `jit config show` / `jit config validate`'s existing
+// behavior for the same underlying failure).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_get_corrupt_config_toml_is_not_invalid_argument() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path()).status.success());
+    // Invalid TOML syntax (unclosed table header).
+    fs::write(
+        temp.path().join(".jit/config.toml"),
+        "[type_hierarchy\nbroken = true\n",
+    )
+    .unwrap();
+
+    let out = config_get(temp.path(), &["worktree.mode"]);
+    assert!(!out.status.success());
+    assert_ne!(
+        out.status.code(),
+        Some(2),
+        "a malformed config.toml must not be classified as a bad CLI argument: {:?}",
+        out
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("Failed to parse config.toml"),
+        "stderr should surface the load failure: {stderr}"
+    );
+}
+
+#[test]
+fn test_get_corrupt_config_toml_json_is_not_invalid_argument() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path()).status.success());
+    fs::write(
+        temp.path().join(".jit/config.toml"),
+        "[type_hierarchy\nbroken = true\n",
+    )
+    .unwrap();
+
+    let out = config_get(temp.path(), &["worktree.mode", "--json"]);
+    assert!(!out.status.success());
+    assert_ne!(
+        out.status.code(),
+        Some(2),
+        "a malformed config.toml must not be classified as a bad CLI argument: {:?}",
+        out
+    );
+    // Not rendered as a JSON error envelope: `--json` on `config get` only
+    // wraps the SUCCESS path and the unknown-key argument error, not every
+    // failure mode.
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        serde_json::from_str::<serde_json::Value>(&stdout).is_err(),
+        "unexpected JSON on stdout for a load failure: {stdout}"
+    );
+    assert!(stderr.contains("Failed to parse config.toml"));
+}
+
+// ---------------------------------------------------------------------------
 // `--json` envelope shape for a successful leaf get.
 // ---------------------------------------------------------------------------
 
