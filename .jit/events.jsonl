@@ -5540,3 +5540,9 @@
 {"type":"issue_created","id":"fcd1b84d-21ea-434d-b67d-b29e37743843","issue_id":"1d59070d-bebc-4a55-9456-c6c7a3caba2a","timestamp":"2026-07-05T22:41:02.603829312Z","title":"Checker command on gate define implies automated mode","priority":"normal"}
 {"type":"issue_created","id":"c7abc005-c943-4a21-bd13-4035752273ee","issue_id":"0daba57d-4cb8-4494-a825-22b286bc02c6","timestamp":"2026-07-05T22:41:02.671026431Z","title":"Refused issue deletion exits nonzero","priority":"normal"}
 {"type":"issue_updated","id":"3ff2eb4e-7553-4cdd-9eb3-c859a7a1499e","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-05T22:41:02.816107576Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_passed","id":"0f5fbd3a-6a85-43c8-8a3a-08d288a9cc8f","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T22:41:06.434050847Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"bdd73fa0-3d8b-4077-a9d7-d2dcb775a38b","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T22:42:42.309867126Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9a05fe54-f8e1-40e3-8eeb-9415448a810a","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T22:59:31.400294302Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6b5c6c03-a9a4-4743-b46c-cd39867ba805","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T23:00:39.236495031Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"aa9187fa-9336-46be-93ec-3ac96cfd066b","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T23:01:20.471409496Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"bb6c7e56-81bc-4b4e-ab26-26ccefe01556","issue_id":"1a63ef75-f411-4c77-a837-45a2b649623e","timestamp":"2026-07-05T23:01:20.471434046Z"}
