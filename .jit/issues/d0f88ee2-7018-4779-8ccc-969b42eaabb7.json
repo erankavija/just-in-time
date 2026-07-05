@@ -2,9 +2,9 @@
   "id": "d0f88ee2-7018-4779-8ccc-969b42eaabb7",
   "title": "CLI verb alias sweep for observed wrong guesses",
   "description": "Session mining captured live wrong-guess invocations that each cost a failed command plus retry: `dep remove` (3 sessions), `issue complete`, `issue edit`, a three-step guess chain for adding a label to an issue, and cross-group removal-verb guesses (issue delete vs dep rm vs gate remove vs doc remove).\n\n## Background\n\nDecided policy: hints only — no new aliases, no sugar commands. Existing per-group spellings remain canonical and are not renamed; every observed wrong guess fails fast with an actionable message naming the canonical command.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Wrong removal-verb spellings in the issue, dep, gate, and doc groups (the rm/remove/delete variants that do not exist in that group) fail with a hint naming that group's canonical command.\n- [ ] [hard] REQ-02: `issue complete` and `issue edit` fail with hints naming the update command and, for complete, its state flag.\n- [ ] [hard] REQ-03: Adding a label to an issue via the label command fails with a hint redirecting to the update command's label flag, and the label command's help disambiguates namespace management from issue labeling.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -19,5 +19,5 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:02:41.559978499Z",
-  "updated_at": "2026-07-05T10:12:58.388290541Z"
+  "updated_at": "2026-07-05T15:20:13.741156450Z"
 }
