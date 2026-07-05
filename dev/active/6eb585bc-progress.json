@@ -2,7 +2,7 @@
   "epic_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "epic_short_id": "6eb585bc",
   "batch": "usability-maintenance-2026-07-05 (15 children filed from usability audit + session mining; prior 8-child batch complete, see dev/active/6eb585bc-batch-report-2026-07-05.md)",
-  "current_wave": 6,
+  "current_wave": 7,
   "note": "15 open leaf children, no inter-sibling deps. Serial waves (invoker directive + main.rs/cli.rs contention). Order: output-shape conventions first (envelope, gate fields) so later features emit final shapes; doc/help sweeps last. Worker model per difficulty: sonnet easy, opus hard (invoker directive). Workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit binary (cargo install --path crates/jit) after waves changing output/storage shapes before running gates that consume them. DOGFOOD (invoker directive): after each wave lands + reinstall, the lead's own orchestration commands must use the newly landed features (envelope keys, gate status fields, repeatable --label, issue status projection, children rollup, config get, --full export); log friction found while dogfooding here and file candidates at batch end.",
   "waves": [
     {
@@ -73,7 +73,7 @@
           "title": "Atomic variadic dependency add",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -197,7 +197,8 @@
   "escalations": [],
   "rework_counts": {
     "74fbdb69": 1,
-    "a05b87ae": 1
+    "a05b87ae": 1,
+    "c8518f2a": 2
   },
   "started_at": "2026-07-05T10:30:00Z"
 }

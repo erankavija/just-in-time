@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "cde7f71a-5637-4dd0-8b51-a1264a292db2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c8518f2a-20d7-4564-a31c-bd8fb5908953",
+  "commit": "a27901dcbe76bbe3a042f6832202c082acab44e8",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-05T15:17:30.441745883Z",
+  "completed_at": "2026-07-05T15:19:20.126242233Z",
+  "duration_ms": 109684,
+  "exit_code": 0,
+  "stdout": "**Architecture And Separation Of Concerns**\n\nPass. Dependency mutation remains in `crates/jit/src/commands/dependency.rs`; storage access stays behind `IssueStore`; CLI/JSON error shaping remains in `crates/jit/src/main.rs`. I did not find file I/O or formatting leaking into domain/command logic.\n\n**Functional Correctness**\n\nPass. `add_dependencies_with_policy` now validates the batch before applying writes. Rejected batches return before `apply_batch_dependency_add` at `crates/jit/src/commands/dependency.rs:535-566`, preserving REQ-01 and REQ-03.\n\nREQ-02 is now satisfied for the prior failing cases: cycle failures are collected first, then redundancy is still analyzed over the non-cycle edges at `crates/jit/src/commands/dependency.rs:408-448`. Shadow redundancy attribution remains per-edge at `crates/jit/src/commands/dependency.rs:482-527`.\n\n**Tests And Gates**\n\nPass. I used the provided/recorded gate evidence: `cargo-ci` passed for latest commit `a27901dc` at `2026-07-05T15:17:30Z`; I did not rerun cargo tests. I ran `./scripts/jit-validate.sh`, and it passed.\n\nRelevant coverage exists in `crates/jit/tests/dep_add_atomic_tests.rs:151-236` and CLI JSON/text coverage in `crates/jit/tests/dep_add_redundancy_cli_tests.rs:283-350`.\n\n**Prior Review Feedback**\n\nPass. The most recent failed review’s remaining finding is addressed: cycle-failing edges no longer suppress sibling redundancy checks, and both rejected edges are named.\n\nEarlier findings are also addressed: `DependencyBatchRejectedError` derives `thiserror::Error` at `crates/jit/src/errors.rs:572-574`, and its public methods include examples at `crates/jit/src/errors.rs:615-652`.\n\n**Error Handling**\n\nPass. Batch rejection remains typed and downcastable through `DependencyBatchRejectedError`, preserving per-edge errors without message parsing.\n\n**CLI Contract**\n\nPass. `dep add --json` still reports batch rejection details through `details.rejected` in `crates/jit/src/main.rs:267-395`.\n\n**Documentation**\n\nPass. New public API documentation includes descriptions and examples for the batch error constructor/accessors.\n\n**Jit Issue Management**\n\nPass. `issue.dependencies` is empty, so there are no prerequisite issues to verify. Labels and assignee format are valid in the provided issue context. `./scripts/jit-validate.sh` passed.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}
