@@ -56,6 +56,33 @@ impl State {
     pub fn is_closed(self) -> bool {
         self.is_terminal()
     }
+
+    /// The canonical snake_case string for this state.
+    ///
+    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
+    /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
+    /// is needed (e.g. a compact one-line status render) without allocating.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::State;
+    ///
+    /// assert_eq!(State::Ready.as_str(), "ready");
+    /// assert_eq!(State::InProgress.as_str(), "in_progress");
+    /// assert_eq!(State::Done.as_str(), "done");
+    /// ```
+    pub fn as_str(self) -> &'static str {
+        match self {
+            State::Backlog => "backlog",
+            State::Ready => "ready",
+            State::InProgress => "in_progress",
+            State::Gated => "gated",
+            State::Done => "done",
+            State::Rejected => "rejected",
+            State::Archived => "archived",
+        }
+    }
 }
 
 impl FromStr for State {
@@ -161,6 +188,31 @@ pub enum GateStatus {
     Passed,
     /// Gate failed
     Failed,
+}
+
+impl GateStatus {
+    /// The canonical snake_case string for this status.
+    ///
+    /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`);
+    /// use it when a `&'static str` is needed (e.g. a compact `key=status`
+    /// render) without allocating.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::GateStatus;
+    ///
+    /// assert_eq!(GateStatus::Pending.as_str(), "pending");
+    /// assert_eq!(GateStatus::Passed.as_str(), "passed");
+    /// assert_eq!(GateStatus::Failed.as_str(), "failed");
+    /// ```
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GateStatus::Pending => "pending",
+            GateStatus::Passed => "passed",
+            GateStatus::Failed => "failed",
+        }
+    }
 }
 
 /// A parsed assignee in the documented `{kind}:{identifier}` form.

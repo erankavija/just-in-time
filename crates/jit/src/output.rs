@@ -884,6 +884,51 @@ impl GateView {
     }
 }
 
+/// A single unmet dependency, as projected into `issue show --json` and the
+/// compact `issue status` view.
+///
+/// A dependency is *unmet* when it is not in a terminal state (`Done` or
+/// `Rejected`) — the exact same readiness test as [`Issue::is_blocked`] and
+/// [`query_ready`](crate::domain::queries::query_ready): a terminal dependency
+/// unblocks its dependents, so it is never listed here. The shape is a subset of
+/// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
+/// carrying only what an orchestrator needs to see what is still blocking work.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{Issue, MinimalIssue, State};
+/// use jit::output::UnmetDependency;
+///
+/// let mut dep = Issue::new("Upstream".into(), String::new());
+/// dep.state = State::InProgress;
+/// let minimal = MinimalIssue::from(&dep);
+///
+/// let unmet = UnmetDependency::from(&minimal);
+/// assert_eq!(unmet.id, dep.id);
+/// assert_eq!(unmet.state, State::InProgress);
+/// assert_eq!(unmet.short_id, dep.id[..8]);
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct UnmetDependency {
+    pub id: String,
+    /// Short ID (first 8 chars of the full UUID), for human-readable references.
+    pub short_id: String,
+    pub title: String,
+    pub state: State,
+}
+
+impl From<&MinimalIssue> for UnmetDependency {
+    fn from(dep: &MinimalIssue) -> Self {
+        Self {
+            id: dep.id.clone(),
+            short_id: dep.short_id(),
+            title: dep.title.clone(),
+            state: dep.state,
+        }
+    }
+}
+
 /// Response for `issue show` command with enriched dependencies
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowResponse {
@@ -908,6 +953,10 @@ pub struct IssueShowResponse {
     /// hidden.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dangling_dependency_ids: Vec<String>,
+    /// The subset of `dependencies` that are not yet met (state is not terminal),
+    /// consistent with readiness — see [`UnmetDependency`]. Always an array,
+    /// empty when every dependency is `Done`/`Rejected` or there are none.
+    pub unmet_dependencies: Vec<UnmetDependency>,
     /// Per-gate view, one entry per required gate, enriched from each gate's
     /// latest run.
     pub gates: Vec<GateView>,
@@ -980,6 +1029,15 @@ impl IssueShowResponse {
             .cloned()
             .collect();
 
+        // Unmet = resolved dependency whose state is not terminal, the same
+        // met/unmet test `Issue::is_blocked` / `query_ready` apply. Dangling ids
+        // are reported separately above rather than projected here.
+        let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
+            .iter()
+            .filter(|dep| !dep.state.is_terminal())
+            .map(UnmetDependency::from)
+            .collect();
+
         Self {
             short_id: issue.short_id(),
             id: issue.id,
@@ -993,6 +1051,7 @@ impl IssueShowResponse {
                 .map(crate::domain::Assignee::to_string),
             dependencies: enriched_deps,
             dangling_dependency_ids,
+            unmet_dependencies,
             gates,
             context: issue.context,
             documents: issue.documents,
@@ -1001,6 +1060,112 @@ impl IssueShowResponse {
             created_at: issue.created_at.to_rfc3339(),
             updated_at: issue.updated_at.to_rfc3339(),
         }
+    }
+}
+
+/// Compact orchestration status for one issue: where it stands in one glance.
+///
+/// This is the small shape behind `jit issue status` (text one-liner and
+/// `--json` object). It projects an [`IssueShowResponse`] down to the fields an
+/// agent reconstructs by hand when it only needs "state, per-gate status, and
+/// what is still blocking": `state`, a `{key, status}` entry per required gate
+/// (b1586c0d convention), and the `short_id`s of the [unmet
+/// dependencies](UnmetDependency). It carries no run history, description, or
+/// enriched dependency metadata.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{GateStatus, Issue, State};
+/// use jit::output::{IssueShowResponse, IssueStatusResponse};
+///
+/// let mut issue = Issue::new("Build parser".into(), "Body".into());
+/// issue.state = State::Ready;
+/// issue.gates_required = vec!["tests".into()];
+/// let show = IssueShowResponse::from_issue(issue, vec![], &[]);
+///
+/// let status = IssueStatusResponse::from_show(&show);
+/// assert_eq!(status.state, State::Ready);
+/// assert_eq!(status.gates.len(), 1);
+/// assert_eq!(status.gates[0].key, "tests");
+/// assert_eq!(status.gates[0].status, GateStatus::Pending);
+/// assert!(status.unmet_dependencies.is_empty());
+///
+/// // The one-line render is stable and greppable; empty sections read `none`.
+/// let line = status.to_line();
+/// assert!(line.contains("[ready]"));
+/// assert!(line.contains("gates: tests=pending"));
+/// assert!(line.contains("unmet: none"));
+/// assert!(line.ends_with("title: Build parser"));
+/// ```
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueStatusResponse {
+    /// Short ID (first 8 chars of the full UUID).
+    pub short_id: String,
+    pub state: State,
+    /// One entry per required gate, `{key, status}` only.
+    pub gates: Vec<GateStatusEntry>,
+    /// Short ids of the dependencies that are not yet met (state not terminal),
+    /// consistent with readiness. Empty when nothing is blocking.
+    pub unmet_dependencies: Vec<String>,
+    pub title: String,
+}
+
+impl IssueStatusResponse {
+    /// Project a full [`IssueShowResponse`] down to the compact status shape.
+    pub fn from_show(show: &IssueShowResponse) -> Self {
+        Self {
+            short_id: show.short_id.clone(),
+            state: show.state,
+            gates: show
+                .gates
+                .iter()
+                .map(|g| GateStatusEntry {
+                    key: g.key.clone(),
+                    status: g.status,
+                })
+                .collect(),
+            unmet_dependencies: show
+                .unmet_dependencies
+                .iter()
+                .map(|d| d.short_id.clone())
+                .collect(),
+            title: show.title.clone(),
+        }
+    }
+
+    /// Render the stable, greppable one-line text form:
+    ///
+    /// ```text
+    /// <short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
+    /// ```
+    ///
+    /// The `gates:` and `unmet:` sections each render `none` when empty, so the
+    /// field order and separators are fixed regardless of content. `state` and
+    /// each gate `status` use their canonical snake_case names.
+    pub fn to_line(&self) -> String {
+        let gates = if self.gates.is_empty() {
+            "none".to_string()
+        } else {
+            self.gates
+                .iter()
+                .map(|g| format!("{}={}", g.key, g.status.as_str()))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let unmet = if self.unmet_dependencies.is_empty() {
+            "none".to_string()
+        } else {
+            self.unmet_dependencies.join(",")
+        };
+        format!(
+            "{} [{}] gates: {} unmet: {} title: {}",
+            self.short_id,
+            self.state.as_str(),
+            gates,
+            unmet,
+            self.title
+        )
     }
 }
 

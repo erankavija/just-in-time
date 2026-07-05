@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit issue status <id>...` — the compact "where does this issue stand"
+  view.** Prints state, per-gate status, and still-unmet dependencies as one
+  greppable line per issue (`<short_id> [<state>] gates: <key>=<status>,...
+  unmet: <short_id>,... title: <title>`; empty sections read `none`), or as one
+  small object per issue with `--json`
+  (`{short_id, state, gates:[{key,status}], unmet_dependencies:[short_id,...],
+  title}`). It accepts multiple ids in argument order; two or more with `--json`
+  use the `{"count": N, "issues": [...]}` list envelope. This replaces the
+  hand-rolled `jq`/`python` projections agents previously reconstructed from
+  full issue JSON. The unmet-dependency filter follows readiness semantics — a
+  dependency is met exactly when it is terminal (`done`/`rejected`), the same
+  test `jit query ready` applies.
+
+- **`issue show --json` now exposes `unmet_dependencies`.** The full record
+  gains an `unmet_dependencies` array — the subset of `dependencies` that are
+  not yet met (state not terminal), each as `{id, short_id, title, state}` —
+  computed by the same readiness-consistent predicate. Additive: existing fields
+  are unchanged, and the array is always present (empty `[]` when nothing is
+  blocking), so callers no longer recompute the filter client-side.
+
 - **`jit config get` now covers the whole configuration surface.** The
   dotted-key accessor previously recognized only a hand-mapped subset
   (`worktree.*`, `coordination.*`, `global_operations.*`, `locks.*`,

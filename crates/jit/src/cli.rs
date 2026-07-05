@@ -775,6 +775,34 @@ pub enum IssueCommands {
         json: bool,
     },
 
+    /// Print a compact "where does this issue stand" status: state, per-gate
+    /// status, and the still-unmet dependencies — one line per issue.
+    ///
+    /// This is the orchestration one-liner agents otherwise rebuild by piping
+    /// `issue show` JSON through jq. A dependency is *unmet* when it is not yet
+    /// `Done`/`Rejected` (the same readiness test as `query ready`); the section
+    /// reads `none` when nothing is blocking.
+    ///
+    /// Text form (default), one line per id:
+    ///   <short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
+    ///
+    /// `--json` emits the compact object
+    /// `{short_id, state, gates:[{key,status}], unmet_dependencies:[short_id,...], title}`;
+    /// with two or more ids it is wrapped in the list envelope
+    /// `{"count": N, "issues": [...]}` in argument order.
+    ///
+    /// Examples:
+    ///   jit issue status abc123                 # -> abc12345 [ready] gates: ... unmet: none title: ...
+    ///   jit issue status abc123 def456 --json    # -> {"count":2,"issues":[...]}
+    Status {
+        /// Issue id(s). One object/line per id, in argument order.
+        #[arg(required = true)]
+        ids: Vec<String>,
+
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Update an issue or multiple issues. Returns a lightweight confirmation
     /// (id, short_id, state, updated_at); run `jit issue show` to fetch the
     /// full updated body.

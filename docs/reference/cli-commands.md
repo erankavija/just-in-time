@@ -1121,6 +1121,20 @@ from every dependent, so this array is normally absent; it surfaces only
 pre-existing corruption (e.g. a repository hand-edited or written by an older
 binary) rather than silently hiding those ids from the `dependencies` view.
 
+**Unmet dependencies:** the `issue show --json` object also carries an
+`unmet_dependencies` array: the subset of `dependencies` that are not yet **met**.
+A dependency is met exactly when it is in a terminal state (`done` or
+`rejected`) — the same readiness test `jit query ready` uses to decide whether an
+issue is blocked — so a `rejected` dependency counts as met and is **not** listed.
+Each entry is a subset of the matching `dependencies` entry: `{id, short_id,
+title, state}`. The array is always present (empty `[]` when every dependency is
+met or there are none), so callers no longer recompute the filter client-side.
+
+```bash
+jit issue show abc123 --json | jq '.unmet_dependencies'
+# -> [ {"id":"def456...","short_id":"def45678","title":"Build parser","state":"in_progress"} ]
+```
+
 **Flag rules:**
 - `--field` and `--fields` are mutually exclusive.
 - `--field`/`--fields` require **exactly one** issue id; passing them with two or
@@ -1128,6 +1142,56 @@ binary) rather than silently hiding those ids from the `dependencies` view.
 - Passing two or more ids with `--json` returns the list envelope
   `{"count": N, "issues": [...]}` with full issue objects in argument order. A
   single id with `--json` stays a single object.
+
+### Compact status (`jit issue status`)
+
+`jit issue status <id>...` prints the one-line "where does this issue stand"
+view — state, per-gate status, and still-unmet dependencies — that agents
+otherwise rebuild by piping `issue show --json` through `jq`. It accepts one or
+more ids and emits one row (text) or object (`--json`) per id, in argument order.
+
+```bash
+# Text (default): one greppable line per id
+jit issue status abc123
+# -> abc12345 [backlog] gates: tests=passed,review=pending unmet: def45678 title: Wire up login
+
+# Empty sections read `none`
+jit issue status ghi789
+# -> ghi78901 [ready] gates: none unmet: none title: Standalone task
+
+# Multiple ids: one line each
+jit issue status abc123 def456
+
+# JSON: a compact object per id
+jit issue status abc123 --json
+# -> {"short_id":"abc12345","state":"backlog","gates":[{"key":"tests","status":"passed"}],
+#     "unmet_dependencies":["def45678"],"title":"Wire up login"}
+
+# Two or more ids with --json use the list envelope
+jit issue status abc123 def456 --json
+# -> {"count":2,"issues":[ {...}, {...} ]}
+```
+
+**Text format** (stable and greppable, fixed field order):
+
+```text
+<short_id> [<state>] gates: <key>=<status>,... unmet: <short_id>,... title: <title>
+```
+
+- `<state>` and each gate `<status>` use their canonical lowercase names
+  (`backlog`/`ready`/…, `pending`/`passed`/`failed`).
+- The `gates:` and `unmet:` sections render `none` when empty, so the separators
+  stay constant regardless of content.
+
+**JSON shape:** `{short_id, state, gates:[{key,status}], unmet_dependencies:[short_id,...], title}`.
+Note `unmet_dependencies` here is an array of **short ids** (the compact view),
+whereas the full `issue show --json` carries the richer `{id, short_id, title,
+state}` objects. Both use the same readiness-consistent unmet filter (terminal =
+met). A single id yields a bare object; two or more wrap in the
+`{"count": N, "issues": [...]}` list envelope.
+
+`jit issue status` does not accept the `--field`/`--fields` projection flags;
+those belong to `issue show`. Passing one is a usage error (exit code `2`).
 
 ### Assigning and Claiming Issues
 
@@ -2416,7 +2480,7 @@ The collection key is command-specific:
 
 | Command | Collection key |
 | --- | --- |
-| `issue list`, `list`, `query all`/`available`(`ready`)/`blocked`/`strategic`/`closed`, `issue search`, `issue show <id> <id> …` | `issues` |
+| `issue list`, `list`, `query all`/`available`(`ready`)/`blocked`/`strategic`/`closed`, `issue search`, `issue show <id> <id> …`, `issue status <id> <id> …` | `issues` |
 | `search` | `results` |
 | `gate list` | `gates` |
 | `gate preset list` | `presets` |

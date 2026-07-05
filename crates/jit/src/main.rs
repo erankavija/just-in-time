@@ -1956,6 +1956,41 @@ fn run() -> Result<()> {
                         }
                     }
                 }
+                IssueCommands::Status { ids, json } => {
+                    // One compact status per id, in argument order. Each status is
+                    // projected from the same enriched show response so the unmet
+                    // dependency set stays byte-for-byte consistent with
+                    // `issue show --json`.
+                    let statuses = ids
+                        .iter()
+                        .map(|id| {
+                            build_issue_show_response(&executor, id)
+                                .map(|resp| jit::output::IssueStatusResponse::from_show(&resp))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+
+                    if json {
+                        if statuses.len() == 1 {
+                            // Single id stays a bare object, mirroring `issue show`.
+                            let output =
+                                jit::output::JsonOutput::success(&statuses[0], "issue status");
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let output = jit::output::JsonOutput::success(
+                                serde_json::json!({
+                                    "count": statuses.len(),
+                                    "issues": statuses,
+                                }),
+                                "issue status",
+                            );
+                            println!("{}", output.to_json_string()?);
+                        }
+                    } else {
+                        for status in &statuses {
+                            println!("{}", status.to_line());
+                        }
+                    }
+                }
                 IssueCommands::Update {
                     id,
                     filter,
