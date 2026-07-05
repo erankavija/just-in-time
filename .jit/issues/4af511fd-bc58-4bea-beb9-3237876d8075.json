@@ -2,9 +2,9 @@
   "id": "4af511fd-bc58-4bea-beb9-3237876d8075",
   "title": "Expose linked documents to gate checkers for review context",
   "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03).\n\nAI review gate checkers receive the issue (description, criteria, gates) but nothing about its linked documents, so a reviewer cannot see the plan, its binding decisions, or mid-execution amendments. Three review rounds in one session failed on findings that were plan-sequencing facts rather than defects:\n\n- story 37506c12 was failed for the label-regex gap that the plan's ownership split explicitly assigns to the dependent story;\n- task 0597febe was failed for the labels.rs/CANONICAL_LABEL_REGEX divergence that the plan deliberately splits across two back-to-back tasks;\n- task f4b5e3f4 was failed against pre-amendment criteria wording after the invoker had approved amendment D3-A recorded only in the plan doc.\n\nEach was resolved by hand-pasting plan context into the issue description before re-running the gate — workable but lossy and repetitive.\n\nProposal: when a gate checker runs, expose the issue's linked docs (`jit doc list <id>`) to it — e.g. a JIT_ISSUE_DOCS env var with a machine-readable list of {path, doc_type, label}, so checker scripts like scripts/ai-review.sh can inline design/plan docs into the review prompt. Doc selection/filtering (e.g. only doc_type=design) can be checker policy.\n\n## Success Criteria\n- [hard] REQ-01: gate checker processes receive the issue's linked-document list (paths + doc types + labels) via a documented environment variable or equivalent mechanism, covered by a test asserting the variable's content for an issue with linked docs.\n- [hard] REQ-02: the mechanism is documented alongside the existing checker env contract (JIT_ISSUE_ID et al.) in the gate documentation.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -30,5 +30,5 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-03T11:10:51.908482616Z",
-  "updated_at": "2026-07-04T23:25:14.830280539Z"
+  "updated_at": "2026-07-05T06:48:08.771642405Z"
 }
