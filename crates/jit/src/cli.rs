@@ -224,6 +224,11 @@ pub enum Commands {
     },
 
     /// Label namespace management commands
+    ///
+    /// Inspects the label namespace registry itself (which namespaces exist,
+    /// which values have been used) — it does NOT add or remove labels on an
+    /// issue. To label an issue, use `jit issue update <id> --label
+    /// <namespace:value>` (and `--remove-label` to remove one).
     #[command(subcommand)]
     Label(LabelCommands),
 
@@ -901,6 +906,39 @@ pub enum IssueCommands {
         json: bool,
     },
 
+    /// Hidden stub: not a real command. `issue rm` is not the canonical
+    /// spelling in this group (that's `issue delete`); this variant exists
+    /// only to fail fast with a hint instead of clap's generic "unrecognized
+    /// subcommand" error. See `verb_hint_error` in `main.rs`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Rm {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Rm` above. `issue remove` is not a command.
+    #[command(hide = true, trailing_var_arg = true)]
+    Remove {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Rm` above. `issue complete` is not a command; use
+    /// `issue update --state done`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Complete {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Rm` above. `issue edit` is not a command; use
+    /// `issue update`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Edit {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
     /// Assign issue to someone
     ///
     /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
@@ -1061,6 +1099,23 @@ pub enum DepCommands {
 
         #[arg(long)]
         json: bool,
+    },
+
+    /// Hidden stub: not a real command. The canonical spelling in this group
+    /// is `dep rm`; this variant exists only to fail fast with a hint instead
+    /// of clap's generic "unrecognized subcommand" error. See
+    /// `verb_hint_error` in `main.rs`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Remove {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Remove` above. `dep delete` is not a command.
+    #[command(hide = true, trailing_var_arg = true)]
+    Delete {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 }
 
@@ -1262,6 +1317,23 @@ pub enum GateCommands {
 
         #[arg(long)]
         json: bool,
+    },
+
+    /// Hidden stub: not a real command. The canonical spelling in this group
+    /// is `gate remove`; this variant exists only to fail fast with a hint
+    /// instead of clap's generic "unrecognized subcommand" error. See
+    /// `verb_hint_error` in `main.rs`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Rm {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Rm` above. `gate delete` is not a command.
+    #[command(hide = true, trailing_var_arg = true)]
+    Delete {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Add a gate requirement to an issue
@@ -1648,6 +1720,23 @@ pub enum DocCommands {
         json: bool,
     },
 
+    /// Hidden stub: not a real command. The canonical spelling in this group
+    /// is `doc remove`; this variant exists only to fail fast with a hint
+    /// instead of clap's generic "unrecognized subcommand" error. See
+    /// `verb_hint_error` in `main.rs`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Rm {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Rm` above. `doc delete` is not a command.
+    #[command(hide = true, trailing_var_arg = true)]
+    Delete {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
     /// Show document content
     Show {
         /// Issue ID
@@ -2010,6 +2099,32 @@ pub enum LabelCommands {
 
         #[arg(long)]
         json: bool,
+    },
+
+    /// Hidden stub: not a real command. There is no `label add` — labeling an
+    /// issue goes through `jit issue update --label`; this variant exists
+    /// only to fail fast with a hint instead of clap's generic "unrecognized
+    /// subcommand" error. See `verb_hint_error` in `main.rs`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Add {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Add` above. `label rm` is not a command; use
+    /// `jit issue update --remove-label`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Rm {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Hidden stub: see `Add` above. `label remove` is not a command; use
+    /// `jit issue update --remove-label`.
+    #[command(hide = true, trailing_var_arg = true)]
+    Remove {
+        #[arg(allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 }
 

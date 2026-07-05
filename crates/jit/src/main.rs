@@ -681,6 +681,65 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
+/// Wrong-verb guess -> canonical-command hint, keyed by (group, guessed verb).
+/// Backs the hidden stub subcommands in `cli.rs` (`IssueCommands::Rm`,
+/// `DepCommands::Remove`, ...): each stub always fails through
+/// [`verb_hint_error`], which looks itself up here. Adding a newly observed
+/// wrong guess is a one-line addition: wire a hidden stub variant in
+/// `cli.rs`, add its match arm below, and add the mapping here. See
+/// docs/reference/cli-commands.md's "Command and flag aliases" section for
+/// the user-facing writeup — these are hints, not aliases: the wrong verb
+/// still fails, it just names the right one.
+const VERB_HINTS: &[(&str, &str, &str)] = &[
+    ("dep", "remove", "jit dep rm"),
+    ("dep", "delete", "jit dep rm"),
+    ("issue", "rm", "jit issue delete"),
+    ("issue", "remove", "jit issue delete"),
+    ("issue", "complete", "jit issue update <id> --state done"),
+    ("issue", "edit", "jit issue update <id>"),
+    ("gate", "rm", "jit gate remove"),
+    ("gate", "delete", "jit gate remove"),
+    ("doc", "rm", "jit doc remove"),
+    ("doc", "delete", "jit doc remove"),
+    (
+        "label",
+        "add",
+        "jit issue update <id> --label <namespace:value>",
+    ),
+    (
+        "label",
+        "rm",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+    (
+        "label",
+        "remove",
+        "jit issue update <id> --remove-label <namespace:value>",
+    ),
+];
+
+/// Fail fast on an observed wrong-verb guess (`jit <group> <verb>`) with a
+/// hint naming the canonical command, instead of executing (there is nothing
+/// to execute — these are hidden stubs) or falling through to clap's generic
+/// "unrecognized subcommand" error. `args` is the wrong subcommand's raw
+/// trailing argv (positionals and flags alike, captured verbatim by the
+/// stub); it is inspected only for a literal `--json` so the hint renders
+/// through the same JSON error envelope the real command would have used.
+/// Always returns an error; never used as a fallible operation.
+fn verb_hint_error(group: &str, verb: &str, args: &[String]) -> anyhow::Error {
+    let json = args.iter().any(|a| a == "--json");
+    let canonical = VERB_HINTS
+        .iter()
+        .find_map(|(g, v, hint)| (*g == group && *v == verb).then_some(*hint))
+        .unwrap_or_else(|| panic!("no verb hint registered for 'jit {group} {verb}'"));
+    let command = format!("{group} {verb}");
+    invalid_argument(
+        format!("'jit {command}' is not a jit command. Use '{canonical}' instead."),
+        &command,
+        json,
+    )
+}
+
 /// Read description content for `--description-file` / `--append-description-file`.
 ///
 /// `path == "-"` reads stdin to completion instead of a file. Content is
@@ -2219,6 +2278,16 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
                     }
                 }
+                IssueCommands::Rm { args } => return Err(verb_hint_error("issue", "rm", &args)),
+                IssueCommands::Remove { args } => {
+                    return Err(verb_hint_error("issue", "remove", &args))
+                }
+                IssueCommands::Complete { args } => {
+                    return Err(verb_hint_error("issue", "complete", &args))
+                }
+                IssueCommands::Edit { args } => {
+                    return Err(verb_hint_error("issue", "edit", &args))
+                }
                 IssueCommands::Assign { id, assignee, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
@@ -2620,6 +2689,8 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            DepCommands::Remove { args } => return Err(verb_hint_error("dep", "remove", &args)),
+            DepCommands::Delete { args } => return Err(verb_hint_error("dep", "delete", &args)),
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
             GateCommands::Define {
@@ -2977,6 +3048,8 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            GateCommands::Rm { args } => return Err(verb_hint_error("gate", "rm", &args)),
+            GateCommands::Delete { args } => return Err(verb_hint_error("gate", "delete", &args)),
             GateCommands::Status {
                 id,
                 gate_key,
@@ -4043,6 +4116,8 @@ fn run() -> Result<()> {
                     );
                 }
             }
+            DocCommands::Rm { args } => return Err(verb_hint_error("doc", "rm", &args)),
+            DocCommands::Delete { args } => return Err(verb_hint_error("doc", "delete", &args)),
             DocCommands::Show { id, path, at, json } => {
                 let result = executor.show_document_content(&id, &path, at.as_deref())?;
 
@@ -4703,6 +4778,15 @@ fn run() -> Result<()> {
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", values.len()));
                 }
+            }
+            jit::cli::LabelCommands::Add { args } => {
+                return Err(verb_hint_error("label", "add", &args))
+            }
+            jit::cli::LabelCommands::Rm { args } => {
+                return Err(verb_hint_error("label", "rm", &args))
+            }
+            jit::cli::LabelCommands::Remove { args } => {
+                return Err(verb_hint_error("label", "remove", &args))
             }
         },
         Commands::Config(config_cmd) => match config_cmd {

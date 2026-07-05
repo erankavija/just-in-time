@@ -107,6 +107,37 @@ jit issue list --json       # == jit query all --json
 jit issue update <id> --add-label area:foo  # == --label area:foo
 ```
 
+### Wrong-verb hints (not aliases)
+
+Each command group has exactly one canonical spelling for removal: `jit issue
+delete`, `jit dep rm`, `jit gate remove`, `jit doc remove`. Other groups'
+spellings are NOT aliased onto each other — `dep remove`, `dep delete`, `issue
+rm`, `issue remove`, `gate rm`, `gate delete`, `doc rm`, and `doc delete` all
+fail (exit code 2). The error names the group's canonical command instead of
+clap's generic "unrecognized subcommand" message, e.g.:
+
+```
+$ jit dep remove abc123 def456
+Error: 'jit dep remove' is not a jit command. Use 'jit dep rm' instead.
+```
+
+The same applies to two guesses at editing an issue and to labeling an issue
+through the wrong command:
+
+| Wrong guess | Hint names |
+|-------------|-----------|
+| `jit issue complete <id>` | `jit issue update <id> --state done` |
+| `jit issue edit <id>` | `jit issue update <id>` |
+| `jit label add <id> <label>` | `jit issue update <id> --label <namespace:value>` |
+| `jit label rm`/`remove <id> <label>` | `jit issue update <id> --remove-label <namespace:value>` |
+
+`jit label` itself only inspects the namespace registry (`jit label
+namespaces`, `jit label values`) — it never touches an issue's labels. See
+`jit label --help`.
+
+Under `--json`, the same hint is in `error.message` with code
+`INVALID_ARGUMENT`, exit code 2 — identical to any other usage error.
+
 Gate-blocked example:
 
 ```json

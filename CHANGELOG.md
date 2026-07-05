@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Wrong-verb hints for observed wrong-guess spellings.** `jit dep
+  remove`/`delete`, `jit issue rm`/`remove`/`complete`/`edit`, `jit gate
+  rm`/`delete`, `jit doc rm`/`delete`, and `jit label add`/`rm`/`remove` now
+  fail fast (exit 2) with a message naming that group's canonical command
+  (`jit dep rm`, `jit issue delete`, `jit issue update --state
+  done`/`--label`/`--remove-label`, `jit gate remove`, `jit doc remove`)
+  instead of clap's generic "unrecognized subcommand" error. These are hints,
+  not new aliases — the wrong verb still fails, and canonical spellings are
+  unchanged. `jit label --help` now also clarifies that the `label` group
+  manages the namespace registry, not an issue's labels.
+
 - **Repeatable, AND-combined `--label` filter across the query family.**
   `jit issue list`, the top-level `jit list` alias, the bare `jit query` form,
   and `jit query all`/`available`/`blocked`/`strategic`/`closed` now accept
