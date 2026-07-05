@@ -397,14 +397,22 @@ fn test_worktree_list_json_output() {
 /// Regression for the reported bug: `jit worktree list` showed stale
 /// `active_claims` after a lease TTL expired, while `jit claim list` (which
 /// evicts expired leases) correctly returned 0. The two views must agree.
+/// CLI-boundary smoke test that `worktree list` and `claim list` are wired to
+/// the same active-lease view for live leases (happy path).
+///
+/// Expiry-boundary exclusion (the deflaked behavior) is covered deterministically
+/// in-process by `commands::worktree::tests::test_worktree_list_excludes_expired_leases`,
+/// which drives an injected clock past a lease's TTL instead of sleeping. That
+/// trade-off keeps this test free of any wall-clock timing while still exercising
+/// the real CLI wiring for the common case.
 #[test]
-fn test_worktree_list_excludes_expired_leases() {
+fn test_worktree_list_agrees_with_claim_list_for_live_leases() {
     let temp = setup_repo();
 
     let short_id = create_issue(temp.path(), "short-lived");
     let long_id = create_issue(temp.path(), "long-lived");
 
-    // Acquire a 1-second lease and a long-lived lease from the main worktree.
+    // Acquire two live leases from the main worktree.
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
@@ -412,7 +420,7 @@ fn test_worktree_list_excludes_expired_leases() {
             "acquire",
             &short_id,
             "--ttl",
-            "1",
+            "600",
             "--agent-id",
             "agent:test",
         ])
@@ -432,24 +440,10 @@ fn test_worktree_list_excludes_expired_leases() {
         .assert()
         .success();
 
-    // Both leases are live initially, so they are both counted.
-    assert_eq!(
-        worktree_active_claims_total(temp.path()),
-        2,
-        "both live leases should be counted before expiry"
-    );
-
-    // Let the 1-second lease's TTL elapse.
-    std::thread::sleep(std::time::Duration::from_millis(1600));
-
-    // The expired lease must no longer be counted, and `worktree list` must
-    // agree with `claim list` (the divergence this bug was about).
+    // Both leases are live, so `worktree list` and `claim list` must agree.
     let active = worktree_active_claims_total(temp.path());
     let claims = claim_list_count(temp.path());
-    assert_eq!(
-        active, 1,
-        "expired lease must be excluded from active_claims"
-    );
+    assert_eq!(active, 2, "both live leases should be counted");
     assert_eq!(
         active, claims,
         "worktree list active_claims must agree with claim list count"

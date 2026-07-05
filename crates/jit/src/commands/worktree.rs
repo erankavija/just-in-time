@@ -125,14 +125,23 @@ fn parse_git_worktree_porcelain(output: &str) -> Result<Vec<GitWorktreeEntry>> {
 /// Filters the claims index to count leases where the worktree_id matches
 /// the provided identifier.
 ///
+/// Expiry is evaluated against `now` (supplied by the caller via the
+/// [`Clock`](crate::storage::clock::Clock) abstraction) rather than read from
+/// the system clock here, so the count is a
+/// pure function of its inputs and can be exercised deterministically in tests.
+///
 /// # Arguments
 /// * `index` - Claims index containing all active leases
 /// * `worktree_id` - Worktree identifier to filter by (e.g., "wt:abc12345")
+/// * `now` - Instant to evaluate lease expiry against
 ///
 /// # Returns
 /// Number of active claims (leases) for the worktree
-fn count_claims_for_worktree(index: &ClaimsIndex, worktree_id: &str) -> usize {
-    let now = chrono::Utc::now();
+fn count_claims_for_worktree(
+    index: &ClaimsIndex,
+    worktree_id: &str,
+    now: chrono::DateTime<chrono::Utc>,
+) -> usize {
     index
         .leases
         .iter()
@@ -227,16 +236,35 @@ pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
-    use std::path::PathBuf;
-
     // Get worktree paths to access shared control plane
     let paths = WorktreePaths::detect()
         .context("Failed to detect worktree paths - are you in a git repository?")?;
 
-    // Execute git worktree list --porcelain
+    // Production time source: the real system clock.
+    execute_worktree_list_at(&paths, &crate::storage::clock::SystemClock)
+}
+
+/// Core of [`execute_worktree_list`] with the control-plane paths and time
+/// source injected.
+///
+/// This holds the real command logic (running `git worktree list`, loading the
+/// claims index, resolving each worktree's identity, and counting active
+/// claims); the public wrapper only detects `paths` and supplies a
+/// [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
+/// per-worktree expiry check is read once from `clock`, so a test can drive
+/// expiry deterministically by advancing an injected clock while exercising this
+/// exact path.
+fn execute_worktree_list_at(
+    paths: &WorktreePaths,
+    clock: &dyn crate::storage::clock::Clock,
+) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use std::path::PathBuf;
+
+    // Execute git worktree list --porcelain from this worktree's root.
     let output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
+        .current_dir(&paths.worktree_root)
         .output()
         .context("Failed to execute git worktree list")?;
 
@@ -255,7 +283,11 @@ pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWar
 
     // Load the active-lease index through storage to count active claims per
     // worktree (an absent index yields an empty one, i.e. no active claims).
-    let claims_index = ClaimsIndex::load(&paths)?;
+    let claims_index = ClaimsIndex::load(paths)?;
+
+    // Single "now" for all per-worktree expiry checks, read once from the
+    // injected clock.
+    let now = clock.now();
 
     // Enrich git entries with JIT data, collecting any relocation warnings
     // observed while loading each worktree's identity.
@@ -287,7 +319,7 @@ pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWar
             };
 
             // Count active claims for this worktree
-            let active_claims = count_claims_for_worktree(&claims_index, &worktree_id);
+            let active_claims = count_claims_for_worktree(&claims_index, &worktree_id, now);
 
             // Determine if main worktree (compare with common_dir parent)
             let is_main = worktree_path == paths.worktree_root && !paths.is_worktree();
@@ -541,9 +573,10 @@ mod tests {
             ],
         };
 
-        let count_abc = count_claims_for_worktree(&index, "wt:abc123");
-        let count_def = count_claims_for_worktree(&index, "wt:def456");
-        let count_xyz = count_claims_for_worktree(&index, "wt:xyz789");
+        let now = Utc::now();
+        let count_abc = count_claims_for_worktree(&index, "wt:abc123", now);
+        let count_def = count_claims_for_worktree(&index, "wt:def456", now);
+        let count_xyz = count_claims_for_worktree(&index, "wt:xyz789", now);
 
         assert_eq!(count_abc, 2);
         assert_eq!(count_def, 1);
@@ -588,7 +621,99 @@ mod tests {
 
         // Only the live and indefinite leases count; the expired one is excluded,
         // matching `claim list` which evicts expired leases before reporting.
-        assert_eq!(count_claims_for_worktree(&index, "wt:abc123"), 2);
+        assert_eq!(count_claims_for_worktree(&index, "wt:abc123", now), 2);
+    }
+
+    /// REQ-02: expiry is driven through an injected [`Clock`] rather than a real
+    /// `sleep`, exercising the real `execute_worktree_list_at` command path (the
+    /// core of `execute_worktree_list`) against a temporary git repo.
+    ///
+    /// The former subprocess test slept 1600ms to let a 1s TTL elapse; here a
+    /// [`FixedClock`] is advanced past the short lease's TTL and the real command
+    /// path is re-run, asserting the expired lease drops out of the reported
+    /// `active_claims`. See `tests/worktree_cli_tests.rs` for the CLI-boundary
+    /// happy-path smoke test.
+    #[test]
+    fn test_worktree_list_excludes_expired_leases() {
+        use crate::storage::clock::FixedClock;
+        use crate::storage::worktree_paths::WorktreePaths;
+        use crate::storage::{ClaimCoordinator, FileLocker};
+        use chrono::Utc;
+        use std::process::Command as StdCommand;
+        use std::sync::Arc;
+        use std::time::Duration as StdDuration;
+
+        fn git(dir: &std::path::Path, args: &[&str]) {
+            let status = StdCommand::new("git")
+                .current_dir(dir)
+                .args(args)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git {:?} failed", args);
+        }
+
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Minimal real git repo so `git worktree list` reports the main worktree.
+        git(root, &["init"]);
+        git(root, &["config", "user.email", "test@example.com"]);
+        git(root, &["config", "user.name", "Test User"]);
+        std::fs::write(root.join("README.md"), "# test\n").unwrap();
+        git(root, &["add", "."]);
+        git(root, &["commit", "-m", "init"]);
+
+        // Resolve the actual branch so lease worktree_ids match what the command
+        // computes (no local .jit -> worktree_id is `wt:<branch>`).
+        let branch_out = StdCommand::new("git")
+            .current_dir(root)
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .output()
+            .unwrap();
+        let branch = String::from_utf8(branch_out.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+        let worktree_id = format!("wt:{branch}");
+
+        let paths = WorktreePaths {
+            common_dir: root.join(".git"),
+            worktree_root: root.to_path_buf(),
+            local_jit: root.join(".jit"),
+            shared_jit: root.join(".git/jit"),
+        };
+
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = ClaimCoordinator::new(
+            paths.clone(),
+            FileLocker::new(StdDuration::from_secs(5)),
+            worktree_id,
+            "agent:test".to_string(),
+        )
+        .with_clock(clock.clone());
+        coordinator.init().unwrap();
+
+        // A short (1s TTL) and a long (600s TTL) lease, both acquired "now".
+        coordinator.acquire_claim("issue-short", 1).unwrap();
+        coordinator.acquire_claim("issue-long", 600).unwrap();
+
+        let active_total = |clock: &FixedClock| -> usize {
+            let (entries, _warnings) = execute_worktree_list_at(&paths, clock).unwrap();
+            entries.iter().map(|e| e.active_claims).sum()
+        };
+
+        // Before expiry: both live leases are counted by the real command path.
+        assert_eq!(active_total(clock.as_ref()), 2, "both live leases counted");
+
+        // Advance time past the short lease's TTL (no real sleep) and re-run the
+        // same command path: the expired lease must be excluded.
+        clock.set(base + chrono::Duration::seconds(5));
+        assert_eq!(
+            active_total(clock.as_ref()),
+            1,
+            "expired lease excluded from list"
+        );
     }
 
     #[test]

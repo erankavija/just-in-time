@@ -12,12 +12,14 @@
 //!
 //! See design doc: `dev/design/worktree-parallel-work.md` - "Claim Acquisition Algorithm"
 
+use crate::storage::clock::{Clock, SystemClock};
 use crate::storage::StorageWarning;
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use super::lock::FileLocker;
@@ -294,6 +296,10 @@ pub struct ClaimCoordinator {
     /// [`ClaimCoordinator::with_fsync`]: an fsync costs ~10ms and property
     /// tests do hundreds of writes, so leaving it on makes them minutes long.
     fsync: bool,
+    /// Source of "now" for lease expiry and eviction. Defaults to
+    /// [`SystemClock`] (the real system clock) in production; tests inject a
+    /// deterministic clock so TTL boundaries are exercised without real delays.
+    clock: Arc<dyn Clock>,
 }
 
 impl ClaimCoordinator {
@@ -317,7 +323,16 @@ impl ClaimCoordinator {
             worktree_id,
             agent_id,
             fsync: true,
+            clock: Arc::new(SystemClock),
         }
+    }
+
+    /// Override the clock used for lease expiry and eviction (see the `clock`
+    /// field). Test-only: production always uses [`SystemClock`].
+    #[cfg(test)]
+    pub(crate) fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Override the fsync-on-write behavior (see the `fsync` field).
@@ -407,7 +422,7 @@ impl ClaimCoordinator {
         }
 
         // 4. Create new lease
-        let now = Utc::now();
+        let now = self.clock.now();
         let lease = Lease {
             lease_id: Uuid::new_v4().to_string(),
             issue_id: issue_id.to_string(),
@@ -540,7 +555,7 @@ impl ClaimCoordinator {
         }
 
         // 5. Create new lease
-        let now = Utc::now();
+        let now = self.clock.now();
         let lease = Lease {
             lease_id: Uuid::new_v4().to_string(),
             issue_id: issue_id.to_string(),
@@ -612,7 +627,7 @@ impl ClaimCoordinator {
         }
 
         // 5. Update last_beat
-        let now = Utc::now();
+        let now = self.clock.now();
         let new_last_beat = now;
 
         // 6. Append heartbeat operation to log
@@ -659,7 +674,7 @@ impl ClaimCoordinator {
 
     /// Evict expired leases from index
     pub fn evict_expired(&self, index: &mut ClaimsIndex) -> Result<()> {
-        let now = Utc::now();
+        let now = self.clock.now();
         let expired: Vec<_> = index
             .leases
             .iter()
@@ -693,7 +708,7 @@ impl ClaimCoordinator {
         let entry = ClaimLogEntry {
             schema_version: 1,
             seq,
-            timestamp: Utc::now(),
+            timestamp: self.clock.now(),
             operation: op.clone(),
         };
 
@@ -803,7 +818,7 @@ impl ClaimCoordinator {
         }
 
         // 5. Calculate new expiry/heartbeat
-        let now = Utc::now();
+        let now = self.clock.now();
         let (new_expires_at, new_last_beat) = if lease.ttl_secs > 0 {
             // Finite lease: extend expiry by extension_secs
             let new_expiry = now + Duration::seconds(extension_secs as i64);
@@ -875,7 +890,7 @@ impl ClaimCoordinator {
         // 5. Log release
         let op = ClaimOp::Release {
             lease_id: lease_id.to_string(),
-            released_at: Utc::now(),
+            released_at: self.clock.now(),
         };
         self.append_claim_op(&op)?;
 
@@ -916,7 +931,7 @@ impl ClaimCoordinator {
         // 4. Log eviction
         let op = ClaimOp::ForceEvict {
             lease_id: lease_id.to_string(),
-            evicted_at: Utc::now(),
+            evicted_at: self.clock.now(),
             reason: reason.to_string(),
         };
         self.append_claim_op(&op)?;
@@ -1071,7 +1086,7 @@ impl ClaimCoordinator {
         // Filter out expired finite leases. Uses the same single source of
         // truth (`Lease::is_expired`) as eviction and `worktree list`, so the
         // rebuilt index cannot diverge from those views at the TTL boundary.
-        let now = Utc::now();
+        let now = self.clock.now();
         let stale_threshold_secs = 3600u64; // 1 hour default
         active.retain(|_, lease| !lease.is_expired(now));
 
@@ -1093,7 +1108,7 @@ impl ClaimCoordinator {
 
         Ok(ClaimsIndex {
             schema_version: 1,
-            generated_at: Utc::now(),
+            generated_at: now,
             last_seq: max_seq,
             stale_threshold_secs,
             leases,

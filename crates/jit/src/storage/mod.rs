@@ -12,6 +12,7 @@ use std::collections::HashMap;
 pub mod atomic_write;
 pub mod claim_coordinator;
 pub mod claims_log;
+pub mod clock;
 pub mod config_store;
 pub mod control_plane;
 pub mod discovery;
@@ -33,6 +34,7 @@ pub mod worktree_paths;
 
 // Re-export for convenience
 pub use claim_coordinator::{ClaimCoordinator, Lease};
+pub use clock::{Clock, SystemClock};
 pub use errors::{
     GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError, IssueNotFoundError,
     PresetNotFoundError, RepositoryFormatTooNewError, RepositoryNotFoundError,
