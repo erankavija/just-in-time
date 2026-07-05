@@ -481,6 +481,12 @@ fn test_exit_code_state_transition_blocked_by_gates_json() {
         .as_str()
         .unwrap()
         .contains(&format!("jit gate status-all {}", id))));
+    // jit:62f3bebd REQ-01 — the gate-blocked transition error also points at
+    // the per-gate run-history view, not just the readiness/evaluate commands.
+    assert!(remediation.iter().any(|cmd| {
+        let cmd = cmd.as_str().unwrap();
+        cmd.contains(&format!("jit gate status {} tests", id)) && cmd.contains("--all")
+    }));
 }
 
 #[test]

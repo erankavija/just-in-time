@@ -158,12 +158,14 @@ Gate-blocked example:
       ],
       "remediation": [
         "jit gate status-all work-id",
-        "jit gate evaluate work-id code-review"
+        "jit gate evaluate work-id code-review",
+        "jit gate status work-id code-review --all  # run history"
       ]
     },
     "suggestions": [
       "jit gate status-all work-id",
-      "jit gate evaluate work-id code-review"
+      "jit gate evaluate work-id code-review",
+      "jit gate status work-id code-review --all  # run history"
     ]
   }
 }

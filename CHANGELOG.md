@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Help cross-references from mutation/inspection commands to the reporting
+  commands that answer "what happened".** `jit issue show --help` now names
+  `jit issue status` (compact one-line view), `jit gate status-all`/`jit gate
+  status <id> <gate>` (per-issue gate readiness/history), and summarizes the
+  JSON response's top-level fields (`dependencies`, `unmet_dependencies`,
+  `gates`, `documents`, etc.) so a caller doesn't have to run `--json` and
+  inspect the shape to discover them. `jit issue create`/`update` and `jit doc
+  add`/`remove` `--help` now point at `jit events query --issue-id`/`jit
+  events tail` for verifying a recorded change. Gate failure output (`jit gate
+  evaluate`'s error message and JSON suggestions, and the gate-blocked
+  transition error's remediation) now also names `jit gate status <id> <gate>
+  --all`, the run-history view, alongside the existing single-run and
+  readiness commands. Top-level `jit --help`/`-h` now names `jit --schema` for
+  JSON response shapes and exit code documentation.
+
 - **Canonical hierarchy resolution in the core, shared by the CLI and web UI.**
   Parent, children, cluster, and rank per node are now resolved once in the core
   library (`jit::graph::hierarchy`) treating the **dependency DAG as

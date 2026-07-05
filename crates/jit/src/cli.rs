@@ -21,6 +21,7 @@ use crate::build_info;
 #[derive(Parser)]
 #[command(name = "jit")]
 #[command(about = "Just-In-Time issue tracker", long_about = None)]
+#[command(after_help = "For JSON output shapes and exit code documentation, run `jit --schema`.")]
 #[command(version = build_info::VERSION_TEXT)]
 pub struct Cli {
     /// Suppress non-essential output (for scripting)
@@ -599,6 +600,9 @@ pub enum IssueCommands {
     /// (`jit issue create "Title"`) or via the `-t`/`--title` flag.
     /// Exactly one form is required; providing both is an error.
     ///
+    /// To verify what was recorded, see `jit events query --issue-id <id>` or
+    /// `jit events tail`.
+    ///
     /// Examples:
     ///   jit issue create "Fix login bug"
     ///   jit issue create "Fix login bug" --type bug --priority high
@@ -742,6 +746,17 @@ pub enum IssueCommands {
     /// Show issue details. Use `--summary` for a compact response without the
     /// description field.
     ///
+    /// JSON top-level fields: id, short_id, title, description, state,
+    /// priority, assignee, dependencies, unmet_dependencies, gates, context,
+    /// documents, labels, content_format, created_at, updated_at (plus
+    /// first_ready_at/claimed_at/done_at once set).
+    ///
+    /// For a compact one-line status (state, per-gate status, unmet
+    /// dependencies) without the description, see `jit issue status`. For
+    /// per-gate readiness/history, see `jit gate status-all` (every required
+    /// gate) or `jit gate status <id> <gate>` (one gate; add --all for its
+    /// run history).
+    ///
     /// Field projection (single id only):
     ///   --field <name>   print one top-level field as plain text (arrays/objects
     ///                    fall back to compact JSON for that field)
@@ -866,6 +881,9 @@ pub enum IssueCommands {
     /// Update an issue or multiple issues. Returns a lightweight confirmation
     /// (id, short_id, state, updated_at); run `jit issue show` to fetch the
     /// full updated body.
+    ///
+    /// To verify what was recorded, see `jit events query --issue-id <id>` or
+    /// `jit events tail`.
     ///
     /// Description flags — exactly one may be given (they are all mutually
     /// exclusive), and each has a replace form and an append form:
@@ -1769,6 +1787,9 @@ pub enum PresetCommands {
 #[derive(Subcommand)]
 pub enum DocCommands {
     /// Add a document reference to an issue
+    ///
+    /// To verify what was recorded, see `jit events query --issue-id <id>` or
+    /// `jit events tail`.
     Add {
         /// Issue ID
         id: String,
@@ -1808,6 +1829,9 @@ pub enum DocCommands {
     },
 
     /// Remove a document reference from an issue
+    ///
+    /// To verify what was recorded, see `jit events query --issue-id <id>` or
+    /// `jit events tail`.
     Remove {
         /// Issue ID
         id: String,

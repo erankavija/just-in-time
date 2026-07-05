@@ -475,6 +475,10 @@ fn render_gate_pass_error(
                 gate_failure.issue_id, gate_failure.gate_key
             ))
             .with_suggestion(format!(
+                "View run history with: jit gate status {} {} --all",
+                gate_failure.issue_id, gate_failure.gate_key
+            ))
+            .with_suggestion(format!(
                 "Fix the failing gate and rerun: jit gate evaluate {} {}",
                 gate_failure.issue_id, gate_failure.gate_key
             ))

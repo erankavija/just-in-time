@@ -308,6 +308,54 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
     assert!(gate["last_run_at"].is_string());
 }
 
+// jit:62f3bebd REQ-01 — gate failure output points at the run-history view
+// (`gate status <id> <gate> --all`), which mining found agents rebuilding by
+// hand instead of discovering.
+#[test]
+fn test_gate_pass_json_failure_suggests_run_history_view() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .assert()
+        .failure()
+        .code(4)
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert!(
+        json["error"]["suggestions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|suggestion| {
+                let s = suggestion.as_str().unwrap();
+                s.contains("jit gate status") && s.contains("--all")
+            }),
+        "expected a run-history (--all) suggestion in JSON: {json}"
+    );
+}
+
+#[test]
+fn test_gate_pass_stderr_failure_suggests_run_history_view() {
+    let (temp, issue_id) = setup_auto_gate_issue("exit 1");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &issue_id, "test-gate"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--all"),
+        "expected the non-JSON gate failure message to mention --all for run history, got: {stderr}"
+    );
+}
+
 #[test]
 fn test_gate_pass_json_failure_includes_lease_warnings() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");

@@ -853,21 +853,30 @@ impl TransitionBlockedError {
         });
 
         std::iter::once(inspect_command)
-            .chain(self.blockers.iter().map(|blocker| match blocker {
+            .chain(self.blockers.iter().flat_map(|blocker| match blocker {
                 TransitionBlocker::Dependency { issue_id, .. } => {
-                    format!("jit issue show {}", issue_id)
+                    vec![format!("jit issue show {}", issue_id)]
                 }
                 TransitionBlocker::MissingDependency { issue_id } => {
-                    format!("jit validate --json  # missing dependency: {}", issue_id)
+                    vec![format!(
+                        "jit validate --json  # missing dependency: {}",
+                        issue_id
+                    )]
                 }
                 TransitionBlocker::Gate { gate_key, .. } => {
-                    format!("jit gate evaluate {} {}", self.issue_id, gate_key)
+                    vec![
+                        format!("jit gate evaluate {} {}", self.issue_id, gate_key),
+                        format!(
+                            "jit gate status {} {} --all  # run history",
+                            self.issue_id, gate_key
+                        ),
+                    ]
                 }
                 TransitionBlocker::GraphRule { rule, .. } => {
-                    format!(
+                    vec![format!(
                         "jit issue update {} ...  # satisfy or fix rule '{}', or re-run with --force",
                         self.issue_id, rule
-                    )
+                    )]
                 }
             }))
             .chain(assign_hint)
