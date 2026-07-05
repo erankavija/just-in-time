@@ -34,40 +34,24 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
-        // Validate pattern format
-        if !pattern.contains(':') {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
-                pattern
-            ))
-            .into());
-        }
+        validate_label_pattern(pattern)?;
+        let issues = self.storage.list_issues()?;
+        Ok(crate::domain::queries::query_by_label(&issues, pattern))
+    }
 
-        let parts: Vec<&str> = pattern.splitn(2, ':').collect();
-        if parts.len() != 2 {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Invalid label pattern '{}': must contain exactly one colon",
-                pattern
-            ))
-            .into());
-        }
-
-        let namespace = parts[0];
-
-        // Validate namespace format
-        if !namespace
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-        {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
-                pattern
-            ))
-            .into());
+    /// Query issues matching every given label pattern (AND-combined).
+    ///
+    /// Each pattern is validated individually with the same rules as
+    /// [`Self::query_by_label`] (the first invalid pattern's error is
+    /// returned). Matching is AND-combined: an issue is kept only when it
+    /// matches every pattern. An empty `patterns` slice matches every issue.
+    pub fn query_by_labels(&self, patterns: &[String]) -> Result<Vec<Issue>> {
+        for pattern in patterns {
+            validate_label_pattern(pattern)?;
         }
 
         let issues = self.storage.list_issues()?;
-        Ok(crate::domain::queries::query_by_label(&issues, pattern))
+        Ok(crate::domain::queries::query_by_labels(&issues, patterns))
     }
 
     pub fn query_strategic(&self) -> Result<Vec<Issue>> {
@@ -99,12 +83,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query all issues with optional filters
+    ///
+    /// `label_filters` is repeatable and AND-combined: an issue is kept only
+    /// when it matches every pattern given. An empty slice applies no label
+    /// filtering, matching the pre-repeatable single-label behavior exactly.
     pub fn query_all(
         &self,
         state_filter: Option<State>,
         assignee_filter: Option<&str>,
         priority_filter: Option<Priority>,
-        label_filter: Option<&str>,
+        label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         let mut issues = self.storage.list_issues()?;
 
@@ -118,8 +106,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(priority) = priority_filter {
             issues.retain(|i| i.priority == priority);
         }
-        if let Some(label_pattern) = label_filter {
-            let label_matches = self.query_by_label(label_pattern)?;
+        if !label_filters.is_empty() {
+            let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
                 label_matches.iter().map(|i| i.id.as_str()).collect();
             issues.retain(|i| label_ids.contains(i.id.as_str()));
@@ -129,10 +117,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query available issues with optional filters (unassigned + state=ready + unblocked)
+    ///
+    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
     pub fn query_available(
         &self,
         priority_filter: Option<Priority>,
-        label_filter: Option<&str>,
+        label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         let mut issues = self.query_ready()?;
 
@@ -140,8 +130,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(priority) = priority_filter {
             issues.retain(|i| i.priority == priority);
         }
-        if let Some(label_pattern) = label_filter {
-            let label_matches = self.query_by_label(label_pattern)?;
+        if !label_filters.is_empty() {
+            let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
                 label_matches.iter().map(|i| i.id.as_str()).collect();
             issues.retain(|i| label_ids.contains(i.id.as_str()));
@@ -159,10 +149,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query blocked issues with optional filters
+    ///
+    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
     pub fn query_blocked_filtered(
         &self,
         priority_filter: Option<Priority>,
-        label_filter: Option<&str>,
+        label_filters: &[String],
     ) -> Result<Vec<(Issue, Vec<crate::domain::queries::BlockingReason>)>> {
         let mut blocked = self.query_blocked()?;
 
@@ -170,8 +162,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(priority) = priority_filter {
             blocked.retain(|(i, _)| i.priority == priority);
         }
-        if let Some(label_pattern) = label_filter {
-            let label_matches = self.query_by_label(label_pattern)?;
+        if !label_filters.is_empty() {
+            let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
                 label_matches.iter().map(|i| i.id.as_str()).collect();
             blocked.retain(|(i, _)| label_ids.contains(i.id.as_str()));
@@ -181,10 +173,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query strategic issues with optional filters
+    ///
+    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
     pub fn query_strategic_filtered(
         &self,
         priority_filter: Option<Priority>,
-        label_filter: Option<&str>,
+        label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         let mut issues = self.query_strategic()?;
 
@@ -192,8 +186,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(priority) = priority_filter {
             issues.retain(|i| i.priority == priority);
         }
-        if let Some(label_pattern) = label_filter {
-            let label_matches = self.query_by_label(label_pattern)?;
+        if !label_filters.is_empty() {
+            let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
                 label_matches.iter().map(|i| i.id.as_str()).collect();
             issues.retain(|i| label_ids.contains(i.id.as_str()));
@@ -203,10 +197,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Query closed issues with optional filters
+    ///
+    /// `label_filters` is repeatable and AND-combined; see [`Self::query_all`].
     pub fn query_closed_filtered(
         &self,
         priority_filter: Option<Priority>,
-        label_filter: Option<&str>,
+        label_filters: &[String],
     ) -> Result<Vec<Issue>> {
         let mut issues = self.query_closed()?;
 
@@ -214,8 +210,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         if let Some(priority) = priority_filter {
             issues.retain(|i| i.priority == priority);
         }
-        if let Some(label_pattern) = label_filter {
-            let label_matches = self.query_by_label(label_pattern)?;
+        if !label_filters.is_empty() {
+            let label_matches = self.query_by_labels(label_filters)?;
             let label_ids: std::collections::HashSet<_> =
                 label_matches.iter().map(|i| i.id.as_str()).collect();
             issues.retain(|i| label_ids.contains(i.id.as_str()));
@@ -223,4 +219,42 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(issues)
     }
+}
+
+/// Validate a label filter pattern's format (`namespace:value` or
+/// `namespace:*`). Shared by [`CommandExecutor::query_by_label`] and
+/// [`CommandExecutor::query_by_labels`] so both single- and multi-pattern
+/// callers reject malformed patterns identically.
+fn validate_label_pattern(pattern: &str) -> Result<()> {
+    if !pattern.contains(':') {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
+            pattern
+        ))
+        .into());
+    }
+
+    let parts: Vec<&str> = pattern.splitn(2, ':').collect();
+    if parts.len() != 2 {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Invalid label pattern '{}': must contain exactly one colon",
+            pattern
+        ))
+        .into());
+    }
+
+    let namespace = parts[0];
+
+    if !namespace
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return Err(crate::errors::InvalidArgumentError::new(format!(
+            "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
+            pattern
+        ))
+        .into());
+    }
+
+    Ok(())
 }

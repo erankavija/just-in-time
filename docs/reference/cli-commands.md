@@ -96,7 +96,7 @@ behave identically to their canonical forms:
 |-------|-----------|-------|
 | `jit dependency ...` | `jit dep ...` | Dependency management commands |
 | `jit document ...` | `jit doc ...` | Document reference commands |
-| `jit issue list` | `jit query all` | Same filters/flags (`-s`/`-a`/`-p`/`-l`, `--full`, `--json`); identical output |
+| `jit issue list` | `jit query all` | Same filters/flags (`-s`/`-a`/`-p`/`-l`, `--full`, `--json`); identical output. `-l`/`--label` is repeatable and ANDed |
 | `jit issue update <id> --add-label <label>` | `... --label <label>` | `--add-label` is an accepted alias for `--label` |
 
 ```bash
@@ -2066,6 +2066,7 @@ jit query --state ready                      # filter by state
 jit query --assignee agent:worker-1          # filter by assignee
 jit query --priority critical                # filter by priority
 jit query --label component:api              # filter by label pattern
+jit query --label epic:auth --label component:api  # repeatable --label is ANDed
 jit query --state in_progress --json         # combine with --json
 ```
 
@@ -2074,6 +2075,11 @@ These filters belong to the bare form only. Supplying one before a subcommand
 rather than a silent no-op, because the parent-level filter would otherwise be
 dropped. Put the filter on the subcommand (`jit query available --priority high`)
 or drop the subcommand to use the bare form.
+
+`--label`/`-l` (format `namespace:value`, or `namespace:*` for wildcard) is
+repeatable everywhere it appears in the query family — on the bare form and on
+every subcommand below, as well as on `jit issue list`. Repeated occurrences
+are ANDed: an issue is returned only if it matches every pattern given.
 
 ### Subcommands
 

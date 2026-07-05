@@ -67,9 +67,11 @@ pub enum Commands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -184,8 +186,8 @@ pub enum Commands {
     ///
     /// With no subcommand, returns all issues (equivalent to `jit query all`).
     /// Filters (`--state`, `--assignee`, `--priority`, `--label`) narrow the
-    /// default listing. Use `jit query ready` (alias of `available`) for
-    /// unassigned, unblocked ready issues.
+    /// default listing. `--label` is repeatable and ANDed. Use `jit query
+    /// ready` (alias of `available`) for unassigned, unblocked ready issues.
     ///
     /// JSON output uses the list envelope `{"count": N, "issues": [...]}`.
     Query {
@@ -205,9 +207,12 @@ pub enum Commands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern — exact match or wildcard (used when no subcommand is given)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard) — used when no subcommand is given.
+        /// Repeatable; patterns are ANDed, so an issue must match every
+        /// pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries (used when no subcommand is given)
         #[arg(long)]
@@ -987,9 +992,11 @@ pub enum IssueCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1868,9 +1875,11 @@ pub enum QueryCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1889,9 +1898,11 @@ pub enum QueryCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1909,9 +1920,11 @@ pub enum QueryCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1929,9 +1942,11 @@ pub enum QueryCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]
@@ -1949,9 +1964,11 @@ pub enum QueryCommands {
         #[arg(short = 'p', long)]
         priority: Option<String>,
 
-        /// Filter by label pattern (exact match or wildcard)
+        /// Filter by label pattern (namespace:value, exact match; or
+        /// namespace:* wildcard). Repeatable; patterns are ANDed, so an issue
+        /// must match every pattern given.
         #[arg(short = 'l', long)]
-        label: Option<String>,
+        label: Vec<String>,
 
         /// Return full issue objects instead of minimal summaries
         #[arg(long)]

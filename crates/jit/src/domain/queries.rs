@@ -192,6 +192,50 @@ pub fn query_by_label(issues: &[Issue], pattern: &str) -> Vec<Issue> {
         .collect()
 }
 
+/// Query issues matching every given label pattern (AND-combined).
+///
+/// Each pattern uses the same `namespace:value` / `namespace:*` wildcard
+/// syntax as [`query_by_label`]; an issue is kept only when it matches every
+/// pattern in `patterns`. An empty `patterns` slice matches every issue.
+///
+/// # Examples
+///
+/// ```rust
+/// use jit::domain::queries::query_by_labels;
+/// use jit::domain::Issue;
+///
+/// let mut a = Issue::new("A".to_string(), String::new());
+/// a.labels = vec!["epic:auth".to_string(), "component:api".to_string()];
+/// let mut b = Issue::new("B".to_string(), String::new());
+/// b.labels = vec!["epic:auth".to_string()];
+///
+/// let issues = vec![a, b];
+///
+/// // Both patterns must match: only issue A carries both labels.
+/// let matches = query_by_labels(
+///     &issues,
+///     &["epic:auth".to_string(), "component:api".to_string()],
+/// );
+/// assert_eq!(matches.len(), 1);
+/// assert_eq!(matches[0].title, "A");
+///
+/// // No patterns: every issue matches.
+/// assert_eq!(query_by_labels(&issues, &[]).len(), 2);
+/// ```
+pub fn query_by_labels(issues: &[Issue], patterns: &[String]) -> Vec<Issue> {
+    use crate::labels;
+
+    issues
+        .iter()
+        .filter(|issue| {
+            patterns
+                .iter()
+                .all(|pattern| labels::matches_pattern(&issue.labels, pattern))
+        })
+        .cloned()
+        .collect()
+}
+
 /// Query strategic issues (those with strategic type labels).
 ///
 /// Strategic types are defined in configuration (e.g., milestone, epic).
@@ -382,6 +426,76 @@ mod tests {
 
         assert_eq!(map.len(), 1);
         assert_eq!(map.get(&issue.id).unwrap().title, "Single task");
+    }
+
+    fn labeled_issue(title: &str, labels: &[&str]) -> Issue {
+        let mut issue = Issue::new(title.to_string(), String::new());
+        issue.labels = labels.iter().map(|l| l.to_string()).collect();
+        issue
+    }
+
+    #[test]
+    fn test_query_by_labels_ands_multiple_patterns() {
+        let both = labeled_issue("Both", &["epic:auth", "component:api"]);
+        let epic_only = labeled_issue("EpicOnly", &["epic:auth"]);
+        let issues = vec![both.clone(), epic_only];
+
+        let result = query_by_labels(
+            &issues,
+            &["epic:auth".to_string(), "component:api".to_string()],
+        );
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "Both");
+    }
+
+    #[test]
+    fn test_query_by_labels_supports_wildcards() {
+        let issues = vec![
+            labeled_issue("A", &["epic:auth", "component:api"]),
+            labeled_issue("B", &["epic:billing", "component:api"]),
+            labeled_issue("C", &["epic:auth", "component:web"]),
+        ];
+
+        // Wildcard on one pattern, exact match on the other: AND still applies.
+        let result = query_by_labels(
+            &issues,
+            &["epic:*".to_string(), "component:api".to_string()],
+        );
+        let titles: Vec<&str> = result.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles, vec!["A", "B"]);
+    }
+
+    #[test]
+    fn test_query_by_labels_empty_patterns_matches_all() {
+        let issues = vec![labeled_issue("A", &["epic:auth"]), labeled_issue("B", &[])];
+
+        assert_eq!(query_by_labels(&issues, &[]).len(), 2);
+    }
+
+    #[test]
+    fn test_query_by_labels_no_match_returns_empty() {
+        let issues = vec![labeled_issue("A", &["epic:auth", "component:api"])];
+
+        let result = query_by_labels(
+            &issues,
+            &["epic:auth".to_string(), "component:web".to_string()],
+        );
+
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_query_by_labels_single_pattern_matches_query_by_label() {
+        let issues = vec![
+            labeled_issue("A", &["epic:auth"]),
+            labeled_issue("B", &["epic:billing"]),
+        ];
+
+        let single = query_by_label(&issues, "epic:auth");
+        let via_labels = query_by_labels(&issues, &["epic:auth".to_string()]);
+
+        assert_eq!(single, via_labels);
     }
 
     /// Build an issue with the given id, type label, and dependency ids.

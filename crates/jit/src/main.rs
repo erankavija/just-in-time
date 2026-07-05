@@ -950,7 +950,7 @@ fn run_query_all<S: IssueStore>(
     state: Option<String>,
     assignee: Option<String>,
     priority: Option<String>,
-    label: Option<String>,
+    label: Vec<String>,
     full: bool,
     json: bool,
 ) -> Result<()> {
@@ -960,12 +960,7 @@ fn run_query_all<S: IssueStore>(
         .as_ref()
         .map(|p| Priority::from_str(p))
         .transpose()?;
-    let issues = executor.query_all(
-        state_filter,
-        assignee.as_deref(),
-        priority_filter,
-        label.as_deref(),
-    )?;
+    let issues = executor.query_all(state_filter, assignee.as_deref(), priority_filter, &label)?;
 
     if json {
         use jit::domain::MinimalIssue;
@@ -1091,7 +1086,7 @@ fn reject_parent_query_filters(
     state: Option<&str>,
     assignee: Option<&str>,
     priority: Option<&str>,
-    label: Option<&str>,
+    label: &[String],
     full: bool,
     json: bool,
 ) -> Result<()> {
@@ -1101,7 +1096,7 @@ fn reject_parent_query_filters(
         state.map(|_| "--state"),
         assignee.map(|_| "--assignee"),
         priority.map(|_| "--priority"),
-        label.map(|_| "--label"),
+        (!label.is_empty()).then_some("--label"),
         full.then_some("--full"),
         json.then_some("--json"),
     ]
@@ -4210,7 +4205,7 @@ fn run() -> Result<()> {
                     bare_state.as_deref(),
                     bare_assignee.as_deref(),
                     bare_priority.as_deref(),
-                    bare_label.as_deref(),
+                    &bare_label,
                     bare_full,
                     bare_json,
                 )?;
@@ -4238,7 +4233,7 @@ fn run() -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues = executor.query_available(priority_filter, label.as_deref())?;
+                        let issues = executor.query_available(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -4287,8 +4282,7 @@ fn run() -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let blocked =
-                            executor.query_blocked_filtered(priority_filter, label.as_deref())?;
+                        let blocked = executor.query_blocked_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -4379,8 +4373,7 @@ fn run() -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues =
-                            executor.query_strategic_filtered(priority_filter, label.as_deref())?;
+                        let issues = executor.query_strategic_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;
@@ -4428,8 +4421,7 @@ fn run() -> Result<()> {
                             .as_ref()
                             .map(|p| Priority::from_str(p))
                             .transpose()?;
-                        let issues =
-                            executor.query_closed_filtered(priority_filter, label.as_deref())?;
+                        let issues = executor.query_closed_filtered(priority_filter, &label)?;
 
                         if json {
                             use jit::domain::MinimalIssue;

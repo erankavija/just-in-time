@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Repeatable, AND-combined `--label` filter across the query family.**
+  `jit issue list`, the top-level `jit list` alias, the bare `jit query` form,
+  and `jit query all`/`available`/`blocked`/`strategic`/`closed` now accept
+  `--label`/`-l` multiple times; an issue is returned only when it matches
+  every pattern given (wildcard `namespace:*` patterns still supported per
+  occurrence). This matches `jit issue search --label`'s existing repeatable
+  AND semantics. A single `--label` occurrence behaves exactly as before.
+
 ### Changed
 
 - **Uniform JSON list envelope across list- and query-family commands.** Every

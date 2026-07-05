@@ -41,8 +41,8 @@ pub use storage::{InMemoryStorage, IssueStore, JsonFileStorage};
 
 // Re-export domain query operations for library consumers
 pub use domain::queries::{
-    query_blocked, query_by_assignee, query_by_label, query_by_priority, query_by_state,
-    query_closed, query_ready, query_strategic,
+    query_blocked, query_by_assignee, query_by_label, query_by_labels, query_by_priority,
+    query_by_state, query_closed, query_ready, query_strategic,
 };
 
 // Re-export key domain operations for library consumers
