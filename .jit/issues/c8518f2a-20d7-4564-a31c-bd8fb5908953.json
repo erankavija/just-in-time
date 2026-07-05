@@ -2,9 +2,9 @@
   "id": "c8518f2a-20d7-4564-a31c-bd8fb5908953",
   "title": "Atomic variadic dependency add",
   "description": "A variadic dependency add that fails per-edge validation partially commits: adding two edges where the second is redundant applies the first edge, then exits nonzero. This contradicts the all-or-nothing behavior of batch issue creation and leaves callers unable to trust the exit code as a no-op signal. Confirmed live during the epic fix audit.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A variadic dependency add that fails validation for any edge leaves the dependency set unchanged.\n- [ ] [hard] REQ-02: The error names every rejected edge, not only the first.\n- [ ] [hard] REQ-03: The event log reflects only edges that were actually applied.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -19,5 +19,5 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:03:40.045294568Z",
-  "updated_at": "2026-07-05T10:03:40.046710099Z"
+  "updated_at": "2026-07-05T14:08:23.740049460Z"
 }
