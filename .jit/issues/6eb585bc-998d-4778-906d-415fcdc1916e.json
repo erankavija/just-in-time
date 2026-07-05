@@ -4,7 +4,7 @@
   "description": "Umbrella for standalone jit core maintenance and bug-fix work that is not part of a feature epic.\n\n## Success Criteria\n\n- [ ] Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
   "state": "ready",
   "priority": "normal",
-  "assignee": "agent:jit-execution-lead",
+  "assignee": null,
   "dependencies": [
     "df0b551f-c60e-4c6f-951c-5a796a1c5635",
     "b6aeb05b-dc02-435f-9ae1-ba0a1c6c63f4",
@@ -58,5 +58,5 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-05T08:09:53.271807511Z"
+  "updated_at": "2026-07-05T08:10:48.368972026Z"
 }
