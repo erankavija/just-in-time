@@ -10,8 +10,9 @@
 //! - `template`: Graph-template apply engine (`jit apply <template> <container>`):
 //!   the plan-before-fan-out scaffold (planning node `P` + breakdown node `B`),
 //!   validating, snapshotting anchors, and instantiating the template's nodes
-//! - `config`: `jit config set` write (target-file resolution, typed
-//!   value validation incl. `project.name`, atomic write)
+//! - `config`: `jit config set` write (target-file resolution, typed value
+//!   validation incl. `project.name`, atomic write) and `jit config get`'s
+//!   generic dotted-path accessor over the whole configuration surface
 //! - `gate`: Quality gate operations
 //! - `graph`: Graph visualization and traversal
 //! - `query`: Issue query operations
@@ -61,7 +62,7 @@ pub use batch_create::{
 };
 pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
-pub use config::ConfigSetOutcome;
+pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
     PassAllOutcome,

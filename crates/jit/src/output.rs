@@ -1105,6 +1105,41 @@ pub fn project_fields(value: &Value, names: &[String]) -> Result<String, Unknown
     Ok(format!("{{{body}}}"))
 }
 
+/// Render a resolved `jit config get` value as plain text.
+///
+/// A scalar (string/number/bool/null) renders bare, mirroring
+/// [`project_field`]'s convention (a string's raw contents, unquoted, rather
+/// than its `Display` which would include the JSON quotes). An array or
+/// object — returned for an intermediate key, e.g. `jit config get
+/// documentation` — has no sensible bare rendering, so it falls back to
+/// PRETTY-printed JSON (unlike [`project_field`]'s compact fallback): a
+/// config section is read by a human at a terminal far more often than
+/// parsed by a script, and scripts should pass `--json` anyway.
+///
+/// # Examples
+///
+/// ```
+/// use jit::output::render_config_get_value;
+/// use serde_json::json;
+///
+/// assert_eq!(render_config_get_value(&json!("dev")), "dev");
+/// assert_eq!(render_config_get_value(&json!(600)), "600");
+/// assert_eq!(render_config_get_value(&json!(null)), "null");
+/// assert_eq!(
+///     render_config_get_value(&json!({"a": 1})),
+///     "{\n  \"a\": 1\n}"
+/// );
+/// ```
+pub fn render_config_get_value(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Null => "null".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        other => serde_json::to_string_pretty(other).unwrap_or_else(|_| other.to_string()),
+    }
+}
+
 // ============================================================================
 // Lean Issue Update / Show Summary Responses
 // ============================================================================

@@ -2229,7 +2229,130 @@ are ANDed: an issue is returned only if it matches every pattern given.
 
 ## Configuration
 
-<!-- jit config commands -->
+### `jit config get`
+
+Resolve a dotted key against the WHOLE configuration surface — type
+hierarchy, label namespaces, item kinds, documentation paths, validation
+settings, project identity, schema version, and the system/user/repo-layered
+worktree/coordination/lock/event settings — via a generic path walk over the
+config, not a hand-maintained list of recognised keys.
+
+**Usage:**
+```bash
+jit config get <DOTTED.KEY> [--json]
+```
+
+A dotted path mirrors `config.toml`'s own structure, including a section's
+kebab-case keys (e.g. `item_kinds.<name>.id-pattern`, matching the TOML
+`id-pattern` spelling) and a user-declared map's own entries (e.g.
+`namespaces.type.unique`, `type_hierarchy.types.epic`). Giving an
+INTERMEDIATE key returns the whole subtree at that point rather than erroring
+— `jit config get documentation` prints the entire `documentation` table.
+
+**Examples:**
+```bash
+# A leaf under a section untouched by the old hand-mapped `config get`.
+jit config get type_hierarchy.strategic_types
+# ["milestone", "epic"] (pretty-printed; a single scalar prints bare)
+
+jit config get documentation.development_root
+# dev
+
+jit config get namespaces.type.unique
+# true
+
+# An intermediate key: the whole section.
+jit config get documentation --json
+# {"key": "documentation", "value": {"development_root": "dev", ...}}
+
+# The pre-existing system/user/repo-layered settings still resolve exactly
+# as before (env var, then repo, then user, then system, then default).
+jit config get worktree.mode
+jit config get coordination.default_ttl_secs
+```
+
+**Two resolution strategies**, matching how the rest of jit already reads
+these sections — `config get` does not invent a third:
+- `worktree`, `coordination`, `global_operations`, `locks`, `events`: the
+  system/user/repo-merged, default-filled view (same as `jit config show`).
+- Every other section (`version`, `project`, `type_hierarchy`, `validation`,
+  `documentation`, `namespaces`, `item_kinds`, `invariant_projection`,
+  `rules_gates_projection`): read from the REPO's `config.toml` only, with no
+  system/user merge and no built-in defaults layered in — jit has no concept
+  of a system/user override for a repo's type hierarchy or label namespaces.
+  This means these sections reflect exactly what `config.toml` declares
+  (an absent section resolves to `{}`), which can differ from `jit config
+  show`'s built-in-default-filled view of the sections it covers (e.g.
+  `namespaces`).
+
+`templates` and `invariants` are NOT part of the dotted-path surface: both
+are loaded from sibling files (`.jit/templates.toml`, `.jit/invariants.toml`)
+rather than `config.toml` itself. Introspect them via `jit config
+list-templates` / `jit invariant list`.
+
+**Exit codes:**
+- `0` — key resolved
+- `2` — unknown key (`INVALID_ARGUMENT`). An unknown TOP-LEVEL key names the
+  valid sections; an unknown NESTED key names the missing segment and its
+  resolved parent path.
+
+```bash
+jit config get bogus_section
+# Error: unknown config key 'bogus_section'; valid top-level sections:
+# coordination, documentation, events, global_operations,
+# invariant_projection, item_kinds, locks, namespaces, project,
+# rules_gates_projection, type_hierarchy, validation, version, worktree
+
+jit config get documentation.bogus_field
+# Error: unknown config key 'documentation.bogus_field': no 'bogus_field'
+# under 'documentation'
+```
+
+### `jit config show`
+
+Display the merged, default-filled effective configuration from all sources
+(system, user, repository).
+
+```bash
+jit config show [--json]
+```
+
+### `jit config set`
+
+Set a `section.field` key in the repository (or, with `--global`, the
+user-global) `config.toml`.
+
+```bash
+jit config set <KEY> <VALUE> [--global] [--json]
+
+jit config set coordination.default_ttl_secs 1200
+jit config set --global worktree.enforce_leases warn
+```
+
+### `jit config validate`
+
+Validate configuration files for syntax errors, invalid values, and
+deprecated options.
+
+```bash
+jit config validate [--json]
+```
+
+Exit codes:
+- `0` — Valid configuration
+- `1` — Errors found
+- `2` — Warnings only
+
+### `jit config show-hierarchy` / `jit config list-templates`
+
+`show-hierarchy` prints the effective type→level map (built from the
+namespace registry, with built-in defaults applied); `list-templates` lists
+the built-in hierarchy templates `jit init --hierarchy-template` accepts.
+
+```bash
+jit config show-hierarchy [--json]
+jit config list-templates [--json]
+```
 
 ## Scripting and Automation
 

@@ -376,8 +376,44 @@ Displays the merged configuration from all sources.
 ### Get Single Value
 
 ```bash
+jit config get <dotted.key> [--json]
+```
+
+Resolves a dotted key against the WHOLE configuration surface — type
+hierarchy, label namespaces, item kinds, documentation paths, validation
+settings, project identity, schema version, and the system/user/repo-layered
+worktree/coordination/lock/event settings below — via a generic path walk,
+not a hand-maintained list of recognised keys. A dotted path mirrors
+`config.toml`'s own structure, including a section's kebab-case keys (e.g.
+`item_kinds.<name>.id-pattern`) and a user-declared map's own entries (e.g.
+`namespaces.type.unique`). An intermediate key returns the whole subtree at
+that point (`jit config get documentation` prints the entire section) rather
+than erroring.
+
+```bash
 jit config get worktree.mode
 jit config get coordination.default_ttl_secs
+jit config get type_hierarchy.strategic_types
+jit config get documentation.development_root
+jit config get namespaces.type.unique
+```
+
+Two resolution strategies, matching how the rest of jit already reads these
+sections: `worktree`/`coordination`/`global_operations`/`locks`/`events`
+resolve the system/user/repo-merged, default-filled view (same as `jit
+config show`); every other section reads the REPO's `config.toml` only, with
+no system/user merge and no built-in defaults layered in, so an absent
+section resolves to `{}` rather than a struct of defaults. `templates` and
+`invariants` are not part of this surface (they load from sibling files, not
+`config.toml`); see `jit config list-templates` / `jit invariant list`.
+
+An unknown key exits `2` (`INVALID_ARGUMENT`): an unknown top-level key
+names the valid sections, an unknown nested key names the missing segment
+and its resolved parent.
+
+```bash
+jit config get bogus_section
+# Error: unknown config key 'bogus_section'; valid top-level sections: ...
 ```
 
 ### Set Value

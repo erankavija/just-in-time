@@ -1,17 +1,27 @@
-//! Config-mutation command (`jit config set`).
+//! Config accessor and mutation commands (`jit config get` / `jit config set`).
 //!
-//! Owns the `jit config set` command logic: target-file resolution (repo vs
-//! user-global), key parsing, per-type value dispatch, and typed validation of
-//! the incoming value (notably `project.name` through [`ProjectName`], REQ-03 of
-//! the multi-jit story: an invalid identity must never reach the file). ALL
-//! config-file IO — reading the TOML document and the atomic write — is
-//! delegated to [`crate::storage::config_store`], so no persistence lives in
-//! this command module (the layer boundary in CLAUDE.md "Separation of
-//! Concerns"). The CLI layer only parses args and formats the returned
-//! [`ConfigSetOutcome`].
+//! `jit config set` (see [`CommandExecutor::set_config`]): target-file
+//! resolution (repo vs user-global), key parsing, per-type value dispatch, and
+//! typed validation of the incoming value (notably `project.name` through
+//! [`ProjectName`], REQ-03 of the multi-jit story: an invalid identity must
+//! never reach the file). ALL config-file IO — reading the TOML document and
+//! the atomic write — is delegated to [`crate::storage::config_store`], so no
+//! persistence lives in this command module (the layer boundary in CLAUDE.md
+//! "Separation of Concerns").
+//!
+//! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
+//! accessor covering the WHOLE configuration surface (jit:043ae624), built by
+//! walking [`EffectiveConfig::full_snapshot`]'s generic JSON snapshot with
+//! [`resolve_dotted_key`] rather than hand-mapping each recognised key —
+//! adding a field to a config section needs no change here, only to that
+//! section's own `Serialize` derive.
+//!
+//! The CLI layer only parses args and formats the returned
+//! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::ProjectName;
+use crate::config::{ConfigLoader, EffectiveConfig, ProjectName};
+use crate::errors::InvalidArgumentError;
 use crate::storage::config_store;
 use std::path::{Path, PathBuf};
 
@@ -50,6 +60,140 @@ pub struct ConfigSetOutcome {
     pub file: PathBuf,
     /// Config scope token: `"user"` for a global write, `"repo"` otherwise.
     pub scope: &'static str,
+}
+
+/// Result of a `jit config get` lookup, carrying what the CLI needs to print.
+///
+/// Returned by [`CommandExecutor::get_config`]. `value` is the raw
+/// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
+/// object/array for an intermediate key (`jit config get documentation`
+/// returns the whole section).
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::ConfigGetOutcome;
+/// use serde_json::json;
+///
+/// let outcome = ConfigGetOutcome {
+///     key: "documentation.development_root".to_string(),
+///     value: json!("dev"),
+/// };
+/// let rendered = serde_json::to_value(&outcome).unwrap();
+/// assert_eq!(rendered["value"], "dev");
+/// ```
+#[derive(Debug, Serialize)]
+pub struct ConfigGetOutcome {
+    /// The dotted key that was resolved.
+    pub key: String,
+    /// The resolved value.
+    pub value: serde_json::Value,
+}
+
+/// Error resolving a dotted `jit config get` key against an assembled
+/// configuration JSON snapshot ([`resolve_dotted_key`]).
+///
+/// Kept independent of IO and of [`anyhow::Error`] so [`resolve_dotted_key`]
+/// stays a pure, directly unit-tested function. [`CommandExecutor::get_config`]
+/// converts either variant's message into the shared
+/// [`InvalidArgumentError`] (exit 2) — the same family every other CLI usage
+/// error in this codebase uses — rather than introducing a parallel
+/// classification path.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ConfigKeyError {
+    /// The first (top-level) path segment is not a section of the
+    /// configuration surface. `sections` lists what IS valid, computed from
+    /// the snapshot itself (never a separately hand-maintained list, so it
+    /// can't drift out of sync with it), sorted for determinism.
+    #[error("unknown config key '{key}'; valid top-level sections: {sections}")]
+    UnknownSection {
+        /// The full dotted key the caller asked for.
+        key: String,
+        /// Comma-separated, sorted list of valid top-level section names.
+        sections: String,
+    },
+    /// A later path segment does not exist under its parent — whether the
+    /// parent is a config section's field or a user-declared map (e.g. a
+    /// namespace or item-kind name) — or the parent is a scalar/array with
+    /// nothing further to descend into.
+    #[error("unknown config key '{key}': no '{segment}' under '{parent}'")]
+    UnknownField {
+        /// The full dotted key the caller asked for.
+        key: String,
+        /// The dotted path of the parent that was successfully resolved.
+        parent: String,
+        /// The segment that does not exist under `parent`.
+        segment: String,
+    },
+}
+
+/// Walk a dotted key path (e.g. `documentation.development_root`,
+/// `type_hierarchy.types.epic`, `namespaces.type.unique`) against an
+/// already-assembled configuration JSON snapshot, returning the resolved
+/// value.
+///
+/// Pure and total over any [`serde_json::Value`] object tree — no IO, no
+/// knowledge of [`JitConfig`](crate::config::JitConfig)'s actual shape — so it
+/// is unit-tested directly against hand-built snapshots, decoupled from
+/// [`EffectiveConfig::full_snapshot`]'s IO-heavy assembly. An intermediate key
+/// (fewer segments than the value's depth) returns the WHOLE subtree at that
+/// point, not an error.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::resolve_dotted_key;
+/// use serde_json::json;
+///
+/// let snapshot = json!({
+///     "documentation": {"development_root": "dev"},
+///     "type_hierarchy": {"types": {"epic": 2}},
+/// });
+///
+/// assert_eq!(
+///     resolve_dotted_key(&snapshot, "documentation.development_root").unwrap(),
+///     json!("dev")
+/// );
+/// // An intermediate key returns the whole subtree, not an error.
+/// assert_eq!(
+///     resolve_dotted_key(&snapshot, "documentation").unwrap(),
+///     json!({"development_root": "dev"})
+/// );
+/// // An unknown top-level key lists the sections that ARE valid.
+/// let err = resolve_dotted_key(&snapshot, "bogus").unwrap_err();
+/// assert!(err.to_string().contains("documentation, type_hierarchy"));
+/// ```
+pub fn resolve_dotted_key(
+    snapshot: &serde_json::Value,
+    key: &str,
+) -> std::result::Result<serde_json::Value, ConfigKeyError> {
+    let mut segments = key.split('.');
+    let first = segments.next().unwrap_or("");
+    let Some(mut current) = snapshot.get(first) else {
+        let mut sections: Vec<&str> = snapshot
+            .as_object()
+            .map(|obj| obj.keys().map(String::as_str).collect())
+            .unwrap_or_default();
+        sections.sort_unstable();
+        return Err(ConfigKeyError::UnknownSection {
+            key: key.to_string(),
+            sections: sections.join(", "),
+        });
+    };
+    let mut resolved_path = first.to_string();
+    for segment in segments {
+        let Some(next) = current.get(segment) else {
+            return Err(ConfigKeyError::UnknownField {
+                key: key.to_string(),
+                parent: resolved_path,
+                segment: segment.to_string(),
+            });
+        };
+        current = next;
+        resolved_path.push('.');
+        resolved_path.push_str(segment);
+    }
+    Ok(current.clone())
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -199,5 +343,269 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::config::slugify_project_name(dir_basename).parse()?;
         config_store::seed_repo_config(jit_root, base_config_toml, &project_name)?;
         Ok(Some(project_name))
+    }
+
+    /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
+    /// configuration surface (REQ-01 of jit:043ae624), returning the value the
+    /// CLI needs to print.
+    ///
+    /// Builds the same system/user/repo-layered [`EffectiveConfig`] `jit
+    /// config show` uses, snapshots it once via
+    /// [`EffectiveConfig::full_snapshot`], then walks `key` with
+    /// [`resolve_dotted_key`]. An unknown key (top-level or nested) surfaces
+    /// as the shared [`InvalidArgumentError`] (exit 2) — naming the valid
+    /// top-level sections for an unknown top-level key — rather than a bare
+    /// `anyhow!` string, so `--json` callers get a machine-readable
+    /// `INVALID_ARGUMENT` error and plain callers get exit code 2.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// let outcome = executor
+    ///     .get_config("documentation.development_root")
+    ///     .unwrap();
+    /// assert_eq!(outcome.key, "documentation.development_root");
+    /// ```
+    pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome> {
+        let jit_root = self.storage.root();
+
+        // Same system/user/repo layering `jit config show` builds (path
+        // derivation and existence checks only; loading is delegated to
+        // `JitConfig::load` via `ConfigLoader`).
+        let mut loader = ConfigLoader::new();
+        let system_path = Path::new("/etc/jit");
+        if system_path.exists() {
+            loader = loader.with_system_config(system_path)?;
+        }
+        if let Some(home) = dirs::home_dir() {
+            let user_path = home.join(".config/jit");
+            if user_path.exists() {
+                loader = loader.with_user_config(&user_path)?;
+            }
+        }
+        loader = loader.with_repo_config(jit_root)?;
+        let effective: EffectiveConfig = loader.build();
+
+        let snapshot = effective.full_snapshot()?;
+        let value = resolve_dotted_key(&snapshot, key)
+            .map_err(|e| anyhow::Error::from(InvalidArgumentError::new(e.to_string())))?;
+
+        Ok(ConfigGetOutcome {
+            key: key.to_string(),
+            value,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_dotted_key_scalar_leaf() {
+        let snapshot = serde_json::json!({
+            "documentation": {"development_root": "dev"},
+        });
+        assert_eq!(
+            resolve_dotted_key(&snapshot, "documentation.development_root").unwrap(),
+            serde_json::json!("dev")
+        );
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_array_leaf() {
+        let snapshot = serde_json::json!({
+            "documentation": {"managed_paths": ["dev/active", "dev/studies"]},
+        });
+        assert_eq!(
+            resolve_dotted_key(&snapshot, "documentation.managed_paths").unwrap(),
+            serde_json::json!(["dev/active", "dev/studies"])
+        );
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_deeply_nested_map_entry() {
+        let snapshot = serde_json::json!({
+            "namespaces": {"type": {"description": "Issue type", "unique": true}},
+        });
+        assert_eq!(
+            resolve_dotted_key(&snapshot, "namespaces.type.unique").unwrap(),
+            serde_json::json!(true)
+        );
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_intermediate_returns_whole_subtree() {
+        let snapshot = serde_json::json!({
+            "documentation": {"development_root": "dev", "archive_root": "dev/archive"},
+        });
+        assert_eq!(
+            resolve_dotted_key(&snapshot, "documentation").unwrap(),
+            serde_json::json!({"development_root": "dev", "archive_root": "dev/archive"})
+        );
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_unknown_top_level_lists_sections() {
+        let snapshot = serde_json::json!({"documentation": {}, "validation": {}});
+        let err = resolve_dotted_key(&snapshot, "bogus").unwrap_err();
+        assert_eq!(
+            err,
+            ConfigKeyError::UnknownSection {
+                key: "bogus".to_string(),
+                sections: "documentation, validation".to_string(),
+            }
+        );
+        assert!(err.to_string().contains("documentation, validation"));
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_unknown_nested_field() {
+        let snapshot = serde_json::json!({"documentation": {"development_root": "dev"}});
+        let err = resolve_dotted_key(&snapshot, "documentation.bogus").unwrap_err();
+        assert_eq!(
+            err,
+            ConfigKeyError::UnknownField {
+                key: "documentation.bogus".to_string(),
+                parent: "documentation".to_string(),
+                segment: "bogus".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_resolve_dotted_key_cannot_descend_past_scalar() {
+        let snapshot = serde_json::json!({"version": {"schema": 1}});
+        let err = resolve_dotted_key(&snapshot, "version.schema.extra").unwrap_err();
+        assert_eq!(
+            err,
+            ConfigKeyError::UnknownField {
+                key: "version.schema.extra".to_string(),
+                parent: "version.schema".to_string(),
+                segment: "extra".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_config_covers_whole_surface_on_fresh_repo() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let storage = crate::storage::JsonFileStorage::new(dir.path());
+        let executor = CommandExecutor::new(storage);
+
+        // No config.toml at all: every top-level section still resolves
+        // (empty object), it's just not an unknown key.
+        for section in [
+            "version",
+            "project",
+            "type_hierarchy",
+            "validation",
+            "documentation",
+            "namespaces",
+            "item_kinds",
+            "invariant_projection",
+            "rules_gates_projection",
+            "worktree",
+            "coordination",
+            "global_operations",
+            "locks",
+            "events",
+        ] {
+            let outcome = executor.get_config(section).unwrap();
+            assert!(
+                outcome.value.is_object(),
+                "section {section} did not resolve to an object: {:?}",
+                outcome.value
+            );
+        }
+
+        // Defaulted merged-config leaf still resolves without any config.toml.
+        let ttl = executor
+            .get_config("coordination.default_ttl_secs")
+            .unwrap();
+        assert_eq!(ttl.value, serde_json::json!(600));
+    }
+
+    #[test]
+    fn test_get_config_reads_whole_surface_from_repo_config_toml() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            r#"
+[type_hierarchy]
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
+strategic_types = ["milestone", "epic"]
+
+[type_hierarchy.label_associations]
+epic = "epic"
+
+[documentation]
+development_root = "dev"
+managed_paths = ["dev/active"]
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+
+[validation]
+strictness = "loose"
+default_type = "task"
+
+[version]
+schema = 1
+"#,
+        )
+        .unwrap();
+        let storage = crate::storage::JsonFileStorage::new(dir.path());
+        let executor = CommandExecutor::new(storage);
+
+        assert_eq!(
+            executor
+                .get_config("type_hierarchy.strategic_types")
+                .unwrap()
+                .value,
+            serde_json::json!(["milestone", "epic"])
+        );
+        assert_eq!(
+            executor
+                .get_config("type_hierarchy.types.epic")
+                .unwrap()
+                .value,
+            serde_json::json!(2)
+        );
+        assert_eq!(
+            executor
+                .get_config("documentation.development_root")
+                .unwrap()
+                .value,
+            serde_json::json!("dev")
+        );
+        assert_eq!(
+            executor.get_config("namespaces.type.unique").unwrap().value,
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            executor.get_config("validation.strictness").unwrap().value,
+            serde_json::json!("loose")
+        );
+        assert_eq!(
+            executor.get_config("version.schema").unwrap().value,
+            serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn test_get_config_unknown_top_level_key_is_invalid_argument() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let storage = crate::storage::JsonFileStorage::new(dir.path());
+        let executor = CommandExecutor::new(storage);
+
+        let err = executor.get_config("bogus_section").unwrap_err();
+        assert!(err.downcast_ref::<InvalidArgumentError>().is_some());
+        assert!(err.to_string().contains("valid top-level sections"));
     }
 }

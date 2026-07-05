@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit config get` now covers the whole configuration surface.** The
+  dotted-key accessor previously recognized only a hand-mapped subset
+  (`worktree.*`, `coordination.*`, `global_operations.*`, `locks.*`,
+  `events.*`); it now walks the full `config.toml` schema generically,
+  including `type_hierarchy` (e.g. `type_hierarchy.strategic_types`,
+  `type_hierarchy.types.epic`), `namespaces` (e.g.
+  `namespaces.type.unique`), `item_kinds`, `documentation`, `validation`,
+  `project`, and `version`. An intermediate key returns the whole subtree
+  (`jit config get documentation`) rather than erroring; an unknown
+  top-level key fails exit 2 naming the valid sections, and an unknown
+  nested key fails exit 2 naming the missing segment. The five
+  system/user/repo-layered sections keep resolving exactly as before;
+  every other section reads the repo's `config.toml` only, with no
+  built-in defaults layered in.
+
 - **Wrong-verb hints for observed wrong-guess spellings.** `jit dep
   remove`/`delete`, `jit issue rm`/`remove`/`complete`/`edit`, `jit gate
   rm`/`delete`, `jit doc rm`/`delete`, and `jit label add`/`rm`/`remove` now

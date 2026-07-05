@@ -4,7 +4,7 @@
 //! If no config file exists, the system falls back to sensible defaults.
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -89,7 +89,7 @@ pub struct JitConfig {
 }
 
 /// Schema version configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VersionConfig {
     /// Schema version number (default: 1).
     pub schema: u32,
@@ -112,7 +112,7 @@ pub struct VersionConfig {
 /// let project = config.project.unwrap();
 /// assert_eq!(project.name.unwrap().as_str(), "just-in-time");
 /// ```
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectConfig {
     /// The project's canonical name: the `@<project>` scope token in the
     /// multi-jit addressing scheme. `None` when the `[project]` table is
@@ -165,7 +165,7 @@ pub enum ProjectNameError {
 /// assert!("Bad_Name".parse::<ProjectName>().is_err());
 /// assert!("1abc".parse::<ProjectName>().is_err());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProjectName(String);
 
 impl ProjectName {
@@ -260,7 +260,7 @@ pub fn slugify_project_name(input: &str) -> String {
 }
 
 /// Type hierarchy configuration from TOML.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct HierarchyConfigToml {
     /// Type name to hierarchy level mapping (lower = more strategic).
     pub types: HashMap<String, u8>,
@@ -273,7 +273,7 @@ pub struct HierarchyConfigToml {
 }
 
 /// Icon configuration from TOML.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct IconConfigToml {
     /// Icon preset name: "simple", "navigation", "minimal", "construction" (optional).
     pub preset: Option<String>,
@@ -291,7 +291,7 @@ pub struct IconConfigToml {
 /// any stale enforcement keys still present in an old `config.toml` (no
 /// `deny_unknown_fields`), so such a file still parses; the keys simply have no
 /// effect — the operative rules live in `rules.toml`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ValidationConfig {
     /// Strictness level: "strict", "loose", or "permissive". Retained as an inert
     /// forward-compat key; it no longer drives validation behavior.
@@ -323,7 +323,7 @@ impl ValidationConfig {
 }
 
 /// Documentation lifecycle management configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DocumentationConfig {
     /// Root directory for development documentation (default: "dev").
     pub development_root: Option<String>,
@@ -384,7 +384,7 @@ impl DocumentationConfig {
 /// repo that wants those constraints authors the corresponding rules in
 /// `rules.toml`. The registry keeps only TAXONOMY (`description`/`unique`/
 /// `examples`); serde ignores any stale constraint keys in an old `config.toml`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NamespaceConfig {
     /// Human-readable description.
     pub description: String,
@@ -482,7 +482,7 @@ pub struct NamespaceConfig {
 /// from the `source` PATH above: a `markdown-first` kind is authored in prose and
 /// indexed from it; a `registry-first` kind is authored in a structured registry
 /// file. Resolve a present value with [`ItemKindConfig::source_of_truth`].
-#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub struct ItemKindConfig {
     /// Section slug whose list items hold this kind's addressable items
     /// (e.g. `"success_criteria"`). Required in an explicit declaration.
@@ -736,6 +736,21 @@ impl<'de> Deserialize<'de> for ItemKindSource {
     }
 }
 
+impl Serialize for ItemKindSource {
+    /// Mirrors the [`Deserialize`] impl above: a [`ItemKindSource::Path`]
+    /// serializes as its bare path string, a [`ItemKindSource::Toml`] as its
+    /// descriptor table — so a value round-trips through TOML or JSON
+    /// unchanged, and `jit config get` (which serializes the loaded
+    /// [`JitConfig`] to walk it generically) renders the same shape a hand
+    /// authored `config.toml` declares.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ItemKindSource::Path(path) => serializer.serialize_str(path),
+            ItemKindSource::Toml(descriptor) => descriptor.serialize(serializer),
+        }
+    }
+}
+
 /// The field mapping that projects a `.toml` registry table into addressable
 /// items for a registry-first project kind.
 ///
@@ -767,7 +782,7 @@ impl<'de> Deserialize<'de> for ItemKindSource {
 /// assert_eq!(descriptor.text_field, "statement");
 /// assert_eq!(descriptor.link_fields.get("enforces").map(String::as_str), Some("enforced-by"));
 /// ```
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct TomlSourceDescriptor {
     /// Repository-local path to the `.toml` registry file (read through storage).
     pub toml: String,
@@ -871,6 +886,19 @@ impl<'de> serde::Deserialize<'de> for KindScopeConfig {
     }
 }
 
+impl Serialize for KindScopeConfig {
+    /// Serializes to the same `"issue"` / `"project"` token [`FromStr`](std::str::FromStr)
+    /// and [`Deserialize`] accept, so `jit config get` renders the value a
+    /// hand-authored `config.toml` would use.
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let token = match self {
+            KindScopeConfig::Issue => "issue",
+            KindScopeConfig::Project => "project",
+        };
+        serializer.serialize_str(token)
+    }
+}
+
 /// The authoring DIRECTION of an item kind: which substrate is the canonical
 /// source for its items.
 ///
@@ -903,7 +931,7 @@ impl<'de> serde::Deserialize<'de> for KindScopeConfig {
 ///     .unwrap_err();
 /// assert!(err.to_string().contains("markdown-first"));
 /// ```
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum SourceOfTruth {
     /// Items are authored in markdown prose (issue descriptions or a markdown
     /// source file) and indexed from it. The requirement-kind default.
@@ -1015,7 +1043,7 @@ pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
 /// its config-layer const default, so [`InvariantProjectionConfig::default`] (an
 /// absent `[invariant_projection]` table) is separate-file mode targeting the
 /// jit-owned file.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 pub struct InvariantProjectionConfig {
     /// Projection mode: a separate jit-owned file or a delimited region within an
     /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
@@ -1157,7 +1185,7 @@ impl InvariantProjectionConfig {
 /// let err = toml::from_str::<InvariantProjectionConfig>("mode = \"inline\"").unwrap_err();
 /// assert!(err.to_string().contains("separate-file"));
 /// ```
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum ProjectionMode {
     /// Write the rendered invariants to a separate jit-owned file (the default).
     #[default]
@@ -1197,7 +1225,7 @@ pub enum ProjectionMode {
 /// let err = toml::from_str::<InvariantProjectionConfig>("style = \"prose\"").unwrap_err();
 /// assert!(err.to_string().contains("full"));
 /// ```
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum ProjectionStyle {
     /// Reproduce the original render: a `## Project invariants` header followed by
     /// `- **{id}** [{kind}]{enforced_by}: {statement}` bullets (the default).
@@ -1312,7 +1340,7 @@ pub const DEFAULT_RULES_GATES_REGION_END: &str = "<!-- jit:rules-and-gates:end -
 /// assert_eq!(cfg.target(), "docs/reference/rules-and-gates.md");
 /// assert_eq!(cfg.region_begin(), "<!-- RG START -->");
 /// ```
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 pub struct RulesGatesProjectionConfig {
     /// Projection mode: a separate jit-owned file or a delimited region within an
     /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
@@ -2183,6 +2211,146 @@ impl EffectiveConfig {
             user: self.user_config.as_ref().and_then(|c| c.events.clone()),
             system: self.system_config.as_ref().and_then(|c| c.events.clone()),
         }
+    }
+
+    /// Assemble a single JSON snapshot of the effective configuration across
+    /// its WHOLE surface, for `jit config get`'s generic dotted-path walk
+    /// (see [`resolve_dotted_key`](crate::commands::resolve_dotted_key)).
+    ///
+    /// Two resolution strategies, matching how the rest of the codebase
+    /// already reads these sections — this method does not invent a THIRD
+    /// merge policy:
+    /// - `worktree`, `coordination`, `global_operations`, `locks`, `events`:
+    ///   the existing system/user/repo-merged accessors above (env var, then
+    ///   repo, then user, then system, then default), unchanged from `jit
+    ///   config show`.
+    /// - every other section (`version`, `project`, `type_hierarchy`,
+    ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
+    ///   `invariant_projection`, `rules_gates_projection`): read from the
+    ///   REPO config only, with no system/user merge and no built-in
+    ///   defaults layered in. jit has no notion of a system/user override for
+    ///   a repo's type hierarchy, label namespaces, or item kinds — every
+    ///   other reader of these fields loads the repo file directly (e.g.
+    ///   [`ConfigManager::namespaces_from_config`](crate::config_manager::ConfigManager::namespaces_from_config)).
+    ///   This is also why these sections reflect exactly what `config.toml`
+    ///   declares rather than `config show`'s built-in-default-filled view: an
+    ///   absent section serializes as an empty object (matching an absent
+    ///   TOML table), not a struct of defaulted fields.
+    ///
+    /// `templates` and `invariants` are deliberately excluded: both are
+    /// `#[serde(skip)]` on [`JitConfig`], populated from the SIBLING
+    /// `templates.toml` / `invariants.toml` files rather than `config.toml`
+    /// itself, so neither has a dotted path here. Introspect them via `jit
+    /// config list-templates` / `jit invariant list`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ConfigLoader;
+    ///
+    /// let effective = ConfigLoader::new().build();
+    /// let snapshot = effective.full_snapshot().unwrap();
+    /// // Every section is present, even with no config files loaded at all.
+    /// assert!(snapshot.get("documentation").unwrap().is_object());
+    /// assert!(snapshot.get("worktree").unwrap().get("mode").is_some());
+    /// ```
+    pub fn full_snapshot(&self) -> Result<serde_json::Value> {
+        fn section<T: Serialize>(value: Option<&T>) -> Result<serde_json::Value> {
+            match value {
+                Some(v) => Ok(serde_json::to_value(v)?),
+                None => Ok(serde_json::json!({})),
+            }
+        }
+
+        let repo = self.repo_config.as_ref();
+        let mut map = serde_json::Map::new();
+        map.insert(
+            "version".to_string(),
+            section(repo.and_then(|c| c.version.as_ref()))?,
+        );
+        map.insert(
+            "project".to_string(),
+            section(repo.and_then(|c| c.project.as_ref()))?,
+        );
+        map.insert(
+            "type_hierarchy".to_string(),
+            section(repo.and_then(|c| c.type_hierarchy.as_ref()))?,
+        );
+        map.insert(
+            "validation".to_string(),
+            section(repo.and_then(|c| c.validation.as_ref()))?,
+        );
+        map.insert(
+            "documentation".to_string(),
+            section(repo.and_then(|c| c.documentation.as_ref()))?,
+        );
+        map.insert(
+            "namespaces".to_string(),
+            section(repo.and_then(|c| c.namespaces.as_ref()))?,
+        );
+        map.insert(
+            "item_kinds".to_string(),
+            section(repo.and_then(|c| c.item_kinds.as_ref()))?,
+        );
+        map.insert(
+            "invariant_projection".to_string(),
+            section(repo.and_then(|c| c.invariant_projection.as_ref()))?,
+        );
+        map.insert(
+            "rules_gates_projection".to_string(),
+            section(repo.and_then(|c| c.rules_gates_projection.as_ref()))?,
+        );
+
+        map.insert(
+            "worktree".to_string(),
+            serde_json::json!({
+                "mode": format!(
+                    "{:?}",
+                    self.worktree_mode().unwrap_or(WorktreeMode::Auto)
+                )
+                .to_lowercase(),
+                "enforce_leases": format!(
+                    "{:?}",
+                    self.enforcement_mode().unwrap_or(EnforcementMode::Strict)
+                )
+                .to_lowercase(),
+            }),
+        );
+        map.insert(
+            "coordination".to_string(),
+            serde_json::json!({
+                "default_ttl_secs": self.coordination().default_ttl_secs(),
+                "heartbeat_interval_secs": self.coordination().heartbeat_interval_secs(),
+                "lease_renewal_threshold_pct": self.coordination().lease_renewal_threshold_pct(),
+                "stale_threshold_secs": self.coordination().stale_threshold_secs(),
+                "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
+                "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
+                "auto_renew_leases": self.coordination().auto_renew_leases(),
+            }),
+        );
+        map.insert(
+            "global_operations".to_string(),
+            serde_json::json!({
+                "require_main_history": self.global_operations().require_main_history(),
+                "allowed_branches": self.global_operations().allowed_branches(),
+            }),
+        );
+        map.insert(
+            "locks".to_string(),
+            serde_json::json!({
+                "max_age_secs": self.locks().max_age_secs(),
+                "enable_metadata": self.locks().enable_metadata(),
+            }),
+        );
+        map.insert(
+            "events".to_string(),
+            serde_json::json!({
+                "enable_sequences": self.events().enable_sequences(),
+                "use_unified_envelope": self.events().use_unified_envelope(),
+            }),
+        );
+
+        Ok(serde_json::Value::Object(map))
     }
 }
 

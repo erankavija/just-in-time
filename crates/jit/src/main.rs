@@ -4937,94 +4937,33 @@ fn run() -> Result<()> {
                 }
             }
             jit::cli::ConfigCommands::Get { key, json } => {
-                use jit::config::ConfigLoader;
-                use jit::output::JsonOutput;
+                use jit::output::{render_config_get_value, ErrorCode, JsonError, JsonOutput};
                 use serde_json::json;
 
-                // Build effective config
-                let mut loader = ConfigLoader::new();
-                let system_path = std::path::Path::new("/etc/jit");
-                if system_path.exists() {
-                    loader = loader.with_system_config(system_path)?;
-                }
-                if let Some(home) = dirs::home_dir() {
-                    let user_path = home.join(".config/jit");
-                    if user_path.exists() {
-                        loader = loader.with_user_config(&user_path)?;
-                    }
-                }
-                loader = loader.with_repo_config(&jit_dir)?;
-                let config = loader.build();
-
-                // Parse key and get value
-                let value: Option<serde_json::Value> = match key.as_str() {
-                    "worktree.mode" => Some(json!(format!(
-                        "{:?}",
-                        config
-                            .worktree_mode()
-                            .unwrap_or(jit::config::WorktreeMode::Auto)
-                    )
-                    .to_lowercase())),
-                    "worktree.enforce_leases" => Some(json!(format!(
-                        "{:?}",
-                        config
-                            .enforcement_mode()
-                            .unwrap_or(jit::config::EnforcementMode::Strict)
-                    )
-                    .to_lowercase())),
-                    "coordination.default_ttl_secs" => {
-                        Some(json!(config.coordination().default_ttl_secs()))
-                    }
-                    "coordination.heartbeat_interval_secs" => {
-                        Some(json!(config.coordination().heartbeat_interval_secs()))
-                    }
-                    "coordination.lease_renewal_threshold_pct" => {
-                        Some(json!(config.coordination().lease_renewal_threshold_pct()))
-                    }
-                    "coordination.stale_threshold_secs" => {
-                        Some(json!(config.coordination().stale_threshold_secs()))
-                    }
-                    "coordination.max_indefinite_leases_per_agent" => Some(json!(config
-                        .coordination()
-                        .max_indefinite_leases_per_agent())),
-                    "coordination.max_indefinite_leases_per_repo" => Some(json!(config
-                        .coordination()
-                        .max_indefinite_leases_per_repo())),
-                    "coordination.auto_renew_leases" => {
-                        Some(json!(config.coordination().auto_renew_leases()))
-                    }
-                    "global_operations.require_main_history" => {
-                        Some(json!(config.global_operations().require_main_history()))
-                    }
-                    "global_operations.allowed_branches" => {
-                        Some(json!(config.global_operations().allowed_branches()))
-                    }
-                    "locks.max_age_secs" => Some(json!(config.locks().max_age_secs())),
-                    "locks.enable_metadata" => Some(json!(config.locks().enable_metadata())),
-                    "events.enable_sequences" => Some(json!(config.events().enable_sequences())),
-                    "events.use_unified_envelope" => {
-                        Some(json!(config.events().use_unified_envelope()))
-                    }
-                    _ => None,
-                };
-
-                match value {
-                    Some(v) => {
+                match executor.get_config(&key) {
+                    Ok(outcome) => {
                         if json {
                             println!(
                                 "{}",
-                                JsonOutput::success(json!({"key": key, "value": v}), "config get")
-                                    .with_message(format!("{} = {}", key, v))
-                                    .to_json_string()?
+                                JsonOutput::success(
+                                    json!({"key": outcome.key, "value": outcome.value}),
+                                    "config get"
+                                )
+                                .to_json_string()?
                             );
                         } else {
-                            println!("{}", v);
+                            println!("{}", render_config_get_value(&outcome.value));
                         }
                     }
-                    None => {
-                        anyhow::bail!(
-                            "Unknown config key: {}. Use 'jit config show' to see available keys.",
-                            key
+                    Err(e) => {
+                        handle_json_error!(
+                            json,
+                            e,
+                            JsonError::new(
+                                ErrorCode::INVALID_ARGUMENT,
+                                e.to_string(),
+                                "config get"
+                            )
                         );
                     }
                 }
