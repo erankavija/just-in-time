@@ -12,6 +12,11 @@
     "npm-ci"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-04-24T22:23:10.280563985Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -21,11 +26,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-04-24T22:22:44.126692323Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-24T22:23:10.280563985Z"
     }
   },
   "context": {},
@@ -45,6 +45,8 @@
     "epic:docs-lifecycle-p2",
     "milestone:v1.1"
   ],
-  "created_at": "2026-04-24T20:50:25.452331386+00:00",
-  "updated_at": "2026-04-24T22:30:03.882455318+00:00"
+  "created_at": "2026-04-24T20:50:25.452331386Z",
+  "updated_at": "2026-07-05T19:51:12.978633550Z",
+  "claimed_at": "2026-04-24T20:57:19.752752228Z",
+  "done_at": "2026-04-24T22:30:03.882359538Z"
 }

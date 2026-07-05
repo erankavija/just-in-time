@@ -21,25 +21,25 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-02-01T23:27:14.801072288Z"
     },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:26:48.165130987Z"
-    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-02-01T23:27:20.690968983Z"
     },
-    "code-review": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T23:27:20.817934079Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-01T23:27:20.162012322Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T23:26:48.165130987Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-01T23:27:20.817934079Z"
     }
   },
   "context": {},
@@ -51,5 +51,8 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:07.585153291Z",
-  "updated_at": "2026-02-01T23:27:20.818737119Z"
+  "updated_at": "2026-07-05T19:51:13.074700399Z",
+  "first_ready_at": "2026-01-07T23:32:21.468508265Z",
+  "claimed_at": "2026-02-01T23:07:36.963310826Z",
+  "done_at": "2026-02-01T23:27:20.818692869Z"
 }

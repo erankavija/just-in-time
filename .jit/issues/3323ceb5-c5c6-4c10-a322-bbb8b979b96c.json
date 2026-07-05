@@ -17,15 +17,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-05-06T15:59:34.114347768Z"
     },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-05-06T15:55:11.808457591Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-05-06T15:59:47.584928191Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-05-06T15:55:11.808457591Z"
     }
   },
   "context": {},
@@ -37,6 +37,8 @@
     "component:web",
     "story:modular-document-rendering"
   ],
-  "created_at": "2026-05-06T15:54:56.479231635+00:00",
-  "updated_at": "2026-05-06T16:05:01.903204069+00:00"
+  "created_at": "2026-05-06T15:54:56.479231635Z",
+  "updated_at": "2026-07-05T19:51:12.941003722Z",
+  "claimed_at": "2026-05-06T15:55:18.522468852Z",
+  "done_at": "2026-05-06T16:05:01.903159159Z"
 }

@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:39:54.919890902Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:45:37.085394307Z"
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:41:58.138119045Z"
     },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T16:42:00.442606335Z"
     },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:39:54.919890902Z"
+    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T16:41:38.322832476Z"
     },
-    "clippy": {
+    "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:41:58.138119045Z"
+      "updated_by": null,
+      "updated_at": "2026-02-02T16:45:37.085394307Z"
     }
   },
   "context": {},
@@ -51,5 +51,8 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:15.077269794Z",
-  "updated_at": "2026-02-02T16:45:37.088550928Z"
+  "updated_at": "2026-07-05T19:51:13.057012387Z",
+  "first_ready_at": "2026-01-06T21:01:34.498972744Z",
+  "claimed_at": "2026-02-02T16:39:54.923008963Z",
+  "done_at": "2026-02-02T16:45:37.088531348Z"
 }

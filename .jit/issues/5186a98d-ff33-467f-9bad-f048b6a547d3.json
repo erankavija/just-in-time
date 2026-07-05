@@ -14,10 +14,10 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "tdd-reminder": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:24:19.825017846Z"
+      "updated_by": null,
+      "updated_at": "2026-01-06T20:24:21.499749577Z"
     },
     "code-review": {
       "status": "passed",
@@ -29,15 +29,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-01-06T20:24:19.054916706Z"
     },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:24:19.825017846Z"
+    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-01-06T20:24:18.441096631Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-06T20:24:21.499749577Z"
     }
   },
   "context": {},
@@ -49,5 +49,6 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:07.561412564Z",
-  "updated_at": "2026-01-06T20:24:38.225262845Z"
+  "updated_at": "2026-07-05T19:51:12.965613080Z",
+  "done_at": "2026-01-06T20:24:38.225262845Z"
 }

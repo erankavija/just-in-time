@@ -26,15 +26,15 @@
       "updated_by": null,
       "updated_at": "2026-02-02T16:39:39.171184877Z"
     },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:33:38.585257542Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T16:34:03.106680238Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T16:33:38.585257542Z"
     },
     "tdd-reminder": {
       "status": "passed",
@@ -51,5 +51,8 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:15.075294664Z",
-  "updated_at": "2026-02-02T16:39:39.174359258Z"
+  "updated_at": "2026-07-05T19:51:12.946206846Z",
+  "first_ready_at": "2026-01-06T21:01:34.496995455Z",
+  "claimed_at": "2026-02-02T16:28:14.798794456Z",
+  "done_at": "2026-02-02T16:39:39.174339708Z"
 }

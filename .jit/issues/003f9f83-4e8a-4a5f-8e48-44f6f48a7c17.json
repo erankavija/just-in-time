@@ -14,16 +14,6 @@
     "tdd-reminder"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-21T22:58:58.294829740Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-21T22:08:06.583895170Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -38,6 +28,16 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-21T22:58:59.504778422Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-21T22:58:58.294829740Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2025-12-21T22:08:06.583895170Z"
     }
   },
   "context": {},
@@ -60,5 +60,7 @@
     "epic:agent-friendly"
   ],
   "created_at": "2025-12-21T22:57:12.516836772Z",
-  "updated_at": "2025-12-21T23:00:27.670755149Z"
+  "updated_at": "2026-07-05T19:51:12.888268634Z",
+  "claimed_at": "2025-12-21T22:08:11.283787761Z",
+  "done_at": "2025-12-21T22:59:22.473720923Z"
 }

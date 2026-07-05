@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T18:27:31.758622486Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-23T18:34:02.406116981Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T18:27:31.758622486Z"
     }
   },
   "context": {},
@@ -34,6 +34,8 @@
     "type:story",
     "story:scaffold-switch"
   ],
-  "created_at": "2026-06-22T21:59:04.450474652+00:00",
-  "updated_at": "2026-06-23T18:36:19.150746994+00:00"
+  "created_at": "2026-06-22T21:59:04.450474652Z",
+  "updated_at": "2026-07-05T19:51:12.939660961Z",
+  "first_ready_at": "2026-06-23T18:13:00.241891753Z",
+  "done_at": "2026-06-23T18:36:19.150920474Z"
 }

@@ -36,11 +36,6 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-02-01T15:32:01.930162522Z"
     },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T15:32:01.930195152Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -50,6 +45,11 @@
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-02-01T15:32:42.644973681Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-01T15:32:01.930195152Z"
     }
   },
   "context": {},
@@ -111,5 +111,8 @@
     "story:claim-cli-commands"
   ],
   "created_at": "2026-01-03T20:27:36.157287744Z",
-  "updated_at": "2026-06-24T06:20:49.545166507+00:00"
+  "updated_at": "2026-07-05T19:51:13.113814968Z",
+  "first_ready_at": "2026-01-15T21:52:33.242844700Z",
+  "claimed_at": "2026-01-15T21:56:29.349205469Z",
+  "done_at": "2026-02-01T15:32:42.655469574Z"
 }

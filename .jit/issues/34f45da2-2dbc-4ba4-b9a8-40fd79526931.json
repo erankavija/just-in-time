@@ -14,11 +14,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:claude",
-      "updated_at": "2026-05-14T21:47:02.546668100Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -29,15 +24,20 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-05-14T22:22:29.193539418Z"
     },
-    "code-review": {
+    "tdd-reminder": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-14T22:17:47.190816787Z"
+      "updated_by": "agent:claude",
+      "updated_at": "2026-05-14T21:47:02.546668100Z"
     },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-05-14T22:22:32.406644037Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-05-14T22:17:47.190816787Z"
     }
   },
   "context": {},
@@ -48,6 +48,8 @@
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2026-05-14T21:33:34.556001122+00:00",
-  "updated_at": "2026-05-14T22:23:01.690564176+00:00"
+  "created_at": "2026-05-14T21:33:34.556001122Z",
+  "updated_at": "2026-07-05T19:51:12.943050434Z",
+  "claimed_at": "2026-05-14T21:47:05.014881076Z",
+  "done_at": "2026-05-14T22:23:01.690517816Z"
 }

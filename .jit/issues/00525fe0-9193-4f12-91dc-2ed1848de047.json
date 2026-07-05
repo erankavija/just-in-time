@@ -14,6 +14,11 @@
     "cargo-ci-features"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-06T20:47:12.199491847Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -23,11 +28,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-06T20:47:23.130309464Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-06T20:47:12.199491847Z"
     }
   },
   "context": {},
@@ -36,6 +36,9 @@
     "type:task",
     "epic:validation-engine"
   ],
-  "created_at": "2026-06-06T15:51:20.570066846+00:00",
-  "updated_at": "2026-06-06T20:54:23.129112777+00:00"
+  "created_at": "2026-06-06T15:51:20.570066846Z",
+  "updated_at": "2026-07-05T19:51:12.892023617Z",
+  "first_ready_at": "2026-06-06T19:10:41.475247498Z",
+  "claimed_at": "2026-06-06T19:11:57.980318656Z",
+  "done_at": "2026-06-06T20:54:23.129062547Z"
 }

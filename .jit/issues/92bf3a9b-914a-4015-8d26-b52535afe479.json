@@ -22,30 +22,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T13:14:00.026221350Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T13:14:20.745028898Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "copilot:cli-session",
+      "updated_at": "2026-02-02T12:59:59.375112778Z"
     },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T13:14:20.542347280Z"
     },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T13:14:00.026221350Z"
+    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "copilot:session",
       "updated_at": "2026-02-02T12:29:37.050180117Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "copilot:cli-session",
-      "updated_at": "2026-02-02T12:59:59.375112778Z"
     }
   },
   "context": {},
@@ -100,5 +100,8 @@
     "story:recovery-robustness"
   ],
   "created_at": "2026-01-03T20:27:36.165112456Z",
-  "updated_at": "2026-06-24T06:20:49.474248167+00:00"
+  "updated_at": "2026-07-05T19:51:13.036046461Z",
+  "first_ready_at": "2026-02-02T12:26:54.281898718Z",
+  "claimed_at": "2026-02-02T12:29:37.053338968Z",
+  "done_at": "2026-02-02T13:00:03.808232716Z"
 }

@@ -16,30 +16,30 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "tdd-reminder": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:27:47.689314992Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:28:50.492814210Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:27:55.408991980Z"
+      "updated_by": null,
+      "updated_at": "2026-01-07T19:27:47.686240941Z"
     },
     "code-review": {
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-01-07T19:27:55.814608246Z"
     },
-    "tdd-reminder": {
+    "tests": {
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-07T19:27:47.686240941Z"
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:27:47.689314992Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:27:55.408991980Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T19:28:50.492814210Z"
     }
   },
   "context": {},
@@ -51,5 +51,7 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:07.571484607Z",
-  "updated_at": "2026-01-03T20:34:28.479776820Z"
+  "updated_at": "2026-07-05T19:51:12.918876976Z",
+  "first_ready_at": "2026-01-06T21:01:34.447928272Z",
+  "done_at": "2026-01-07T19:28:50.700963059Z"
 }

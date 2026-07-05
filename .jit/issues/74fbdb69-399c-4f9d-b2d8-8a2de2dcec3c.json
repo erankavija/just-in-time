@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T11:33:48.574681391Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-05T11:30:31.221321560Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T11:33:48.574681391Z"
     }
   },
   "context": {},
@@ -30,5 +30,7 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:03:08.382534643Z",
-  "updated_at": "2026-07-05T11:36:03.008826598Z"
+  "updated_at": "2026-07-05T19:51:13.006844650Z",
+  "claimed_at": "2026-07-05T10:24:27.898256917Z",
+  "done_at": "2026-07-05T11:36:03.009033269Z"
 }

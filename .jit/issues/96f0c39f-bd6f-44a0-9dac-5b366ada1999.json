@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T22:51:15.147354196Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-26T22:48:53.425059269Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T22:51:15.147354196Z"
     }
   },
   "context": {},
@@ -33,5 +33,8 @@
     "epic:item-sources"
   ],
   "created_at": "2026-06-26T20:51:42.232701269Z",
-  "updated_at": "2026-06-26T22:54:28.853788806Z"
+  "updated_at": "2026-07-05T19:51:13.041001325Z",
+  "first_ready_at": "2026-06-26T21:19:00.663757998Z",
+  "claimed_at": "2026-06-26T21:27:32.683956538Z",
+  "done_at": "2026-06-26T22:54:28.853927216Z"
 }

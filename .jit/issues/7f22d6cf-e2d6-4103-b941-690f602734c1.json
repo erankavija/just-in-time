@@ -14,11 +14,6 @@
     "repo-validate"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T22:45:14.536538995Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -28,6 +23,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T22:35:52.235256853Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T22:45:14.536538995Z"
     }
   },
   "context": {},
@@ -48,5 +48,8 @@
     "story:uniform-readdressing-migration"
   ],
   "created_at": "2026-07-01T23:19:51.166972984Z",
-  "updated_at": "2026-07-03T22:55:41.407543500Z"
+  "updated_at": "2026-07-05T19:51:13.015889197Z",
+  "first_ready_at": "2026-07-03T22:29:59.852704578Z",
+  "claimed_at": "2026-07-03T22:32:14.219966877Z",
+  "done_at": "2026-07-03T22:55:41.407749131Z"
 }

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "fde397a3-d855-4ca4-8db8-8fbce4c9892b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0ab468ba-681e-4660-8ffb-21944c554bc0",
+  "commit": "7b482fa124326961747ab8eaec01fa2bffb736d8",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-05T19:26:09.893213722Z",
+  "completed_at": "2026-07-05T19:28:41.294803307Z",
+  "duration_ms": 151401,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01, REQ-03, and REQ-04 are mostly implemented: `--full` JSON emits serialized `Issue` records, default summary keys are guarded, and docs describe both shapes. REQ-02 is not fully met because several assignment/claim paths still do not persist `claimed_at`.\n\n**Architecture**\nNo new domain/storage/command/CLI boundary violation in the graph export or migration implementation. The backfill derivation is in `domain::queries`, storage access stays in commands/storage, and CLI flag validation stays in `main.rs`.\n\n**Correctness And Invariants**\nBlocking issues remain around lifecycle timestamp coverage and atomic writes. The current issue record itself is also assigned (`agent:claude`) without `claimed_at`, which matches the uncovered code paths.\n\n**Testing**\nI did not run tests, per instruction. The provided issue gate shows `cargo-ci` passed at `2026-07-05T19:24:22.890909482Z`. There is no prior review run history. The new tests cover `issue claim`, `issue assign`, export full/default shapes, and migration, but miss `claim acquire`, bulk assignee update, and atomic `--output`.\n\n**CLI Contract**\n`graph export --full` is correctly limited to JSON. `migrate lifecycle-timestamps` supports `--json`. `graph export --output` violates the atomic file-write rule.\n\n**Documentation**\nExport shapes and lifecycle timestamps are documented in `docs/reference/cli-commands.md` and `docs/reference/storage-format.md`.\n\n**Jit Issue Management**\n`issue.dependencies` is empty, so there are no unmet prerequisites in the issue metadata. Label warnings are not relevant here.\n\n1. F1 high: `jit claim acquire` persists an assignee for visibility but does not call `mark_claimed`, so a lease-based first claim leaves `claimed_at` unset and fails REQ-02.\n   `crates/jit/src/commands/claim.rs:157`\n\n2. F2 high: bulk assignee updates set `updated.assignee` but never stamp `claimed_at`, so `jit issue update --filter ... --assignee ...` violates the documented “first claim or assignment” lifecycle timestamp rule.\n   `crates/jit/src/commands/bulk_update.rs:327`\n\n3. F3 high: `jit graph export --output` writes with `std::fs::write` instead of the temp-file plus rename atomic writer, violating the project’s atomic file-write invariant.\n   `crates/jit/src/main.rs:4232`\n\n4. F4 medium: `assign_issue` now mutates `claimed_at` but still saves without appending an event for the assignment/timestamp change, leaving `events.jsonl` incomplete for a state-changing lifecycle milestone.\n   `crates/jit/src/commands/issue.rs:911`\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Lifecycle claimed_at is not stamped on all claim/assignment paths, assignment timestamping is not event-logged, and graph export output writes are non-atomic.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Lease-based claim acquisition persists assignee without stamping claimed_at.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":157},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Bulk assignee updates do not stamp claimed_at.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":327},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"graph export --output uses non-atomic std::fs::write.\",\"file\":\"crates/jit/src/main.rs\",\"line\":4232},{\"id\":\"F4\",\"severity\":\"medium\",\"summary\":\"issue assign mutates claimed_at without appending an event log entry.\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":911}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9777 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f33be-cd03-7c71-bbce-ff555c78e4ca\n--------\nuser\n--- 9764 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Lifecycle claimed_at is not stamped on all claim/assignment paths, assignment timestamping is not event-logged, and graph export output writes are non-atomic.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Lease-based claim acquisition persists assignee without stamping claimed_at.",
+        "file": "crates/jit/src/commands/claim.rs",
+        "line": 157
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Bulk assignee updates do not stamp claimed_at.",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "line": 327
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "graph export --output uses non-atomic std::fs::write.",
+        "file": "crates/jit/src/main.rs",
+        "line": 4232
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "summary": "issue assign mutates claimed_at without appending an event log entry.",
+        "file": "crates/jit/src/commands/issue.rs",
+        "line": 911
+      }
+    ]
+  }
+}

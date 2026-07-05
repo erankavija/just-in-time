@@ -26,11 +26,6 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T17:11:29.195628249Z"
     },
-    "code-review": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:11:37.753397907Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -40,6 +35,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T17:11:07.175983359Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": null,
+      "updated_at": "2026-02-02T17:11:37.753397907Z"
     }
   },
   "context": {},
@@ -51,5 +51,8 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:15.086565977Z",
-  "updated_at": "2026-02-02T17:11:42.865226520Z"
+  "updated_at": "2026-07-05T19:51:13.092524192Z",
+  "first_ready_at": "2026-01-06T21:01:34.506781523Z",
+  "claimed_at": "2026-02-02T17:09:27.835705628Z",
+  "done_at": "2026-02-02T17:11:42.865195530Z"
 }

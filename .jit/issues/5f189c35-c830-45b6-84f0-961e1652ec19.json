@@ -21,11 +21,6 @@
       "updated_by": "agent:copilot-session",
       "updated_at": "2026-02-02T10:25:34.443776180Z"
     },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:44:38.192962740Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:copilot-session",
@@ -40,6 +35,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-02T10:44:15.776787446Z"
+    },
+    "clippy": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T10:44:38.192962740Z"
     }
   },
   "context": {},
@@ -51,5 +51,8 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:15.065473261Z",
-  "updated_at": "2026-02-02T10:44:40.899978464Z"
+  "updated_at": "2026-07-05T19:51:12.982696462Z",
+  "first_ready_at": "2026-01-07T23:32:21.561006291Z",
+  "claimed_at": "2026-02-02T10:25:34.446961801Z",
+  "done_at": "2026-02-02T10:44:15.797266022Z"
 }

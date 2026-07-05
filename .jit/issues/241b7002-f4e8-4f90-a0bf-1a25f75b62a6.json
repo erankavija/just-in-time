@@ -14,11 +14,6 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T17:48:55.538024298Z"
-    },
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -28,6 +23,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-20T17:48:50.722007752Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "agent:copilot",
+      "updated_at": "2025-12-20T17:48:55.538024298Z"
     },
     "clippy": {
       "status": "passed",
@@ -49,5 +49,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2025-12-20T17:48:49.314196517Z",
-  "updated_at": "2025-12-20T17:45:32.883052406Z"
+  "updated_at": "2026-07-05T19:51:12.925299561Z",
+  "claimed_at": "2025-12-20T17:45:32.886006190Z",
+  "done_at": "2025-12-20T17:48:58.684119953Z"
 }

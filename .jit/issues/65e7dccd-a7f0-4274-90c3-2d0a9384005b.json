@@ -24,6 +24,16 @@
       "updated_by": null,
       "updated_at": "2026-01-06T21:01:00.912407039Z"
     },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T21:01:02.428702884Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T21:01:21.787591784Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": null,
@@ -33,16 +43,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-01-06T21:01:02.122056802Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T21:01:21.787591784Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T21:01:02.428702884Z"
     }
   },
   "context": {},
@@ -97,5 +97,7 @@
     "story:worktree-foundation"
   ],
   "created_at": "2026-01-06T21:01:02.119112192Z",
-  "updated_at": "2026-06-24T06:20:49.411768539+00:00"
+  "updated_at": "2026-07-05T19:51:12.991943199Z",
+  "first_ready_at": "2026-01-06T20:50:50.753402277Z",
+  "done_at": "2026-01-06T21:01:34.400236070Z"
 }

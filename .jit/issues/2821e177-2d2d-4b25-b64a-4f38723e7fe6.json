@@ -17,15 +17,15 @@
     "repo-validate"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T22:59:36.983360485Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T22:55:58.928383251Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T22:59:36.983360485Z"
     },
     "repo-validate": {
       "status": "passed",
@@ -168,5 +168,7 @@
     "type:epic"
   ],
   "created_at": "2026-06-28T11:52:45.519022826Z",
-  "updated_at": "2026-07-03T23:35:57.298662739Z"
+  "updated_at": "2026-07-05T19:51:12.929195154Z",
+  "first_ready_at": "2026-07-03T22:55:41.459749658Z",
+  "done_at": "2026-07-03T23:04:34.850621637Z"
 }

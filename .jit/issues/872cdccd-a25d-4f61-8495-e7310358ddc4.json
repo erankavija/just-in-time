@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T18:47:59.468378269Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-10T18:50:58.409319825Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-10T18:47:59.468378269Z"
     }
   },
   "context": {},
@@ -28,6 +28,8 @@
     "type:task",
     "epic:validation-lifecycle"
   ],
-  "created_at": "2026-06-09T21:52:58.560151723+00:00",
-  "updated_at": "2026-06-10T18:53:21.997790206+00:00"
+  "created_at": "2026-06-09T21:52:58.560151723Z",
+  "updated_at": "2026-07-05T19:51:13.024995653Z",
+  "claimed_at": "2026-06-10T15:57:45.255144370Z",
+  "done_at": "2026-06-10T18:53:21.997937806Z"
 }

@@ -14,21 +14,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-17T19:53:50.564381703Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-17T19:54:16.888425806Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-17T19:45:43.491469326Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:copilot-session",
@@ -38,6 +23,21 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-02-17T19:54:13.082712998Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2026-02-17T19:45:43.491469326Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-17T19:54:16.888425806Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-17T19:53:50.564381703Z"
     }
   },
   "context": {},
@@ -55,6 +55,8 @@
     "component:core",
     "epic:production-polish"
   ],
-  "created_at": "2026-02-17T19:20:27.369210588+00:00",
-  "updated_at": "2026-02-17T19:58:21.538937110+00:00"
+  "created_at": "2026-02-17T19:20:27.369210588Z",
+  "updated_at": "2026-07-05T19:51:13.089997331Z",
+  "claimed_at": "2026-02-17T19:35:29.498716155Z",
+  "done_at": "2026-02-17T19:58:21.541694122Z"
 }

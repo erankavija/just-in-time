@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T16:58:03.817071959Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-26T16:56:33.159684902Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-26T16:58:03.817071959Z"
     }
   },
   "context": {},
@@ -29,5 +29,7 @@
     "epic:code-smell-cleanup"
   ],
   "created_at": "2026-06-25T21:41:24.456320209Z",
-  "updated_at": "2026-06-26T17:02:53.865489503Z"
+  "updated_at": "2026-07-05T19:51:13.103820701Z",
+  "claimed_at": "2026-06-26T14:04:42.096906504Z",
+  "done_at": "2026-06-26T17:02:53.865757123Z"
 }

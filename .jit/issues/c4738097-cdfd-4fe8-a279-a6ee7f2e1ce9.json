@@ -17,11 +17,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:46:19.165171951Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "human:user",
@@ -32,15 +27,20 @@
       "updated_by": "auto:executor",
       "updated_at": "2025-12-20T21:46:20.578229621Z"
     },
-    "tdd-reminder": {
+    "tests": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2025-12-20T21:41:11.808751902Z"
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T21:46:19.165171951Z"
     },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2025-12-20T21:46:20.372883651Z"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_by": "agent:copilot-session",
+      "updated_at": "2025-12-20T21:41:11.808751902Z"
     }
   },
   "context": {},
@@ -52,5 +52,8 @@
     "component:cli"
   ],
   "created_at": "2025-12-20T21:46:20.881695916Z",
-  "updated_at": "2025-12-20T19:29:28.046191414Z"
+  "updated_at": "2026-07-05T19:51:13.079746693Z",
+  "first_ready_at": "2025-12-20T21:39:06.731132210Z",
+  "claimed_at": "2025-12-20T21:41:10.580482837Z",
+  "done_at": "2025-12-20T21:46:50.460771972Z"
 }

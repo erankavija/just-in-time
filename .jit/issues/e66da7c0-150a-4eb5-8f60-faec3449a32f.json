@@ -16,25 +16,25 @@
     "code-review"
   ],
   "gates_status": {
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-07T18:58:31.776970641Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "agent:agent-3",
       "updated_at": "2026-01-07T18:58:32.182688157Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:58:25.358103965Z"
     },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "agent:agent-3",
       "updated_at": "2026-01-07T18:58:25.355042254Z"
     },
-    "fmt": {
+    "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:58:31.776970641Z"
+      "updated_at": "2026-01-07T18:58:25.358103965Z"
     },
     "clippy": {
       "status": "passed",
@@ -51,5 +51,7 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:37:07.578449879Z",
-  "updated_at": "2026-01-06T21:01:34.454344041Z"
+  "updated_at": "2026-07-05T19:51:13.104696441Z",
+  "first_ready_at": "2026-01-06T21:01:34.454344041Z",
+  "done_at": "2026-01-07T18:58:38.960587216Z"
 }

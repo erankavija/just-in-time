@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:56:43.612086683Z"
-    },
     "tdd-reminder": {
       "status": "passed",
       "updated_by": "agent:copilot-session-1",
       "updated_at": "2025-12-20T19:52:33.105670119Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T19:56:43.612086683Z"
     },
     "code-review": {
       "status": "passed",
@@ -49,5 +49,7 @@
     "component:core"
   ],
   "created_at": "2025-12-20T19:56:41.802344799Z",
-  "updated_at": "2025-12-20T19:58:59.518626126Z"
+  "updated_at": "2026-07-05T19:51:12.903785625Z",
+  "claimed_at": "2025-12-20T19:53:24.338346091Z",
+  "done_at": "2025-12-20T19:58:59.518626126Z"
 }

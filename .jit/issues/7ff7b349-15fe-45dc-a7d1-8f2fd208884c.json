@@ -16,11 +16,6 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:28:46.660088913Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "human:user",
@@ -40,6 +35,11 @@
       "status": "passed",
       "updated_by": "agent:copilot-session-1",
       "updated_at": "2025-12-20T20:25:57.637093382Z"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2025-12-20T20:28:46.660088913Z"
     }
   },
   "context": {},
@@ -51,5 +51,8 @@
     "component:cli"
   ],
   "created_at": "2025-12-20T20:25:57.637239182Z",
-  "updated_at": "2025-12-20T20:28:46.968607363Z"
+  "updated_at": "2026-07-05T19:51:13.017284228Z",
+  "first_ready_at": "2025-12-20T20:12:00.366004770Z",
+  "claimed_at": "2025-12-20T20:25:57.640384236Z",
+  "done_at": "2025-12-20T20:28:46.968607363Z"
 }

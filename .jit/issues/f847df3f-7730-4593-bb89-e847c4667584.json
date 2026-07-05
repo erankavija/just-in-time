@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T06:19:04.501407074Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-05T06:14:21.542252333Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T06:19:04.501407074Z"
     }
   },
   "context": {},
@@ -29,5 +29,7 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-06-15T18:38:54.897545192Z",
-  "updated_at": "2026-07-05T06:20:52.607826496Z"
+  "updated_at": "2026-07-05T19:51:13.122198154Z",
+  "claimed_at": "2026-07-05T05:56:45.653286245Z",
+  "done_at": "2026-07-05T06:20:52.608045506Z"
 }

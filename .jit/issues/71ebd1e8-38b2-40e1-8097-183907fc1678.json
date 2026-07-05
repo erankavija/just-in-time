@@ -15,15 +15,15 @@
     "repo-validate"
   ],
   "gates_status": {
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-03T15:26:38.669425874Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-03T15:40:39.203859541Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-03T15:26:38.669425874Z"
     },
     "code-review": {
       "status": "passed",
@@ -49,5 +49,8 @@
     "story:rule-addressable-kind"
   ],
   "created_at": "2026-07-01T23:19:51.065614361Z",
-  "updated_at": "2026-07-03T15:44:07.612339450Z"
+  "updated_at": "2026-07-05T19:51:13.003754378Z",
+  "first_ready_at": "2026-07-03T15:11:48.265696534Z",
+  "claimed_at": "2026-07-03T15:25:35.205386915Z",
+  "done_at": "2026-07-03T15:44:07.612557881Z"
 }

@@ -14,20 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T20:27:06.749966892Z"
-    },
-    "code-review": {
-      "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2026-03-09T20:41:21.938488214Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-03-09T20:27:31.069284520Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-03-09T20:27:06.749966892Z"
     },
     "fmt": {
       "status": "passed",
@@ -38,6 +33,11 @@
       "status": "passed",
       "updated_by": "agent:claude-opus",
       "updated_at": "2026-03-09T20:14:20.781990707Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "human:user",
+      "updated_at": "2026-03-09T20:41:21.938488214Z"
     }
   },
   "context": {},
@@ -48,6 +48,8 @@
     "milestone:v1.0",
     "component:web"
   ],
-  "created_at": "2026-03-09T20:10:37.485302172+00:00",
-  "updated_at": "2026-03-11T20:57:20.347241109+00:00"
+  "created_at": "2026-03-09T20:10:37.485302172Z",
+  "updated_at": "2026-07-05T19:51:13.109491285Z",
+  "claimed_at": "2026-03-09T20:14:23.847351344Z",
+  "done_at": "2026-03-09T20:40:31.457860511Z"
 }

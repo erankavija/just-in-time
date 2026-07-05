@@ -14,15 +14,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T01:11:19.073177354Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-17T01:03:51.279317050Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-17T01:11:19.073177354Z"
     }
   },
   "context": {},
@@ -32,6 +32,9 @@
     "story:examples-and-docs",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.116031444+00:00",
-  "updated_at": "2026-06-17T01:12:49.607836057+00:00"
+  "created_at": "2026-06-15T18:34:31.116031444Z",
+  "updated_at": "2026-07-05T19:51:12.979386930Z",
+  "first_ready_at": "2026-06-16T18:30:17.846333384Z",
+  "claimed_at": "2026-06-17T00:14:01.328793878Z",
+  "done_at": "2026-06-17T01:12:49.608013637Z"
 }

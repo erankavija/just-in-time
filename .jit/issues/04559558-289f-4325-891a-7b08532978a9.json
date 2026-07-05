@@ -13,15 +13,15 @@
     "code-review"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T13:58:20.202637020Z"
-    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-06-23T14:02:55.397843164Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-06-23T13:58:20.202637020Z"
     }
   },
   "context": {},
@@ -33,6 +33,8 @@
     "type:story",
     "story:template-registry"
   ],
-  "created_at": "2026-06-22T21:59:04.435372907+00:00",
-  "updated_at": "2026-06-23T14:09:31.257350220+00:00"
+  "created_at": "2026-06-22T21:59:04.435372907Z",
+  "updated_at": "2026-07-05T19:51:12.894927969Z",
+  "first_ready_at": "2026-06-23T13:15:32.946438422Z",
+  "done_at": "2026-06-23T14:05:38.965199841Z"
 }

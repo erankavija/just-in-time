@@ -29,15 +29,15 @@
       "updated_by": null,
       "updated_at": "2026-01-06T20:28:17.735824957Z"
     },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:25:56.437061154Z"
-    },
     "fmt": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-01-06T20:28:07.626390694Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-01-06T20:25:56.437061154Z"
     }
   },
   "context": {},
@@ -49,5 +49,6 @@
     "type:task"
   ],
   "created_at": "2026-01-03T20:36:59.225616719Z",
-  "updated_at": "2026-01-06T20:28:17.739300026Z"
+  "updated_at": "2026-07-05T19:51:13.067845544Z",
+  "done_at": "2026-01-06T20:28:17.739300026Z"
 }

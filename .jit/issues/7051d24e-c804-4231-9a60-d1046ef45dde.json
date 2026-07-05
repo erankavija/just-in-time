@@ -21,11 +21,6 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:20:52.226062553Z"
-    },
     "clippy": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -35,6 +30,11 @@
       "status": "passed",
       "updated_by": null,
       "updated_at": "2026-02-02T17:16:37.803866872Z"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-02-02T17:20:52.226062553Z"
     },
     "fmt": {
       "status": "passed",
@@ -99,5 +99,8 @@
     "story:config-system"
   ],
   "created_at": "2026-01-03T20:27:36.166661227Z",
-  "updated_at": "2026-06-24T06:20:49.429711534+00:00"
+  "updated_at": "2026-07-05T19:51:13.001654716Z",
+  "first_ready_at": "2026-02-02T17:16:08.178401006Z",
+  "claimed_at": "2026-02-02T17:16:40.317688392Z",
+  "done_at": "2026-02-02T17:21:18.579848463Z"
 }

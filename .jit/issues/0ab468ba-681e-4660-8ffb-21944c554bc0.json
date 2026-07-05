@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T19:48:37.850720174Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T19:46:57.533085856Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -19,5 +30,6 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:02:41.533658649Z",
-  "updated_at": "2026-07-05T18:40:43.459221154Z"
+  "updated_at": "2026-07-05T19:51:12.901277153Z",
+  "claimed_at": "2026-07-05T18:40:43.602032038Z"
 }
