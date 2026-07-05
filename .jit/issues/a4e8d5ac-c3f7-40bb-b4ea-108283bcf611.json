@@ -1,0 +1,25 @@
+{
+  "id": "a4e8d5ac-c3f7-40bb-b4ea-108283bcf611",
+  "title": "Align MCP system prompt with DAG-authoritative containment",
+  "description": "Rewrite the MCP server's hardcoded system prompt so assistants are told the dependency DAG defines containment and membership labels are advisory.\n\n## Background\n\nThe prompt in `mcp-server/index.js:47-51` describes a label-centric model (\"type:epic contains stories, has epic:* label for grouping; type:story has story:* label linking to parent\"), which contradicts core semantics: the DAG is authoritative for containment (a container depends on its contents) and membership labels are advisory grouping that resolution never consults. Assistants primed with the label model will wire membership wrong and misread divergence reports.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: The prompt states that dependency edges define containment (container depends on its contents) and that membership labels are advisory grouping only.\n- [ ] [hard] REQ-2: The prompt points assistants at the resolved-hierarchy and divergence query surfaces instead of label conventions for reading structure.\n- [ ] [hard] REQ-3: MCP server tests pass; no other tool-generation behavior changes.\n\n## Notes\n\nType names in the prompt must stay generic (types come from repository config), consistent with INV-DOMAIN-AGNOSTIC.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:work-graph-integrity",
+    "component:mcp",
+    "satisfies:REQ-8"
+  ],
+  "created_at": "2026-07-05T22:31:18.726402160Z",
+  "updated_at": "2026-07-05T22:31:18.726789550Z",
+  "first_ready_at": "2026-07-05T22:31:18.726402700Z"
+}

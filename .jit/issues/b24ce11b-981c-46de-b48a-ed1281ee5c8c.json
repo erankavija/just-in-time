@@ -1,0 +1,30 @@
+{
+  "id": "b24ce11b-981c-46de-b48a-ed1281ee5c8c",
+  "title": "Canonicalize hierarchy resolution on the reduced dependency graph",
+  "description": "Make `resolve_hierarchy` compute the transitive reduction of its input edge set before resolving, so parent/children/cluster/rank become a pure function of the reachability relation, stable regardless of when edge reduction runs.\n\n## Background\n\n`resolve_hierarchy` (`crates/jit/src/graph/hierarchy.rs:423`) prefers direct edges when choosing a parent (`is_better_parent`, `hierarchy.rs:539-544`: distance 1 beats any transitive reach). Meanwhile `jit dep add` auto-reduction (`commands/dependency.rs:118-142`) and `jit validate --fix` delete redundant direct edges. The two subsystems disagree about whether a redundant-but-direct container edge is meaningful, so a node's resolved parent can flip when reduction prunes an edge (e.g. two same-level containers where one's directness is destroyed). Canonicalizing inside the resolver (reuse `compute_transitive_reduction`, `graph/mod.rs:345`) removes the instability without storage changes. The web UI consumes resolution from the server by the time this lands, so the algorithm changes in exactly one implementation.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: Resolution output is identical for an edge set and any transitively-redundant superset with the same reachability relation, verified by a property test over generated DAGs.\n- [ ] [hard] REQ-2: The module contract in `graph/hierarchy.rs` states that resolution is defined on the transitively-reduced graph and explains the parent tie-break in those terms.\n- [ ] [hard] REQ-3: The shared fixture `test-vectors/hierarchy_resolution.json` contains a case where a redundant direct container edge previously changed the resolved parent, and the vector test passes.\n- [ ] [hard] REQ-4: Behavior on already-reduced graphs is unchanged: existing hierarchy unit and vector tests pass without semantic edits.\n\n## Notes\n\nResolution stays pure (no I/O) and keeps its existing signature; the reduction is internal. Watch performance on large graphs: reduction is O(V*E) worst case, acceptable at jit repo scale, but avoid recomputing it per node.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "d91ea408-3ed9-4021-9f9b-5ee736474c5f"
+  ],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "fmt",
+    "clippy",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:work-graph-integrity",
+    "component:cli",
+    "satisfies:REQ-1"
+  ],
+  "created_at": "2026-07-05T22:31:18.720015375Z",
+  "updated_at": "2026-07-05T22:31:18.984928018Z",
+  "first_ready_at": "2026-07-05T22:31:18.720015885Z"
+}

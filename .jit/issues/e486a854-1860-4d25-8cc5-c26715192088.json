@@ -1,0 +1,29 @@
+{
+  "id": "e486a854-1860-4d25-8cc5-c26715192088",
+  "title": "Expose resolved hierarchy through the server API and output schemas",
+  "description": "Serve core hierarchy resolution to external consumers: resolved fields on the HTTP graph endpoint, a published schema for the tree output, and one consistent field set across export surfaces.\n\n## Background\n\nCore resolves parent/children/cluster/rank in `graph/hierarchy.rs`, and `jit graph tree` emits the full `HierarchyNodeView` (`output.rs:848-866`). But `GET /graph` (`crates/server/src/routes.rs:124-163`) ships only raw edges plus labels, `export_json_full` (`visualization.rs:208-238`) emits only `resolved_parent` and `cluster` (no children/rank), and `get_output_schema_for_command` (`schema.rs:359-410`) has no `graph_tree` arm even though the types derive `JsonSchema`. External consumers therefore re-derive resolution and re-parse `type:` labels.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: Each node in the `GET /graph` response carries resolved parent, children, cluster, rank, and the resolved type value, all computed by core resolution in the server (no client-side derivation required).\n- [ ] [hard] REQ-2: The published output schema set includes the graph-tree response shape, retrievable through the schema command.\n- [ ] [hard] REQ-3: The full JSON export emits the same four resolution fields as the tree output; the parent-and-cluster-only partial shape no longer exists.\n- [ ] [hard] REQ-4: The scoped-export caveat (a scoped node's parent may lie outside the emitted subtree, `commands/graph.rs:246-252`) is documented in the CLI reference for both export and tree surfaces.\n\n## Notes\n\nKeep the response envelope conventions (`{\"count\": N, \"<collection>\": [...]}` for lists). The server links the jit library directly, so this is a matter of calling the existing resolver in the route handler, not new resolution code.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "tdd-reminder",
+    "tests",
+    "fmt",
+    "clippy",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:work-graph-integrity",
+    "component:cli",
+    "component:backend",
+    "satisfies:REQ-2"
+  ],
+  "created_at": "2026-07-05T22:31:18.720853776Z",
+  "updated_at": "2026-07-05T22:31:18.721276526Z",
+  "first_ready_at": "2026-07-05T22:31:18.720854336Z"
+}
