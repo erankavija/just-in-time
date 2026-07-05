@@ -162,7 +162,6 @@ fn test_add_multiple_dependencies() {
         .unwrap();
 
     assert_eq!(result.added.len(), 3);
-    assert!(result.errors.is_empty());
 
     let loaded = h.storage.load_issue(&from).unwrap();
     assert_eq!(loaded.dependencies.len(), 3);
@@ -189,27 +188,39 @@ fn test_add_dependencies_some_already_exist() {
 
     assert_eq!(result.added.len(), 1); // to2
     assert_eq!(result.already_exist.len(), 1); // to1
-    assert!(result.errors.is_empty());
 }
 
+/// jit:c8518f2a REQ-01: a batch with an unresolvable target is atomic — the
+/// resolvable sibling must NOT be persisted either. Mirrors the already-atomic
+/// `add_gates` contract (`test_add_gates_atomic_failure_invalid_gate`).
 #[test]
-fn test_add_dependencies_partial_failure_nonexistent() {
+fn test_add_dependencies_atomic_failure_nonexistent() {
     let h = TestHarness::new();
     let from = h.create_issue("Parent");
     let to1 = h.create_issue("Dep 1");
 
     let result = h
         .executor
-        .add_dependencies(&from, &[to1.clone(), "nonexistent".to_string()])
-        .unwrap();
+        .add_dependencies(&from, &[to1.clone(), "nonexistent".to_string()]);
 
-    assert_eq!(result.added.len(), 1); // to1
-    assert_eq!(result.errors.len(), 1); // nonexistent
-    assert!(result.errors[0].1.contains("not found"));
+    let err = result.expect_err("an unresolvable target must fail the whole batch");
+    let batch = err
+        .downcast_ref::<jit::errors::DependencyBatchRejectedError>()
+        .expect("must be a typed DependencyBatchRejectedError");
+    assert_eq!(batch.rejected().len(), 1);
+    assert_eq!(batch.rejected()[0].0, "nonexistent");
+    assert!(batch.rejected()[0].1.to_string().contains("not found"));
+
+    // Nothing was persisted, including the sibling edge that would have
+    // succeeded on its own.
+    let loaded = h.storage.load_issue(&from).unwrap();
+    assert!(loaded.dependencies.is_empty());
 }
 
+/// jit:c8518f2a REQ-01: a cycle among the requested edges rejects the whole
+/// batch atomically; nothing is written.
 #[test]
-fn test_add_dependencies_cycle_detection() {
+fn test_add_dependencies_cycle_detection_atomic() {
     let h = TestHarness::new();
     let a = h.create_issue("A");
     let b = h.create_issue("B");
@@ -220,14 +231,17 @@ fn test_add_dependencies_cycle_detection() {
     h.executor.add_dependency(&b, &c).unwrap();
 
     // Try to add C → A (would create cycle)
-    let result = h
-        .executor
-        .add_dependencies(&c, std::slice::from_ref(&a))
-        .unwrap();
+    let result = h.executor.add_dependencies(&c, std::slice::from_ref(&a));
 
-    assert_eq!(result.added.len(), 0);
-    assert_eq!(result.errors.len(), 1);
-    assert!(result.errors[0].1.contains("cycle"));
+    let err = result.expect_err("a cycle must fail the whole batch");
+    let batch = err
+        .downcast_ref::<jit::errors::DependencyBatchRejectedError>()
+        .expect("must be a typed DependencyBatchRejectedError");
+    assert_eq!(batch.rejected().len(), 1);
+    assert!(batch.rejected()[0].1.to_string().contains("cycle"));
+
+    let loaded = h.storage.load_issue(&c).unwrap();
+    assert!(!loaded.dependencies.contains(&a));
 }
 
 #[test]

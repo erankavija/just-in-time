@@ -2051,7 +2051,99 @@ jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
 
 ## Dependency Commands
 
-<!-- jit dep add/rm -->
+### `jit dep add`
+
+Add one or more dependencies to an issue. `FROM` is blocked until every listed
+`TO` completes. Dependencies are orthogonal to labels: issues don't need
+matching labels to depend on each other.
+
+**Usage:**
+```bash
+jit dep add <FROM_ID> <TO_ID>... [--reduce] [--json]
+```
+
+**Arguments:**
+- `FROM_ID` — the issue that becomes blocked
+- `TO_ID...` — one or more issues that must complete first
+
+**All-or-nothing (jit:c8518f2a):** every requested edge is validated — id
+resolution, then cycle detection and (by default) a check that the edge
+doesn't leave the graph transitively redundant — against the graph with every
+edge of the call applied at once, BEFORE anything is written. If any edge
+fails, none of them are added and no event is logged for any of them, even
+edges that would have succeeded on their own. The error names every rejected
+edge, not only the first.
+
+By default, an edge that would shadow an existing direct edge (or is itself
+already reachable through other dependencies) is rejected, naming the
+offending edge pair (exit code `4`). Pass `--reduce` to add the edge anyway and
+drop the now-redundant edge(s) in the same operation, leaving the graph
+transitively reduced — `jit validate` would otherwise flag the same violation
+later. `jit validate --fix` performs the equivalent cleanup after the fact.
+
+**Examples:**
+```bash
+# Single dependency
+jit dep add epic-123 task-456
+
+# Multiple dependencies in one call
+jit dep add epic-123 task-1 task-2 task-3
+
+# A redundant edge is rejected by default...
+jit dep add downstream-issue shadowed-target
+# Error: Refusing to add dependency ...: it would leave the graph not
+# transitively reduced. Redundant edge(s): .... Re-run with `jit dep add
+# --reduce` to drop the now-redundant edge(s) in the same operation, ...
+
+# ...--reduce adds it and drops the shadowed edge instead
+jit dep add downstream-issue shadowed-target --reduce
+```
+
+**JSON error output (rejected batch):**
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Refusing to add dependency ...",
+    "details": {
+      "from_id": "epic-123",
+      "rejected": [
+        { "from": "epic-123", "to": "task-2", "code": "VALIDATION_FAILED", "message": "..." }
+      ]
+    }
+  }
+}
+```
+
+A batch mixing an id-resolution failure (too-short/ambiguous prefix, not
+found) with a graph-validation failure (cycle, or a rejected redundant edge)
+exits with the resolution failure's code — resolution runs before graph
+validation, so it wins the batch's exit code — while `details.rejected` still
+lists every rejected edge.
+
+### `jit dep rm`
+
+Remove one or more dependencies from an issue. Unlike `dep add`, each `TO_ID`
+is matched directly against `FROM_ID`'s own stored dependencies (by exact id or
+by a 4+ character prefix), not resolved through the repository-wide index —
+this keeps a dangling edge (whose target issue was deleted) removable.
+
+**Usage:**
+```bash
+jit dep rm <FROM_ID> <TO_ID>... [--json]
+```
+
+**Examples:**
+```bash
+# Single dependency
+jit dep rm epic-123 task-456
+
+# Multiple dependencies in one call
+jit dep rm epic-123 task-1 task-2
+```
+
+Removing a dependency can unblock the issue; a removal that clears the last
+incomplete dependency auto-transitions a `backlog` issue to `ready`.
 
 ## Query Commands
 

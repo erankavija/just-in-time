@@ -31,6 +31,12 @@ use std::str::FromStr;
 
 /// Helper to determine exit code from error message
 fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
+    // A rejected `jit dep add` batch (jit:c8518f2a) wraps every rejected edge's
+    // own typed error; classify by the batch's dominant edge rather than this
+    // wrapper itself, so a mixed batch still maps to the right exit code.
+    if let Some(batch) = error.downcast_ref::<jit::errors::DependencyBatchRejectedError>() {
+        return dependency_batch_exit_code(batch);
+    }
     // A `gate evaluate` checker that ran but did not pass: split checker-failure
     // (verdict `fail`, validation error) from runner/infra error (verdict
     // `error`, external error). `Passed` never produces this error.
@@ -237,6 +243,160 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     // classified by a typed downcast above; classification is never driven by
     // matching against a human-readable error string.
     ExitCode::GenericError
+}
+
+/// Pick the dominant exit code across every rejected edge of a `jit dep add`
+/// batch (jit:c8518f2a). Resolution failures (bad/ambiguous id prefix, not
+/// found — exit 2/3) always win over graph-validation failures (cycle, or a
+/// rejected redundant edge — exit 4): resolution runs before graph
+/// validation, so a resolution failure blocks that edge from ever reaching
+/// graph validation and takes precedence when a batch mixes both classes.
+/// Ties within the winning class are broken by request order (the first
+/// offending edge wins). Each rejected edge is classified by recursing
+/// through [`error_to_exit_code`], so this stays in lockstep with every other
+/// typed classification above.
+fn dependency_batch_exit_code(batch: &jit::errors::DependencyBatchRejectedError) -> ExitCode {
+    batch
+        .rejected()
+        .iter()
+        .map(|(_, e)| error_to_exit_code(e))
+        .find(|code| *code != ExitCode::ValidationFailed)
+        .unwrap_or(ExitCode::ValidationFailed)
+}
+
+/// Build the `--json` error envelope for a rejected `jit dep add` batch
+/// (jit:c8518f2a). Every rejected edge is named under `details.rejected`
+/// (REQ-02), each carrying its own classified `code` — the same per-edge
+/// classification the single-edge path used before the batch was made atomic
+/// (jit:a05b87ae). The top-level `code`/`message` mirror the batch's dominant
+/// edge, matching [`dependency_batch_exit_code`]'s tiering exactly (both walk
+/// the same rejected list and stop at the first non-`ValidationFailed`
+/// classification), so the JSON and non-JSON paths always agree on exit code.
+fn dep_add_batch_json_error(
+    batch: &jit::errors::DependencyBatchRejectedError,
+) -> jit::output::JsonError {
+    use jit::output::{ErrorCode, JsonError};
+    use jit::GraphError;
+
+    let from_id = batch.from_id();
+
+    // Classify every rejected edge (for the `details.rejected` array): the
+    // SAME per-edge classification the single-edge path used before the
+    // batch was made atomic (jit:a05b87ae).
+    let classify = |err: &anyhow::Error| -> &'static str {
+        if matches!(
+            err.downcast_ref::<GraphError>(),
+            Some(GraphError::CycleDetected)
+        ) {
+            ErrorCode::CYCLE_DETECTED
+        } else if err
+            .downcast_ref::<jit::errors::RedundantDependencyError>()
+            .is_some()
+        {
+            ErrorCode::VALIDATION_FAILED
+        } else if err
+            .downcast_ref::<jit::storage::IssueNotFoundError>()
+            .is_some()
+            || matches!(
+                err.downcast_ref::<GraphError>(),
+                Some(GraphError::NodeNotFound { .. })
+            )
+        {
+            ErrorCode::ISSUE_NOT_FOUND
+        } else if err
+            .downcast_ref::<jit::storage::InvalidIdPrefixError>()
+            .is_some()
+        {
+            ErrorCode::INVALID_ID_PREFIX
+        } else if err
+            .downcast_ref::<jit::storage::AmbiguousIdError>()
+            .is_some()
+        {
+            ErrorCode::AMBIGUOUS_ID
+        } else {
+            "DEPENDENCY_ERROR"
+        }
+    };
+    let edge_message = |to: &str, err: &anyhow::Error| -> String {
+        // The nicer templated cycle message names both ends of the edge;
+        // every other kind's `Display` already names what's needed.
+        if matches!(
+            err.downcast_ref::<GraphError>(),
+            Some(GraphError::CycleDetected)
+        ) {
+            format!("Adding dependency would create a cycle: {from_id} -> {to}")
+        } else {
+            err.to_string()
+        }
+    };
+
+    let rejected_details: Vec<serde_json::Value> = batch
+        .rejected()
+        .iter()
+        .map(|(to, err)| {
+            serde_json::json!({
+                "from": from_id,
+                "to": to,
+                "code": classify(err),
+                "message": edge_message(to, err),
+            })
+        })
+        .collect();
+
+    // The dominant edge — the same tiering `dependency_batch_exit_code` uses
+    // (a resolution failure always wins over a graph-validation failure) —
+    // drives the top-level `code`/`message`/`suggestions`. Built via the SAME
+    // per-kind constructor the single-edge path used (`cycle_detected`,
+    // `issue_not_found`, `refine_id_error`), so this batch wrapper preserves
+    // their suggestions and kind-specific detail fields; the batch-wide
+    // per-edge listing is then merged in alongside them, not in place of them.
+    let dominant_index = batch
+        .rejected()
+        .iter()
+        .position(|(_, err)| error_to_exit_code(err) != ExitCode::ValidationFailed)
+        .unwrap_or(0);
+    let (to, err) = &batch.rejected()[dominant_index];
+
+    let mut json_error = if matches!(
+        err.downcast_ref::<GraphError>(),
+        Some(GraphError::CycleDetected)
+    ) {
+        JsonError::cycle_detected(from_id, to, "dep add")
+    } else if err
+        .downcast_ref::<jit::errors::RedundantDependencyError>()
+        .is_some()
+    {
+        JsonError::new(ErrorCode::VALIDATION_FAILED, err.to_string(), "dep add")
+    } else if err
+        .downcast_ref::<jit::storage::IssueNotFoundError>()
+        .is_some()
+        || matches!(
+            err.downcast_ref::<GraphError>(),
+            Some(GraphError::NodeNotFound { .. })
+        )
+    {
+        JsonError::issue_not_found(to, "dep add")
+    } else {
+        jit::output::refine_id_error(
+            err,
+            JsonError::new("DEPENDENCY_ERROR", err.to_string(), "dep add"),
+        )
+    };
+
+    let mut details = json_error
+        .error
+        .details
+        .take()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if let serde_json::Value::Object(ref mut map) = details {
+        map.insert("from_id".to_string(), serde_json::json!(from_id));
+        map.insert(
+            "rejected".to_string(),
+            serde_json::Value::Array(rejected_details),
+        );
+    }
+    json_error.error.details = Some(details);
+    json_error
 }
 
 /// Build the JSON error envelope for a failed claim/lease command.
@@ -2335,73 +2495,7 @@ fn run() -> Result<()> {
                 };
                 let output_ctx = OutputContext::new(quiet, json);
                 match executor.add_dependencies_with_policy(&from_id, &to_ids, policy) {
-                    Ok(mut result) => {
-                        // Any per-edge failure fails the whole command with a
-                        // nonzero exit, even when other edges were added: a
-                        // rejected redundant edge (REQ-01) — or a cycle/not-found
-                        // in a variadic add — must never be masked by a sibling
-                        // success. Edges added before the failure remain
-                        // persisted; the first typed error classifies the exit.
-                        if !result.errors.is_empty() {
-                            // Classify the first failure by its TYPED error, not by
-                            // scanning the message. `typed_errors` mirrors `errors`
-                            // 1:1, so it is guaranteed non-empty here.
-                            let (dep_id, typed) = result
-                                .typed_errors
-                                .drain(..)
-                                .next()
-                                .expect("typed_errors mirrors the non-empty errors list");
-                            if json {
-                                use jit::output::JsonError;
-                                use jit::GraphError;
-                                let json_error = if let Some(GraphError::CycleDetected) =
-                                    typed.downcast_ref::<GraphError>()
-                                {
-                                    JsonError::cycle_detected(&from_id, &dep_id, "dep add")
-                                } else if typed
-                                    .downcast_ref::<jit::errors::RedundantDependencyError>()
-                                    .is_some()
-                                {
-                                    // A transitive-reduction violation is the same
-                                    // condition `jit validate` reports (exit 4).
-                                    JsonError::new(
-                                        jit::output::ErrorCode::VALIDATION_FAILED,
-                                        typed.to_string(),
-                                        "dep add",
-                                    )
-                                } else if typed
-                                    .downcast_ref::<jit::storage::IssueNotFoundError>()
-                                    .is_some()
-                                    || matches!(
-                                        typed.downcast_ref::<GraphError>(),
-                                        Some(GraphError::NodeNotFound { .. })
-                                    )
-                                {
-                                    JsonError::issue_not_found(&dep_id, "dep add")
-                                } else {
-                                    // A too-short / ambiguous id prefix (in either
-                                    // the <from> or a <target> position) is refined
-                                    // to its INVALID_ID_PREFIX / AMBIGUOUS_ID code
-                                    // (exit 2); anything else keeps DEPENDENCY_ERROR.
-                                    jit::output::refine_id_error(
-                                        &typed,
-                                        JsonError::new(
-                                            "DEPENDENCY_ERROR",
-                                            typed.to_string(),
-                                            "dep add",
-                                        ),
-                                    )
-                                };
-                                println!("{}", json_error.to_json_string()?);
-                                std::process::exit(json_error.exit_code().code());
-                            } else {
-                                // Propagate the typed error so `error_to_exit_code`
-                                // can classify it by downcast (preserving the
-                                // cycle -> exit 4 / not-found -> exit 3 mapping).
-                                return Err(typed);
-                            }
-                        }
-
+                    Ok(result) => {
                         if json {
                             use jit::output::JsonOutput;
                             let response = serde_json::json!({
@@ -2409,7 +2503,6 @@ fn run() -> Result<()> {
                                 "added": result.added,
                                 "already_exist": result.already_exist,
                                 "skipped": result.skipped,
-                                "errors": result.errors,
                                 "message": format!("Added {} dependencies to issue {}", result.added.len(), from_id)
                             });
                             let output = JsonOutput::success(response, "dep add");
@@ -2437,19 +2530,26 @@ fn run() -> Result<()> {
                                     println!("  • {}: {}", dep, reason);
                                 }
                             }
-                            if !result.errors.is_empty() {
-                                println!("✗ Errors ({}):", result.errors.len());
-                                for (dep, error) in &result.errors {
-                                    println!("  • {}: {}", dep, error);
-                                }
-                            }
                         }
                     }
                     Err(e) => {
+                        // A rejected-batch failure (jit:c8518f2a) names every
+                        // rejected edge; anything else (bad `<from>`, empty
+                        // `dep_ids`) falls through to the generic fallback below.
+                        if let Some(batch) =
+                            e.downcast_ref::<jit::errors::DependencyBatchRejectedError>()
+                        {
+                            if json {
+                                let json_error = dep_add_batch_json_error(batch);
+                                let code = json_error.exit_code().code();
+                                println!("{}", json_error.to_json_string()?);
+                                std::process::exit(code);
+                            }
+                            return Err(e);
+                        }
                         // `handle_json_error!` refines the fallback when the
                         // failure is a typed id-resolution error (ambiguous /
-                        // too-short prefix), consistent with the per-edge path
-                        // above and with `dep rm`.
+                        // too-short prefix), consistent with `dep rm`.
                         handle_json_error!(
                             json,
                             e,

@@ -524,6 +524,109 @@ impl RedundantDependencyError {
     }
 }
 
+/// A `jit dep add` batch where at least one requested edge failed validation.
+///
+/// [`add_dependencies_with_policy`](crate::commands::CommandExecutor::add_dependencies_with_policy)
+/// validates every requested edge against the would-be-final graph BEFORE
+/// writing anything: id resolution (too-short prefix, ambiguous, or not
+/// found) and graph validation (cycle detection, and — under
+/// [`RedundancyPolicy::Reject`](crate::commands::RedundancyPolicy::Reject) —
+/// the transitive-reduction check) both run for every edge first. If any edge
+/// fails either check, this error is returned and NONE of the batch's edges
+/// are applied and no event is logged for any of them (jit:c8518f2a, REQ-01).
+/// Every rejected edge is named, not only the first (REQ-02).
+///
+/// Each rejected edge keeps its own originating typed error so a caller (the
+/// CLI) can still classify it individually — by downcast, never by message
+/// text — for a per-edge JSON `code`, while the binary's exit-code classifier
+/// can downcast this wrapper directly and pick a single dominant exit code
+/// across the whole batch.
+///
+/// # Examples
+///
+/// ```
+/// use jit::errors::DependencyBatchRejectedError;
+///
+/// let err = DependencyBatchRejectedError::new(
+///     "aaaa1111",
+///     vec![
+///         ("bbbb2222".to_string(), anyhow::anyhow!("Issue not found: bbbb2222")),
+///         ("cccc3333".to_string(), anyhow::anyhow!("cycle detected")),
+///     ],
+/// );
+/// let msg = err.to_string();
+/// assert!(msg.contains("bbbb2222"));
+/// assert!(msg.contains("cccc3333"));
+/// assert!(msg.contains("none were added"));
+/// assert_eq!(err.from_id(), "aaaa1111");
+/// assert_eq!(err.rejected().len(), 2);
+///
+/// // Downcastable through anyhow for exit-code classification.
+/// let any: anyhow::Error = err.into();
+/// assert!(any.downcast_ref::<DependencyBatchRejectedError>().is_some());
+/// ```
+#[derive(Debug)]
+pub struct DependencyBatchRejectedError {
+    message: String,
+    from_id: String,
+    rejected: Vec<(String, anyhow::Error)>,
+}
+
+impl std::fmt::Display for DependencyBatchRejectedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for DependencyBatchRejectedError {}
+
+impl DependencyBatchRejectedError {
+    /// Build the aggregate rejection from every failing target: the as-supplied
+    /// target id text paired with the typed error that rejected it, in request
+    /// order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::errors::DependencyBatchRejectedError;
+    ///
+    /// let err = DependencyBatchRejectedError::new(
+    ///     "aaaa1111",
+    ///     vec![("bbbb2222".to_string(), anyhow::anyhow!("bad prefix"))],
+    /// );
+    /// assert!(err.to_string().contains("Rejected 1"));
+    /// ```
+    pub fn new(from_id: impl Into<String>, rejected: Vec<(String, anyhow::Error)>) -> Self {
+        let from_id = from_id.into();
+        let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
+        let mut message = format!(
+            "Rejected {} dependency edge{} for {}; none were added:\n",
+            rejected.len(),
+            if rejected.len() == 1 { "" } else { "s" },
+            short(&from_id),
+        );
+        for (to, error) in &rejected {
+            message.push_str(&format!("  - {}: {}\n", to, error));
+        }
+        Self {
+            message,
+            from_id,
+            rejected,
+        }
+    }
+
+    /// The issue the batch targeted (the `<from>` of `jit dep add`).
+    pub fn from_id(&self) -> &str {
+        &self.from_id
+    }
+
+    /// Every rejected edge: the as-supplied target id text paired with the
+    /// typed error that rejected it, in request order.
+    pub fn rejected(&self) -> &[(String, anyhow::Error)] {
+        &self.rejected
+    }
+}
+
 /// A state-transition failure with structured blocker details.
 ///
 /// Command logic uses this error to report why an issue cannot move to the

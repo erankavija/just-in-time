@@ -132,10 +132,13 @@ fn test_cli_dep_add_reduce_succeeds_and_validate_clean() {
     );
 }
 
-/// REQ-01 (variadic): a redundant edge among several targets must fail the whole
-/// `jit dep add` with a nonzero exit, even though a sibling edge was added — a
-/// rejected redundant edge must not be masked by a partial success. The valid
-/// edge stays persisted and the graph stays transitively reduced.
+/// jit:c8518f2a REQ-01 (variadic): a redundant edge among several targets
+/// fails the whole `jit dep add` atomically — the sibling edge that would
+/// have succeeded on its own must NOT be persisted either. This is the
+/// combination case: A -> C is only redundant once A -> B is ALSO in this
+/// same call (neither edge is redundant on its own against the pre-existing
+/// graph), so the would-be-final-graph check must consider both edges
+/// together, not one at a time.
 #[test]
 fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
     let temp = setup_test_repo();
@@ -147,7 +150,8 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
     // Pre-existing B -> C, so a later A -> C is redundant once A -> B is added.
     assert!(dep_add(dir, &b, &c, &[]).status.success());
 
-    // Variadic: A -> B (valid) and A -> C (redundant via A -> B -> C).
+    // Variadic: A -> B (valid alone) and A -> C (redundant only in
+    // combination with A -> B).
     let out = Command::new(jit_binary())
         .args(["dep", "add", &a, &b, &c])
         .current_dir(dir)
@@ -159,17 +163,119 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "redundant-edge rejection maps to ValidationFailed (exit 4)"
+    );
 
-    // The valid A -> B edge persisted and the redundant A -> C was rejected, so
-    // the repository still validates cleanly (no transitive-reduction violation).
-    let validate = Command::new(jit_binary())
-        .args(["validate"])
+    // All-or-nothing: A -> B must NOT have been persisted either, even though
+    // it would have succeeded on its own.
+    let show = Command::new(jit_binary())
+        .args(["issue", "show", &a, "--json"])
         .current_dir(dir)
         .output()
         .unwrap();
+    assert!(show.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
+    let deps = json["dependencies"].as_array().unwrap();
     assert!(
-        validate.status.success(),
-        "validate must be clean after the partial add: {}",
-        String::from_utf8_lossy(&validate.stderr)
+        deps.is_empty(),
+        "no edge should have been added when a sibling edge is rejected: {:?}",
+        deps
     );
+
+    // Nothing was written, so the pre-existing B -> C edge is exactly as it
+    // was: still direct, not shadowed by any A edge.
+    let show_b = Command::new(jit_binary())
+        .args(["issue", "show", &b, "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(show_b.status.success());
+    let json_b: serde_json::Value = serde_json::from_slice(&show_b.stdout).unwrap();
+    let deps_b: Vec<&str> = json_b["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(deps_b, vec![c.as_str()]);
+}
+
+/// jit:c8518f2a: a batch mixing a usage/resolution failure (too-short id
+/// prefix) with a graph-validation failure (a self-redundant edge) exits with
+/// the usage error's code (2), not the validation error's (4) — resolution
+/// runs before graph validation, so it wins the batch's dominant
+/// classification. Both edges are still named in the error output.
+#[test]
+fn test_cli_dep_add_mixed_error_classes_prefix_wins_over_redundant() {
+    let temp = setup_test_repo();
+    let dir = temp.path();
+    let a = create_issue(dir, "A");
+    let b = create_issue(dir, "B");
+    let c = create_issue(dir, "C");
+
+    // A -> B -> C exist, so a direct A -> C is self-redundant.
+    assert!(dep_add(dir, &a, &b, &[]).status.success());
+    assert!(dep_add(dir, &b, &c, &[]).status.success());
+
+    // Text mode: exit 2 (usage/prefix), not 4 (validation).
+    let out = Command::new(jit_binary())
+        .args(["dep", "add", &a, &c, "ab"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "a bad id prefix must dominate a sibling redundant-edge failure: stdout={} stderr={}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("at least 4 characters"),
+        "must name the bad prefix: {stderr}"
+    );
+    assert!(
+        stderr.contains(&c[..8]),
+        "must ALSO name the redundant edge, not only the dominant failure: {stderr}"
+    );
+
+    // JSON mode: same exit code, INVALID_ID_PREFIX at top level, both edges
+    // present in details.rejected.
+    let out_json = Command::new(jit_binary())
+        .args(["dep", "add", &a, &c, "ab", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert_eq!(out_json.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&out_json.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+
+    let rejected = json["error"]["details"]["rejected"].as_array().unwrap();
+    assert_eq!(rejected.len(), 2, "both edges must be named: {rejected:?}");
+    let codes: Vec<&str> = rejected
+        .iter()
+        .map(|r| r["code"].as_str().unwrap())
+        .collect();
+    assert!(codes.contains(&"INVALID_ID_PREFIX"));
+    assert!(codes.contains(&"VALIDATION_FAILED"));
+
+    // Nothing was written.
+    let show = Command::new(jit_binary())
+        .args(["issue", "show", &a, "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let json_a: serde_json::Value = serde_json::from_slice(&show.stdout).unwrap();
+    let deps: Vec<&str> = json_a["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(deps, vec![b.as_str()]);
 }

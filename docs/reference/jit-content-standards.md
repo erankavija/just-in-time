@@ -162,6 +162,9 @@ These are JIT CLI / tooling quirks worth knowing while writing or editing issues
   a nonzero exit that names the offending pair; pass `--reduce` to add it and drop
   the now-redundant edge in the same operation. `jit validate` still flags any
   pre-existing "Transitive reduction violation" and `jit validate --fix` removes it.
+- **`jit dep add` with multiple targets is all-or-nothing.** If any of the listed
+  edges fails validation, none of them are added — even ones that would have
+  succeeded alone — and the error names every rejected edge, not only the first.
 - **`jit issue update --label` appends; it does not replace.** To rename a label,
   pair it with `--remove-label`: `jit issue update <id> --label new --remove-label old`.
 - **Title HTML-escaping.** See *Issue Titles* above — `<` and `>` are escaped only in

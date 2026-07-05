@@ -74,6 +74,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`jit dep add` with multiple targets is now atomic.** Previously, a variadic
+  add (`jit dep add <from> <to1> <to2> ...`) applied edges one at a time, so an
+  edge that failed validation (e.g. a redundant edge under the default
+  `--reduce`-less policy) left any earlier, already-applied edges persisted —
+  the exit code no longer meant "nothing changed." Every requested edge is now
+  validated against the would-be-final graph (every edge of the call applied at
+  once, so a violation that only emerges from the COMBINATION of two edges in
+  the same call is also caught) before anything is written; if any edge fails,
+  none of them are added and no event is logged for any of them. The error now
+  names every rejected edge, not only the first, and under `--json` carries a
+  `details.rejected` array of `{from, to, code, message}` per rejected edge. A
+  batch mixing an id-resolution failure with a graph-validation failure exits
+  with the resolution failure's code (resolution runs before graph
+  validation).
 - **Doubled "Error: Error:" prefix on `ActionableError` paths.** Any command
   surfacing an `ActionableError`-derived failure (e.g. an already-claimed
   lease, a missing acting identity, the claims-require-git failure) now prints
@@ -97,6 +111,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Migration
 
+- **BREAKING — `jit dep add` with multiple targets no longer partially
+  applies on failure.** A variadic add where one target fails validation used
+  to leave every edge before the failure persisted; it now leaves the
+  dependency set completely unchanged. Scripts that relied on the partial
+  application (e.g. retrying only the failed target) must instead retry the
+  whole batch. The `--json` success/error response no longer includes an
+  `errors` array — a failure is now the command's `Err`/nonzero-exit path,
+  carrying every rejected edge under `error.details.rejected` instead.
 - **BREAKING — exit codes for prefix and batch-usage errors changed from `1` to
   `2`.** Scripts that branch on the exit code of an ambiguous/too-short id prefix,
   a `jit issue update --filter` usage guard, a misplaced pre-subcommand `jit
