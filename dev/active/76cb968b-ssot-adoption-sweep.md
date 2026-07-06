@@ -17,7 +17,7 @@ Copied from the issue description (authoritative there):
 
 - [ ] [hard] REQ-01: every repo-tracked skill file that restates invariant/rule/gate content is converted per the tier rule — behavioral text to bare address (tier 3), explanatory text to clause-length gloss + address (tier 2) — and each dispatch-prompt template carries the standing resolve instruction; invariant citations in skill files use the `@/inv/…` alias form; a sweep table (file -> tier -> change) is linked to this issue via `jit doc add` as evidence.
 - [ ] [hard] REQ-02: README and docs/ introduce the addressing scheme and the cite-the-address convention; quoted registry content carries its address; renderer-owned projections stay inline and are identified as such.
-- [ ] [hard] REQ-03: CLAUDE.md guidance cites addresses for rule/gate/invariant references outside the rendered invariant region.
+- [ ] [hard] REQ-03: CLAUDE.md guidance cites addresses for rule/gate/invariant references outside the rendered invariant region; invariant citations use the `@/inv/…` alias form.
 - [ ] [hard] REQ-04: every `@/…` address cited by the swept surfaces (skills, README, docs, CLAUDE.md, Rust comments) resolves via `jit item show` (dangling-citation check attached as evidence); `jit validate` stays green.
 - [ ] [hard] REQ-05: every invariant self-id is lowercase-kebab without a kind prefix, uniform with rule and gate self-ids: the registry, the config id-pattern, the `jit init` scaffold, and the rendered CLAUDE.md region all agree; `jit item show @/invariant/<id>` resolves all eight renamed ids; `jit invariant check` stays green; no `INV-`-prefixed invariant id remains outside historical documents.
 - [ ] [hard] REQ-06: Rust comments and doc-comment examples cite invariants by address in the `@/inv/<self-id>` alias form, and doc-comment example ids follow the lowercase convention; `cargo clippy --workspace --all-targets` and `cargo fmt --all -- --check` stay clean.
@@ -80,7 +80,7 @@ Surfaces: `.claude/skills/{jit-manage,jit-breakdown,jit-parallel,jit-execution-l
 
 - README: a section introducing addressable project knowledge, `jit item show/list/search`, the cite-the-address convention, the `@/inv` alias, and the note that user-global skill copies under `~/.claude/skills/` sync from the repo-tracked ones.
 - docs/: introduce the addressing scheme where reference/how-to content quotes registry items; add the address after each quote (tier 2); point at `docs/reference/rules-and-gates.md` as the rendered SSOT example and mark renderer-owned projections as such; document the `enforces:@/…` label convention.
-- CLAUDE.md: guidance outside the `jit:invariants` region cites addresses instead of restating rule/gate behavior.
+- CLAUDE.md: guidance outside the `jit:invariants` region cites addresses instead of restating rule/gate behavior; invariant citations use the `@/inv/…` form. The rendered region itself is renderer-owned (id-anchor bullets over self-ids) and stays exactly as `jit invariant render` emits it.
 
 ### Verification harness (REQ-04)
 
@@ -108,7 +108,7 @@ Commits: code and doc edits in feature commits per phase (`feat(jit:76cb968b): �
 
 ## Risks and Open Questions
 
-- **Citation-form split:** skills and Rust comments cite `@/inv/…` (brevity in agent-facing text); README, docs, and CLAUDE.md cite canonical `@/invariant/…` (self-descriptive for readers being introduced to the scheme). Two spellings for one kind is deliberate; the alias task documents that they are the same namespace.
+- **Citation-form split:** agent-facing authored text (skills, CLAUDE.md guidance, Rust comments) cites `@/inv/…`; README and docs cite canonical `@/invariant/…` (self-descriptive for readers being introduced to the scheme). Two spellings for one kind is deliberate; the alias task documents that they are the same namespace.
 - **id-pattern semantics:** the old pattern never matched the real ids, which suggests patterns are not validated against registry ids; if implementation finds a validator that does check, the pattern change is load-bearing and needs a test.
 - **Stale binary:** alias resolution and the rename must be exercised against a freshly installed binary (`cargo install --path crates/jit`), not a stale PATH copy.
 - **Scope guard:** `~/.claude/skills/` user-global copies stay untouched; only the README note covers the sync expectation.
