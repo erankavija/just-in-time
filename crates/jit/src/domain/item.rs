@@ -794,6 +794,7 @@ pub struct ItemKind {
     source_path: Option<String>,
     toml_source: Option<TomlSourceDescriptor>,
     source_of_truth: SourceOfTruth,
+    aliases: Vec<String>,
 }
 
 impl ItemKind {
@@ -873,6 +874,7 @@ impl ItemKind {
                 kind: name.to_string(),
             });
         }
+        let aliases = config.aliases.clone().unwrap_or_default();
         Ok(Self {
             name: name.to_string(),
             section,
@@ -884,12 +886,57 @@ impl ItemKind {
             source_path,
             toml_source,
             source_of_truth,
+            aliases,
         })
     }
 
     /// The kind's display name.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The kind's config-declared aliases: shorthand names it may ALSO be
+    /// addressed by, beyond its registry [`name`](Self::name). Empty when the
+    /// kind declares none. Aliases are input sugar only — canonical output always
+    /// uses the registry name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ItemKindConfig;
+    /// use jit::domain::item::ItemKind;
+    ///
+    /// let cfg = ItemKindConfig {
+    ///     aliases: Some(vec!["inv".to_string()]),
+    ///     ..Default::default()
+    /// };
+    /// let kind = ItemKind::from_config("invariant", &cfg).unwrap();
+    /// assert_eq!(kind.aliases(), &["inv".to_string()]);
+    /// ```
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
+    }
+
+    /// Whether `name` addresses this kind by its registry [`name`](Self::name) or
+    /// any of its declared [`aliases`](Self::aliases).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ItemKindConfig;
+    /// use jit::domain::item::ItemKind;
+    ///
+    /// let cfg = ItemKindConfig {
+    ///     aliases: Some(vec!["inv".to_string()]),
+    ///     ..Default::default()
+    /// };
+    /// let kind = ItemKind::from_config("invariant", &cfg).unwrap();
+    /// assert!(kind.matches_name("invariant"));
+    /// assert!(kind.matches_name("inv"));
+    /// assert!(!kind.matches_name("requirement"));
+    /// ```
+    pub fn matches_name(&self, name: &str) -> bool {
+        self.name == name || self.aliases.iter().any(|alias| alias == name)
     }
 
     /// The section slug scanned for this kind's items.
@@ -1699,6 +1746,45 @@ pub fn resolve_item_kinds(
     }
 }
 
+/// Resolve a kind name OR one of its config-declared aliases to the kind's
+/// canonical registry name.
+///
+/// An alias is accepted anywhere a kind name is (the kind segment of an address,
+/// or a `--kind` filter); this maps whatever the caller typed back to the
+/// registry name so downstream matching — which always compares against the
+/// canonical [`AddressableItem::kind`] — works uniformly. Returns `None` when
+/// `name` matches no kind by name or alias, leaving the caller to report a
+/// descriptive not-found error. A pure lookup over its `kinds` parameter: no kind
+/// identity is baked into this module.
+///
+/// # Examples
+///
+/// ```
+/// use jit::config::ItemKindConfig;
+/// use jit::domain::item::{resolve_kind_alias, ItemKind};
+///
+/// let invariant = ItemKind::from_config(
+///     "invariant",
+///     &ItemKindConfig {
+///         aliases: Some(vec!["inv".to_string()]),
+///         ..Default::default()
+///     },
+/// )
+/// .unwrap();
+/// let kinds = [invariant];
+/// // Both the registry name and the alias resolve to the registry name.
+/// assert_eq!(resolve_kind_alias(&kinds, "invariant"), Some("invariant"));
+/// assert_eq!(resolve_kind_alias(&kinds, "inv"), Some("invariant"));
+/// // An unknown token resolves to nothing.
+/// assert_eq!(resolve_kind_alias(&kinds, "bogus"), None);
+/// ```
+pub fn resolve_kind_alias<'a>(kinds: &'a [ItemKind], name: &str) -> Option<&'a str> {
+    kinds
+        .iter()
+        .find(|kind| kind.matches_name(name))
+        .map(ItemKind::name)
+}
+
 /// The `(section, marker, id-pattern)` triple a named kind expands to, as owned
 /// strings ready to splice into a free-form rule config.
 ///
@@ -1804,6 +1890,7 @@ mod tests {
             scope: Some(KindScopeConfig::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         }
     }
 
@@ -1816,6 +1903,7 @@ mod tests {
             scope: Some(KindScopeConfig::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         }
     }
 
@@ -1828,6 +1916,7 @@ mod tests {
             scope: Some(KindScopeConfig::Issue),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         }
     }
 
@@ -1846,6 +1935,7 @@ mod tests {
                 link_fields: std::collections::BTreeMap::new(),
             })),
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
+            aliases: None,
         }
     }
 
@@ -2060,6 +2150,34 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_kind_alias_maps_alias_and_name_to_registry_name() {
+        // An alias declared on a kind resolves to that kind's registry name, as
+        // does the registry name itself; an unknown token resolves to nothing.
+        let invariant = ItemKind::from_config(
+            "invariant",
+            &ItemKindConfig {
+                aliases: Some(vec!["inv".to_string()]),
+                ..invariant_cfg()
+            },
+        )
+        .unwrap();
+        let requirement = ItemKind::from_config("requirement", &req_cfg()).unwrap();
+        let kinds = [invariant, requirement];
+
+        // Alias and registry name both resolve to the registry name.
+        assert_eq!(resolve_kind_alias(&kinds, "inv"), Some("invariant"));
+        assert_eq!(resolve_kind_alias(&kinds, "invariant"), Some("invariant"));
+        // A kind with no alias still resolves by its registry name.
+        assert_eq!(
+            resolve_kind_alias(&kinds, "requirement"),
+            Some("requirement")
+        );
+        // An unknown token (neither a name nor an alias) resolves to nothing.
+        assert_eq!(resolve_kind_alias(&kinds, "req"), None);
+        assert_eq!(resolve_kind_alias(&kinds, "bogus"), None);
+    }
+
+    #[test]
     fn test_resolve_item_kinds_empty_when_absent() {
         // No `[item_kinds]` table -> no kinds. The engine bakes in no domain
         // defaults (D4: single consumer, no backward-compat layer); kinds are
@@ -2128,6 +2246,7 @@ mod tests {
             scope: Some(KindScopeConfig::Project),
             source,
             source_of_truth: Some(SourceOfTruth::RegistryFirst),
+            aliases: None,
         };
 
         // No descriptor → rejected (the registry-first analogue of a missing
@@ -2188,6 +2307,7 @@ mod tests {
                 scope: Some(scope),
                 source,
                 source_of_truth: Some(sot),
+                aliases: None,
             }
         };
 
@@ -2227,6 +2347,7 @@ mod tests {
             scope: Some(KindScopeConfig::Project),
             source: None,
             source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         };
         let err = ItemKind::from_config("doc-req", &cfg).unwrap_err();
         assert!(matches!(err, ItemError::MissingProjectSource { .. }));

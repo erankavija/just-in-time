@@ -527,6 +527,16 @@ pub struct ItemKindConfig {
     /// a present value with [`ItemKindConfig::source_of_truth`].
     #[serde(rename = "source-of-truth")]
     pub source_of_truth: Option<SourceOfTruth>,
+    /// Shorthand names this kind may ALSO be addressed by, beyond its registry
+    /// key. An alias is accepted anywhere a kind name is (the kind segment of a
+    /// project- or issue-scope address, and `--kind` filters); canonical output
+    /// still uses the registry name, so aliases are input sugar only. Aliases
+    /// share the kind-name namespace: an alias duplicating a kind name or another
+    /// kind's alias is rejected by [`JitConfig::validate_item_kinds`]. NOT one of
+    /// the six required fields — it stays optional, and an absent field means the
+    /// kind has no aliases.
+    #[serde(default)]
+    pub aliases: Option<Vec<String>>,
 }
 
 /// The six required fields of an explicitly-declared item kind, in declaration
@@ -1497,6 +1507,22 @@ pub enum ItemKindConfigError {
         /// Comma-separated authored keys of the missing fields.
         missing: String,
     },
+    /// A kind's declared `alias` duplicates a kind name or another kind's alias.
+    /// Aliases share the kind-name namespace, so a shorthand that is already a
+    /// registry key or another declared alias is ambiguous and rejected.
+    #[error(
+        "[item_kinds.{kind}] alias '{alias}' collides with {conflict}; \
+         aliases share the kind-name namespace and must each be unique"
+    )]
+    AliasCollision {
+        /// The kind declaring the offending alias.
+        kind: String,
+        /// The duplicated alias token.
+        alias: String,
+        /// A short description of what the alias collides with (a kind name or
+        /// another declared alias).
+        conflict: String,
+    },
 }
 
 /// Parse error for [`WorktreeMode`].
@@ -1959,13 +1985,16 @@ impl JitConfig {
 
     /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all
     /// six fields (`section`, `id-pattern`, `markers`, `link-namespaces`, `scope`,
-    /// `source-of-truth`) on each.
+    /// `source-of-truth`) on each, and rejecting any `aliases` collision.
     ///
     /// Called by [`JitConfig::load`]. A `None` registry (no `[item_kinds]` table
     /// at all) declares no kinds (the engine bakes in none) and so validates
     /// trivially. Kinds are checked in name order so the first error is
     /// deterministic. The optional `source` PATH is not one of the six and is not
-    /// required.
+    /// required. The optional `aliases` list is likewise not required, but an
+    /// alias that duplicates a kind name or another kind's alias is an
+    /// [`ItemKindConfigError::AliasCollision`] (aliases share the kind-name
+    /// namespace).
     ///
     /// # Examples
     ///
@@ -2002,13 +2031,41 @@ impl JitConfig {
         };
         let mut names: Vec<&String> = registry.keys().collect();
         names.sort();
-        for name in names {
-            let missing = registry[name].missing_required_fields();
+        for name in &names {
+            let missing = registry[*name].missing_required_fields();
             if !missing.is_empty() {
                 return Err(ItemKindConfigError::MissingFields {
-                    kind: name.clone(),
+                    kind: (*name).clone(),
                     missing: missing.join(", "),
                 });
+            }
+        }
+        // Aliases share the kind-name namespace: an alias that duplicates a
+        // registry key or another declared alias is ambiguous. Kind names take
+        // precedence, and aliases are checked in kind-name then declaration order
+        // so the first reported collision is deterministic.
+        let kind_names: std::collections::HashSet<&str> =
+            registry.keys().map(String::as_str).collect();
+        let mut seen_aliases: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for name in &names {
+            let Some(aliases) = &registry[*name].aliases else {
+                continue;
+            };
+            for alias in aliases {
+                if kind_names.contains(alias.as_str()) {
+                    return Err(ItemKindConfigError::AliasCollision {
+                        kind: (*name).clone(),
+                        alias: alias.clone(),
+                        conflict: format!("kind name '{alias}'"),
+                    });
+                }
+                if !seen_aliases.insert(alias.as_str()) {
+                    return Err(ItemKindConfigError::AliasCollision {
+                        kind: (*name).clone(),
+                        alias: alias.clone(),
+                        conflict: format!("another declared alias '{alias}'"),
+                    });
+                }
             }
         }
         Ok(())
@@ -3001,6 +3058,7 @@ section = "success_criteria"
                     "present field not reported: {missing}"
                 );
             }
+            other => panic!("expected MissingFields, got {other:?}"),
         }
     }
 
@@ -3020,6 +3078,104 @@ section = "success_criteria"
             msg.contains("markers"),
             "error names a missing field: {msg}"
         );
+    }
+
+    /// A complete `[item_kinds.X]` table body with the six required fields, so a
+    /// test can focus on the `aliases` behavior under study.
+    fn complete_kind_body() -> &'static str {
+        "section = \"success_criteria\"\n\
+         id-pattern = \"REQ-\\\\d+\"\n\
+         markers = []\n\
+         link-namespaces = [\"satisfies\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n"
+    }
+
+    #[test]
+    fn test_item_kinds_aliases_parse_and_validate() {
+        // REQ-01: `aliases` parses from `[item_kinds.<kind>]` and a non-colliding
+        // alias validates cleanly.
+        let body = complete_kind_body();
+        let config_toml = format!("[item_kinds.invariant]\n{body}aliases = [\"inv\"]\n");
+        let config: JitConfig = toml::from_str(&config_toml).unwrap();
+        config
+            .validate_item_kinds()
+            .expect("non-colliding alias validates");
+        let kinds = config.item_kinds.unwrap();
+        assert_eq!(
+            kinds["invariant"].aliases.as_deref(),
+            Some(["inv".to_string()].as_slice())
+        );
+    }
+
+    #[test]
+    fn test_item_kinds_alias_colliding_with_kind_name_is_rejected() {
+        // REQ-02: an alias equal to a declared kind NAME is rejected — aliases
+        // share the kind-name namespace.
+        let body = complete_kind_body();
+        let config_toml = format!(
+            "[item_kinds.requirement]\n{body}\n[item_kinds.decision]\n{body}aliases = [\"requirement\"]\n"
+        );
+        let config: JitConfig = toml::from_str(&config_toml).unwrap();
+        let err = config
+            .validate_item_kinds()
+            .expect_err("alias duplicating a kind name must be rejected");
+        match err {
+            ItemKindConfigError::AliasCollision {
+                kind,
+                alias,
+                conflict,
+            } => {
+                assert_eq!(kind, "decision");
+                assert_eq!(alias, "requirement");
+                assert!(
+                    conflict.contains("kind name"),
+                    "conflict names cause: {conflict}"
+                );
+            }
+            other => panic!("expected AliasCollision, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_item_kinds_alias_colliding_with_another_alias_is_rejected() {
+        // REQ-02: an alias equal to ANOTHER kind's alias is rejected.
+        let body = complete_kind_body();
+        let config_toml = format!(
+            "[item_kinds.requirement]\n{body}aliases = [\"rq\"]\n[item_kinds.decision]\n{body}aliases = [\"rq\"]\n"
+        );
+        let config: JitConfig = toml::from_str(&config_toml).unwrap();
+        let err = config
+            .validate_item_kinds()
+            .expect_err("alias duplicating another alias must be rejected");
+        match err {
+            ItemKindConfigError::AliasCollision {
+                alias, conflict, ..
+            } => {
+                assert_eq!(alias, "rq");
+                assert!(
+                    conflict.contains("another declared alias"),
+                    "conflict names cause: {conflict}"
+                );
+            }
+            other => panic!("expected AliasCollision, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_item_kinds_alias_collision_rejected_through_load() {
+        // The alias-collision guard fires through the real `JitConfig::load` path,
+        // the same path that rejects a partial `[item_kinds]` declaration.
+        let body = complete_kind_body();
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            format!("[item_kinds.requirement]\n{body}aliases = [\"requirement\"]\n"),
+        )
+        .unwrap();
+        let err = JitConfig::load(temp_dir.path()).expect_err("load must reject colliding alias");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("requirement"), "error names the token: {msg}");
     }
 
     #[test]

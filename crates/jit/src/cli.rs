@@ -268,7 +268,10 @@ pub enum Commands {
     /// (`@/issue/<short-id>/<kind>/<self-id>` for an issue item, `@/<kind>/<self-id>`
     /// for a project item). Kinds are declared in `[item_kinds]` config; with no such table no kinds
     /// are declared (`jit init` scaffolds the table). Markdown stays the source of
-    /// truth — the index is a projection.
+    /// truth — the index is a projection. A kind may declare `aliases` in config;
+    /// an alias is accepted anywhere a kind name is (the kind segment of an address,
+    /// and `--kind` filters), e.g. `@/inv/<self-id>` for the `invariant` kind, while
+    /// canonical output always uses the registry name.
     #[command(subcommand)]
     Item(ItemCommands),
 
@@ -456,7 +459,8 @@ pub enum ItemCommands {
     ///
     /// JSON output uses the list envelope `{"count": N, "items": [...]}`.
     List {
-        /// Filter to one item kind by name (e.g. "requirement")
+        /// Filter to one item kind by name or config-declared alias
+        /// (e.g. "requirement", or "inv" for the invariant kind)
         #[arg(long)]
         kind: Option<String>,
 
@@ -472,11 +476,13 @@ pub enum ItemCommands {
     /// the local project's name resolves — `@/issue/<short-id>/<kind>/<self-id>` for
     /// an issue item) and the `<short-id>/<self-id>` input sugar (the kind is
     /// inferred from the self-id's shape). An issue reference may be a full id,
-    /// short id, or unique prefix.
+    /// short id, or unique prefix. The kind segment accepts a config-declared alias
+    /// (e.g. `@/inv/<self-id>` for the invariant kind); output uses the registry name.
     ///
     /// Examples:
     ///   jit item show @/issue/56ab0224/requirement/REQ-01
     ///   jit item show @/invariant/INV-01
+    ///   jit item show @/inv/INV-01                  # alias of @/invariant/INV-01
     ///   jit item show 56ab0224/REQ-01 --json
     Show {
         /// Qualified id of the item (`@/<kind>/<self-id>`,
@@ -515,7 +521,7 @@ pub enum ItemCommands {
         #[arg(default_value = "")]
         query: String,
 
-        /// Filter to one item kind by name
+        /// Filter to one item kind by name or config-declared alias
         #[arg(long)]
         kind: Option<String>,
 

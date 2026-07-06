@@ -215,6 +215,9 @@ link-namespaces = ["enforces"]
 scope = "project"
 source = {{ toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }}
 source-of-truth = "registry-first"
+# Shorthand for space-constrained citations: `@/inv/<self-id>` resolves the same
+# item as `@/invariant/<self-id>`.
+aliases = ["inv"]
 
 # Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
 # source, scaffolded above); the rule kind projects each entry's `name` as its
@@ -552,6 +555,9 @@ link-namespaces = [\"enforces\"]
 scope = \"project\"
 source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }
 source-of-truth = \"registry-first\"
+# Shorthand for space-constrained citations: `@/inv/<self-id>` resolves the same
+# item as `@/invariant/<self-id>`.
+aliases = [\"inv\"]
 
 # Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
 # source, scaffolded above); the rule kind projects each entry's `name` as its

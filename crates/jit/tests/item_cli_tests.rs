@@ -514,6 +514,60 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
 }
 
 #[test]
+fn test_item_kind_alias_resolves_through_real_cli() {
+    // REQ-01/REQ-03: the SHIPPED `jit init` scaffold declares `aliases = ["inv"]`
+    // on the invariant kind. The alias is accepted anywhere the registry name is
+    // (the `--kind` filter and the kind segment of a project-scope address), and
+    // canonical output still uses the registry name `invariant`.
+    let temp = setup_test_repo();
+    std::fs::write(
+        temp.path().join(".jit").join("invariants.toml"),
+        "[[invariants]]\n\
+         id = \"INV-01\"\n\
+         statement = \"Every dependency edge stays acyclic.\"\n\
+         kind = \"enforced\"\n",
+    )
+    .unwrap();
+
+    // `--kind inv` filters the same items as `--kind invariant`; qualified_id and
+    // kind fields are canonical (`invariant`, not the alias).
+    let output = Command::new(jit_binary())
+        .args(["item", "list", "--kind", "inv", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "item list --kind inv failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["count"].as_u64().unwrap(), 1);
+    let item = &json["items"][0];
+    assert_eq!(item["qualified_id"].as_str().unwrap(), "@/invariant/INV-01");
+    assert_eq!(item["kind"].as_str().unwrap(), "invariant");
+
+    // `jit item show @/inv/INV-01` resolves the SAME item as `@/invariant/INV-01`,
+    // and the canonical qualified_id uses the registry name.
+    let output = Command::new(jit_binary())
+        .args(["item", "show", "@/inv/INV-01", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "item show @/inv/INV-01 must resolve: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        json["item"]["qualified_id"].as_str().unwrap(),
+        "@/invariant/INV-01"
+    );
+    assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
+}
+
+#[test]
 fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     // REQ-03: the SHIPPED CLI no longer reserves the `invariant` name. A
     // config-declared markdown-first `[item_kinds.invariant]` (once rejected) now

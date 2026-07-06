@@ -3988,6 +3988,7 @@ source-of-truth = "markdown-first"
                 scope: Some(KindScopeConfig::Issue),
                 source: None,
                 source_of_truth: None,
+                aliases: None,
             },
         );
         let declared = expand_kind_triple(Some(&registry), "requirement").unwrap();

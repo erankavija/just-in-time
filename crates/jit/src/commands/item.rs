@@ -11,8 +11,8 @@ use super::*;
 use crate::config::SourceOfTruth;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressableItem,
-    ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
+    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, resolve_kind_alias,
+    AddressableItem, ItemError, ItemKind, ProjectSource, Scope, PROJECT_SCOPE_SENTINEL,
 };
 
 /// Result of a `jit item list` / `search` query.
@@ -78,6 +78,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// Canonicalize a kind name or config-declared alias to the registry name it
+    /// addresses ([`resolve_kind_alias`]), or return the input verbatim when it
+    /// matches no configured kind.
+    ///
+    /// Callers compare the result against the canonical [`AddressableItem::kind`],
+    /// so an alias (`inv`) resolves to the same items as the registry name
+    /// (`invariant`); an unresolved input stays as typed, so an unknown kind still
+    /// yields an empty result / descriptive not-found rather than an error here.
+    fn canonical_kind_name(&self, name: &str) -> Result<String> {
+        let kinds = self.item_kinds()?;
+        Ok(resolve_kind_alias(&kinds, name).unwrap_or(name).to_string())
+    }
+
     /// The issue-scope subset of the configured kinds.
     ///
     /// Project-scope kinds read a config-declared file, not issue descriptions, so
@@ -97,8 +110,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Reads every issue through storage and projects items via the pure
     /// [`index_items`]; the qualified ids are derived, nothing is persisted. A
-    /// `kind_filter` keeps only kinds whose name matches; an unknown kind name
-    /// yields an empty result (not an error) so callers can probe freely.
+    /// `kind_filter` keeps only kinds whose name matches — a config-declared alias
+    /// is accepted and resolved to the registry name first ([`resolve_kind_alias`]),
+    /// so `--kind inv` filters the same items as `--kind invariant`. An unknown
+    /// kind name yields an empty result (not an error) so callers can probe freely.
     ///
     /// # Examples
     ///
@@ -112,12 +127,21 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn list_items(&self, kind_filter: Option<&str>) -> Result<ItemListResult> {
+        // Resolve a kind alias in the filter to the canonical registry name so both
+        // the kind-set filter and the item filter compare against canonical names
+        // (items always carry the registry name). An unresolved filter is kept
+        // verbatim, so an unknown kind still yields an empty result.
+        let canonical_filter: Option<String> = match kind_filter {
+            Some(f) => Some(self.canonical_kind_name(f)?),
+            None => None,
+        };
+        let filter = canonical_filter.as_deref();
         // Only issue-scope kinds index issue descriptions; project-scope kinds are
         // sourced from their config-declared file via `project_items`.
         let kinds: Vec<ItemKind> = self
             .issue_item_kinds()?
             .into_iter()
-            .filter(|k| kind_filter.is_none_or(|f| k.name() == f))
+            .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
         let repo_format = self.repo_content_format()?;
         let mut issues = self.storage.list_issues()?;
@@ -131,7 +155,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         items.extend(
             self.project_items()?
                 .into_iter()
-                .filter(|i| kind_filter.is_none_or(|f| i.kind == f)),
+                .filter(|i| filter.is_none_or(|f| i.kind == f)),
         );
         for issue in &issues {
             let parser = crate::document::content_parser_for(issue.content_format, repo_format)
@@ -471,6 +495,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // REQ-04 retired the legacy kind-agnostic path).
         match parse_kind_segmented_address(qualified) {
             Ok(addr) => {
+                // Canonicalize the parsed kind segment: it may be a config-declared
+                // alias (`@/inv/...`), which resolves to the registry name items
+                // carry, so downstream kind-AND-self-id filtering matches. An
+                // unknown kind stays verbatim, giving a descriptive not-found.
+                let kind = self.canonical_kind_name(&addr.kind)?;
                 // Bind the parsed scope token to local project identity: a bare
                 // `@` or a `@<name>` naming the repo's own declared project both
                 // collapse to `Scope::Project`; a `@<name>` naming any other
@@ -483,19 +512,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .project_name_from_config(self.cached_config()?);
                 let scope = addr.scope.bind_local(local_name.as_deref()).map_err(|err| {
                     anyhow!(
-                        "cannot resolve item address '{qualified}' (kind '{}', self-id '{}'): {err}",
-                        addr.kind,
+                        "cannot resolve item address '{qualified}' (kind '{kind}', self-id '{}'): {err}",
                         addr.self_id,
                     )
                 })?;
                 match scope {
                     Scope::Project => Ok(ResolvedItemAddress::Project {
-                        kind: addr.kind,
+                        kind,
                         self_id: addr.self_id,
                     }),
                     Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
                         issue_ref,
-                        kind: Some(addr.kind),
+                        kind: Some(kind),
                         self_id: addr.self_id,
                     }),
                 }
