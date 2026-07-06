@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2b5e0cca-c3b5-4557-819f-278499524558",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d8c48af9-40eb-495d-a236-230e343b6357",
+  "commit": "9ddc9bafade52671df6dd36a1cf1764a7e4a96c8",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-06T10:12:34.444460628Z",
+  "completed_at": "2026-07-06T10:14:30.947940567Z",
+  "duration_ms": 116503,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\nREQ-01 through REQ-03 are met. `aliases` is parsed on `ItemKindConfig` ([crates/jit/src/config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:530)), command resolution canonicalizes aliases before matching ([crates/jit/src/commands/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/item.rs:89)), and the CLI test covers `jit item list --kind inv` plus `jit item show @/inv/INV-01` with canonical output ([crates/jit/tests/item_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/item_cli_tests.rs:517)).\n\n**Architecture**\nBoundaries are preserved. Alias lookup is pure domain logic in `domain/item.rs`; command code only orchestrates config/domain/storage; CLI changes are help text only. No new persistence or file access was added outside storage, apart from existing test setup writes.\n\n**Functional Paradigm**\nThe implementation uses iterator-based resolution and filtering (`resolve_kind_alias`, list filtering) and keeps the alias behavior as immutable canonicalization before matching. No concerning imperative debt found.\n\n**Correctness And Invariants**\nCollision rejection is deterministic and runs on the same config validation path as invalid `[item_kinds]` tables ([crates/jit/src/config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:2029)). Explicit project and issue-scope kind segments are canonicalized; issue-scope sugar remains pattern-based and alias-free. No PID, gate-transition, event-log, or atomic-write paths were changed.\n\n**Safety**\nNo unsafe code introduced in the reviewed changes. Existing `unwrap`/`expect` hits are in tests/doctests or unchanged test helpers.\n\n**Testing**\nI did not rerun the test suite because the issue has a succeeded `cargo-ci` gate. Recorded evidence shows the first cargo-ci run failed on a doctest, then commit `9ddc9baf` fixed it; the latest cargo-ci artifact passed with `fmt`, `clippy`, and `3433 passed, 0 failed, 12 ignored`. I also ran `./scripts/jit-validate.sh`, which passed.\n\n**Error Handling**\nConfig alias collisions use a typed `thiserror` variant with contextual messages naming the kind, alias, and conflict ([crates/jit/src/config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:1514)). Command errors retain address/kind/self-id context.\n\n**CLI Contract**\nAll touched item subcommands already expose `--json`. Help text now mentions aliases for `jit item`, `show`, `list --kind`, and `search --kind` ([crates/jit/src/cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:271)).\n\n**Documentation**\nNew public API surface has doc comments with examples, including `ItemKind::aliases`, `ItemKind::matches_name`, and `resolve_kind_alias`.\n\n**Jit Management**\nDependencies are empty. `./scripts/jit-validate.sh` passed. The current issue metadata records `cargo-ci` as passed.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No blocking findings; acceptance criteria are met and latest cargo-ci plus jit validation are green.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No blocking findings; acceptance criteria are met and latest cargo-ci plus jit validation are green.",
+    "findings": []
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "1908e1b8-abcd-4697-9264-c4a684fcca89",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "d8c48af9-40eb-495d-a236-230e343b6357",
+  "commit": "b0c2f7031af8593dc88cbc84ff0efa8c9a6433ac",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T10:02:05.841700483Z",
+  "completed_at": "2026-07-06T10:04:58.914242608Z",
+  "duration_ms": 173072,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest crates/jit/src/config.rs - config::ItemKindConfig::missing_required_fields (line 566) ... FAILED\ntest result: FAILED. 546 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 42.57s\n---- crates/jit/src/config.rs - config::ItemKindConfig::missing_required_fields (line 566) stdout ----\nerror[E0063]: missing field `aliases` in initializer of `ItemKindConfig`\n   --> crates/jit/src/config.rs:584:16\n    |\n584 | let complete = ItemKindConfig {\n    |                ^^^^^^^^^^^^^^ missing `aliases`\n\nerror: aborting due to 1 previous error\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
