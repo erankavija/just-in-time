@@ -9,13 +9,13 @@
 
 Epic 2821e177 made project knowledge addressable (`@/<kind>/<self-id>` over invariants, rules, gates, requirements, definitions), but the authored surfaces still copy prose: skills paste invariant/rule text into dispatch prompts and review protocols, README/docs restate registry content, and CLAUDE.md guidance paraphrases rule/gate behavior. Copied text re-creates the drift problem the epic solved. The sweep converts each occurrence per a three-tier rule (projection / gloss + address / bare address + resolve) so the registry stays the single source of truth.
 
-Folded scope: invariant self-ids (`INV-LABEL-FORMAT`, all-caps, kind double-encoded) are renamed to the lowercase-kebab form rules and gates already use (`@/invariant/label-format`), so the addresses the sweep cites are uniform across kinds. A sibling task (d8c48af9, dependency) adds config-declared kind aliases so `@/inv/<id>` resolves as a shorthand; code comments cite that form.
+Folded scope: invariant self-ids (`INV-LABEL-FORMAT`, all-caps, kind double-encoded) are renamed to the lowercase-kebab form rules and gates already use (`@/invariant/label-format`), so the addresses the sweep cites are uniform across kinds. A sibling task (d8c48af9, dependency) adds config-declared kind aliases so `@/inv/<id>` resolves as a shorthand; skill files and code comments cite that form.
 
 ## Success Criteria
 
 Copied from the issue description (authoritative there):
 
-- [ ] [hard] REQ-01: every repo-tracked skill file that restates invariant/rule/gate content is converted per the tier rule — behavioral text to bare address (tier 3), explanatory text to clause-length gloss + address (tier 2) — and each dispatch-prompt template carries the standing resolve instruction; a sweep table (file -> tier -> change) is linked to this issue via `jit doc add` as evidence.
+- [ ] [hard] REQ-01: every repo-tracked skill file that restates invariant/rule/gate content is converted per the tier rule — behavioral text to bare address (tier 3), explanatory text to clause-length gloss + address (tier 2) — and each dispatch-prompt template carries the standing resolve instruction; invariant citations in skill files use the `@/inv/…` alias form; a sweep table (file -> tier -> change) is linked to this issue via `jit doc add` as evidence.
 - [ ] [hard] REQ-02: README and docs/ introduce the addressing scheme and the cite-the-address convention; quoted registry content carries its address; renderer-owned projections stay inline and are identified as such.
 - [ ] [hard] REQ-03: CLAUDE.md guidance cites addresses for rule/gate/invariant references outside the rendered invariant region.
 - [ ] [hard] REQ-04: every `@/…` address cited by the swept surfaces (skills, README, docs, CLAUDE.md, Rust comments) resolves via `jit item show` (dangling-citation check attached as evidence); `jit validate` stays green.
@@ -74,7 +74,7 @@ Touch points:
 
 ### Skills sweep (REQ-01)
 
-Surfaces: `.claude/skills/{jit-manage,jit-breakdown,jit-parallel,jit-execution-lead,jit-planning-lead,jit-project-lead}` including `references/` and `scripts/`. Known citation sites from the survey: jit-project-lead `references/standards-fix.md`, `references/coherence-review.md`, `references/wave-layering.md`, `scripts/standards-fix.sh` (INV-… restatements); dispatch-prompt templates in the lead skills; gate-semantics passages. Per file, classify each registry-content occurrence into tier 1/2/3 and edit accordingly; dispatch-prompt templates gain the one standing resolve instruction; lead review protocols gain the resolve-check step. Skill-owned rules (lead-invariant sections) stay prose. `jit-planning-lead/evals/results.md` is a historical eval record — leave it. Deliverable: sweep table (file -> tier -> change) at `dev/active/76cb968b-sweep-table.md`, linked via `jit doc add`.
+Surfaces: `.claude/skills/{jit-manage,jit-breakdown,jit-parallel,jit-execution-lead,jit-planning-lead,jit-project-lead}` including `references/` and `scripts/`. Known citation sites from the survey: jit-project-lead `references/standards-fix.md`, `references/coherence-review.md`, `references/wave-layering.md`, `scripts/standards-fix.sh` (INV-… restatements); dispatch-prompt templates in the lead skills; gate-semantics passages. Per file, classify each registry-content occurrence into tier 1/2/3 and edit accordingly; dispatch-prompt templates gain the one standing resolve instruction; lead review protocols gain the resolve-check step. Invariant citations in skills (tier 2 and tier 3 alike) use the `@/inv/…` alias form; rule and gate citations use their canonical segments. Skill-owned rules (lead-invariant sections) stay prose. `jit-planning-lead/evals/results.md` is a historical eval record — leave it. Deliverable: sweep table (file -> tier -> change) at `dev/active/76cb968b-sweep-table.md`, linked via `jit doc add`.
 
 ### README + docs (REQ-02) and CLAUDE.md (REQ-03)
 
@@ -108,7 +108,7 @@ Commits: code and doc edits in feature commits per phase (`feat(jit:76cb968b): �
 
 ## Risks and Open Questions
 
-- **Citation-form split:** docs/README/skills cite canonical `@/invariant/…` (self-descriptive for readers being introduced to the scheme); Rust comments cite `@/inv/…` (brevity where the user asked for it). Two spellings for one kind is deliberate; the alias task documents that they are the same namespace.
+- **Citation-form split:** skills and Rust comments cite `@/inv/…` (brevity in agent-facing text); README, docs, and CLAUDE.md cite canonical `@/invariant/…` (self-descriptive for readers being introduced to the scheme). Two spellings for one kind is deliberate; the alias task documents that they are the same namespace.
 - **id-pattern semantics:** the old pattern never matched the real ids, which suggests patterns are not validated against registry ids; if implementation finds a validator that does check, the pattern change is load-bearing and needs a test.
 - **Stale binary:** alias resolution and the rename must be exercised against a freshly installed binary (`cargo install --path crates/jit`), not a stale PATH copy.
 - **Scope guard:** `~/.claude/skills/` user-global copies stay untouched; only the README note covers the sync expectation.
