@@ -26,13 +26,13 @@ fn setup_test_repo() -> TempDir {
 
 const INVARIANTS_TOML: &str = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
 
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "Issues prefer functional style."
 kind = "advisory"
 "#;
@@ -63,8 +63,11 @@ fn test_invariant_render_writes_separate_file_default() {
 
     // The default jit-owned target was actually written with the rendered registry.
     let written = std::fs::read_to_string(temp.path().join(".jit/invariants.md")).unwrap();
-    assert!(written.contains("INV-01"), "rendered file: {written}");
-    assert!(written.contains("INV-02"));
+    assert!(
+        written.contains("sample-invariant"),
+        "rendered file: {written}"
+    );
+    assert!(written.contains("second-invariant"));
     assert!(written.contains("Every dependency edge stays acyclic."));
     assert!(written.contains("dag-no-cycles"));
 }
@@ -113,6 +116,6 @@ fn test_invariant_render_region_mode_byte_preserves_surroundings() {
         "suffix not preserved: {updated}"
     );
     // The region was replaced.
-    assert!(updated.contains("INV-01"));
+    assert!(updated.contains("sample-invariant"));
     assert!(!updated.contains("stale placeholder"));
 }

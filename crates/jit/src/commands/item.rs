@@ -1292,13 +1292,13 @@ statement = \"Every dependency edge stays acyclic.\"
 
     const TWO_INVARIANTS: &str = "\
 [[invariants]]
-id = \"INV-01\"
+id = \"sample-invariant\"
 statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 enforced-by = \"dag-no-cycles\"
 
 [[invariants]]
-id = \"INV-02\"
+id = \"second-invariant\"
 statement = \"Issues prefer functional style.\"
 kind = \"advisory\"
 ";
@@ -1316,11 +1316,15 @@ kind = \"advisory\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        assert!(qids.contains(&"@/invariant/INV-01"));
-        assert!(qids.contains(&"@/invariant/INV-02"));
+        assert!(qids.contains(&"@/invariant/sample-invariant"));
+        assert!(qids.contains(&"@/invariant/second-invariant"));
         // The self-id is the invariant's id; the statement is its text; the kind is
         // `invariant`; the scope is `@`.
-        let first = result.items.iter().find(|i| i.self_id == "INV-01").unwrap();
+        let first = result
+            .items
+            .iter()
+            .find(|i| i.self_id == "sample-invariant")
+            .unwrap();
         assert_eq!(first.kind, "invariant");
         assert_eq!(first.scope, "@");
         assert_eq!(first.text, "Every dependency edge stays acyclic.");
@@ -1331,9 +1335,9 @@ kind = \"advisory\"
         // REQ-01: the generic resolver returns an invariant by its
         // `@/<kind>/<self-id>` address.
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
-        let shown = exec.show_item("@/invariant/INV-02").unwrap();
-        assert_eq!(shown.item.self_id, "INV-02");
-        assert_eq!(shown.item.qualified_id, "@/invariant/INV-02");
+        let shown = exec.show_item("@/invariant/second-invariant").unwrap();
+        assert_eq!(shown.item.self_id, "second-invariant");
+        assert_eq!(shown.item.qualified_id, "@/invariant/second-invariant");
         assert_eq!(shown.item.kind, "invariant");
         assert_eq!(shown.item.scope, "@");
         // No owning issue for a project-scope item.
@@ -1546,18 +1550,18 @@ stage = \"postcheck\"
         let exec = registry_exec(TWO_INVARIANTS, vec![]);
         let hits = exec.search_items("acyclic", Some("invariant")).unwrap();
         assert_eq!(hits.count, 1);
-        assert_eq!(hits.items[0].qualified_id, "@/invariant/INV-01");
+        assert_eq!(hits.items[0].qualified_id, "@/invariant/sample-invariant");
     }
 
     #[test]
     fn test_invariant_registry_is_authoritative_no_markdown_index() {
         // REQ-02: the registry is the authoritative source for invariants and NO
         // markdown index is produced for them. An issue description containing an
-        // `INV-`-looking line is NOT projected as an invariant item — invariants
+        // invariant-looking line is NOT projected as an invariant item — invariants
         // come ONLY from `.jit/invariants.toml`.
         let issue = Issue::new(
             "A".to_string(),
-            "## Success Criteria\n\n- [hard] INV-99: a markdown line that LOOKS like an invariant\n"
+            "## Success Criteria\n\n- [hard] missing-invariant: a markdown line that LOOKS like an invariant\n"
                 .to_string(),
         );
         let exec = registry_exec(TWO_INVARIANTS, vec![issue]);
@@ -1568,13 +1572,13 @@ stage = \"postcheck\"
             .iter()
             .map(|i| i.qualified_id.as_str())
             .collect();
-        // Only the two registry entries are invariants; the issue's INV-99 line is
+        // Only the two registry entries are invariants; the issue's missing-invariant line is
         // NOT among them (no markdown index for invariants).
         assert_eq!(invariants.count, 2);
-        assert!(qids.contains(&"@/invariant/INV-01"));
-        assert!(qids.contains(&"@/invariant/INV-02"));
-        assert!(!qids.iter().any(|q| q.ends_with("/INV-99")));
-        assert!(!qids.iter().any(|q| q.contains("INV-99")));
+        assert!(qids.contains(&"@/invariant/sample-invariant"));
+        assert!(qids.contains(&"@/invariant/second-invariant"));
+        assert!(!qids.iter().any(|q| q.ends_with("/missing-invariant")));
+        assert!(!qids.iter().any(|q| q.contains("missing-invariant")));
     }
 
     #[test]
@@ -1619,7 +1623,7 @@ stage = \"postcheck\"
         let exec = config_exec(
             "[item_kinds.invariant]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"[a-z][a-z0-9-]*\"\n\
              markers = []\n\
              link-namespaces = [\"enforces\"]\n\
              scope = \"project\"\n\
@@ -1627,10 +1631,10 @@ stage = \"postcheck\"
              id-field = \"id\", text-field = \"statement\" }\n\
              source-of-truth = \"registry-first\"\n",
             Some(TWO_INVARIANTS),
-            // An issue with an INV- line: it must NEVER become a project invariant.
+            // An issue with an invariant-looking line: it must NEVER become a project invariant.
             vec![issue_with_criteria(
                 "A",
-                "## Success Criteria\n\n- [hard] INV-99: looks like an invariant\n",
+                "## Success Criteria\n\n- [hard] missing-invariant: looks like an invariant\n",
             )],
         );
         let result = exec.list_items(Some("invariant")).unwrap();
@@ -1640,11 +1644,11 @@ stage = \"postcheck\"
             .map(|i| i.qualified_id.as_str())
             .collect();
         assert_eq!(result.count, 2);
-        assert!(qids.contains(&"@/invariant/INV-01"));
-        assert!(qids.contains(&"@/invariant/INV-02"));
-        // The issue's INV-99 line is NOT a project invariant (registry-first reads
+        assert!(qids.contains(&"@/invariant/sample-invariant"));
+        assert!(qids.contains(&"@/invariant/second-invariant"));
+        // The issue's missing-invariant line is NOT a project invariant (registry-first reads
         // only the toml, never a markdown section).
-        assert!(!qids.iter().any(|q| q.contains("INV-99")));
+        assert!(!qids.iter().any(|q| q.contains("missing-invariant")));
     }
 
     #[test]
@@ -1655,13 +1659,13 @@ stage = \"postcheck\"
         // kind, indexing its items from issue descriptions like any other.
         let issue = issue_with_criteria(
             "A",
-            "## Success Criteria\n\n- INV-99: an issue-scoped invariant line\n",
+            "## Success Criteria\n\n- sample-invariant: an issue-scoped invariant line\n",
         );
         let short = issue.short_id();
         let exec = config_exec(
             "[item_kinds.invariant]\n\
              section = \"success_criteria\"\n\
-             id-pattern = \"INV-[0-9]+\"\n\
+             id-pattern = \"[a-z][a-z0-9-]*\"\n\
              markers = []\n\
              link-namespaces = [\"enforces\"]\n\
              scope = \"issue\"\n\
@@ -1674,7 +1678,7 @@ stage = \"postcheck\"
         assert_eq!(result.count, 1);
         assert_eq!(
             result.items[0].qualified_id,
-            format!("@/issue/{short}/invariant/INV-99")
+            format!("@/issue/{short}/invariant/sample-invariant")
         );
     }
 
@@ -1854,11 +1858,11 @@ stage = \"postcheck\"
 
         // invariant / `enforces:@/<kind>/<id>` -> the registry-first invariant item.
         let inv = exec
-            .resolve_link_label("enforces:@/invariant/INV-01")
+            .resolve_link_label("enforces:@/invariant/sample-invariant")
             .unwrap()
             .expect("enforces resolves");
         assert_eq!(inv.item.kind, "invariant");
-        assert_eq!(inv.item.qualified_id, "@/invariant/INV-01");
+        assert_eq!(inv.item.qualified_id, "@/invariant/sample-invariant");
         assert_eq!(inv.item.scope, "@");
     }
 

@@ -2696,7 +2696,7 @@ depends_on = ["planning"]
             dir.path().join("invariants.toml"),
             r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
@@ -2707,7 +2707,7 @@ enforced-by = "dag-no-cycles"
         let config = JitConfig::load(dir.path()).unwrap();
         assert_eq!(config.invariants.invariants.len(), 1);
         let inv = &config.invariants.invariants[0];
-        assert_eq!(inv.id, "INV-01");
+        assert_eq!(inv.id, "sample-invariant");
         assert_eq!(
             inv.kind,
             crate::validation::invariants::InvariantKind::Enforced
@@ -2727,14 +2727,14 @@ enforced-by = "dag-no-cycles"
         .unwrap();
         std::fs::write(
             dir.path().join("invariants.toml"),
-            "[[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"advisory\"\n",
+            "[[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
         )
         .unwrap();
 
         let config = JitConfig::load(dir.path()).unwrap();
         assert!(config.type_hierarchy.is_some());
         assert_eq!(config.invariants.invariants.len(), 1);
-        assert_eq!(config.invariants.invariants[0].id, "INV-02");
+        assert_eq!(config.invariants.invariants[0].id, "second-invariant");
     }
 
     #[test]
@@ -2764,7 +2764,7 @@ enforced-by = "dag-no-cycles"
     fn test_load_invalid_invariant_fails_config_load_both_paths() {
         // A malformed invariant entry fails config load with a descriptive,
         // context-bearing error on BOTH the config-absent and config-present paths.
-        let bad = "[[invariants]]\nid = \"INV-01\"\nkind = \"advisory\"\n"; // missing statement
+        let bad = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n"; // missing statement
 
         let no_config = TempDir::new().unwrap();
         std::fs::write(no_config.path().join("invariants.toml"), bad).unwrap();

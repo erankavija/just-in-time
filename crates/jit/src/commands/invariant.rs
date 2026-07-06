@@ -229,8 +229,9 @@ mod tests {
 
     #[test]
     fn test_check_reports_declared_but_unenforced() {
-        // INV-01 binds to a rule/gate that does not exist -> the sole drift.
-        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        // sample-invariant binds to a rule/gate that does not exist -> the sole drift.
+        let inv =
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"@/rule/ghost-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
@@ -238,7 +239,7 @@ mod tests {
         let result = executor.check_invariants().unwrap();
         assert!(result.has_drift());
         assert_eq!(result.findings.len(), 1, "{:?}", result.findings);
-        assert_eq!(result.findings[0].invariant_id, "INV-01");
+        assert_eq!(result.findings[0].invariant_id, "sample-invariant");
         assert_eq!(result.findings[0].subject, "@/rule/ghost-rule");
     }
 
@@ -247,7 +248,8 @@ mod tests {
         // A rule and a gate that NO invariant claims no longer drift (REQ-05): the
         // single resolving binding leaves the check clean despite the unclaimed
         // `real-rule` and `code-review` gate.
-        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        let inv =
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"@/rule/real-rule\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
@@ -260,9 +262,9 @@ mod tests {
     #[test]
     fn test_check_clean_when_consistent() {
         // Two invariants claim exactly the one rule and the one gate present.
-        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        let inv = "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"@/rule/real-rule\"\n\
-                   [[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+                   [[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"@/gate/code-review\"\n";
         let rules = "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
@@ -274,9 +276,10 @@ mod tests {
 
     #[test]
     fn test_check_result_serializes_to_json() {
-        // INV-01's `ghost` binding dangles -> one declared-but-unenforced finding;
+        // sample-invariant's `ghost` binding dangles -> one declared-but-unenforced finding;
         // the unclaimed real rule `other` is NOT drift (REQ-05).
-        let inv = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        let inv =
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                    enforced-by = \"@/rule/ghost\"\n";
         let rules = "[[rules]]\nname = \"other\"\nseverity = \"warn\"\n\
                      assert = { require-section = { heading = \"Goal\" } }\n";
@@ -286,7 +289,7 @@ mod tests {
         assert_eq!(json["count"], result.count);
         let findings = json["findings"].as_array().unwrap();
         assert_eq!(findings.len(), 1, "{json}");
-        assert_eq!(findings[0]["invariant_id"], "INV-01");
+        assert_eq!(findings[0]["invariant_id"], "sample-invariant");
         assert_eq!(findings[0]["subject"], "@/rule/ghost");
     }
 }

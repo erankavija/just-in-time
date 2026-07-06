@@ -1972,8 +1972,8 @@ mod tests {
             "@/issue/56ab0224/requirement/REQ-01"
         );
         assert_eq!(
-            qualified_id(&Scope::Project, "invariant", "INV-01"),
-            "@/invariant/INV-01"
+            qualified_id(&Scope::Project, "invariant", "sample-invariant"),
+            "@/invariant/sample-invariant"
         );
     }
 
@@ -2302,7 +2302,7 @@ mod tests {
         let cfg = |scope: KindScopeConfig, sot: SourceOfTruth, source: Option<ItemKindSource>| {
             ItemKindConfig {
                 section: Some(DEFAULT_ITEM_SECTION.to_string()),
-                id_pattern: Some("INV-[0-9]+".to_string()),
+                id_pattern: Some("[a-z][a-z0-9-]*".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["enforces".to_string()]),
                 scope: Some(scope),
@@ -2364,14 +2364,14 @@ mod tests {
         }];
         let registry = vec![RawScopeItem {
             kind: "invariant".to_string(),
-            self_id: "INV-01".to_string(),
+            self_id: "sample-invariant".to_string(),
             text: "atomic writes".to_string(),
             links: Vec::new(),
         }];
         let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
         let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
         assert!(qids.contains(&"@/requirement/REQ-01"));
-        assert!(qids.contains(&"@/invariant/INV-01"));
+        assert!(qids.contains(&"@/invariant/sample-invariant"));
     }
 
     #[test]
@@ -2381,11 +2381,11 @@ mod tests {
         // pooling across substrates does not bypass per-(scope, kind) uniqueness.
         let sources = vec![ProjectSource {
             kind: req_kind(),
-            markdown: "## Success Criteria\n\n- [hard] INV-01: a\n".to_string(),
+            markdown: "## Success Criteria\n\n- [hard] REQ-01: a\n".to_string(),
         }];
         let registry = vec![RawScopeItem {
             kind: "requirement".to_string(),
-            self_id: "INV-01".to_string(),
+            self_id: "REQ-01".to_string(),
             text: "dup".to_string(),
             links: Vec::new(),
         }];
@@ -2648,11 +2648,12 @@ name = \"bare\"
     fn test_derive_scope_items_derives_at_project_scope() {
         // REQ-01: project-scoped candidates mint `@/<kind>/<self-id>`; the item's
         // own `scope` field stays the bare `@` prefix.
-        let items = derive_scope_items(&Scope::Project, vec![raw("invariant", "INV-01")]).unwrap();
+        let items = derive_scope_items(&Scope::Project, vec![raw("invariant", "sample-invariant")])
+            .unwrap();
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].qualified_id, "@/invariant/INV-01");
+        assert_eq!(items[0].qualified_id, "@/invariant/sample-invariant");
         assert_eq!(items[0].scope, "@");
-        assert_eq!(items[0].self_id, "INV-01");
+        assert_eq!(items[0].self_id, "sample-invariant");
     }
 
     #[test]
@@ -2661,12 +2662,12 @@ name = \"bare\"
         // `@/<kind>/<self-id>`, through the SAME parse + extract + derive path as
         // issue scope.
         let kinds = vec![req_kind()];
-        let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n- prose line\n";
+        let md = "## Success Criteria\n\n- [hard] REQ-01: all writes are atomic\n- prose line\n";
         let items =
             index_markdown_items(md, &Scope::Project, &kinds, &MarkdownContentParser).unwrap();
         // The prose line without a self-id is skipped (REQ-06).
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].qualified_id, "@/requirement/INV-01");
+        assert_eq!(items[0].qualified_id, "@/requirement/REQ-01");
         assert_eq!(items[0].scope, "@");
     }
 
@@ -2676,13 +2677,16 @@ name = \"bare\"
         // resolved to one.
         let err = derive_scope_items(
             &Scope::Project,
-            vec![raw("invariant", "INV-01"), raw("invariant", "INV-01")],
+            vec![
+                raw("invariant", "sample-invariant"),
+                raw("invariant", "sample-invariant"),
+            ],
         )
         .unwrap_err();
         match err {
             ItemError::DuplicateSelfId { scope, self_id, .. } => {
                 assert_eq!(scope, "@");
-                assert_eq!(self_id, "INV-01");
+                assert_eq!(self_id, "sample-invariant");
             }
             other => panic!("expected DuplicateSelfId, got {other:?}"),
         }

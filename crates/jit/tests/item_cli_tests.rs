@@ -439,22 +439,22 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),
         "[[invariants]]\n\
-         id = \"INV-01\"\n\
+         id = \"sample-invariant\"\n\
          statement = \"Every dependency edge stays acyclic.\"\n\
          kind = \"enforced\"\n\
          enforced-by = \"dag-no-cycles\"\n\n\
          [[invariants]]\n\
-         id = \"INV-02\"\n\
+         id = \"second-invariant\"\n\
          statement = \"All state changes are logged.\"\n\
          kind = \"advisory\"\n",
     )
     .unwrap();
-    // An issue whose description carries an INV-looking line must NOT leak in as an
+    // An issue whose description carries an invariant-looking line must NOT leak in as an
     // invariant (registry is authoritative; no markdown index for invariants).
     create_issue(
         temp.path(),
         "Decoy",
-        "## Success Criteria\n\n- [hard] INV-99: looks like an invariant\n",
+        "## Success Criteria\n\n- [hard] missing-invariant: looks like an invariant\n",
     );
 
     let output = Command::new(jit_binary())
@@ -475,19 +475,22 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
     assert!(
-        qids.contains(&"@/invariant/INV-01"),
-        "list must include @/invariant/INV-01: {qids:?}"
+        qids.contains(&"@/invariant/sample-invariant"),
+        "list must include @/invariant/sample-invariant: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/invariant/INV-02"),
-        "list must include @/invariant/INV-02: {qids:?}"
+        qids.contains(&"@/invariant/second-invariant"),
+        "list must include @/invariant/second-invariant: {qids:?}"
     );
-    // The decoy INV-99 from an issue description is NOT an invariant (REQ-02).
+    // The decoy missing-invariant from an issue description is NOT an invariant (REQ-02).
     assert!(
-        !qids.iter().any(|q| q.contains("INV-99")),
+        !qids.iter().any(|q| q.contains("missing-invariant")),
         "no markdown index for invariants: {qids:?}"
     );
-    let inv01 = items.iter().find(|i| i["self_id"] == "INV-01").unwrap();
+    let inv01 = items
+        .iter()
+        .find(|i| i["self_id"] == "sample-invariant")
+        .unwrap();
     assert_eq!(inv01["kind"].as_str().unwrap(), "invariant");
     assert_eq!(inv01["scope"].as_str().unwrap(), "@");
     assert_eq!(
@@ -495,20 +498,20 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
         "Every dependency edge stays acyclic."
     );
 
-    // `jit item show @/invariant/INV-02` resolves through the shipped binary too.
+    // `jit item show @/invariant/second-invariant` resolves through the shipped binary too.
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/invariant/INV-02", "--json"])
+        .args(["item", "show", "@/invariant/second-invariant", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
         output.status.success(),
-        "item show @/invariant/INV-02 must resolve"
+        "item show @/invariant/second-invariant must resolve"
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
         json["item"]["qualified_id"].as_str().unwrap(),
-        "@/invariant/INV-02"
+        "@/invariant/second-invariant"
     );
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
 }
@@ -523,7 +526,7 @@ fn test_item_kind_alias_resolves_through_real_cli() {
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),
         "[[invariants]]\n\
-         id = \"INV-01\"\n\
+         id = \"sample-invariant\"\n\
          statement = \"Every dependency edge stays acyclic.\"\n\
          kind = \"enforced\"\n",
     )
@@ -544,25 +547,28 @@ fn test_item_kind_alias_resolves_through_real_cli() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
     let item = &json["items"][0];
-    assert_eq!(item["qualified_id"].as_str().unwrap(), "@/invariant/INV-01");
+    assert_eq!(
+        item["qualified_id"].as_str().unwrap(),
+        "@/invariant/sample-invariant"
+    );
     assert_eq!(item["kind"].as_str().unwrap(), "invariant");
 
-    // `jit item show @/inv/INV-01` resolves the SAME item as `@/invariant/INV-01`,
+    // `jit item show @/inv/sample-invariant` resolves the SAME item as `@/invariant/sample-invariant`,
     // and the canonical qualified_id uses the registry name.
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/inv/INV-01", "--json"])
+        .args(["item", "show", "@/inv/sample-invariant", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
         output.status.success(),
-        "item show @/inv/INV-01 must resolve: {}",
+        "item show @/inv/sample-invariant must resolve: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
         json["item"]["qualified_id"].as_str().unwrap(),
-        "@/invariant/INV-01"
+        "@/invariant/sample-invariant"
     );
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
 }
@@ -584,7 +590,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
         "[version]\nschema = 2\n\n\
          [item_kinds.invariant]\n\
          section = \"success_criteria\"\n\
-         id-pattern = \"INV-[0-9]+\"\n\
+         id-pattern = \"[a-z][a-z0-9-]*\"\n\
          markers = []\n\
          link-namespaces = [\"enforces\"]\n\
          scope = \"project\"\n\
@@ -594,7 +600,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     .unwrap();
     std::fs::write(
         temp.path().join("project-items.md"),
-        "## Success Criteria\n\n- INV-01: a markdown-sourced invariant item\n",
+        "## Success Criteria\n\n- sample-invariant: a markdown-sourced invariant item\n",
     )
     .unwrap();
 
@@ -613,7 +619,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     let items = json["items"].as_array().unwrap();
     assert_eq!(
         items[0]["qualified_id"].as_str().unwrap(),
-        "@/invariant/INV-01"
+        "@/invariant/sample-invariant"
     );
     assert_eq!(items[0]["kind"].as_str().unwrap(), "invariant");
 }

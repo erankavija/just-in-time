@@ -361,13 +361,13 @@ mod tests {
         InvariantRegistry::from_toml_str(
             r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
 
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "Issues prefer functional style."
 kind = "advisory"
 "#,
@@ -378,9 +378,9 @@ kind = "advisory"
     #[test]
     fn test_render_lists_each_invariant_deterministically() {
         let md = render_invariants_markdown(&registry_with_two(), ProjectionStyle::Full);
-        // Authored order is preserved: INV-01 before INV-02.
-        let p1 = md.find("INV-01").unwrap();
-        let p2 = md.find("INV-02").unwrap();
+        // Authored order is preserved: sample-invariant before second-invariant.
+        let p1 = md.find("sample-invariant").unwrap();
+        let p2 = md.find("second-invariant").unwrap();
         assert!(p1 < p2);
         assert!(md.contains("[enforced]"));
         assert!(md.contains("[advisory]"));
@@ -418,8 +418,8 @@ kind = "advisory"
         let md = render_invariants_markdown(&registry_with_two(), ProjectionStyle::IdAnchor);
         assert_eq!(
             md,
-            "- **INV-01** — Every dependency edge stays acyclic.\n\
-             - **INV-02** — Issues prefer functional style.\n"
+            "- **sample-invariant** — Every dependency edge stays acyclic.\n\
+             - **second-invariant** — Issues prefer functional style.\n"
         );
         // No header, no kind tag, no enforced-by leaks into the id-anchor render.
         assert!(!md.contains("## Project invariants"));
@@ -507,8 +507,8 @@ kind = "advisory"
         assert_eq!(written, "docs/invariants.md");
 
         let on_disk = std::fs::read_to_string(dir.path().join("docs/invariants.md")).unwrap();
-        assert!(on_disk.contains("INV-01"));
-        assert!(on_disk.contains("INV-02"));
+        assert!(on_disk.contains("sample-invariant"));
+        assert!(on_disk.contains("second-invariant"));
         // No leftover temp file (atomic temp+rename leaves only the target).
         let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("docs"))
             .unwrap()
@@ -546,7 +546,7 @@ kind = "advisory"
         assert!(updated.starts_with(&format!("{prefix}{begin}")));
         assert!(updated.ends_with(&format!("{end}{suffix}")));
         // Region replaced.
-        assert!(updated.contains("INV-01"));
+        assert!(updated.contains("sample-invariant"));
         assert!(!updated.contains("stale"));
     }
 
@@ -642,8 +642,8 @@ kind = "advisory"
         // Stale hand-authored prose was replaced.
         assert!(!updated.contains("stale hand-authored prose"));
         // Registry content is present in the region.
-        assert!(updated.contains("INV-01"));
-        assert!(updated.contains("INV-02"));
+        assert!(updated.contains("sample-invariant"));
+        assert!(updated.contains("second-invariant"));
         // Markers themselves survive.
         assert!(updated.contains(begin));
         assert!(updated.contains(end));

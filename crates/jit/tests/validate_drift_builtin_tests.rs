@@ -67,10 +67,10 @@ fn finding_messages(json: &Value) -> Vec<String> {
 fn test_validate_reports_drift_without_opt_in_rule() {
     let temp = setup_test_repo();
     // NO rules.toml authored: drift is a built-in pass, not an opt-in rule.
-    // INV-01 binds to a MISSING rule/gate (declared-but-unenforced).
+    // sample-invariant binds to a MISSING rule/gate (declared-but-unenforced).
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"Acyclic deps.\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"Acyclic deps.\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     )
     .unwrap();
@@ -78,7 +78,7 @@ fn test_validate_reports_drift_without_opt_in_rule() {
     let (_code, json) = run_validate(&temp);
     let messages = finding_messages(&json);
 
-    // declared-but-unenforced: INV-01 -> ghost-rule.
+    // declared-but-unenforced: sample-invariant -> ghost-rule.
     assert!(
         messages
             .iter()
@@ -101,7 +101,7 @@ fn test_validate_fails_on_declared_but_unenforced_drift() {
     // A dangling binding is Error severity -> `jit validate` exits non-zero.
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     )
     .unwrap();
@@ -132,7 +132,7 @@ fn test_validate_reports_unloadable_target_drift_not_parse_error() {
     .unwrap();
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/bad-rule\"\n",
     )
     .unwrap();
@@ -198,7 +198,7 @@ fn test_validate_clean_when_invariants_fully_consistent() {
             "--title",
             "Only",
             "--description",
-            "gate for INV-02",
+            "gate for second-invariant",
             "--mode",
             "manual",
         ])
@@ -213,9 +213,9 @@ fn test_validate_clean_when_invariants_fully_consistent() {
     );
     std::fs::write(
         temp.path().join(".jit/invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/only-rule\"\n\
-         [[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+         [[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/gate/only-gate\"\n",
     )
     .unwrap();

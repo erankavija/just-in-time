@@ -47,13 +47,13 @@ fn setup_jit_root_with_invariants_toml(with_config_toml: bool) -> (TempDir, std:
         jit_dir.join("invariants.toml"),
         r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
 
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "All state changes must be logged."
 kind = "advisory"
 "#,
@@ -82,13 +82,13 @@ fn setup_cli_repo() -> TempDir {
         temp.path().join(".jit").join("invariants.toml"),
         r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
 
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "All state changes must be logged."
 kind = "advisory"
 "#,
@@ -113,7 +113,7 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
     let invs = &config.invariants.invariants;
     assert_eq!(invs.len(), 2, "both invariants must be loaded");
 
-    let inv01 = invs.iter().find(|i| i.id == "INV-01").unwrap();
+    let inv01 = invs.iter().find(|i| i.id == "sample-invariant").unwrap();
     assert_eq!(
         inv01.statement, "Every dependency edge stays acyclic.",
         "statement must round-trip"
@@ -125,7 +125,7 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
         "enforced-by must round-trip"
     );
 
-    let inv02 = invs.iter().find(|i| i.id == "INV-02").unwrap();
+    let inv02 = invs.iter().find(|i| i.id == "second-invariant").unwrap();
     assert_eq!(inv02.kind, InvariantKind::Advisory, "kind must be Advisory");
     assert!(
         inv02.enforced_by.is_none(),
@@ -159,12 +159,12 @@ fn req02_invariants_load_without_config_toml() {
         "invariants must load even when config.toml is absent"
     );
     assert!(
-        invs.iter().any(|i| i.id == "INV-01"),
-        "INV-01 must be present"
+        invs.iter().any(|i| i.id == "sample-invariant"),
+        "sample-invariant must be present"
     );
     assert!(
-        invs.iter().any(|i| i.id == "INV-02"),
-        "INV-02 must be present"
+        invs.iter().any(|i| i.id == "second-invariant"),
+        "second-invariant must be present"
     );
 }
 
@@ -190,8 +190,8 @@ fn req02_invariants_load_with_config_toml() {
         "invariants must load on the config-present path"
     );
     assert!(
-        invs.iter().any(|i| i.id == "INV-01"),
-        "INV-01 must be present"
+        invs.iter().any(|i| i.id == "sample-invariant"),
+        "sample-invariant must be present"
     );
 }
 
@@ -256,16 +256,19 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
         .collect();
 
     assert!(
-        qids.contains(&"@/invariant/INV-01"),
-        "INV-01 must be addressed as @/invariant/INV-01: {qids:?}"
+        qids.contains(&"@/invariant/sample-invariant"),
+        "sample-invariant must be addressed as @/invariant/sample-invariant: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/invariant/INV-02"),
-        "INV-02 must be addressed as @/invariant/INV-02: {qids:?}"
+        qids.contains(&"@/invariant/second-invariant"),
+        "second-invariant must be addressed as @/invariant/second-invariant: {qids:?}"
     );
 
     // Structural checks on one item.
-    let inv01 = items.iter().find(|i| i["self_id"] == "INV-01").unwrap();
+    let inv01 = items
+        .iter()
+        .find(|i| i["self_id"] == "sample-invariant")
+        .unwrap();
     assert_eq!(inv01["kind"].as_str().unwrap(), "invariant");
     assert_eq!(inv01["scope"].as_str().unwrap(), "@");
     assert_eq!(
@@ -277,25 +280,25 @@ fn req03_item_list_kind_invariant_returns_at_qualified_ids() {
 
 #[test]
 fn req03_item_show_at_qualified_id_resolves_invariant() {
-    // REQ-03 (show path): `jit item show @/invariant/INV-01` also resolves the invariant
+    // REQ-03 (show path): `jit item show @/invariant/sample-invariant` also resolves the invariant
     // from the registry rather than the issue store.
     let temp = setup_cli_repo();
 
     let output = Command::new(jit_binary())
-        .args(["item", "show", "@/invariant/INV-02", "--json"])
+        .args(["item", "show", "@/invariant/second-invariant", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
     assert!(
         output.status.success(),
-        "item show @/invariant/INV-02 must resolve: {}",
+        "item show @/invariant/second-invariant must resolve: {}",
         String::from_utf8_lossy(&output.stdout)
     );
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(
         json["item"]["qualified_id"].as_str().unwrap(),
-        "@/invariant/INV-02"
+        "@/invariant/second-invariant"
     );
     assert_eq!(json["item"]["kind"].as_str().unwrap(), "invariant");
     assert_eq!(json["item"]["scope"].as_str().unwrap(), "@");
@@ -330,7 +333,7 @@ fn req04_missing_statement_fails_with_typed_error() {
         // Valid id and kind but no statement.
         std::fs::write(
             jit_dir.join("invariants.toml"),
-            "[[invariants]]\nid = \"INV-01\"\nkind = \"advisory\"\n",
+            "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n",
         )
         .unwrap();
 
@@ -362,7 +365,7 @@ fn req04_invalid_kind_token_fails_with_descriptive_error() {
 
     std::fs::write(
         jit_dir.join("invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"x\"\nkind = \"bogus\"\n",
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"x\"\nkind = \"bogus\"\n",
     )
     .unwrap();
 
@@ -389,9 +392,10 @@ fn req04_error_type_is_invariant_config_error() {
     use jit::validation::invariants::InvariantRegistry;
 
     // Missing statement → InvariantConfigError::Toml naming the field.
-    let err =
-        InvariantRegistry::from_toml_str("[[invariants]]\nid = \"INV-01\"\nkind = \"advisory\"\n")
-            .unwrap_err();
+    let err = InvariantRegistry::from_toml_str(
+        "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n",
+    )
+    .unwrap_err();
     assert!(
         matches!(err, InvariantConfigError::Toml(_)),
         "missing statement must produce InvariantConfigError::Toml, got: {err:?}"
@@ -404,18 +408,18 @@ fn req04_error_type_is_invariant_config_error() {
     // Duplicate id → InvariantConfigError::DuplicateId.
     let toml = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "a"
 kind = "advisory"
 
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "b"
 kind = "enforced"
 "#;
     let err = InvariantRegistry::from_toml_str(toml).unwrap_err();
     assert!(
-        matches!(err, InvariantConfigError::DuplicateId { ref id } if id == "INV-01"),
+        matches!(err, InvariantConfigError::DuplicateId { ref id } if id == "sample-invariant"),
         "duplicate id must produce InvariantConfigError::DuplicateId, got: {err:?}"
     );
 }
@@ -427,12 +431,12 @@ kind = "enforced"
 #[test]
 fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item() {
     // REQ-05: the ONLY source of invariant items is `.jit/invariants.toml`.
-    // An INV-tagged line inside an issue description (which would be indexed by
+    // An invariant-tagged line inside an issue description (which would be indexed by
     // a markdown-first kind) must NOT appear as an invariant.
     let temp = setup_cli_repo();
 
-    // Create an issue whose description contains an INV-looking criterion line.
-    // If the engine were to parse markdown for invariants, "INV-99" would leak in.
+    // Create an issue whose description contains an invariant-looking criterion line.
+    // If the engine were to parse markdown for invariants, "missing-invariant" would leak in.
     let output = Command::new(jit_binary())
         .args([
             "issue",
@@ -440,7 +444,7 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
             "-t",
             "Decoy issue",
             "-d",
-            "## Success Criteria\n\n- [hard] INV-99: this must NOT appear as an invariant\n",
+            "## Success Criteria\n\n- [hard] missing-invariant: this must NOT appear as an invariant\n",
             "--json",
         ])
         .current_dir(temp.path())
@@ -474,11 +478,12 @@ fn req05_inv_looking_line_in_issue_description_does_not_produce_invariant_item()
         "only the registry's two entries must appear, not the markdown decoy: {qids:?}"
     );
     assert!(
-        !qids.iter().any(|q| q.contains("INV-99")),
-        "INV-99 from the issue description must NOT appear as an invariant: {qids:?}"
+        !qids.iter().any(|q| q.contains("missing-invariant")),
+        "missing-invariant from the issue description must NOT appear as an invariant: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/invariant/INV-01") && qids.contains(&"@/invariant/INV-02"),
+        qids.contains(&"@/invariant/sample-invariant")
+            && qids.contains(&"@/invariant/second-invariant"),
         "the two registry entries must still be present: {qids:?}"
     );
 }
@@ -530,12 +535,12 @@ fn req05_item_list_without_kind_filter_does_not_mix_invariants_with_requirements
 
     // Invariants from the registry must be present.
     assert!(
-        qids.contains(&"@/invariant/INV-01"),
-        "@/invariant/INV-01 must appear in the unfiltered list: {qids:?}"
+        qids.contains(&"@/invariant/sample-invariant"),
+        "@/invariant/sample-invariant must appear in the unfiltered list: {qids:?}"
     );
     assert!(
-        qids.contains(&"@/invariant/INV-02"),
-        "@/invariant/INV-02 must appear in the unfiltered list: {qids:?}"
+        qids.contains(&"@/invariant/second-invariant"),
+        "@/invariant/second-invariant must appear in the unfiltered list: {qids:?}"
     );
 
     // The requirement from the issue markdown must also be present, minted in the

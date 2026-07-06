@@ -253,7 +253,7 @@ mod tests {
     fn test_from_toml_str_loads_full_entry() {
         let toml = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
@@ -261,7 +261,7 @@ enforced-by = "dag-no-cycles"
         let reg = InvariantRegistry::from_toml_str(toml).unwrap();
         assert_eq!(reg.invariants.len(), 1);
         let inv = &reg.invariants[0];
-        assert_eq!(inv.id, "INV-01");
+        assert_eq!(inv.id, "sample-invariant");
         assert_eq!(inv.statement, "Every dependency edge stays acyclic.");
         assert_eq!(inv.kind, InvariantKind::Enforced);
         assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
@@ -271,7 +271,7 @@ enforced-by = "dag-no-cycles"
     fn test_from_toml_str_enforced_by_is_optional() {
         let toml = r#"
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "Issues prefer functional style."
 kind = "advisory"
 "#;
@@ -290,7 +290,7 @@ kind = "advisory"
     fn test_from_toml_str_missing_statement_is_typed_error() {
         let toml = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 kind = "advisory"
 "#;
         let err = InvariantRegistry::from_toml_str(toml).unwrap_err();
@@ -305,7 +305,7 @@ kind = "advisory"
     fn test_from_toml_str_bad_kind_is_typed_error() {
         let toml = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "x"
 kind = "mandatory"
 "#;
@@ -322,19 +322,19 @@ kind = "mandatory"
     fn test_from_toml_str_duplicate_id_is_typed_error() {
         let toml = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "a"
 kind = "advisory"
 
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "b"
 kind = "advisory"
 "#;
         let err = InvariantRegistry::from_toml_str(toml).unwrap_err();
         assert!(matches!(
             err,
-            InvariantConfigError::DuplicateId { ref id } if id == "INV-01"
+            InvariantConfigError::DuplicateId { ref id } if id == "sample-invariant"
         ));
     }
 
@@ -350,12 +350,12 @@ kind = "advisory"
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("invariants.toml"),
-            "[[invariants]]\nid = \"INV-09\"\nstatement = \"s\"\nkind = \"enforced\"\n",
+            "[[invariants]]\nid = \"ninth-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n",
         )
         .unwrap();
         let reg = InvariantRegistry::load(dir.path()).unwrap();
         assert_eq!(reg.invariants.len(), 1);
-        assert_eq!(reg.invariants[0].id, "INV-09");
+        assert_eq!(reg.invariants[0].id, "ninth-invariant");
         assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
     }
 

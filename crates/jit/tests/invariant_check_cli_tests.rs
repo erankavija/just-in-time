@@ -40,7 +40,7 @@ fn write_invariants(temp: &TempDir, toml: &str) {
 #[test]
 fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     let temp = setup_test_repo();
-    // One rule named `real-rule`; INV-01 binds to a MISSING `ghost-rule`.
+    // One rule named `real-rule`; sample-invariant binds to a MISSING `ghost-rule`.
     write_rules(
         &temp,
         "[[rules]]\nname = \"real-rule\"\nseverity = \"warn\"\n\
@@ -48,7 +48,7 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
     );
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
@@ -63,12 +63,12 @@ fn test_check_reports_declared_but_unenforced_and_exits_nonzero() {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     let findings = json["findings"].as_array().unwrap();
-    // The dangling binding INV-01 -> ghost-rule is the sole finding.
+    // The dangling binding sample-invariant -> ghost-rule is the sole finding.
     assert_eq!(findings.len(), 1, "{json}");
     assert!(
         findings
             .iter()
-            .any(|f| f["invariant_id"] == "INV-01" && f["subject"] == "@/rule/ghost-rule"),
+            .any(|f| f["invariant_id"] == "sample-invariant" && f["subject"] == "@/rule/ghost-rule"),
         "missing declared-but-unenforced finding: {json}"
     );
     // The unclaimed `real-rule` is NOT reported (no enforced-but-undeclared).
@@ -92,7 +92,7 @@ fn test_check_exits_zero_with_unclaimed_rules_and_gates() {
     );
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/claimed-rule\"\n",
     );
 
@@ -124,7 +124,7 @@ fn test_check_exits_zero_when_consistent() {
     );
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/real-rule\"\n",
     );
 
@@ -155,7 +155,7 @@ fn test_check_human_output_names_declared_direction() {
     );
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/ghost-rule\"\n",
     );
 
@@ -191,7 +191,7 @@ fn test_check_reports_unloadable_rule_source_not_a_parse_error() {
     );
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/rule/bad-rule\"\n",
     );
 
@@ -230,7 +230,7 @@ fn test_check_reports_unloadable_gate_registry() {
     std::fs::write(temp.path().join(".jit/gates.toml"), "not valid toml {").unwrap();
     write_invariants(
         &temp,
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+        "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
          enforced-by = \"@/gate/some-gate\"\n",
     );
 

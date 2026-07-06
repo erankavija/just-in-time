@@ -2075,7 +2075,7 @@ mod tests {
 
     const REGISTRY_TOML: &str = "\
 [[invariants]]
-id = \"INV-01\"
+id = \"sample-invariant\"
 statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 ";
@@ -2314,7 +2314,7 @@ description = \"Full Rust CI pipeline must pass.\"
                 &format!("satisfies:{short}/REQ-01"),
                 &format!("per:{short}/D-01"),
                 &format!("mitigates:{short}/RISK-01"),
-                "enforces:@/invariant/INV-01",
+                "enforces:@/invariant/sample-invariant",
             ],
         );
         let exec = dangling_exec(vec![target, node]);
@@ -2339,7 +2339,7 @@ description = \"Full Rust CI pipeline must pass.\"
             "node",
             "",
             &[
-                "enforces:@/invariant/INV-01",
+                "enforces:@/invariant/sample-invariant",
                 &format!("satisfies:@/issue/{short}/requirement/REQ-01"),
             ],
         );
@@ -2352,12 +2352,12 @@ description = \"Full Rust CI pipeline must pass.\"
 
         // An unresolvable explicit form is still classified as qualified and
         // reported as dangling, never silently ignored as unqualified.
-        let bad = issue_with_labels("bad", "", &["enforces:@/invariant/INV-99"]);
+        let bad = issue_with_labels("bad", "", &["enforces:@/invariant/missing-invariant"]);
         let exec = dangling_exec(vec![bad]);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("INV-99"));
+        assert!(findings[0].finding.message.contains("missing-invariant"));
     }
 
     #[test]
@@ -2368,7 +2368,7 @@ description = \"Full Rust CI pipeline must pass.\"
         // (task a1b6b3da), it resolves through the SAME path as any other
         // unresolvable qualified id: a dangling-link finding, never a panic or
         // a silently-ignored label.
-        let node = issue_with_labels("node", "", &["enforces:@acme/invariant/INV-01"]);
+        let node = issue_with_labels("node", "", &["enforces:@acme/invariant/sample-invariant"]);
         let exec = dangling_exec(vec![node]);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
@@ -2379,12 +2379,12 @@ description = \"Full Rust CI pipeline must pass.\"
         // components in distinct phrasing, proving the named-project value was
         // structurally routed to (project, kind, self-id) rather than mis-split.
         let err = exec
-            .resolve_link_label("enforces:@acme/invariant/INV-01")
+            .resolve_link_label("enforces:@acme/invariant/sample-invariant")
             .unwrap_err();
         let chain = format!("{err:#}");
         assert!(chain.contains("project 'acme'"), "got: {chain}");
         assert!(chain.contains("kind 'invariant'"), "got: {chain}");
-        assert!(chain.contains("self-id 'INV-01'"), "got: {chain}");
+        assert!(chain.contains("self-id 'sample-invariant'"), "got: {chain}");
     }
 
     #[test]
@@ -2399,14 +2399,14 @@ description = \"Full Rust CI pipeline must pass.\"
 
     #[test]
     fn test_dangling_invariant_link_reports_finding() {
-        // REQ-03 for the project-scope invariant kind: `enforces:@/invariant/INV-99`
+        // REQ-03 for the project-scope invariant kind: `enforces:@/invariant/missing-invariant`
         // is a registered link namespace with a qualified-but-unresolvable id.
-        let node = issue_with_labels("node", "", &["enforces:@/invariant/INV-99"]);
+        let node = issue_with_labels("node", "", &["enforces:@/invariant/missing-invariant"]);
         let exec = dangling_exec(vec![node]);
         let issues = exec.storage().list_issues().unwrap();
         let findings = exec.dangling_link_findings(&issues).unwrap();
         assert_eq!(findings.len(), 1);
-        assert!(findings[0].finding.message.contains("INV-99"));
+        assert!(findings[0].finding.message.contains("missing-invariant"));
     }
 
     #[test]

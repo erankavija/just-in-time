@@ -12,13 +12,13 @@ use jit::storage::{InMemoryStorage, IssueStore};
 
 const INVARIANTS_TOML: &str = r#"
 [[invariants]]
-id = "INV-01"
+id = "sample-invariant"
 statement = "Every dependency edge stays acyclic."
 kind = "enforced"
 enforced-by = "dag-no-cycles"
 
 [[invariants]]
-id = "INV-02"
+id = "second-invariant"
 statement = "Issues prefer functional style."
 kind = "advisory"
 "#;
@@ -55,8 +55,8 @@ fn test_render_invariants_separate_file_default_via_command() {
         .read_repo_file(".jit/invariants.md")
         .unwrap()
         .expect("separate-file target should be written");
-    assert!(written.contains("INV-01"), "rendered: {written}");
-    assert!(written.contains("INV-02"));
+    assert!(written.contains("sample-invariant"), "rendered: {written}");
+    assert!(written.contains("second-invariant"));
     assert!(written.contains("Every dependency edge stays acyclic."));
     assert!(written.contains("dag-no-cycles"));
 
@@ -89,7 +89,7 @@ fn test_render_invariants_region_mode_via_command() {
     assert!(updated.starts_with(&format!("{prefix}{begin}")));
     assert!(updated.ends_with(&format!("{end}{suffix}")));
     // The region was replaced.
-    assert!(updated.contains("INV-01"));
+    assert!(updated.contains("sample-invariant"));
     assert!(!updated.contains("stale"));
 
     let _ = std::fs::remove_dir_all(storage.root());

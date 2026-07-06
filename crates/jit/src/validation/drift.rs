@@ -320,23 +320,23 @@ mod tests {
     #[test]
     fn test_declared_but_unenforced_reports_dangling_binding() {
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/ghost-rule\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
         assert_eq!(findings.len(), 1, "{findings:?}");
-        assert_eq!(findings[0].invariant_id, "INV-01");
+        assert_eq!(findings[0].invariant_id, "sample-invariant");
         assert_eq!(findings[0].subject, "@/rule/ghost-rule");
-        assert!(findings[0].message().contains("INV-01"));
+        assert!(findings[0].message().contains("sample-invariant"));
         assert!(findings[0].message().contains("@/rule/ghost-rule"));
     }
 
     #[test]
     fn test_binding_to_real_rule_is_not_drift() {
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/dag-no-cycles\"\n",
         );
         let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn test_binding_to_real_gate_is_not_drift() {
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/gate/code-review\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
@@ -363,7 +363,7 @@ mod tests {
         // A rule and a gate that NO invariant claims must NOT produce any finding:
         // the enforced-but-undeclared direction is gone (REQ-05).
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/rule-a\"\n",
         );
         let rules: BTreeSet<&str> = ["rule-a", "rule-b"].into_iter().collect();
@@ -377,7 +377,9 @@ mod tests {
     fn test_advisory_invariant_with_no_binding_is_clean() {
         // An advisory invariant with no enforced-by has no binding to dangle, and
         // unclaimed rules are no longer drift, so the result is clean.
-        let r = reg("[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"advisory\"\n");
+        let r = reg(
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
+        );
         let rules: BTreeSet<&str> = ["only-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
         let findings = enforcement_drift(&r.invariants, &rules, &gates);
@@ -394,7 +396,7 @@ mod tests {
     fn test_unresolved_rule_name_is_drift() {
         // The address form parses fine, but no loaded rule carries the name.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/ghost\"\n",
         );
         let rules: BTreeSet<&str> = ["real-rule"].into_iter().collect();
@@ -411,7 +413,7 @@ mod tests {
         // unresolved: the drift check recognizes only those two enforcement-target
         // kinds, even though "label-format" is a real loaded rule name.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/definition/label-format\"\n",
         );
         let rules: BTreeSet<&str> = ["label-format"].into_iter().collect();
@@ -427,7 +429,7 @@ mod tests {
         // when a gate of that exact name is loaded — there is no bare-name
         // fallback.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"cargo-ci\"\n",
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
@@ -442,7 +444,7 @@ mod tests {
         // The old colon-prefixed rule-name form is also rejected outright, even
         // when the post-colon segment names a real loaded rule.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"legacy:old-rule\"\n",
         );
         let rules: BTreeSet<&str> = ["old-rule"].into_iter().collect();
@@ -459,7 +461,7 @@ mod tests {
         // The rule set failed to parse; the binding names a rule that would have
         // lived there. It is declared-but-unenforced WITH the unloadable flag.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/bad-rule\"\n",
         );
         let gates: BTreeSet<&str> = BTreeSet::new();
@@ -480,7 +482,7 @@ mod tests {
         // declared-but-unenforced with the unloadable flag, regardless of the
         // (irrelevant) rule set's own state.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/gate/some-gate\"\n",
         );
         let rules: BTreeSet<&str> = ["a-rule"].into_iter().collect();
@@ -500,7 +502,7 @@ mod tests {
         // satisfied by the LOADED rule set is NOT drift: only the rule source is
         // relevant to a rule-kind binding.
         let r = reg(
-            "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+            "[[invariants]]\nid = \"sample-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n\
                      enforced-by = \"@/rule/a-rule\"\n",
         );
         let rules: BTreeSet<&str> = ["a-rule"].into_iter().collect();
