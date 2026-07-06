@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "3f6faa81-da4c-4f38-a21e-81e321ac2a95",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+  "commit": "3366974fee7ea20b26183493c46e7ce8d6340d84",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T11:04:09.748393669Z",
+  "completed_at": "2026-07-06T11:05:44.577552547Z",
+  "duration_ms": 94829,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 appear satisfied for the authored skill/docs/CLAUDE surfaces I inspected: skill dispatch prompts include the standing resolve instruction, README/docs introduce `@/<kind>/<self-id>`, and CLAUDE guidance outside the rendered invariant region cites `@/inv/gate-semantics`.\n\nREQ-04 and REQ-06 are not fully satisfied. Public Rust doc-comment examples still use `INV-01` and cite non-resolving example addresses such as `@/policy/INV-01` and `@/example/INV-01` in `crates/jit/src/domain/item.rs`. The attached dangling-citation evidence only extracts `@/(inv|invariant|rule|gate)/...`, so it misses these Rust-comment `@/...` addresses even though REQ-04 covers Rust comments.\n\nREQ-05 is partially satisfied in live registry/config/scaffold: `.jit/invariants.toml`, `.jit/config.toml`, and `crates/jit/src/hierarchy_templates.rs` use lowercase-kebab invariant IDs and the `inv` alias. However, non-historical Rust source/test fixtures still contain many `INV-` invariant IDs, including public doc examples, so the “no `INV-`-prefixed invariant id remains outside historical documents” requirement is not met.\n\n**Architecture And Separation Of Concerns**\n\nNo new domain/storage/commands/CLI boundary violation found in the reviewed change. This issue is mostly documentation/config/test-surface work.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found. The reviewed changes do not add material imperative production logic.\n\n**Correctness And Invariants**\n\nAtomic writes, event logging, gate semantics, assignee/label format, PID safety, and unsafe-code policy do not appear regressed by this change. The correctness blocker is acceptance-level drift in the Rust documentation examples and citation evidence.\n\n**Safety**\n\nNo unsafe code issue found.\n\n**Testing**\n\nI did not run tests because the issue context has a succeeded `cargo-ci` gate. Provided evidence shows `cargo-ci` passed with exit code 0 at `2026-07-06T11:02:11.767118256+00:00`, and `repo-validate` passed with exit code 0 at `2026-07-06T11:04:01.381900975+00:00`.\n\n**Error Handling**\n\nNo new production `unwrap()`/`expect()` concern found in the reviewed paths.\n\n**CLI Contract**\n\nNo new command was introduced. Relevant `jit item show` checks support `--json`; I used `jit item show @/policy/INV-01 --json` and `jit item show @/example/INV-01 --json` to confirm those Rust-comment example addresses do not resolve.\n\n**Documentation**\n\nBlocking issue: public doc-comment examples in `crates/jit/src/domain/item.rs` still document uppercase `INV-01` examples despite REQ-06 explicitly calling out `domain/item.rs` doc-comment examples for conversion to the lowercase convention.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there are no prior findings for this issue to verify.\n\n**Jit Issue Management**\n\nThe listed dependencies are marked done in the issue context, and the issue has passed `cargo-ci` and `repo-validate`. The attached sweep and dangling-citation evidence exist, but the dangling-citation evidence is incomplete for Rust comments.\n\n1. **REQ-04/REQ-06 are not met: Rust doc-comment examples still use `INV-01` and cite non-resolving `@/...` addresses.** In `crates/jit/src/domain/item.rs`, public examples still set `self_id: \"INV-01\"` at line 1198, derive `@/policy/INV-01` at line 1243, and derive `@/example/INV-01` at line 1397. These contradict REQ-06’s requirement that `domain/item.rs` doc-comment example IDs switch to the lowercase convention. They also undermine REQ-04 because `jit item show @/policy/INV-01 --json` and `jit item show @/example/INV-01 --json` fail, while `dev/active/76cb968b-citation-check.md` only checked `inv|invariant|rule|gate` addresses and missed these Rust-comment citations.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Rust doc-comment examples still use INV-prefixed IDs and unresolved @/... addresses, so hard REQ-04/REQ-06 are not met.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Rust doc-comment examples still use INV-01 and cite non-resolving @/... addresses, violating REQ-04 and REQ-06.\",\"file\":\"crates/jit/src/domain/item.rs\",\"line\":1198}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4140 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3719-9313-7012-b163-ddc0e7123d5e\n--------\nuser\n--- 4127 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Rust doc-comment examples still use INV-prefixed IDs and unresolved @/... addresses, so hard REQ-04/REQ-06 are not met.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Rust doc-comment examples still use INV-01 and cite non-resolving @/... addresses, violating REQ-04 and REQ-06.",
+        "file": "crates/jit/src/domain/item.rs",
+        "line": 1198
+      }
+    ]
+  }
+}

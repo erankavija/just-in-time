@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "d78313e7-7279-4f19-aa36-31d9b2422f1f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+  "commit": "dd969daf3e8cba648bf46b42164d6b10f9bf4d0d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T12:11:36.324984513Z",
+  "completed_at": "2026-07-06T12:12:51.723086661Z",
+  "duration_ms": 75398,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 appear satisfied on the inspected skill, README/docs, and CLAUDE surfaces. Dispatch templates include the standing resolve instruction, README/docs introduce `@/<kind>/<self-id>`, and CLAUDE guidance cites `@/inv/gate-semantics` outside the rendered region.\n\nREQ-05 and REQ-06 appear satisfied for the live registry/config/scaffold and Rust examples I inspected: invariant IDs are lowercase-kebab in `.jit/invariants.toml`, `.jit/config.toml`, and `crates/jit/src/hierarchy_templates.rs`; representative `@/invariant/...` and `@/inv/...` addresses resolve.\n\nREQ-04 is still not fully met as evidence. The dangling-citation report now checks all kinds, but it limits Rust scanning to `///` and `//!` doc comments. The issue explicitly requires Rust comments, and ordinary `//` comments still cite concrete addresses.\n\n**Architecture And Separation Of Concerns**\n\nNo new domain/storage/commands/CLI boundary violation found. The latest change is documentation/evidence oriented.\n\n**Functional Paradigm**\n\nNo blocking functional-style issue found. No material production logic was added in this delta.\n\n**Correctness And Invariants**\n\nNo new concern found for atomic writes, event logging, gate semantics, assignee/label formats, PID safety, or unsafe-code policy. Representative cited addresses resolved via `jit item show --json`.\n\n**Safety**\n\nNo unsafe code issue found in the reviewed paths.\n\n**Testing**\n\nI did not rerun cargo tests because the issue has a succeeded `cargo-ci` gate in the provided evidence at `2026-07-06T12:09:34.651491585+00:00`. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo new production `unwrap()` / `expect()` or context-poor error handling concern found.\n\n**CLI Contract**\n\nNo new CLI command was introduced. Relevant `jit item show` paths support `--json`.\n\n**Documentation**\n\nThe remaining blocker is the REQ-04 evidence document’s Rust-comment scope. It documents only Rust doc-comment extraction, while ordinary Rust comments contain concrete citations such as `@/inv/event-log` and `@/inv/atomic-writes`.\n\n**Prior Review Feedback**\n\nThe most recent prior finding about non-invariant/rule/gate citation coverage is partly addressed: the evidence now has no kind filter and includes `@/definition/State` plus the issue-scoped requirement. The broader evidence requirement remains incomplete because non-doc Rust comments are still excluded.\n\n**Jit Issue Management**\n\nDependencies are marked done in the issue context. `./scripts/jit-validate.sh` passed. The issue has passed `repo-validate` and `cargo-ci`; code review still fails on REQ-04 evidence.\n\n1. **REQ-04 evidence still excludes ordinary Rust comments.** `dev/active/76cb968b-citation-check.md:13` defines the Rust citation surface as only `///` and `//!` doc comments, and the extraction command at line 25 matches only those lines. However REQ-04 requires every `@/...` address cited by Rust comments to resolve, and ordinary comments still contain concrete citations, for example `@/inv/event-log` in `crates/jit/src/commands/claim.rs:161` and `@/inv/atomic-writes` in `crates/jit/src/storage/gitattributes.rs:73`. These examples resolve, but the attached dangling-citation evidence does not prove coverage for the required Rust-comment surface.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04 evidence remains incomplete because the dangling-citation check excludes ordinary Rust comments with concrete @/... citations.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Dangling-citation evidence scans only Rust doc comments, missing ordinary Rust comments required by REQ-04.\",\"file\":\"dev/active/76cb968b-citation-check.md\",\"line\":13}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1491 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3757-5092-7c22-bdfe-9a6d712e0309\n--------\nuser\n--- 1478 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-04 evidence remains incomplete because the dangling-citation check excludes ordinary Rust comments with concrete @/... citations.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Dangling-citation evidence scans only Rust doc comments, missing ordinary Rust comments required by REQ-04.",
+        "file": "dev/active/76cb968b-citation-check.md",
+        "line": 13
+      }
+    ]
+  }
+}

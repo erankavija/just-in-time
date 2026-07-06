@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "c3090642-03e8-4fb5-a719-3166fe7bab1d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+  "commit": "0eed51980affcc0f6ceafd99841f08cf68509c4a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T11:20:45.083178993Z",
+  "completed_at": "2026-07-06T11:22:21.839418362Z",
+  "duration_ms": 96756,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01 through REQ-04 and REQ-06 look substantially addressed on the authored docs/skill/CLAUDE surfaces I inspected. The prior doc-comment finding in `crates/jit/src/domain/item.rs` was fixed in commit `0eed5198`: the public examples now use `atomic-writes` and `@/invariant/atomic-writes`.\n\nREQ-05 is still not met. Non-historical Rust tests still construct and assert invariant IDs like `INV-01` and addresses like `@/invariant/INV-01`, despite the hard requirement that no `INV-`-prefixed invariant id remain outside historical documents.\n\n**Architecture And Separation Of Concerns**\nNo new domain/storage/commands/CLI boundary violation found. The reviewed changes are documentation, config, and test-surface oriented.\n\n**Functional Paradigm**\nNo blocking functional-style issue found. No material production logic was added in the reviewed delta.\n\n**Correctness And Invariants**\nLive `.jit/invariants.toml`, `.jit/config.toml`, and `crates/jit/src/hierarchy_templates.rs` use lowercase-kebab invariant IDs and the `inv` alias. `jit item show @/invariant/atomic-writes --json` resolves; `jit item show @/invariant/INV-01 --json` correctly does not.\n\n**Safety**\nNo unsafe code issue found.\n\n**Testing**\nI did not rerun cargo tests because the issue has a succeeded `cargo-ci` gate. The provided issue context records `cargo-ci` passed with exit code 0 at `2026-07-06T11:18:26.624125479+00:00`. I did run the required `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\nNo new production `unwrap()`/`expect()` or context-poor error handling found in the reviewed paths.\n\n**CLI Contract**\nNo new command was introduced. The relevant `jit item` commands continue to support `--json`.\n\n**Documentation**\nREADME/docs introduce the addressing scheme and cite registry addresses. The rendered `docs/reference/rules-and-gates.md` remains a projection-owned inline copy. The remaining blocker is not user docs, but non-historical Rust test fixtures that preserve the old invariant ID convention.\n\n**Prior Review Feedback**\nThe enumerated prior finding about public `domain/item.rs` doc-comment examples is addressed. However, the broader acceptance gap noted in that review remains: non-historical Rust fixtures still contain `INV-` invariant IDs.\n\n**Jit Issue Management**\nDependencies are marked done in the issue context. `./scripts/jit-validate.sh` passed. Label warnings are not relevant here.\n\n1. **REQ-05 is not met: non-historical Rust tests still use `INV-`-prefixed invariant IDs.** For example, `crates/jit/src/domain/item.rs:1975` asserts `qualified_id(&Scope::Project, \"invariant\", \"INV-01\")` produces `@/invariant/INV-01`; `crates/jit/src/validation/projection.rs:364` seeds an invariant registry with `id = \"INV-01\"`; and `crates/jit/tests/cross_substrate_generality_tests.rs:187` does the same in an integration fixture. These are not historical documents, and they directly contradict the hard REQ-05 requirement that no `INV-`-prefixed invariant id remain outside historical documents.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-05 is still unmet because non-historical Rust tests retain INV-prefixed invariant IDs and @/invariant/INV-01 addresses.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Non-historical Rust tests still use INV-prefixed invariant IDs, violating hard REQ-05.\",\"file\":\"crates/jit/src/domain/item.rs\",\"line\":1975}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1800 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3728-c163-77d2-bb18-39c086127a92\n--------\nuser\n--- 1787 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-05 is still unmet because non-historical Rust tests retain INV-prefixed invariant IDs and @/invariant/INV-01 addresses.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Non-historical Rust tests still use INV-prefixed invariant IDs, violating hard REQ-05.",
+        "file": "crates/jit/src/domain/item.rs",
+        "line": 1975
+      }
+    ]
+  }
+}
