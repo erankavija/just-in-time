@@ -1,0 +1,24 @@
+{
+  "id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
+  "title": "Repair the dev index and stray plan files",
+  "description": "dev/index.md links a nonexistent AGENTS.md and omits five real directories (design/, eval/, experiments/, plans/, presentations/). Three plan files sit loose at dev/ root outside the documented doc lifecycle, one of them marked complete.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: dev/index.md links only existing files and describes every top-level dev/ directory\n- [ ] [hard] REQ-2: Loose plan files at dev/ root are moved into their lifecycle locations, with issue doc links re-pointed at the final paths\n- [ ] [hard] REQ-3: dev/ root holds only the index and authoring conventions",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "jit-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-accuracy",
+    "component:docs"
+  ],
+  "created_at": "2026-07-06T15:39:58.882532955Z",
+  "updated_at": "2026-07-06T15:39:58.882771595Z",
+  "first_ready_at": "2026-07-06T15:39:58.882533185Z"
+}

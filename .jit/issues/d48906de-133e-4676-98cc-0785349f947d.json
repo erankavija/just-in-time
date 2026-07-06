@@ -1,0 +1,24 @@
+{
+  "id": "d48906de-133e-4676-98cc-0785349f947d",
+  "title": "Correct the storage-format reference layout",
+  "description": "docs/reference/storage-format.md places lease records inside .jit/, but the lease control plane lives in .git/jit/. The directory diagram also omits four first-class registries: rules.toml, templates.toml, invariants.toml, and schemas/.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: The .jit/ diagram contains no lease records and lists rules.toml, templates.toml, invariants.toml, and schemas/ with one-line purposes\n- [ ] [hard] REQ-2: The .git/jit/ control plane (claims.index.json, claims.jsonl, heartbeat, locks) is documented in its own subsection\n- [ ] [hard] REQ-3: Registry formats are documented in place or cross-linked",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "jit-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-accuracy",
+    "component:docs"
+  ],
+  "created_at": "2026-07-06T15:39:58.880071113Z",
+  "updated_at": "2026-07-06T15:39:58.880355723Z",
+  "first_ready_at": "2026-07-06T15:39:58.880071573Z"
+}

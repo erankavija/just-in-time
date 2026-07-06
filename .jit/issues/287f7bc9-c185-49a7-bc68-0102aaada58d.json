@@ -1,0 +1,24 @@
+{
+  "id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
+  "title": "Refresh mcp-server README tool statements",
+  "description": "mcp-server/README.md hardcodes a stale generated-tool count in four places; the generator currently emits substantially more tools than stated.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: The README carries no hardcoded tool count that can silently rot; it states the generation mechanism instead\n- [ ] [hard] REQ-2: Statements about tool generation match the current generator behavior",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "jit-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-accuracy",
+    "component:docs"
+  ],
+  "created_at": "2026-07-06T15:39:58.883006375Z",
+  "updated_at": "2026-07-06T15:39:58.883248275Z",
+  "first_ready_at": "2026-07-06T15:39:58.883006625Z"
+}

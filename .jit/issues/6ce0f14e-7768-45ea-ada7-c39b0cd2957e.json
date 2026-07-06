@@ -1,0 +1,35 @@
+{
+  "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "title": "Documentation review gate",
+  "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the five review dimensions above\n- [ ] [hard] REQ-2: The gate produces structured findings\n- [ ] [hard] REQ-3: The gate passes on the repository's documentation tree at the time this issue completes\n- [ ] [hard] REQ-4: The gate registry description states when to apply the gate to future documentation work",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "287f7bc9-c185-49a7-bc68-0102aaada58d",
+    "c29118f9-72e5-4d20-a20a-4de58cce4b33",
+    "313a7f3a-c6db-4adc-8934-36a7874287ed",
+    "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
+    "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
+    "a6e1ae3d-169c-4959-b105-66a418ddc022",
+    "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
+    "f1aaaca7-84ad-4985-96f8-20b1cd94fadf",
+    "d48906de-133e-4676-98cc-0785349f947d",
+    "7eec3d59-60ab-448c-9334-50c5cb93d4bd"
+  ],
+  "gates_required": [
+    "jit-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-accuracy",
+    "component:docs"
+  ],
+  "created_at": "2026-07-06T15:39:58.883953366Z",
+  "updated_at": "2026-07-06T15:39:59.099196982Z",
+  "first_ready_at": "2026-07-06T15:39:58.883953626Z"
+}

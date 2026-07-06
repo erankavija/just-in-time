@@ -1,0 +1,24 @@
+{
+  "id": "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
+  "title": "Relocate self-documentation out of the adopter docs tree",
+  "description": "jit self-documentation sits in the adopter-facing docs/ tree, contradicting that tree's own charter (permanent, user-facing, domain-agnostic): the v1.0 milestone charter at docs/ root, two skill-eval records in docs/reference/, and a repo-local skills-sync sentence in README. The rules-and-gates reference renders this repository's own gate registries without signalling that.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: The milestone charter and skill-eval records live under dev/, with issue-linked paths re-linked at their final locations\n- [ ] [hard] REQ-2: README contains no repo-local skills-sync convention\n- [ ] [hard] REQ-3: The rules-and-gates reference presents the projection mechanism as the shipped feature and marks the rendered region as this repository's registries serving as a live example\n- [ ] [hard] REQ-4: The configured projection target for rules-and-gates rendering remains valid after any moves",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "jit-validate",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-accuracy",
+    "component:docs"
+  ],
+  "created_at": "2026-07-06T15:39:58.881578684Z",
+  "updated_at": "2026-07-06T15:39:58.881819524Z",
+  "first_ready_at": "2026-07-06T15:39:58.881578914Z"
+}
