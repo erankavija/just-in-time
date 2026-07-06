@@ -5582,3 +5582,4 @@
 {"type":"gate_added","id":"a1a1aafa-d8b1-4b05-9cca-213a761f8ba5","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:00:03.089142904Z","gate_key":"cargo-ci"}
 {"type":"issue_created","id":"865ae665-1dcf-4333-9be8-55c94801df92","issue_id":"d8c48af9-40eb-495d-a236-230e343b6357","timestamp":"2026-07-06T06:00:03.095858289Z","title":"Config-declared kind aliases for item addresses","priority":"normal"}
 {"type":"issue_updated","id":"1efe5b45-4d51-41b4-b4c2-29f9ea2f0d7b","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:00:07.603543527Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"fd99df5b-2d17-4489-ab2c-0fcf5a038a27","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:01:21.613191675Z","updated_by":"doc-add","fields":["documents"]}

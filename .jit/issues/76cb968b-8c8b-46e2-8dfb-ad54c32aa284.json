@@ -22,13 +22,21 @@
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/76cb968b-ssot-adoption-sweep.md",
+      "commit": null,
+      "label": "Design Document",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:enhancement",
     "milestone:v1.0"
   ],
   "created_at": "2026-07-03T23:37:07.531563300Z",
-  "updated_at": "2026-07-06T06:00:07.603333917Z",
+  "updated_at": "2026-07-06T06:01:21.612967555Z",
   "first_ready_at": "2026-07-06T00:33:14.209591265Z",
   "claimed_at": "2026-07-06T05:57:24.903126755Z"
 }
