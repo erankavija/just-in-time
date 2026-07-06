@@ -112,6 +112,9 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // shorthand, so it is a raw schema over the projection's `raw_labels` array.
     rules.push(json_schema_rule(
         "label-format",
+        "Every label must match the canonical `namespace:value` format \
+         (namespace lowercase-kebab, value non-empty). Blocks the write and \
+         fails validation.",
         Selector::default(),
         Severity::Error,
         true,
@@ -127,6 +130,9 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
         registered.sort(); // deterministic alternation order (namespaces is a HashMap)
         rules.push(json_schema_rule(
             "namespace-registry",
+            "Every label's namespace must be declared in the namespace \
+             registry. An unknown namespace fails validation but never blocks a \
+             write.",
             Selector::default(),
             Severity::Error,
             false,
@@ -142,6 +148,9 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // always emitted.
     rules.push(json_schema_rule(
         "type-hierarchy-known",
+        "Every `type:<value>` label must name a type declared in the \
+         configured type hierarchy. An unknown type fails validation but never \
+         blocks a write.",
         Selector::default(),
         Severity::Error,
         false,
@@ -158,6 +167,10 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
         if ns.unique {
             rules.push(local_rule(
                 &format!("namespace-unique-{name}"),
+                &format!(
+                    "At most one `{name}:` label per issue: `{name}` is a \
+                     unique namespace. Blocks the write and fails validation."
+                ),
                 Selector::default(),
                 Severity::Error,
                 true,
@@ -179,6 +192,10 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // injected by the graph evaluator at evaluation time.
     rules.push(graph_rule(
         "orphan-leaf",
+        "Warn when a leaf-level-typed issue (a type at the deepest hierarchy \
+         level, e.g. task) carries no parent-membership label (e.g. `epic:*`), \
+         leaving it unattached to any strategic container. Advisory: never \
+         blocks a write.",
         Severity::Warn,
         Assertion::TypeHierarchy {
             kind: TypeHierarchyKind::OrphanLeaf,
@@ -186,6 +203,10 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     ));
     rules.push(graph_rule(
         "strategic-consistency",
+        "Warn when a strategic-typed issue (a type with a membership namespace, \
+         e.g. epic/milestone) lacks its own identifying membership label, such \
+         as a `type:epic` issue that has no `epic:*` label. Advisory: never \
+         blocks a write.",
         Severity::Warn,
         Assertion::TypeHierarchy {
             kind: TypeHierarchyKind::StrategicConsistency,
@@ -251,6 +272,7 @@ const DEFAULT_ORIGIN: &str = "default";
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
 fn local_rule(
     name: &str,
+    description: &str,
     when: Selector,
     severity: Severity,
     enforce: bool,
@@ -261,6 +283,7 @@ fn local_rule(
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
+        description: Some(description.to_string()),
         when,
         severity,
         enforce,
@@ -271,12 +294,13 @@ fn local_rule(
 
 /// Construct a built-in graph-scope rule (warn-only, never blocking). Used for
 /// the type-hierarchy defaults, whose assertions are [`Scope::Graph`].
-fn graph_rule(name: &str, severity: Severity, assert: Assertion) -> Rule {
+fn graph_rule(name: &str, description: &str, severity: Severity, assert: Assertion) -> Rule {
     let scope = assert.scope();
     debug_assert_eq!(scope, Scope::Graph, "graph default rules are graph-scope");
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
+        description: Some(description.to_string()),
         when: Selector::default(),
         severity,
         enforce: false,
@@ -288,6 +312,7 @@ fn graph_rule(name: &str, severity: Severity, assert: Assertion) -> Rule {
 /// Construct a local-scope rule carrying a raw JSON Schema (inline, no file).
 fn json_schema_rule(
     name: &str,
+    description: &str,
     when: Selector,
     severity: Severity,
     enforce: bool,
@@ -296,6 +321,7 @@ fn json_schema_rule(
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
+        description: Some(description.to_string()),
         when,
         severity,
         enforce,

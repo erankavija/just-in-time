@@ -217,15 +217,16 @@ source = {{ toml = ".jit/invariants.toml", table = "invariants", id-field = "id"
 source-of-truth = "registry-first"
 
 # Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source, scaffolded above); the rule kind projects each entry's `name` as both
-# its self-id and its display text, addressed at `@/rule/<name>`.
+# source, scaffolded above); the rule kind projects each entry's `name` as its
+# self-id and its optional `description` as its display text (falling back to
+# the `name` when a rule has no description), addressed at `@/rule/<name>`.
 [item_kinds.rule]
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"
 markers = []
 link-namespaces = ["enforces"]
 scope = "project"
-source = {{ toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "name" }}
+source = {{ toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }}
 source-of-truth = "registry-first"
 
 # Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry);
@@ -553,15 +554,16 @@ source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \
 source-of-truth = \"registry-first\"
 
 # Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source, scaffolded above); the rule kind projects each entry's `name` as both
-# its self-id and its display text, addressed at `@/rule/<name>`.
+# source, scaffolded above); the rule kind projects each entry's `name` as its
+# self-id and its optional `description` as its display text (falling back to
+# the `name` when a rule has no description), addressed at `@/rule/<name>`.
 [item_kinds.rule]
 section = \"success_criteria\"
 id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
 link-namespaces = [\"enforces\"]
 scope = \"project\"
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }
 source-of-truth = \"registry-first\"
 
 # Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry);

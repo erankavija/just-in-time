@@ -178,6 +178,12 @@ fn render_rule(
     if let Some(origin) = &rule.origin {
         out.push_str(&format!("origin = {}\n", toml_basic_string(origin)));
     }
+    if let Some(description) = &rule.description {
+        out.push_str(&format!(
+            "description = {}\n",
+            toml_basic_string(description)
+        ));
+    }
 
     if let Some(selector) = render_selector(&rule.when) {
         out.push_str(&format!("when = {selector}\n"));
@@ -512,6 +518,11 @@ mod tests {
             "origin ({})",
             original.name
         );
+        assert_eq!(
+            original.description, reloaded.description,
+            "description ({})",
+            original.name
+        );
         assert_eq!(original.when, reloaded.when, "selector ({})", original.name);
         assert_eq!(
             original.severity, reloaded.severity,
@@ -636,6 +647,60 @@ assert = { require-section = { heading = "Goals" } }
         let out = serialize_ruleset(&set);
         assert!(out.rules_toml.contains("origin = \"bracket\""));
         assert_round_trips(&set);
+    }
+
+    #[test]
+    fn test_round_trip_rule_description_field() {
+        // REQ-01: a rule's optional `description` round-trips, and a rule with
+        // none reloads with `None` (not an empty string).
+        let toml = r#"
+[[rules]]
+name = "with-description"
+description = "Every label must be namespace:value."
+severity = "error"
+assert = { require-section = { heading = "Goals" } }
+
+[[rules]]
+name = "without-description"
+severity = "warn"
+assert = { require-section = { heading = "Goals" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(
+            set.rules[0].description.as_deref(),
+            Some("Every label must be namespace:value.")
+        );
+        assert_eq!(set.rules[1].description, None);
+        let out = serialize_ruleset(&set);
+        assert!(out
+            .rules_toml
+            .contains("description = \"Every label must be namespace:value.\""));
+        // The description-less rule emits no `description =` line.
+        assert!(!out
+            .rules_toml
+            .contains("name = \"without-description\"\ndescription"));
+        assert_round_trips(&set);
+    }
+
+    #[test]
+    fn test_default_ruleset_seeds_descriptions() {
+        // REQ-02: every rule the fixed default emits carries a description, so a
+        // fresh `jit init` scaffolds a fully-described rules.toml.
+        let set = default_ruleset(&registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("milestone", LabelNamespace::new("Release", false)),
+        ]));
+        assert!(!set.rules.is_empty());
+        for rule in &set.rules {
+            assert!(
+                rule.description.as_deref().is_some_and(|d| !d.is_empty()),
+                "default rule {} must carry a non-empty description",
+                rule.name
+            );
+        }
+        // The seeded descriptions survive serialization into rules.toml text.
+        let out = serialize_ruleset(&set);
+        assert!(out.rules_toml.contains("description = \""));
     }
 
     #[test]

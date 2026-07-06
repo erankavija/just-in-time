@@ -968,6 +968,12 @@ pub struct Rule {
     /// `"bracket"` for the planning-bracket coverage-preview rule. `None` for a
     /// plain repo-authored rule.
     pub origin: Option<String>,
+    /// Optional free-text explanation of what the rule enforces and why. A
+    /// rule's [`name`](Rule::name) is its only mandatory human-readable content;
+    /// this carries the richer prose that consumers (the rules/gates reference
+    /// projection, `jit item show`) render, falling back to the name when
+    /// absent. Existing description-less rules load unchanged.
+    pub description: Option<String>,
     /// Selector deciding which issues the rule applies to.
     pub when: Selector,
     /// Reporting severity.
@@ -1140,6 +1146,10 @@ struct RawRule {
     /// repo-authored rule.
     #[serde(default)]
     origin: Option<String>,
+    /// Optional free-text explanation (see [`Rule::description`]); absent field
+    /// falls back to the name in every consumer, so existing repos stay valid.
+    #[serde(default)]
+    description: Option<String>,
     #[serde(default)]
     when: Selector,
     #[serde(default)]
@@ -1395,6 +1405,7 @@ impl RawRule {
         Ok(Rule {
             name: self.name,
             origin: self.origin,
+            description: self.description,
             when: self.when,
             severity: self.severity,
             enforce: self.enforce,
@@ -2759,6 +2770,36 @@ assert = { json-schema = "schemas/bad.json" }
     }
 
     // --- Regex round-trip (TOML literal string -> serde_json) --------------
+
+    #[test]
+    fn test_rule_description_loads_when_present_and_absent() {
+        // REQ-01: the schema accepts an optional `description`. A rule that
+        // authors one loads it; a description-less rule loads unchanged with
+        // `None`, and a consumer wanting display text falls back to the name.
+        let toml = r#"
+[[rules]]
+name = "described"
+description = "Every label must be namespace:value."
+assert = { require-section = { heading = "Goals" } }
+
+[[rules]]
+name = "bare"
+assert = { require-section = { heading = "Goals" } }
+"#;
+        let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
+        assert_eq!(
+            set.rules[0].description.as_deref(),
+            Some("Every label must be namespace:value.")
+        );
+        assert_eq!(set.rules[1].description, None);
+        // Name fallback: a consumer reads description-or-name for each rule.
+        let display = |r: &Rule| r.description.as_deref().unwrap_or(&r.name).to_string();
+        assert_eq!(
+            display(&set.rules[0]),
+            "Every label must be namespace:value."
+        );
+        assert_eq!(display(&set.rules[1]), "bare");
+    }
 
     #[test]
     fn test_regex_literal_string_round_trips_to_serde_json() {

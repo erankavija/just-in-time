@@ -48,15 +48,16 @@ fn gate_address(key: &str) -> String {
 /// styles ([`ProjectionStyle`]) differ only in framing:
 ///
 /// - [`ProjectionStyle::Full`] (the default) renders a `## Rules` section of
-///   `- **@/rule/{name}** — severity: {severity}, enforce: {bool}` bullets followed
-///   by a `## Gates` section of `- **@/gate/{key}** — {title}: {description}`
-///   bullets (the `: {description}` suffix is omitted when the description is
-///   empty).
+///   `- **@/rule/{name}** — {description} ({severity}, {enforced|advisory})`
+///   bullets (the description falls back to the rule name, and the prose suffix
+///   mirrors the gate line's framing) followed by a `## Gates` section of
+///   `- **@/gate/{key}** — {title}: {description}` bullets (the `: {description}`
+///   suffix is omitted when the description is empty).
 /// - [`ProjectionStyle::IdAnchor`] renders a HEADING-LESS bullet list — one
 ///   `- **{address}** — {display-text}` line per rule (display text = the rule
-///   name, the rule kind's registry text-field) then per gate (display text = the
-///   gate description, or its title when the description is empty) — for embedding
-///   beneath a hand-authored heading.
+///   description, or its name when absent — the rule kind's registry text-field)
+///   then per gate (display text = the gate description, or its title when the
+///   description is empty) — for embedding beneath a hand-authored heading.
 ///
 /// An empty registry renders an explicit "none declared" line in its section (Full
 /// style) or, when BOTH registries are empty, a single "none declared" line
@@ -72,7 +73,8 @@ fn gate_address(key: &str) -> String {
 /// use std::path::Path;
 ///
 /// let rules = RuleSet::from_toml_str(
-///     "[[rules]]\nname = \"label-format\"\nseverity = \"error\"\nenforce = true\n\
+///     "[[rules]]\nname = \"label-format\"\ndescription = \"Labels are namespace:value.\"\n\
+///      severity = \"error\"\nenforce = true\n\
 ///      assert = { require-label = { label = \"type:*\" } }\n",
 ///     Path::new("/nonexistent"),
 /// )
@@ -83,13 +85,13 @@ fn gate_address(key: &str) -> String {
 /// let full = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
 /// assert!(full.contains("## Rules"));
 /// assert!(full.contains("## Gates"));
-/// assert!(full.contains("- **@/rule/label-format** — severity: error, enforce: true"));
+/// assert!(full.contains("- **@/rule/label-format** — Labels are namespace:value. (error, enforced)"));
 /// assert!(full.contains("_No gates declared._"));
 ///
-/// // Id-anchor style is heading-less.
+/// // Id-anchor style is heading-less; the rule's description is its display text.
 /// let anchored = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::IdAnchor);
 /// assert!(!anchored.contains("## Rules"));
-/// assert_eq!(anchored, "- **@/rule/label-format** — label-format\n");
+/// assert_eq!(anchored, "- **@/rule/label-format** — Labels are namespace:value.\n");
 /// ```
 pub fn render_rules_and_gates_markdown(
     rules: &RuleSet,
@@ -100,6 +102,22 @@ pub fn render_rules_and_gates_markdown(
         ProjectionStyle::Full => render_full(rules, gates),
         ProjectionStyle::IdAnchor => render_id_anchor(rules, gates),
     }
+}
+
+/// A rule's display text: its `description`, falling back to its `name` (the
+/// rule kind's registry text-field fallback) when no description is authored, so
+/// a description-less rule never trails a bare em-dash.
+fn rule_display_text(rule: &crate::validation::rules::Rule) -> &str {
+    rule.description.as_deref().unwrap_or(&rule.name)
+}
+
+/// A rule's prose metadata suffix — `(error, enforced)` / `(warn, advisory)` —
+/// mirroring the gate line's framing instead of the raw `severity: …, enforce: …`
+/// key/value form. The severity token is rendered as-is; `enforce` becomes
+/// `enforced` (blocks writes) or `advisory` (never blocks).
+fn rule_metadata_suffix(rule: &crate::validation::rules::Rule) -> String {
+    let enforcement = if rule.enforce { "enforced" } else { "advisory" };
+    format!("({}, {})", rule.severity.token(), enforcement)
 }
 
 /// Gate `(key, gate)` pairs in ascending key order (deterministic).
@@ -127,10 +145,10 @@ fn render_full(rules: &RuleSet, gates: &GateRegistry) -> String {
     } else {
         for rule in &rules.rules {
             out.push_str(&format!(
-                "- **{address}** — severity: {severity}, enforce: {enforce}\n",
+                "- **{address}** — {text} {suffix}\n",
                 address = rule_address(&rule.name),
-                severity = rule.severity.token(),
-                enforce = rule.enforce,
+                text = rule_display_text(rule),
+                suffix = rule_metadata_suffix(rule),
             ));
         }
     }
@@ -171,7 +189,7 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
         out.push_str(&format!(
             "- **{address}** — {text}\n",
             address = rule_address(&rule.name),
-            text = rule.name,
+            text = rule_display_text(rule),
         ));
     }
     for (key, gate) in sorted {
@@ -266,10 +284,13 @@ mod tests {
     use std::path::Path;
 
     fn ruleset() -> RuleSet {
+        // `label-format` carries a description (rendered verbatim); `orphan-leaf`
+        // has none (exercises the name fallback), so one fixture covers both.
         RuleSet::from_toml_str(
             r#"
 [[rules]]
 name = "label-format"
+description = "Every label is namespace:value."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "type:*" } }
@@ -327,9 +348,12 @@ assert = { require-section = { heading = "Goal" } }
         let rules_at = md.find("## Rules").unwrap();
         let gates_at = md.find("## Gates").unwrap();
         assert!(rules_at < gates_at);
-        // Rules in authored order with canonical addresses + metadata.
-        assert!(md.contains("- **@/rule/label-format** — severity: error, enforce: true"));
-        assert!(md.contains("- **@/rule/orphan-leaf** — severity: warn, enforce: false"));
+        // Rules in authored order with canonical addresses, description (or name
+        // fallback), and the prose metadata suffix mirroring the gate line.
+        assert!(md.contains(
+            "- **@/rule/label-format** — Every label is namespace:value. (error, enforced)"
+        ));
+        assert!(md.contains("- **@/rule/orphan-leaf** — orphan-leaf (warn, advisory)"));
         // Gates sorted by key (breakdown-review before cargo-ci despite insert order).
         let brk = md.find("@/gate/breakdown-review").unwrap();
         let cci = md.find("@/gate/cargo-ci").unwrap();
@@ -340,6 +364,43 @@ assert = { require-section = { heading = "Goal" } }
             md,
             render_rules_and_gates_markdown(&ruleset(), &gate_registry(), ProjectionStyle::Full)
         );
+    }
+
+    #[test]
+    fn test_render_full_rule_prose_suffix_and_description_fallback() {
+        // REQ-04: a described rule renders its description then the prose suffix;
+        // a description-less rule falls back to its name. The suffix is prose
+        // (`error, enforced` / `warn, advisory`), never `severity: …, enforce: …`.
+        let rules = RuleSet::from_toml_str(
+            r#"
+[[rules]]
+name = "described"
+description = "A hand-authored explanation."
+severity = "error"
+enforce = true
+assert = { require-label = { label = "type:*" } }
+
+[[rules]]
+name = "bare"
+severity = "warn"
+enforce = false
+assert = { require-section = { heading = "Goal" } }
+"#,
+            Path::new("/nonexistent"),
+        )
+        .unwrap();
+        let md = render_rules_and_gates_markdown(
+            &rules,
+            &GateRegistry::default(),
+            ProjectionStyle::Full,
+        );
+        assert!(
+            md.contains("- **@/rule/described** — A hand-authored explanation. (error, enforced)")
+        );
+        assert!(md.contains("- **@/rule/bare** — bare (warn, advisory)"));
+        // The legacy key/value metadata form is gone.
+        assert!(!md.contains("severity:"));
+        assert!(!md.contains("enforce:"));
     }
 
     #[test]
@@ -377,10 +438,11 @@ assert = { require-section = { heading = "Goal" } }
         assert!(!md.contains("## Rules"));
         assert!(!md.contains("## Gates"));
         assert!(!md.contains("severity:"));
-        // Rules use the name as display text; gates use the description.
+        // Rules use the description (or name fallback) as display text; gates use
+        // the description.
         assert_eq!(
             md,
-            "- **@/rule/label-format** — label-format\n\
+            "- **@/rule/label-format** — Every label is namespace:value.\n\
              - **@/rule/orphan-leaf** — orphan-leaf\n\
              - **@/gate/breakdown-review** — adversarial review\n\
              - **@/gate/cargo-ci** — fmt + clippy + tests\n"

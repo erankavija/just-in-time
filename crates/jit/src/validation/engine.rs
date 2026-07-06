@@ -1232,6 +1232,7 @@ assert = { json-schema = "schemas/b.json" }
         let rule_alpha = Rule {
             name: "dup".to_string(),
             origin: None,
+            description: None,
             when: Selector::default(),
             severity: Severity::Error,
             enforce: false,
@@ -1245,6 +1246,7 @@ assert = { json-schema = "schemas/b.json" }
         let rule_beta = Rule {
             name: "dup".to_string(),
             origin: None,
+            description: None,
             when: Selector::default(),
             severity: Severity::Error,
             enforce: false,
@@ -1522,6 +1524,7 @@ assert = { json-schema = "schemas/b.json" }
         let rule = Rule {
             name: "title-non-empty".to_string(),
             origin: None,
+            description: None,
             when: crate::validation::rules::Selector::default(),
             severity: Severity::Error,
             enforce: false,
@@ -1591,6 +1594,7 @@ assert = { json-schema = "schemas/b.json" }
         let rule = Rule {
             name: "title-non-empty".to_string(),
             origin: None,
+            description: None,
             when: crate::validation::rules::Selector::default(),
             severity: Severity::Error,
             enforce: false,
@@ -1672,6 +1676,7 @@ assert = { json-schema = "schemas/b.json" }
         Rule {
             name: "spec".to_string(),
             origin: None,
+            description: None,
             when: Selector::default(),
             severity: Severity::Error,
             enforce: true,

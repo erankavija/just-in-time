@@ -623,7 +623,7 @@ id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
 link-namespaces = [\"enforces\"]
 scope = \"project\"
-source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"name\" }
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }
 source-of-truth = \"registry-first\"
 ";
 

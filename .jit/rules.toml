@@ -8,6 +8,7 @@
 [[rules]]
 name = "label-format"
 origin = "default"
+description = "Every label must match the canonical `namespace:value` format (namespace lowercase-kebab, value non-empty). Blocks the write and fails validation."
 severity = "error"
 enforce = true
 assert = { json-schema = "schemas/default-label-format.json" }
@@ -15,6 +16,7 @@ assert = { json-schema = "schemas/default-label-format.json" }
 [[rules]]
 name = "namespace-registry"
 origin = "default"
+description = "Every label's namespace must be declared in the namespace registry. An unknown namespace fails validation but never blocks a write."
 severity = "error"
 enforce = false
 assert = { json-schema = "schemas/default-namespace-registry.json" }
@@ -22,6 +24,7 @@ assert = { json-schema = "schemas/default-namespace-registry.json" }
 [[rules]]
 name = "type-hierarchy-known"
 origin = "default"
+description = "Every `type:<value>` label must name a type declared in the configured type hierarchy. An unknown type fails validation but never blocks a write."
 severity = "error"
 enforce = false
 assert = { json-schema = "schemas/default-type-hierarchy-known.json" }
@@ -29,6 +32,7 @@ assert = { json-schema = "schemas/default-type-hierarchy-known.json" }
 [[rules]]
 name = "namespace-unique-resolution"
 origin = "default"
+description = "At most one `resolution:` label per issue: `resolution` is a unique namespace. Blocks the write and fails validation."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "resolution:*", min = 0, max = 1 } }
@@ -36,6 +40,7 @@ assert = { require-label = { label = "resolution:*", min = 0, max = 1 } }
 [[rules]]
 name = "namespace-unique-team"
 origin = "default"
+description = "At most one `team:` label per issue: `team` is a unique namespace. Blocks the write and fails validation."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "team:*", min = 0, max = 1 } }
@@ -43,6 +48,7 @@ assert = { require-label = { label = "team:*", min = 0, max = 1 } }
 [[rules]]
 name = "namespace-unique-type"
 origin = "default"
+description = "At most one `type:` label per issue: `type` is a unique namespace. Blocks the write and fails validation."
 severity = "error"
 enforce = true
 assert = { require-label = { label = "type:*", min = 0, max = 1 } }
@@ -50,6 +56,7 @@ assert = { require-label = { label = "type:*", min = 0, max = 1 } }
 [[rules]]
 name = "coverage-preview"
 origin = "bracket"
+description = "On a breakdown node, assert every [hard] REQ-id in the bracketed container's Success Criteria is credited by some issue in its dependency closure via a satisfies:<id> label. A plan-time coverage preview; fires once breakdown is underway."
 # Fires on the breakdown node B, redirects to its bracketed container C via the
 # brackets: label, and asserts every [hard] REQ-id in C's Success Criteria is
 # credited by some issue in C's dependency closure (stories/tasks) carrying a
@@ -67,6 +74,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 [[rules]]
 name = "orphan-leaf"
 origin = "default"
+description = "Warn when a leaf-level-typed issue (a type at the deepest hierarchy level, e.g. task) carries no parent-membership label (e.g. `epic:*`), leaving it unattached to any strategic container. Advisory: never blocks a write."
 severity = "warn"
 enforce = false
 assert = { type-hierarchy = { kind = "orphan-leaf" } }
@@ -74,6 +82,7 @@ assert = { type-hierarchy = { kind = "orphan-leaf" } }
 [[rules]]
 name = "strategic-consistency"
 origin = "default"
+description = "Warn when a strategic-typed issue (a type with a membership namespace, e.g. epic/milestone) lacks its own identifying membership label, such as a `type:epic` issue that has no `epic:*` label. Advisory: never blocks a write."
 severity = "warn"
 enforce = false
 assert = { type-hierarchy = { kind = "strategic-consistency" } }

@@ -1488,8 +1488,10 @@ pub fn index_project_sources(
 /// - A missing `table` key yields NO items (an empty registry, like an absent
 ///   file), never an error.
 /// - A malformed file is [`ItemError::TomlSourceParse`].
-/// - An entry missing the mapped `id-field` / `text-field` is
-///   [`ItemError::TomlSourceMissingField`]; a mapped field of an unexpected TOML
+/// - An entry missing the mapped `id-field` is
+///   [`ItemError::TomlSourceMissingField`]; the `text-field` is OPTIONAL and,
+///   when absent, falls back to the id-field value (so a description-less rule
+///   projects its `name` as display text). A mapped field of an unexpected TOML
 ///   type is [`ItemError::TomlSourceFieldType`].
 /// - An entry that simply lacks a mapped LINK field contributes no labels for it
 ///   (graceful) — only the addressing fields are mandatory.
@@ -1556,7 +1558,11 @@ fn project_toml_entry(
     entry: &toml::Value,
 ) -> Result<RawScopeItem, ItemError> {
     let self_id = required_toml_str(kind_name, descriptor, entry, &descriptor.id_field)?;
-    let text = required_toml_str(kind_name, descriptor, entry, &descriptor.text_field)?;
+    // The text field is OPTIONAL: an entry lacking it falls back to its self-id
+    // (the id-field value), so a description-less rule projects its `name` as
+    // display text. A present-but-wrong-type field is still a typed error.
+    let text = optional_toml_str(kind_name, descriptor, entry, &descriptor.text_field)?
+        .unwrap_or_else(|| self_id.clone());
     // Link fields iterate in namespace order (BTreeMap) for deterministic labels.
     let links = descriptor
         .link_fields
@@ -1598,6 +1604,30 @@ fn required_toml_str(
             field: field.to_string(),
             expected: "a string".to_string(),
         })
+}
+
+/// Read an OPTIONAL string `field` from a TOML entry: `Ok(None)` when the field
+/// is absent (the caller supplies a fallback), `Ok(Some(_))` when present as a
+/// string, and a typed [`ItemError::TomlSourceFieldType`] when present as a
+/// non-string. Used for the display `text-field`, which falls back to the
+/// id-field value when unset (so a description-less rule projects its name).
+fn optional_toml_str(
+    kind_name: &str,
+    descriptor: &TomlSourceDescriptor,
+    entry: &toml::Value,
+    field: &str,
+) -> Result<Option<String>, ItemError> {
+    match entry.get(field) {
+        None => Ok(None),
+        Some(value) => value.as_str().map(|s| Some(s.to_string())).ok_or_else(|| {
+            ItemError::TomlSourceFieldType {
+                kind: kind_name.to_string(),
+                table: descriptor.table.clone(),
+                field: field.to_string(),
+                expected: "a string".to_string(),
+            }
+        }),
+    }
 }
 
 /// Project one mapped link `field` of a TOML entry into `<namespace>:<target>`
@@ -2307,6 +2337,48 @@ enforced-by = \"tests\"
         assert!(matches!(
             err,
             ItemError::TomlSourceMissingField { ref field, .. } if field == "id"
+        ));
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_absent_text_field_falls_back_to_id() {
+        // REQ-03: the text-field is optional. An entry lacking it projects its
+        // id-field value as display text (a description-less rule shows its
+        // name), rather than erroring. A `rule`-shaped descriptor whose
+        // text-field is `description`, with an entry that omits it, exercises the
+        // fallback the item-kind flip relies on.
+        let descriptor = TomlSourceDescriptor {
+            toml: ".jit/rules.toml".to_string(),
+            table: "rules".to_string(),
+            id_field: "name".to_string(),
+            text_field: "description".to_string(),
+            link_fields: Default::default(),
+        };
+        let content = "\
+[[rules]]
+name = \"described\"
+description = \"Every label must be namespace:value.\"
+
+[[rules]]
+name = \"bare\"
+";
+        let rows = load_toml_scope_items("rule", &descriptor, content).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].text, "Every label must be namespace:value.");
+        // Name fallback: the description-less rule's text is its self-id.
+        assert_eq!(rows[1].self_id, "bare");
+        assert_eq!(rows[1].text, "bare");
+    }
+
+    #[test]
+    fn test_load_toml_scope_items_wrong_text_type_is_error() {
+        // A present-but-non-string text-field is still a typed field-type error
+        // (the fallback only covers an ABSENT field, not a malformed one).
+        let content = "[[policies]]\nid = \"POL-05\"\nstatement = 7\n";
+        let err = load_toml_scope_items("policy", &policy_descriptor(), content).unwrap_err();
+        assert!(matches!(
+            err,
+            ItemError::TomlSourceFieldType { ref field, .. } if field == "statement"
         ));
     }
 

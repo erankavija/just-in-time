@@ -342,6 +342,7 @@ mod tests {
         Rule {
             name: name.to_string(),
             origin: None,
+            description: None,
             when: Selector::default(),
             severity: Severity::Error,
             enforce: false,
