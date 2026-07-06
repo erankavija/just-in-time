@@ -5669,3 +5669,7 @@
 {"type":"issue_updated","id":"a38f1ec1-9d9d-4925-854a-92d6b236ae53","issue_id":"dbe1e821-f4cb-4ef9-9b61-73c9495ee039","timestamp":"2026-07-06T16:09:15.958893159Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"e8a4b3fc-50c6-46a0-8454-108650fccfe6","issue_id":"e486a854-1860-4d25-8cc5-c26715192088","timestamp":"2026-07-06T16:09:15.964371873Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"f2c59bd7-f77c-4e7e-902d-c59641f8e1fb","issue_id":"f16cfe8c-970e-450b-9ac5-050243c6741d","timestamp":"2026-07-06T16:09:15.970839318Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"52e0d079-c530-4f11-9a11-e7f6cfb93b03","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-06T16:16:38.009302487Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_updated","id":"d0664e33-aa19-406f-95dc-d9a9a44fb6f2","issue_id":"6ce0f14e-7768-45ea-ada7-c39b0cd2957e","timestamp":"2026-07-06T16:16:38.044057103Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_created","id":"49ff2890-668e-4fb7-86be-02c52b4031cc","issue_id":"f5eb11a2-d368-4ede-aa9f-abdc1343236e","timestamp":"2026-07-06T16:16:38.049994337Z","title":"Convert ASCII diagrams in docs to Mermaid","priority":"normal"}
+{"type":"issue_updated","id":"5cef9587-791d-4a10-baaf-cd415d7fe4fe","issue_id":"6ce0f14e-7768-45ea-ada7-c39b0cd2957e","timestamp":"2026-07-06T16:16:38.095872340Z","updated_by":"dependency-add","fields":["dependencies"]}
