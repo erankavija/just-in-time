@@ -32,17 +32,18 @@ cd mcp-server && npm install && npm test
 
 # Web UI (React + Vite)
 cd web && npm install && npm run dev    # Dev server
+cd web && npm test                      # Vitest unit tests
 cd web && npm run build                 # Production build
 cd web && npm run lint                  # ESLint
 ```
 
 ## Workspace Structure
 
-Cargo workspace with three crates plus Node.js and React components:
+Cargo workspace with two crates plus Node.js and React components:
 
-- **`crates/jit/`** — Core CLI binary and library. Contains all domain logic, storage, graph algorithms, and command implementations.
-- **`crates/server/`** — Web UI HTTP server wrapping the jit CLI.
-- **`mcp-server/`** — MCP (Model Context Protocol) server (Node.js). Auto-generates 60+ tools from CLI schema.
+- **`crates/jit/`** — Core CLI binary and library (see Core Architecture below).
+- **`crates/server/`** — Web UI HTTP server embedding the jit library (`CommandExecutor`) in-process.
+- **`mcp-server/`** — MCP (Model Context Protocol) server (Node.js). Auto-generates its tools from the CLI schema.
 - **`web/`** — React + TypeScript + Vite web UI for issue visualization.
 - **`docs/`** — User-facing documentation (Diataxis structure).
 - **`dev/`** — Contributor/development documentation and session notes.
@@ -58,6 +59,8 @@ Cargo workspace with three crates plus Node.js and React components:
 5. **Graph** (`graph/`) — DAG construction, cycle detection, blocking analysis, transitive reduction, and DAG-authoritative hierarchy resolution (`graph/hierarchy.rs`).
 6. **Output** (`output.rs`) — JSON serialization and structured output formatting.
 
+Adjacent subsystems include `validation/` (rules engine), `document/` (linked docs), `query_engine/`, and `search.rs`.
+
 `commands/mod.rs` hosts the `CommandExecutor` that orchestrates commands. `main.rs` is CLI dispatch and output rendering — large and monolithic.
 
 ### Issue Lifecycle States
@@ -65,7 +68,7 @@ Cargo workspace with three crates plus Node.js and React components:
 `Backlog → Ready → InProgress → Gated → Done`
 
 - `Rejected` and `Archived` are reachable from any state.
-- Dependencies must complete before an issue becomes `Ready`.
+- Dependencies must reach a terminal state (`Done` or `Rejected`) before an issue becomes `Ready`.
 - Gates must pass before transitioning through `Gated` to `Done` (`@/inv/gate-semantics`).
 
 ### Data Storage (`.jit/` directory)
@@ -75,30 +78,46 @@ Cargo workspace with three crates plus Node.js and React components:
 ├── index.json          # Repository metadata (incl. format version)
 ├── config.toml         # Configuration
 ├── gates.toml          # Gate registry
-├── templates.toml      # Graph templates (plan bracket)
+├── templates.toml      # Graph template registry (this repo declares the `plan` bracket)
 ├── rules.toml          # Validation rules
-├── invariants.toml     # Invariants registry (rendered into CLAUDE.md)
+├── invariants.toml     # Invariants registry (rendered to the `[invariant_projection]` target; here CLAUDE.md)
 ├── issues/{id}.json    # Individual issue files
 ├── events.jsonl        # Append-only event log
 ├── gate-runs/          # Recorded gate runs (+ structured findings)
 └── schemas/            # JSON schemas
 ```
 
-Advisory work leases live in `.git/jit/`, not `.jit/`.
+A live repo also carries gitignored machine-local files in `.jit/` (`worktree.json`, `server.log`, `server.pid.json`, `*.lock`, `tmp/`). Advisory work leases live in `.git/jit/`, not `.jit/`.
+
+### Addressable Items
+
+Structured lines in issue descriptions and project registries carry a self-id and are addressable via qualified ids: `@/<kind>/<self-id>` (project scope, e.g. `@/invariant/dag-acyclic`), `@/issue/<short-id>/<kind>/<self-id>` (issue scope), with `<short-id>/<self-id>` as input sugar. Kinds (requirement, decision, risk, invariant, …) and their aliases (`@/inv/…`) are declared in `[item_kinds]` in `.jit/config.toml`; beyond the six kinds `jit init` scaffolds, this repo adds a `definition` kind over `docs/reference/glossary.md`. Each kind declares its source of truth: markdown-first for description-embedded items (requirement, decision, risk), registry-first for TOML registries (invariant, rule, gate — `jit invariant render` projects the registry into markdown); the item index is always a projection. Citations like `@/inv/gate-semantics` in docs and issue text resolve through this scheme; `jit validate` flags dangling item links (`dangling-item-link`).
+
+## Dogfooding Setup
+
+This repository tracks jit's own development with jit: `.jit/` here is project configuration, distinct from what the product ships.
+
+- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (4-type hierarchy, 7 namespaces, 6 item kinds), `rules.toml` with 8 default rules. Gate presets (`rust-tdd`, `minimal`, the planning-bracket trio) live in code; `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
+- **This repo's local layer**: 13 gates wired to repo scripts (`cargo-ci`, `npm-ci`, `jit-validate`, `code-review` via `./scripts/ai-review.sh`); `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:` namespaces; the `plan` template; the `definition` item kind; the invariant projection into this file; the `dev/` doc lifecycle.
+
+When editing docs or config, keep this boundary explicit: adopter-facing text describes the shipped surface, repo-local values are signalled as this project's configuration.
 
 ## Agent Workflow Quick Reference
 
-All commands support `--json`; list output uses `{"count": N, "<collection>": [...]}`.
+All commands support `--json` (envelope spec under Coding Conventions).
 
 - `jit issue status <id>...` — state + gates + unmet deps, one line per issue
-- `jit issue children` / `jit issue progress <id>` — per-child rollup, counts by state
+- `jit issue children <id>` / `jit issue progress <id>` — per-child rollup, counts by state
 - `jit query available --label a:b --label c:d` — ready work; labels AND
 - `jit query count --by state [--label ...]` — aggregate over a bucket
-- `jit graph tree [--json]` / `jit query divergence` — resolved hierarchy; label-vs-DAG report
+- `jit graph tree` / `jit query divergence` — resolved hierarchy; label-vs-DAG report
 - `jit gate evaluate <id> <gate>` runs a checker; `jit gate status` reads results; `--findings` prints structured findings
 - `jit config get <dotted.key>` — config values
 - `jit graph export --format json --full` — full records incl. lifecycle timestamps
-- `jit schema` — JSON shapes + exit-code taxonomy
+- `jit apply <template> <container>` — instantiate a graph template from `.jit/templates.toml` (plan-before-fan-out scaffold)
+- `jit issue batch-create --from-json <file>` — create many issues plus dependency edges from one JSON payload
+- `jit item show @/inv/dag-acyclic` — resolve a qualified id; `jit item list --kind <k>` / `jit item search <text>` to discover
+- `jit --schema` — JSON shapes + exit-code taxonomy
 
 ## Testing Strategy
 
@@ -106,7 +125,7 @@ Three-layer approach (see TESTING.md for details):
 
 - **Unit tests** — In-source `#[cfg(test)]` modules. Fast, test individual functions.
 - **Harness tests** (`tests/harness_demo.rs`) — Use `TestHarness` for isolated in-process tests with `CommandExecutor` directly. Fast and reliable.
-- **Integration tests** (`tests/integration_test.rs`, 50+ test files) — Spawn `jit` as subprocess, test actual CLI interface end-to-end.
+- **Integration tests** (`tests/*.rs`, e.g. `integration_test.rs`) — Spawn `jit` as subprocess, test actual CLI interface end-to-end.
 
 Test naming: `test_<function>_<scenario>` (e.g., `test_query_ready_returns_unassigned`).
 
@@ -137,15 +156,17 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
-- **git is optional** — jit must work without git unless a feature strictly requires it. Exception: claim and lease commands (`jit claim acquire/release/renew/heartbeat/status/list`) require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
+- **git is optional** — jit must work without git unless a feature strictly requires it. Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
 ### Domain Invariants
+
+Each invariant is addressable at `@/inv/<name>`.
 
 <!-- jit:invariants:begin -->
 - **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
 - **namespace-registry** — Every label namespace is declared in the namespace registry.
 - **dag-acyclic** — Cycle detection runs before every dependency operation; the graph stays acyclic.
-- **gate-semantics** — An issue cannot reach Ready or Done with pending or failed gates.
+- **gate-semantics** — An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated.
 - **event-log** — Every state change appends an event to events.jsonl.
 - **atomic-writes** — All file writes use the temp-file + atomic-rename pattern.
 - **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).

@@ -29,7 +29,7 @@ enforced-by = "@/gate/cargo-ci"
 
 [[invariants]]
 id = "gate-semantics"
-statement = "An issue cannot reach Ready or Done with pending or failed gates."
+statement = "An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated."
 kind = "enforced"
 enforced-by = "@/gate/cargo-ci"
 

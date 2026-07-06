@@ -26,9 +26,9 @@ pub const SHORT_ID_LENGTH: usize = 8;
 )]
 #[serde(rename_all = "snake_case")]
 pub enum State {
-    /// Created but not actionable yet (blocked by dependencies or gates)
+    /// Created but not actionable yet (blocked by dependencies)
     Backlog,
-    /// All dependencies done and gates passed, ready for work
+    /// All dependencies in a terminal state, ready for work (gates gate completion, not start)
     Ready,
     /// Currently being worked on
     InProgress,
