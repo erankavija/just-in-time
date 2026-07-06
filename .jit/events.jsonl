@@ -5593,3 +5593,4 @@
 {"type":"gate_passed","id":"ee1d2a4a-510c-4ab9-924f-25337881d283","issue_id":"d8c48af9-40eb-495d-a236-230e343b6357","timestamp":"2026-07-06T10:14:30.948418677Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"94f32d00-245f-45a3-9310-c8f62dc3e652","issue_id":"d8c48af9-40eb-495d-a236-230e343b6357","timestamp":"2026-07-06T10:15:10.695412800Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"d0414438-af9c-40d7-a9ad-11cd86a2d7d1","issue_id":"d8c48af9-40eb-495d-a236-230e343b6357","timestamp":"2026-07-06T10:15:10.695435400Z"}
+{"type":"issue_updated","id":"80429847-6215-430d-a6c0-57d1c16f5dac","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T10:49:16.723099883Z","updated_by":"doc-add","fields":["documents"]}
