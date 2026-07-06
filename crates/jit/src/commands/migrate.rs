@@ -28,8 +28,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// overwritten, preserving first-occurrence semantics). Issues whose fields
     /// are all set — or whose event log yields nothing to fill — are left byte
     /// unchanged. Each updated issue is saved through the storage layer (atomic
-    /// temp-file + rename, INV-ATOMIC-WRITES). When at least one issue changed, a
-    /// single [`Event::LifecycleTimestampsBackfilled`] is appended (INV-EVENT-LOG);
+    /// temp-file + rename, @/inv/atomic-writes). When at least one issue changed, a
+    /// single [`Event::LifecycleTimestampsBackfilled`] is appended (@/inv/event-log);
     /// a no-op run appends nothing, so re-running is safe and quiet.
     ///
     /// Issues predating event coverage (no relevant events) keep `None` for the

@@ -7,7 +7,7 @@
 //! [`toml_edit::DocumentMut`] mutations or the identity value; this module reads
 //! and writes the files. Every write goes through the shared atomic writer
 //! ([`crate::storage::atomic_write`]), preserving the temp-file + rename
-//! invariant (INV-ATOMIC-WRITES), so no config-file path or write primitive
+//! invariant (@/inv/atomic-writes), so no config-file path or write primitive
 //! leaks into the command/CLI layers.
 
 use crate::config::ProjectName;

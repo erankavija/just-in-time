@@ -245,7 +245,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut pending_state_event: Option<Event> = None;
         // Pending claim event for a first assignee set on this update, emitted with
         // the same deferred-after-save discipline. Coupled to the `claimed_at`
-        // stamp below (INV-EVENT-LOG) and folded by the lifecycle-timestamp
+        // stamp below (@/inv/event-log) and folded by the lifecycle-timestamp
         // backfill (`derive_lifecycle_timestamps`), matching the claim/assign paths.
         let mut pending_claim_event: Option<Event> = None;
 
@@ -745,7 +745,7 @@ mod tests {
         let updated = executor.get_issue("test-1").unwrap();
         assert!(updated.claimed_at.is_some());
 
-        // INV-EVENT-LOG: the assignee mutation appended an issue_claimed event.
+        // @/inv/event-log: the assignee mutation appended an issue_claimed event.
         let claimed = reader
             .read_events()
             .unwrap()

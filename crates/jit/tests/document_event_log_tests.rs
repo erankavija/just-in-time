@@ -1,4 +1,4 @@
-//! Event-log coverage for document reference mutations (INV-EVENT-LOG)
+//! Event-log coverage for document reference mutations (@/inv/event-log)
 //!
 //! `jit doc add` and `jit doc remove` mutate an issue's `documents` field, so
 //! each must append an `issue_updated` event with `fields: ["documents"]`,

@@ -1108,8 +1108,8 @@ impl ItemKind {
 /// );
 /// // Project scope carries the kind directly after the `@` sentinel.
 /// assert_eq!(
-///     qualified_id(&Scope::Project, "invariant", "INV-01"),
-///     "@/invariant/INV-01"
+///     qualified_id(&Scope::Project, "invariant", "dag-acyclic"),
+///     "@/invariant/dag-acyclic"
 /// );
 /// ```
 pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {

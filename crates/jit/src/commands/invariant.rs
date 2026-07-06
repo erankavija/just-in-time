@@ -66,7 +66,7 @@ pub struct InvariantRenderResult {
 /// // The shape mirrors the computed drift (built by hand to show the JSON).
 /// let result = InvariantCheckResult {
 ///     findings: vec![DriftFinding {
-///         invariant_id: "INV-01".to_string(),
+///         invariant_id: "dag-acyclic".to_string(),
 ///         subject: "@/rule/ghost-rule".to_string(),
 ///         unloadable: false,
 ///     }],
@@ -75,7 +75,7 @@ pub struct InvariantRenderResult {
 /// assert!(result.has_drift());
 /// let json = serde_json::to_value(&result).unwrap();
 /// assert_eq!(json["count"], 1);
-/// assert_eq!(json["findings"][0]["invariant_id"], "INV-01");
+/// assert_eq!(json["findings"][0]["invariant_id"], "dag-acyclic");
 /// assert_eq!(json["findings"][0]["subject"], "@/rule/ghost-rule");
 /// ```
 #[derive(Debug, Serialize)]

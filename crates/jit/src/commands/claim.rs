@@ -158,7 +158,7 @@ pub fn execute_claim_acquire<S: IssueStore>(
         issue.assignee = Some(agent.clone());
         // Record the first claim time (first-occurrence only). The stamp and the
         // `issue_claimed` event below are the coupled record of this claim: the
-        // mutation never persists without an event (INV-EVENT-LOG), and the event
+        // mutation never persists without an event (@/inv/event-log), and the event
         // is what the lifecycle-timestamp backfill folds to reconstruct
         // `claimed_at` (see `derive_lifecycle_timestamps`).
         issue.mark_claimed(chrono::Utc::now());

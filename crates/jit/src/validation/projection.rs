@@ -134,19 +134,19 @@ pub enum ProjectionError {
 /// use jit::validation::projection::render_invariants_markdown;
 ///
 /// let reg = InvariantRegistry::from_toml_str(
-///     "[[invariants]]\nid = \"INV-01\"\nstatement = \"Acyclic.\"\nkind = \"enforced\"\nenforced-by = \"dag-no-cycles\"\n",
+///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"Acyclic.\"\nkind = \"enforced\"\nenforced-by = \"dag-no-cycles\"\n",
 /// )
 /// .unwrap();
 ///
 /// // Full style keeps the header, kind tag, and enforced-by.
 /// let full = render_invariants_markdown(&reg, ProjectionStyle::Full);
 /// assert!(full.contains("## Project invariants"));
-/// assert!(full.contains("- **INV-01** [enforced] (enforced-by: `dag-no-cycles`): Acyclic."));
+/// assert!(full.contains("- **dag-acyclic** [enforced] (enforced-by: `dag-no-cycles`): Acyclic."));
 ///
 /// // Id-anchor style is heading-less with no kind/enforced-by.
 /// let anchored = render_invariants_markdown(&reg, ProjectionStyle::IdAnchor);
 /// assert!(!anchored.contains("## Project invariants"));
-/// assert_eq!(anchored, "- **INV-01** — Acyclic.\n");
+/// assert_eq!(anchored, "- **dag-acyclic** — Acyclic.\n");
 /// ```
 pub fn render_invariants_markdown(registry: &InvariantRegistry, style: ProjectionStyle) -> String {
     match style {

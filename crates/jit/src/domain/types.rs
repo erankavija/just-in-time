@@ -88,7 +88,7 @@ impl State {
     /// Every `State` variant, in canonical lifecycle order.
     ///
     /// Use this to enumerate the state space exhaustively instead of hardcoding
-    /// a state list at a call site (INV-DOMAIN-AGNOSTIC): a counts-by-state
+    /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
     /// rollup, for instance, must list every state so its shape stays stable
     /// and complete as the enum evolves.
     ///

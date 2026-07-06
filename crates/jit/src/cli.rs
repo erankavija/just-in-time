@@ -481,8 +481,8 @@ pub enum ItemCommands {
     ///
     /// Examples:
     ///   jit item show @/issue/56ab0224/requirement/REQ-01
-    ///   jit item show @/invariant/INV-01
-    ///   jit item show @/inv/INV-01                  # alias of @/invariant/INV-01
+    ///   jit item show @/invariant/dag-acyclic
+    ///   jit item show @/inv/dag-acyclic             # alias of @/invariant/dag-acyclic
     ///   jit item show 56ab0224/REQ-01 --json
     Show {
         /// Qualified id of the item (`@/<kind>/<self-id>`,

@@ -128,7 +128,7 @@ fn test_claim_stamps_claimed_at() {
 }
 
 /// Assigning an issue (without claiming) stamps `claimed_at` and logs an
-/// `issue_claimed` event (INV-EVENT-LOG) so the mutation is auditable and the
+/// `issue_claimed` event (@/inv/event-log) so the mutation is auditable and the
 /// backfill can fold it.
 #[test]
 fn test_assign_stamps_claimed_at_and_logs_event() {

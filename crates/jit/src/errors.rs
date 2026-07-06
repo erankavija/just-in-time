@@ -437,7 +437,7 @@ impl ClaimRequiresGitError {
 
 /// A `jit dep add` rejected because the edge would break transitive reduction.
 ///
-/// Cycle detection is a write-time guard (INV-DAG-ACYCLIC); this error makes the
+/// Cycle detection is a write-time guard (@/inv/dag-acyclic); this error makes the
 /// transitive-reduction property a write-time guard too. `jit dep add` refuses,
 /// by default, any edge that shadows an existing direct edge or is itself already
 /// reachable through other dependencies — the exact property `jit validate`

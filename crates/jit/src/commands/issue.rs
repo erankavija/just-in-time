@@ -915,7 +915,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue_id = issue.id.clone();
         self.storage.save_issue(issue)?;
         // The assignee (and `claimed_at`) mutation above appends an
-        // `issue_claimed` event so the change is auditable (INV-EVENT-LOG) and the
+        // `issue_claimed` event so the change is auditable (@/inv/event-log) and the
         // lifecycle-timestamp backfill can fold it back into `claimed_at` (see
         // `derive_lifecycle_timestamps`), matching the `claim`/lease-acquire paths.
         self.storage
@@ -1006,7 +1006,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Record the first claim time (first-occurrence only; a re-claim by the
         // same assignee leaves the original stamp intact). This stamp and the
         // `issue_claimed` event below are coupled: the mutation persists together
-        // with the event (INV-EVENT-LOG), and the event feeds the
+        // with the event (@/inv/event-log), and the event feeds the
         // lifecycle-timestamp backfill (`derive_lifecycle_timestamps`).
         issue.mark_claimed(chrono::Utc::now());
 
@@ -2232,7 +2232,7 @@ enforce_leases = "off"
         );
 
         // The cascade edit is itself event-logged (in addition to the
-        // `issue_deleted` event for B), preserving INV-EVENT-LOG.
+        // `issue_deleted` event for B), preserving @/inv/event-log.
         let events = executor.storage.read_events().unwrap();
         assert!(
             events.len() > events_before,

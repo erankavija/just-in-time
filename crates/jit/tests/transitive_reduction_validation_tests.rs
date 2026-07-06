@@ -298,7 +298,7 @@ fn test_multiple_issues_with_redundancies() {
 // Write-time redundancy guard on `jit dep add` (jit:7a50e021)
 // ============================================================================
 //
-// Cycle detection is enforced at write time (INV-DAG-ACYCLIC); these tests pin
+// Cycle detection is enforced at write time (@/inv/dag-acyclic); these tests pin
 // the same treatment for the transitive-reduction property: a `dep add` that
 // would shadow an existing edge (or is itself redundant) is rejected by default
 // and only applied under an explicit `--reduce`, so a silent write can never

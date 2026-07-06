@@ -84,7 +84,7 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///    `domain::types::Assignee::from_str` /
 ///    `domain::types::Assignee`'s `PartialEq<str>` — label values never reach
 ///    these; they parse `{type}:{identifier}` assignees, a different input
-///    domain per INV-ASSIGNEE-FORMAT).
+///    domain per @/inv/assignee-format).
 /// 2. **Slash-decode qualified-id sites** — route through the structural
 ///    address parser ([`crate::domain::item::parse_kind_segmented_address`] /
 ///    [`crate::domain::item::expand_sugar_address`]):

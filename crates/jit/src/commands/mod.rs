@@ -294,7 +294,7 @@ pub enum DependencyAddResult {
 
 /// How `jit dep add` treats an edge that would break transitive reduction.
 ///
-/// Cycle detection is a write-time guard (INV-DAG-ACYCLIC); this policy makes the
+/// Cycle detection is a write-time guard (@/inv/dag-acyclic); this policy makes the
 /// transitive-reduction property a write-time guard too, closing the asymmetry
 /// where a redundant edge was written silently and only rejected at a later
 /// `jit validate`.

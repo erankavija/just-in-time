@@ -58,13 +58,13 @@ use std::collections::BTreeSet;
 /// use jit::validation::drift::DriftFinding;
 ///
 /// let f = DriftFinding {
-///     invariant_id: "INV-01".to_string(),
+///     invariant_id: "dag-acyclic".to_string(),
 ///     subject: "@/rule/dag-no-cycles".to_string(),
 ///     unloadable: false,
 /// };
 /// // The human message names the invariant and the dangling binding.
 /// let msg = f.message();
-/// assert!(msg.contains("INV-01"));
+/// assert!(msg.contains("dag-acyclic"));
 /// assert!(msg.contains("@/rule/dag-no-cycles"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -96,11 +96,11 @@ impl DriftFinding {
     /// use jit::validation::drift::DriftFinding;
     ///
     /// let f = DriftFinding {
-    ///     invariant_id: "INV-01".to_string(),
+    ///     invariant_id: "dag-acyclic".to_string(),
     ///     subject: "@/rule/ghost-rule".to_string(),
     ///     unloadable: false,
     /// };
-    /// assert!(f.message().contains("INV-01"));
+    /// assert!(f.message().contains("dag-acyclic"));
     /// assert!(f.message().contains("@/rule/ghost-rule"));
     /// assert!(f.message().contains("declared-but-unenforced"));
     /// ```
@@ -144,7 +144,7 @@ impl DriftFinding {
 /// use std::collections::BTreeSet;
 ///
 /// let reg = InvariantRegistry::from_toml_str(
-///     "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n\
 ///      enforced-by = \"@/rule/missing-rule\"\n",
 /// )
 /// .unwrap();
@@ -241,7 +241,7 @@ impl SourceState<'_> {
 /// use std::collections::BTreeSet;
 ///
 /// let reg = InvariantRegistry::from_toml_str(
-///     "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n\
+///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n\
 ///      enforced-by = \"@/rule/bad-rule\"\n",
 /// )
 /// .unwrap();

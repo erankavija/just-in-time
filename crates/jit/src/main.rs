@@ -4312,7 +4312,7 @@ fn run() -> Result<()> {
                 if let Some(path) = output {
                     // Write through the shared atomic primitive (temp file +
                     // rename) so a reader never observes a partially written
-                    // export file (INV-ATOMIC-WRITES), matching every storage write.
+                    // export file (@/inv/atomic-writes), matching every storage write.
                     jit::storage::atomic_write::write_file_atomic(
                         std::path::Path::new(&path),
                         &graph_output,

@@ -80,7 +80,7 @@ impl InMemoryStorage {
     /// use jit::storage::{InMemoryStorage, IssueStore};
     ///
     /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file("project-items.md", "## Success Criteria\n\n- INV-01: x\n");
+    /// storage.add_repo_file("project-items.md", "## Success Criteria\n\n- atomic-writes: x\n");
     /// assert!(storage.read_repo_file("project-items.md").unwrap().is_some());
     /// assert!(storage.read_repo_file("absent.md").unwrap().is_none());
     /// ```

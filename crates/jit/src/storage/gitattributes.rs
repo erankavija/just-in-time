@@ -70,7 +70,7 @@ pub fn setup_gitattributes() -> Result<GitattributesOutcome> {
         }
 
         // Append to existing file, through the atomic temp-file + rename
-        // primitive (INV-ATOMIC-WRITES) so a concurrent reader never observes
+        // primitive (@/inv/atomic-writes) so a concurrent reader never observes
         // a partially written file.
         let new_content = if content.ends_with('\n') {
             format!("{}\n{}", content, jit_config)

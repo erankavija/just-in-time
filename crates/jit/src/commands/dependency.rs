@@ -56,7 +56,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Add a dependency under an explicit transitive-reduction [`RedundancyPolicy`].
     ///
     /// Cycle detection runs first (the existing write-time guard,
-    /// INV-DAG-ACYCLIC). The candidate graph (the current issues plus the new
+    /// @/inv/dag-acyclic). The candidate graph (the current issues plus the new
     /// edge) is then checked for transitive-reduction violations with the same
     /// [`DependencyGraph::find_redundant_edges`] property `jit validate` enforces:
     ///

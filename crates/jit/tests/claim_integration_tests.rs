@@ -133,7 +133,7 @@ fn test_claim_acquire_stamps_claimed_at_and_logs_event() {
         .expect("claimed_at must be set after claim acquire")
         .to_string();
 
-    // INV-EVENT-LOG: an issue_claimed event was appended.
+    // @/inv/event-log: an issue_claimed event was appended.
     let events = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["events", "query", "--event-type", "issue_claimed", "--json"])

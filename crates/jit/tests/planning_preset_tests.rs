@@ -88,7 +88,7 @@ fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node()
     }
 }
 
-/// INV-EVENT-LOG (jit:bb7d57a2): a preset application that WRITES the gate
+/// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
 /// registry appends a registry-scoped audit event per definition write —
 /// `gate_definition_created` for a new key, `gate_definition_updated` for a
 /// timeout-override overwrite — and a no-write re-application appends none.

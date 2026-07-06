@@ -33,7 +33,7 @@ use thiserror::Error;
 /// // An entry with a missing `statement` is a typed, descriptive error.
 /// let toml = r#"
 /// [[invariants]]
-/// id = "INV-01"
+/// id = "dag-acyclic"
 /// kind = "advisory"
 /// "#;
 /// let err = InvariantRegistry::from_toml_str(toml).unwrap_err();
@@ -79,12 +79,12 @@ pub enum InvariantConfigError {
 /// use jit::validation::invariants::{InvariantKind, InvariantRegistry};
 ///
 /// // Parsed from its token inside an invariant entry.
-/// let toml = "[[invariants]]\nid = \"INV-01\"\nstatement = \"s\"\nkind = \"enforced\"\n";
+/// let toml = "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n";
 /// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
 /// assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
 ///
 /// // An invalid token is a descriptive error listing the valid values.
-/// let bad = "[[invariants]]\nid = \"INV-02\"\nstatement = \"s\"\nkind = \"both\"\n";
+/// let bad = "[[invariants]]\nid = \"event-log\"\nstatement = \"s\"\nkind = \"both\"\n";
 /// let err = InvariantRegistry::from_toml_str(bad).unwrap_err();
 /// assert!(err.to_string().contains("enforced"));
 /// assert!(err.to_string().contains("advisory"));
@@ -112,14 +112,14 @@ pub enum InvariantKind {
 ///
 /// let toml = r#"
 /// [[invariants]]
-/// id = "INV-01"
+/// id = "dag-acyclic"
 /// statement = "Every dependency edge stays acyclic."
 /// kind = "enforced"
 /// enforced-by = "dag-no-cycles"
 /// "#;
 /// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
 /// let inv: &Invariant = &reg.invariants[0];
-/// assert_eq!(inv.id, "INV-01");
+/// assert_eq!(inv.id, "dag-acyclic");
 /// assert_eq!(inv.kind, InvariantKind::Enforced);
 /// assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
 /// ```
@@ -221,12 +221,12 @@ impl InvariantRegistry {
     ///
     /// let toml = r#"
     /// [[invariants]]
-    /// id = "INV-01"
+    /// id = "gate-semantics"
     /// statement = "Gates must pass before Done."
     /// kind = "advisory"
     /// "#;
     /// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
-    /// assert_eq!(reg.invariants[0].id, "INV-01");
+    /// assert_eq!(reg.invariants[0].id, "gate-semantics");
     /// assert!(reg.invariants[0].enforced_by.is_none());
     /// ```
     pub fn from_toml_str(content: &str) -> Result<Self, InvariantConfigError> {

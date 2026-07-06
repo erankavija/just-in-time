@@ -701,7 +701,7 @@ fn test_gate_remove() {
         .failure();
 }
 
-/// REQ-02 (jit:bb7d57a2), INV-EVENT-LOG: `jit gate define` appends a
+/// REQ-02 (jit:bb7d57a2), @/inv/event-log: `jit gate define` appends a
 /// `gate_definition_created` event to the registry-scoped audit log, mirroring
 /// `gate_update_test.rs`'s `test_gate_update_appends_event` for
 /// `gate_definition_updated`.
@@ -735,7 +735,7 @@ fn test_gate_define_appends_event() {
     );
 }
 
-/// REQ-02 (jit:bb7d57a2), INV-EVENT-LOG: `jit gate remove` appends a
+/// REQ-02 (jit:bb7d57a2), @/inv/event-log: `jit gate remove` appends a
 /// `gate_definition_removed` event to the registry-scoped audit log, mirroring
 /// `gate_update_test.rs`'s `test_gate_update_appends_event` for
 /// `gate_definition_updated`.

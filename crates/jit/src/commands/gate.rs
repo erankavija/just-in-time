@@ -767,7 +767,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         self.storage.save_gate_registry(&registry)?;
 
-        // INV-EVENT-LOG: registry-scoped audit entry for the definition create.
+        // @/inv/event-log: registry-scoped audit entry for the definition create.
         self.storage
             .append_event(&Event::new_gate_definition_created(key))?;
 
@@ -780,7 +780,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// definition (surfaced by `jit gate show`). Returns an error if `key` is
     /// already registered, or if `mode` is [`GateMode::Auto`](crate::domain::GateMode)
     /// without a `checker`. A `gate_definition_created` event is appended
-    /// (INV-EVENT-LOG), mirroring [`update_gate`](Self::update_gate)'s
+    /// (@/inv/event-log), mirroring [`update_gate`](Self::update_gate)'s
     /// `gate_definition_updated` event.
     ///
     /// # Examples
@@ -859,7 +859,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         self.storage.save_gate_registry(&registry)?;
 
-        // INV-EVENT-LOG: registry-scoped audit entry for the definition create.
+        // @/inv/event-log: registry-scoped audit entry for the definition create.
         self.storage
             .append_event(&Event::new_gate_definition_created(key))?;
 
@@ -1068,7 +1068,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         registry.gates.insert(updated.key.clone(), updated.clone());
         self.storage.save_gate_registry(&registry)?;
 
-        // INV-EVENT-LOG: registry-scoped audit entry for the definition edit.
+        // @/inv/event-log: registry-scoped audit entry for the definition edit.
         self.storage
             .append_event(&Event::new_gate_definition_updated(updated.key.clone()))?;
 
@@ -1088,7 +1088,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         registry.gates.remove(key);
         self.storage.save_gate_registry(&registry)?;
 
-        // INV-EVENT-LOG: registry-scoped audit entry for the definition removal.
+        // @/inv/event-log: registry-scoped audit entry for the definition removal.
         self.storage
             .append_event(&Event::new_gate_definition_removed(key.to_string()))?;
 
@@ -1198,7 +1198,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Save updated registry
         self.storage.save_gate_registry(&registry)?;
 
-        // INV-EVENT-LOG: registry-scoped audit entries for the preset's
+        // @/inv/event-log: registry-scoped audit entries for the preset's
         // definition writes (created for new keys, updated for overwrites).
         for (key, existed) in definition_writes {
             let event = if existed {

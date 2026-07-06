@@ -1367,7 +1367,7 @@ pub struct StateCount {
 ///
 /// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
 /// order, zero-count states included, so the shape is stable and complete
-/// (INV-DOMAIN-AGNOSTIC — the state list is enumerated, never hardcoded).
+/// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (the list-envelope count, one entry per state).
 ///
 /// Terminal-state semantics, tied to [`State::is_terminal`] (`Done`/`Rejected`):

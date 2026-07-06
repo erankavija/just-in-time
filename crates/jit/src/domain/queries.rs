@@ -365,7 +365,7 @@ pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
 /// [`State::all`] order, so a state with no issues is present with count `0`
 /// (never omitted). This keeps the aggregation shape stable and complete
 /// regardless of which states happen to be populated, and derives the state
-/// list from the enum rather than hardcoding it (INV-DOMAIN-AGNOSTIC).
+/// list from the enum rather than hardcoding it (@/inv/domain-agnostic).
 ///
 /// # Examples
 ///

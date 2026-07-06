@@ -26,7 +26,7 @@
 //!
 //! Container-ness comes from the configured [type hierarchy
 //! levels](crate::type_hierarchy::HierarchyConfig), never from label namespaces
-//! (INV-DOMAIN-AGNOSTIC). A type is a **container** iff its level is strictly
+//! (@/inv/domain-agnostic). A type is a **container** iff its level is strictly
 //! less than the deepest (leaf) configured level. With the default
 //! `milestone=1, epic=2, story=3, task=4`, the leaf level is `4`, so
 //! `milestone`, `epic`, and `story` are containers and `task` is a leaf. Nodes
