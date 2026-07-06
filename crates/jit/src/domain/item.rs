@@ -658,9 +658,10 @@ pub enum ItemError {
         /// The underlying TOML parse error (boxed to keep [`ItemError`] small).
         source: Box<toml::de::Error>,
     },
-    /// An entry of a registry-first kind's source table is missing a field the
-    /// descriptor maps (its `id-field` or `text-field`), so no self-id / text can
-    /// be projected for that entry.
+    /// An entry of a registry-first kind's source table is missing its mapped
+    /// `id-field`, so no self-id can be projected for that entry. (The
+    /// `text-field` is optional and falls back to the id-field value when absent,
+    /// so a missing text-field does not raise this error.)
     #[error(
         "item kind '{kind}' toml source table '{table}' has an entry missing required \
          field '{field}'"

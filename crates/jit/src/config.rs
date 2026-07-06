@@ -758,8 +758,11 @@ impl Serialize for ItemKindSource {
 /// item: `id-field` supplies its self-id (so its qualified id is `@/<kind>/<self-id>`),
 /// `text-field` supplies its display text, and each `link-fields` entry maps a
 /// toml field holding link targets to the link NAMESPACE those targets are
-/// labelled under. A `link-fields` value may be a single string or an array of
-/// strings; an absent link field on an entry contributes no labels (graceful).
+/// labelled under. The `text-field` is the only OPTIONAL addressing field: an
+/// entry lacking it falls back to its `id-field` value as display text (so a
+/// description-less rule projects its `name`). A `link-fields` value may be a
+/// single string or an array of strings; an absent link field on an entry
+/// contributes no labels (graceful).
 ///
 /// This is the generic analogue of the typed invariant registry: it carries only
 /// the addressing mapping (id/text/links), leaving any kind-specific TYPED
@@ -792,6 +795,9 @@ pub struct TomlSourceDescriptor {
     #[serde(rename = "id-field")]
     pub id_field: String,
     /// The entry field supplying each item's display text (e.g. `"statement"`).
+    /// OPTIONAL at projection time: an entry that omits this field falls back to
+    /// its [`id_field`](Self::id_field) value as display text (a present-but-
+    /// non-string value is still a typed error).
     #[serde(rename = "text-field")]
     pub text_field: String,
     /// Map of link NAMESPACE to the entry field holding its targets. Each mapped

@@ -955,3 +955,60 @@ fn test_item_list_qualified_ids_round_trip_through_show() {
         "the init-scaffolded rules registry must appear as project-scope items"
     );
 }
+
+#[test]
+fn test_item_show_rule_renders_description_and_name_fallback() {
+    // REQ-03: through the shipped binary, `jit item show @/rule/<name>` displays
+    // the rule's DESCRIPTION as its text (the item kind's `text-field` is
+    // `description`), and a description-less rule falls back to its NAME.
+    let temp = setup_test_repo();
+
+    // `jit init` seeds `.jit/rules.toml` with described default rules; append a
+    // hand-authored rule that deliberately omits `description` to exercise the
+    // name fallback on the same registry.
+    let rules_path = temp.path().join(".jit").join("rules.toml");
+    let mut rules = std::fs::read_to_string(&rules_path).unwrap();
+    rules.push_str(
+        "\n[[rules]]\nname = \"no-description-rule\"\n\
+         assert = { require-section = { heading = \"Goals\" } }\n",
+    );
+    std::fs::write(&rules_path, rules).unwrap();
+
+    // A seeded rule shows its description verbatim.
+    let described = Command::new(jit_binary())
+        .args(["item", "show", "@/rule/label-format", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        described.status.success(),
+        "item show @/rule/label-format failed: {}",
+        String::from_utf8_lossy(&described.stderr)
+    );
+    let described_json: Value = serde_json::from_slice(&described.stdout).unwrap();
+    let text = described_json["item"]["text"].as_str().unwrap();
+    assert!(
+        text.contains("canonical `namespace:value` format"),
+        "rule item text must render the seeded description, got: {text}"
+    );
+    // The name is NOT the display text once a description exists.
+    assert_ne!(text, "label-format");
+
+    // The description-less rule falls back to its name as display text.
+    let bare = Command::new(jit_binary())
+        .args(["item", "show", "@/rule/no-description-rule", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        bare.status.success(),
+        "item show @/rule/no-description-rule failed: {}",
+        String::from_utf8_lossy(&bare.stderr)
+    );
+    let bare_json: Value = serde_json::from_slice(&bare.stdout).unwrap();
+    assert_eq!(
+        bare_json["item"]["text"].as_str().unwrap(),
+        "no-description-rule",
+        "a description-less rule must fall back to its name as display text"
+    );
+}
