@@ -26,8 +26,8 @@
           "classification": "implementation",
           "status": "pending",
           "stages": [
-            {"stage": "A", "scope": "invariant id rename + Rust comment/doc-example sweep (plan phases 1-2)", "status": "pending"},
-            {"stage": "B", "scope": "skills + README/docs + CLAUDE.md sweep (plan phases 3-5)", "status": "pending"},
+            {"stage": "A", "scope": "invariant id rename + Rust comment/doc-example sweep (plan phases 1-2)", "status": "done (commits 3b959982, 8bf2e525, ad8ecc6e; lead review PASS)"},
+            {"stage": "B", "scope": "skills + README/docs + CLAUDE.md sweep (plan phases 3-5)", "status": "done (commits 8f0a39cd, dc2db584, 6810950d, 1c5c6919, c4365d64; lead review PASS after rework-1)"},
             {"stage": "C", "scope": "dangling-citation check, evidence docs, gates (plan phase 6)", "status": "pending"}
           ]
         }
@@ -36,6 +36,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"d8c48af9": 1},
+  "rework_counts": {"d8c48af9": 1, "76cb968b-stage-b": 1},
   "started_at": "2026-07-06T00:00:00Z"
 }

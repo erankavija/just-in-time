@@ -36,6 +36,13 @@
       "label": "Skill sweep table",
       "doc_type": "report",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/76cb968b-citation-check.md",
+      "commit": null,
+      "label": "Dangling-citation check",
+      "doc_type": "report",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -43,7 +50,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-03T23:37:07.531563300Z",
-  "updated_at": "2026-07-06T10:49:16.722853543Z",
+  "updated_at": "2026-07-06T11:02:00.217430328Z",
   "first_ready_at": "2026-07-06T00:33:14.209591265Z",
   "claimed_at": "2026-07-06T05:57:24.903126755Z"
 }
