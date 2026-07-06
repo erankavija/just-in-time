@@ -291,12 +291,12 @@ pub struct KindSegmentedAddress {
 /// ```
 /// use jit::domain::item::{parse_kind_segmented_address, AddressScope};
 ///
-/// let addr = parse_kind_segmented_address("@/requirement/REQ-01").unwrap();
+/// let addr = parse_kind_segmented_address("@/invariant/atomic-writes").unwrap();
 /// assert_eq!(addr.scope, AddressScope::Project);
-/// assert_eq!(addr.kind, "requirement");
-/// assert_eq!(addr.self_id, "REQ-01");
+/// assert_eq!(addr.kind, "invariant");
+/// assert_eq!(addr.self_id, "atomic-writes");
 ///
-/// let addr = parse_kind_segmented_address("@acme/requirement/REQ-01").unwrap();
+/// let addr = parse_kind_segmented_address("@acme/invariant/atomic-writes").unwrap();
 /// assert_eq!(addr.scope, AddressScope::NamedProject("acme".to_string()));
 ///
 /// let addr =

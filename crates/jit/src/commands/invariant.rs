@@ -67,7 +67,7 @@ pub struct InvariantRenderResult {
 /// let result = InvariantCheckResult {
 ///     findings: vec![DriftFinding {
 ///         invariant_id: "dag-acyclic".to_string(),
-///         subject: "@/rule/ghost-rule".to_string(),
+///         subject: "ghost-rule".to_string(),
 ///         unloadable: false,
 ///     }],
 ///     count: 1,
@@ -76,7 +76,7 @@ pub struct InvariantRenderResult {
 /// let json = serde_json::to_value(&result).unwrap();
 /// assert_eq!(json["count"], 1);
 /// assert_eq!(json["findings"][0]["invariant_id"], "dag-acyclic");
-/// assert_eq!(json["findings"][0]["subject"], "@/rule/ghost-rule");
+/// assert_eq!(json["findings"][0]["subject"], "ghost-rule");
 /// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantCheckResult {

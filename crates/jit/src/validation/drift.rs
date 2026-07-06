@@ -57,15 +57,17 @@ use std::collections::BTreeSet;
 /// ```
 /// use jit::validation::drift::DriftFinding;
 ///
+/// // A malformed binding (a bare name, not a recognized `@/rule/<name>` or
+/// // `@/gate/<key>` address) is a structural-defect drift case.
 /// let f = DriftFinding {
 ///     invariant_id: "dag-acyclic".to_string(),
-///     subject: "@/rule/dag-no-cycles".to_string(),
+///     subject: "ghost-rule".to_string(),
 ///     unloadable: false,
 /// };
 /// // The human message names the invariant and the dangling binding.
 /// let msg = f.message();
 /// assert!(msg.contains("dag-acyclic"));
-/// assert!(msg.contains("@/rule/dag-no-cycles"));
+/// assert!(msg.contains("ghost-rule"));
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DriftFinding {
@@ -97,11 +99,11 @@ impl DriftFinding {
     ///
     /// let f = DriftFinding {
     ///     invariant_id: "dag-acyclic".to_string(),
-    ///     subject: "@/rule/ghost-rule".to_string(),
+    ///     subject: "ghost-rule".to_string(),
     ///     unloadable: false,
     /// };
     /// assert!(f.message().contains("dag-acyclic"));
-    /// assert!(f.message().contains("@/rule/ghost-rule"));
+    /// assert!(f.message().contains("ghost-rule"));
     /// assert!(f.message().contains("declared-but-unenforced"));
     /// ```
     pub fn message(&self) -> String {
@@ -145,7 +147,7 @@ impl DriftFinding {
 ///
 /// let reg = InvariantRegistry::from_toml_str(
 ///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-///      enforced-by = \"@/rule/missing-rule\"\n",
+///      enforced-by = \"ghost-rule\"\n",
 /// )
 /// .unwrap();
 /// // A repo with one real rule and no gates.
@@ -155,7 +157,7 @@ impl DriftFinding {
 /// let findings = enforcement_drift(&reg.invariants, &rules, &gates);
 /// // The dangling binding is reported; the unclaimed real rule is NOT drift.
 /// assert_eq!(findings.len(), 1);
-/// assert_eq!(findings[0].subject, "@/rule/missing-rule");
+/// assert_eq!(findings[0].subject, "ghost-rule");
 /// ```
 pub fn enforcement_drift(
     invariants: &[Invariant],
@@ -174,7 +176,7 @@ pub fn enforcement_drift(
 /// An invariant's `enforced-by` binding can only be confirmed "enforced" against
 /// a source that LOADED. When a source fails to parse it is
 /// [`SourceState::Unloadable`]: its entries cannot be enumerated, so a binding
-/// whose address kind routes to it (`@/rule/...` to the rule set, `@/gate/...`
+/// whose address kind routes to it (`@/rule/<name>` to the rule set, `@/gate/<key>`
 /// to the gate registry) is reported as declared-but-unenforced with the
 /// `unloadable` flag set (REQ-01 covers a binding naming a missing OR
 /// unloadable target).
@@ -230,7 +232,7 @@ impl SourceState<'_> {
 /// the binding's own source is [`SourceState::Unloadable`] (worded as "source
 /// failed to load"), clear when that source loaded but lacks the target (worded
 /// as "missing"), and also clear for a binding that is not a recognized
-/// `@/rule/...` / `@/gate/...` address at all — a structural defect in the
+/// `@/rule/<name>` / `@/gate/<key>` address at all — a structural defect in the
 /// binding's FORM, not a load-state question.
 ///
 /// # Examples
@@ -242,7 +244,7 @@ impl SourceState<'_> {
 ///
 /// let reg = InvariantRegistry::from_toml_str(
 ///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-///      enforced-by = \"@/rule/bad-rule\"\n",
+///      enforced-by = \"@/rule/coverage-preview\"\n",
 /// )
 /// .unwrap();
 /// let gates: BTreeSet<&str> = BTreeSet::new();
@@ -253,7 +255,7 @@ impl SourceState<'_> {
 ///     SourceState::Loaded(&gates),
 /// );
 /// let f = &findings[0];
-/// assert_eq!(f.subject, "@/rule/bad-rule");
+/// assert_eq!(f.subject, "@/rule/coverage-preview");
 /// assert!(f.unloadable, "binding into an unloadable source is flagged");
 /// assert!(f.message().contains("failed to load"));
 /// ```
