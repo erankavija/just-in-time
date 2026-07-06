@@ -7,11 +7,11 @@ This document explains what JIT guarantees about data integrity, consistency, an
 
 ## Invariants
 
-JIT maintains four core invariants that are enforced at all times:
+JIT maintains four core invariants that are enforced at all times. Three of them are also registered project invariants, cited below by their address (`@/invariant/<id>`); run `jit item show <address>` for the registry's canonical statement. The invariant registry (`.jit/invariants.toml`) also renders into the invariant region of the project `CLAUDE.md` via `jit invariant render`.
 
 ### DAG Property
 
-**Guarantee:** Dependencies always form a directed acyclic graph (DAG) - cycles are strictly prevented.
+**Guarantee:** Dependencies always form a directed acyclic graph (DAG) - cycles are strictly prevented. (`@/invariant/dag-acyclic`)
 
 Dependencies in JIT represent "FROM depends on TO" relationships. If issue A depends on B, then A cannot complete until B is done. To prevent deadlock, JIT enforces that the dependency graph is always acyclic.
 
@@ -56,7 +56,7 @@ While JIT allows transitive dependencies (A→B→C and A→C simultaneously), m
 
 ### Atomic Operations
 
-**Guarantee:** All file writes are atomic - either the entire write succeeds or nothing changes.
+**Guarantee:** All file writes are atomic - either the entire write succeeds or nothing changes. (`@/invariant/atomic-writes`)
 
 JIT uses the write-temp-rename pattern for all file operations. This leverages the POSIX guarantee that `rename()` is atomic at the filesystem level.
 
@@ -110,7 +110,7 @@ jit claim acquire abc123           jit claim acquire abc123
 
 ### Event Logging
 
-**Guarantee:** All state changes are logged to `.jit/events.jsonl` as an append-only audit trail.
+**Guarantee:** All state changes are logged to `.jit/events.jsonl` as an append-only audit trail. (`@/invariant/event-log`)
 
 Every operation that modifies issue state, dependencies, or gates emits an event. The event log provides complete observability and supports future undo/replay capabilities.
 

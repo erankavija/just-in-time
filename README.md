@@ -173,7 +173,9 @@ jit graph export --json --full           # complete records + edges for external
 jit events tail                          # append-only event log, for verification
 ```
 
-Structured lines in issue descriptions and project registries (requirements, invariants, definitions) are **addressable items** with stable qualified ids — `@/issue/<short-id>/<kind>/<self-id>` inside an issue, `@/<kind>/<self-id>` project-wide. `jit item list` and `jit item search` query them; markdown stays the source of truth, the index is a projection. Item kinds are declared in `[item_kinds]` config, and the project invariants registry (`.jit/invariants.toml`) renders into project docs via `jit invariant render`.
+Structured lines in issue descriptions and project registries (requirements, invariants, rules, gates, definitions) are **addressable items** with stable qualified ids: `@/<kind>/<self-id>` project-wide (e.g. `@/invariant/event-log`, `@/rule/label-format`, `@/gate/code-review`), and `@/issue/<short-id>/<kind>/<self-id>` for a line inside an issue. `jit item show <address>` resolves one to its authoritative text; `jit item list` and `jit item search` query the set. Markdown stays the source of truth; the index is a projection.
+
+The address is how project knowledge is cited: write each fact once in the registry or issue section that owns it, and everywhere else — docs, skills, code comments — cite its address rather than copying the text, so a single source stays authoritative. A kind may declare aliases in `[item_kinds]` config; the invariant kind declares `inv`, so `@/inv/<self-id>` is a shorthand for `@/invariant/<self-id>`. The project invariants registry (`.jit/invariants.toml`) renders into project docs via `jit invariant render`. Repo-tracked skills under `.claude/skills/` cite these addresses; user-global skill copies under `~/.claude/skills/` sync from the repo-tracked ones.
 
 ### Document Management
 

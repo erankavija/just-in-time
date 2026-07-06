@@ -179,6 +179,16 @@ rules, `bracket` for those a bracket criterion installs) is a separate
 rule is addressable at `@/rule/<self-id>` (`self-id` being its `name`), e.g.
 `@/rule/namespace-registry`.
 
+### The `enforces:` namespace
+
+Work that changes an enforcement mechanism links to what it enforces with the
+`enforces:` namespace, whose value is an item address: `enforces:@/rule/label-format`,
+`enforces:@/gate/cargo-ci`, or `enforces:@/invariant/label-format`. The label
+carries the address of the rule, gate, or invariant the issue implements or
+maintains, so the mechanism and the work that backs it cross-reference by a
+stable id rather than by copied text. The namespace is non-unique: one issue may
+enforce several items.
+
 > **Enforcement lives in `.jit/rules.toml`, the single source of truth.** Allowed
 > values, value patterns, required namespaces, the canonical label format, and the
 > orphan-leaf / strategic-consistency warnings are declarative rules there
