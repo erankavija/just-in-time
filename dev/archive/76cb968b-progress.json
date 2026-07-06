@@ -2,7 +2,7 @@
   "epic_id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
   "epic_short_id": "76cb968b",
   "note": "Leaf enhancement led to completion per invoker instruction; wave 1 is its dependency task, wave 2 the issue itself (staged per dev/active/76cb968b-ssot-adoption-sweep.md).",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -24,18 +24,38 @@
           "short_id": "76cb968b",
           "title": "SSOT adoption sweep: skills, README, and docs cite @-addresses instead of copying item text",
           "classification": "implementation",
-          "status": "pending",
+          "status": "done",
           "stages": [
-            {"stage": "A", "scope": "invariant id rename + Rust comment/doc-example sweep (plan phases 1-2)", "status": "done (commits 3b959982, 8bf2e525, ad8ecc6e; lead review PASS)"},
-            {"stage": "B", "scope": "skills + README/docs + CLAUDE.md sweep (plan phases 3-5)", "status": "done (commits 8f0a39cd, dc2db584, 6810950d, 1c5c6919, c4365d64; lead review PASS after rework-1)"},
-            {"stage": "C", "scope": "dangling-citation check, evidence docs, gates (plan phase 6)", "status": "pending"}
+            {
+              "stage": "A",
+              "scope": "invariant id rename + Rust comment/doc-example sweep (plan phases 1-2)",
+              "status": "done (commits 3b959982, 8bf2e525, ad8ecc6e; lead review PASS)"
+            },
+            {
+              "stage": "B",
+              "scope": "skills + README/docs + CLAUDE.md sweep (plan phases 3-5)",
+              "status": "done (commits 8f0a39cd, dc2db584, 6810950d, 1c5c6919, c4365d64; lead review PASS after rework-1)"
+            },
+            {
+              "stage": "C",
+              "scope": "dangling-citation check, evidence docs, gates (plan phase 6)",
+              "status": "done (evidence linked; gates cargo-ci/repo-validate/code-review all passed round 6)"
+            }
           ]
         }
       ]
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {"d8c48af9": 1, "76cb968b-stage-b": 1},
-  "started_at": "2026-07-06T00:00:00Z"
+  "rework_counts": {
+    "d8c48af9": 1,
+    "76cb968b-stage-b": 1,
+    "76cb968b-stage-a": 3
+  },
+  "rework_note": "stage-a round 3 explicitly authorized by invoker on 2026-07-06 (counter reset per policy 5). Round 3 finding: project-form doc-example addresses must resolve for ALL kinds; issue-scope doctest placeholders adjudicated acceptable and documented in evidence.",
+  "escalations": [
+    "2026-07-06 round-3 code-review failure at stage-a rework limit; invoker chose 'one more worker round' over lead-fix and criterion amendment"
+  ],
+  "started_at": "2026-07-06T00:00:00Z",
+  "completed_at": "2026-07-06"
 }
