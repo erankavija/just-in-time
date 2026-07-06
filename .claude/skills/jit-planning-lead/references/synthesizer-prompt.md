@@ -31,6 +31,10 @@ short-id, NOT the container's. C and P are different issues; do not conflate the
 **Type hierarchy (for sketch tiers):** [TYPE_HIERARCHY]
 **Content standards (authoring SSOT):** [CONTENT_STANDARDS_PATH]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## Structure — the four plan-review areas are the sections AND the self-check
 
 1. **Completeness vs criteria.** Address **every** `[hard]` criterion explicitly, in

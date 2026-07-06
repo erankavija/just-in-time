@@ -45,8 +45,8 @@ to exactly one of these labels (per Decomposition rule 2a):
 
 ## Container [hard] criteria to cover
 
-The parent is a breakable container, and the breakdown is checked by a
-**coverage-preview** gate: every `[hard]` success criterion below must be delivered
+The parent is a breakable container, and the breakdown is checked by the
+`@/gate/coverage-preview` gate: every `[hard]` success criterion below must be delivered
 by at least one child you produce. For each child, list (in its `satisfies` array)
 the id(s) of the criteria it completes — coverage must be **total**.
 
@@ -60,6 +60,10 @@ as `[]`.)
 Read the following file in full, then decompose it into work items:
 
 [SPEC_DOC_PATH]
+
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
 
 ## Your task
 

@@ -22,6 +22,10 @@ artifact **linked to the planning node P**; it is *not* the plan.
 **Constraints** (what any answer must respect — existing architecture, deps, scope):
 [CONSTRAINTS]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## What to produce
 
 A markdown research doc with, per open question:

@@ -20,14 +20,21 @@ node carries it, lead-invariant sections) is the skill's own content and stays.
 | jit-execution-lead/references/doc-agent-prompt.md | T3 | Added the standing resolve instruction under Project Context. |
 | jit-execution-lead/references/explorer-agent-prompt.md | T3 | Added the standing resolve instruction under Project Context. |
 | jit-execution-lead/references/rework-prompt-template.md | T3 | Added the standing resolve instruction after the pasted review verdict. |
+| jit-breakdown/references/analysis-prompt.md | T2 + T3 | Coverage-preview restatement ("**coverage-preview** gate: every `[hard]` criterion below must be delivered…") → `@/gate/coverage-preview`. Info-preservation guard: `jit item show @/gate/coverage-preview` returns thinner mechanism text than the prose's operational detail, so the gloss is kept alongside the address (tier 2), not reduced to a bare address. Standing resolve instruction added before "Your task". |
+| jit-manage/references/issue-extraction-prompt.md | T3 | Standing resolve instruction added before "Your task" (pasted plan/context may cite addresses). |
+| jit-migrate/references/analysis-prompt.md | T3 | Standing resolve instruction added before "Your task". |
+| jit-planning-lead/references/investigator-prompt.md | T3 | Standing resolve instruction added before "What to produce". |
+| jit-planning-lead/references/researcher-prompt.md | T3 | Standing resolve instruction added before "What to produce". |
+| jit-planning-lead/references/synthesizer-prompt.md | T3 | Standing resolve instruction added before "Structure". |
+| jit-planning-lead/references/reviewer-prompt.md | T3 | Standing resolve instruction added; plus the review resolve-check in area 3 (Technical soundness): any `@/…` address the plan cites must resolve, a dangling citation is a blocking failure. This is the plan-review protocol. |
 
 ## Inspected, intentionally left
 
 | File(s) | Reason |
 |---|---|
-| jit-breakdown/{SKILL.md, references/bracket-spine.md, references/analysis-prompt.md, references/plan-schema.md} | Gate keys (`coverage-preview`, `breakdown-review`, `plan-review`) appear only as workflow mechanics — which node carries which gate, run it, block on its status — not as restatements of the gate's definition text. Naming ≠ restating; left as prose. |
-| jit-planning-lead/{SKILL.md, references/synthesizer-prompt.md, references/investigator-prompt.md, references/interview-protocol.md, references/plan-doc-template.md} | Same: `plan-review`, `coverage-preview`, `breakdown-review` named as workflow mechanics. No invariant/rule/gate definition is restated. Prompt templates here are outside the scoped dispatch-prompt set (jit-parallel `agent-prompt-template.md` + jit-execution-lead `*-prompt*`), so they take no standing instruction. |
-| jit-execution-lead/SKILL.md, references/worktree-dispatch-protocol.md | Gate keys named as workflow mechanics (gate presets per node, re-run `cargo-ci` before integration). No definition restated. |
-| jit-project-lead/references/{standards-scan.md, standards-sweep.md, container-dispatch.md, mode-routing.md, tier-derivation.md} | Enforce `docs/reference/jit-content-standards.md` STD-* rules, which are not `.jit/` registry items and have no `@/…` address; no invariant/rule/gate registry text restated. |
-| jit-manage/*, jit-migrate/* | No invariant/rule/gate registry-text restatements; gate/rule mentions are workflow mechanics. |
+| jit-breakdown/{SKILL.md, references/bracket-spine.md, references/plan-schema.md} | Gate keys (`coverage-preview`, `breakdown-review`, `plan-review`) appear only as workflow mechanics — which node carries which gate, run it, block on its status — not as restatements of the gate's definition text. Naming ≠ restating; left as prose. (analysis-prompt.md is a changed row above.) |
+| jit-planning-lead/{SKILL.md, references/interview-protocol.md, references/plan-doc-template.md} | `plan-review`, `coverage-preview`, `breakdown-review` named as workflow mechanics; no invariant/rule/gate definition restated. These are not dispatch-prompt templates (the four prompt templates in this skill are changed rows above). |
+| jit-execution-lead/SKILL.md, references/worktree-dispatch-protocol.md | Gate keys named as workflow mechanics (gate presets per node, re-run `cargo-ci` before integration). No definition restated; not dispatch-prompt templates. |
+| jit-project-lead/references/{standards-scan.md, standards-sweep.md, container-dispatch.md, mode-routing.md, tier-derivation.md} | Enforce `docs/reference/jit-content-standards.md` STD-* rules, which are not `.jit/` registry items and have no `@/…` address; no invariant/rule/gate registry text restated; not dispatch-prompt templates. |
+| jit-manage/references/{design-doc-template.md, state-commit-patterns.md}, jit-manage/SKILL.md, jit-migrate/{SKILL.md, references/plan-schema.md} | No invariant/rule/gate registry-text restatements; gate/rule mentions are workflow mechanics; not dispatch-prompt templates. (The dispatch-prompt templates jit-manage/references/issue-extraction-prompt.md and jit-migrate/references/analysis-prompt.md are changed rows above.) |
 | jit-planning-lead/evals/results.md and all */evals/ transcripts | Historical eval records; left unchanged per the issue. |

@@ -22,6 +22,10 @@ fan-out. Read the **actual codebase** to check the plan's claims; cite `file:lin
 **Plan document (read in full):** [PLAN_DOC_PATH]
 **Research doc (if linked):** [RESEARCH_DOC_PATH]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## Check each area — a serious defect in any one is a blocking failure
 
 1. **Plan present + linked.** A plan doc exists at its stated location and is linked to P.
@@ -38,6 +42,8 @@ fan-out. Read the **actual codebase** to check the plan's claims; cite `file:lin
    blocking. Hunt **design-level domain leakage**: a domain concept or literal proposed to
    live in pure/engine code, or types/categories hardcoded where the project derives them
    from config — a blocking failure even when the prose claims "respects boundaries."
+   Any `@/…` address the plan cites must resolve via `jit item show`; a dangling
+   citation is a blocking failure.
 
 4. **Decomposition + dependencies.** Coherent, well-scoped sketch items, each independently
    implementable and testable, no overlaps/gaps. Dependency ordering correct — no item

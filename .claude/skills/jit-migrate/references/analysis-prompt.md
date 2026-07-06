@@ -28,6 +28,10 @@ Read each of the following files in full, then extract all work items:
 
 [FILE_LIST]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## Your task
 
 Produce a single JSON object following the schema at the end of this prompt.

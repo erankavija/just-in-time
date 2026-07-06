@@ -25,6 +25,10 @@ referenced artifact):
 
 [PROJECT_CONVENTIONS — relevant CLAUDE.md sections, architecture/layer boundaries]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## What to produce
 
 Read the actual code, config, and docs. Use search aggressively. Return a structured
