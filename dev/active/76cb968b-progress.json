@@ -1,0 +1,41 @@
+{
+  "epic_id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+  "epic_short_id": "76cb968b",
+  "note": "Leaf enhancement led to completion per invoker instruction; wave 1 is its dependency task, wave 2 the issue itself (staged per dev/active/76cb968b-ssot-adoption-sweep.md).",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "d8c48af9-40eb-495d-a236-230e343b6357",
+          "short_id": "d8c48af9",
+          "title": "Config-declared kind aliases for item addresses",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "76cb968b-8c8b-46e2-8dfb-ad54c32aa284",
+          "short_id": "76cb968b",
+          "title": "SSOT adoption sweep: skills, README, and docs cite @-addresses instead of copying item text",
+          "classification": "implementation",
+          "status": "pending",
+          "stages": [
+            {"stage": "A", "scope": "invariant id rename + Rust comment/doc-example sweep (plan phases 1-2)", "status": "pending"},
+            {"stage": "B", "scope": "skills + README/docs + CLAUDE.md sweep (plan phases 3-5)", "status": "pending"},
+            {"stage": "C", "scope": "dangling-citation check, evidence docs, gates (plan phase 6)", "status": "pending"}
+          ]
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-06T00:00:00Z"
+}
