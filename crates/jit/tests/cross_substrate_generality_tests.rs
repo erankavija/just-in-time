@@ -147,7 +147,7 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 ///   (a `REQ-01` requirement), a `## Decisions` section (a `D-01` decision),
 ///   and a `## Risks` section (a `RISK-01` risk) — three issue-scope,
 ///   markdown-first items.
-/// - A `.jit/invariants.toml` with one invariant (`INV-01`) — the project-scope,
+/// - A `.jit/invariants.toml` with one invariant — the project-scope,
 ///   registry-first item.
 ///
 /// ## Assertions (REQ-01)
@@ -156,7 +156,7 @@ fn qualified_ids(json: &Value) -> Vec<&str> {
 /// 2. `jit item list --kind <each>` returns exactly the item(s) of that kind.
 /// 3. `jit item show <qualified-id>` resolves one item of EACH kind:
 ///    - issue-scope: `<short>/<REQ-01>`, `<short>/D-01`, `<short>/RISK-01`
-///    - project-scope: `@/invariant/INV-01`
+///    - project-scope: `@/invariant/<id>`
 /// 4. `jit item search <term>` finds across kinds.
 ///
 /// ## REQ-02 assertion

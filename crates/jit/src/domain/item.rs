@@ -1194,12 +1194,12 @@ pub struct AddressableItem {
 /// use jit::domain::item::RawScopeItem;
 ///
 /// let raw = RawScopeItem {
-///     kind: "policy".to_string(),
-///     self_id: "INV-01".to_string(),
+///     kind: "invariant".to_string(),
+///     self_id: "atomic-writes".to_string(),
 ///     text: "all writes are atomic".to_string(),
 ///     links: Vec::new(),
 /// };
-/// assert_eq!(raw.self_id, "INV-01");
+/// assert_eq!(raw.self_id, "atomic-writes");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawScopeItem {
@@ -1234,13 +1234,13 @@ pub struct RawScopeItem {
 /// use jit::domain::item::{derive_scope_items, RawScopeItem, Scope};
 ///
 /// let raw = vec![RawScopeItem {
-///     kind: "policy".to_string(),
-///     self_id: "INV-01".to_string(),
+///     kind: "invariant".to_string(),
+///     self_id: "atomic-writes".to_string(),
 ///     text: "atomic writes".to_string(),
 ///     links: Vec::new(),
 /// }];
 /// let items = derive_scope_items(&Scope::Project, raw).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/policy/INV-01");
+/// assert_eq!(items[0].qualified_id, "@/invariant/atomic-writes");
 /// assert_eq!(items[0].scope, "@");
 /// ```
 pub fn derive_scope_items(
@@ -1381,20 +1381,21 @@ fn extract_raw_items(
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_markdown_items, ItemKind, Scope};
 ///
+/// // `definition` is this repo's markdown-first project kind (sourced from the
+/// // glossary); its config drives which section and id shape are scanned.
 /// let kind = ItemKind::from_config(
-///     "example",
+///     "definition",
 ///     &ItemKindConfig {
-///         section: Some("success_criteria".into()),
-///         id_pattern: Some("[A-Z]+-[0-9]+".into()),
-///         markers: Some(vec!["[hard]".into()]),
+///         section: Some("core_concepts".into()),
+///         id_pattern: Some("[A-Z][a-z]+".into()),
 ///         ..Default::default()
 ///     },
 /// )
 /// .unwrap();
-/// let md = "## Success Criteria\n\n- [hard] INV-01: all writes are atomic\n";
+/// let md = "## Core Concepts\n\n- State: current lifecycle stage of an issue\n";
 /// let items =
 ///     index_markdown_items(md, &Scope::Project, &[kind], &MarkdownContentParser).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/example/INV-01");
+/// assert_eq!(items[0].qualified_id, "@/definition/State");
 /// ```
 pub fn index_markdown_items(
     markdown: &str,
@@ -1436,12 +1437,12 @@ fn sections_from_markdown(
 /// use jit::config::ItemKindConfig;
 /// use jit::domain::item::{ItemKind, ProjectSource};
 ///
-/// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
+/// let kind = ItemKind::from_config("definition", &ItemKindConfig::default()).unwrap();
 /// let src = ProjectSource {
 ///     kind,
-///     markdown: "## Success Criteria\n\n- [hard] INV-01: x\n".to_string(),
+///     markdown: "## Core Concepts\n\n- State: current lifecycle stage\n".to_string(),
 /// };
-/// assert_eq!(src.kind.name(), "example");
+/// assert_eq!(src.kind.name(), "definition");
 /// ```
 #[derive(Debug, Clone)]
 pub struct ProjectSource {
@@ -1478,31 +1479,31 @@ pub struct ProjectSource {
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource, RawScopeItem};
 ///
+/// // A markdown-first kind (`definition`, sourced from the glossary).
 /// let kind = ItemKind::from_config(
-///     "example",
+///     "definition",
 ///     &ItemKindConfig {
-///         section: Some("success_criteria".into()),
-///         id_pattern: Some("REQ-[0-9]+".into()),
-///         markers: Some(vec!["[hard]".into()]),
+///         section: Some("core_concepts".into()),
+///         id_pattern: Some("[A-Z][a-z]+".into()),
 ///         ..Default::default()
 ///     },
 /// )
 /// .unwrap();
 /// let sources = vec![ProjectSource {
 ///     kind,
-///     markdown: "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
+///     markdown: "## Core Concepts\n\n- State: current lifecycle stage\n".to_string(),
 /// }];
-/// // A registry-first candidate is supplied directly.
+/// // A registry-first candidate (an invariant) is supplied directly.
 /// let registry = vec![RawScopeItem {
-///     kind: "policy".to_string(),
-///     self_id: "INV-01".to_string(),
-///     text: "every dependency edge stays acyclic".to_string(),
+///     kind: "invariant".to_string(),
+///     self_id: "atomic-writes".to_string(),
+///     text: "all writes are atomic".to_string(),
 ///     links: Vec::new(),
 /// }];
 /// let items = index_project_sources(&sources, registry, &MarkdownContentParser).unwrap();
 /// let qids: Vec<&str> = items.iter().map(|i| i.qualified_id.as_str()).collect();
-/// assert!(qids.contains(&"@/example/REQ-01"));
-/// assert!(qids.contains(&"@/policy/INV-01"));
+/// assert!(qids.contains(&"@/definition/State"));
+/// assert!(qids.contains(&"@/invariant/atomic-writes"));
 /// ```
 pub fn index_project_sources(
     sources: &[ProjectSource],

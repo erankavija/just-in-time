@@ -11,7 +11,7 @@
 //! - REQ-03: `jit item list --kind invariant` returns the invariant as `@/<kind>/<self-id>`.
 //! - REQ-04: an invalid invariant entry (missing field, bad `kind` token)
 //!   makes config load fail with a typed, descriptive error.
-//! - REQ-05: the registry is authoritative — an INV-looking line in an issue
+//! - REQ-05: the registry is authoritative — an invariant-looking line in an issue
 //!   DESCRIPTION does NOT produce an invariant item; only `.jit/invariants.toml`
 //!   entries do.
 
