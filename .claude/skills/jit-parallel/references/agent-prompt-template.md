@@ -13,6 +13,10 @@ You are [implementing / planning / reviewing] issue [SHORT-ID] in the JIT reposi
 
 [FULL DESCRIPTION — paste verbatim from jit issue show]
 
+## Addressable context
+
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## [For implementation tasks] What to do
 
 1. [Derive concrete steps from the issue description and acceptance criteria.]

@@ -105,6 +105,7 @@ This tier catches issues that per-issue gates and criteria cannot: problems that
 ### Documentation narrative
 - If the epic involves documentation, does the overall doc story remain coherent with this addition?
 - Are there contradictions between this doc and other docs produced for the same epic?
+- Do cited addresses resolve? Every `@/<kind>/<self-id>` citation the issue's artifacts introduce (docs, code comments) must resolve via `jit item show`; a dangling citation is a FAIL.
 
 ### Scope discipline
 - Did the agent make changes outside the issue's scope? (Unrelated refactors, formatting changes to other files, modifications to other agents' work.)

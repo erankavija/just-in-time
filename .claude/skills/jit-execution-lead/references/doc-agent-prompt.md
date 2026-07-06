@@ -25,6 +25,9 @@ You are working as a technical writer on a team delivering an epic. Your task is
 ### Documentation Configuration
 [FROM .jit/config.toml documentation section — doc paths, managed paths, permanent paths]
 
+### Addressable context
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) in the description and conventions above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## Instructions
 
 1. **Understand the documentation standards.** Read the project's existing documentation to learn:

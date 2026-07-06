@@ -25,6 +25,9 @@ You are working as the architect on a team delivering an epic. Your task is to p
 ### Documentation Configuration
 [FROM .jit/config.toml documentation section — doc paths, managed paths]
 
+### Addressable context
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) in the description and conventions above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ## Instructions
 
 1. **Explore the domain.** Read existing code, documents, and configuration relevant to this issue. Understand what exists before proposing what to build. Use Glob and Grep to find relevant files. Read linked documents if any.

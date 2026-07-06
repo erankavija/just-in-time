@@ -39,6 +39,8 @@ done
 
 [PASTE THE FULL REVIEW VERDICT FROM lead-review-protocol.md HERE]
 
+Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) in the verdict and the issue text are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+
 ### What to fix
 
 [FOR EACH REQUIRED CHANGE FROM THE REVIEW:]
