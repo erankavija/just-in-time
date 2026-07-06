@@ -66,7 +66,7 @@ Cargo workspace with three crates plus Node.js and React components:
 
 - `Rejected` and `Archived` are reachable from any state.
 - Dependencies must complete before an issue becomes `Ready`.
-- Gates must pass before transitioning through `Gated` to `Done`.
+- Gates must pass before transitioning through `Gated` to `Done` (`@/inv/gate-semantics`).
 
 ### Data Storage (`.jit/` directory)
 
