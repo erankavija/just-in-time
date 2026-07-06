@@ -2,7 +2,7 @@
   "id": "8d2c5ff3-0804-47b1-beff-583fb5323123",
   "title": "Rule descriptions: schema field, seeded texts, item text-field flip, richer reference rendering",
   "description": "The rules/gates reference projection (ebb6ad45, epic 2821e177) renders gates as `title: description` but rules as bare metadata (`severity: error, enforce: true`) because the rule data model carries no free-text field: a rule's name is its only human-readable content, and the rule item kind declares `text-field = \"name\"`. The rich explanations that DO exist in `.jit/rules.toml` are TOML comments, invisible to every consumer (renderer, `jit item show`, future tooling).\n\nAdd an optional `description` field to the rule schema and thread it through every rule-consuming surface:\n\n1. Schema: `description` (optional string) on the rule TOML schema and the typed load path (`RawRule`/`Rule` in the ruleset store); absent field falls back to the name everywhere, so existing repos stay valid.\n2. Seeded defaults: `jit init`'s scaffolded default ruleset gains hand-authored descriptions for every seeded rule; source material is the existing comment blocks in this repo's `.jit/rules.toml` (condensed). This repo's live `rules.toml` entries also gain descriptions.\n3. Item projection: flip the rule item kind's `text-field` from `name` to `description` (live `.jit/config.toml` `[item_kinds.rule]` and the `jit init` config template), so `jit item show @/rule/<name>` displays real text; name fallback covers description-less rules.\n4. Renderer: `validation/rules_gates_projection.rs` renders rules as `**@/rule/<name>** — <description> (error, enforced)` mirroring the gate line; metadata suffix is prose (`error, enforced` / `warn, advisory`) instead of `severity: ..., enforce: ...`. Re-render the live `docs/reference/rules-and-gates.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: the rule schema accepts an optional `description`; a description-less rule loads unchanged and falls back to its name in every consumer (load-path unit tests cover both).\n- [hard] REQ-02: every `jit init`-seeded default rule carries a description, and this repo's live `.jit/rules.toml` entries do too.\n- [hard] REQ-03: the rule item kind's `text-field` is `description` (live config + init template); `jit item show @/rule/<name>` displays the description, with name fallback verified by test.\n- [hard] REQ-04: the reference projection renders rule descriptions with the prose metadata suffix, verified by a render test; the live `docs/reference/rules-and-gates.md` is re-rendered.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-06T00:17:12.067172238Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-06T00:31:38.256526200Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,6 +31,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-03T22:16:43.859003491Z",
-  "updated_at": "2026-07-05T23:47:25.452464824Z",
-  "claimed_at": "2026-07-05T23:47:25.452464564Z"
+  "updated_at": "2026-07-06T00:33:14.125193114Z",
+  "claimed_at": "2026-07-05T23:47:25.452464564Z",
+  "done_at": "2026-07-06T00:33:14.125192254Z"
 }

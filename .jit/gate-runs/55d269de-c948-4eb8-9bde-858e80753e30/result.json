@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "55d269de-c948-4eb8-9bde-858e80753e30",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8d2c5ff3-0804-47b1-beff-583fb5323123",
+  "commit": "3bc58d8c0a32d589faf52154ad6c201dbdbc87a3",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T00:23:33.259127122Z",
+  "completed_at": "2026-07-06T00:25:34.911074354Z",
+  "duration_ms": 121651,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01, REQ-02, and REQ-04 are functionally implemented: `Rule`/`RawRule` accept `description`, seeded/live rules have descriptions, and the reference projection renders descriptions with prose suffixes. REQ-03 is functionally close, but its required CLI-level verification is incomplete.\n\n**Architecture**\nNo new domain/storage/command/CLI boundary violations found in the reviewed paths. The reference projection still writes through `IssueStore`.\n\n**Functional Paradigm**\nNo blocking issues found.\n\n**Correctness And Invariants**\nNo unsafe code, PID handling, gate semantics, event logging, or atomic-write regressions found in this change set.\n\n**Testing**\nUsed the provided passed `cargo-ci` gate as primary test evidence. I also ran `./scripts/jit-validate.sh`; it passed.\n\n**Jit Issue Management**\nThe prerequisite dependency is marked `done`, and `unmet_dependencies` is empty.\n\n1. **F1 [medium]** The rule-description fallback was implemented by making every registry-first TOML `text-field` optional in `load_toml_scope_items`, not just rule descriptions. This broadens the generic item-source contract and can silently turn malformed custom registry entries into items whose display text is the id. It also conflicts with public docs that still describe `text-field` as the display-text field and `TomlSourceMissingField` as covering missing `id-field` or `text-field`. See [domain/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:1561), [config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:754), and [domain/item.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/item.rs:661).\n2. **F2 [medium]** REQ-03 requires `jit item show @/rule/<name>` to display the rule description with name fallback verified by test, but the CLI test only asserts that `@/rule/label-format` resolves and has kind `\"rule\"`; it does not assert `item.text` contains the description, and the fallback is only covered by the lower-level TOML loader test. See [item_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/item_cli_tests.rs:844).\n3. **F3 [low]** The live `.jit/config.toml` comment above `[item_kinds.rule]` still says rules project `name` as both self-id and display text and “carry no separate free-text field,” directly contradicting the new `description` field and `text-field = \"description\"`. See [.jit/config.toml](/home/vkaskivuo/Projects/just-in-time/.jit/config.toml:143).\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Rule descriptions mostly work, but the change broadens generic TOML item fallback semantics and leaves REQ-03 CLI verification/stale live config debt unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"Rule-description fallback makes every registry-first TOML text-field optional, broadening the generic item-source contract and conflicting with public docs.\",\"file\":\"crates/jit/src/domain/item.rs\",\"line\":1561},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"REQ-03 lacks CLI-level assertion that item show renders rule description text and name fallback.\",\"file\":\"crates/jit/tests/item_cli_tests.rs\",\"line\":844},{\"id\":\"F3\",\"severity\":\"low\",\"summary\":\"Live rule item-kind config comment still says rules have no free-text field and display name as text.\",\"file\":\".jit/config.toml\",\"line\":143}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8193 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f34cf-12d9-74b2-b8ba-5e595da68c71\n--------\nuser\n--- 8180 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Rule descriptions mostly work, but the change broadens generic TOML item fallback semantics and leaves REQ-03 CLI verification/stale live config debt unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "Rule-description fallback makes every registry-first TOML text-field optional, broadening the generic item-source contract and conflicting with public docs.",
+        "file": "crates/jit/src/domain/item.rs",
+        "line": 1561
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "REQ-03 lacks CLI-level assertion that item show renders rule description text and name fallback.",
+        "file": "crates/jit/tests/item_cli_tests.rs",
+        "line": 844
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "summary": "Live rule item-kind config comment still says rules have no free-text field and display name as text.",
+        "file": ".jit/config.toml",
+        "line": 143
+      }
+    ]
+  }
+}

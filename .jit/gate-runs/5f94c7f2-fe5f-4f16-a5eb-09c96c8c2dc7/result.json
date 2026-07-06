@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "5f94c7f2-fe5f-4f16-a5eb-09c96c8c2dc7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8d2c5ff3-0804-47b1-beff-583fb5323123",
+  "commit": "56e1393d9a73f9b66160fb86de15cd12e4e33270",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-06T00:29:04.993557371Z",
+  "completed_at": "2026-07-06T00:30:36.536428039Z",
+  "duration_ms": 91542,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01, REQ-02, REQ-03, and REQ-04 are functionally implemented. Rule descriptions load as optional schema data, seeded/live rules carry descriptions, `text-field = \"description\"` is present in live/init config, CLI-level `item show` coverage now asserts description and fallback behavior, and the reference doc is rendered with prose suffixes.\n\n**Architecture And Separation**\n\nNo new domain/storage/command/CLI boundary violation found. Rule loading remains in validation/storage paths, item projection remains domain-pure, and rendering I/O stays behind the existing projection/storage boundary.\n\n**Functional Paradigm**\n\nNo blocking issue found.\n\n**Correctness And Invariants**\n\nNo atomic-write, event-log, gate-semantics, assignee/label-format, PID-safety, or unsafe-code regression found in the reviewed paths.\n\n**Testing**\n\nUsed the provided passed `cargo-ci` gate as primary test evidence and did not rerun cargo tests. I ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo new `unwrap()` / `expect()` misuse in non-test library code found for this change.\n\n**CLI Contract**\n\nThe new CLI-level test at [item_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/item_cli_tests.rs:960) verifies `jit item show @/rule/<name> --json` emits description text and name fallback.\n\n**Documentation**\n\nPublic-facing docs for the generic TOML `text-field` fallback and live config comments were updated, resolving the prior review’s documentation conflict. One stale internal renderer doc comment remains and contradicts the implemented behavior.\n\n**Prior Review Feedback**\n\nPrior F1 is addressed by documenting the generic optional `text-field` contract in `TomlSourceDescriptor` and `ItemError`. Prior F2 is addressed by the CLI test. Prior F3 is addressed in `.jit/config.toml`.\n\n**Jit Issue Management**\n\nThe issue dependency is marked done, `unmet_dependencies` is empty, and `./scripts/jit-validate.sh` passes.\n\n1. **F1 [low]** The private renderer doc comment still says id-anchor rules render with “display text = name,” but the implementation now renders `description` with name fallback via `rule_display_text`. This is stale technical debt in the rule-description renderer path and contradicts the new behavior. See [rules_gates_projection.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/rules_gates_projection.rs:179).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Rule descriptions are functionally implemented, but a stale renderer doc comment still contradicts the new rule display-text behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"summary\":\"Stale renderer doc comment says id-anchor rules display the name, contradicting description-with-name-fallback behavior.\",\"file\":\"crates/jit/src/validation/rules_gates_projection.rs\",\"line\":179}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5087 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f34d4-213c-78a3-8895-67b769813319\n--------\nuser\n--- 5074 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Rule descriptions are functionally implemented, but a stale renderer doc comment still contradicts the new rule display-text behavior.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "summary": "Stale renderer doc comment says id-anchor rules display the name, contradicting description-with-name-fallback behavior.",
+        "file": "crates/jit/src/validation/rules_gates_projection.rs",
+        "line": 179
+      }
+    ]
+  }
+}

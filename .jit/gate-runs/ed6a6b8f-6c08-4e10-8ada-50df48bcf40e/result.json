@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "ed6a6b8f-6c08-4e10-8ada-50df48bcf40e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8d2c5ff3-0804-47b1-beff-583fb5323123",
+  "commit": "83fb51ab617088dd3f9e325dae495f5cefc65026",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-06T00:31:38.256526200Z",
+  "completed_at": "2026-07-06T00:32:41.007392561Z",
+  "duration_ms": 62750,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-04 are met. `Rule`/`RawRule` carry optional `description` with load-path fallback documented and tested at `crates/jit/src/validation/rules.rs:971` and `crates/jit/src/validation/rules.rs:2775`. Live and init-scaffolded rule item kinds use `text-field = \"description\"` at `.jit/config.toml:154` and `crates/jit/src/hierarchy_templates.rs:229`. CLI coverage asserts `jit item show @/rule/<name> --json` emits description text and name fallback at `crates/jit/tests/item_cli_tests.rs:960`. The rendered reference uses rule descriptions plus prose suffixes at `docs/reference/rules-and-gates.md:17`.\n\n**Architecture And Separation Of Concerns**\n\nNo boundary violations found. Rule loading remains in validation/storage paths, registry projection remains domain-pure in `crates/jit/src/domain/item.rs:1476`, command/CLI concerns stay outside the domain, and rules/gates documentation writes continue through the storage boundary described at `crates/jit/src/validation/rules_gates_projection.rs:205`.\n\n**Functional Paradigm**\n\nNo blocking issue found. The touched logic is small and deterministic; generic TOML item projection uses iterator collection at `crates/jit/src/domain/item.rs:1548`.\n\n**Correctness And Invariants**\n\nNo atomic-write, event-log, gate-semantics, assignee/label-format, PID-safety, or unsafe-code regression found in this change set. The optional `text-field` fallback is now explicitly documented as generic behavior at `crates/jit/src/domain/item.rs:1492`.\n\n**Safety**\n\nNo unsafe code was introduced in the reviewed changes.\n\n**Testing**\n\nUsed the provided passed `cargo-ci` gate as primary test evidence and did not rerun cargo tests. I ran `./scripts/jit-validate.sh`; it passed. Relevant coverage exists for rule load fallback, CLI item-show behavior, and rules/gates rendering.\n\n**Error Handling**\n\nNo new non-test `unwrap()`/`expect()` misuse found in production code. The TOML projection still reports typed missing-field and wrong-type errors with context at `crates/jit/src/domain/item.rs:661`.\n\n**CLI Contract**\n\nNo CLI contract regression found. The relevant `item show` path is covered via `--json` at `crates/jit/tests/item_cli_tests.rs:979` and `crates/jit/tests/item_cli_tests.rs:999`.\n\n**Documentation**\n\nThe prior stale renderer doc comment is fixed at `crates/jit/src/validation/rules_gates_projection.rs:179`. Live config and init-template comments now describe description display text with name fallback at `.jit/config.toml:143` and `crates/jit/src/hierarchy_templates.rs:219`.\n\n**Prior Review Feedback**\n\nPrior findings are resolved. The latest prior failure only cited the stale `display text = name` renderer comment, and the current diff updates it to description-with-name-fallback behavior.\n\n**Jit Issue Management**\n\nThe issue dependency is marked done, `unmet_dependencies` is empty, and `./scripts/jit-validate.sh` passes.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Rule descriptions, item projection, renderer output, tests, and prior review feedback are all resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Rule descriptions, item projection, renderer output, tests, and prior review feedback are all resolved.",
+    "findings": []
+  }
+}
