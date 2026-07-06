@@ -5578,3 +5578,7 @@
 {"type":"issue_state_changed","id":"e510fd12-d0e6-4781-84e0-7ae2d0f8c07a","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T00:33:14.209786385Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"0b853dfb-904b-46c6-a547-2421036537c7","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T05:57:24.903058075Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"5da4836c-0e43-48d4-9f12-df07f51a8366","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T05:57:24.905887467Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"5925210a-de0b-4f73-b0b1-c143a98deede","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:00:03.081234128Z","updated_by":"issue-update","fields":["description"]}
+{"type":"gate_added","id":"a1a1aafa-d8b1-4b05-9cca-213a761f8ba5","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:00:03.089142904Z","gate_key":"cargo-ci"}
+{"type":"issue_created","id":"865ae665-1dcf-4333-9be8-55c94801df92","issue_id":"d8c48af9-40eb-495d-a236-230e343b6357","timestamp":"2026-07-06T06:00:03.095858289Z","title":"Config-declared kind aliases for item addresses","priority":"normal"}
+{"type":"issue_updated","id":"1efe5b45-4d51-41b4-b4c2-29f9ea2f0d7b","issue_id":"76cb968b-8c8b-46e2-8dfb-ad54c32aa284","timestamp":"2026-07-06T06:00:07.603543527Z","updated_by":"dependency-add","fields":["dependencies"]}
