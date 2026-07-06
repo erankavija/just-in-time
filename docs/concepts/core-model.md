@@ -75,10 +75,10 @@ Store the intended URL in session before redirecting to login page.
 After successful auth, redirect to stored URL or default to /home.
 
 ## Acceptance Criteria
-- [ ] Pre-login URL captured in session
-- [ ] Post-login redirect uses stored URL
-- [ ] Falls back to /home if no stored URL
-- [ ] Works across browser sessions
+- Pre-login URL captured in session
+- Post-login redirect uses stored URL
+- Falls back to /home if no stored URL
+- Works across browser sessions
 ```
 
 #### State - Current Lifecycle Position

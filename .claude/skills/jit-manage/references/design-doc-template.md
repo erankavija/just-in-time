@@ -29,8 +29,8 @@ a reader unfamiliar with the issue would need.]
 [Copy verbatim from the issue description. These are the acceptance
 criteria that must all be met before the issue can be closed.]
 
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
+- [Criterion 1]
+- [Criterion 2]
 
 ## Design
 

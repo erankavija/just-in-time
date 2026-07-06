@@ -26,8 +26,8 @@ where the title is fully self-explanatory.]
 
 ## Success Criteria
 
-- [ ] Criterion stated as an observable outcome, not an action
-- [ ] Specific enough that a reviewer can verify it without ambiguity
+- Criterion stated as an observable outcome, not an action
+- Specific enough that a reviewer can verify it without ambiguity
 
 ## Notes
 
@@ -41,9 +41,16 @@ where the title is fully self-explanatory.]
 - **Criticality markers.** Where the project distinguishes criterion maturity (the
   planning-bracket / coverage model — see
   `.claude/skills/jit-manage/references/issue-extraction-prompt.md`), prefix **every**
-  criterion with `[hard]` or `[aspirational]` and a stable `REQ-N` id. **Default to
-  `[hard]`.** Never leave a criterion unmarked or mix marked and unmarked items in one
-  issue. `[hard]` criteria must be covered by a child and fail review if unmet;
+  criterion with `[hard]` or `[aspirational]` and a stable zero-padded `REQ-NN` id.
+  A marked criterion is a plain bullet whose text opens with the marker — that exact
+  shape is what registers the row as an addressable requirement item:
+
+  ```markdown
+  - [hard] REQ-01: Returns the resolved address for every configured kind
+  ```
+
+  **Default to `[hard]`.** Never leave a criterion unmarked or mix marked and unmarked
+  items in one issue. `[hard]` criteria must be covered by a child and fail review if unmet;
   `[aspirational]` ones are amendable in-loop while the aggregate contract holds.
 - Descriptions use second-level headings (`##`) — never `#` (reserved for the title if
   rendered standalone) or deeper than `###`.

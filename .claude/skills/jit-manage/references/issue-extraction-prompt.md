@@ -90,9 +90,17 @@ fences.
    `code-review-prompt` or CLAUDE.md for whether it does), prefix each
    criterion line with either `[hard]` (the default; fails the review if
    unmet) or `[aspirational]` (amendable in-loop if empirical evidence
-   contradicts, as long as the aggregate contract holds). Default to `[hard]`
-   when in doubt. Projects that do not use these markers will simply treat
-   every criterion as hard, which is the safe behaviour.
+   contradicts, as long as the aggregate contract holds). A marked criterion
+   is a plain bullet whose text opens with the marker, followed by a stable
+   zero-padded id — that exact shape registers the row as an addressable
+   requirement item:
+
+   ```markdown
+   - [hard] REQ-01: Returns the resolved address for every configured kind
+   ```
+
+   Default to `[hard]` when in doubt. Projects that do not use these markers
+   will simply treat every criterion as hard, which is the safe behaviour.
 
 4. **Descriptions must stand alone.** Include enough context — motivation,
    success criteria, and constraints — that the issue is self-contained.
