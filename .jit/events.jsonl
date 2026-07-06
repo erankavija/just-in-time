@@ -5675,3 +5675,5 @@
 {"type":"issue_updated","id":"5cef9587-791d-4a10-baaf-cd415d7fe4fe","issue_id":"6ce0f14e-7768-45ea-ada7-c39b0cd2957e","timestamp":"2026-07-06T16:16:38.095872340Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"2bbbc92b-65b1-4ad2-82e2-51035ca328e0","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-06T16:19:06.711849490Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"e4fac581-1f45-4f7d-ba06-1455fe6508b9","issue_id":"6ce0f14e-7768-45ea-ada7-c39b0cd2957e","timestamp":"2026-07-06T16:19:06.748233797Z","updated_by":"issue-update","fields":["description"]}
+{"type":"issue_created","id":"d946b6f4-fd1b-497b-8d08-b9be131decad","issue_id":"ce1eb77c-a125-41f9-ab2c-24fda442135c","timestamp":"2026-07-06T23:35:33.428164696Z","title":"Steward-owned charter facilitation and addressable charter decisions","priority":"normal"}
+{"type":"issue_updated","id":"d5a0d960-2800-4e9b-8e77-c71ffba0e8d1","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-06T23:35:39.591747718Z","updated_by":"dependency-add","fields":["dependencies"]}
