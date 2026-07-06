@@ -1142,7 +1142,7 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// use jit::domain::item::is_qualified_reference;
 ///
 /// assert!(is_qualified_reference("@/rule/coverage-preview"));
-/// assert!(is_qualified_reference("@/issue/56ab0224/rule/coverage-preview"));
+/// assert!(is_qualified_reference("@/issue/56ab0224/requirement/REQ-01"));
 /// assert!(is_qualified_reference("56ab0224/REQ-01"));
 /// assert!(!is_qualified_reference("REQ-01"));
 /// ```
