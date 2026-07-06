@@ -588,6 +588,7 @@ impl ItemKindConfig {
     ///     scope: Some(KindScopeConfig::Issue),
     ///     source_of_truth: Some(SourceOfTruth::MarkdownFirst),
     ///     source: None,
+    ///     aliases: None,
     /// };
     /// assert!(complete.missing_required_fields().is_empty());
     /// ```
