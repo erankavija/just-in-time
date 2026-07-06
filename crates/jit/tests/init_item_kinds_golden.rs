@@ -80,7 +80,7 @@ source-of-truth = \"markdown-first\"
 
 [item_kinds.invariant]
 section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
 link-namespaces = [\"enforces\"]
 scope = \"project\"
@@ -174,7 +174,7 @@ fn test_init_authored_table_indexes_all_kinds() {
 
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
+        "[[invariants]]\nid = \"acyclic\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
     )
     .unwrap();
 
@@ -225,7 +225,7 @@ fn test_init_authored_table_indexes_all_kinds() {
         .map(|i| i["qualified_id"].as_str().unwrap())
         .collect();
     assert!(qids.contains(&format!("@/issue/{short}/requirement/REQ-01").as_str()));
-    assert!(qids.contains(&"@/invariant/INV-01"));
+    assert!(qids.contains(&"@/invariant/acyclic"));
     assert!(qids.contains(&"@/gate/cargo-ci"));
 }
 
@@ -251,7 +251,7 @@ fn test_no_item_kinds_table_indexes_nothing() {
 
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),
-        "[[invariants]]\nid = \"INV-01\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
+        "[[invariants]]\nid = \"acyclic\"\nstatement = \"acyclic\"\nkind = \"enforced\"\n",
     )
     .unwrap();
 

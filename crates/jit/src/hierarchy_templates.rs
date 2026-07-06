@@ -162,7 +162,7 @@ examples = ["resolution:wont-fix", "resolution:duplicate"]
 [namespaces.enforces]
 description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
 unique = false
-examples = ["enforces:@/invariant/INV-01", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 
 # =============================================================================
 # ITEM KINDS
@@ -209,7 +209,7 @@ source-of-truth = "markdown-first"
 
 [item_kinds.invariant]
 section = "success_criteria"
-id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+id-pattern = "[a-z][a-z0-9-]*"
 markers = []
 link-namespaces = ["enforces"]
 scope = "project"
@@ -549,7 +549,7 @@ source-of-truth = \"markdown-first\"
 
 [item_kinds.invariant]
 section = \"success_criteria\"
-id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
+id-pattern = \"[a-z][a-z0-9-]*\"
 markers = []
 link-namespaces = [\"enforces\"]
 scope = \"project\"

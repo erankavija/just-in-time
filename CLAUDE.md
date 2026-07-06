@@ -142,14 +142,14 @@ New code should respect these boundaries. Prefer adding a domain function over e
 ### Domain Invariants
 
 <!-- jit:invariants:begin -->
-- **INV-LABEL-FORMAT** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
-- **INV-NAMESPACE-REGISTRY** — Every label namespace is declared in the namespace registry.
-- **INV-DAG-ACYCLIC** — Cycle detection runs before every dependency operation; the graph stays acyclic.
-- **INV-GATE-SEMANTICS** — An issue cannot reach Ready or Done with pending or failed gates.
-- **INV-EVENT-LOG** — Every state change appends an event to events.jsonl.
-- **INV-ATOMIC-WRITES** — All file writes use the temp-file + atomic-rename pattern.
-- **INV-ASSIGNEE-FORMAT** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
-- **INV-DOMAIN-AGNOSTIC** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
+- **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
+- **namespace-registry** — Every label namespace is declared in the namespace registry.
+- **dag-acyclic** — Cycle detection runs before every dependency operation; the graph stays acyclic.
+- **gate-semantics** — An issue cannot reach Ready or Done with pending or failed gates.
+- **event-log** — Every state change appends an event to events.jsonl.
+- **atomic-writes** — All file writes use the temp-file + atomic-rename pattern.
+- **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
+- **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
 <!-- jit:invariants:end -->
 
 ## Commit Conventions
