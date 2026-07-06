@@ -1,7 +1,7 @@
 {
   "id": "f1aaaca7-84ad-4985-96f8-20b1cd94fadf",
   "title": "Fix stale storage comment and unignored jit tmp directory",
-  "description": "A storage-layer comment claims config.toml is never auto-created, while the init command scaffolds it from the chosen hierarchy template. Separately, .jit/tmp/ is the one machine-local runtime artifact not gitignored.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: The storage init comment states where config.toml scaffolding actually happens (the init command layer)\n- [ ] [hard] REQ-2: .jit/tmp/ is gitignored alongside the other runtime artifacts",
+  "description": "A storage-layer comment claims config.toml is never auto-created, while the init command scaffolds it from the chosen hierarchy template. Separately, .jit/tmp/ is the one machine-local runtime artifact not gitignored.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage init comment states where config.toml scaffolding actually happens (the init command layer)\n- [hard] REQ-02: .jit/tmp/ is gitignored alongside the other runtime artifacts",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -17,9 +17,10 @@
   "labels": [
     "type:task",
     "epic:docs-accuracy",
-    "component:cli"
+    "component:cli",
+    "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.883478846Z",
-  "updated_at": "2026-07-06T15:39:58.883714846Z",
+  "updated_at": "2026-07-06T15:47:42.445387277Z",
   "first_ready_at": "2026-07-06T15:39:58.883479096Z"
 }

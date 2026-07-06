@@ -1,7 +1,7 @@
 {
   "id": "7eec3d59-60ab-448c-9334-50c5cb93d4bd",
   "title": "Remove legacy narration from shipped reference docs",
-  "description": "Shipped reference docs narrate past behavior instead of stating current behavior: the labels reference cites a retired registry file, the command-grammar reference describes a completed short-flag migration as in-flight conformance work, and the command reference explains what callers used to do. The labels reference also omits the enforces namespace from its pre-declared registry list.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: Shipped reference docs state current behavior only; no formerly/previously/no-longer narration remains\n- [ ] [hard] REQ-2: The command-grammar doc reads as a statement of the current grammar\n- [ ] [hard] REQ-3: The pre-declared namespace list in the labels reference matches the init scaffold, including enforces",
+  "description": "Shipped reference docs narrate past behavior instead of stating current behavior: the labels reference cites a retired registry file, the command-grammar reference describes a completed short-flag migration as in-flight conformance work, and the command reference explains what callers used to do. The labels reference also omits the enforces namespace from its pre-declared registry list.\n\n## Success Criteria\n\n- [hard] REQ-01: Shipped reference docs state current behavior only; no formerly/previously/no-longer narration remains\n- [hard] REQ-02: The command-grammar doc reads as a statement of the current grammar\n- [hard] REQ-03: The pre-declared namespace list in the labels reference matches the init scaffold, including enforces",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -16,9 +16,10 @@
   "labels": [
     "type:task",
     "epic:docs-accuracy",
-    "component:docs"
+    "component:docs",
+    "satisfies:REQ-03"
   ],
   "created_at": "2026-07-06T15:39:58.881089894Z",
-  "updated_at": "2026-07-06T15:39:58.881343354Z",
+  "updated_at": "2026-07-06T15:47:42.418556037Z",
   "first_ready_at": "2026-07-06T15:39:58.881090124Z"
 }

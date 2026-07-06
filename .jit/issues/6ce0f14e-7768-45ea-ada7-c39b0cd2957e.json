@@ -1,7 +1,7 @@
 {
   "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
   "title": "Documentation review gate",
-  "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the five review dimensions above\n- [ ] [hard] REQ-2: The gate produces structured findings\n- [ ] [hard] REQ-3: The gate passes on the repository's documentation tree at the time this issue completes\n- [ ] [hard] REQ-4: The gate registry description states when to apply the gate to future documentation work",
+  "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve.\n\n## Success Criteria\n\n- [hard] REQ-01: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the five review dimensions above\n- [hard] REQ-02: The gate produces structured findings\n- [hard] REQ-03: The gate passes on the repository's documentation tree at the time this issue completes\n- [hard] REQ-04: The gate registry description states when to apply the gate to future documentation work",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
@@ -27,9 +27,10 @@
   "labels": [
     "type:task",
     "epic:docs-accuracy",
-    "component:docs"
+    "component:docs",
+    "satisfies:REQ-04"
   ],
   "created_at": "2026-07-06T15:39:58.883953366Z",
-  "updated_at": "2026-07-06T15:39:59.099196982Z",
+  "updated_at": "2026-07-06T15:47:42.450640341Z",
   "first_ready_at": "2026-07-06T15:39:58.883953626Z"
 }

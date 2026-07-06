@@ -1,7 +1,7 @@
 {
   "id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
   "title": "Consolidate the docs landing pages",
-  "description": "docs/README.md and docs/index.md duplicate each other (quick links, structure diagram, getting-started list) and must be kept in sync by hand; both omit docs/examples/ and several existing reference docs.\n\n## Success Criteria\n\n- [ ] [hard] REQ-1: One authoritative landing page remains; any second file is a pointer to it\n- [ ] [hard] REQ-2: The landing page lists docs/examples/ and every existing reference doc\n- [ ] [hard] REQ-3: All landing-page links resolve",
+  "description": "docs/README.md and docs/index.md duplicate each other (quick links, structure diagram, getting-started list) and must be kept in sync by hand; both omit docs/examples/ and several existing reference docs.\n\n## Success Criteria\n\n- [hard] REQ-01: One authoritative landing page remains; any second file is a pointer to it\n- [hard] REQ-02: The landing page lists docs/examples/ and every existing reference doc\n- [hard] REQ-03: All landing-page links resolve",
   "state": "ready",
   "priority": "normal",
   "assignee": null,
@@ -16,9 +16,10 @@
   "labels": [
     "type:task",
     "epic:docs-accuracy",
-    "component:docs"
+    "component:docs",
+    "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.882052514Z",
-  "updated_at": "2026-07-06T15:39:58.882299185Z",
+  "updated_at": "2026-07-06T15:47:42.429223165Z",
   "first_ready_at": "2026-07-06T15:39:58.882052774Z"
 }
