@@ -176,9 +176,9 @@ fn render_full(rules: &RuleSet, gates: &GateRegistry) -> String {
 
 /// Render the `id-anchor` style: a heading-less `- **{address}** — {text}` list.
 ///
-/// Rules (display text = name) then gates (display text = description or title), in
-/// deterministic order. When BOTH registries are empty, a single explicit line is
-/// emitted so the projected region is never blank.
+/// Rules (display text = description, or name when absent) then gates (display
+/// text = description or title), in deterministic order. When BOTH registries are
+/// empty, a single explicit line is emitted so the projected region is never blank.
 fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
     let sorted = gates_sorted(gates);
     if rules.rules.is_empty() && sorted.is_empty() {
