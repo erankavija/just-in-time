@@ -18,7 +18,7 @@
           "short_id": "027d7cbf",
           "title": "Declare the gate contract in the breakdown analysis schema",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "4c9ee033",
@@ -82,7 +82,16 @@
   ],
   "wave_rationale": "No sibling dependency edges; waves shaped by file-conflict lanes (A: jit-project-lead+config+docs, B: jit-breakdown, C: jit-planning-lead). Within-lane order serializes same-file edits.",
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {},
+  "escalations": [
+    {
+      "issue": "ce1eb77c",
+      "category": "shared-infrastructure",
+      "summary": "per label-namespace registration required for REQ-07; invoker approved schema+config registration, scope extended",
+      "resolved": "2026-07-07"
+    }
+  ],
+  "rework_counts": {
+    "027d7cbf": 1
+  },
   "started_at": "2026-07-07T07:15:07+03:00"
 }

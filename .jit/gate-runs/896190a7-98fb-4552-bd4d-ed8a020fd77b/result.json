@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "896190a7-98fb-4552-bd4d-ed8a020fd77b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce",
+  "commit": "99d6481beee2fb97155f1802757e681da0f6cf13",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-07T04:30:13.376433642Z",
+  "completed_at": "2026-07-07T04:31:07.099510088Z",
+  "duration_ms": 53723,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 met: [plan-schema.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/references/plan-schema.md:19) declares `gate_tier`, [plan-schema.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/references/plan-schema.md:20) declares required `gates`, and [plan-schema.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/references/plan-schema.md:71) ties `gates` to the orchestrator-supplied `[GATE_TIERS]` mapping.\n\nREQ-02 met: [analysis-prompt.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/references/analysis-prompt.md:46) tells the agent to copy from `[GATE_TIERS]` and points to the schema for both fields. The output-shape block at [analysis-prompt.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/references/analysis-prompt.md:208) is explicitly non-canonical for gate-field semantics.\n\nREQ-03 met: [SKILL.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/SKILL.md:242) now requires validating every child before creation, [SKILL.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/SKILL.md:243) delegates the required-field set to the schema, and [SKILL.md](/home/vkaskivuo/Projects/just-in-time/.claude/skills/jit-breakdown/SKILL.md:246) rejects missing required fields or invalid empty `gates` before Step 6 creates anything.\n\n**Architecture and Separation of Concerns**\n\nNo Rust architecture boundary changes. The reviewed changes are limited to `.claude/skills/jit-breakdown` procedural/schema documentation.\n\n**Functional Paradigm**\n\nNo Rust implementation changed.\n\n**Correctness and Invariants**\n\nNo atomic-write, event-log, gate-transition, assignee/label-format, PID-safety, or unsafe-code issue introduced by these documentation/procedure changes.\n\n**Testing**\n\nProvided history contains the prior failed code-review finding; I verified that specific finding is addressed. I ran `./scripts/jit-validate.sh`, and it passed. I did not run cargo tests; this issue changes skill docs/procedure files, not Rust code.\n\n**Error Handling**\n\nNo Rust fallible-operation/error type code changed. The skill now directs malformed analysis output to surface as a schema-validation error before state mutation.\n\n**CLI Contract**\n\nNo CLI command surface changed.\n\n**Documentation**\n\nThe schema and prompt are now aligned around `gate_tier` and `gates`, and the schema’s Requiredness section is named as the canonical contract.\n\n**Prior Review Feedback**\n\nThe prior finding at `.claude/skills/jit-breakdown/SKILL.md:242` is resolved: Step 4 no longer lists only a subset of required child fields; it references the schema’s Requiredness section and applies it to every child before creation.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; prior schema-validation feedback is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; prior schema-validation feedback is addressed.",
+    "findings": []
+  }
+}
