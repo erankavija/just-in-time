@@ -4,7 +4,7 @@
   "description": "Umbrella for standalone maintenance and defect-fix work on the jit skill suite (jit-planning-lead, jit-breakdown, jit-execution-lead, jit-manage, and their reference prompts) that is not part of a feature epic.\n\n## Success Criteria\n\n- Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.",
   "state": "backlog",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [
     "4817c1bc-74a9-4d85-be7c-135751c78961",
     "9b191163-380f-4c6a-8ad1-992f7c23c2b2",
@@ -25,5 +25,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:38:10.660996776Z",
-  "updated_at": "2026-07-06T23:35:39.591565267Z"
+  "updated_at": "2026-07-07T04:13:29.574941982Z",
+  "claimed_at": "2026-07-07T04:13:29.574941412Z"
 }
