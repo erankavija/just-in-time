@@ -5678,3 +5678,9 @@
 {"type":"issue_created","id":"d946b6f4-fd1b-497b-8d08-b9be131decad","issue_id":"ce1eb77c-a125-41f9-ab2c-24fda442135c","timestamp":"2026-07-06T23:35:33.428164696Z","title":"Steward-owned charter facilitation and addressable charter decisions","priority":"normal"}
 {"type":"issue_updated","id":"d5a0d960-2800-4e9b-8e77-c71ffba0e8d1","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-06T23:35:39.591747718Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_claimed","id":"a83e6b81-0af0-43ff-8946-6a6113c763a1","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T04:13:29.575171452Z","assignee":"agent:jit-execution-lead"}
+{"type":"issue_state_changed","id":"0fb76c0b-7c8c-4b8a-bad8-e55b555fe014","issue_id":"ce1eb77c-a125-41f9-ab2c-24fda442135c","timestamp":"2026-07-07T04:15:13.457759623Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"35e946ce-16ed-4d8d-bf39-362c577a7e33","issue_id":"ce1eb77c-a125-41f9-ab2c-24fda442135c","timestamp":"2026-07-07T04:15:13.460740015Z","assignee":"agent:claude"}
+{"type":"issue_state_changed","id":"f93696db-9d54-4db7-97c0-efda1fa03e8e","issue_id":"027d7cbf-bee1-4b4e-9912-bc144bc14cce","timestamp":"2026-07-07T04:15:13.477842987Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"e290fa93-55fa-4640-b057-941197975acf","issue_id":"027d7cbf-bee1-4b4e-9912-bc144bc14cce","timestamp":"2026-07-07T04:15:13.478021087Z","assignee":"agent:claude"}
+{"type":"issue_state_changed","id":"6c81b9e0-3450-40aa-be25-17da986ac5f8","issue_id":"4c9ee033-9602-4363-aee2-b47d918f94c5","timestamp":"2026-07-07T04:15:13.494618779Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"7d646c49-7e25-4246-8a22-240c28a42768","issue_id":"4c9ee033-9602-4363-aee2-b47d918f94c5","timestamp":"2026-07-07T04:15:13.494794340Z","assignee":"agent:claude"}
