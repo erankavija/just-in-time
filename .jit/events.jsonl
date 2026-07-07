@@ -5732,3 +5732,6 @@
 {"type":"issue_created","id":"ec1bf0ef-0069-4d6c-9a8f-14f441739816","issue_id":"8917c558-2c6d-4425-96ed-9dad1dbe7f2b","timestamp":"2026-07-07T07:52:08.541553871Z","title":"Make jit doc add idempotent for an existing identical link","priority":"normal"}
 {"type":"issue_created","id":"ccdfa961-97a4-4400-a4b4-2a6aae936ce6","issue_id":"6f881a85-851c-4279-931b-4279380609f3","timestamp":"2026-07-07T07:52:08.566451469Z","title":"Exit quietly on closed stdout instead of panicking","priority":"normal"}
 {"type":"issue_updated","id":"0d1e6755-f6ca-499f-8004-47ef5d78c36a","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-07T07:52:15.036180504Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"f61b8b02-8879-456c-a072-811b2e2ee5cd","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.951660524Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_state_changed","id":"486ac01d-0e72-488b-8ba3-742c612be843","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.975262132Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"49f197b6-2136-4734-81a6-dd8806631700","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.975282712Z"}
