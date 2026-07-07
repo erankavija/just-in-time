@@ -2,9 +2,9 @@
   "id": "4817c1bc-74a9-4d85-be7c-135751c78961",
   "title": "Reconcile plan-sketch type tiers with the breakdown child-type rule",
   "description": "The plan document template has decomposition-sketch items carry their own type tier, while the jit-breakdown workflow instructs that children are created strictly at one level below the parent. For an epic whose approved sketch types some items as tasks, the two rules contradict each other, and the breakdown quality gate sides with the plan.\n\n## Background\n\nObserved on the f2532a2d fan-out (2026-07-02): the breakdown analysis agent obeyed the level+1 rule and promoted three sketch items the approved plan typed as tasks into stories; the gate failed all three across two rounds and required retyping them back. The sketch's tiers are the reviewed contract, so the breakdown workflow must honor them when they exist.\n\n## Success Criteria\n\n- [hard] REQ-01: The jit-breakdown instructions state that in a bracket breakdown each sketch item's declared type tier from the approved plan overrides the uniform level+1 rule, so mixed story- and task-typed children under one epic are a valid outcome.\n- [hard] REQ-02: The breakdown analysis prompt receives the per-item tiers from the plan sketch and assigns them instead of forcing a single child type.\n- [hard] REQ-03: The plan document template states that the sketch's type tiers are binding for fan-out, closing the loop from the authoring side.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "code-review"
@@ -18,5 +18,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:38:41.474465353Z",
-  "updated_at": "2026-07-01T22:38:41.475890344Z"
+  "updated_at": "2026-07-07T05:46:40.841483797Z",
+  "claimed_at": "2026-07-07T05:46:40.841483637Z"
 }
