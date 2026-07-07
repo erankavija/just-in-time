@@ -239,6 +239,15 @@ The agent must return **only** a JSON object — see
 Parse the returned JSON. If parsing fails, show the raw output to the user and
 ask whether to retry or abort.
 
+**Validate every child against the schema before continuing — no issue is created
+until the whole batch passes.** Reject the batch if any child is missing a required
+field (`ref`, `title`, `description`, `type`, `priority`, `depends_on`, `gate_tier`,
+`gates`) or carries an empty `gates` array where its `gate_tier` maps to a non-empty
+gate set ([references/plan-schema.md](references/plan-schema.md)). Report the
+offending `ref` and the violated field, then retry or abort. A malformed batch fails
+here, before Step 6 creates anything, so drift surfaces as one schema-validation error
+and the repository is left untouched.
+
 ---
 
 ## Step 5: Plan review
@@ -269,7 +278,7 @@ Notes from analysis agent:
 Show all sequencing edges. Cross-dependencies (where a child depends on another
 child that is not an immediate predecessor) should be explicitly called out.
 
-**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); and a non-empty `gate_tier` mapped to at least one gate (Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
+**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); and a non-empty `gate_tier` with its `gates` array (validated in Step 4, Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
 
 Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abort]"**
 
@@ -294,11 +303,12 @@ jit issue create \
   --label "<membership-label>" \
   --label "satisfies:<id>" ...        # one per id in this child's `satisfies` (bracket only; Step 1.5 step 5)
   --priority "<priority>" \
-  --gate "<g1>" --gate "<g2>"          # the gates this issue's gate_tier maps to (Step 1.6)
+  --gate "<g1>" --gate "<g2>"          # this child's `gates` array (its gate_tier's set; validated in Step 4)
 ```
 
-Apply the quality gates from the issue's `gate_tier`. Every implementation issue gets
-its tier's gates — skipping them leaves work that can be closed with no quality check.
+Apply the quality gates from the child's validated `gates` field (its `gate_tier`'s
+set). Every implementation issue gets its tier's gates — skipping them leaves work that
+can be closed with no quality check.
 Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate preset
 apply <preset> <uuid>` afterward. **This per-task gate assignment applies to BOTH
 breakdown shapes**.

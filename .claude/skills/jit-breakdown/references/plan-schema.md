@@ -16,7 +16,8 @@ No prose before or after — the main agent parses the output directly.
       "source":      "string  — section heading or excerpt from the spec that motivated this issue",
       "satisfies":   ["string  — container [hard] criterion id(s) this child covers, e.g. 'REQ-01'; [] if none"],
       "decompose_further": "boolean — true if this child is itself several distinct deliverables and should become a parent at the next level down (only when a finer child type exists below it)",
-      "gate_tier":   "string  — which project gate tier this task needs, chosen from the tiers the skill supplies in [GATE_TIERS] (never invent gate names)"
+      "gate_tier":   "string  — which project gate tier this task needs, chosen from the tiers the skill supplies in [GATE_TIERS] (never invent tier names)",
+      "gates":       ["string — the concrete gate keys for gate_tier, copied from that tier's gate set in [GATE_TIERS]; required, non-empty for every implementation child"]
     }
   ],
   "notes": "string — ambiguities, assumptions, items that could not be classified, or open questions"
@@ -50,6 +51,14 @@ a review-only tier), research (a peer-review+reproducibility tier alongside a no
 and others. Give core deliverables the **primary/full** tier and clearly supporting work
 (documentation, notes) a lighter tier. When unsure, choose the primary tier; pick from the
 supplied tier labels.
+
+**`gates`**
+The concrete gate keys the created child will carry: the gate set that `gate_tier`
+maps to. The orchestrator supplies the tier → gate-set mapping as dispatch input in
+`[GATE_TIERS]`; copy the chosen tier's gates verbatim into this array (pick from the
+supplied keys). **Required and non-empty** for every implementation child, so a leaf
+always carries a quality check. An empty array is valid only for a tier the project
+defines as gateless (rare, e.g. pure notes).
 
 **`depends_on`**
 `["ref-X"]` means this issue **is blocked by** `ref-X` — it cannot start until
@@ -135,7 +144,9 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "priority": "high",
       "depends_on": [],
       "source": "Section 2: Shader Interface",
-      "satisfies": ["REQ-01"]
+      "satisfies": ["REQ-01"],
+      "gate_tier": "full",
+      "gates": ["cargo-ci", "code-review"]
     },
     {
       "ref": "C2",
@@ -144,7 +155,9 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "type": "task",
       "priority": "normal",
       "depends_on": ["C1"],
-      "source": "Section 3: Shader Implementation"
+      "source": "Section 3: Shader Implementation",
+      "gate_tier": "full",
+      "gates": ["cargo-ci", "code-review"]
     },
     {
       "ref": "C3",
@@ -153,7 +166,9 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "type": "task",
       "priority": "normal",
       "depends_on": ["C1"],
-      "source": "Section 4: CPU-side Dispatch"
+      "source": "Section 4: CPU-side Dispatch",
+      "gate_tier": "full",
+      "gates": ["cargo-ci", "code-review"]
     },
     {
       "ref": "C4",
@@ -163,7 +178,9 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "priority": "normal",
       "depends_on": ["C2", "C3"],
       "source": "Section 5: Performance Validation",
-      "satisfies": ["REQ-04"]
+      "satisfies": ["REQ-04"],
+      "gate_tier": "full",
+      "gates": ["cargo-ci", "code-review"]
     }
   ],
   "notes": "Section 6 (fallback CPU path) was too vague to decompose into a single task; included as C5 with a note in its description."

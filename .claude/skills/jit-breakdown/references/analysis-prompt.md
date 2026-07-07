@@ -38,10 +38,14 @@ it to understand the grouping context.
 
 ## Gate tiers
 
-This project defines the following quality-gate tiers. Assign each issue's `gate_tier`
-to exactly one of these labels (per Decomposition rule 2a):
+This project defines the following quality-gate tiers, each mapping a tier label to a
+concrete gate set:
 
 [GATE_TIERS]
+
+Assign each issue's `gate_tier` to one of these labels and copy that tier's gate set
+into the issue's `gates` array (per Decomposition rule 2a). Both fields are defined in
+[the schema](plan-schema.md); record them exactly as it specifies.
 
 ## Container [hard] criteria to cover
 
@@ -98,11 +102,12 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
 2. **Use the narrowest child type that fits.** If there are multiple child types
    available, assign the type whose scope best matches the work item.
 
-2a. **Assign each issue a `gate_tier`** from the `[GATE_TIERS]` the skill supplies
-   below. These tiers come from this project's own gate registry, so they fit any
-   domain. Give core deliverables the primary/full tier and clearly supporting work
+2a. **Record each issue's gate fields** from the `[GATE_TIERS]` mapping the skill
+   supplies above. These tiers come from this project's own gate registry, so they fit
+   any domain. Give core deliverables the primary/full tier and clearly supporting work
    (such as pure documentation) a lighter tier; when in doubt, choose the primary tier.
-   Pick a supplied tier label and leave the tier → gate mapping to the skill.
+   Set `gate_tier` to the chosen tier label and `gates` to that tier's concrete gate
+   set. [The schema](plan-schema.md) defines both fields; follow it.
 
 3. **Descriptions must stand alone.** The person reading the issue in JIT will not
    have access to the spec document. Include enough context — motivation, acceptance
@@ -200,6 +205,10 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
 
 ## Output schema
 
+Return a JSON object with the shape below. The gate fields (`gate_tier`, `gates`) are
+defined in [plan-schema.md](plan-schema.md), the canonical contract; this block only
+shows where they sit in the object.
+
 ```json
 {
   "issues": [
@@ -208,7 +217,8 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
       "title":       "concise action-oriented title",
       "description": "self-contained description with context and acceptance criteria",
       "type":        "one of the configured child type names",
-      "gate_tier":    "one of the supplied gate-tier labels (per Decomposition rule 2a)",
+      "gate_tier":    "gate-tier label — see plan-schema.md",
+      "gates":        ["concrete gate keys for gate_tier — see plan-schema.md"],
       "priority":    "low | normal | high | critical",
       "depends_on":  ["ref-of-sibling-prerequisite"],
       "source":      "section heading or excerpt from the spec that motivated this issue",
