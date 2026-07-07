@@ -13,22 +13,21 @@ compatibility: Requires JIT CLI on PATH. JIT MCP tools used where available.
 Read the specification document attached to a parent issue, decompose it into
 child issues with a correct dependency DAG, and populate JIT.
 
+Concrete gate, namespace, and id names in this document (`plan-review`,
+`coverage-preview`, `breakdown-review`, `satisfies`, `REQ-`) are the default
+ruleset's. Read the live names from `.jit/templates.toml` and `.jit/rules.toml`
+and substitute them.
+
 **Two breakdown shapes, selected by the ruleset (Step 1.5):**
 
-- **Bracket breakdown** — when the parent is a *breakable container*, i.e. its
-  type appears in some `.jit/templates.toml` template's `applies_to`. The plan is
-  a first-class, gated node `P` sequenced *before* the fan-out, and breakdown
-  splices a **source/sink spine** `C → impl → B → P` (not parent-centric
-  containment). This is the plan-before-fan-out flow. See [The bracket](#the-bracket) below.
-- **Plain breakdown** — when the parent is NOT a breakable container (no
-  `.jit/templates.toml` template applies to the parent's type). The classic
-  parent-centric flow: create children, then make the parent depend on all of
-  them (Step 6c-plain).
+- **Bracket breakdown** — the parent is a *breakable container* (its type appears
+  in some `.jit/templates.toml` template's `applies_to`). See
+  [The bracket](#the-bracket).
+- **Plain breakdown** — no template applies to the parent's type: create
+  children, then make the parent depend on all of them (Step 6c-plain).
 
-Steps 2-5 (read hierarchy, membership label, analysis, plan review) are largely
-shared; the one content difference is child-type selection in Step 2, where a
-bracket breakdown honors the approved plan's declared tiers. The two shapes' wiring
-differs in **Step 6 execution**.
+Steps 2–5 are shared apart from child-type selection (Step 2); the shapes differ
+in Step 6 wiring.
 
 ---
 
@@ -44,231 +43,157 @@ precedence `P > B > impl > C` (plan first, then breakdown, then work, then the
 container closes). Concretely:
 
 - **`B`** (`type:<breakdown_type>`) was created by `jit apply plan <C>`, not by
-  breakdown — it already carries the `brackets:<C-short-id>` label, **both** of the
-  breakdown node's preset gates (the **coverage-preview** gate and the
-  **breakdown-review** gate), and a dependency on `P`. Breakdown CONSUMES this
-  pre-created `B`. Both gates the fan-out: jit will not release the impl children
-  until each passes. Run the coverage-preview inline for immediate feedback (Step
-  6c-bracket). **Breakdown-review is left PENDING** for the standard gate runner.
-  Jit's own gate enforcement holds the fan-out until both pass.
+  breakdown — it already carries the `brackets:<C-short-id>` label, both preset
+  gates (coverage-preview, breakdown-review), and a dependency on `P`. Breakdown
+  CONSUMES this pre-created `B`. Run coverage-preview inline (Step 6c-bracket);
+  leave breakdown-review PENDING for the standard gate runner.
 - **Impl children** are created in backlog.
-- **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`;
-  internal chains carry the rest. This transitively gates ALL impl behind `B`.
-- **Sinks** (impl issues with no intra-subgraph successor) are depended-on by `C`
-  (`C depends on each sink`). Transitive reduction drops the scaffold's direct
-  `C → B` edge and any redundant `C → non-sink` edge automatically.
+- **Sources** (impl issues with no intra-subgraph predecessor) depend on `B`.
+- **Sinks** (impl issues with no intra-subgraph successor) are depended-on by
+  `C`. Transitive reduction drops the scaffold's `C → B` edge and any redundant
+  `C → non-sink` edge.
 
-The node types (`breakdown_type`, `planning_type`) and the gate preset names come
-from the `.jit/templates.toml` template's node declarations.
+The node types and gate preset names come from the template's node declarations.
 
 ---
 
 ## Step 1: Pre-flight
 
 1. Identify the parent issue:
-   - If the user provided an issue ID, fetch it with `jit issue show <id>`.
-   - If the user described an issue by title, search with `jit issue search <query>`
-     and confirm the match before continuing.
+   - Issue ID given → `jit issue show <id>`.
+   - Title described → `jit issue search <query>`; confirm the match.
 
-2. Display the parent issue's title, state, type, labels, and description.
+2. Display the parent's title, state, type, labels, and description.
 
-3. Check whether the parent already has children by inspecting its `depends_on`
-   list (via `jit graph downstream <id>` or by noting deps in `jit issue show`).
-   If children already exist, warn:
-   > "This issue already has N dependency edge(s). Continuing will add more child
-   > issues and update the parent's depends_on. Existing issues are untouched."
-   Ask the user to confirm before continuing.
+3. Check for existing children via the parent's `depends_on` list. If any exist,
+   warn that breakdown will add more child issues alongside them and confirm
+   before continuing.
 
 4. Locate the specification document:
-   - Run `jit doc list <id>`. If one or more docs are listed, present them and
-     ask which to use (default: the most recently modified).
-   - If no docs are linked, ask: "No spec doc is linked to this issue. Please
-     provide the path to the specification document." Accept a path, verify it
-     exists. Offer to link it: `jit doc add <id> --path <path> --doc-type design`
+   - `jit doc list <id>` — if docs are listed, ask which to use (default: most
+     recently modified).
+   - None linked → ask for the path, verify it exists, offer to link it:
+     `jit doc add <id> --path <path> --doc-type design`
 
-5. Run `jit validate` on the current repository state. Surface any errors to the
-   user before adding anything new.
+5. Run `jit validate`; surface any errors before adding anything new.
 
-6. **Determine the project's gate tiers.** Every implementation issue needs quality
-   gates — a breakdown that ships gateless work is incomplete. Run `jit gate list` and
-   `jit gate preset list`, and sample a few existing issues
-   (`jit issue show <id> --json | jq .gates_required`) to learn the convention. From
-   these, define a small set of named tiers for this project — at minimum a
-   **primary/full** tier (the standard gates a core deliverable must pass) and a lighter
-   tier for clearly supporting work (e.g. documentation). The gates are whatever the
-   project configured. Present the proposed tiers and
-   their gate sets and confirm with the user once. These become `[GATE_TIERS]` for the
+6. **Determine the project's gate tiers.** Run `jit gate list` and
+   `jit gate preset list`, and sample existing issues
+   (`jit issue show <id> --json | jq .gates_required`) to learn the convention.
+   Define a small set of named tiers — at minimum a **primary/full** tier and a
+   lighter tier for clearly supporting work. Present the tiers with their gate
+   sets and confirm with the user once. These become `[GATE_TIERS]` for the
    analysis prompt and the tier → gate mapping applied at creation (Step 6).
 
 ---
 
 ## Step 1.5: Bracket detection and plan-approval gate
 
-Decide which breakdown shape applies, and — if bracket — confirm the plan is
-approved before drafting any children.
+Decide the breakdown shape; if bracket, require an approved plan before drafting
+any children.
 
-1. **Read the templates.** Inspect `.jit/templates.toml` for a template whose
-   `applies_to` lists the parent's `type:*` value. If none applies, the repo does
-   not bracket this type → this is a **plain breakdown**; skip the rest of this
-   step and use the plain wiring (Step 6c-plain).
+1. **Is the parent breakable?** Inspect `.jit/templates.toml` for a template
+   whose `applies_to` lists the parent's `type:*` value. None → **plain
+   breakdown**; skip the rest of this step and use Step 6c-plain. Found →
+   **bracket breakdown**; record the template's `planning_type`,
+   `breakdown_type`, and the gate presets they declare.
 
-2. **Is the parent breakable?** From the templates' `applies_to` sets, check
-   whether the parent's `type:*` value appears. If NOT → **plain breakdown** (skip
-   the rest of this step). If it does → **bracket breakdown**; continue. From the
-   matching template's nodes, read and record `planning_type` and `breakdown_type`
-   (the planning- and breakdown-role node `type`s) and the gate presets they
-   declare — the planning node's gate (plan-review), and the breakdown node's two
-   gates (`coverage-preview`, then `breakdown-review`). The concrete gate names
-   shown throughout this doc (`plan-review`, `coverage-preview`, `breakdown-review`)
-   are the DEFAULT ruleset's; read the actual preset names from the template and
-   substitute them in the commands below whenever a ruleset differs.
-
-3. **Require a scaffolded bracket (`P` and `B`).** The container must already be
-   bracketed (`C → B → P`) by the scaffold step `jit apply plan <id>`, which
-   creates BOTH the planning node `P` and the breakdown node `B` and wires
-   `B → P`. Breakdown CONSUMES the pre-created `B`; it does not create it. Locate
-   `B`, then find `P` through it:
+2. **Require a scaffolded bracket (`P` and `B`).** `jit apply plan <id>` must
+   already have created both nodes and wired `B → P`. Locate them:
    ```bash
    jit issue show <C> --json | jq -r '.depends_on[]'
-   # B is the dependency typed <breakdown_type> carrying brackets:<C-short-id>
+   # B: the dependency typed <breakdown_type> carrying brackets:<C-short-id>
    jit issue show <B> --json | jq -r '.depends_on[]'
-   # P is B's dependency typed <planning_type>
+   # P: B's dependency typed <planning_type>
    ```
-   If no breakdown node exists, STOP and tell the user:
-   > "This breakable container has no bracket. Scaffold it first with
-   > `jit apply plan <id>`, produce and review the plan, then re-run breakdown."
+   No breakdown node → STOP: direct the user to scaffold with
+   `jit apply plan <id>`, produce and review the plan, then re-run breakdown.
 
-4. **Require an APPROVED plan.** Bracket breakdown consumes an *approved* plan, so
-   the plan-quality gate on `P` must have passed. Check:
-   ```bash
-   jit issue show <P> --json | jq '{state, gates_required, gates_status}'
-   ```
-   The plan is approved when `P`'s plan-quality gate status is `passed` (and `P` is
-   Done or Gated-passing). If the plan gate is pending or failed, STOP:
-   > "The plan node <P> has not passed its plan-quality gate. Review and pass the
-   > plan before fanning out (the breakdown must consume an approved plan)."
-   Do not proceed to draft children until the plan is approved.
+3. **Require an APPROVED plan.** Check
+   `jit issue show <P> --json | jq '{state, gates_required, gates_status}'`.
+   Proceed only when `P`'s plan-quality gate status is `passed` (and `P` is Done
+   or Gated-passing); otherwise STOP and direct the user to pass the plan gate
+   first.
 
-5. **Extract the container's `[hard]` criteria (for coverage).** The
-   coverage-preview gate on `B` checks that every `[hard]` success criterion of the
-   container `C` is credited by some child via a `satisfies:<id>` label. Pull the
-   container's `## Success Criteria` and collect each line tagged `[hard]`, with its
-   id token (the ruleset's `id-pattern`, e.g. `REQ-01`):
-   ```bash
-   jit issue show <C> --json | jq -r '.description'   # read the Success Criteria section
-   ```
-   Record these as `[CONTAINER_HARD_CRITERIA]` (id + text, one per line) for the
-   analysis prompt (Step 4). If the container has no `[hard]` criteria, note
-   "(none — plain breakdown)" so the analysis agent leaves `satisfies` empty.
-   The `satisfies-namespace` (default `satisfies`) and `id-pattern` come from the
-   coverage rule in `.jit/rules.toml` — read them there; never hardcode `satisfies`
-   or `REQ-` if the rule declares otherwise.
+4. **Extract the container's `[hard]` criteria (for coverage).** Pull `C`'s
+   `## Success Criteria` and collect each `[hard]` line with its id token.
+   Record them as `[CONTAINER_HARD_CRITERIA]` (id + text, one per line) for the
+   analysis prompt; with no `[hard]` criteria, record "(none — plain breakdown)"
+   so the agent leaves `satisfies` empty. Read the `satisfies-namespace` and
+   `id-pattern` from the coverage rule in `.jit/rules.toml`.
 
 ---
 
 ## Step 2: Read the configured type hierarchy
 
-Read `.jit/config.toml` and extract the `[type_hierarchy]` section. Build a table
-of type names sorted by level (ascending), for example:
+Read `[type_hierarchy]` from `.jit/config.toml` and build a type table sorted by
+level. Determine the parent's level from its `type:*` label.
 
-```
-Level 1 (broadest): milestone
-Level 2:            epic
-Level 3:            story
-Level 4 (finest):   task, bug
-```
+Identify the **child types**:
 
-Determine the **parent issue's level** from its `type:*` label and the hierarchy
-table.
+- **Plain breakdown** — the type(s) at level+1. If the parent is already at the
+  finest level, warn that it cannot be broken down further.
+- **Bracket breakdown** — the tiers the approved plan's decomposition sketch
+  (§3) declares per item; that assignment is the reviewed contract and may span
+  more than one level below the parent. Mixed story- and task-typed children
+  under one parent are a valid outcome.
 
-Identify the **child types** — the type(s) at level+1. If the parent is already at
-the finest level, warn: "This issue type has no child level in the configured
-hierarchy. Cannot break it down further."
-
-**A bracket breakdown draws its child types from the approved plan instead.** When
-Step 1.5 selected a bracket breakdown, the plan's decomposition sketch (§3) already
-assigns each sketch item its own type tier, and that assignment is the reviewed
-contract. Take the child types from the set of tiers the sketch declares — which may
-span more than one level below the parent — and let each child keep the tier its
-sketch item names. A sketch that types some items as stories and others as tasks
-yields mixed-tier children under one epic, a valid outcome. The uniform level+1 rule
-governs plain breakdowns.
-
-Also read `[type_hierarchy.label_associations]` to find the membership namespace
-for the parent's type. For example, if `epic = "epic"` in label_associations, then
-children of an epic carry an `epic:<name>` label.
+Read `[type_hierarchy.label_associations]` for the parent type's membership
+namespace (e.g. `epic = "epic"` → children carry `epic:<name>`).
 
 **Never hardcode type names — always use the configured hierarchy.**
 
-**Depth is size-driven, not fixed at one level.** Break one level at a
-time (parent → level+1), but a large parent should end up multi-level (e.g.
-epic → story → task), not a flat layer of leaves. The analysis agent flags any child
-that is itself several deliverables with `decompose_further: true`; Step 6e recurses
-on those into the next level. A small parent simply produces leaf children directly.
+**Depth is size-driven.** Break one level at a time, but let a large parent end
+up multi-level: the analysis agent flags oversized children with
+`decompose_further: true` and Step 6e recurses on them.
 
 ---
 
 ## Step 3: Determine the membership label
 
-Children need a label that groups them with this parent.
+1. Look for a label on the parent matching the membership namespace.
+2. Found → use its value for all children.
+3. Missing → derive a kebab slug from the parent's title (lowercase, hyphens,
+   ≤ 30 chars), confirm with the user, and add it:
+   `jit issue update <id> --label <namespace>:<slug>`
 
-1. Inspect the parent issue's existing labels for one matching the membership
-   namespace (e.g., look for `epic:*` if parent type is named `epic`).
-
-2. If such a label already exists on the parent (e.g., `epic:gpu-acceleration`),
-   use that value for all children.
-
-3. If no such label exists:
-   - Suggest a slug derived from the parent's title (lowercase, hyphens, ≤ 30 chars).
-     Example: "GPU Acceleration Pipeline" → `epic:gpu-acceleration-pipeline`
-   - Confirm with the user or accept their alternative.
-   - Add the label to the parent: `jit issue update <id> --label <namespace>:<slug>`
-
-Record the full label (e.g., `epic:gpu-acceleration-pipeline`) — it will be added
-to every created child issue.
+Record the full label — every created child carries it.
 
 ---
 
 ## Step 4: Analysis (sub-agent)
 
 Dispatch a `general-purpose` sub-agent using the prompt template at
-[references/analysis-prompt.md](references/analysis-prompt.md).
-
-Fill in the template fields:
+[references/analysis-prompt.md](references/analysis-prompt.md), filling:
 
 | Field | Value |
 |---|---|
 | `[PARENT_ISSUE_TITLE]` | Parent issue title |
 | `[PARENT_ISSUE_DESCRIPTION]` | Parent issue description (or "(none provided)") |
-| `[PARENT_TYPE]` | Parent's type name (e.g., `epic`) |
-| `[CHILD_TYPES_TABLE]` | Plain: child type name(s) at level+1. Bracket: the tiers the approved plan's sketch declares (Step 2). One per line with level |
-| `[MEMBERSHIP_LABEL]` | The membership label determined in Step 3 |
+| `[PARENT_TYPE]` | Parent's type name |
+| `[CHILD_TYPES_TABLE]` | Plain: type(s) at level+1. Bracket: the sketch's declared tiers (Step 2). One per line with level |
+| `[MEMBERSHIP_LABEL]` | The label from Step 3 |
 | `[SPEC_DOC_PATH]` | Absolute path to the spec document |
 | `[TYPE_HIERARCHY_TABLE]` | Full hierarchy table from Step 2 |
 | `[GATE_TIERS]` | The gate tiers and their gate sets from Step 1.6 (one per line) |
-| `[CONTAINER_HARD_CRITERIA]` | Bracket only: the container's `[hard]` criteria (id + text) from Step 1.5 step 5, one per line; "(none — plain breakdown)" otherwise |
+| `[CONTAINER_HARD_CRITERIA]` | Bracket only: the `[hard]` criteria from Step 1.5 step 4; "(none — plain breakdown)" otherwise |
 
-The agent must return **only** a JSON object — see
-[references/plan-schema.md](references/plan-schema.md) for the schema.
+Require a bare JSON object in return — schema at
+[references/plan-schema.md](references/plan-schema.md). If parsing fails, show
+the raw output and ask whether to retry or abort.
 
-Parse the returned JSON. If parsing fails, show the raw output to the user and
-ask whether to retry or abort.
-
-**Validate every child against the schema before continuing — no issue is created
-until the whole batch passes.** The canonical required-field set is the
-Requiredness section of [references/plan-schema.md](references/plan-schema.md):
-every schema field is required on each child except `decompose_further`, which
-defaults to `false` when omitted. Reject the batch if any child is missing a
-required field or carries an empty `gates` array where its `gate_tier` maps to a
-non-empty gate set. Report the offending `ref` and the violated field, then retry
-or abort. A malformed batch fails here, before Step 6 creates anything, so drift
-surfaces as one schema-validation error and the repository is left untouched.
+**Validate every child against the schema before continuing.** The canonical
+required-field set is the schema's Requiredness section: every field is required
+except `decompose_further` (defaults to `false`). Reject the batch if any child
+misses a required field or carries an empty `gates` array where its `gate_tier`
+maps to a non-empty gate set; report the offending `ref` and field, then retry
+or abort. Nothing is created until the whole batch passes.
 
 ---
 
 ## Step 5: Plan review
 
-Present the proposed child issues as a list, then ask for approval.
+Present the proposed children, then ask for approval.
 
 **Render format:**
 
@@ -279,28 +204,30 @@ Breakdown plan for: "<Parent Issue Title>"  (N child issues, M sequencing edges)
   [child-type] Title of second work item (ref: B, priority: normal) ← depends on A
   [child-type] Title of third work item (ref: C, priority: normal)  ← depends on A, B
 
-  Wiring after creation:
-    - Plain breakdown:   the parent will depend on all N children (containment).
-    - Bracket breakdown: the pre-created breakdown node B (created by
-      `jit apply plan`, already depending on the approved plan P) is consumed;
-      children are drafted in Backlog; source children depend on B; the container
-      depends on the sink children. The scaffold's C → B edge is dropped by
-      reduction. (See "The bracket".)
+  Wiring after creation: plain — parent depends on all N children;
+  bracket — source/sink spine around the pre-created B (see "The bracket").
 
 Notes from analysis agent:
   <notes field from JSON>
 ```
 
-Show all sequencing edges. Cross-dependencies (where a child depends on another
-child that is not an immediate predecessor) should be explicitly called out.
+Show all sequencing edges; call out cross-dependencies explicitly.
 
-**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); an identifying `<namespace>:<slug>` label, a kebab slug from the child's title, on every child whose type carries a membership namespace in `[type_hierarchy.label_associations]` (Step 6a), so every strategic-typed child enters creation already holding its own grouping label; and a non-empty `gate_tier` with its `gates` array (validated in Step 4, Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
+**Before asking for approval**, verify every proposed child meets the quality
+bar — an item missing any of these fails the Step 7 lint, so correct it now via
+**edit**:
+
+- Descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs
+  (content-standards Issue Titles).
+- Type derived from the configured hierarchy (Step 2).
+- Identifying `<namespace>:<slug>` label on every child whose type has a
+  membership namespace (Step 6a).
+- Non-empty `gate_tier` with its `gates` array (validated in Step 4).
 
 Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abort]"**
 
 - **yes** — proceed to Step 6
-- **edit** — print the raw JSON and ask the user to paste a corrected version;
-  re-render the list and ask again
+- **edit** — print the raw JSON, accept a corrected version, re-render, ask again
 - **abort** — stop; nothing has been written to JIT
 
 ---
@@ -309,7 +236,7 @@ Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abor
 
 ### 6a. Create child issues
 
-For each child issue:
+For each child:
 
 ```bash
 jit issue create \
@@ -317,173 +244,116 @@ jit issue create \
   --description "<description>" \
   --label "type:<child-type>" \
   --label "<membership-label>" \
-  --label "<identifying-label>"        # own <namespace>:<slug>; present when the child type has a membership namespace (Identifying label, below)
-  --label "satisfies:<id>" ...        # one per id in this child's `satisfies` (bracket only; Step 1.5 step 5)
+  --label "<identifying-label>"        # own <namespace>:<slug>; when the child type has a membership namespace
+  --label "satisfies:<id>" ...        # one per id in this child's `satisfies` (bracket only)
   --priority "<priority>" \
-  --gate "<g1>" --gate "<g2>"          # this child's `gates` array (its gate_tier's set; validated in Step 4)
+  --gate "<g1>" --gate "<g2>"          # this child's validated `gates` array
 ```
 
-**Identifying label — the child's own grouping namespace.** When the child's `type`
-is a key in `.jit/config.toml`'s `[type_hierarchy.label_associations]` (for example a
-`story` child, since `story = "story"` associates the `story` namespace), derive a
-kebab slug from the child's title (lowercase, hyphens, ≤ 30 chars — the Step 3 slug
-shape) and attach `<namespace>:<slug>` as the `<identifying-label>` above. This is the
-child's own label, held alongside the `<membership-label>` that groups it under the
-parent: a `story` child created under an epic carries both `epic:<parent-slug>`
-(membership) and `story:<child-slug>` (its own), and the tasks broken out of that story
-later carry `story:<child-slug>`. The rule keys off each child's own type, so a
-mixed-tier fan-out attaches an identifying label to every strategic-typed child and
-leaves association-free leaves (a `task` or `bug`) carrying the membership label alone.
+**Identifying label.** When the child's `type` is a key in
+`[type_hierarchy.label_associations]`, derive a kebab slug from the child's
+title (the Step 3 slug shape) and attach `<namespace>:<slug>` — the child's own
+label, alongside the membership label that groups it under the parent (a `story`
+child under an epic carries both `epic:<parent-slug>` and `story:<child-slug>`).
+The rule keys off each child's own type, so a mixed-tier fan-out labels every
+strategic-typed child and leaves association-free leaves with the membership
+label alone.
 
-Apply the quality gates from the child's validated `gates` field (its `gate_tier`'s
-set). Every implementation issue gets its tier's gates — skipping them leaves work that
-can be closed with no quality check.
-Use `--gate` at creation (above), or `jit gate add <uuid> <gates>` / `jit gate preset
-apply <preset> <uuid>` afterward. **This per-task gate assignment applies to BOTH
-breakdown shapes**.
+**Gates.** Apply the child's validated `gates` field (its `gate_tier`'s set) —
+at creation via `--gate`, or afterwards via `jit gate add` /
+`jit gate preset apply`. This applies to BOTH breakdown shapes.
 
-**Bracket only — attach the coverage credits.** For each id in this child's
-`satisfies` array (the plan JSON field), add a `<satisfies-namespace>:<id>` label
-(default namespace `satisfies`, e.g. `satisfies:REQ-01`) — via `--label` above or
-`jit issue update <uuid> --label satisfies:<id>` afterward. These labels are what the
-coverage-preview gate on `B` reads to credit each container `[hard]` criterion; a
-criterion no child carries is reported uncovered (references/bracket-spine.md step 5). When the in-process
-engine path is used, pass them as the child's `labels` so they are attached at creation.
-Plain breakdown produces no `satisfies` labels.
+**Coverage credits (bracket only).** Attach a `satisfies:<id>` label per entry
+in the child's `satisfies` array — these are what the coverage-preview gate on
+`B` reads (references/bracket-spine.md step 5). Plain breakdown produces none.
 
-Capture the returned UUID and store in an in-memory map: `ref → UUID`.
+Capture each returned UUID in a `ref → UUID` map.
 
 ### 6b. Add sequencing dependencies between children
 
-After **all** children are created, add peer-to-peer sequencing edges (shared by
-both shapes):
+After **all** children are created (both shapes):
 
 ```bash
-# For each child that has depends_on entries:
 jit dep add <child-UUID> <dep-UUID-1> [<dep-UUID-2> ...]
 ```
 
-### 6c-plain. Wire containment: parent depends on all children (PLAIN only)
-
-For a **non-breakable** parent (Step 1.5 selected plain breakdown):
+### 6c-plain. Wire containment (PLAIN only)
 
 ```bash
 jit dep add <parent-UUID> <child-UUID-1> <child-UUID-2> ... <child-UUID-N>
 ```
 
-This expresses the containment invariant: the parent cannot be marked done until
-every child is complete. **Do NOT use this wiring for a bracket breakdown** — use
-6c-bracket instead.
+The parent cannot close until every child completes. Do NOT use this wiring for
+a bracket breakdown.
 
 ### 6c-bracket. Wire the bracket spine (BRACKET only)
 
-For a **breakable** parent with an approved plan (Step 1.5 selected bracket
-breakdown), splice the source/sink spine `C → impl → B → P` around the
-pre-created `B`, then run the coverage-preview gate inline and block the fan-out
-on its result.
-
-**Follow [references/bracket-spine.md](references/bracket-spine.md)** for the full
-procedure: locate the pre-created `B` (and `P` through it), wire sources → `B` and
-`C` → sinks (transitive reduction drops the scaffold's `C → B` edge), then run
-coverage-preview via the standard runner and gate the fan-out on its recorded
-status. The agent breakdown-review gate is left PENDING for the runner, like
-`plan-review` on `P`.
-
-Do **not** also run 6c-plain — the bracket spine REPLACES parent-centric
-containment.
+Follow [references/bracket-spine.md](references/bracket-spine.md): wire
+sources → `B` and `C` → sinks around the pre-created `B`, run coverage-preview
+via the standard runner, and block the fan-out on its recorded status. Leave
+breakdown-review PENDING for the runner. The spine REPLACES parent-centric
+containment — do not also run 6c-plain.
 
 ### 6d. Error handling
 
-If any `jit issue create` or `jit dep add` fails:
-- Report which step failed and why.
-- Do **not** roll back already-created issues (partial state is recoverable).
-- Show the ref-to-UUID map so the user can complete the wiring manually.
+If any `jit issue create` or `jit dep add` fails: report which step and why, do
+NOT roll back created issues (partial state is recoverable), and show the
+ref-to-UUID map so the user can finish the wiring manually.
 
 ### 6e. Recurse into oversized children (multi-level breakdown)
 
-For each created child whose plan entry had `decompose_further: true` **and** a finer
-child type exists below it in the hierarchy, break that child down another level by
-re-running this skill with the child as the new parent:
+For each created child with `decompose_further: true` **and** a finer child type
+below it, break it down another level with this skill, the child as parent:
 
-- **Spec source:** the child has no linked spec doc. Materialize one — write the
-  child's description plus the parent-spec section named in its `source` field to a
-  temp markdown file under `dev/active/`, link it with `jit doc add`, and pass it as
-  `[SPEC_DOC_PATH]`.
-- Re-run Steps 2–7 with the child as parent: child type is the next level down, and
-  the membership label is the child's own identifying label (a `type:story` child gets
-  a `story:<slug>` label that its tasks then carry).
-- Present each sub-breakdown for its own approval (Step 5) before creating anything.
+- **Spec source:** write the child's description plus the parent-spec section
+  named in its `source` field to a markdown file under `dev/active/`, link it
+  with `jit doc add`, pass it as `[SPEC_DOC_PATH]`.
+- Re-run Steps 2–7: child type is the next level down; the membership label is
+  the child's own identifying label.
+- Present each sub-breakdown for its own Step 5 approval.
 - Recursion ends when no child is flagged or the finest type is reached.
 
-This is what turns a large epic into epic → story → task rather than a flat layer of
-leaves. Keep depth proportional to size — do not force a story level onto small work.
+Keep depth proportional to size — do not force a story level onto small work.
 
-> Bracket note: recursion shape is decided per-child in Step 1.5 by the *child's*
-> type, not the root's. A `decompose_further` child is itself a bracket breakdown
-> only if its own type is in a `.jit/templates.toml` template's `applies_to` AND it
-> has been scaffolded with its own plan node; otherwise it recurses as a plain
-> breakdown. In practice the impl
-> children of a bracket are leaves or plain sub-containers — the bracket lives at
-> the breakable-container level.
+> Bracket note: the recursion shape is decided per-child in Step 1.5 by the
+> *child's* type — a `decompose_further` child is a bracket breakdown only if
+> its own type is breakable AND it has been scaffolded with its own plan node;
+> otherwise it recurses plain.
 
 ---
 
 ## Step 7: Validation and summary
 
-1. Run `jit validate`. If it reports errors:
-   - Show the errors.
-   - Identify which edges are problematic.
-   - Offer to remove offending edges with `jit dep rm` and re-validate.
+1. Run `jit validate`. On errors: show them, identify the offending edges, offer
+   `jit dep rm` and re-validate.
 
-2. **Content lint — verify every created issue (all levels) meets the standards**
-   (`../../../docs/reference/jit-content-standards.md` relative to this skill's root).
-   Via `jit issue show <id> --json`:
-   - **Success Criteria present** — the description has a `## Success Criteria` section
-     (or an accepted equivalent). Missing → fix the description before finishing.
-   - **Clean title** — no embedded metadata: reject ordinals (`T1`, `S0:`),
-     `feat(...)`/`type:` prefixes, or parent IDs. Position lives in the DAG and labels.
-   - **Correct type + membership** — `type:*` matches the level created; the membership
-     label (`epic:<slug>`, `story:<slug>`, …) is present and is a kebab slug, never a
-     JIT short ID; every `type:story`/`type:epic` carries its own identifying label.
-   - **Quality gates present** — `gates_required` is non-empty and matches the issue's
-     `gate_tier` set (Step 1.6). A leaf issue with no gates can be closed with no quality
-     check — that is a defect; add the tier's gates before finishing.
-   - **Coverage credits present (bracket only)** — every container `[hard]` criterion
-     (Step 1.5 step 5) is carried by at least one child as a `satisfies:<id>` label, so
-     the coverage-preview gate on `B` can credit it. The standard gate runner records
-     that gate's verdict on `B` when you run `jit gate pass <B> <coverage-gate>` (the
-     breakdown node's coverage gate from the template; `coverage-preview` in the
-     default ruleset) (references/bracket-spine.md step 5); a `[hard]` criterion no child satisfies is reported uncovered
-     and the gate fails — add the missing `satisfies:<id>` label
-     (`jit issue update <child> --label satisfies:<id>`) and re-run the gate.
+2. **Content lint — verify every created issue (all levels) against
+   `../../../docs/reference/jit-content-standards.md`** via
+   `jit issue show <id> --json`:
+   - `## Success Criteria` section present (or an accepted equivalent).
+   - Clean title: no ordinals, `feat(...)`/`type:` prefixes, or parent IDs.
+   - `type:*` matches the level created; membership label is a kebab slug (never
+     a JIT short ID); every strategic-typed child carries its own identifying
+     label.
+   - `gates_required` non-empty and matching the issue's `gate_tier` set — add
+     missing gates before finishing.
+   - Bracket only: every container `[hard]` criterion is carried by some child
+     as a `satisfies:<id>` label; the coverage gate reports any uncovered
+     criterion — add the missing label and re-run it
+     (references/bracket-spine.md step 5).
 
-3. Show a summary (shape-aware):
+3. Show a summary:
 
-   Plain breakdown:
    ```
-   Breakdown complete
-     Parent issue      : <title> (<short-id>)
-     Children created  : N
+   Breakdown complete (<plain | bracket>)
+     Parent/container  : <title> (<short-id>)
+     Children created  : N (bracket: drafted in Backlog)
      Sequencing edges  : M (between siblings)
-     Containment edges : N (parent → each child)
+     Wiring            : plain — N containment edges | bracket — spine C → {sinks} … {sources} → B → P;
+                         P plan gate passed; coverage-preview <pass/fail>; breakdown-review pending runner
      Longest chain     : K issues
      Warnings          : <any from jit validate>
    ```
 
-   Bracket breakdown:
-   ```
-   Bracket breakdown complete
-     Container (C)     : <title> (<short-id>)
-     Plan node (P)     : <short-id>  (plan-quality gate: passed)
-     Breakdown node (B): <short-id>  (coverage-preview: <pass/fail>, breakdown-review: attached, pending gate runner)
-     Children drafted  : N (in Backlog)
-     Spine             : C → {S sinks} … {sources} → B → P
-     Sequencing edges  : M (between siblings)
-     Warnings          : <any from jit validate>
-   ```
-
-4. Optionally export a Mermaid sub-graph for the parent and its new children:
-   ```bash
-   jit graph export --format mermaid
-   ```
-   Print the first 40 lines so the user can paste it into a renderer.
+4. Optionally export a Mermaid sub-graph (`jit graph export --format mermaid`)
+   and print the first 40 lines.

@@ -21,12 +21,12 @@ All 8 invariants from jit-manage are inherited and apply without modification. I
 
 1. **Autonomy by default.** Handle all decisions except those in `references/escalation-policy.md`. Do not ask the invoker for routine confirmations — act, then report.
 2. **Quality is non-negotiable.** Every sub-agent's output is reviewed before acceptance. Unpassed gates, unmet criteria, or coherence failures trigger rework. No exceptions.
-3. **Gates are inviolable.** Never remove, bypass, or work around quality gates to unblock state transitions. If a gate fails, the only options are: fix the code to pass it, or escalate to the invoker. Removing a gate, changing a gate from auto to manual, or any other workaround is strictly forbidden — even when the failure appears to be a false positive.
-4. **Issue scope changes require escalation.** Modifying an issue's gates, success criteria, description, or any other scope-defining attribute always requires the invoker's explicit approval. This applies even when the change seems minor or obviously correct.
+3. **Gates are inviolable.** Never remove, bypass, or work around a quality gate. On failure: fix the work to pass it, or escalate to the invoker — even when the failure appears to be a false positive.
+4. **Issue scope changes require escalation.** Never modify an issue's gates, success criteria, description, or other scope-defining attributes without the invoker's explicit approval, however minor the change.
 5. **Wave discipline.** Work is dispatched in topological waves. A wave must complete (all issues done or rejected) before the next begins.
 6. **Single epic scope.** Drive exactly one epic to completion, then stop. Do not pick up additional work.
-7. **Rework before escalation.** Failed work is retried with specific feedback up to MAX_REWORK_ATTEMPTS (see `references/escalation-policy.md`) before escalating.
-8. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` so execution can resume across sessions.
+7. **Rework before escalation.** Retry failed work with specific feedback up to MAX_REWORK_ATTEMPTS (`references/escalation-policy.md`) before escalating.
+8. **Resumable state.** Persist progress to `dev/active/<short-id>-progress.json` (`references/progress-file.md`) so execution can resume across sessions.
 9. **Project discovery.** All conventions, gates, documentation standards, and type hierarchies are discovered from the project's own configuration. Assume nothing about language, domain, or tooling.
 
 ## Section 1: Project Discovery
@@ -92,7 +92,7 @@ Hold all discovered context in working memory for the duration of the session.
    - Load it. It contains the wave plan and per-issue status.
    - Jump to the appropriate phase and wave.
    - Verify loaded state matches current JIT state (children may have changed).
-   - Also read every `dev/active/<short-id>-handoff*.md` in order (oldest to newest). Pay particular attention to the **Traps — do not repeat these** sections — every trap from every prior handoff remains in force unless the handoff explicitly records its resolution. The traps section exists specifically to prevent the new session from repeating approaches that earlier sessions proved wrong.
+   - Also read every `dev/active/<short-id>-handoff*.md` in order (oldest to newest). Every trap in every **Traps — do not repeat these** section remains in force unless a later handoff records its resolution.
 
 6. **Inform the user.** Briefly state: which epic you're leading, how many success criteria, whether children exist, and what phase you're entering. This is informational — do not wait for approval.
 
@@ -102,25 +102,8 @@ If the epic already has children that fully cover its success criteria, skip to 
 
 **Choose the breakdown path by the epic's type** (discovered in Section 1):
 
-- If the epic's type is in a `.jit/templates.toml` template's `applies_to`, follow **Section 3A — Bracketed breakdown**.
-- Otherwise (no template applies to it), follow **Section 3B — Plain breakdown** (the legacy flow).
-
-### Section 3A: Bracketed breakdown (plan → review → breakdown → coverage → implement)
-
-A breakable container `C` (the epic) is bracketed by a planning node `P` and a breakdown node `B`, with the implementation subgraph spliced as a spine `C → impl → B → P` (precedence **P > B > impl > C**: plan first, then breakdown, then the work, then the container closes). Drive the bracket strictly in order — each gate blocks the next step:
-
-1. **Scaffold the bracket.** Apply the `plan` template, which instantiates the whole bracket in one operation:
-   - `jit apply plan <epic-id>` creates BOTH `P` (`type:<planning_type>`, `plan-review` gate) and `B` (`type:<breakdown_type>`, `coverage-preview` + `breakdown-review` gates), wires the internal edge `B → P` and the anchor edge `C → B`, and moves `C`'s pre-existing upstream deps onto `P`. The node roles, types, gates, and `P`'s plan-doc location come from `.jit/templates.toml`. Commit JIT state.
-
-2. **Produce the plan on `P`.** `P`'s plan is the spec for the decomposition. If a design doc exists (Section 2), it is `P`'s plan-doc; otherwise dispatch an architect agent (Section 6, `design` classification) to author it at `P`'s configured plan-doc location. The plan must be concrete enough to decompose and to judge coverage of `C`'s `[hard]` success criteria.
-
-3. **Enforce the plan-quality gate on `P` — this BLOCKS breakdown.** Run `P`'s plan-quality gate (the gate preset the template declares on the planning node — `plan-review` in the default rulesets, but use whatever the template names). Breakdown does **not** begin until that gate shows `passed` (check the recorded status, not the exit code). If it fails, revise the plan (rework) and re-run. Breakdown consumes an **approved** plan only. The gate is inviolable — never bypass it.
-
-4. **Break down behind the approved plan.** Delegate to jit-breakdown (`.claude/skills/jit-breakdown/SKILL.md`), which for a breakable container takes the bracket path: it **consumes** the pre-created breakdown node `B` (created by `jit apply plan` in step 1, already typed `<breakdown_type>`, carrying the `brackets:<C-short-id>` label and its `coverage-preview` + `breakdown-review` gates, already depending on `P`), drafts the impl children in Backlog carrying their `satisfies:<criterion-id>` coverage labels, and splices the interior spine (sources → `B`, `C` → sinks; transitive reduction drops the scaffold's `C → B` edge). Apply gate inheritance + per-task quality gates to the drafted children (Section 3B bullets apply to the children). Self-approve the decomposition (escalate only if it introduces stories or higher-level types, per `references/escalation-policy.md`).
-
-5. **Enforce the coverage gate on `B` — this BLOCKS the implementation fan-out.** Run `B`'s coverage gate (the gate preset the template declares on the breakdown node — `coverage-preview` in the default rulesets, but use whatever the template names) via the standard runner (deterministic; it runs `jit validate --scope <C>`). It blocks (exit 4) when the drafted children leave a `[hard]` criterion uncovered. Implementation waves are **not** dispatched until that gate shows `passed` (check the recorded status). If it fails, revise the decomposition (add or relabel children to cover the gap) and re-run — the coverage gap is closed at plan time, before any code is written.
-
-6. Commit JIT state in batch, then proceed to Section 4 (Wave Planning) over the **impl interior only**: `P` and `B` are bracket-infrastructure nodes, not implementation waves — exclude them from the wave plan (they are already `done`/gated by the time the impl waves run).
+- Epic's type in a `.jit/templates.toml` template's `applies_to` → **bracketed breakdown**: read `references/bracketed-breakdown.md` **in full** and follow it (scaffold via `jit apply plan`, pass the plan gate, delegate to jit-breakdown, pass the coverage gate), then proceed to Section 4 over the impl interior only.
+- Otherwise → **Section 3B — Plain breakdown**.
 
 ### Section 3B: Plain breakdown (non-breakable epics)
 
@@ -140,52 +123,21 @@ After breakdown, commit JIT state in batch.
 
 Convert the epic's children into ordered execution waves.
 
-1. **Build the dependency subgraph.** From `jit graph deps <epic-id>`, extract only the direct children and their inter-sibling dependencies. **For a bracketed epic (Section 3A):** plan over the **impl interior** — the issues between `C` and the breakdown node `B` — and exclude the bracket-infrastructure nodes `P` (`type:<planning_type>`) and `B` (`type:<breakdown_type>`); they are already scaffolded and gated, not implementation waves.
+1. **Build the dependency subgraph.** From `jit graph deps <epic-id>`, extract only the direct children and their inter-sibling dependencies. **For a bracketed epic (`references/bracketed-breakdown.md`):** plan over the **impl interior** — the issues between `C` and the breakdown node `B` — and exclude the bracket-infrastructure nodes `P` (`type:<planning_type>`) and `B` (`type:<breakdown_type>`); they are already scaffolded and gated, not implementation waves.
 
 2. **Compute topological layers.** Group children by dependency depth:
    - **Wave 1:** Children with no sibling dependencies (can start immediately).
    - **Wave N:** Children whose dependencies are all in waves 1..N-1.
 
-3. **Resolve open design questions BEFORE dispatching.** Before dispatching any wave, scan the epic description and every dependent story/task description for:
-   - Sections titled **Open Issues**, **TBD**, **Unresolved**, **Questions**, **Pending decisions**, or similar.
-   - Parameters that have multiple plausible values and no resolution ("dimension is either 640 or 646", "either algorithm A or algorithm B would work").
-   - Algorithm choices listed without a selected variant ("LDPC", without BP vs NMS vs MS specified).
-   - References to planning docs that themselves flag unresolved choices.
-
-   Every such question that blocks an implementation issue must become a **resolved prerequisite before the dependent issue is dispatched**:
-   - If the lead can make the decision under `references/escalation-policy.md` (routine implementation choice), create a small `decision` task whose output is a JIT doc (or a note in the parent issue's description) recording the chosen value and the reasoning, then wire the dependent issue to depend on it.
-   - If the decision has architectural impact, multiple plausible options, or affects shared infrastructure, escalate to the invoker per `references/escalation-policy.md` entry 6 (via `AskUserQuestion` when the invoker is the human). Do not pick the option yourself.
-
-   Implementation issues are **not dispatched** until their upstream decisions are `done`. Dispatching a story that embeds an unresolved question forces the worker to guess; their guess will differ from what the reviewer expects and burns at least one review cycle resolving the decision rather than writing code. This is a hard blocker, not a soft recommendation.
+3. **Resolve open design questions BEFORE dispatching.** Scan the epic and every dependent issue description for open choices: sections titled **Open Issues**/**TBD**/**Unresolved**/**Questions**/**Pending decisions**, parameters with multiple plausible values, algorithm choices without a selected variant, and planning docs that flag unresolved choices. Do not dispatch an issue until its upstream decisions are `done` — this is a hard blocker:
+   - Routine implementation choice (per `references/escalation-policy.md`): create a small `decision` task recording the chosen value and reasoning, and wire the dependent issue onto it.
+   - Architectural impact, multiple plausible options, or shared infrastructure: escalate per policy entry 6 (`AskUserQuestion` when the invoker is the human). Do not pick the option yourself.
 
 4. **Classify each issue.** Read `references/task-classifier.md`. Assign each child a classification: `design`, `research`, `implementation`, or `documentation`. This determines which agent prompt template is used.
 
-5. **Assess parallelism within each wave.** Read `.claude/skills/jit-parallel/references/conflict-heuristics.md` (if it exists for this project). For issues within the same wave:
-   - If two issues are likely to touch the same files, serialize them (move one to a sub-wave).
-   - If the wave has 4+ parallel issues, consider worktree mode (see `.claude/skills/jit-parallel/references/worktree-mode.md`).
-   - **CRITICAL**: Initialize the worktree with the current repository state at the start of each wave. Failure to do so will cause workers to operate on stale code and produce invalid output.
-   - **Use `references/worktree-dispatch-protocol.md` for any parallel worktree dispatch.** Do NOT use Agent's `isolation: "worktree"` parameter — it has been observed to branch from a stale ancestor. Instead, run `scripts/dispatch-worker-worktree.sh <short-id>...` (project-agnostic; anchors on whatever repo your cwd belongs to) to create worktrees anchored to current `main` HEAD with verification, dispatch the Agent without `isolation`, and run `scripts/check-leak-into-main.sh` after completion to catch any worker file leakage into main's tree. Both guards are mandatory — eyeballing main's `git status` after a wave is what missed the leak the first time.
+5. **Assess parallelism within each wave.** Read `.claude/skills/jit-parallel/references/conflict-heuristics.md` if present. Serialize issues likely to touch the same files (move one to a sub-wave). Dispatch any wave needing filesystem isolation through the worktree steps in Section 6 (`references/worktree-dispatch-protocol.md`) — never through Agent's `isolation: "worktree"` parameter.
 
-6. **Persist the wave plan.** Save to `dev/active/<short-id>-progress.json`:
-   ```json
-   {
-     "epic_id": "<full-id>",
-     "epic_short_id": "<short-id>",
-     "current_wave": 1,
-     "waves": [
-       {
-         "wave_number": 1,
-         "issues": [
-           {"id": "<full-id>", "short_id": "<short-id>", "title": "...", "classification": "implementation", "status": "pending"}
-         ]
-       }
-     ],
-     "created_during_execution": [],
-     "escalations": [],
-     "rework_counts": {},
-     "started_at": "<ISO-8601>"
-   }
-   ```
+6. **Persist the wave plan** to `dev/active/<short-id>-progress.json` per `references/progress-file.md`.
 
 ## Section 5: Orchestration Loop
 
@@ -234,42 +186,25 @@ For each issue in the wave, select the prompt template based on its classificati
 
 Fill each template with:
 - Full issue context from `jit issue show` (title, description, success criteria, linked docs)
-- The gates defined on the issue and the explicit requirement that the implementation be sufficient to pass them
-- This instruction: **"Do NOT mark the issue as done. Do NOT modify `.jit/` state or pass the gates. The execution lead handles all state transitions."**
-- This instruction: **"Link every durable artifact you produce — design/plan docs, research findings, figures, slide decks, generated datasets, benchmark outputs — to the issue via `jit doc add <id> <path> --doc-type <type> --label "..."` (jit-manage invariant 8). The `jit doc add` reference is a doc link, not a lifecycle state change, so it is yours to make."** Verify in review (Section 7) that promised artifacts are linked; link any the worker missed.
+- The gates defined on the issue and the requirement that the work be sufficient to pass them
+- The worker constraints: never transition issue state, pass gates, or write `.jit/` — the lead owns all state changes. The one exception is `jit doc add` to link every durable artifact the worker produces (jit-manage invariant 8). Verify links in review (Section 7); add any the worker missed.
 
 ### Agent type
-All dispatched agents are `general-purpose` (they need write access to produce artifacts).
-
-### Conflict check
-Per jit-parallel's conflict heuristics, if two issues in the wave may touch the same files, serialize them — dispatch one, wait for completion and review, then dispatch the next.
+Dispatch all agents as `general-purpose` (they need write access to produce artifacts).
 
 ### Claim and dispatch
 1. Claim each issue: `jit issue claim <id> agent:claude`. Commit in batch.
-2. **For any parallel dispatch that needs filesystem isolation (multiple workers editing the same crate / module / source tree), follow `references/worktree-dispatch-protocol.md`.** In summary:
-   - Run `scripts/dispatch-worker-worktree.sh <short-id>...` to manually create worktrees anchored to current `main` HEAD with SHA verification. The script is project-agnostic and anchors on whatever repo your cwd belongs to. Do NOT use Agent's `isolation: "worktree"` parameter — it was observed to branch from a stale ancestor.
-   - Prefix each Agent prompt with the boilerplate emitted by the dispatch script (worktree path + path-discipline rules forbidding absolute `/home/...` paths that leak into main).
-   - Dispatch with `subagent_type: "general-purpose"` and **no** `isolation` parameter.
-3. Send a **single message** with one Agent/Task tool call per issue for concurrent execution.
-4. **After every parallel-dispatch wave completes**, run `scripts/check-leak-into-main.sh` to verify no worker wrote files into main's tree. This is the only guard against worker file leakage; eyeballing main's `git status` is not sufficient and is what missed the leak originally.
+2. For any parallel dispatch needing filesystem isolation, follow `references/worktree-dispatch-protocol.md`: run `scripts/dispatch-worker-worktree.sh <short-id>...` (creates worktrees anchored to current `main` HEAD, SHA-verified; project-agnostic), prefix each prompt with the header block the script emits, and dispatch with `subagent_type: "general-purpose"` and **no** `isolation` parameter.
+3. Send a **single message** with one Agent call per issue for concurrent execution.
+4. After every parallel wave completes, run `scripts/check-leak-into-main.sh` and resolve any reported leak before committing on main.
 
 ## Section 7: Lead Review
 
-For each completed sub-agent, review its output by following
-`references/lead-review-protocol.md` **in full** — read it before every review. It
-defines six tiers, applied in order; a failure at any tier is an automatic FAIL:
-
-- **Tier 1 — Gate verification:** all gates on the issue show `passed`.
-- **Tier 1.5 — Prior-findings regression check** (re-reviews only): every prior `code-review` finding still closed at HEAD.
-- **Tier 2 — Success criteria:** each criterion genuinely satisfied, verified against the artifacts.
-- **Tier 2.5 — Stale-narrative sweep:** no forward-looking narrative about the work that just landed.
-- **Tier 2.75 — Deferred-items audit:** no in-scope deferral surviving in linked design docs.
-- **Tier 3 — Holistic coherence:** cross-issue naming, interfaces, doc narrative, and scope fit the rest of the epic.
-
-The protocol also defines the **No-argue discipline**, the rule to complete Tiers
-1.5 and 2.75 before any rework, and the structured verdict format. Record a
-PASS/FAIL verdict with specific findings; on FAIL, pass it to the rework protocol
-(Section 8).
+For each completed sub-agent, read `references/lead-review-protocol.md` **in
+full** before the review and apply it: six tiers in order, a failure at any tier
+is an automatic FAIL; complete Tiers 1.5 and 2.75 before any rework; observe the
+No-argue discipline. Record the structured verdict; on FAIL, pass it to the
+rework protocol (Section 8).
 
 ## Section 8: Rework
 
@@ -292,9 +227,7 @@ When a sub-agent's output fails review:
 
 ## Section 9: Escalation
 
-Before any decision that might need escalation, consult `references/escalation-policy.md`. Escalations target **the invoker** as defined there: the human when the lead runs standalone, the parent lead (e.g. jit-project-lead) when the lead runs as a dispatched subagent.
-
-The decision tree is defined there. In summary — escalate ONLY for:
+Before any decision that might need escalation, consult `references/escalation-policy.md`. Escalate to **the invoker** it defines: the human when running standalone, the parent lead (e.g. jit-project-lead) when running as a dispatched subagent. Escalate ONLY for:
 1. Creating stories or higher-level types
 2. Cross-epic dependencies
 3. Epic success criteria modifications
@@ -313,12 +246,7 @@ If the session ends without completing the epic (budget exhausted, wave still in
 
 1. **Write a session handoff.** Follow `references/handoff-template.md` verbatim. Save to `dev/active/<epic-short-id>-handoff-<N>.md` where `<N>` is 1 more than the highest existing handoff index for this epic (or omit `-<N>` for the first handoff). Do not overwrite a prior handoff.
 
-2. **Populate the Traps section from the session's actual experience.** This section is mandatory and must not be empty unless no wrong approaches were tried or considered this session. Include:
-   - Every wrong algorithm choice, parameter value, or approach that was tried and rejected, with the evidence it was wrong.
-   - Every misleading reference in the handoff chain or spec docs (e.g., a prior handoff's shell-comment that embedded `NMS` when the correct variant is `BP`).
-   - Any dispatch prompts that led a worker astray — quote the misleading line and state the correct alternative.
-
-   Unresolved traps from prior handoffs carry forward — link them (do not copy-paste) and add new ones.
+2. **Populate the Traps section from the session's actual experience** — mandatory, empty only when nothing wrong was tried or considered: every approach tried and rejected (with the evidence it was wrong), every misleading reference in the handoff chain or spec docs, every dispatch line that led a worker astray (quote it, state the correct alternative). Link unresolved traps from prior handoffs forward; do not copy-paste them.
 
 3. **Update the progress file.** Ensure `dev/active/<epic-short-id>-progress.json` reflects the current wave number, per-issue statuses, rework counts, and any open escalations.
 
