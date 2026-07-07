@@ -1,7 +1,7 @@
 {
   "epic_id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
   "epic_short_id": "1f564776",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -44,7 +44,7 @@
           "short_id": "de06e685",
           "title": "Make cross-sibling coherence review mandatory for multi-story recursion",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -88,10 +88,17 @@
       "category": "shared-infrastructure",
       "summary": "per label-namespace registration required for REQ-07; invoker approved schema+config registration, scope extended",
       "resolved": "2026-07-07"
+    },
+    {
+      "issue": "de06e685",
+      "category": "false-positive-gate",
+      "summary": "code-review failed twice on sandbox-environmental cargo failures (docs-only diff); invoker directed adding cargo-ci gate as recorded evidence; round-3 code-review passed",
+      "resolved": "2026-07-07"
     }
   ],
   "rework_counts": {
-    "027d7cbf": 1
+    "027d7cbf": 1,
+    "de06e685-gate-reruns": 2
   },
   "started_at": "2026-07-07T07:15:07+03:00"
 }

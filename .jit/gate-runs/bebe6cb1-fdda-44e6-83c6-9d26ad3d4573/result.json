@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "bebe6cb1-fdda-44e6-83c6-9d26ad3d4573",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "de06e685-05ff-4ce9-80df-3390e1c29f1e",
+  "commit": "f31b04b75c1b2f69c2800c7bdf4105c01b5fba07",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-07T05:54:14.624444387Z",
+  "completed_at": "2026-07-07T05:55:22.196201934Z",
+  "duration_ms": 67571,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-03 are met at `.claude/skills/jit-planning-lead/SKILL.md:230`. Step 5 makes the pass mandatory for two or more independently dispatched sibling containers, narrows skipping to one recursed container or one-dispatch authorship, and directs review of consumed-vs-promised contracts across story boundaries.\n\n**Architecture And Separation**\n\nNo Rust code changed in the issue commit. The change is documentation-only, so domain/storage/commands/CLI boundaries are unaffected.\n\n**Testing**\n\nBlocking. The provided run history has no succeeded `cargo-ci` gate. The most recent review evidence records `./scripts/jit-validate.sh` passing, but `cargo-ci` failing with 1489 passed and 7 failed tests. Under the review rules, existing test failures still fail the review.\n\n**Prior Review Feedback**\n\nThe prior failed review findings have not been resolved in the current reviewed state. The working tree contains only `.jit` metadata changes, and there is no newer passing cargo-ci evidence.\n\n**Other Areas**\n\nNo executable code changed, so functional style, invariants, unsafe code, error handling, CLI JSON support, and public API documentation are not newly affected. `issue.dependencies` is empty.\n\n1. **High:** `cargo-ci` test step still fails in the provided gate history, including claim/precheck tests; the first captured panic is tied to the `tdd-reminder` assertion at `crates/jit/src/commands/issue.rs:1336`. This violates the “No test or lint failures” requirement.\n2. **High:** The serve command tests still fail under `cargo-ci`: `test_find_available_port_returns_free_port`, `test_find_available_port_skips_bound_port`, and `test_start_server_errors_when_child_exits_immediately`, rooted in tests beginning at `crates/jit/src/commands/serve.rs:712`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Acceptance criteria are met, but unresolved cargo-ci test failures remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"cargo-ci test step still fails, including claim/precheck tests; first captured panic is tied to the tdd-reminder assertion.\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":1336},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"cargo-ci serve command tests still fail: port selection and immediate child-exit startup behavior.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":712}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 369 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3b24-2ea4-7a80-874d-92043cc8ec68\n--------\nuser\n--- 356 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Acceptance criteria are met, but unresolved cargo-ci test failures remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "cargo-ci test step still fails, including claim/precheck tests; first captured panic is tied to the tdd-reminder assertion.",
+        "file": "crates/jit/src/commands/issue.rs",
+        "line": 1336
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "cargo-ci serve command tests still fail: port selection and immediate child-exit startup behavior.",
+        "file": "crates/jit/src/commands/serve.rs",
+        "line": 712
+      }
+    ]
+  }
+}
