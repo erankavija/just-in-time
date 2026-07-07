@@ -1,0 +1,24 @@
+{
+  "id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
+  "title": "Make jit doc add idempotent for an existing identical link",
+  "description": "Re-running `jit doc add` with a path already linked to the issue appends a duplicate document reference and a duplicate event instead of re-pointing the existing link.\n\n## Background\n\nObserved while dogfooding charter linkage: the v1.0 charter was already doc-linked to its milestone, and a second `jit doc add` with the same path appended a second reference rather than updating the first. The vision-charter workflow explicitly re-runs `jit doc add` after updates (\"re-running jit doc add after an update re-points the link at the current commit\"), so the append behavior contradicts the documented steward workflow and accretes duplicate rows in `jit doc list`.\n\n## Success Criteria\n\n- [hard] REQ-01: Running `jit doc add` for an issue and path that are already linked updates the existing reference in place; `jit doc list` shows one entry for that path afterwards.\n- [hard] REQ-02: The idempotent re-add records the refresh in the event log as an update, not a second add.\n- [hard] REQ-03: Adding a genuinely new path still appends a new reference, and a regression test covers both behaviors.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "epic:core-maintenance",
+    "milestone:v1.0"
+  ],
+  "created_at": "2026-07-07T07:52:08.539780520Z",
+  "updated_at": "2026-07-07T07:52:08.541232841Z",
+  "first_ready_at": "2026-07-07T07:52:08.539790120Z"
+}
