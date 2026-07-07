@@ -199,6 +199,17 @@ plan review gate.
 
 #### Step 4e — Completion
 
+**Audit P's inherited upstream dependencies before completing the plan.** Step 3's
+`jit apply plan` moved `C`'s pre-existing upstream deps onto `P`. Classify each as
+**planning-required** (the plan authoring itself depends on it) or
+**implementation-consumed** (only a future implementation child consumes it). An
+implementation-consumed dep left on `P` deadlocks the bracket: `P` can never close
+until it completes, so `B` never releases. Re-home each implementation-consumed edge
+onto its consuming child — the `jit dep` move runs at breakdown time (Step 5) — and
+record the move with its rationale in the plan's **Decisions** section. Escalate a
+planning-required dep that cannot complete to the requester rather than dropping the
+edge or forcing the plan through.
+
 Ensure that the plan document is linked to the plan issue P with `jit doc add
 <P> <plan-doc-path> --doc-type design` and that all the findings uncovered in
 the review have been addressed. Proceed then through the quality gates by
