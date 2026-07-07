@@ -236,9 +236,26 @@ hand the tree to execution; do not start implementing the work.
    over the sibling set to check consumed-vs-promised contracts across story boundaries —
    the names, shapes, and deletions one sibling relies on and another must honor —
    alongside interface mismatch, boundary overlap, duplicated responsibility, and
-   dependency direction. It returns fixes as criterion or description rewords consistent
-   with the approved plan, folded back into the affected task. Skip only for a single
-   recursed container, or a level authored in one dispatch.
+   dependency direction.
+
+   **The approved plan's decomposition sketch is the contract.** Its intended
+   parallelism and its per-item tiers bind the fan-out. Instruct the reviewer to test
+   every graph edge or type-tier change a finding would imply against the sketch and to
+   **mark each sketch conflict explicitly** in its findings, naming the sanctioned
+   resolution: a **child-criterion or description rewording** that respects the sketch's
+   boundaries, or, where the sketch itself is wrong, a **plan-document amendment**. A
+   finding that contradicts the sketch is folded in through one of those two paths and
+   **never lands as a direct graph edit against the sketch**. Fold each fix back into the
+   affected task. Skip only for a single recursed container, or a level authored in one
+   dispatch.
+
+   **Re-review a material plan amendment before the fan-out proceeds.** When a finding
+   rises to a plan-document amendment — the material path, changing the sketch's
+   parallelism or tiers — re-run the affected plan's `plan-review` gate on the amendment
+   and reconcile the fan-out to the amended sketch before treating the level as broken
+   down. Loop as in Step 4e; escalate the subtree (Step 5's non-convergence path) after
+   three rounds. A criterion or description rewording stays within the approved sketch and
+   needs no plan re-review.
 
 4. **Collect the new breakable children.** Of the children just created, any whose
    `type` is a breakable container type (it appears in some template's `applies_to`,
