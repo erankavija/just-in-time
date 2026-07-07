@@ -5,16 +5,29 @@
 ## Vision
 
 Just-In-Time ships its first stable production release: a CLI-first,
-repository-local issue tracker built for AI-agent workflows. The release is
-coherent when it delivers a complete quality-gate system, dependency DAGs with
-cycle detection, machine-consumable JSON storage under `.jit/`, multi-agent
-coordination with file locking and leases, and user documentation complete
-enough that an agent or human can operate the tool without reading its source.
-Every epic under this milestone is judged against that outcome: work that does
-not move the tracker toward a dependable, self-describing v1.0 an agent can drive
-end to end is out of scope, however useful in isolation.
+repository-local issue tracker whose primary user is an AI agent driving work end
+to end. Every surface is machine-consumable first and human-pretty second — plain
+JSON under `.jit/`, `--json` on every command, dependency DAGs with cycle
+detection, quality gates, and multi-agent coordination through file locking and
+leases. The engine stays domain-agnostic (`@/inv/domain-agnostic`): type names,
+label vocabularies, gate keys, templates, and workflow shapes come from repository
+configuration, never from baked-in assumptions. The release is coherent when an
+agent or human can operate the tracker end to end from its own documentation
+without reading its source. Every epic under this milestone is judged against that
+outcome; work that does not move the tracker toward a dependable, self-describing,
+agent-drivable v1.0 is out of scope, however useful in isolation.
 
 ## Decision Log
+
+- D-1: Repository-local git-versioned JSON storage, not an external database
+- D-2: Quality gates declared in `.jit/gates.toml`, not baked into the binary
+- D-3: Plan-before-fan-out bracket gates a breakable container before implementation
+- D-4: git optional for core commands, required only for claims and leases
+- D-5: A milestone-tier steward skill sits above the epic-level execution lead
+- D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
+- D-7: Charter decisions are addressable `@/charter/D-N` items over the vision charter
+
+## Decision Details
 
 ### D-1: Repository-local git-versioned JSON storage
 
@@ -36,9 +49,8 @@ end to end is out of scope, however useful in isolation.
 - **Rejected:** Baking a fixed set of gate presets into the Rust binary — every
   new or tuned gate would require recompiling and reinstalling `jit`.
 - **Reasoning:** Projects set their own quality bar without touching the engine.
-  The tracker dogfoods this: its own gates (repo-validate, plan-review,
-  coverage-preview, breakdown-review, code-review) live in the registry, not in
-  code.
+  The tracker dogfoods this: its own gates (`cargo-ci`, `jit-validate`,
+  `code-review`, and the planning-bracket trio) live in the registry, not in code.
 - **Date:** 2026-07-03
 
 ### D-3: Plan-before-fan-out bracket for breakable containers
@@ -78,3 +90,39 @@ end to end is out of scope, however useful in isolation.
   interior of one container. Merging them would grow one skill across two
   responsibilities and blur where a decision belongs.
 - **Date:** 2026-07-03
+
+### D-6: Per-kind source of truth for addressable items
+
+- **Chosen:** Every addressable item kind declares its source of truth in
+  `[item_kinds]`: description-embedded kinds (requirement, decision, risk) are
+  markdown-first; registry-backed kinds (invariant, rule, gate) are
+  registry-first and projected into markdown by `jit … render`. The item index is
+  always a projection of the declared source, never itself the source.
+- **Rejected:** One uniform substrate for every kind — all-markdown loses the
+  structured TOML registries the engine already reads and machine-edits, while
+  all-registry forces prose-embedded requirements and decisions out of the text
+  that defines them.
+- **Reasoning:** Each kind lives where its author naturally edits it: criteria and
+  decisions inside the issue prose, invariants/rules/gates in their TOML
+  registries. A per-kind declaration keeps exactly one source of truth per kind
+  while a single addressing scheme (`@/<kind>/<self-id>`) spans both substrates.
+- **Date:** 2026-06-27
+
+### D-7: Charter decisions as addressable items
+
+- **Chosen:** The vision charter's decisions are a project-scope, markdown-first
+  `charter` item kind. Each summary row under `## Decision Log`
+  (`- D-N: <one-liner>`) is addressable as `@/charter/D-N`; the full entries sit
+  under `## Decision Details`. An issue cites a decision with the reused `per:`
+  link namespace (`per:@/charter/D-N`).
+- **Rejected:** A new dedicated link namespace for charter references — redundant,
+  since resolution is by qualified id and `per` already carries decision links
+  unambiguously; and leaving the charter as unaddressable prose — decisions could
+  then be neither cited nor machine-validated, so a dangling reference would go
+  undetected.
+- **Reasoning:** Reusing the proven markdown-first kind machinery (the
+  `definition` kind precedent) turns every logged decision into a citable,
+  `jit validate`-checked anchor with no new engine surface. The bullet-index /
+  details split keeps the addressable rows short and stable while the full
+  rationale stays readable below them.
+- **Date:** 2026-07-07

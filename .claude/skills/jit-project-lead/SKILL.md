@@ -80,9 +80,11 @@ via `jit doc` and both read back on re-invocation:
   decision log recording, for every consequential decision, what was chosen, what
   was rejected, and why. It lands under the permanent documentation path (first
   entry of `permanent_paths`) so it is never archived on container completion.
-  Instantiate `references/templates/vision-charter.md` on first invocation; on
-  resume, read every logged decision back and treat it as binding (append a new
-  `D-N` to supersede, never edit a landed entry).
+  Modes 2 and 3 create and evolve it with its owner through the charter
+  facilitation body (`references/charter-facilitation.md`), which instantiates
+  `references/templates/vision-charter.md` on first invocation. On resume, read
+  every logged decision back and treat it as binding (append a new `D-N` to
+  supersede, never edit a landed entry).
 - **Progress artifact** (`references/progress-artifact.md`) — the resumable wave
   plan with a per-sub-strategic-container status row, under
   `<development_root>/active/`. It is the one-tier-up analogue of the execution
@@ -122,8 +124,9 @@ resolved. A wave completes before the next begins.
 A dispatched execution lead reports every escalation to the steward, not to the
 human. Read `references/parent-escalation.md` **in full** and follow it: the
 default is to resolve the escalation against the vision and decision log,
-recording the resolution as a new `### D-N` charter entry
-(`references/vision-charter.md` format). Only three categories forward to the
+recording the resolution as a new `D-N` charter entry (a `## Decision Log` row
+plus its `### D-N` details, `references/vision-charter.md` format). Only three
+categories forward to the
 human: **vision-level conflicts**, **cross-strategic-container dependencies**, and
 **project-wide infrastructure changes**. Every other subordinate escalation is
 resolved from the vision without human involvement.
@@ -147,10 +150,15 @@ mode's handoff:
   `## Sub-strategic dispatch`. Mode 1 is resolve-and-handoff only: wave execution,
   coherence review, and charter/progress maintenance belong to that section, not
   to the front door.
-- **Modes 2 and 3** — route to the `jit-planning-lead` skill invoked at the
-  strategic altitude (its cold-start interview for mode 2; its interactive
-  strategic-altitude planning for mode 3). Read that skill and follow it; do not
-  reimplement planning. Neither mode dispatches a worker from the front door.
+- **Mode 2** — run the charter step (`references/charter-facilitation.md`) to
+  produce or evolve the charter with its owner, then hand the scoped goal to the
+  `jit-planning-lead` skill invoked at the strategic altitude (its cold-start
+  interview). The charter lands before planning begins; read that skill and follow
+  it for the plan. No worker is dispatched from the front door.
+- **Mode 3** — run the steward-owned charter facilitation body
+  (`references/charter-facilitation.md`) end to end. The steering discussion's
+  vision and decision outcomes land in the charter; no planning skill is invoked
+  and no worker is dispatched.
 - **Mode 4** — run the `## Standards sweep mode` below end to end.
 
 When the request does not clearly signal exactly one mode, **stop and ask** which
@@ -216,7 +224,8 @@ Stop immediately and report to the invoker when:
 
 - Authoring mode behavior from this shell. The front door routes; each mode's
   work lives in the section it hands to (`## Sub-strategic dispatch`,
-  `jit-planning-lead`, `## Standards sweep mode`). Do not carry the work here.
+  `references/charter-facilitation.md`, `jit-planning-lead`,
+  `## Standards sweep mode`). Do not carry the work here.
 - Guessing a mode the request does not clearly signal. A generic or ambiguous
   request stops and asks which mode (see `references/mode-routing.md`); never
   default to a mode.

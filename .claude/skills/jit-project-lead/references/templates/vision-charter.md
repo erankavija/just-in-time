@@ -29,12 +29,22 @@ escalations. Keep it short and load-bearing.
 ## Decision Log
 
 <!--
-One ### D-N per consequential decision, ascending id order, append-only.
-Every entry names what was chosen, what was rejected, and why. A decision with
-no considered alternative is not consequential — leave it out. To overturn a
-landed decision, add a NEW D-N that cites and supersedes it; never edit the old
-entry's outcome. Delete this comment and the example below once real entries
-exist.
+One summary bullet per consequential decision, ascending id order, append-only.
+Each `- D-N: <one-liner>` row is the addressable anchor (`@/charter/D-N`); the
+full entry goes under ## Decision Details below, sharing the same D-N id. A
+decision with no considered alternative is not consequential — leave it out. To
+overturn a landed decision, add a NEW D-N (row + entry) that cites and supersedes
+it; never edit the old entry's outcome or renumber the log. Delete this comment
+and the examples once real entries exist.
+-->
+
+- D-1: {{DECISION_ONE_LINER}}
+
+## Decision Details
+
+<!--
+The full entry for each row above, same D-N id, ascending order. Every entry
+names what was chosen, what was rejected, and why.
 -->
 
 ### D-1: {{DECISION_TITLE}}

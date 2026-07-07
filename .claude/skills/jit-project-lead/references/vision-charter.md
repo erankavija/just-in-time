@@ -33,6 +33,13 @@ The short id comes from the steward anchor container resolved in tier derivation
 A standalone markdown document. As a rendered-standalone doc it carries one `#`
 title; every other heading is `##`/`###` per the content standards.
 
+Each decision appears in two places: a one-line summary **row** under
+`## Decision Log`, and the full **entry** under `## Decision Details`. The row is
+the addressable anchor — the `charter` item kind indexes the `- D-N: <one-liner>`
+bullets under `## Decision Log`, so `@/charter/D-N` resolves to the row, and
+`jit item list --kind charter` enumerates every logged decision. The `### D-N`
+entries under `## Decision Details` hold the full record and are not indexed.
+
 ```markdown
 # Charter: <strategic-container title>
 
@@ -46,8 +53,13 @@ with it. This is the yardstick the steward resolves escalations against.>
 
 ## Decision Log
 
-<One `### D-N` subsection per consequential decision, in ascending id order.
-Never delete or renumber a landed entry.>
+- D-1: <one-line summary of the decision>
+- D-2: <one-line summary of the decision>
+
+## Decision Details
+
+<One `### D-N` subsection per consequential decision, in ascending id order,
+matching the rows above. Never delete or renumber a landed row or entry.>
 ```
 
 Keep the vision short and load-bearing. It is the reference the steward cites
@@ -61,10 +73,18 @@ architecture, a tier/boundary interpretation, an escalation resolution, or a
 rejected alternative someone will otherwise re-propose. Routine, reversible calls
 stay out.
 
-Every entry states what was **chosen**, what was **rejected**, and **why**
-(REQ-01). Each entry has a stable ascending `D-N` id.
+Each decision lands as two matched parts under the same `D-N` id: a summary row
+under `## Decision Log`, and the full entry under `## Decision Details`. The full
+entry states what was **chosen**, what was **rejected**, and **why** (REQ-01).
+Each `D-N` id is stable and ascending.
 
 ```markdown
+## Decision Log
+
+- D-N: <one-line summary of the decision>
+
+## Decision Details
+
 ### D-N: <one-line decision title>
 
 - **Chosen:** <the selected option, stated concretely>
@@ -75,6 +95,8 @@ Every entry states what was **chosen**, what was **rejected**, and **why**
 
 Rules:
 
+- The summary row and its full entry share one `D-N` id and are added together.
+  The row is the addressable anchor (`@/charter/D-N`); keep it a single line.
 - `Rejected` is never empty for a consequential decision. A decision with no
   considered alternative was not consequential; leave it out. If a real
   alternative existed, name it and say why it lost — that is what stops the

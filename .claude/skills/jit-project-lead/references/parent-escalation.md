@@ -96,12 +96,19 @@ not forward it. Forwarding a resolvable escalation is a red flag.
 
 ## The recording step
 
-A resolved escalation is recorded as a new decision-log entry in the strategic
-container's charter, in the exact `### D-N` format defined by
-`references/vision-charter.md` (Decision-log entry format). The entry states the
-option chosen, the option(s) rejected, and the reasoning:
+A resolved escalation is recorded as a new charter decision, in the exact format
+defined by `references/vision-charter.md` (Decision-log entry format): a one-line
+summary row under `## Decision Log` and the full `### D-N` entry under
+`## Decision Details`, sharing the same `D-N` id. The entry states the option
+chosen, the option(s) rejected, and the reasoning:
 
 ```markdown
+## Decision Log
+
+- D-N: <one-line summary of the resolved escalation>
+
+## Decision Details
+
 ### D-N: <one-line title of the resolved escalation>
 
 - **Chosen:** <the resolution the steward gave the lead, stated concretely>
@@ -110,11 +117,12 @@ option chosen, the option(s) rejected, and the reasoning:
 - **Date:** <ISO-8601 date>
 ```
 
-Follow `vision-charter.md`'s rules verbatim: continue the numbering from the
-highest existing `D-N`; ids are append-only and never reused; `Rejected` is never
-empty. The lead escalated because a real alternative existed, so name it. After
-appending, re-link the charter to the strategic container with `jit doc add` per
-`vision-charter.md`.
+The summary row is the addressable anchor (`@/charter/D-N`); add it together with
+the full entry. Follow `vision-charter.md`'s rules verbatim: continue the
+numbering from the highest existing `D-N`; ids are append-only and never reused;
+`Rejected` is never empty. The lead escalated because a real alternative existed,
+so name it. After appending, re-link the charter to the strategic container with
+`jit doc add` per `vision-charter.md`.
 
 A resolution the steward gives without logging it is not recorded: a resumed
 session re-reads the charter, not the lead's chat, so an unlogged decision is lost
@@ -151,8 +159,9 @@ steward on a tooling failure and are reported to the steward's own invoker:
   container as if it were cross-strategic-container. The former stays inside the
   steward's scope and is resolved from the vision; only a dependency reaching into
   another top-level strategic container forwards.
-- Resolving an escalation without recording a `### D-N` entry. An unlogged
-  resolution is lost on resume and the escalation recurs.
+- Resolving an escalation without recording its `## Decision Log` row and
+  `### D-N` entry. An unlogged resolution is lost on resume and the escalation
+  recurs.
 - Logging the resolution with an empty `Rejected` field. The lead escalated
   because a real alternative existed; name it and say why it lost.
 - Adding a fourth forward-to-human category, or dropping one of the three. The set

@@ -15,8 +15,8 @@ Tier derivation has already produced the **ANCHOR TYPE** (steward anchor) and
 | Mode | Request intent | Signal | Handoff |
 |---|---|---|---|
 | 1 | Lead an already-existing strategic container | The request names or points at a strategic container that already exists (an id, or a name/label that resolves to one) | Resolve the container, hand it + context to `## Sub-strategic dispatch` |
-| 2 | Plan and execute a vague high-level goal | A goal with no container yet — a cold start needing scoping before any work exists | `jit-planning-lead` at the strategic altitude (its interview / research-and-plan entry) |
-| 3 | Steering discussion | Interactive vision or decision work with **no workers dispatched** — think through direction, not drive execution | `jit-planning-lead` at the strategic altitude (its interactive strategic-altitude planning) |
+| 2 | Plan and execute a vague high-level goal | A goal with no container yet — a cold start needing scoping before any work exists | Charter step (`references/charter-facilitation.md`), then `jit-planning-lead` at the strategic altitude (its interview / research-and-plan entry) |
+| 3 | Steering discussion | Interactive vision or decision work with **no workers dispatched** — think through direction, not drive execution | Steward-owned charter facilitation (`references/charter-facilitation.md`) |
 | 4 | Standards sweep | Audit the project against the content standards and fix the mechanical violations | `## Standards sweep mode` |
 
 ## Classifying the opening request
@@ -57,9 +57,11 @@ signal; match the request to exactly one, or stop and ask (below).
   Representative request: *"Sweep the whole project for content-standards
   violations, auto-fix the mechanical ones, and list what needs a decision."*
 
-Modes 2 and 3 both hand to `jit-planning-lead`; the split is delivery intent.
-Mode 2 asks to plan **and get it built** (a cold-start goal to carry through);
-mode 3 asks only to **deliberate** with no execution committed. When the request
+Modes 2 and 3 both run the charter facilitation step; the split is delivery
+intent. Mode 2 asks to plan **and get it built** (a cold-start goal to carry
+through), so after the charter step it hands the scoped goal to
+`jit-planning-lead`; mode 3 asks only to **deliberate** with no execution
+committed, so it stops at the charter — no planning, no dispatch. When the request
 wants a team put to work, it is mode 2; when it wants to think first with no
 dispatch, it is mode 3.
 
@@ -87,21 +89,25 @@ run any of that here.
    That section resolves the vision/progress artifacts, layers the waves, and
    drives them. Routing stops here; it does not enter the dispatch loop itself.
 
-### Modes 2 and 3 — hand to jit-planning-lead
+### Modes 2 and 3 — run the charter step
 
-Both route to the `jit-planning-lead` skill invoked **at the strategic
-altitude** — the container is created (mode 2) or deliberated (mode 3) at the
-anchor tier, not below it. Read that skill's `SKILL.md` and follow it; do not
-reimplement planning here.
+Both run the steward-owned charter facilitation body
+(`references/charter-facilitation.md`) at the **strategic altitude** — the vision
+and its decisions are settled for the anchor-tier container, not below it. Mode 2
+continues into planning after the charter step; mode 3 stops at the charter.
 
-- **Mode 2** enters `jit-planning-lead` at its cold-start entry (its
-  research-and-plan / interview path): the vague goal is refined into a
-  strategic-tier container and planned behind. The steward supplies the goal and
-  the anchor tier; planning-lead owns the interview and the plan.
-- **Mode 3** enters `jit-planning-lead` for interactive strategic-altitude vision
-  and decision work: the deliberation the requester asked for, with no execution
-  dispatched. No `jit-execution-lead` is dispatched from the front door in either
-  mode; execution, if it follows, is a separate later invocation (mode 1 over the
+- **Mode 2** runs the charter step first: the facilitation body produces or
+  evolves the charter with its owner (posture selected from the entry state), so a
+  cold start yields a charter before planning begins. It then hands the scoped
+  goal to the `jit-planning-lead` skill at its cold-start entry (its
+  research-and-plan / interview path), which refines the goal into a
+  strategic-tier container and plans behind it. Read that skill's `SKILL.md` and
+  follow it for the plan; do not reimplement planning here.
+- **Mode 3** runs the charter facilitation body end to end: the interactive
+  strategic-altitude vision and decision work the requester asked for, every
+  outcome landing in the charter, with no planning skill invoked. No
+  `jit-execution-lead` is dispatched from the front door in either mode;
+  execution, if it follows, is a separate later invocation (mode 1 over the
   now-existing container).
 
 ### Mode 4 — hand to the standards sweep
@@ -142,9 +148,10 @@ halts before any mode body runs. It writes no issue state.
 - **Running mode 1 as more than resolve-and-handoff.** Mode 1 resolves the
   container and hands it to `## Sub-strategic dispatch`; it does not itself run
   waves, coherence review, or charter/progress maintenance.
-- **Reimplementing planning or the sweep in the front door.** Modes 2 and 3 hand
-  to `jit-planning-lead`; mode 4 hands to `## Standards sweep mode`. The front
-  door routes; it does not carry the work.
+- **Reimplementing planning, facilitation, or the sweep in the front door.** Mode
+  2 runs the charter step then hands to `jit-planning-lead`; mode 3 runs
+  `references/charter-facilitation.md`; mode 4 hands to `## Standards sweep mode`.
+  The front door routes; each mode's work lives in its own referenced section.
 - **Leading a sub-strategic container directly in mode 1.** If the resolved
   container is below the anchor tier, that is an execution lead's target, not the
   steward's. Stop and ask for the anchor-tier container.

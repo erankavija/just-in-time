@@ -99,6 +99,11 @@ description = "Enforcement link: names an invariant, rule, or gate item that the
 unique = false
 examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 
+[namespaces.per]
+description = "Decision link: names a decision item (issue-scope `decision` or project-scope `charter`) the labeled issue is done per"
+unique = false
+examples = ["per:@/charter/D-1", "per:@/issue/9db27a3a/decision/D-1"]
+
 # =============================================================================
 # ITEM KINDS
 # =============================================================================
@@ -182,6 +187,23 @@ markers = []
 link-namespaces = ["defines"]
 scope = "project"
 source = "docs/reference/glossary.md"
+source-of-truth = "markdown-first"
+
+# Dogfood: charter decisions as addressable items, sourced from the v1.0 vision
+# charter. The kind scans the summary rows under `## Decision Log`
+# (`- D-N: <one-liner>`), so `@/charter/D-N` resolves the one-line row; full
+# entries live under `## Decision Details`, a `###`-heading section the kind does
+# not scan. Reuses the `per` link namespace, so an issue carries `per:@/charter/D-N`
+# (resolution is by qualified id, unambiguous alongside the issue-scope `decision`
+# kind). `jit item list --kind charter`. The source path is derived: first entry
+# of `permanent_paths` + `<strategic-anchor-short-id>-charter.md`.
+[item_kinds.charter]
+section = "decision_log"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "project"
+source = "docs/9db27a3a-charter.md"
 source-of-truth = "markdown-first"
 
 [invariant_projection]
