@@ -1,19 +1,9 @@
 ---
 name: jit-planning-lead
 description: >
-  Turn a vague request, idea, article, or rough epic into a fully planned,
-  broken-down jit work tree ready to execute — from any of three starting
-  points: a vague idea needing research and scoping, an existing container
-  with criteria needing a plan, or an external document needing import into
-  a jit plan. Use when asked to "plan this feature with jit", "plan with
-  jit", "scope and plan" an initiative, turn an article or rough epic into
-  a ready-to-execute jit plan or work tree, or take a loose problem
-  statement and break it into child jit issues. Also use when the user
-  wants to go from a vague or half-formed idea to a complete,
-  self-contained jit issue structure ready for implementation. Planning
-  and breakdown only, not execution — use jit-execution-lead to run an
-  already-planned epic, and jit-breakdown to decompose a single
-  already-specified issue from its own spec.
+  Turn a vague idea, external document, or existing container into a fully
+  planned, broken-down jit work tree ready to execute. Planning and breakdown
+  only; jit-execution-lead runs the planned container.
 ---
 
 # JIT Planning Lead

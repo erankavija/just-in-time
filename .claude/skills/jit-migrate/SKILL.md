@@ -1,6 +1,8 @@
 ---
 name: jit-migrate
-description: Migrate an existing project to JIT issue tracking by scanning planning artifacts (ROADMAP, TODO, etc.), extracting work items, inferring a dependency DAG, and populating JIT. Use when asked to "migrate to jit", "import tasks into jit", or "set up jit for this project".
+description: >
+  Adopt jit in an existing project: scan planning artifacts (ROADMAP, TODO,
+  issue lists), extract work items, infer the dependency DAG, populate .jit/.
 compatibility: Requires JIT CLI on PATH. JIT MCP tools used where available.
 ---
 

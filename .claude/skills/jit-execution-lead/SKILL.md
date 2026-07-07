@@ -1,14 +1,9 @@
 ---
 name: jit-execution-lead
 description: >
-  Autonomous team leader that drives an epic to completion by breaking it down,
-  delegating to AI sub-agents (engineers, researchers, architects), and enforcing
-  quality with holistic coherence review. Use when asked to "lead an epic", "drive
-  this epic", "manage this epic end-to-end", "run this epic",
-  "take charge of", "own this epic", or "deliver this epic". Also use when handing
-  off an epic for autonomous execution with quality enforcement, or when the user
-  wants a team of agents to collaboratively complete a large work item. Do not use
-  for individual task execution — use jit-manage for that.
+  Drive one already-planned breakable container (e.g. an epic) end to end with
+  a team of AI sub-agents: dependency waves, quality gates, holistic review,
+  rework, minimal escalation. For a single issue use jit-manage.
 ---
 
 # JIT Execution Lead

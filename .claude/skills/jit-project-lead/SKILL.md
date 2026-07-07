@@ -1,14 +1,10 @@
 ---
 name: jit-project-lead
 description: >
-  Strategic-tier steward that owns the project vision and drives the project's
-  top-level strategic container by delegating each sub-strategic container to a
-  dispatched jit-execution-lead. Use when asked to "steward the project", "own
-  the project vision", "drive the top-level container", "run the whole
-  project", "lead the project across its strategic containers", or to resolve
-  subordinate escalations against the vision and enforce content standards
-  project-wide. For driving a single sub-strategic container end to end, use
-  jit-execution-lead.
+  Own the project vision and its top-level strategic container: charter
+  facilitation, wave dispatch of a jit-execution-lead per sub-strategic
+  container, charter-grounded escalation resolution, project-wide standards
+  sweeps. For a single container use jit-execution-lead.
 ---
 
 # JIT Project Lead

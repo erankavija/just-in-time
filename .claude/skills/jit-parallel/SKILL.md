@@ -1,6 +1,9 @@
 ---
 name: jit-parallel
-description: Orchestrate parallel implementation of multiple independent JIT issues using sub-agents. Use when asked to implement, work on, or dispatch several issues simultaneously. Handles pre-flight conflict analysis, sub-agent dispatch, result verification, and commit.
+description: >
+  Implement several independent jit issues concurrently with sub-agents:
+  pre-flight conflict analysis, dispatch, result verification, commit.
+  jit-execution-lead wraps this for whole-container delivery.
 compatibility: Designed for Claude Code with JIT MCP tools available
 ---
 

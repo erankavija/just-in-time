@@ -1,6 +1,10 @@
 ---
 name: jit-breakdown
-description: Break down a JIT issue into child work items based on its specification document. Reads the spec doc linked to the issue (or user-specified), uses an analysis sub-agent to decompose it into child issues with proper dependency edges, presents a plan for approval, then creates the issues and wires up the dependency graph. Use when asked to "break down", "decompose", "detail out", or "create subtasks for" a JIT issue.
+description: >
+  Decompose one specified jit issue into child issues: an analysis sub-agent
+  drafts schema-validated children from the linked spec or approved plan, then
+  they are created and wired into the dependency graph. To produce the plan
+  first, use jit-planning-lead.
 compatibility: Requires JIT CLI on PATH. JIT MCP tools used where available.
 ---
 

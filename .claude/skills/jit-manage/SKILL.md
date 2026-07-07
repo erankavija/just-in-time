@@ -1,12 +1,10 @@
 ---
 name: jit-manage
 description: >
-  JIT project management workflow orchestrator covering the full issue lifecycle:
-  surveying available work, claiming and planning issues, creating new work items
-  with DAG wiring, reviewing project status, and completing work with gate
-  enforcement. Use when asked to "manage issues", "start a work session",
-  "what should I work on", "create an issue/epic/story/task", "show project status",
-  "complete this issue", or any general JIT project management question.
+  Work jit issues through their lifecycle: survey available work, claim and
+  plan, create with DAG wiring, check status, complete through gates. The
+  default for any single-issue jit operation; container delivery belongs to
+  jit-execution-lead.
 compatibility: Requires JIT CLI on PATH or JIT MCP tools available. Works in any repository with a .jit/ directory.
 ---
 
