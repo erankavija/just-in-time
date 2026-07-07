@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "a6170468-44ca-4688-af70-feed019f20b2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "de06e685-05ff-4ce9-80df-3390e1c29f1e",
+  "commit": "4c014fe573895426201acfbba52d5fcbd320ac9a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-07T05:51:09.343448655Z",
+  "completed_at": "2026-07-07T05:53:13.751136762Z",
+  "duration_ms": 124407,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\nREQ-01, REQ-02, and REQ-03 are met in `.claude/skills/jit-planning-lead/SKILL.md:230`. Step 5 now makes the coherence pass mandatory for two or more independently dispatched sibling containers, narrows the skip condition, explains the missing gate, and directs reviewers to check consumed-vs-promised contracts across story boundaries.\n\n**Architecture And Separation**\nNo Rust code changed. The change is confined to skill documentation, so domain/storage/commands/CLI boundaries are not affected.\n\n**Functional Paradigm**\nNo executable code changed.\n\n**Correctness And Invariants**\nNo file-write, event-log, gate-transition, assignee, label, or PID-handling code changed. The new planning guidance is consistent with the intended gate semantics by adding a required review point for independently authored task sets.\n\n**Safety**\nNo unsafe code introduced.\n\n**Testing**\n`./scripts/jit-validate.sh` passed.\n\nThere was no succeeded cargo-ci gate in the supplied `run_history`, so I ran `CARGO_CI_TMPDIR=/tmp/jit-cargo-ci-tmp ./scripts/cargo-ci.sh`. Formatting and clippy passed, but tests failed: 1489 passed, 7 failed. Per the review criteria, this is blocking even if pre-existing.\n\n**Error Handling**\nNo error-handling code changed.\n\n**CLI Contract**\nNo CLI command behavior changed.\n\n**Documentation**\nThe documentation change is targeted and satisfies the issue. No public Rust APIs were added or changed.\n\n**Prior Review Feedback**\n`run_history` is empty, so there is no prior feedback to verify.\n\n**Jit Issue Management**\n`issue.dependencies` is empty; no prerequisite work is listed. `./scripts/jit-validate.sh` passed.\n\n1. **High:** `cargo-ci` test step fails. The failing suite includes four claim/precheck tests, with the first captured panic at `crates/jit/src/commands/issue.rs:1336`, plus three serve tests. This violates the “No test or lint failures” requirement.\n2. **High:** The serve command tests fail under `cargo-ci`: `test_find_available_port_returns_free_port`, `test_find_available_port_skips_bound_port`, and `test_start_server_errors_when_child_exits_immediately`, rooted in tests beginning at `crates/jit/src/commands/serve.rs:712`.\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Acceptance criteria are met, but cargo-ci tests fail.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"cargo-ci test step fails, including claim/precheck tests; first captured panic is at the tdd-reminder assertion.\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":1336},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"cargo-ci serve command tests fail: port selection and immediate child-exit startup behavior.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":712}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1103 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f3b21-5bc1-7190-8a5b-c6af70c91a7f\n--------\nuser\n--- 1090 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Acceptance criteria are met, but cargo-ci tests fail.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "cargo-ci test step fails, including claim/precheck tests; first captured panic is at the tdd-reminder assertion.",
+        "file": "crates/jit/src/commands/issue.rs",
+        "line": 1336
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "cargo-ci serve command tests fail: port selection and immediate child-exit startup behavior.",
+        "file": "crates/jit/src/commands/serve.rs",
+        "line": 712
+      }
+    ]
+  }
+}
