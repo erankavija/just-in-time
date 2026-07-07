@@ -75,7 +75,7 @@
           "short_id": "6846d37e",
           "title": "Audit inherited planning-node dependencies for deadlock",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     }
@@ -98,7 +98,8 @@
   ],
   "rework_counts": {
     "027d7cbf": 1,
-    "de06e685-gate-reruns": 2
+    "de06e685-gate-reruns": 2,
+    "6846d37e": 1
   },
   "started_at": "2026-07-07T07:15:07+03:00"
 }
