@@ -3,22 +3,82 @@
   "epic_short_id": "1f564776",
   "current_wave": 1,
   "waves": [
-    {"wave_number": 1, "issues": [
-      {"id": "ce1eb77c-a125-41f9-ab2c-24fda442135c", "short_id": "ce1eb77c", "title": "Steward-owned charter facilitation and addressable charter decisions", "classification": "implementation", "status": "pending"},
-      {"id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce", "short_id": "027d7cbf", "title": "Declare the gate contract in the breakdown analysis schema", "classification": "implementation", "status": "pending"},
-      {"id": "4c9ee033", "short_id": "4c9ee033", "title": "Persist investigation output to the repo and link it to the planning node", "classification": "implementation", "status": "pending"}
-    ]},
-    {"wave_number": 2, "issues": [
-      {"id": "4817c1bc-74a9-4d85-be7c-135751c78961", "short_id": "4817c1bc", "title": "Reconcile plan-sketch type tiers with the breakdown child-type rule", "classification": "implementation", "status": "pending"},
-      {"id": "de06e685", "short_id": "de06e685", "title": "Make cross-sibling coherence review mandatory for multi-story recursion", "classification": "implementation", "status": "pending"}
-    ]},
-    {"wave_number": 3, "issues": [
-      {"id": "9b191163-380f-4c6a-8ad1-992f7c23c2b2", "short_id": "9b191163", "title": "Require identifying labels for strategic-typed children at creation", "classification": "implementation", "status": "pending"},
-      {"id": "eeb5f05a", "short_id": "eeb5f05a", "title": "Route cross-sibling coherence findings through the plan contract", "classification": "implementation", "status": "pending"}
-    ]},
-    {"wave_number": 4, "issues": [
-      {"id": "6846d37e", "short_id": "6846d37e", "title": "Audit inherited planning-node dependencies for deadlock", "classification": "implementation", "status": "pending"}
-    ]}
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "ce1eb77c-a125-41f9-ab2c-24fda442135c",
+          "short_id": "ce1eb77c",
+          "title": "Steward-owned charter facilitation and addressable charter decisions",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce",
+          "short_id": "027d7cbf",
+          "title": "Declare the gate contract in the breakdown analysis schema",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "4c9ee033",
+          "short_id": "4c9ee033",
+          "title": "Persist investigation output to the repo and link it to the planning node",
+          "classification": "implementation",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "4817c1bc-74a9-4d85-be7c-135751c78961",
+          "short_id": "4817c1bc",
+          "title": "Reconcile plan-sketch type tiers with the breakdown child-type rule",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "de06e685",
+          "short_id": "de06e685",
+          "title": "Make cross-sibling coherence review mandatory for multi-story recursion",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "9b191163-380f-4c6a-8ad1-992f7c23c2b2",
+          "short_id": "9b191163",
+          "title": "Require identifying labels for strategic-typed children at creation",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "eeb5f05a",
+          "short_id": "eeb5f05a",
+          "title": "Route cross-sibling coherence findings through the plan contract",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "6846d37e",
+          "short_id": "6846d37e",
+          "title": "Audit inherited planning-node dependencies for deadlock",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    }
   ],
   "wave_rationale": "No sibling dependency edges; waves shaped by file-conflict lanes (A: jit-project-lead+config+docs, B: jit-breakdown, C: jit-planning-lead). Within-lane order serializes same-file edits.",
   "created_during_execution": [],
