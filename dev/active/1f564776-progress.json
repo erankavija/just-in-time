@@ -1,7 +1,7 @@
 {
   "epic_id": "1f564776-0c6e-4c5b-9300-aa239b48adda",
   "epic_short_id": "1f564776",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -11,7 +11,7 @@
           "short_id": "ce1eb77c",
           "title": "Steward-owned charter facilitation and addressable charter decisions",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce",

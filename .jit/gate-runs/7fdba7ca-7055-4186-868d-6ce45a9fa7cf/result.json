@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "7fdba7ca-7055-4186-868d-6ce45a9fa7cf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ce1eb77c-a125-41f9-ab2c-24fda442135c",
+  "commit": "4f2d08f0f1b4cde536dd58738781d967bf89ad22",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-07T05:29:35.162255438Z",
+  "completed_at": "2026-07-07T05:46:04.362157350Z",
+  "duration_ms": 989199,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 through REQ-08 are met. Mode 3 now routes to steward-owned charter facilitation, not `jit-planning-lead` ([SKILL.md:158](.claude/skills/jit-project-lead/SKILL.md:158), [mode-routing.md:106](.claude/skills/jit-project-lead/references/mode-routing.md:106)). Mode 2 runs the same charter step before planning ([SKILL.md:153](.claude/skills/jit-project-lead/SKILL.md:153), [mode-routing.md:99](.claude/skills/jit-project-lead/references/mode-routing.md:99)). The facilitation reference covers coached elicitation, bootstrap-from-repo with owner ratification, append-only `D-N` write-back, and supersession rules ([charter-facilitation.md:15](.claude/skills/jit-project-lead/references/charter-facilitation.md:15), [charter-facilitation.md:73](.claude/skills/jit-project-lead/references/charter-facilitation.md:73)).\n\nThe charter format is defined and instantiated with `## Decision Log` summary rows plus `## Decision Details` full entries ([vision-charter.md:36](.claude/skills/jit-project-lead/references/vision-charter.md:36), [templates/vision-charter.md:29](.claude/skills/jit-project-lead/references/templates/vision-charter.md:29), [docs/9db27a3a-charter.md:20](docs/9db27a3a-charter.md:20)). The repo declares `[item_kinds.charter]` over the charter source ([.jit/config.toml:200](.jit/config.toml:200)) and `per` as a decision-link namespace ([.jit/config.toml:102](.jit/config.toml:102)). I verified `jit item list --kind charter --json` returns seven charter items and `jit item resolve @/charter/D-7 --json` resolves to the summary row. The v1.0 milestone has the charter doc link ([9db27a3a issue:40](.jit/issues/9db27a3a-86c5-4d79-9582-9ad68364ea36.json:40)).\n\n**Architecture And Separation Of Concerns**\n\nNo Rust architecture boundary violations found. This change is skill/config/documentation only; no domain/storage/commands/CLI/output implementation code was modified.\n\n**Functional Paradigm**\n\nNo Rust implementation was changed. Not applicable beyond the documentation/config updates.\n\n**Correctness And Invariants**\n\nNo file-write, event-log, gate-transition, assignee-format, label-format, PID, or unsafe-code implementation path was changed. The new `charter` item kind resolves through existing item projection and link-label machinery; `jit validate ce1eb77c-a125-41f9-ab2c-24fda442135c --json` reports no findings.\n\n**Safety**\n\nNo unsafe Rust code was introduced.\n\n**Testing**\n\nI did not run cargo tests. The issue has no `cargo-ci` gate in the provided issue context; its required `jit-validate` gate passed at commit `4f2d08f0` ([result.json:9](.jit/gate-runs/19966e51-45f7-4ea7-a8c0-88a7aa5d9f99/result.json:9)). No issue-specific failed test or lint evidence was provided.\n\n**Error Handling**\n\nNo new fallible Rust operations were added. Existing CLI validation surfaces dangling qualified item references through `resolve_link_label`.\n\n**CLI Contract**\n\nNo CLI command surface changed. The relevant existing item commands support `--json`, and the new config works with `jit item list --kind charter --json` and `jit item resolve @/charter/D-7 --json`.\n\n**Documentation**\n\nThe new references and template are consistent with the issue contract. `parent-escalation.md` also records resolved escalations as both a summary row and full decision entry ([parent-escalation.md:97](.claude/skills/jit-project-lead/references/parent-escalation.md:97)).\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there is no prior review feedback for this issue.\n\n**JIT Issue Management**\n\nThe issue has no dependencies, and `unmet_dependencies` is empty. The recorded `jit-validate` gate passed. Label warnings are not present in the issue-specific validation output.\n\n**Findings**\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No blocking findings; charter facilitation, charter item kind, addressability, and v1.0 charter linkage satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No blocking findings; charter facilitation, charter item kind, addressability, and v1.0 charter linkage satisfy the issue criteria.",
+    "findings": []
+  }
+}
