@@ -2,14 +2,20 @@
   "id": "027d7cbf-bee1-4b4e-9912-bc144bc14cce",
   "title": "Declare the gate contract in the breakdown analysis schema",
   "description": "The analysis-agent JSON contract (`.claude/skills/jit-breakdown/references/plan-schema.md`) declares `gate_tier` but no `gates` field. In practice the orchestrator needs the concrete gate list per child at creation time, so each run re-invents the field ad hoc in the dispatch prompt. During the 2821e177 story recursion, six independently dispatched agents produced drifting shapes (some emitted `gates`, one emitted only `gate_tier`), and the creation script crashed mid-run on the missing key, leaving partially created state that had to be recovered by hand-reconstructing ref-to-UUID maps.\n\nMake the schema the single contract: `plan-schema.md` declares both `gate_tier` (the named tier) and `gates` (the concrete gate-key array for that tier, required, non-empty for implementation children), and the analysis prompt template points at the schema instead of restating it. The executing skill treats a child missing the field as a schema-validation failure before any issue is created, so drift surfaces as a parse error rather than a mid-creation crash.\n\n## Success Criteria\n\n- [hard] REQ-01: `plan-schema.md` declares `gate_tier` and a required `gates` array per child issue, with the tier-to-gates mapping supplied by the orchestrator as dispatch input.\n- [hard] REQ-02: the analysis prompt template references the schema for the gate fields rather than defining them inline.\n- [hard] REQ-03: jit-breakdown validates every returned child against the schema (all required fields present, `gates` non-empty where the tier demands it) before creating any issue, and reports a schema violation without writing partial state.\n",
-  "state": "in_progress",
+  "state": "gated",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-07T04:24:40.146671005Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,6 +24,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T23:59:55.244328822Z",
-  "updated_at": "2026-07-07T04:15:13.477890047Z",
+  "updated_at": "2026-07-07T04:26:06.171300430Z",
   "claimed_at": "2026-07-07T04:15:13.477889857Z"
 }

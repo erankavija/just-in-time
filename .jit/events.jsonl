@@ -5687,3 +5687,5 @@
 {"type":"gate_passed","id":"0f5a8d13-b79b-4231-88df-69f67275c456","issue_id":"4c9ee033-9602-4363-aee2-b47d918f94c5","timestamp":"2026-07-07T04:22:47.081264917Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"f0f3cfd3-7ffd-4f49-ad50-949f3c221004","issue_id":"4c9ee033-9602-4363-aee2-b47d918f94c5","timestamp":"2026-07-07T04:22:59.352262200Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"e2f2d506-f9be-4f9c-88b8-da22dac64c8c","issue_id":"4c9ee033-9602-4363-aee2-b47d918f94c5","timestamp":"2026-07-07T04:22:59.352289890Z"}
+{"type":"gate_failed","id":"2ccfe2f4-1013-41c8-9beb-53408417da48","issue_id":"027d7cbf-bee1-4b4e-9912-bc144bc14cce","timestamp":"2026-07-07T04:25:58.128331102Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"e4170a48-ed69-4401-bd36-3e4021ce192f","issue_id":"027d7cbf-bee1-4b4e-9912-bc144bc14cce","timestamp":"2026-07-07T04:26:06.171494160Z","from":"in_progress","to":"gated"}
