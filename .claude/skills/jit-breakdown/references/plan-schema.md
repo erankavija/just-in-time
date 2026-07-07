@@ -24,18 +24,34 @@ No prose before or after — the main agent parses the output directly.
 }
 ```
 
+## Requiredness
+
+This section is the canonical required-field set; the skill's Step 4 batch
+validation checks every child against it.
+
+Every field in the object above is **required** on every child, with one
+exception: `decompose_further` is optional and defaults to `false` when
+omitted. Array-valued fields are required as arrays — use `[]` where the
+field rules permit an empty list (`satisfies` when the child credits no
+container criterion or in a plain breakdown, `depends_on` with no sibling
+prerequisites, `gates` only for a project-defined gateless tier).
+
 ## Field rules
 
-**`ref`**
+**`ref`** (required)
 Unique within this plan. Used only to express `depends_on` relationships; never
 written to JIT. Keep short and stable (survives copy-paste editing by the user).
 Suggested format: `C1`, `C2`, etc. (C for child) or a short mnemonic.
 
-**`type`**
+**`title`** (required)
+Concise and action-oriented; content standards for titles are enforced at plan
+review (SKILL.md Step 5).
+
+**`type`** (required)
 Must be one of the child type names at level+1 below the parent — these are
 passed to the agent in `[CHILD_TYPES_TABLE]`. Never invent new type names.
 
-**`decompose_further`**
+**`decompose_further`** (optional; defaults to `false`)
 `true` when this child is not a single coherent unit but bundles several distinct
 deliverables — i.e. it should become a parent at the next level down rather than a
 leaf. Set it **only** when a finer child type exists below this one in the hierarchy.
@@ -43,7 +59,7 @@ Heuristic: if the child's own Success Criteria would split into three or more gr
 addressing separate concerns, it is a story, not a task — set `true`. Default `false`.
 The skill recurses on every child flagged `true`.
 
-**`gate_tier`**
+**`gate_tier`** (required)
 Which of the project's gate tiers applies, chosen from the `[GATE_TIERS]` list the skill
 supplies in the analysis prompt. The skill derives these tiers from the project's own gate
 registry, so the same mechanism fits any domain: software (a full CI+review tier alongside
@@ -52,7 +68,7 @@ and others. Give core deliverables the **primary/full** tier and clearly support
 (documentation, notes) a lighter tier. When unsure, choose the primary tier; pick from the
 supplied tier labels.
 
-**`gates`**
+**`gates`** (required)
 The concrete gate keys the created child will carry: the gate set that `gate_tier`
 maps to. The orchestrator supplies the tier → gate-set mapping as dispatch input in
 `[GATE_TIERS]`; copy the chosen tier's gates verbatim into this array (pick from the
@@ -60,7 +76,7 @@ supplied keys). **Required and non-empty** for every implementation child, so a 
 always carries a quality check. An empty array is valid only for a tier the project
 defines as gateless (rare, e.g. pure notes).
 
-**`depends_on`**
+**`depends_on`** (required; `[]` when there are no sibling prerequisites)
 `["ref-X"]` means this issue **is blocked by** `ref-X` — it cannot start until
 `ref-X` is complete. Only reference other issues in this plan's `issues` array.
 Do NOT reference the parent issue (that relationship is handled by the skill).
@@ -68,7 +84,7 @@ Use an empty array `[]` when there are no sibling prerequisites.
 
 This is the most important field. Take time to reason carefully about sequencing.
 
-**`satisfies`** (bracket breakdown only)
+**`satisfies`** (required; `[]` when the child credits none, and always in a plain breakdown)
 The container's `[hard]` criterion ids that THIS child delivers. The skill supplies
 the container's `[hard]` criteria (id + text) in `[CONTAINER_HARD_CRITERIA]`; for
 each criterion, name the child(ren) that complete it and list that criterion's id
@@ -84,7 +100,7 @@ a `[hard]` criterion no child lists here is reported as *uncovered* by the gate.
   `satisfies` — coverage must be total, or the gate fails.
 - Plain breakdown (no `[CONTAINER_HARD_CRITERIA]` supplied): leave `satisfies: []`.
 
-**`description`**
+**`description`** (required)
 Must be self-contained. The reader will not have access to the spec document.
 Include:
 - What needs to be built or done
@@ -92,13 +108,13 @@ Include:
 - Acceptance criteria or definition of done
 - Relevant constraints, edge cases, or interface requirements
 
-**`priority`**
+**`priority`** (required)
 Default to `"normal"` when uncertain.
 - `"high"` for items that block most other siblings.
 - `"critical"` only for hard blockers with no workaround.
 - `"low"` for optional polish or deferred enhancements.
 
-**`source`**
+**`source`** (required)
 Quote the section heading, bullet, or short excerpt from the spec document that
 this issue came from. Helps the user verify coverage and trace requirements.
 
@@ -156,6 +172,7 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "priority": "normal",
       "depends_on": ["C1"],
       "source": "Section 3: Shader Implementation",
+      "satisfies": ["REQ-02"],
       "gate_tier": "full",
       "gates": ["cargo-ci", "code-review"]
     },
@@ -167,6 +184,7 @@ Given a spec for "GPU Acceleration Pipeline" epic, the output might be:
       "priority": "normal",
       "depends_on": ["C1"],
       "source": "Section 4: CPU-side Dispatch",
+      "satisfies": ["REQ-03"],
       "gate_tier": "full",
       "gates": ["cargo-ci", "code-review"]
     },
@@ -193,5 +211,5 @@ C3 (needs both implementations to benchmark). The container's `[hard]` criteria
 REQ-01..REQ-04 are each credited to the child that delivers them via `satisfies`
 (the interface task covers REQ-01, the two implementation tasks REQ-02/REQ-03, the
 benchmark REQ-04), so the coverage-preview gate sees every `[hard]` criterion
-covered. `C2` and `C3` (omitted above for brevity) carry `"satisfies": ["REQ-02"]`
-and `["REQ-03"]` respectively.
+covered. Every child carries the full required-field set (see Requiredness);
+none sets `decompose_further`, so each defaults to `false` and stays a leaf.

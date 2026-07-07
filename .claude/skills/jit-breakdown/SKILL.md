@@ -240,13 +240,14 @@ Parse the returned JSON. If parsing fails, show the raw output to the user and
 ask whether to retry or abort.
 
 **Validate every child against the schema before continuing — no issue is created
-until the whole batch passes.** Reject the batch if any child is missing a required
-field (`ref`, `title`, `description`, `type`, `priority`, `depends_on`, `gate_tier`,
-`gates`) or carries an empty `gates` array where its `gate_tier` maps to a non-empty
-gate set ([references/plan-schema.md](references/plan-schema.md)). Report the
-offending `ref` and the violated field, then retry or abort. A malformed batch fails
-here, before Step 6 creates anything, so drift surfaces as one schema-validation error
-and the repository is left untouched.
+until the whole batch passes.** The canonical required-field set is the
+Requiredness section of [references/plan-schema.md](references/plan-schema.md):
+every schema field is required on each child except `decompose_further`, which
+defaults to `false` when omitted. Reject the batch if any child is missing a
+required field or carries an empty `gates` array where its `gate_tier` maps to a
+non-empty gate set. Report the offending `ref` and the violated field, then retry
+or abort. A malformed batch fails here, before Step 6 creates anything, so drift
+surfaces as one schema-validation error and the repository is left untouched.
 
 ---
 
