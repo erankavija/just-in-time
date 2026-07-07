@@ -227,14 +227,18 @@ hand the tree to execution; do not start implementing the work.
    (`jit gate pass <B> breakdown-review`, looping on FAIL as in Step 4e). A gated
    fan-out is not fully broken down. Commit jit state.
 
-3. **Cross-sibling coherence.** When this level produced **two or more** children that
-   share a contract (one consumes another's output, or several touch the same surface),
-   dispatch a read-and-report reviewer over the sibling set before going deeper:
-   interface mismatch, boundary overlap, duplicated responsibility, and dependency
-   direction. `breakdown-review` judges *this* container's decomposition; this pass
-   catches what only shows up **across** siblings, the cheapest place to catch it.
-   Fold any finding back into the affected child (or the §3 sketch) and re-run the gate.
-   Skip for a single child or trivially independent leaves.
+3. **Cross-sibling coherence.** When a level breaks down **two or more** sibling
+   containers through independent analysis dispatches — each recursed sibling (item 5)
+   runs its own `jit-breakdown` analysis agent — a coherence pass over their combined
+   task set is **mandatory** once those breakdowns return. The containers are not
+   bracketed, so their fan-outs get no `breakdown-review`; this pass is the only review
+   those independently authored task sets receive. Dispatch a read-and-report reviewer
+   over the sibling set to check consumed-vs-promised contracts across story boundaries —
+   the names, shapes, and deletions one sibling relies on and another must honor —
+   alongside interface mismatch, boundary overlap, duplicated responsibility, and
+   dependency direction. It returns fixes as criterion or description rewords consistent
+   with the approved plan, folded back into the affected task. Skip only for a single
+   recursed container, or a level authored in one dispatch.
 
 4. **Collect the new breakable children.** Of the children just created, any whose
    `type` is a breakable container type (it appears in some template's `applies_to`,
@@ -244,6 +248,8 @@ hand the tree to execution; do not start implementing the work.
 5. **Recurse.** For each breakable child on the frontier, re-enter Step 2 (its intent
    derived autonomously, per the Step 2 autonomous preamble) through Step 5. Push any
    new breakable grandchildren onto the frontier. Continue until the frontier is empty.
+   When this level recursed two or more sibling containers, run item 3's coherence pass
+   over their combined task set before treating them as broken down.
 
 If a level stops converging (repeated gate pathology, an unresolvable owner fork, or
 intent that the artifacts cannot support), **escalate that subtree** to the requester
