@@ -205,10 +205,12 @@ plan review gate.
 **implementation-consumed** (only a future implementation child consumes it). An
 implementation-consumed dep left on `P` deadlocks the bracket: `P` can never close
 until it completes, so `B` never releases. Re-home each implementation-consumed edge
-onto its consuming child — the `jit dep` move runs at breakdown time (Step 5) — and
-record the move with its rationale in the plan's **Decisions** section. Escalate a
-planning-required dep that cannot complete to the requester rather than dropping the
-edge or forcing the plan through.
+in two steps. Now, during the audit, **remove** it from `P` so `P` is free to
+complete, and record the removal, its intended consuming child, and the rationale in
+the plan's **Decisions** section — that record carries the obligation forward. At
+breakdown time (Step 5), once the consuming child exists, **attach** the edge to it,
+completing the re-home. Escalate a planning-required dep that cannot complete to the
+requester rather than dropping the edge or forcing the plan through.
 
 Ensure that the plan document is linked to the plan issue P with `jit doc add
 <P> <plan-doc-path> --doc-type design` and that all the findings uncovered in
