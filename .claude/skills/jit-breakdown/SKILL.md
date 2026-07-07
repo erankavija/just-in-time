@@ -290,7 +290,7 @@ Notes from analysis agent:
 Show all sequencing edges. Cross-dependencies (where a child depends on another
 child that is not an immediate predecessor) should be explicitly called out.
 
-**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); and a non-empty `gate_tier` with its `gates` array (validated in Step 4, Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
+**Before asking for approval**, verify that every proposed child meets the minimum output quality bar: a descriptive title with no ordinals, `feat(...)` prefixes, or embedded IDs (content-standards Issue Titles); a type derived from the configured hierarchy (Step 2); an identifying `<namespace>:<slug>` label, a kebab slug from the child's title, on every child whose type carries a membership namespace in `[type_hierarchy.label_associations]` (Step 6a), so every strategic-typed child enters creation already holding its own grouping label; and a non-empty `gate_tier` with its `gates` array (validated in Step 4, Step 1.6). An item missing any of these will fail the content lint in Step 7; catch it now and use **edit** to correct the plan before creation.
 
 Ask: **"Create these N child issues and wire up dependencies? [yes / edit / abort]"**
 
@@ -313,10 +313,23 @@ jit issue create \
   --description "<description>" \
   --label "type:<child-type>" \
   --label "<membership-label>" \
+  --label "<identifying-label>"        # own <namespace>:<slug>; present when the child type has a membership namespace (Identifying label, below)
   --label "satisfies:<id>" ...        # one per id in this child's `satisfies` (bracket only; Step 1.5 step 5)
   --priority "<priority>" \
   --gate "<g1>" --gate "<g2>"          # this child's `gates` array (its gate_tier's set; validated in Step 4)
 ```
+
+**Identifying label — the child's own grouping namespace.** When the child's `type`
+is a key in `.jit/config.toml`'s `[type_hierarchy.label_associations]` (for example a
+`story` child, since `story = "story"` associates the `story` namespace), derive a
+kebab slug from the child's title (lowercase, hyphens, ≤ 30 chars — the Step 3 slug
+shape) and attach `<namespace>:<slug>` as the `<identifying-label>` above. This is the
+child's own label, held alongside the `<membership-label>` that groups it under the
+parent: a `story` child created under an epic carries both `epic:<parent-slug>`
+(membership) and `story:<child-slug>` (its own), and the tasks broken out of that story
+later carry `story:<child-slug>`. The rule keys off each child's own type, so a
+mixed-tier fan-out attaches an identifying label to every strategic-typed child and
+leaves association-free leaves (a `task` or `bug`) carrying the membership label alone.
 
 Apply the quality gates from the child's validated `gates` field (its `gate_tier`'s
 set). Every implementation issue gets its tier's gates — skipping them leaves work that
