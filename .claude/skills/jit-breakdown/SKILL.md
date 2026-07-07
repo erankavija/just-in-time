@@ -21,8 +21,10 @@ child issues with a correct dependency DAG, and populate JIT.
   parent-centric flow: create children, then make the parent depend on all of
   them (Step 6c-plain).
 
-Everything in Steps 2-5 (read hierarchy, membership label, analysis, plan review)
-is shared. The two shapes differ only in **Step 6 execution wiring**.
+Steps 2-5 (read hierarchy, membership label, analysis, plan review) are largely
+shared; the one content difference is child-type selection in Step 2, where a
+bracket breakdown honors the approved plan's declared tiers. The two shapes' wiring
+differs in **Step 6 execution**.
 
 ---
 
@@ -179,6 +181,15 @@ Identify the **child types** — the type(s) at level+1. If the parent is alread
 the finest level, warn: "This issue type has no child level in the configured
 hierarchy. Cannot break it down further."
 
+**A bracket breakdown draws its child types from the approved plan instead.** When
+Step 1.5 selected a bracket breakdown, the plan's decomposition sketch (§3) already
+assigns each sketch item its own type tier, and that assignment is the reviewed
+contract. Take the child types from the set of tiers the sketch declares — which may
+span more than one level below the parent — and let each child keep the tier its
+sketch item names. A sketch that types some items as stories and others as tasks
+yields mixed-tier children under one epic, a valid outcome. The uniform level+1 rule
+governs plain breakdowns.
+
 Also read `[type_hierarchy.label_associations]` to find the membership namespace
 for the parent's type. For example, if `epic = "epic"` in label_associations, then
 children of an epic carry an `epic:<name>` label.
@@ -226,7 +237,7 @@ Fill in the template fields:
 | `[PARENT_ISSUE_TITLE]` | Parent issue title |
 | `[PARENT_ISSUE_DESCRIPTION]` | Parent issue description (or "(none provided)") |
 | `[PARENT_TYPE]` | Parent's type name (e.g., `epic`) |
-| `[CHILD_TYPES_TABLE]` | Child type name(s) at level+1, one per line with level |
+| `[CHILD_TYPES_TABLE]` | Plain: child type name(s) at level+1. Bracket: the tiers the approved plan's sketch declares (Step 2). One per line with level |
 | `[MEMBERSHIP_LABEL]` | The membership label determined in Step 3 |
 | `[SPEC_DOC_PATH]` | Absolute path to the spec document |
 | `[TYPE_HIERARCHY_TABLE]` | Full hierarchy table from Step 2 |

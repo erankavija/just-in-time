@@ -41,7 +41,9 @@ property (atomic / validated-first / reuses X), cite the verification that it ho
 ## 3. Decomposition sketch (near-ready; jit-breakdown instantiates — no issues created here)
 
 Intermediate groupings sized to the work; each group independently landable (green at every
-boundary). Express ordering through the `depends-on` field — never as prose ordinals.
+boundary). Express ordering through the `depends-on` field — never as prose ordinals. Each
+item's `type:` tier is binding for fan-out: jit-breakdown creates each child at the tier its
+sketch item declares, so a sketch may mix story- and task-typed items under one container.
 
 ### Group A: <name>  — covers REQ-01, REQ-04
 - **<item title>**  `type: <story|task>`  `satisfies: REQ-01, REQ-10`  `depends-on: —`

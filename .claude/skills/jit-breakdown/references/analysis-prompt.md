@@ -23,11 +23,18 @@ This project uses the following issue type hierarchy (lower level = more strateg
 [TYPE_HIERARCHY_TABLE]
 
 The parent issue is of type `[PARENT_TYPE]`. The child issues you create must use
-the following type(s) at the next level down:
+the following child type(s), listed with their level:
 
 [CHILD_TYPES_TABLE]
 
 Use **only** these child type names — do not invent others.
+
+When the specification document is an approved plan, its decomposition sketch assigns
+each item a `type:` tier, and that assignment is the reviewed contract. Give each
+child the tier its sketch item declares, drawn from the names above. A sketch may
+type some items as stories and others as tasks, so mixed-tier children under one
+parent are a valid, expected outcome — set each child's `type` field to its sketch
+item's tier.
 
 ## Membership label
 
@@ -99,7 +106,10 @@ Output **only** the JSON object — no preamble, no explanation, no markdown fen
    tasks). Match decomposition **depth to size** — a large parent becomes
    parent → story → task, a small one stops at the first level.
 
-2. **Use the narrowest child type that fits.** If there are multiple child types
+2. **Assign each child's type.** When the specification is an approved plan whose
+   decomposition sketch types each item, use the tier that sketch item declares —
+   that assignment is binding and may mix stories and tasks under one parent.
+   Otherwise, use the narrowest child type that fits: when multiple child types are
    available, assign the type whose scope best matches the work item.
 
 2a. **Record each issue's gate fields** from the `[GATE_TIERS]` mapping the skill
