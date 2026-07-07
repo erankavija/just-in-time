@@ -48,8 +48,11 @@ Concise and action-oriented; content standards for titles are enforced at plan
 review (SKILL.md Step 5).
 
 **`type`** (required)
-Must be one of the child type names at level+1 below the parent — these are
-passed to the agent in `[CHILD_TYPES_TABLE]`. Never invent new type names.
+Must be one of the child type names passed to the agent in `[CHILD_TYPES_TABLE]`.
+In a plain breakdown those are the types at level+1 below the parent. In a bracket
+breakdown each child takes the tier its approved-plan sketch item declares, which may
+sit more than one level below the parent, so mixed story- and task-typed children
+under one parent are valid. Never invent new type names.
 
 **`decompose_further`** (optional; defaults to `false`)
 `true` when this child is not a single coherent unit but bundles several distinct
