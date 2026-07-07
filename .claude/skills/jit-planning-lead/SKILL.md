@@ -120,7 +120,13 @@ and owns the gate.
 **Dispatch hygiene** (every sub-agent this skill dispatches). Hand work over as
 **files, not pasted prose**: give the agent the paths to read and have it return a
 short status plus the path it wrote — a pasted artifact stays resident in your
-context for the rest of the session. **Pick the model per role:** a cheap model for
+context for the rest of the session. **Route output by whether the plan cites it.**
+An artifact the plan cites as grounding — an investigation or research report the
+`plan-review` gate resolves as an authoritative source — is **repo-resident under the
+managed active-docs directory** (`dev/active/`, the `[documentation]` `managed_paths`
+in `.jit/config.toml`) and **linked to P with `jit doc add`**, so the gate reaches it.
+An intermediate artifact no reviewed document cites stays in the **session
+scratchpad**. **Pick the model per role:** a cheap model for
 mechanical reads (investigator), a capable one where judgment drives quality
 (synthesizer, adversarial reviewer). State the model on every dispatch; an omitted
 model inherits this session's, usually the most expensive.
@@ -128,7 +134,12 @@ model inherits this session's, usually the most expensive.
 #### Step 4b — Investigate
 
 Dispatch a `general-purpose` sub-agent with
-**[references/investigator-prompt.md](references/investigator-prompt.md)**.
+**[references/investigator-prompt.md](references/investigator-prompt.md)**, directing
+it to write its findings report to a **repo-resident path derived from the container
+id** under the managed active-docs directory —
+`dev/active/{container.short_id}-investigation.md` (the `[documentation]`
+`managed_paths` in `.jit/config.toml`). The plan cites this report as grounding, so it
+is repo-resident from the start.
 Investigation is **mandatory** — the `plan-review` area "technical soundness +
 architectural fit" fails any ungrounded plan. The investigator:
 
@@ -141,7 +152,10 @@ architectural fit" fails any ungrounded plan. The investigator:
   / "validated-first" / "transactional", confirm the cited operations actually support
   it; do not paraphrase intent into fact).
 
-Returns cited findings (`file:line`) keyed to the criteria they bear on.
+Returns cited findings (`file:line`) keyed to the criteria they bear on. **Link the
+report to P before the `plan-review` gate runs:** `jit doc add <P>
+<investigation-doc-path> --doc-type study`, so the gate resolves the source the plan
+cites as grounding.
 
 **Research (conditional).** Only when a signal fires — a **new external dependency**, a
 **"choose/evaluate"** decision, or **architectural-scope** work — dispatch

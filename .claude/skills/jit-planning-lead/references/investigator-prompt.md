@@ -31,8 +31,12 @@ Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/
 
 ## What to produce
 
-Read the actual code, config, and docs. Use search aggressively. Return a structured
-findings report:
+Read the actual code, config, and docs. Use search aggressively. Write a structured
+findings report to the **repo-resident path the dispatch names**
+(`dev/active/<C-id>-investigation.md` under the project's development docs path — read
+the live `[documentation]` config for the correct location). The plan cites this report
+as grounding, so it is repo-resident. Return a short summary plus the path you wrote. The
+report contains:
 
 1. **Claim classification.** For every input claim, classify it against the code and cite
    `file:line`:
