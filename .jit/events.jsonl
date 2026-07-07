@@ -5735,3 +5735,6 @@
 {"type":"issue_updated","id":"f61b8b02-8879-456c-a072-811b2e2ee5cd","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.951660524Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_state_changed","id":"486ac01d-0e72-488b-8ba3-742c612be843","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.975262132Z","from":"ready","to":"done"}
 {"type":"issue_completed","id":"49f197b6-2136-4734-81a6-dd8806631700","issue_id":"1f564776-0c6e-4c5b-9300-aa239b48adda","timestamp":"2026-07-07T07:53:17.975282712Z"}
+{"type":"issue_created","id":"ece6bdd9-6ffe-459a-a077-51bf39edb7d4","issue_id":"3e12ffbd-694e-44b3-81c9-5a24ebf17340","timestamp":"2026-07-07T09:07:13.960739474Z","title":"Scoped batch-shape graph export as the batch-create inverse","priority":"normal"}
+{"type":"issue_updated","id":"6ea34054-9b8c-4647-bed7-5e483b98c36a","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-07T09:07:57.571709607Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"9ccb4152-0f53-4d65-b847-1c08e57e827a","issue_id":"3e12ffbd-694e-44b3-81c9-5a24ebf17340","timestamp":"2026-07-07T09:07:57.582723975Z","updated_by":"doc-add","fields":["documents"]}
