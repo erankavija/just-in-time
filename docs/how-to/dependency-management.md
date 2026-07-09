@@ -57,7 +57,7 @@ jit dep add $EPIC $TASK
 ```
 
 **When to use dependencies:**
-- One piece of work must finish before another can start
+- One piece of work must reach a terminal state before another can start
 - Enforcing execution order (A → B → C)
 - Determining what's available to work on
 - Controlling state transitions automatically

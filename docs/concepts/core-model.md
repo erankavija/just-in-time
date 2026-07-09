@@ -124,7 +124,7 @@ See [Assignees](#assignees) for complete specification.
 
 #### Dependencies - Work Order
 
-List of issue IDs that must complete before this issue can be done.
+List of issue IDs that must reach a terminal state before this issue can proceed.
 
 **Semantics:** "This issue depends on those issues"
 - Blocks completion (state transition to `done`)
@@ -483,7 +483,7 @@ Invalid label: v1.0 cannot "belong to" v2.0 task
 - Querying specific subsets
 
 **Use Dependencies:**
-- Enforcing work order (A must complete before B)
+- Enforcing work order (A must reach a terminal state before B)
 - Blocking work until prerequisites ready
 - Determining what's available to work on
 - Controlling state transitions

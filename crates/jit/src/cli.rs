@@ -1987,7 +1987,7 @@ pub enum AssetCommands {
 pub enum GraphCommands {
     /// Show what an issue depends on (upstream dependencies)
     ///
-    /// Shows the issues that must be completed before this issue can proceed.
+    /// Shows the issues that must reach a terminal state before this issue can proceed.
     /// By default shows immediate dependencies only (depth 1).
     ///
     /// Examples:
