@@ -2,7 +2,7 @@
   "id": "c291e95c-82f0-437f-8b58-264ac73e27b2",
   "title": "Refresh MCP curated tool set for the expanded CLI surface",
   "description": "The MCP server auto-generates tools from the CLI schema and its integration test bounds the curated set below 50; the maintenance batch grew the surface to 68 generated tools, so the suite fails.\n\n## Background\n\nNew commands from the batch (issue status/children/progress, query count/divergence, config get, gate findings view, graph tree, migrate, export --full) enter the generated tool set. The curated bound exists to keep the MCP surface intentional, so the fix is a deliberate re-curation, not only a raised number.\n\n## Success Criteria\n\n- [hard] REQ-01: The curated tool list explicitly includes or excludes each newly generated command with a one-line rationale in the test or its fixture.\n- [hard] REQ-02: mcp-server npm test passes.\n- [hard] REQ-03: The tool-count bound reflects the curated set with documented headroom.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -12,20 +12,20 @@
     "mcp-ci"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T20:54:21.023035268Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T21:03:36.841556306Z"
-    },
     "mcp-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-09T21:38:25.021491081Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T21:38:42.087780021Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T20:54:21.023035268Z"
     }
   },
   "context": {},
@@ -35,7 +35,8 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-07-05T22:01:24.041267338Z",
-  "updated_at": "2026-07-09T21:38:26.128171315Z",
+  "updated_at": "2026-07-09T21:39:40.964345415Z",
   "first_ready_at": "2026-07-05T22:01:24.041272188Z",
-  "claimed_at": "2026-07-09T20:35:17.339477169Z"
+  "claimed_at": "2026-07-09T20:35:17.339477169Z",
+  "done_at": "2026-07-09T21:39:40.964344835Z"
 }

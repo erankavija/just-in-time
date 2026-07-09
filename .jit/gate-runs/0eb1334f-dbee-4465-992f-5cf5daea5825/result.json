@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0eb1334f-dbee-4465-992f-5cf5daea5825",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a4e8d5ac-c3f7-40bb-b4ea-108283bcf611",
+  "commit": "6fd9b667d0d95ffa7a8460a7797cd4032ff46bff",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-09T21:39:44.811010152Z",
+  "completed_at": "2026-07-09T21:40:51.820257849Z",
+  "duration_ms": 67009,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nREQ-1 and REQ-2 are satisfied in `mcp-server/index.js:47-52`: the prompt states dependency edges define containment, containers depend on contents, membership labels are advisory only, and agents should use `jit_graph_tree` plus `jit_query_divergence`.\n\nREQ-3 is satisfied by recorded gate evidence: `mcp-ci` passed with exit code `0` at `2026-07-09T21:38:27Z`. The reviewed implementation diff touches only `mcp-server/index.js`.\n\n**Architecture And Separation**\n\nNo boundary violation found. This is a static MCP server instruction-string change only; it does not add domain, storage, command, CLI, or output logic.\n\n**Functional Paradigm**\n\nNo implementation logic was added beyond prompt text replacement.\n\n**Correctness And Invariants**\n\nNo new writes, event mutations, gate transitions, assignee/label parsing, PID handling, or unsafe code paths are introduced by the prompt change. The prior dependency blocker is addressed: `.jit/issues/c291e95c-82f0-437f-8b58-264ac73e27b2.json:5` is now `done`, with corresponding event-log entries appended.\n\n**Safety**\n\nNo Rust unsafe-code surface is implicated.\n\n**Testing**\n\nI did not rerun MCP tests because the issue has a succeeded `mcp-ci` gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo fallible production path changed.\n\n**CLI Contract**\n\nNo CLI command surface changed.\n\n**Documentation**\n\nNo public API was added or modified.\n\n**Prior Review Feedback**\n\nThe most recent prior finding was that prerequisite issue `c291e95c` was still `in_progress`. It is now `done` at `.jit/issues/c291e95c-82f0-437f-8b58-264ac73e27b2.json:5`, so the prior blocker is resolved.\n\n**Jit Issue Management**\n\n`./scripts/jit-validate.sh` passed. The listed dependency is completed, and the issue correctly builds on the MCP tool-surface work.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The MCP prompt now reflects DAG-authoritative containment, points agents to the resolved hierarchy and divergence tools, and the prior dependency blocker is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The MCP prompt now reflects DAG-authoritative containment, points agents to the resolved hierarchy and divergence tools, and the prior dependency blocker is resolved.",
+    "findings": []
+  }
+}

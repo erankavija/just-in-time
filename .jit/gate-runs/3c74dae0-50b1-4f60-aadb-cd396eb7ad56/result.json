@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "3c74dae0-50b1-4f60-aadb-cd396eb7ad56",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c291e95c-82f0-437f-8b58-264ac73e27b2",
+  "commit": "6fd9b667d0d95ffa7a8460a7797cd4032ff46bff",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-09T21:38:42.087780021Z",
+  "completed_at": "2026-07-09T21:39:36.774029057Z",
+  "duration_ms": 54686,
+  "exit_code": 0,
+  "stdout": "**Acceptance Criteria**\n\nPass. `mcp-server/curated-tools.json:1` documents the curation policy, and `mcp-server/curated-tools.json:11` through `mcp-server/curated-tools.json:119` explicitly includes or excludes each generated command with a rationale. The newly mentioned commands are covered: `jit_issue_status`, `jit_issue_children`, `jit_issue_progress`, `jit_query_count`, `jit_query_divergence`, `jit_config_get`, `jit_graph_tree`, `jit_migrate_lifecycle-timestamps`, and export-related graph/snapshot commands.\n\nREQ-02 is now satisfied by recorded evidence: `.jit/gate-runs/fcd8233c-ba64-4dc6-bfd8-742948a52263/result.json:14` shows `46 passed, 0 failed` unit tests plus `8 passed, 0 failed` integration tests, and `.jit/gate-runs/fcd8233c-ba64-4dc6-bfd8-742948a52263/result.json:16` records the exact command `cd mcp-server && npm test`.\n\nREQ-03 is satisfied. `mcp-server/curated-tools.json:8` documents the headroom policy, and `mcp-server/curated-tools.json:10` sets `max_curated_tools` to `55`.\n\n**Architecture And Separation Of Concerns**\n\nPass. The change remains confined to MCP server curation data, MCP generator logic, tests, and README documentation. No Rust domain, storage, command, CLI, or output boundary violations found.\n\n**Functional Paradigm**\n\nPass. The curation behavior is data-driven through manifest membership in `mcp-server/lib/tool-generator.js:237`. Coverage checks use set-style operations in `mcp-server/lib/tool-generator.js:250`.\n\n**Correctness And Invariants**\n\nPass. No state-transition, file-write, event-log, assignee/label, PID, or gate-semantics code is changed. The manifest narrows the MCP advertised tool set without modifying CLI state behavior.\n\n**Safety**\n\nPass. No Rust unsafe code is introduced by this MCP-server change.\n\n**Testing**\n\nPass. I did not rerun cargo tests because the issue has a succeeded `cargo-ci` gate. The required MCP npm suite is recorded passed in `.jit/gate-runs/fcd8233c-ba64-4dc6-bfd8-742948a52263/result.json:14`.\n\nI ran `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nPass. No new Rust fallible operations are introduced. The manifest load remains startup-time JSON loading in `mcp-server/lib/tool-generator.js:15`.\n\n**CLI Contract**\n\nPass. No CLI command surface changed. The MCP default listing is curated through `generateDefaultTools`, while full generation remains available via `generateTools`.\n\n**Documentation**\n\nPass. `mcp-server/README.md:100` through `mcp-server/README.md:118` documents the generated tool naming, curated default listing, curation manifest, and full-tool override.\n\n**Prior Review Feedback**\n\nResolved. The previous blocker was lack of evidence for `cd mcp-server && npm test`; the current `mcp-ci` gate result records that exact command and a passing test suite.\n\n**Jit Issue Management**\n\nPass. The issue has no dependencies. `./scripts/jit-validate.sh` passes. Labels in the issue context use the required namespace format.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The curated MCP tool set meets the issue requirements, the prior npm-test evidence gap is resolved, and repository validation passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The curated MCP tool set meets the issue requirements, the prior npm-test evidence gap is resolved, and repository validation passes.",
+    "findings": []
+  }
+}

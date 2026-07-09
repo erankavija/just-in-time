@@ -2,7 +2,7 @@
   "id": "a4e8d5ac-c3f7-40bb-b4ea-108283bcf611",
   "title": "Align MCP system prompt with DAG-authoritative containment",
   "description": "Rewrite the MCP server's hardcoded system prompt so assistants are told the dependency DAG defines containment and membership labels are advisory.\n\n## Background\n\nThe prompt in `mcp-server/index.js:47-51` describes a label-centric model (\"type:epic contains stories, has epic:* label for grouping; type:story has story:* label linking to parent\"), which contradicts core semantics: the DAG is authoritative for containment (a container depends on its contents) and membership labels are advisory grouping that resolution never consults. Assistants primed with the label model will wire membership wrong and misread divergence reports.\n\n## Success Criteria\n\n- [hard] REQ-1: The prompt states that dependency edges define containment (container depends on its contents) and that membership labels are advisory grouping only.\n- [hard] REQ-2: The prompt points assistants at the resolved-hierarchy and divergence query surfaces instead of label conventions for reading structure.\n- [hard] REQ-3: MCP server tests pass; no other tool-generation behavior changes.\n\n## Notes\n\nType names in the prompt must stay generic (types come from repository config), consistent with INV-DOMAIN-AGNOSTIC.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [
@@ -14,20 +14,20 @@
     "mcp-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
+    "mcp-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T21:03:37.905055809Z"
+      "updated_at": "2026-07-09T21:38:26.137424132Z"
     },
     "npm-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-09T21:01:55.754635788Z"
     },
-    "mcp-ci": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T21:38:26.137424132Z"
+      "updated_at": "2026-07-09T21:39:44.811010152Z"
     }
   },
   "context": {},
@@ -39,7 +39,8 @@
     "satisfies:REQ-8"
   ],
   "created_at": "2026-07-05T22:31:18.726402160Z",
-  "updated_at": "2026-07-09T21:38:27.041204849Z",
+  "updated_at": "2026-07-09T21:41:02.258098659Z",
   "first_ready_at": "2026-07-05T22:31:18.726402700Z",
-  "claimed_at": "2026-07-09T14:14:14.350574129Z"
+  "claimed_at": "2026-07-09T14:14:14.350574129Z",
+  "done_at": "2026-07-09T21:41:02.258097889Z"
 }
