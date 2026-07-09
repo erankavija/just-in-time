@@ -2,9 +2,9 @@
   "id": "313a7f3a-c6db-4adc-8934-36a7874287ed",
   "title": "Correct git-requirement claims in the guarantees doc",
   "description": "docs/concepts/guarantees.md lists agent claiming and coordination under what works without git, while the advisory-lease commands require a git repository and fail with a typed error (exit 10) outside one. The document's own multi-agent example uses a lease command.\n\n## Success Criteria\n\n- [hard] REQ-01: The git-optional section distinguishes issue assignment (works without git) from advisory leases (require git, typed failure with exit 10)\n- [hard] REQ-02: The requires-git list includes the lease commands\n- [hard] REQ-03: Examples in the document are consistent with the stated requirements",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "jit-validate",
@@ -20,6 +20,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.879453893Z",
-  "updated_at": "2026-07-06T15:47:42.401521725Z",
-  "first_ready_at": "2026-07-06T15:39:58.879454223Z"
+  "updated_at": "2026-07-09T23:14:07.796527200Z",
+  "first_ready_at": "2026-07-06T15:39:58.879454223Z",
+  "claimed_at": "2026-07-09T23:14:07.796527010Z"
 }

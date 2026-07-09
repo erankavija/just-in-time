@@ -2,9 +2,9 @@
   "id": "f5eb11a2-d368-4ede-aa9f-abdc1343236e",
   "title": "Convert ASCII diagrams in docs to Mermaid",
   "description": "Five adopter-facing docs draw diagrams as ASCII art; the content standards require Mermaid for all diagrams, and ASCII-art diagrams are forbidden in docs. Convert each diagram while directory listings and verbatim CLI output stay plain text.\n\n## Success Criteria\n\n- [hard] REQ-01: Every authored diagram in docs/ is a fenced Mermaid block conveying the same relationships as the ASCII art it replaces\n- [hard] REQ-02: Directory listings and verbatim CLI output remain plain text\n- [hard] REQ-03: docs/ is free of authored box-drawing and arrow-art diagrams\n\n## Notes\n\nAffected diagrams: docs/concepts/core-model.md (labels-vs-DAG boxes), docs/concepts/design-philosophy.md (two boxed layer diagrams), docs/how-to/dependency-management.md (boxed dependency illustration), docs/tutorials/parallel-work-worktrees.md (worktree control-plane arrows), docs/reference/labels.md (membership-vs-blocking arrow art).",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "jit-validate",
@@ -20,6 +20,7 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-07-06T16:16:38.048116726Z",
-  "updated_at": "2026-07-06T16:16:38.049661947Z",
-  "first_ready_at": "2026-07-06T16:16:38.048121706Z"
+  "updated_at": "2026-07-09T23:14:07.826133181Z",
+  "first_ready_at": "2026-07-06T16:16:38.048121706Z",
+  "claimed_at": "2026-07-09T23:14:07.826132991Z"
 }
