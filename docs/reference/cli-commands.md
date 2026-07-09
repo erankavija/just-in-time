@@ -97,13 +97,23 @@ behave identically to their canonical forms:
 | `jit dependency ...` | `jit dep ...` | Dependency management commands |
 | `jit document ...` | `jit doc ...` | Document reference commands |
 | `jit issue list` | `jit query all` | Same filters/flags (`-s`/`-a`/`-p`/`-l`, `--full`, `--json`); identical output. `-l`/`--label` is repeatable and ANDed |
+| `jit list` | `jit issue list` | Top-level spelling of the same listing, with the same filters |
+| `jit rdeps <id>` | `jit graph rdeps <id>` | Top-level spelling; takes the same `--depth`/`--json` |
+| `jit graph dependencies` | `jit graph deps` | Long spelling of the upstream view |
+| `jit graph downstream` | `jit graph rdeps` | Long spelling of the reverse view |
+| `jit query ready` | `jit query available` | Visible alias |
+| `jit gate eval` | `jit gate evaluate` | Visible alias |
+| `jit item resolve` | `jit item show` | Distinct verb, identical behavior |
 | `jit issue update <id> --add-label <label>` | `... --label <label>` | `--add-label` is an accepted alias for `--label` |
+| `jit doc add <id> <path> --title <t>` | `... --label <t>` | `--title` is an accepted alias for `--label` |
 
 ```bash
 # These pairs are equivalent
 jit dependency add a b      # == jit dep add a b
 jit document list <id>      # == jit doc list <id>
 jit issue list --json       # == jit query all --json
+jit list --json             # == jit issue list --json
+jit rdeps abc123            # == jit graph rdeps abc123
 jit issue update <id> --add-label area:foo  # == --label area:foo
 ```
 
@@ -1003,6 +1013,117 @@ state could not be determined.
 
 ## Issue Commands
 
+### Creating Issues (`jit issue create`)
+
+Create one issue. The title is the subject of the verb: give it positionally or
+through `-t`/`--title`. Exactly one of the two forms is required, and supplying
+both is a usage error (exit code `2`).
+
+```bash
+jit issue create <TITLE> [OPTIONS]
+jit issue create --title <TITLE> [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-t`, `--title <TITLE>` | Title, as a flag instead of the positional argument. |
+| `-d`, `--description <DESCRIPTION>` | Issue body. Defaults to the empty string. |
+| `-p`, `--priority <PRIORITY>` | `low`, `normal` (default), `high`, or `critical`. |
+| `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
+| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Each key must already exist in the gate registry (`jit gate define`). |
+| `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
+| `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to Markdown. `html`/`xml` require the matching cargo feature. |
+| `--force` | Bypass validation warnings. |
+| `--orphan` | Suppress the `orphan-leaf` hint for an issue deliberately created without a container. |
+| `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
+
+```bash
+jit issue create "Fix login bug"
+jit issue create "Fix login bug" --type bug --priority high
+jit issue create --title "Fix login bug" --gate tests --label epic:auth
+jit issue create "Wire up parser" --json
+```
+
+**Initial state.** A new issue has no dependencies, so it is born `Ready` and its
+`first_ready_at` timestamp is stamped at creation. Adding a dependency
+afterwards (`jit dep add`) is what moves it back to `Backlog` until the
+dependency reaches a terminal state.
+
+Under `--quiet` the command prints only the new issue's id, which is what
+scripts capture. Validation warnings go to stderr, so they never pollute that
+capture.
+
+### Updating Issues (`jit issue update`)
+
+Update one issue by id, or every issue matching a `--filter` expression. The two
+modes are mutually exclusive; giving neither is a usage error (exit code `2`).
+
+```bash
+jit issue update <ID> [OPTIONS]
+jit issue update --filter <QUERY> [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--filter <FILTER>` | Boolean query selecting the issues to update (batch mode). Mutually exclusive with `<ID>`. |
+| `-t`, `--title <TITLE>` | Replace the title. |
+| `-d`, `--description <TEXT>` | Replace the whole description with `TEXT`. |
+| `--description-file <PATH>` | Replace the whole description with the contents of `PATH` (`-` reads stdin), used verbatim. |
+| `--append-description <TEXT>` | Append `TEXT` to the description. |
+| `--append-description-file <PATH>` | Append the contents of `PATH` (`-` reads stdin) to the description. |
+| `-p`, `--priority <PRIORITY>` | `low`, `normal`, `high`, or `critical`. |
+| `-s`, `--state <STATE>` | Requested lifecycle state. |
+| `--type <KIND>` | Replace the issue's `type:*` label with `type:<kind>`. Long-only. |
+| `-l`, `--label <LABEL>` | Add labels (alias `--add-label`). Repeatable and comma-separated; adds to the existing set. |
+| `--remove-label <LABEL>` | Remove labels. Repeatable and comma-separated. |
+| `--add-gate <GATE>` | Require additional registered gates. Repeatable and comma-separated. |
+| `--remove-gate <GATE>` | Drop gates from the issue's requirements. |
+| `--assignee <ASSIGNEE>` | Set the assignee, in `type:identifier` form. |
+| `--unassign` | Clear the assignee. |
+| `--content-format <FORMAT>` | Set the description parser: `markdown`, `html`, `xml`, or `inherit`/`default` to fall back to the repository setting. |
+| `--force` | Bypass blocking (`enforce`) validation rules. The bypass is recorded as an event. |
+| `--json` | Emit the update confirmation object. |
+
+**Description flags are mutually exclusive**: exactly one of `--description`,
+`--description-file`, `--append-description`, `--append-description-file` may
+appear in a call. The `-file` forms read the file (or stdin) verbatim, including
+a trailing newline, which keeps large bodies out of `argv` and away from shell
+quoting. An append separates the old and new text with exactly one blank line;
+appending to an empty description yields just the new text.
+
+```bash
+jit issue update abc123 --state in_progress --assignee agent:worker-1
+jit issue update abc123 --description "New text"
+jit issue update abc123 --append-description "Follow-up note"
+cat notes.txt | jit issue update abc123 --append-description-file -
+jit issue update abc123 --label area:auth --remove-label area:core
+```
+
+**Single-issue JSON** is a lightweight confirmation rather than the full issue;
+fetch the body with `jit issue show`:
+
+```json
+{
+  "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
+  "short_id": "5c581575",
+  "state": "in_progress",
+  "updated_at": "2026-04-28T18:25:16.699033997Z",
+  "message": "Updated issue 5c581575 to InProgress"
+}
+```
+
+**State transitions are guarded.** `--state ready` runs the dependency check and
+fails with the `BLOCKED` envelope when any dependency is unmet. `--state done`
+runs both checks: unmet dependencies fail the same way, and unpassed gates divert
+the issue to `Gated` (the diverted state is persisted) with the
+`VALIDATION_FAILED` envelope. Both envelopes carry `error.details.blockers` and
+`error.details.remediation`, as shown under **CLI JSON contracts** above.
+
+**Batch mode is literal.** With `--filter`, the flags below are rejected as usage
+errors rather than silently ignored, because each is a per-issue edit:
+`--type`, `--content-format`, and every description flag. Batch results report
+`matched`, `modified`, `skipped`, and `errors` id lists.
+
 ### Bulk Operations
 
 Update multiple issues with a single command using `--filter`:
@@ -1036,8 +1157,6 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 **When to use bulk vs single-issue update:**
 - **Single-issue:** Smart orchestration with prechecks, postchecks, auto-transitions
 - **Bulk:** Explicit, predictable batch changes across many issues
-
-<!-- Additional jit issue commands -->
 
 ### Batch-Create with Dependency Wiring (`jit issue batch-create`)
 
@@ -1187,7 +1306,7 @@ A dependency is met exactly when it is in a terminal state (`done` or
 issue is blocked — so a `rejected` dependency counts as met and is **not** listed.
 Each entry is a subset of the matching `dependencies` entry: `{id, short_id,
 title, state}`. The array is always present (empty `[]` when every dependency is
-met or there are none), so callers no longer recompute the filter client-side.
+met or there are none), so a caller reads the filter straight from the response.
 
 ```bash
 jit issue show abc123 --json | jq '.unmet_dependencies'
@@ -2579,11 +2698,201 @@ never changes the validate exit status.
 
 ## Document Commands
 
-<!-- jit doc add/show/list/archive -->
+A document reference links a repository file to an issue, so an agent reading the
+issue can find the design note, spec, or report that belongs with it. The file
+itself stays in the repository; jit stores the reference. `jit document` is a
+visible alias of `jit doc`.
+
+Reading a document at a commit needs a git repository: `history` and `diff`
+always, and `show` whenever `--at` is given or the reference itself is pinned to
+a commit. The rest of the family works without git.
+
+### `jit doc add`
+
+Attach a document reference to an issue.
+
+```bash
+jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_TYPE>] [--skip-scan] [--json]
+```
+
+| Argument / flag | Description |
+|-----------------|-------------|
+| `<ID>` | Issue id (full, short, or a unique prefix). |
+| `<PATH>` | Document path relative to the repository root. |
+| `-c`, `--commit <COMMIT>` | Git commit to pin the reference to. Defaults to `HEAD`. |
+| `-l`, `--label <LABEL>` | Human-readable label for the reference (alias `--title`). |
+| `--doc-type <DOC_TYPE>` | Free-form document type, e.g. `design`, `implementation`, `notes`. |
+| `--skip-scan` | Skip scanning the document for asset references. |
+
+```bash
+jit doc add abc123 docs/design/auth.md --label "Auth design" --doc-type design
+jit doc add abc123 docs/design/auth.md --commit 44ee4610 --json
+```
+
+### `jit doc list`
+
+List an issue's document references.
+
+```bash
+jit doc list <ID> [--json]
+```
+
+JSON returns the list envelope with the issue id alongside it:
+`{"issue_id": <id>, "count": N, "documents": [...]}`.
+
+### `jit doc show`
+
+Print a document's content as recorded for an issue.
+
+```bash
+jit doc show <ID> <PATH> [--at <COMMIT>] [--json]
+```
+
+`--at <COMMIT>` reads the document as it stood at that commit instead of at
+`HEAD`.
+
+### `jit doc history`
+
+List the commits that touched a document.
+
+```bash
+jit doc history <ID> <PATH> [--json]
+```
+
+### `jit doc diff`
+
+Diff a document between two commits.
+
+```bash
+jit doc diff <ID> <PATH> --from <COMMIT> [--to <COMMIT>] [--json]
+```
+
+`--from` is required; `--to` defaults to `HEAD`.
+
+### `jit doc remove`
+
+Detach a document reference from an issue. The file on disk is untouched.
+
+```bash
+jit doc remove <ID> <PATH> [--json]
+```
+
+`remove` is this group's canonical spelling: `doc rm` and `doc delete` exit `2`
+with a hint (see **Wrong-verb hints** above).
+
+### `jit doc assets list`
+
+List the assets (images, diagrams) a document references.
+
+```bash
+jit doc assets list <ID> <PATH> [--rescan] [--json]
+```
+
+`--rescan` re-reads the document to refresh the stored asset metadata instead of
+reporting what was recorded when the reference was added.
+
+### `jit doc check-links`
+
+Validate the links and asset references of the documents in scope.
+
+```bash
+jit doc check-links [--scope all|issue:<ID>] [--json]
+```
+
+`--scope` defaults to `all`. The exit code carries the verdict: `0` when every
+document is valid, `2` when only warnings were found, `1` when any error was
+found. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
+
+### `jit doc archive`
+
+Move a document and its assets into a configured archive category.
+
+```bash
+jit doc archive <PATH> --type <CATEGORY> [--dry-run] [--force] [--json]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--type <CATEGORY>` | Archive category. Must be configured in `config.toml`. |
+| `--dry-run` | Print the archival plan (source, destination, assets to move) and change nothing. |
+| `--force` | Archive even when the document is linked to an active issue. |
 
 ## Graph Commands
 
-<!-- jit graph deps/roots/downstream -->
+The graph family reads the dependency DAG. `deps` walks upstream (what an issue
+needs); `rdeps` walks downstream (what needs it). `jit rdeps <id>` is a top-level
+spelling of `jit graph rdeps <id>`.
+
+### `jit graph deps`
+
+Show what an issue depends on: the issues that must reach a terminal state before
+it can proceed.
+
+```bash
+jit graph deps <ID> [--depth <N>] [--json]
+```
+
+`--depth` defaults to `1` (immediate dependencies). `--depth 0` is the opt-in
+unlimited transitive walk; any other `N` bounds the walk to `N` levels.
+
+JSON uses the list envelope over `nodes`:
+
+```json
+{
+  "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+  "depth": 1,
+  "count": 2,
+  "nodes": [
+    {
+      "id": "<dep-uuid>",
+      "short_id": "aa11bb22",
+      "title": "Build parser",
+      "state": "done",
+      "priority": "normal",
+      "level": 1,
+      "children": []
+    }
+  ],
+  "summary": { "total": 2, "by_state": { "done": 1, "ready": 1 } }
+}
+```
+
+`count` is the number of top-level `nodes`; `summary.total` counts every unique
+dependency across the whole tree, so the two differ whenever the walk goes deeper
+than one level. Each node's `level` is its depth (`1` = immediate), `children`
+holds its own dependencies, and `shared` marks a node reachable through more than
+one path.
+
+```bash
+jit graph deps epic-123              # immediate dependencies
+jit graph deps epic-123 --depth 2    # two levels deep
+jit graph deps epic-123 --depth 0    # all transitive
+```
+
+### `jit graph rdeps`
+
+Show the issues that depend on this one. Symmetric to `deps`, with the same
+`--depth` semantics.
+
+```bash
+jit graph rdeps <ID> [--depth <N>] [--json]
+jit rdeps <ID> [--depth <N>] [--json]        # top-level spelling
+```
+
+JSON uses the list envelope `{"count": N, "dependents": [...]}` over compact
+issue summaries. This reads dependency edges; membership labels play no part in
+it.
+
+### `jit graph roots`
+
+List the issues that have no dependencies of their own: the entry points of the
+DAG.
+
+```bash
+jit graph roots [--json]
+```
+
+JSON uses the list envelope `{"count": N, "roots": [...]}`.
 
 ### `jit graph export`
 
@@ -2697,7 +3006,377 @@ where each node is:
 
 ## Status and Validation
 
-<!-- jit status, jit validate -->
+### `jit status`
+
+Print the repository-wide state rollup.
+
+```bash
+jit status [--json]
+```
+
+```text
+Status:
+  Open: 3
+  Ready: 4
+  In Progress: 2
+  Done: 8
+  Rejected: 1
+  Blocked: 5
+```
+
+JSON carries the same counts plus `gated` and `total`:
+
+```json
+{
+  "open": 3,
+  "ready": 4,
+  "in_progress": 2,
+  "gated": 0,
+  "done": 8,
+  "rejected": 1,
+  "blocked": 5,
+  "total": 18,
+  "message": "3 open, 4 ready, 2 in progress, 8 done"
+}
+```
+
+`open` counts `backlog` issues; `blocked` counts issues held by an unmet
+dependency, so an issue can appear in both `open` and `blocked`. For a rollup
+scoped to a container or a label bucket, use
+[`jit issue progress`](#container-progress-jit-issue-progress) or
+[`jit query count`](#state-aggregation-jit-query-count).
+
+### `jit validate`
+
+Check repository integrity and run the declarative rule set from `.jit/rules.toml`.
+
+```bash
+jit validate [<ID>] [--json]
+jit validate <ID> --explain [--json]
+jit validate --scope <ID> [--json]
+jit validate --fix [--dry-run] [--json]
+jit validate --divergence [--leases] [--json]
+```
+
+| Mode | What it does |
+|------|--------------|
+| (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, claims index) plus every local and graph rule. |
+| `<ID>` | The local and graph rules for that issue only. |
+| `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
+| `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean. |
+| `--fix` | Apply the automatic fixes (e.g. dropping transitively redundant edges). `--dry-run` reports what would be fixed and writes nothing. |
+| `--divergence` | Check that the branch has not diverged from `origin/main`. Requires git. |
+| `--leases` | Check that active leases are consistent and not stale. |
+
+**Mode exclusivity.** `--scope` may not be combined with a positional id or with
+`--fix`/`--divergence`/`--leases`/`--explain`. `--fix`, `--divergence`, and
+`--leases` are repository-wide, so combining any of them with a positional id is
+a usage error rather than a silently ignored argument. `--dry-run` requires
+`--fix`.
+
+Whole-repository JSON reports both the integrity verdict and the rule findings in
+one object:
+
+```json
+{
+  "valid": false,
+  "integrity_error": null,
+  "warnings": [
+    { "type": "rule_warning", "issue_id": "...", "rule": "orphan-leaf", "message": "..." }
+  ],
+  "warning_count": 1,
+  "membership_divergences": [],
+  "divergence_count": 0,
+  "rule_findings": [ { "issue_id": "...", "rule": "...", "message": "...", "severity": "error" } ],
+  "error_count": 1,
+  "message": "Repository validation failed with 1 rule error(s)"
+}
+```
+
+`divergence_count` and `membership_divergences` mirror
+[`jit query divergence`](#membership-divergence-jit-query-divergence). They are
+advisory and never change the exit status; resolve them with `jit query
+divergence` when a membership label claims what the DAG does not back.
+
+### `jit recover`
+
+Run the recovery routines: clear locks left by dead processes (checked by PID),
+rebuild the claims index from the append-only log, evict expired leases, and
+remove temp files older than an hour.
+
+```bash
+jit recover [--json]
+```
+
+It removes only provably stale data, so it is safe to run at any time.
+
+## Template Commands
+
+### `jit apply`
+
+Instantiate a graph template from `.jit/templates.toml` onto a container: create
+the template's typed nodes with their gate presets, documents, and interpolated
+descriptions, wire the declared dependency edges, and run its transforms (such as
+moving the container's upstream dependencies onto a planning node).
+
+```bash
+jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force] [--json]
+```
+
+| Argument / flag | Description |
+|-----------------|-------------|
+| `<TEMPLATE>` | Template name. Must be declared in `.jit/templates.toml`. |
+| `<CONTAINER>` | Container issue the template is applied to. |
+| `--anchor <ROLE=ID>` | Bind a template anchor. Repeatable. The `container` anchor is auto-bound to `<CONTAINER>`; an explicit `--anchor container=<id>` overrides that binding. A value without an `=`, or with an empty role, is a usage error. |
+| `--force` | Bypass validation warnings and refresh an already-applied template, rewriting the existing nodes' prose in place instead of creating new ones. |
+
+The container's `type:` label must be one of the template's `applies_to` types.
+
+```bash
+jit apply plan epic-123
+jit apply plan epic-123 --json
+jit apply plan epic-123 --anchor container=epic-123 --force
+```
+
+JSON returns the role-to-id map plus the created issues:
+
+```json
+{
+  "template": "plan",
+  "container": "epic-123",
+  "anchor_bindings": { "container": "epic-123" },
+  "created_node_ids_by_role": { "planning": "<uuid>", "breakdown": "<uuid>" },
+  "anchor_dependency_snapshots": {},
+  "created_issues": { "planning": { "id": "<uuid>", "title": "..." } },
+  "message": "Applied template 'plan' to epic-123"
+}
+```
+
+Under `--quiet` the command prints one created id per line. Templates and their
+node types are repository configuration: the `plan` template used in the examples
+above is this repository's own declaration, not a shipped default.
+
+## Item Commands
+
+Items are addressable structured lines: entries in an issue's description (a
+requirement, a decision, a risk) and entries in the project registries
+(invariants, rules, gates). Each carries a self-id and resolves through a
+kind-segmented qualified id:
+
+- `@/<kind>/<self-id>` for a project item, e.g. `@/invariant/dag-acyclic`.
+- `@/issue/<short-id>/<kind>/<self-id>` for an issue item, e.g.
+  `@/issue/56ab0224/requirement/REQ-01`.
+- `<short-id>/<self-id>` as input sugar, where the kind is inferred from the
+  self-id's shape.
+
+Kinds and their aliases are declared in `[item_kinds]` in `.jit/config.toml`. An
+alias is accepted anywhere a kind name is, so `@/inv/dag-acyclic` resolves the
+same item as `@/invariant/dag-acyclic`; output always prints the registry name.
+`jit init` scaffolds the table, and a repository with no `[item_kinds]` table
+declares no kinds.
+
+### `jit item list`
+
+```bash
+jit item list [--kind <KIND>] [--json]
+```
+
+`--kind` filters to one kind, named by its registry name or a declared alias.
+Text output is one line per item: `<qualified_id>  [<kind>]  <text>`. JSON uses
+the list envelope `{"count": N, "items": [...]}`, where each item is
+`{kind, qualified_id, self_id, scope, text, ...}` and `scope` is the owning
+issue's short id, or `@` for a project item.
+
+### `jit item show` / `jit item resolve`
+
+```bash
+jit item show <QUALIFIED_ID> [--json]
+jit item resolve <QUALIFIED_ID> [--json]
+```
+
+`resolve` is a distinct verb with identical behavior, for orchestrators that
+think in terms of resolving an address. JSON returns
+`{item, issue_full_id, issue_title}`; the two issue fields are `null` for a
+project item, which no single issue owns.
+
+```bash
+jit item show @/issue/56ab0224/requirement/REQ-01
+jit item show @/invariant/dag-acyclic
+jit item show @/inv/dag-acyclic          # alias of the same address
+jit item show 56ab0224/REQ-01 --json
+```
+
+### `jit item search`
+
+```bash
+jit item search [<QUERY>] [--kind <KIND>] [--json]
+```
+
+The query matches self-id, qualified id, and item text. It defaults to the empty
+string, which matches everything, so `--kind` filters on its own.
+
+```bash
+jit item search atomic
+jit item search "" --kind requirement
+```
+
+A failing `jit item` command under `--json` returns the error envelope with code
+`ITEM_COMMAND_FAILED`.
+
+## Registry Projection Commands
+
+Invariants live in `.jit/invariants.toml`; rules live in `.jit/rules.toml` and
+gates in `.jit/gates.toml`. These registries are the source of truth, and the
+`render` verbs project them into markdown. Each target path, projection mode, and
+region delimiter comes from configuration alone. In `region` mode only the
+delimited region of the target is rewritten and every byte outside it is
+preserved; in `separate-file` mode the whole jit-owned file is written.
+
+### `jit invariant render`
+
+```bash
+jit invariant render [--json]
+```
+
+Writes the invariant registry into the target configured by
+`[invariant_projection]`. JSON returns `{target, mode, count, message}`.
+
+### `jit invariant check`
+
+```bash
+jit invariant check [--json]
+```
+
+Reports enforcement drift in the declared-but-unenforced direction: an invariant
+whose `enforced-by` names a rule or gate that does not load. Bindings are
+declarations, and this check never executes them. Exits `4` when any drift is
+present. JSON uses the list envelope `{"count": N, "findings": [...]}`.
+
+### `jit reference render`
+
+```bash
+jit reference render [--json]
+```
+
+Writes the effective rule set and the gate registry as one reference document
+into the target configured by `[rules_gates_projection]`. Every rule and gate is
+addressed by its canonical form, `@/rule/<name>` and `@/gate/<key>`. JSON returns
+`{target, mode, rules, gates, message}`.
+
+A failing command under `--json` returns the error envelope with code
+`INVARIANT_COMMAND_FAILED` or `REFERENCE_COMMAND_FAILED`.
+
+## Repository Search
+
+### `jit search`
+
+Grep the `.jit/` data directory: the stored issue records, the event log, and the
+other files jit keeps there. Matching is delegated to
+[ripgrep](https://github.com/BurntSushi/ripgrep), which must be on `PATH`.
+
+```bash
+jit search <QUERY> [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-r`, `--regex` | Treat `<QUERY>` as a regular expression. Without it the query is a fixed string. |
+| `-C`, `--case-sensitive` | Match case. The default is case-insensitive. |
+| `-c`, `--context <CONTEXT>` | Context lines requested from the matcher. Defaults to `0`. Results list the matching lines. |
+| `-n`, `--limit <LIMIT>` | Stop after `LIMIT` results. |
+| `-g`, `--glob <GLOB>` | Restrict the search to files matching a glob, e.g. `"*.json"` or `"*.md"`. |
+
+```bash
+jit search "rate limit"
+jit search '^REQ-\d+' --regex --limit 20
+jit search auth --glob "*.json" --json
+```
+
+JSON uses the list envelope, with the query echoed back:
+
+```json
+{
+  "query": "auth",
+  "count": 1,
+  "results": [
+    {
+      "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
+      "path": "/path/to/repo/.jit/issues/003f9f83-4e8a-4a5f-8e48-44f6f48a7c17.json",
+      "line_number": 12,
+      "line_text": "  \"title\": \"Harden auth\",",
+      "matches": [{ "text": "auth", "start": 22, "end": 26 }]
+    }
+  ],
+  "message": "Found 1 result(s)"
+}
+```
+
+`path` is the file's path as the matcher reports it, and `issue_id` is the issue
+the file belongs to, or `null` for a file that is not an issue record. `matches`
+gives each match's byte offsets within `line_text`. A missing ripgrep
+returns the error envelope with code `RIPGREP_NOT_FOUND`; any other matcher
+failure returns `SEARCH_FAILED`. Both exit `10` (external dependency failed).
+
+To search issue fields rather than raw storage lines, use
+[`jit issue search`](#searching-issues-jit-issue-search); to search addressable
+items, use `jit item search`.
+
+## Snapshot Commands
+
+### `jit snapshot export`
+
+Export a self-contained snapshot of issues, the documents they reference, the
+assets those documents use, a manifest of SHA256 hashes, and a README describing
+the contents. A snapshot preserves its provenance: git commit, source mode, and
+timestamps.
+
+```bash
+jit snapshot export [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--out <OUT>` | Output path. Defaults to `snapshot-YYYYMMDD-HHMMSS`. |
+| `--format <FORMAT>` | `dir` (default) or `tar`. |
+| `--scope <SCOPE>` | `all` (default), `issue:<ID>`, or `label:<namespace>:<value>`. |
+| `--at <AT>` | Export the documents as of a git commit or tag. Requires a git repository. |
+| `--working-tree` | Export the documents from the working tree instead of git. |
+| `--committed-only` | Fail when uncommitted documents or assets exist. Requires git, and implies `--at HEAD`. |
+| `--force` | Skip repository validation before exporting. |
+
+```bash
+jit snapshot export
+jit snapshot export --scope label:epic:auth --format tar --out auth-snapshot.tar
+jit snapshot export --at abc123 --out release-v1.0
+jit snapshot export --working-tree
+```
+
+JSON returns `{path, issue_count, document_count, format, size_bytes, message}`;
+`size_bytes` is `null` for a directory export.
+
+## Git Hook Commands
+
+### `jit hooks install`
+
+Copy the hook templates into `.git/hooks/` and make them executable.
+
+```bash
+jit hooks install [--json]
+```
+
+Two hooks are installed: `pre-commit` validates leases and branch divergence
+before a commit, and `pre-push` validates leases before a push. An existing hook
+of the same name is left in place and reported as skipped.
+
+JSON returns `{hooks_dir, installed, skipped, message}`. A failure returns the
+error envelope with code `HOOKS_INSTALL_ERROR`.
+
+Enforcement strictness is configuration, set in `.jit/config.toml`:
+
+```toml
+[worktree]
+enforce_leases = "strict"
+```
 
 ## Maintenance Commands
 
@@ -2751,7 +3430,7 @@ INTERMEDIATE key returns the whole subtree at that point rather than erroring
 
 **Examples:**
 ```bash
-# A leaf under a section untouched by the old hand-mapped `config get`.
+# A leaf under any section of the config.
 jit config get type_hierarchy.strategic_types
 # ["milestone", "epic"] (pretty-printed; a single scalar prints bare)
 
@@ -2765,8 +3444,8 @@ jit config get namespaces.type.unique
 jit config get documentation --json
 # {"key": "documentation", "value": {"development_root": "dev", ...}}
 
-# The pre-existing system/user/repo-layered settings still resolve exactly
-# as before (env var, then repo, then user, then system, then default).
+# The layered settings resolve through their precedence chain
+# (env var, then repo, then user, then system, then default).
 jit config get worktree.mode
 jit config get coordination.default_ttl_secs
 ```
