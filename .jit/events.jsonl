@@ -5808,3 +5808,7 @@
 {"type":"issue_created","id":"25942ab5-95ae-4b96-9eee-2eb9b04d4563","issue_id":"894337e2-e708-466b-ac25-3aed102a166f","timestamp":"2026-07-09T22:08:16.105783344Z","title":"find_available_port races between probe and bind","priority":"normal"}
 {"type":"issue_updated","id":"59e30dc2-39b4-4e7c-82bd-80365f47bda4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-09T22:08:23.782367927Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"gate_passed","id":"5a594105-35cb-4a73-9239-372a325cccc5","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T22:44:09.062867534Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"619f4576-cef7-4ec7-9f6b-27c6cbaf9e81","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T22:45:49.118712112Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"b91ecfe7-256c-4458-8789-e6cc2e044554","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T22:46:06.959184255Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"aa43b288-dee8-4b98-bea0-09487124f8f4","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T22:46:06.959216165Z"}
+{"type":"issue_state_changed","id":"c625d817-e99f-4715-af5d-db484228c579","issue_id":"136268f8-5aed-4f36-9c10-46019c98ca76","timestamp":"2026-07-09T22:46:06.988426996Z","from":"backlog","to":"ready"}
