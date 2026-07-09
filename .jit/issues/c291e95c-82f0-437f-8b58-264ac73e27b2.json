@@ -10,7 +10,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T20:54:21.023035268Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,7 +24,7 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-07-05T22:01:24.041267338Z",
-  "updated_at": "2026-07-09T20:35:17.339477349Z",
+  "updated_at": "2026-07-09T21:01:55.644791378Z",
   "first_ready_at": "2026-07-05T22:01:24.041272188Z",
   "claimed_at": "2026-07-09T20:35:17.339477169Z"
 }
