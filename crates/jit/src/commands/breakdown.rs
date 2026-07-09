@@ -541,56 +541,19 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// returning one offending cycle as a list of child indices if present (pure
 /// helper). Assumes indices are already range/self checked.
 ///
-/// Iterative DFS with a recursion stack over the index graph; on the first
-/// back-edge it reconstructs the cycle from the stack.
+/// Keys the graph layer's [`find_keyed_cycle`] by child index. That primitive
+/// closes the cycle by repeating its first key; the repetition is dropped here
+/// so the caller renders each child once (`0 -> 1` for the cycle 0 → 1 → 0).
 fn first_child_cycle(children: &[BracketChild]) -> Option<Vec<usize>> {
-    #[derive(Clone, Copy, PartialEq)]
-    enum Mark {
-        Unvisited,
-        InStack,
-        Done,
-    }
-    let n = children.len();
-    let mut mark = vec![Mark::Unvisited; n];
+    let adjacency: Vec<(usize, Vec<usize>)> = children
+        .iter()
+        .enumerate()
+        .map(|(index, child)| (index, child.deps.clone()))
+        .collect();
 
-    // Each stack frame tracks a node and the next dep index to explore, so the
-    // live stack always spells the current DFS path (for cycle reconstruction).
-    for start in 0..n {
-        if mark[start] != Mark::Unvisited {
-            continue;
-        }
-        let mut stack: Vec<(usize, usize)> = vec![(start, 0)];
-        mark[start] = Mark::InStack;
-        // Take a mutable handle to the top frame each iteration; `last_mut()`
-        // returning `Some` is also the loop condition, so no fallible unwrap is
-        // needed (and library code must not `expect`).
-        while let Some(&mut (node, ref mut next)) = stack.last_mut() {
-            if *next < children[node].deps.len() {
-                let dep = children[node].deps[*next];
-                *next += 1;
-                match mark[dep] {
-                    Mark::Unvisited => {
-                        mark[dep] = Mark::InStack;
-                        stack.push((dep, 0));
-                    }
-                    Mark::InStack => {
-                        // Back-edge to `dep`: the cycle is the path suffix from
-                        // `dep` to the current node, closed by `node -> dep`. `dep`
-                        // is marked InStack, so it is on the stack; guard with
-                        // `if let` rather than `expect` (no panic in library code).
-                        if let Some(from) = stack.iter().position(|&(id, _)| id == dep) {
-                            return Some(stack[from..].iter().map(|&(id, _)| id).collect());
-                        }
-                    }
-                    Mark::Done => {}
-                }
-            } else {
-                mark[node] = Mark::Done;
-                stack.pop();
-            }
-        }
-    }
-    None
+    let mut cycle = crate::graph::find_keyed_cycle(&adjacency)?;
+    cycle.pop();
+    Some(cycle)
 }
 
 /// The container's labels minus its `type:*` label — the membership labels
