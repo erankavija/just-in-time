@@ -1,6 +1,7 @@
 //! Graph visualization and traversal
 
 use super::*;
+use crate::graph::Direction;
 use crate::output::DependencyTreeNode;
 use std::collections::{HashMap, HashSet};
 
@@ -39,61 +40,40 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns a tree structure that preserves parent-child relationships
     /// and marks shared dependencies (diamonds in the DAG).
+    ///
+    /// Every issue is loaded once up front; the unfolding itself
+    /// ([`expand`](DependencyGraph::expand)) runs in memory over the graph.
     pub fn build_dependency_tree(
         &self,
         issue_id: &str,
         depth: u32,
     ) -> Result<Vec<DependencyTreeNode>> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let root_issue = self.storage.load_issue(&full_id)?;
-
-        // Track all seen nodes to detect shared dependencies
-        let mut seen_ids: HashMap<String, usize> = HashMap::new();
-
-        // Build tree recursively
-        let mut tree = Vec::new();
-        for dep_id in &root_issue.dependencies {
-            if let Ok(dep_issue) = self.storage.load_issue(dep_id) {
-                let node = self.build_tree_node(&dep_issue, 1, depth, &mut seen_ids)?;
-                tree.push(node);
-            }
-        }
-
-        // Mark nodes that appear multiple times as shared
-        mark_shared_nodes(&mut tree, &seen_ids);
-
-        Ok(tree)
-    }
-
-    /// Recursively build a tree node
-    fn build_tree_node(
-        &self,
-        issue: &Issue,
-        current_level: u32,
-        max_depth: u32,
-        seen_ids: &mut HashMap<String, usize>,
-    ) -> Result<DependencyTreeNode> {
         use crate::domain::MinimalIssue;
+        use crate::graph::Expansion;
 
-        // Track this node
-        *seen_ids.entry(issue.id.clone()).or_insert(0) += 1;
+        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let issues = self.storage.list_issues()?;
+        let issue_refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&issue_refs);
 
-        let minimal = MinimalIssue::from(issue);
-        let mut node = DependencyTreeNode::from_minimal(&minimal, current_level);
-
-        // Recurse into children if we haven't reached max depth
-        if max_depth == 0 || current_level < max_depth {
-            for dep_id in &issue.dependencies {
-                if let Ok(dep_issue) = self.storage.load_issue(dep_id) {
-                    let child_node =
-                        self.build_tree_node(&dep_issue, current_level + 1, max_depth, seen_ids)?;
-                    node.children.push(child_node);
-                }
+        let forest = graph.expand(&full_id, Direction::Dependencies, depth);
+        // An issue unfolded along several paths is a diamond in the DAG.
+        let occurrences = Expansion::occurrences(&forest);
+        let to_tree_node = |issue: &Issue, level: u32, children: Vec<DependencyTreeNode>| {
+            let shared = occurrences.get(issue.id.as_str()).is_some_and(|&n| n > 1);
+            DependencyTreeNode {
+                shared: shared.then_some(true),
+                children,
+                ..DependencyTreeNode::from_minimal(&MinimalIssue::from(issue), level)
             }
-        }
+        };
 
-        Ok(node)
+        Ok(forest
+            .iter()
+            .map(|occurrence| occurrence.fold(&to_tree_node))
+            .collect())
     }
+
     /// Show what an issue depends on with depth control.
     ///
     /// # Arguments
@@ -101,93 +81,37 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// * `issue_id` - Issue ID to show dependencies for
     /// * `depth` - Maximum depth to traverse (1 = immediate, 0 = unlimited)
     pub fn show_dependencies_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        let issue = self.storage.load_issue(&full_id)?;
-
-        if depth == 1 {
-            // Immediate dependencies only
-            let deps: Vec<Issue> = issue
-                .dependencies
-                .iter()
-                .filter_map(|dep_id| self.storage.load_issue(dep_id).ok())
-                .collect();
-            return Ok(deps);
-        }
-
-        // Depth-limited or unlimited traversal
-        let mut result = Vec::new();
-        let mut to_process: Vec<(String, u32)> = issue
-            .dependencies
-            .iter()
-            .map(|id| (id.clone(), 1))
-            .collect();
-        let mut processed = std::collections::HashSet::new();
-
-        while let Some((dep_id, current_depth)) = to_process.pop() {
-            if processed.contains(&dep_id) {
-                continue;
-            }
-            processed.insert(dep_id.clone());
-
-            if let Ok(dep_issue) = self.storage.load_issue(&dep_id) {
-                result.push(dep_issue.clone());
-
-                // Add children if we haven't reached max depth
-                if depth == 0 || current_depth < depth {
-                    for child_id in &dep_issue.dependencies {
-                        to_process.push((child_id.clone(), current_depth + 1));
-                    }
-                }
-            }
-        }
-
-        Ok(result)
+        self.traverse_dependency_edges(issue_id, Direction::Dependencies, depth)
     }
 
+    /// Show what depends on an issue with depth control.
+    ///
+    /// # Arguments
+    ///
+    /// * `issue_id` - Issue ID to show dependents for
+    /// * `depth` - Maximum depth to traverse (1 = immediate, 0 = unlimited)
     pub fn show_rdeps_with_depth(&self, issue_id: &str, depth: u32) -> Result<Vec<Issue>> {
+        self.traverse_dependency_edges(issue_id, Direction::Dependents, depth)
+    }
+
+    /// Walk the repository's dependency graph from `issue_id`, following edges in
+    /// `direction` up to `depth` (0 = unlimited), and return the issues reached.
+    fn traverse_dependency_edges(
+        &self,
+        issue_id: &str,
+        direction: Direction,
+        depth: u32,
+    ) -> Result<Vec<Issue>> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
 
-        if depth == 0 {
-            // Unlimited transitive traversal
-            let dependents = graph.get_transitive_dependents(&full_id);
-            return Ok(dependents.into_iter().cloned().collect());
-        }
-
-        if depth == 1 {
-            // Immediate dependents only
-            let dependents = graph.get_dependents(&full_id);
-            return Ok(dependents.into_iter().cloned().collect());
-        }
-
-        // Depth-limited BFS
-        let mut result = Vec::new();
-        let mut to_process: Vec<(String, u32)> = graph
-            .get_dependents(&full_id)
-            .iter()
-            .map(|issue| (issue.id.to_string(), 1))
-            .collect();
-        let mut processed = HashSet::new();
-
-        while let Some((dep_id, current_depth)) = to_process.pop() {
-            if processed.contains(&dep_id) {
-                continue;
-            }
-            processed.insert(dep_id.clone());
-
-            if let Ok(dep_issue) = self.storage.load_issue(&dep_id) {
-                result.push(dep_issue.clone());
-                if current_depth < depth {
-                    for parent in graph.get_dependents(&dep_id) {
-                        to_process.push((parent.id.to_string(), current_depth + 1));
-                    }
-                }
-            }
-        }
-
-        Ok(result)
+        Ok(graph
+            .traverse(&full_id, direction, depth)
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     pub fn show_roots(&self) -> Result<Vec<Issue>> {
@@ -397,16 +321,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             count: views.len(),
             divergences: views,
         })
-    }
-}
-
-/// Mark nodes that appear multiple times in the tree as shared
-fn mark_shared_nodes(tree: &mut [DependencyTreeNode], seen_counts: &HashMap<String, usize>) {
-    for node in tree {
-        if seen_counts.get(&node.id).copied().unwrap_or(0) > 1 {
-            node.shared = Some(true);
-        }
-        mark_shared_nodes(&mut node.children, seen_counts);
     }
 }
 

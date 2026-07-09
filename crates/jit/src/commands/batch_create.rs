@@ -453,7 +453,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 3. Cycle detection over the symbolic graph (only over edges whose
         //    endpoints are both defined, so missing-ref problems aren't
         //    double-reported as cycles).
-        if let Some(cycle) = detect_cycle(defs, &defined) {
+        if let Some(cycle) = detect_cycle(defs) {
             problems.push(BatchValidationProblem::Cycle { keys: cycle });
         }
 
@@ -583,75 +583,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 /// Detect a cycle in the symbolic `depends_on` graph over the given entries.
 ///
-/// Considers only edges whose target is a DEFINED key, so an unknown-reference
-/// problem is not double-reported as a cycle. Returns the keys forming one
-/// detected cycle (in traversal order, closing back to the start), or `None`
-/// when the graph is acyclic.
-fn detect_cycle(defs: &[BatchIssueDef], defined: &HashSet<&str>) -> Option<Vec<String>> {
-    // Adjacency: key -> its (defined) depends_on targets.
-    let adjacency: HashMap<&str, Vec<&str>> = defs
+/// Projects the entries onto a keyed adjacency and hands it to
+/// [`find_keyed_cycle`], which ignores edges to keys the batch never defines, so
+/// an unknown-reference problem is not double-reported as a cycle. Returns the
+/// keys forming one detected cycle (in traversal order, closing back to the
+/// start), or `None` when the graph is acyclic.
+fn detect_cycle(defs: &[BatchIssueDef]) -> Option<Vec<String>> {
+    let adjacency: Vec<(&str, Vec<&str>)> = defs
         .iter()
         .map(|def| {
-            let edges = def
-                .depends_on
-                .iter()
-                .map(String::as_str)
-                .filter(|dep| defined.contains(dep))
-                .collect();
+            let edges = def.depends_on.iter().map(String::as_str).collect();
             (def.key.as_str(), edges)
         })
         .collect();
 
-    #[derive(Clone, Copy, PartialEq)]
-    enum Mark {
-        Visiting,
-        Done,
-    }
-
-    // Iterative DFS tracking the active path so we can reconstruct the cycle.
-    let mut marks: HashMap<&str, Mark> = HashMap::new();
-
-    for def in defs {
-        if marks.contains_key(def.key.as_str()) {
-            continue;
-        }
-        // Explicit stack of (node, next-child-index); `path` mirrors the active
-        // recursion stack for cycle reconstruction.
-        let mut stack: Vec<(&str, usize)> = vec![(def.key.as_str(), 0)];
-        let mut path: Vec<&str> = Vec::new();
-        marks.insert(def.key.as_str(), Mark::Visiting);
-        path.push(def.key.as_str());
-
-        while let Some(&mut (node, ref mut idx)) = stack.last_mut() {
-            let neighbors = adjacency.get(node).map(Vec::as_slice).unwrap_or(&[]);
-            if *idx < neighbors.len() {
-                let next = neighbors[*idx];
-                *idx += 1;
-                match marks.get(next) {
-                    Some(Mark::Visiting) => {
-                        // Found a back-edge: reconstruct the cycle from `path`.
-                        let start = path.iter().position(|&k| k == next).unwrap_or(0);
-                        let mut cycle: Vec<String> =
-                            path[start..].iter().map(|s| s.to_string()).collect();
-                        cycle.push(next.to_string());
-                        return Some(cycle);
-                    }
-                    Some(Mark::Done) => {}
-                    None => {
-                        marks.insert(next, Mark::Visiting);
-                        path.push(next);
-                        stack.push((next, 0));
-                    }
-                }
-            } else {
-                marks.insert(node, Mark::Done);
-                path.pop();
-                stack.pop();
-            }
-        }
-    }
-
-    None
+    crate::graph::find_keyed_cycle(&adjacency)
+        .map(|cycle| cycle.into_iter().map(str::to_string).collect())
 }
 
 #[cfg(test)]
@@ -682,8 +629,7 @@ mod tests {
     #[test]
     fn test_detect_cycle_finds_simple_cycle() {
         let defs = vec![def("a", &["b"]), def("b", &["a"])];
-        let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
-        let cycle = detect_cycle(&defs, &defined).expect("cycle expected");
+        let cycle = detect_cycle(&defs).expect("cycle expected");
         assert!(cycle.contains(&"a".to_string()));
         assert!(cycle.contains(&"b".to_string()));
     }
@@ -691,24 +637,21 @@ mod tests {
     #[test]
     fn test_detect_cycle_self_loop() {
         let defs = vec![def("a", &["a"])];
-        let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
-        let cycle = detect_cycle(&defs, &defined).expect("self-loop is a cycle");
+        let cycle = detect_cycle(&defs).expect("self-loop is a cycle");
         assert_eq!(cycle.first().map(String::as_str), Some("a"));
     }
 
     #[test]
     fn test_detect_cycle_acyclic_returns_none() {
         let defs = vec![def("a", &["b"]), def("b", &["c"]), def("c", &[])];
-        let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
-        assert!(detect_cycle(&defs, &defined).is_none());
+        assert!(detect_cycle(&defs).is_none());
     }
 
     #[test]
     fn test_detect_cycle_ignores_undefined_edges() {
         // b is undefined; that is an unknown-ref problem, not a cycle.
         let defs = vec![def("a", &["b"])];
-        let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
-        assert!(detect_cycle(&defs, &defined).is_none());
+        assert!(detect_cycle(&defs).is_none());
     }
 
     #[test]
