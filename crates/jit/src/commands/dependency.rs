@@ -190,15 +190,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             //
             // INTENTIONAL direct state write (does NOT route through
             // `apply_state_transition`): this is an automatic invariant-maintaining
-            // demotion, not a user-initiated forward transition. Adding a not-yet-done
+            // demotion, not a user-initiated forward transition. Adding an unmet
             // dependency to a Ready issue MUST move it to Backlog to keep the DAG
-            // invariant (a Ready issue cannot have an incomplete dependency).
+            // invariant (a Ready issue cannot have an unmet dependency).
             // Subjecting this to graph-rule enforcement could BLOCK the demotion and
             // leave the issue Ready with an unmet dependency — a corrupt state. So it
             // bypasses the chokepoint deliberately. Only the ADDED edge can demote;
             // the reachability-preserving edges dropped below never do.
             let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if from_issue.state == State::Ready && dep_issue.state != State::Done {
+            if from_issue.state == State::Ready && !is_dependency_met(dep_issue.state) {
                 let old_state = from_issue.state;
                 from_issue.state = State::Backlog;
 
@@ -606,20 +606,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         from_issue.dependencies = reduced_from.iter().cloned().collect();
         let from_id = from_issue.id.clone();
 
-        // If any newly-added dependency isn't Done, a Ready issue must demote
-        // to Backlog (INV: a Ready issue cannot have an incomplete
-        // dependency). See the single-edge path for why this bypasses
+        // If any newly-added dependency is unmet, a Ready issue must demote
+        // to Backlog (INV: a Ready issue cannot have an unmet dependency).
+        // See the single-edge path for why this bypasses
         // `apply_state_transition` deliberately.
-        let mut any_incomplete = false;
+        let mut any_unmet = false;
         for full_dep_id in reduced_from.difference(&old_from_deps) {
             let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if dep_issue.state != State::Done {
-                any_incomplete = true;
+            if !is_dependency_met(dep_issue.state) {
+                any_unmet = true;
                 break;
             }
         }
 
-        if from_issue.state == State::Ready && any_incomplete {
+        if from_issue.state == State::Ready && any_unmet {
             let old_state = from_issue.state;
             from_issue.state = State::Backlog;
             self.storage.save_issue(from_issue)?;

@@ -4,7 +4,7 @@
 //! without requiring storage access. These are pure functions that can be used
 //! independently of the CLI orchestration layer.
 
-use crate::domain::{Event, GateStatus, Issue, Priority, State};
+use crate::domain::{is_dependency_met, Event, GateStatus, Issue, Priority, State};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
@@ -127,7 +127,7 @@ pub fn build_issue_map(issues: &[Issue]) -> HashMap<String, &Issue> {
 /// Returns issues that are:
 /// - In `Ready` state
 /// - Unassigned
-/// - Not blocked by dependencies or gates
+/// - Free of unmet dependencies (gates gate completion, not start)
 pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
     let resolved = build_issue_map(issues);
 
@@ -140,12 +140,11 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 
 /// A typed reason explaining why an issue is blocked.
 ///
-/// Produced by [`query_blocked`] in place of the previously hand-formatted
-/// strings: the CLI matches on these variants to build its presentation form
-/// without re-parsing text. The [`Display`](std::fmt::Display) implementation
-/// renders the canonical reason string (`dependency:<id> (<title>:<state>)` and
-/// `gate:<key> (<status>)`), so the human and `--json` output stay byte-identical
-/// to the original.
+/// Produced by [`query_blocked`]: the CLI matches on these variants to build its
+/// presentation form without re-parsing text. The [`Display`](std::fmt::Display)
+/// implementation renders the canonical reason string (`dependency:<id>
+/// (<title>:<state>)` and `gate:<key> (<status>)`) shared by human and `--json`
+/// output.
 ///
 /// # Examples
 ///
@@ -168,8 +167,9 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockingReason {
-    /// An incomplete dependency: the issue waits on `id` (titled `title`),
-    /// which is in `state` (anything other than `Done`).
+    /// An unmet dependency: the issue waits on `id` (titled `title`), which is in
+    /// `state`, a state that [`is_dependency_met`] rejects (anything short of the
+    /// terminal `Done` or `Rejected`).
     Dependency {
         /// Id of the depended-on issue.
         id: String,
@@ -204,8 +204,9 @@ impl std::fmt::Display for BlockingReason {
 
 /// Query blocked issues with typed reasons for being blocked.
 ///
-/// Returns issues that have incomplete dependencies or unfulfilled gates,
-/// along with a list of [`BlockingReason`]s explaining why each issue is blocked.
+/// Returns the issues [`Issue::is_blocked`] holds back, each with the list of
+/// [`BlockingReason`]s explaining it: every unmet dependency (by
+/// [`is_dependency_met`]) plus every required gate that has not passed.
 pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
     let resolved = build_issue_map(issues);
 
@@ -213,10 +214,10 @@ pub fn query_blocked(issues: &[Issue]) -> Vec<(Issue, Vec<BlockingReason>)> {
         .iter()
         .filter(|issue| issue.is_blocked(&resolved))
         .map(|issue| {
-            // Incomplete dependencies (anything not yet Done).
+            // Unmet dependencies, by the one predicate every surface shares.
             let dep_reasons = issue.dependencies.iter().filter_map(|dep_id| {
                 resolved.get(dep_id).and_then(|dep| {
-                    (dep.state != State::Done).then(|| BlockingReason::Dependency {
+                    (!is_dependency_met(dep.state)).then(|| BlockingReason::Dependency {
                         id: dep_id.clone(),
                         title: dep.title.clone(),
                         state: dep.state,
@@ -828,10 +829,40 @@ mod tests {
                 state: State::InProgress,
             }]
         );
-        // Display matches the historical string format byte-for-byte.
+        // Display renders the canonical reason string.
         assert_eq!(
             result[0].1[0].to_string(),
             "dependency:dep1 (Upstream:InProgress)"
+        );
+    }
+
+    #[test]
+    fn test_query_blocked_omits_rejected_dependency_from_reasons() {
+        // A Rejected dependency is met: only the InProgress one is a reason.
+        let mut rejected = Issue::new("Abandoned".to_string(), String::new());
+        rejected.id = "dep1".to_string();
+        rejected.state = State::Rejected;
+
+        let mut pending = Issue::new("Upstream".to_string(), String::new());
+        pending.id = "dep2".to_string();
+        pending.state = State::InProgress;
+
+        let mut blocked = Issue::new("Downstream".to_string(), String::new());
+        blocked.id = "blocked1".to_string();
+        blocked.state = State::Backlog;
+        blocked.dependencies = vec!["dep1".to_string(), "dep2".to_string()];
+
+        let issues = vec![rejected, pending, blocked];
+        let result = query_blocked(&issues);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].1,
+            vec![BlockingReason::Dependency {
+                id: "dep2".to_string(),
+                title: "Upstream".to_string(),
+                state: State::InProgress,
+            }]
         );
     }
 

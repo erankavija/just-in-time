@@ -87,7 +87,7 @@ The issue's current position in the workflow. See [States](#states) for complete
 
 **Primary states:**
 - `backlog` - Created but not ready for work
-- `ready` - All dependencies done, can start work
+- `ready` - All dependencies terminal (`done` or `rejected`), can start work
 - `in_progress` - Currently being worked on
 - `done` - Completed successfully
 

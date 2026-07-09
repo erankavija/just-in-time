@@ -1277,14 +1277,14 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
     if response.dependencies.is_empty() {
         println!("Dependencies: None");
     } else {
-        let done_count = response
+        let met_count = response
             .dependencies
             .iter()
-            .filter(|d| d.state.is_terminal())
+            .filter(|d| jit::domain::is_dependency_met(d.state))
             .count();
         println!(
             "Dependencies ({}/{} complete):",
-            done_count,
+            met_count,
             response.dependencies.len()
         );
         for dep in &response.dependencies {

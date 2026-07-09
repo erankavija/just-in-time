@@ -418,6 +418,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// The dependencies that hold a transition back: every dependency unmet by
+    /// [`is_dependency_met`], plus every dependency id that resolves to no issue.
     fn blocking_dependencies(
         &self,
         issue: &Issue,
@@ -427,7 +429,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .dependencies
             .iter()
             .filter_map(|dep_id| match resolved_issues.get(dep_id).copied() {
-                Some(dependency) if dependency.state.is_terminal() => None,
+                Some(dependency) if is_dependency_met(dependency.state) => None,
                 Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
                 None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
             })
@@ -1080,13 +1082,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         _filter: Option<String>,
     ) -> Result<(String, Vec<StorageWarning>)> {
         let issues = self.storage.list_issues()?;
-        let resolved = crate::domain::queries::build_issue_map(&issues);
 
-        // Find first ready, unassigned issue with highest priority
-        let mut candidates: Vec<&Issue> = issues
-            .iter()
-            .filter(|i| i.state == State::Ready && i.assignee.is_none() && !i.is_blocked(&resolved))
-            .collect();
+        // Highest-priority issue of the domain ready set (Ready, unassigned, every
+        // dependency met); `sort_by_key` is stable, so ties keep storage order.
+        let mut candidates = crate::domain::queries::query_ready(&issues);
 
         candidates.sort_by_key(|i| match i.priority {
             Priority::Critical => 0,

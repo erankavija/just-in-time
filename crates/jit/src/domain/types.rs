@@ -114,6 +114,31 @@ impl State {
     }
 }
 
+/// Whether a dependency whose target sits in `state` is met.
+///
+/// This is the single definition of dependency satisfaction: a dependency is met
+/// exactly when its target reached a terminal state ([`State::is_terminal`] —
+/// `Done` or `Rejected`). Every surface that asks whether a dependency still
+/// holds work back routes through here: [`Issue::is_blocked`], the blocked-reason
+/// enumeration, the transition blockers, and unmet-dependency rendering.
+///
+/// A dependency id that resolves to no issue is dangling. That is a separate
+/// condition, reported on each surface's own terms, so it is not this predicate's
+/// input.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{is_dependency_met, State};
+///
+/// assert!(is_dependency_met(State::Done));
+/// assert!(is_dependency_met(State::Rejected));
+/// assert!(!is_dependency_met(State::InProgress));
+/// ```
+pub fn is_dependency_met(state: State) -> bool {
+    state.is_terminal()
+}
+
 impl FromStr for State {
     type Err = anyhow::Error;
 
@@ -579,15 +604,15 @@ impl Issue {
         }
     }
 
-    /// Check if this issue is blocked by incomplete dependencies
+    /// Check if this issue is blocked by unmet dependencies
     ///
-    /// Returns true if any dependency is not in a terminal state (Done or Rejected).
+    /// Returns true if any dependency is unmet by [`is_dependency_met`], including
+    /// a dependency whose id resolves to no issue.
     /// Note: Gates do not block work from starting, only from completing.
     pub fn is_blocked(&self, resolved_issues: &HashMap<String, &Issue>) -> bool {
-        // Check if any dependency is not in a terminal state
-        self.dependencies
-            .iter()
-            .any(|dep_id| !matches!(resolved_issues.get(dep_id), Some(issue) if issue.state.is_terminal()))
+        self.dependencies.iter().any(|dep_id| {
+            !matches!(resolved_issues.get(dep_id), Some(issue) if is_dependency_met(issue.state))
+        })
     }
 
     /// Check if this issue has unpassed gates
@@ -2454,6 +2479,21 @@ mod tests {
         assert!(!State::InProgress.is_terminal());
         assert!(!State::Gated.is_terminal());
         assert!(!State::Archived.is_terminal());
+    }
+
+    #[test]
+    fn test_is_dependency_met_accepts_terminal_states() {
+        assert!(is_dependency_met(State::Done));
+        assert!(is_dependency_met(State::Rejected));
+    }
+
+    #[test]
+    fn test_is_dependency_met_rejects_non_terminal_states() {
+        assert!(!is_dependency_met(State::Backlog));
+        assert!(!is_dependency_met(State::Ready));
+        assert!(!is_dependency_met(State::InProgress));
+        assert!(!is_dependency_met(State::Gated));
+        assert!(!is_dependency_met(State::Archived));
     }
 
     #[test]
