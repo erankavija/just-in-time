@@ -8,15 +8,14 @@ This MCP server wraps the `jit` CLI to provide MCP tools for AI agents like Clau
 
 ## Features
 
-- **60+ MCP tools** automatically generated from JIT schema
+- **Schema-generated tools** - every CLI command becomes a callable MCP tool
+- **Curated default listing** - `tools/list` advertises an agent-facing subset; every command is callable
 - **Nested subcommand support** - handles multi-level commands like `doc.assets.list`
 - **Type-safe** input validation using Zod
-- **Runtime schema loading** - prefers live schema from `jit --schema` with fallback to bundled schema
+- **Runtime schema loading** - the live schema from `jit --schema` is the single source of truth
 - **Structured error responses** - consistent JSON envelope with error codes
 - **Operational hardening** - timeouts (30s) and concurrency limits (10 concurrent commands)
 - **Modular architecture** - clean separation of concerns for maintainability
-- **Zero-maintenance** - tools update automatically when CLI changes
-- **Full coverage** - all CLI commands exposed as MCP tools
 
 ## Installation
 
@@ -98,59 +97,25 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ## Available Tools
 
-The server exposes 60+ tools organized by command, including nested subcommands:
+Every leaf command in `jit --schema` becomes a callable tool named `jit_<command_path>`, so
+`jit doc assets list` is `jit_doc_assets_list`. Any generated tool can be invoked by name.
 
-### Issue Management
-- `jit_issue_create` - Create a new issue
-- `jit_issue_list` - List issues with filters
-- `jit_issue_show` - Show issue details
-- `jit_issue_search` - Search issues by text
-- `jit_issue_update` - Update an issue
-- `jit_issue_delete` - Delete an issue
-- `jit_issue_claim` - Claim an issue
-- `jit_issue_unclaim` - Unclaim an issue
+`tools/list` advertises a curated subset: the commands an autonomous agent drives to find work,
+claim it, inspect it, transition it, check gates, and read repository structure. Interactive
+setup, destructive operations, registry administration, and alias spellings stay out of the
+listing so the advertised surface stays small enough to reason about.
 
-### Dependency Management
-- `jit_dep_add` - Add dependency between issues
-- `jit_dep_rm` - Remove dependency
+[`curated-tools.json`](curated-tools.json) is the source of truth for that decision. It records
+the curation policy, the ceiling the test suite enforces, and a one-line rationale for every
+command it includes or excludes. Adding a CLI command fails `npm test` until the manifest decides
+it.
 
-### Gate Management
-- `jit_gate_define` - Define a new gate in the registry
-- `jit_gate_update` - Update an existing gate definition
-- `jit_gate_remove` - Remove a gate definition from the registry
-- `jit_gate_list` - List registered gate definitions
-- `jit_gate_show` - Show a gate definition
-- `jit_gate_add` - Add gate to issue
-- `jit_gate_evaluate` - Evaluate a gate (run the checker or record attestation)
-- `jit_gate_fail` - Mark gate as failed
-- `jit_gate_status-all` - Report readiness of every required gate (strict)
+To enumerate the listing, or the full generated set:
 
-### Events
-- `jit_events_tail` - Show recent events
-
-### Document Management
-- `jit_doc_add` - Add document reference to issue
-- `jit_doc_list` - List document references
-- `jit_doc_remove` - Remove document reference
-- `jit_doc_show` - Show document content
-
-### Graph Operations
-- `jit_graph_show` - Show dependency graph
-- `jit_graph_roots` - Show root issues
-- `jit_graph_downstream` - Show downstream issues
-- `jit_graph_export` - Export graph (dot/mermaid)
-
-### Query Operations
-- `jit_query_ready` - Query ready issues
-- `jit_query_blocked` - Query blocked issues
-- `jit_query_assignee` - Query by assignee
-- `jit_query_state` - Query by state
-- `jit_query_priority` - Query by priority
-
-### System
-- `jit_init` - Initialize tracker
-- `jit_status` - Show status
-- `jit_validate` - Validate repository
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
+JIT_MCP_ALL_TOOLS=1 sh -c 'echo "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}" | node index.js'
+```
 
 ## Example Usage (via MCP)
 
@@ -161,7 +126,7 @@ User: Create a high-priority issue for implementing authentication
 Claude: [calls jit_issue_create with title="Implement authentication", priority="high"]
 
 User: Show me all ready issues
-Claude: [calls jit_query_ready]
+Claude: [calls jit_query_available]
 
 User: Add a dependency - the auth issue depends on the database setup
 Claude: [calls jit_dep_add with from="AUTH_ID", to="DB_ID"]
@@ -176,8 +141,9 @@ The server is modularized into focused components:
 ```
 mcp-server/
 ├── index.js                    # MCP server entry point
+├── curated-tools.json          # Curation manifest for the default tool listing
 └── lib/
-    ├── schema-loader.js        # Runtime schema loading with fallback
+    ├── schema-loader.js        # Runtime schema loading from `jit --schema`
     ├── tool-generator.js       # Recursive tool generation
     ├── validator.js            # Zod-based input validation
     ├── cli-executor.js         # CLI execution with timeouts
@@ -186,25 +152,9 @@ mcp-server/
 
 ### Schema Loading
 
-The server prefers loading the schema from the runtime CLI to ensure synchronization:
-
-```javascript
-// Try loading from `jit --schema` first
-const cliSchema = await loadSchemaFromCli();
-const bundledSchema = loadSchemaFromFile(schemaPath);
-
-if (!cliSchema) {
-  warnings.push("Could not load schema from jit CLI. Using bundled schema.");
-  return { schema: bundledSchema, warnings };
-}
-
-// Check version mismatch
-if (cliSchema.version !== bundledSchema.version) {
-  warnings.push(`Schema version mismatch: CLI ${cliSchema.version}, bundled ${bundledSchema.version}`);
-}
-
-return { schema: cliSchema, warnings };
-```
+The CLI is the single source of truth for the command schema. The server shells out to
+`jit --schema` at startup and fails fast when the binary is absent from PATH, so the MCP surface
+and the installed CLI can never disagree.
 
 ### Dynamic Tool Generation with Nested Subcommands
 
@@ -316,7 +266,8 @@ npm test
 
 The test suite verifies:
 - MCP protocol initialization
-- Tool listing (60+ tools)
+- Tool listing matches the `curated-tools.json` include set and stays under its ceiling
+- Every generated tool is decided by the curation manifest, with a rationale
 - Nested subcommand tool generation and CLI mapping
 - Input validation with Zod (required fields, type checking)
 - Structured error responses with proper envelopes
@@ -387,15 +338,14 @@ node --version  # Should be v16 or later
 │                                                          │
 │  ┌─────────────────────────────────────────────┐        │
 │  │ Schema Loader                               │        │
-│  │ - Prefers jit --schema (runtime)            │        │
-│  │ - Falls back to bundled jit-schema.json     │        │
-│  │ - Warns on version mismatch                 │        │
+│  │ - Reads jit --schema at startup             │        │
+│  │ - Fails fast when jit is absent from PATH   │        │
 │  └─────────────────────────────────────────────┘        │
 │                     │                                    │
 │  ┌─────────────────▼─────────────────────┐              │
 │  │ Tool Generator                        │              │
 │  │ - Recursive generation (nested cmds)  │              │
-│  │ - Generates 60+ tools from schema     │              │
+│  │ - Curates the advertised listing      │              │
 │  └─────────────────────────────────────┬─┘              │
 │                                        │                 │
 │  ┌─────────────────▼─────────────────┐ │                │
