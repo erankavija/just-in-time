@@ -252,23 +252,18 @@ reason: outside one, it fails with a typed `ClaimRequiresGitError` (exit code
 
 - **`claims.jsonl`**: an append-only, newline-delimited log of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
-  `ForceEvict`), each entry carrying a monotonic `seq` for total ordering
-  (`crates/jit/src/storage/claim_coordinator.rs:104-155`).
+  `ForceEvict`), each entry carrying a monotonic `seq` for total ordering.
 - **`claims.index.json`**: a cache of active leases derived from
-  `claims.jsonl`, rebuilt (not hand-edited) as operations are appended
-  (`crates/jit/src/storage/claim_coordinator.rs:157-173,654-656`). Each lease
-  record carries `lease_id`, `issue_id`, `agent_id`, `worktree_id`, `branch`,
-  `ttl_secs`, `acquired_at`, `expires_at`, `last_beat`, and `stale`
-  (`crates/jit/src/storage/claim_coordinator.rs:33-55`).
+  `claims.jsonl`, rebuilt (not hand-edited) as operations are appended. Each
+  lease record carries `lease_id`, `issue_id`, `agent_id`, `worktree_id`,
+  `branch`, `ttl_secs`, `acquired_at`, `expires_at`, `last_beat`, and `stale`.
   A `ttl_secs` of `0` marks an indefinite lease, kept alive by heartbeats
   instead of expiry.
 - **`heartbeat/<agent-id>.json`** (colons in the agent id replaced with
   hyphens): process-liveness records (`pid`, `last_beat`, `interval_secs`)
-  for agents holding indefinite leases
-  (`crates/jit/src/storage/heartbeat.rs:56-74,256-260`).
+  for agents holding indefinite leases.
 - **`locks/claims.lock`**: an advisory file lock guarding atomic reads and
-  appends against `claims.jsonl` and `claims.index.json`
-  (`crates/jit/src/storage/claim_coordinator.rs:400`).
+  appends against `claims.jsonl` and `claims.index.json`.
 
 `jit claim` command usage (acquire, release, renew, heartbeat, status, list,
 force-evict) is documented in the [Claim reference](claim.md).
