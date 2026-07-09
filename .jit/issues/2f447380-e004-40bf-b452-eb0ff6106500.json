@@ -12,9 +12,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-05T22:34:56.917972404Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T20:45:25.507129614Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T20:47:13.375395323Z"
     }
   },
   "context": {},
@@ -26,7 +31,7 @@
     "satisfies:REQ-5"
   ],
   "created_at": "2026-07-05T22:31:18.724369749Z",
-  "updated_at": "2026-07-09T14:14:14.333901257Z",
+  "updated_at": "2026-07-09T20:48:42.823352687Z",
   "first_ready_at": "2026-07-05T22:31:18.724370209Z",
   "claimed_at": "2026-07-09T14:14:14.333901077Z"
 }

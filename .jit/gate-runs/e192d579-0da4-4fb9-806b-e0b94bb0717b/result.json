@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "e192d579-0da4-4fb9-806b-e0b94bb0717b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "2f447380-e004-40bf-b452-eb0ff6106500",
+  "commit": "663d0c4d8ea451fd9251b154fcaf100f91435a89",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T20:47:13.375395323Z",
+  "completed_at": "2026-07-09T20:48:42.750690915Z",
+  "duration_ms": 89375,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nThe pure expansion split is present in [template_expand.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template_expand.rs:206), and it does not touch storage. Commit orchestration remains in commands. No domain/storage boundary violation found in the new expansion path.\n\n**Functional Paradigm**\n\nThe expansion code mostly uses iterator style where appropriate. Some command-layer loops are pragmatic orchestration and not a blocker.\n\n**Correctness and Invariants**\n\nBlocking issue found: the new repository lock is not shared with normal issue/dependency writers, so REQ-2’s concurrency guarantee is not met.\n\n**Safety**\n\nNo unsafe-code issue found in the reviewed changes.\n\n**Testing**\n\nI did not rerun cargo tests because the issue has a passed `cargo-ci` gate in the provided context. `./scripts/jit-validate.sh` passed. The injected failure tests cover rollback for the apply path, but they use `InMemoryStorage` and do not catch the cross-process locking gap.\n\n**Error Handling**\n\nNo new `unwrap()`/`expect()` issue in library code observed in the reviewed paths. Registry load errors for unsupported transform kinds include template and kind.\n\n**CLI Contract**\n\nNo CLI contract regression found in the reviewed changes.\n\n**Documentation**\n\nNew public expansion/delta APIs include doc comments and examples.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there were no prior findings to verify.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed; label warnings were not present in the run output.\n\n1. **F1 [high] REQ-2 is not satisfied because `jit apply` locks `apply.lock`, but normal issue/dependency writers do not participate in that lock.** `apply_template_with` acquires `APPLY_LOCK` at [crates/jit/src/commands/template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:231), and `repo_write_lock` locks the caller-provided filename at [crates/jit/src/commands/mod.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1054). However `JsonFileStorage::save_issue`, `delete_issue`, and `list_issues` use `.index.lock` and per-issue locks, not `apply.lock`, at [crates/jit/src/storage/json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:503), [crates/jit/src/storage/json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:644), and [crates/jit/src/storage/json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:671). A concurrent `jit issue create`, `jit dep add`, or other writer can therefore mutate the store after the pre-apply snapshot and during commit. On failure, rollback treats every issue absent from the pre-apply snapshot as apply-created and deletes it, and reverts changed pre-existing issues at [crates/jit/src/commands/template.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:549). This can erase unrelated concurrent work and means the apply is not actually atomic with respect to repository mutations.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-2 is not met: the apply lock is private to apply and does not serialize ordinary repository writers, so rollback can erase concurrent changes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"`jit apply` locks `apply.lock`, but normal issue/dependency writers use `.index.lock` and per-issue locks, so concurrent mutations can occur during apply and be deleted or reverted by rollback.\",\"file\":\"crates/jit/src/commands/template.rs\",\"line\":231}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9162 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f48a2-72af-75d0-a670-e8eed679589d\n--------\nuser\n--- 9149 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-2 is not met: the apply lock is private to apply and does not serialize ordinary repository writers, so rollback can erase concurrent changes.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "`jit apply` locks `apply.lock`, but normal issue/dependency writers use `.index.lock` and per-issue locks, so concurrent mutations can occur during apply and be deleted or reverted by rollback.",
+        "file": "crates/jit/src/commands/template.rs",
+        "line": 231
+      }
+    ]
+  }
+}

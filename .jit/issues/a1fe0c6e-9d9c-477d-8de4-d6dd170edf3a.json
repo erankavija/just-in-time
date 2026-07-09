@@ -2,14 +2,20 @@
   "id": "a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a",
   "title": "Document the containment and completion model",
   "description": "State the work-graph's design commitments in user-facing docs: what an edge means, how containment is derived, why containers complete last, and the item address grammar.\n\n## Background\n\nTwo load-bearing properties are currently implicit. First, because a container depends on its contents and blocking follows dependency edges, a container never becomes workable until its whole subtree is terminal — an intended consequence stated nowhere. Second, the addressable-item grammar (project scope `@/<kind>/<self-id>`, issue scope `@/issue/<short-id>/<kind>/<self-id>`, and the `<short-id>/<self-id>` sugar form) is documented only in CLI help text; the reference docs under-specify it.\n\n## Success Criteria\n\n- [hard] REQ-1: A concepts page states the containment model: one edge kind, container-depends-on-contents direction, hierarchy derived from the DAG plus type levels (never stored), membership labels advisory, containers become workable last.\n- [hard] REQ-2: The reference docs specify the full item address grammar, including both scopes, the reserved `issue` segment, and the sugar form with its kind-inference and ambiguity behavior, matching the implementation in `domain/item.rs`.\n- [hard] REQ-3: All added text states current behavior only, with no references to earlier models or transitional narration.\n\n## Notes\n\nFollow the Diátaxis split already used in `docs/`: the model goes under concepts, the grammar under reference. Mermaid for any diagrams.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T20:46:41.282575276Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -102,7 +108,8 @@
     "satisfies:REQ-8"
   ],
   "created_at": "2026-07-05T22:31:18.727973291Z",
-  "updated_at": "2026-07-09T14:26:23.285858203Z",
+  "updated_at": "2026-07-09T20:48:41.803015675Z",
   "first_ready_at": "2026-07-05T22:31:18.727973821Z",
-  "claimed_at": "2026-07-09T14:14:14.367631061Z"
+  "claimed_at": "2026-07-09T14:14:14.367631061Z",
+  "done_at": "2026-07-09T20:48:41.803015195Z"
 }
