@@ -9,7 +9,7 @@
 
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
-import { generateTools, generateDefaultTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
+import { CURATION, curationCoverage, generateTools, generateDefaultTools, parseToolName, getCommandByPath } from './lib/tool-generator.js';
 import { validateArguments, createValidator } from './lib/validator.js';
 import { buildCliArgs } from './lib/cli-executor.js';
 import { ConcurrencyLimiter } from './lib/concurrency.js';
@@ -291,37 +291,52 @@ await runTest('generateTools matches real schema without errors', () => {
   }
 });
 
-await runTest('generateDefaultTools returns curated subset of all tools', () => {
+await runTest('curation manifest decides every generated tool exactly once', () => {
+
+  const { uncurated, stale } = curationCoverage(realSchema);
+  assert.deepStrictEqual(uncurated, [],
+    `curated-tools.json must include or exclude each generated tool, with a rationale. Undecided: ${uncurated.join(', ')}`);
+  assert.deepStrictEqual(stale, [],
+    `curated-tools.json names tools the CLI no longer generates: ${stale.join(', ')}`);
+
+  // A rationale is what makes the curation reviewable, so require a real one.
+  for (const [name, rationale] of [...Object.entries(CURATION.include), ...Object.entries(CURATION.exclude)]) {
+    assert.ok(typeof rationale === 'string' && rationale.length >= 20,
+      `${name} needs a one-line rationale in curated-tools.json`);
+  }
+});
+
+await runTest('generateDefaultTools returns the manifest include set', () => {
 
   const allTools = generateTools(realSchema);
   const defaultTools = generateDefaultTools(realSchema);
-  assert.ok(defaultTools.length >= 20, `should have 20+ default tools, got ${defaultTools.length}`);
-  assert.ok(defaultTools.length < allTools.length, `default (${defaultTools.length}) should be fewer than all (${allTools.length})`);
-  // Every default tool must exist in the full set
-  const allNames = new Set(allTools.map(t => t.name));
-  for (const tool of defaultTools) {
-    assert.ok(allNames.has(tool.name), `default tool ${tool.name} not in full set`);
-  }
+  assert.deepStrictEqual(
+    defaultTools.map(t => t.name).sort(),
+    Object.keys(CURATION.include).sort(),
+    'default tools should be exactly the manifest include set');
+  assert.ok(defaultTools.length < allTools.length,
+    `curated (${defaultTools.length}) should be fewer than all (${allTools.length})`);
   // Core workflow tools must be present
   for (const name of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_status-all']) {
     assert.ok(defaultTools.some(t => t.name === name), `missing core tool: ${name}`);
   }
 });
 
-await runTest('generateDefaultTools filters based on schema hidden field', () => {
+await runTest('curated set stays within the manifest headroom bound', () => {
 
-  const allTools = generateTools(realSchema);
   const defaultTools = generateDefaultTools(realSchema);
-  // Default tools should be exactly the non-hidden tools
-  const hiddenTools = allTools.filter(t => t._hidden);
-  const nonHiddenTools = allTools.filter(t => !t._hidden);
-  assert.strictEqual(defaultTools.length, nonHiddenTools.length,
-    `default tools (${defaultTools.length}) should equal non-hidden tools (${nonHiddenTools.length})`);
-  assert.ok(hiddenTools.length > 0, 'should have some hidden tools');
-  // No default tool should have _hidden=true
-  for (const tool of defaultTools) {
-    assert.ok(!tool._hidden, `default tool ${tool.name} should not be hidden`);
-  }
+  assert.ok(defaultTools.length <= CURATION.max_curated_tools,
+    `curated set (${defaultTools.length}) exceeds max_curated_tools (${CURATION.max_curated_tools}); re-curate rather than raising the bound`);
+});
+
+await runTest('curation never widens the set beyond what the CLI schema exposes', () => {
+
+  // Commands the CLI marks hidden are excluded here too: the manifest narrows.
+  const hiddenIncluded = generateTools(realSchema)
+    .filter(t => t._hidden && Object.hasOwn(CURATION.include, t.name))
+    .map(t => t.name);
+  assert.deepStrictEqual(hiddenIncluded, [],
+    `schema-hidden commands must stay excluded: ${hiddenIncluded.join(', ')}`);
 });
 
 // ---------------------------------------------------------------------------

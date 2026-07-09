@@ -13,6 +13,7 @@ import { mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { strict as assert } from 'node:assert';
+import { CURATION } from './lib/tool-generator.js';
 
 const TIMEOUT = 5000;
 
@@ -181,9 +182,13 @@ async function main() {
     await runTest('tools/list returns curated default set with correct shape', async () => {
       const resp = await tester.request('tools/list');
       const tools = resp.result.tools;
-      // Default set is curated (~30-40 tools), not the full 75
-      assert.ok(tools.length >= 20, `expected 20+ tools, got ${tools.length}`);
-      assert.ok(tools.length < 50, `expected curated set (<50), got ${tools.length}`);
+      // tools/list advertises exactly the manifest include set, and that set
+      // stays under the ceiling the manifest documents.
+      const curatedNames = Object.keys(CURATION.include).sort();
+      assert.deepStrictEqual(tools.map(t => t.name).sort(), curatedNames,
+        'tools/list should advertise the curated-tools.json include set');
+      assert.ok(tools.length <= CURATION.max_curated_tools,
+        `curated set (${tools.length}) exceeds max_curated_tools (${CURATION.max_curated_tools})`);
       for (const tool of tools) {
         assert.ok(tool.name.startsWith('jit_'));
         assert.ok(tool.description);

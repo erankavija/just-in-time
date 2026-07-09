@@ -1,9 +1,20 @@
 /**
  * Tool generation from JIT schema
- * 
+ *
  * Generates MCP tool definitions from JIT schema, including support for
  * nested subcommands (e.g., doc.assets.list).
+ *
+ * The default tool set advertised over MCP is curated by `curated-tools.json`,
+ * which decides every generated tool and states why. Curation is data there
+ * rather than control flow here.
  */
+
+import { readFileSync } from "fs";
+
+/** Curation manifest: `{ policy, max_curated_tools, include, exclude }`. */
+export const CURATION = JSON.parse(
+  readFileSync(new URL("../curated-tools.json", import.meta.url), "utf8")
+);
 
 /**
  * Generate MCP tool definition from JIT schema command
@@ -217,7 +228,7 @@ function generateToolsRecursive(commands, parentPath = [], globalTypes = {}, inc
 
 /**
  * Generate the default (curated) set of MCP tools from JIT schema.
- * Returns only tools not marked as hidden in the schema.
+ * Returns the tools listed under `include` in the curation manifest.
  * Use generateTools() for the full set.
  * @param {Object} schema - JIT schema object
  * @param {boolean} includeOutputSchema - Whether to include outputSchema
@@ -225,7 +236,28 @@ function generateToolsRecursive(commands, parentPath = [], globalTypes = {}, inc
  */
 export function generateDefaultTools(schema, includeOutputSchema = true) {
   const allTools = generateTools(schema, includeOutputSchema);
-  return allTools.filter(t => !t._hidden);
+  return allTools.filter(t => Object.hasOwn(CURATION.include, t.name));
+}
+
+/**
+ * Compare the curation manifest against the tools a schema generates.
+ * `uncurated` names tools the manifest has not decided; `stale` names manifest
+ * entries with no generated tool behind them. Both empty means the manifest
+ * decides every command exactly once.
+ * @param {Object} schema - JIT schema object
+ * @returns {{uncurated: string[], stale: string[]}}
+ */
+export function curationCoverage(schema) {
+  const generated = new Set(generateTools(schema, false).map(t => t.name));
+  const decided = new Set([
+    ...Object.keys(CURATION.include),
+    ...Object.keys(CURATION.exclude),
+  ]);
+
+  return {
+    uncurated: [...generated].filter(name => !decided.has(name)).sort(),
+    stale: [...decided].filter(name => !generated.has(name)).sort(),
+  };
 }
 
 /**
