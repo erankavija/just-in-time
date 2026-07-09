@@ -29,7 +29,7 @@ jit worktree list
 
 **Symptom:**
 ```text
-Error: Cannot transition to 'ready': issue blocked by 1 incomplete dependencies
+Error: Cannot transition to 'ready': issue blocked by 1 unmet dependencies
 
 Blockers:
   - abc12345 Blocked prerequisite [ready]

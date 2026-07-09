@@ -171,8 +171,8 @@ fn test_query_closed_includes_done_and_rejected() {
 }
 
 #[test]
-fn test_query_blocked_finds_issues_with_incomplete_deps() {
-    let dep1 = make_issue("dep1", "Incomplete dep", State::InProgress);
+fn test_query_blocked_finds_issues_with_unmet_deps() {
+    let dep1 = make_issue("dep1", "Unmet dep", State::InProgress);
     let dep2 = make_issue("dep2", "Done dep", State::Done);
     let blocked = make_issue_with_deps(
         "blocked1",

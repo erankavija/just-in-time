@@ -8,7 +8,7 @@ Dependencies control work order by expressing "FROM depends on TO" relationships
 
 ### Express Work Order Constraints
 
-Dependencies represent blocking relationships: "FROM cannot complete until TO is done."
+Dependencies represent blocking relationships: "FROM stays blocked until TO reaches a terminal state (done or rejected)."
 
 **Basic syntax:**
 ```bash
@@ -34,7 +34,7 @@ Both can flow in the same direction, but serve different purposes:
 
 | Aspect | Dependencies | Labels |
 |--------|--------------|--------|
-| **Semantics** | "Blocks until complete" | "Belongs to group" |
+| **Semantics** | "Blocks until terminal" | "Belongs to group" |
 | **Enforces** | Work order (workflow) | Organization (categorization) |
 | **Dynamic** | Affects state transitions | Static metadata |
 | **Structure** | Arbitrary DAG | Strict hierarchy |

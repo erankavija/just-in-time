@@ -1283,7 +1283,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
             .filter(|d| jit::domain::is_dependency_met(d.state))
             .count();
         println!(
-            "Dependencies ({}/{} complete):",
+            "Dependencies ({}/{} met):",
             met_count,
             response.dependencies.len()
         );

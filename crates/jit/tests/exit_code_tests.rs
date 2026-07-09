@@ -865,7 +865,7 @@ fn test_claim_next_json_skips_non_ready_issues() {
 }
 
 /// Build a dependency-blocked fixture: returns (dependency, dependent) where
-/// `dependent` is in `backlog` and depends on the still-incomplete `dependency`.
+/// `dependent` is in `backlog` and depends on the still-unmet `dependency`.
 fn dependency_blocked_fixture(temp_dir: &TempDir) -> (String, String) {
     let dependency = json_issue_id(
         &Command::new(jit_binary())
@@ -890,7 +890,7 @@ fn dependency_blocked_fixture(temp_dir: &TempDir) -> (String, String) {
     (dependency, dependent)
 }
 
-/// A claim blocked by incomplete dependencies must name `jit issue assign` in
+/// A claim blocked by unmet dependencies must name `jit issue assign` in
 /// its human-readable error so the operator learns how to assign without
 /// starting work.
 #[test]

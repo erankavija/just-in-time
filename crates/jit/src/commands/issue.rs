@@ -941,8 +941,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         // still hard-fails exactly as before (REQ-02); claiming one already
         // assigned to the SAME assignee is idempotent and falls through to the
         // normal claim flow below (REQ-01) instead of erroring, so an assignment
-        // made while dependencies were still open can be promoted into a real
-        // claim once they complete.
+        // made while dependencies were still unmet can be promoted into a real
+        // claim once they reach a terminal state.
         let claimant: crate::domain::Assignee = assignee.parse()?;
         if let Some(existing) = &issue.assignee {
             if existing != &claimant {
@@ -1560,7 +1560,7 @@ enforce_leases = "off"
         let issue_id = issue.id.clone();
         executor.storage.save_issue(issue).unwrap();
 
-        // Transition to Rejected should succeed even with incomplete dependencies
+        // Transition to Rejected should succeed even with unmet dependencies
         let result = executor.update_issue_state(&issue_id, State::Rejected);
         assert!(
             result.is_ok(),

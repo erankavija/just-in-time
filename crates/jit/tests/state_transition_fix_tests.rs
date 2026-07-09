@@ -45,7 +45,7 @@ fn test_validate_fix_transitions_backlog_to_ready() {
 }
 
 #[test]
-fn test_validate_fix_ignores_incomplete_dependencies() {
+fn test_validate_fix_ignores_unmet_dependencies() {
     let mut h = TestHarness::new();
 
     // Create a story with two task dependencies
@@ -62,7 +62,7 @@ fn test_validate_fix_ignores_incomplete_dependencies() {
 
     // Run validate --fix
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
-    assert_eq!(fixes, 0, "Should not fix - dependencies incomplete");
+    assert_eq!(fixes, 0, "Should not fix - dependencies unmet");
 
     // Story should still be in backlog
     let story_issue = h.storage.load_issue(&story).unwrap();
@@ -210,7 +210,7 @@ fn test_validate_fix_complex_dependency_chain() {
     let story2_issue = h.storage.load_issue(&story2).unwrap();
     assert_eq!(story2_issue.state, State::Ready);
 
-    // Epic should still be in backlog (dependencies need to be Done, not just Ready)
+    // Epic stays in backlog: its Ready dependencies are still outside a terminal state
     let epic_issue = h.storage.load_issue(&epic).unwrap();
     assert_eq!(epic_issue.state, State::Backlog);
 

@@ -2134,7 +2134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_issue_blocked_by_incomplete_dependency() {
+    fn test_issue_blocked_by_unmet_dependency() {
         let mut issue = Issue::new("Dependent".to_string(), "Desc".to_string());
         let dependency = Issue::new("Dependency".to_string(), "Desc".to_string());
 

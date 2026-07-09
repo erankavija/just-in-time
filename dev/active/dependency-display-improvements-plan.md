@@ -28,7 +28,7 @@ The current dependency exploration tools have two major issues:
 
 **Human-readable output:**
 ```
-Dependencies (3/12 complete):
+Dependencies (3/12 met):
   ✓ cbf75d46 | Implement FromStr trait [done]
   ✓ a66e16a4 | Add git merge driver [done]
   ○ 32f804f1 | CLI ergonomics improvements [in_progress]
