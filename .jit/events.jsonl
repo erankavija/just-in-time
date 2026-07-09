@@ -5766,3 +5766,8 @@
 {"type":"issue_claimed","id":"80038939-f845-4f5f-8e16-4746badbbd50","issue_id":"a4e8d5ac-c3f7-40bb-b4ea-108283bcf611","timestamp":"2026-07-09T14:14:14.350741589Z","assignee":"agent:claude"}
 {"type":"issue_state_changed","id":"0df29143-8484-4c4b-ac6d-e3bf5db7169d","issue_id":"a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a","timestamp":"2026-07-09T14:14:14.367583021Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"0a17bb67-266f-43b9-84ea-62fe982b0527","issue_id":"a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a","timestamp":"2026-07-09T14:14:14.367771441Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"100bf2ea-f5ef-449d-87a2-75c2950f4b30","issue_id":"a4e8d5ac-c3f7-40bb-b4ea-108283bcf611","timestamp":"2026-07-09T20:34:36.279471291Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_created","id":"7da75884-8338-496d-aa93-91be605f519c","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-09T20:35:02.528431799Z","title":"Gate npm-ci does not cover the mcp-server test suite","priority":"normal"}
+{"type":"issue_updated","id":"3a3f1b14-fd2c-48af-980a-eeecbbf4a2ba","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-09T20:35:06.040846013Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"d80cbbd9-c251-4108-b785-cc70d40037e5","issue_id":"c291e95c-82f0-437f-8b58-264ac73e27b2","timestamp":"2026-07-09T20:35:17.339424489Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"eee33961-8b68-4ac2-88d9-b4e34e92df29","issue_id":"c291e95c-82f0-437f-8b58-264ac73e27b2","timestamp":"2026-07-09T20:35:17.339607889Z","assignee":"agent:claude"}

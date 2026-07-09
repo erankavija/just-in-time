@@ -5,7 +5,9 @@
   "state": "in_progress",
   "priority": "normal",
   "assignee": "agent:claude",
-  "dependencies": [],
+  "dependencies": [
+    "c291e95c-82f0-437f-8b58-264ac73e27b2"
+  ],
   "gates_required": [
     "npm-ci",
     "code-review"
@@ -20,7 +22,7 @@
     "satisfies:REQ-8"
   ],
   "created_at": "2026-07-05T22:31:18.726402160Z",
-  "updated_at": "2026-07-09T14:14:14.350574259Z",
+  "updated_at": "2026-07-09T20:34:36.279112381Z",
   "first_ready_at": "2026-07-05T22:31:18.726402700Z",
   "claimed_at": "2026-07-09T14:14:14.350574129Z"
 }
