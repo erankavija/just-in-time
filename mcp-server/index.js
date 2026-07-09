@@ -41,26 +41,27 @@ Key concepts:
 - Issues have states: backlog → ready → in_progress → done (or rejected)
 - Dependencies are CRITICAL: use jit_dep_add to express "B needs A done first"
 - Gates are quality checkpoints (tests, clippy, fmt, code-review) that must pass
-- Labels organize issues: type:task/story/epic, epic:*, milestone:*, component:*
+- Labels are advisory metadata for grouping and search; the label vocabulary and any type hierarchy come from this repository's configuration, not from the engine
 - Claims/leases prevent concurrent edits across multiple agents
 
-Label hierarchy:
-- type:epic → contains stories, has epic:* label for grouping
-- type:story → contains tasks, has story:* label linking to parent
-- type:task → leaf work items, should have epic:* or story:* label
-- type:bug → defects, should link to epic:* for tracking
+Containment is DAG-authoritative:
+- Dependency edges define containment: a container issue depends on the issues it contains, so a container's outgoing dependencies are its contents
+- Membership labels (grouping tags such as an epic or milestone label) are advisory only; resolving structure never consults an issue's claimed group
+- Because containment follows dependency, blocking follows the same edges: a container reaches a workable state only once its whole contained subtree is terminal
+- Read structure from jit_graph_tree, the resolved parent/child hierarchy, instead of inferring it from label prefixes
+- Run jit_query_divergence to find issues whose membership label disagrees with the DAG. When they disagree, trust the DAG: fix the label or the dependency edges, not the resolved structure
 
 Common workflows:
 1. Find work: jit_query_available (unassigned ready issues)
-2. Claim issue: jit_issue_claim or jit_claim_acquire  
+2. Claim issue: jit_issue_claim or jit_claim_acquire
 3. Check details: jit_issue_show (includes labels, gates, documents)
-4. Check dependencies: jit_graph_deps (what blocks this issue)
+4. Check dependencies: jit_graph_deps (what blocks this issue) or jit_graph_tree (full resolved hierarchy)
 5. Inspect gate runs: jit_gate_status-all
 6. Complete: jit_issue_update with state=done
 
 Tips:
 - Short IDs work: "92bf3a9b" instead of full UUID
-- Dependencies matter more than labels for workflow
+- Dependency edges define structure; membership labels never do
 - jit_recover cleans up stale locks and corrupted state
 - jit_validate checks repository consistency
 - Always check gates before marking done: jit_gate_status-all`;
