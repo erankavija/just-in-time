@@ -98,7 +98,7 @@ JIT's workflow revolves around **issues** (units of work) that progress through 
 ```mermaid
 stateDiagram-v2
     [*] --> backlog
-    backlog --> ready: dependencies complete
+    backlog --> ready: dependencies terminal
     ready --> in_progress: claim (prechecks pass)
     in_progress --> gated: work submitted
     gated --> done: postchecks pass
@@ -122,7 +122,7 @@ Issues record lifecycle timestamps (first ready, claimed, done) as they transiti
 
 ### Dependencies Form a DAG
 
-Issues depend on other issues. An issue is **blocked** until all its dependencies complete, and containment (which epic a task belongs to) is derived from the same graph.
+Issues depend on other issues. An issue is **blocked** until all its dependencies reach a terminal state (done or rejected), and containment (which epic a task belongs to) is derived from the same graph.
 
 ```bash
 jit dep add <blocked-issue> <dependency-issue...>   # atomic, all-or-nothing

@@ -2352,8 +2352,8 @@ jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
 ### `jit dep add`
 
 Add one or more dependencies to an issue. `FROM` is blocked until every listed
-`TO` completes. Dependencies are orthogonal to labels: issues don't need
-matching labels to depend on each other.
+`TO` reaches a terminal state. Dependencies are orthogonal to labels: issues
+don't need matching labels to depend on each other.
 
 **Usage:**
 ```bash
@@ -2362,7 +2362,7 @@ jit dep add <FROM_ID> <TO_ID>... [--reduce] [--json]
 
 **Arguments:**
 - `FROM_ID` — the issue that becomes blocked
-- `TO_ID...` — one or more issues that must complete first
+- `TO_ID...` — one or more issues that must reach a terminal state first
 
 **All-or-nothing (jit:c8518f2a):** every requested edge is validated — id
 resolution, then cycle detection and (by default) a check that the edge

@@ -69,7 +69,7 @@ Each issue is stored as `issues/<uuid>.json`:
 | `state` | enum | `backlog`, `ready`, `in_progress`, `done`, `rejected` |
 | `priority` | enum | `critical`, `high`, `normal`, `low` |
 | `assignee` | string? | Format: `type:identifier` (e.g., `agent:copilot-1`) |
-| `dependencies` | UUID[] | Issues that must complete before this one |
+| `dependencies` | UUID[] | Issues that must reach a terminal state before this one |
 | `gates_required` | string[] | Gate keys from registry |
 | `gates_status` | object | Per-gate status with timestamps |
 | `labels` | string[] | Format: `namespace:value` |

@@ -1,8 +1,8 @@
 //! Tests for automatic state transitions in `jit validate --fix`
 //!
-//! After worktree merges, issues in backlog may have all dependencies complete
-//! but never auto-transition to ready. The validate --fix command should detect
-//! and fix these pending transitions.
+//! After worktree merges, issues in backlog may have all dependencies reach a
+//! terminal state but never auto-transition to ready. The validate --fix command
+//! should detect and fix these pending transitions.
 
 mod harness;
 use harness::TestHarness;

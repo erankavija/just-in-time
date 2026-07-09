@@ -1405,9 +1405,9 @@ enforce_leases = "off"
 
     /// REQ-01: an issue assigned to X while its dependency was still open
     /// (leaving the issue Backlog and blocked) must be claimable by that SAME
-    /// assignee once the dependency completes, instead of hard-failing with
-    /// "already assigned". This is the assign-then-claim promotion sequence
-    /// container stewardship produces.
+    /// assignee once the dependency reaches a terminal state, instead of
+    /// hard-failing with "already assigned". This is the assign-then-claim
+    /// promotion sequence container stewardship produces.
     #[test]
     fn test_claim_promotes_existing_same_assignee_assignment_once_unblocked() {
         let executor = setup();
@@ -1449,7 +1449,7 @@ enforce_leases = "off"
         assert_eq!(
             promoted.state,
             State::Ready,
-            "dependent should auto-promote to Ready once its dependency completes"
+            "dependent should auto-promote to Ready once its dependency reaches a terminal state"
         );
 
         // Claim as the SAME assignee: must proceed rather than erroring.

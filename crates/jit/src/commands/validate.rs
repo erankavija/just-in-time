@@ -1603,7 +1603,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             for issue in backlog_issues {
                 if issue.should_auto_transition_to_ready(&resolved) {
                     messages.push(format!(
-                        "  → Transitioning {} to ready (dependencies complete)",
+                        "  → Transitioning {} to ready (dependencies terminal)",
                         &issue.id[..8.min(issue.id.len())]
                     ));
 

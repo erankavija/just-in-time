@@ -205,7 +205,7 @@ function adjustGridColumns(
  * Compute horizontal positions for clusters AND orphan nodes based on topological sort.
  * Uses Kahn's algorithm for topological ordering of cross-cluster dependencies.
  * 
- * In jit: A→B means "A depends on B" (B must complete first)
+ * In jit: A→B means "A depends on B" (B must reach a terminal state first)
  * So B should be positioned LEFT of A (dependencies on left, dependents on right)
  */
 export function computeClusterPositions(

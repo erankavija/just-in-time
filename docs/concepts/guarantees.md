@@ -13,7 +13,7 @@ JIT maintains four core invariants that are enforced at all times. Three of them
 
 **Guarantee:** Dependencies always form a directed acyclic graph (DAG) - cycles are strictly prevented. (`@/invariant/dag-acyclic`)
 
-Dependencies in JIT represent "FROM depends on TO" relationships. If issue A depends on B, then A cannot complete until B is done. To prevent deadlock, JIT enforces that the dependency graph is always acyclic.
+Dependencies in JIT represent "FROM depends on TO" relationships. If issue A depends on B, then A cannot proceed until B reaches a terminal state (done or rejected). To prevent deadlock, JIT enforces that the dependency graph is always acyclic.
 
 **How it works:**
 
@@ -46,7 +46,7 @@ jit dep add g7h8i9 a1b2c3  # ✗ ERROR: Cycle detected
 
 **Why this matters:**
 
-- **No deadlocks:** Issues can always make progress when dependencies complete
+- **No deadlocks:** Issues can always make progress once dependencies reach a terminal state
 - **Clear work order:** Topological sort determines execution order
 - **Predictable scheduling:** Agents can identify ready work deterministically
 
