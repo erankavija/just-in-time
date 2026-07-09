@@ -177,10 +177,10 @@ fn test_graph_export_json_composes_with_full() {
     assert!(output.status.success(), "--json --full failed: {output:?}");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     // The full shape carries resolved-hierarchy fields absent from the summary shape.
-    assert!(json["nodes"][0]
-        .as_object()
-        .unwrap()
-        .contains_key("resolved_parent"));
+    let node = json["nodes"][0].as_object().unwrap();
+    for field in ["parent", "children", "cluster", "rank"] {
+        assert!(node.contains_key(field), "missing {field} in --full node");
+    }
 }
 
 #[test]

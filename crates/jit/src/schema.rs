@@ -426,6 +426,10 @@ impl CommandSchema {
                 Some(schema_to_value::<GraphRootsResponse>()),
                 "GraphRootsResponse",
             ),
+            "graph_tree" => (
+                Some(schema_to_value::<GraphTreeResponse>()),
+                "GraphTreeResponse",
+            ),
 
             "gate_list" => (
                 Some(schema_to_value::<GateListResponse>()),
@@ -634,6 +638,53 @@ mod tests {
             json.contains("\"hidden\":true"),
             "hidden:true should be present in serialization"
         );
+    }
+
+    /// `graph tree` publishes its response shape through the schema command, so
+    /// MCP clients and other consumers read the resolved-hierarchy contract
+    /// instead of re-deriving it.
+    #[test]
+    fn test_graph_tree_schema_is_published() {
+        let schema = CommandSchema::generate();
+
+        let tree = schema
+            .commands
+            .get("graph")
+            .and_then(|g| g.subcommands.as_ref())
+            .and_then(|s| s.get("tree"))
+            .expect("graph tree subcommand should exist");
+
+        let output = tree
+            .output
+            .as_ref()
+            .expect("graph tree should have an output schema");
+        assert_eq!(output.success, "GraphTreeResponse");
+
+        let schema_val = output
+            .success_schema
+            .as_ref()
+            .expect("success_schema should be present");
+        let props = schema_val
+            .pointer("/definitions/GraphTreeResponse/properties")
+            .or_else(|| schema_val.pointer("/properties"))
+            .expect("GraphTreeResponse properties should be present in schema");
+        assert!(props.get("nodes").is_some(), "list envelope collection");
+        assert!(props.get("count").is_some(), "list envelope count");
+        assert!(props.get("root").is_some(), "scoping root id");
+
+        // The node shape carries the four resolved-hierarchy fields.
+        let node_schema = serde_json::to_string(
+            schema_val
+                .pointer("/definitions/HierarchyNodeView")
+                .expect("HierarchyNodeView definition"),
+        )
+        .unwrap();
+        for field in ["parent", "children", "cluster", "rank"] {
+            assert!(
+                node_schema.contains(&format!("\"{field}\"")),
+                "node schema should describe the {field} field"
+            );
+        }
     }
 
     #[test]

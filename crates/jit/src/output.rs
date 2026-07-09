@@ -821,12 +821,15 @@ pub struct GraphRootsResponse {
 /// One node's resolved hierarchy facts, as rendered by `graph tree`.
 ///
 /// The `type` key is the value of the node's `type:` label (absent when it has
-/// none). `parent`, `cluster`, `children`, and `rank` are the DAG-authoritative
-/// resolution from [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
+/// none). The `parent`, `children`, `cluster`, and `rank` keys are flattened
+/// from [`NodeHierarchy`](crate::graph::hierarchy::NodeHierarchy), the
+/// DAG-authoritative resolution produced by
+/// [`resolve_hierarchy`](crate::graph::hierarchy::resolve_hierarchy).
 ///
 /// # Examples
 ///
 /// ```
+/// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::HierarchyNodeView;
 ///
 /// let view = HierarchyNodeView {
@@ -834,15 +837,20 @@ pub struct GraphRootsResponse {
 ///     short_id: "epic-123".into(),
 ///     title: "Auth epic".into(),
 ///     type_name: Some("epic".into()),
-///     parent: None,
-///     children: vec!["task-a".into()],
-///     cluster: Some("epic-1234".into()),
-///     rank: 1,
+///     hierarchy: NodeHierarchy {
+///         parent: None,
+///         children: vec!["task-a".into()],
+///         cluster: Some("epic-1234".into()),
+///         rank: 1,
+///     },
 /// };
 /// let json = serde_json::to_value(&view).unwrap();
 /// // `type_name` serializes under the `type` key.
 /// assert_eq!(json["type"], "epic");
+/// // The resolution fields sit flat on the node.
 /// assert_eq!(json["children"][0], "task-a");
+/// assert_eq!(json["cluster"], "epic-1234");
+/// assert_eq!(json["rank"], 1);
 /// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct HierarchyNodeView {
@@ -855,14 +863,9 @@ pub struct HierarchyNodeView {
     /// The node's `type:` label value, if any.
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub type_name: Option<String>,
-    /// Nearest dominating container id, or `null` for a root node.
-    pub parent: Option<String>,
-    /// Ids of nodes whose resolved parent is this node, sorted ascending.
-    pub children: Vec<String>,
-    /// Strategic root container id, or `null` for an orphan leaf.
-    pub cluster: Option<String>,
-    /// Longest dependency-path length to an in-set sink.
-    pub rank: u32,
+    /// DAG-resolved parent, children, cluster, and rank, flattened onto the node.
+    #[serde(flatten)]
+    pub hierarchy: crate::graph::hierarchy::NodeHierarchy,
 }
 
 /// Response for `graph tree` command.
@@ -874,6 +877,7 @@ pub struct HierarchyNodeView {
 /// # Examples
 ///
 /// ```
+/// use jit::graph::hierarchy::NodeHierarchy;
 /// use jit::output::{GraphTreeResponse, HierarchyNodeView};
 ///
 /// let response = GraphTreeResponse {
@@ -884,10 +888,12 @@ pub struct HierarchyNodeView {
 ///         short_id: "task-123".into(),
 ///         title: "A task".into(),
 ///         type_name: Some("task".into()),
-///         parent: Some("epic-1".into()),
-///         children: vec![],
-///         cluster: Some("epic-1".into()),
-///         rank: 0,
+///         hierarchy: NodeHierarchy {
+///             parent: Some("epic-1".into()),
+///             children: vec![],
+///             cluster: Some("epic-1".into()),
+///             rank: 0,
+///         },
 ///     }],
 /// };
 /// let json = serde_json::to_value(&response).unwrap();

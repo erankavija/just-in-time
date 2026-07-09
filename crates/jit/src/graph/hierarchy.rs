@@ -111,6 +111,8 @@
 //! ```
 
 use crate::type_hierarchy::HierarchyConfig;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A node that can participate in hierarchy resolution.
@@ -167,6 +169,13 @@ impl HierarchyNode for crate::domain::Issue {
 ///
 /// See the [module docs](self) for how each field is derived from the DAG.
 ///
+/// This type is the **single serialization path** for resolved hierarchy: every
+/// surface that publishes a node's parent/children/cluster/rank flattens this
+/// struct into its own node shape (`graph tree`, `graph export --format json
+/// --full`, and the server's `GET /graph`), so the four fields cannot drift
+/// apart. [`Default`] is the resolution of a node absent from the input: a root
+/// orphan sink.
+///
 /// # Examples
 ///
 /// ```
@@ -181,8 +190,19 @@ impl HierarchyNode for crate::domain::Issue {
 /// assert_eq!(facts.parent.as_deref(), Some("epic-1"));
 /// assert_eq!(facts.children.len(), 2);
 /// assert_eq!(facts.rank, 2);
+///
+/// // The four published field names come from this one derive.
+/// let json = serde_json::to_value(&facts).unwrap();
+/// assert_eq!(json["parent"], "epic-1");
+/// assert_eq!(json["cluster"], "milestone-1");
+/// assert_eq!(json["children"][1], "task-b");
+/// assert_eq!(json["rank"], 2);
+///
+/// let orphan = NodeHierarchy::default();
+/// assert_eq!(orphan.rank, 0);
+/// assert!(orphan.parent.is_none());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct NodeHierarchy {
     /// The nearest dominating container's id, or `None` for a root node.
     pub parent: Option<String>,

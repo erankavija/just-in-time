@@ -179,10 +179,16 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// present. This gives bulk consumers complete records in one call without
 /// globbing `.jit/issues/*.json`.
 ///
-/// Two additive fields carry the DAG-authoritative hierarchy from `resolution`:
-/// `resolved_parent` (the node's nearest dominating container id, or `null`) and
-/// `cluster` (its strategic root container id, or `null`). These appear only in
-/// the `--full` shape; the default summary shape is untouched.
+/// The DAG-authoritative hierarchy from `resolution` is flattened onto each node
+/// as `parent`, `children`, `cluster`, and `rank` — the same four fields, from
+/// the same [`NodeHierarchy`](crate::graph::hierarchy::NodeHierarchy)
+/// serialization, that `jit graph tree` emits. These appear only in the `--full`
+/// shape; the default summary shape is untouched.
+///
+/// Resolution is repository-wide, so a node's `parent`, `cluster`, or `children`
+/// name ids by their canonical placement in the whole graph. A consumer that
+/// filters the emitted node set can therefore hold references to nodes it did
+/// not keep.
 ///
 /// # Example
 /// ```
@@ -202,8 +208,10 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// let resolution = resolve_hierarchy(&issues, &HierarchyConfig::default());
 /// let json = visualization::export_json_full(&graph, &resolution);
 /// assert!(json.contains("\"description\""));
-/// assert!(json.contains("\"resolved_parent\""));
+/// assert!(json.contains("\"parent\""));
+/// assert!(json.contains("\"children\""));
 /// assert!(json.contains("\"cluster\""));
+/// assert!(json.contains("\"rank\""));
 /// ```
 pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
@@ -216,22 +224,11 @@ pub fn export_json_full(
         .iter()
         .map(|issue| {
             let mut value = serde_json::to_value(issue).unwrap_or(serde_json::Value::Null);
-            if let Some(obj) = value.as_object_mut() {
-                let facts = resolution.get(&issue.id);
-                obj.insert(
-                    "resolved_parent".to_string(),
-                    facts
-                        .and_then(|f| f.parent.clone())
-                        .map(serde_json::Value::String)
-                        .unwrap_or(serde_json::Value::Null),
-                );
-                obj.insert(
-                    "cluster".to_string(),
-                    facts
-                        .and_then(|f| f.cluster.clone())
-                        .map(serde_json::Value::String)
-                        .unwrap_or(serde_json::Value::Null),
-                );
+            let facts = resolution.get(&issue.id).cloned().unwrap_or_default();
+            if let (Some(obj), Ok(serde_json::Value::Object(resolved))) =
+                (value.as_object_mut(), serde_json::to_value(&facts))
+            {
+                obj.extend(resolved);
             }
             value
         })
@@ -445,8 +442,8 @@ mod tests {
         assert_eq!(summary["edges"][0]["to"], dep.id);
     }
 
-    /// The `--full` node carries the additive DAG-resolved hierarchy fields
-    /// (`resolved_parent`, `cluster`); the summary node never does.
+    /// The `--full` node carries the four DAG-resolved hierarchy fields; the
+    /// summary node never does.
     #[test]
     fn test_export_json_full_carries_resolved_hierarchy_fields() {
         let mut epic = Issue::new("Epic".to_string(), String::new());
@@ -464,27 +461,104 @@ mod tests {
 
         let full: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
-        let task_node = full["nodes"]
+        let node_by_id = |id: &str| -> serde_json::Value {
+            full["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|n| n["id"] == serde_json::Value::String(id.to_string()))
+                .unwrap()
+                .clone()
+        };
+
+        let task_node = node_by_id(&task.id);
+        assert_eq!(task_node["parent"], epic.id);
+        // The epic is a root container, so the whole subtree clusters to it.
+        assert_eq!(task_node["cluster"], epic.id);
+        assert_eq!(task_node["children"], serde_json::json!([]));
+        assert_eq!(task_node["rank"], 0);
+
+        let epic_node = node_by_id(&epic.id);
+        assert_eq!(epic_node["parent"], serde_json::Value::Null);
+        assert_eq!(epic_node["children"], serde_json::json!([task.id]));
+        assert_eq!(epic_node["rank"], 1);
+
+        // The summary shape stays free of the hierarchy fields.
+        let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
+        for field in ["parent", "children", "cluster", "rank"] {
+            assert!(summary["nodes"][0].get(field).is_none());
+        }
+    }
+
+    /// The `--full` export and the `graph tree` view publish the *same* four
+    /// resolution keys, because both flatten one `NodeHierarchy` serialization.
+    #[test]
+    fn test_export_json_full_hierarchy_keys_match_tree_view() {
+        use crate::output::HierarchyNodeView;
+
+        let mut epic = Issue::new("Epic".to_string(), String::new());
+        epic.labels = vec!["type:epic".to_string()];
+        let mut task = Issue::new("Task".to_string(), String::new());
+        task.labels = vec!["type:task".to_string()];
+        epic.dependencies.push(task.id.clone());
+
+        let issues = vec![&epic, &task];
+        let graph = DependencyGraph::new(&issues);
+        let resolution = crate::graph::hierarchy::resolve_hierarchy(
+            &issues,
+            &crate::type_hierarchy::HierarchyConfig::default(),
+        );
+        let facts = resolution.get(&task.id).cloned().unwrap_or_default();
+
+        // The keys a `graph tree` node contributes beyond its identity fields.
+        let tree_node = serde_json::to_value(HierarchyNodeView {
+            id: task.id.clone(),
+            short_id: task.short_id(),
+            title: task.title.clone(),
+            type_name: Some("task".to_string()),
+            hierarchy: facts,
+        })
+        .unwrap();
+        let identity: std::collections::BTreeSet<&str> =
+            ["id", "short_id", "title", "type"].into_iter().collect();
+        let tree_resolution_keys: std::collections::BTreeSet<String> = tree_node
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| !identity.contains(k.as_str()))
+            .cloned()
+            .collect();
+
+        // The keys the `--full` export node adds beyond the on-disk issue record.
+        let full: serde_json::Value =
+            serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
+        let full_node = full["nodes"]
             .as_array()
             .unwrap()
             .iter()
             .find(|n| n["id"] == serde_json::Value::String(task.id.clone()))
             .unwrap();
-        assert_eq!(task_node["resolved_parent"], epic.id);
-        // The epic is a root container, so the whole subtree clusters to it.
-        assert_eq!(task_node["cluster"], epic.id);
-
-        let epic_node = full["nodes"]
-            .as_array()
+        let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&task)
             .unwrap()
-            .iter()
-            .find(|n| n["id"] == serde_json::Value::String(epic.id.clone()))
-            .unwrap();
-        assert_eq!(epic_node["resolved_parent"], serde_json::Value::Null);
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let export_resolution_keys: std::collections::BTreeSet<String> = full_node
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| !record_keys.contains(*k))
+            .cloned()
+            .collect();
 
-        // The summary shape stays free of the hierarchy fields.
-        let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
-        assert!(summary["nodes"][0].get("resolved_parent").is_none());
-        assert!(summary["nodes"][0].get("cluster").is_none());
+        assert_eq!(export_resolution_keys, tree_resolution_keys);
+        let expected: std::collections::BTreeSet<String> =
+            ["parent", "children", "cluster", "rank"]
+                .into_iter()
+                .map(String::from)
+                .collect();
+        assert_eq!(export_resolution_keys, expected);
     }
 }
