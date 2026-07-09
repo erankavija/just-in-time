@@ -171,6 +171,7 @@ Each invariant is addressable at `@/inv/<name>`.
 - **atomic-writes** — All file writes use the temp-file + atomic-rename pattern.
 - **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
 - **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
+- **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
 <!-- jit:invariants:end -->
 
 ## Commit Conventions
