@@ -6,7 +6,7 @@
 use crate::domain::{Event, Issue};
 use crate::storage::{
     AmbiguousIdError, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, PresetNotFoundError,
+    IssueStore, PresetNotFoundError, RepoWriteGuard, RepoWriteLock,
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -47,6 +47,9 @@ pub struct InMemoryStorage {
     /// so command/domain tests can exercise project-scope sources (and any other
     /// config-declared file) with NO real filesystem, per CLAUDE.md "testability".
     repo_files: Arc<Mutex<HashMap<String, String>>>,
+    /// Outermost lock of every mutating path, shared by every clone. Process-local:
+    /// this backend has no files, so there is no other process to exclude.
+    repo_lock: Arc<RepoWriteLock>,
 }
 
 impl InMemoryStorage {
@@ -64,6 +67,7 @@ impl InMemoryStorage {
             gate_runs: Arc::new(Mutex::new(HashMap::new())),
             root_path,
             repo_files: Arc::new(Mutex::new(HashMap::new())),
+            repo_lock: RepoWriteLock::in_process(),
         }
     }
 
@@ -105,10 +109,15 @@ impl IssueStore for InMemoryStorage {
         Ok(())
     }
 
+    fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
+        self.repo_lock.acquire()
+    }
+
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
 
+        let _repo_lock = self.repo_lock.acquire()?;
         self.issues.lock().unwrap().insert(issue.id.clone(), issue);
         Ok(())
     }
@@ -178,6 +187,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn delete_issue(&self, id: &str) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
         self.issues
             .lock()
             .unwrap()
@@ -195,11 +205,13 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
         *self.gate_registry.lock().unwrap() = registry.clone();
         Ok(())
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
         self.events.lock().unwrap().push(event.clone());
         Ok(())
     }

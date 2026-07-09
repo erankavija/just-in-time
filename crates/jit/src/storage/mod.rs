@@ -27,6 +27,7 @@ pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
+pub mod repo_lock;
 pub mod ruleset_store;
 pub mod temp_cleanup;
 pub mod warnings;
@@ -44,6 +45,7 @@ pub use errors::{
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use warnings::StorageWarning;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
@@ -82,6 +84,45 @@ pub trait IssueStore: Clone {
     ///
     /// Creates necessary directories, files, or database tables.
     fn init(&self) -> Result<()>;
+
+    /// Acquire this backend's repository-wide write lock, held until the returned
+    /// guard drops.
+    ///
+    /// Every mutating method of this trait takes it as its OUTERMOST lock, so a
+    /// caller that holds one guard across a multi-write sequence (`jit apply`)
+    /// excludes every ordinary writer for the whole sequence: the reads its
+    /// validation depends on, its writes, and its compensating rollback all see
+    /// one store nobody else is touching. The lock is
+    /// [reentrant](repo_lock::RepoWriteLock#reentrancy), so the nested writes of
+    /// such a sequence do not self-deadlock.
+    ///
+    /// The lock lives with the data (`.jit/.repo-write.lock` for file storage),
+    /// never in the git control plane, so it guards the store with or without git
+    /// (`@/charter/D-4`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the lock cannot be acquired within the backend's
+    /// timeout.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    ///
+    /// // Hold the lock across a sequence of writes; nested writes reenter it.
+    /// let guard = storage.acquire_repo_write_lock().unwrap();
+    /// storage.save_issue(Issue::new("A".to_string(), String::new())).unwrap();
+    /// storage.save_issue(Issue::new("B".to_string(), String::new())).unwrap();
+    /// drop(guard);
+    ///
+    /// assert_eq!(storage.list_issues().unwrap().len(), 2);
+    /// ```
+    fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard>;
 
     /// Save an issue (create or update).
     ///
