@@ -59,6 +59,16 @@
       "second_finding": "npm-ci gate coverage hole; invoker chose file-do-not-fix. Filed as 950256ae under epic 6eb585bc."
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "69ffdcf8": 1,
+    "50677708": 1,
+    "2f447380": 1
+  },
+  "review_findings": {
+    "a1fe0c6e": "PASS on first review. Gates green, criteria met, sweeps clean.",
+    "69ffdcf8": "R1 FAIL [low]: stale dependency wording at docs/tutorials/first-workflow.md:270 describes readiness as dependencies 'done' rather than terminal. REQ-4 is a sweep criterion; the worker's sweep and the lead's Tier 2.5 sweep both grepped 'not Done' patterns and missed 'all dependencies done'.",
+    "50677708": "R1 FAIL [medium]: newly public graph APIs lack the mandatory '# Examples' doc sections (scripts/code-review-prompt.md:61). Functional criteria all met.",
+    "2f447380": "R1 FAIL [high]: apply holds .git/jit/locks/apply.lock while ordinary writers hold .jit/.index.lock, so the apply lock excludes no one and compensation-rollback can erase concurrent writes. Also absent entirely outside a git repo. Lead confirmed independently against storage/json.rs:508 and commands/mod.rs:1054."
+  },
   "started_at": "2026-07-09T00:00:00+00:00"
 }
