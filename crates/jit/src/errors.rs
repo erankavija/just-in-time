@@ -681,7 +681,7 @@ pub struct TransitionBlockedError {
     warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TransitionBlocker {
     Dependency {
         issue_id: String,

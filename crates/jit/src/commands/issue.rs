@@ -420,7 +420,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// The dependencies that hold a transition back: every dependency unmet by
     /// [`is_dependency_met`], plus every dependency id that resolves to no issue.
-    fn blocking_dependencies(
+    pub(super) fn blocking_dependencies(
         &self,
         issue: &Issue,
         resolved_issues: &std::collections::HashMap<String, &Issue>,
@@ -557,34 +557,22 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let old_state = issue.state;
 
-        // Resolve the requested state transition's TARGET (running dependency/gate
-        // guards) WITHOUT mutating `issue.state` yet, so the actual state change is
-        // performed by the chokepoint (`apply_state_transition`) and cannot bypass
-        // graph enforcement. `issue.state` is projected into the target only for
-        // the `validate_for_write` shape below, then restored. `gate_blocked` marks
-        // the gate-diversion-to-Gated case, which still persists/returns an error.
+        // Resolve the requested state transition's TARGET WITHOUT mutating
+        // `issue.state` yet, so the actual state change is performed by the
+        // chokepoint (`apply_state_transition`), which owns the dependency/gate
+        // guards and graph enforcement. `issue.state` is projected into the target
+        // only for the `validate_for_write` shape below, then restored.
+        //
+        // A `--state done` request against unpassed gates resolves to `Gated`
+        // instead: the diversion (`gate_blocked`) persists the gated shape and
+        // returns the gate-blocking error. Resolving it here means the chokepoint
+        // is entered with the target actually being landed. The dependency guard
+        // runs first so a dependency-blocked issue reports its dependencies rather
+        // than diverting to Gated.
         let mut gate_blocked = false;
         let mut target_state: Option<State> = None;
         if let Some(s) = state {
-            if s == State::Ready {
-                // Check dependencies only (gates don't block Ready)
-                let issues = self.storage.list_issues()?;
-                let resolved = crate::domain::queries::build_issue_map(&issues);
-
-                let blockers = self.blocking_dependencies(&issue, &resolved);
-                if !blockers.is_empty() {
-                    return Err(TransitionBlockedError::dependencies(
-                        issue.id.clone(),
-                        State::Ready,
-                        issue.state,
-                        blockers,
-                    )
-                    .into());
-                }
-
-                target_state = Some(State::Ready);
-            } else if s == State::Done {
-                // Check both dependencies and gates
+            if s == State::Done {
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -806,31 +794,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Reload issue after prechecks (which may have modified it)
         let mut issue = self.storage.load_issue(&full_id)?;
 
-        // Run the per-target pre-guards (dependency/gate/gate-diversion) that
-        // differ per path. The ACTUAL state mutation, graph-rule enforcement
-        // (CC-2), save, and audit logging are all performed by the single
-        // chokepoint (`apply_state_transition`); the rejection/no-op policy lives
-        // inside it, so this path never special-cases them. This state-only path
-        // carries no content edits and no `--force`.
+        // Resolve the targets that need per-path handling before the chokepoint:
+        // the gate diversion into `Gated`, and the postcheck run that follows an
+        // explicit `--state gated`. Everything else — the dependency and gate
+        // guards, graph-rule enforcement (CC-2), the state mutation, the save, and
+        // the audit logging — belongs to the single chokepoint
+        // (`apply_state_transition`), as does the rejection/no-op policy. This
+        // state-only path carries no content edits and no `--force`.
         match new_state {
-            State::Ready => {
-                // Check dependencies only (gates don't block Ready)
-                let issues = self.storage.list_issues()?;
-                let resolved = crate::domain::queries::build_issue_map(&issues);
-
-                let blockers = self.blocking_dependencies(&issue, &resolved);
-                if !blockers.is_empty() {
-                    return Err(TransitionBlockedError::dependencies(
-                        issue.id.clone(),
-                        State::Ready,
-                        issue.state,
-                        blockers,
-                    )
-                    .into());
-                }
-            }
             State::Done => {
-                // Check both dependencies and gates
+                // The dependency guard runs ahead of the gate check so a
+                // dependency-blocked issue reports its dependencies rather than
+                // diverting to Gated.
                 let issues = self.storage.list_issues()?;
                 let resolved = crate::domain::queries::build_issue_map(&issues);
 
@@ -1189,18 +1164,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         bypassed_rules: &[String],
         force: bool,
     ) -> Result<Vec<String>> {
-        let unpassed = issue.get_unpassed_gates();
-        let gate_blockers = unpassed
-            .into_iter()
-            .map(|gate_key| {
-                let status = issue
-                    .gates_status
-                    .get(&gate_key)
-                    .map(|gate| gate.status)
-                    .unwrap_or(GateStatus::Pending);
-                (gate_key, status)
-            })
-            .collect();
+        let gate_blockers = unpassed_gate_blockers(issue);
         // The gate-diversion path lands the issue in `gated`, so it enforces
         // graph rules against THAT target state via the chokepoint, exactly
         // like an explicit `--state gated` transition. Rules keyed on the
