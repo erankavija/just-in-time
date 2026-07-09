@@ -795,6 +795,10 @@ impl IssueStore for FailingSaveStorage {
         Err(anyhow::anyhow!("simulated save failure"))
     }
 
+    fn restore_issue_verbatim(&self, issue: Issue) -> anyhow::Result<()> {
+        self.inner.restore_issue_verbatim(issue)
+    }
+
     fn load_issue(&self, id: &str) -> anyhow::Result<Issue> {
         self.inner.load_issue(id)
     }

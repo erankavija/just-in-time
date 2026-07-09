@@ -2,10 +2,11 @@
 //!
 //! Apply commits its expanded delta under one repository lock; a write failure
 //! anywhere in the sequence must leave the issue store observably unchanged. The
-//! failure is INJECTED by [`FaultyStore`], an [`IssueStore`] wrapper over
-//! `InMemoryStorage` that fails the FIRST `save_issue` matching a caller-supplied
-//! predicate and then behaves normally, so the engine's own rollback writes go
-//! through. That models a transient I/O failure mid-apply.
+//! failure is INJECTED by [`FaultyStore`], an [`IssueStore`] wrapper that fails
+//! the FIRST `save_issue` matching a caller-supplied predicate and then behaves
+//! normally, so the engine's own rollback writes go through. That models a
+//! transient I/O failure mid-apply. It wraps either backend, so the rollback
+//! assertions run against `InMemoryStorage` and the real `JsonFileStorage` alike.
 //!
 //! [`StallingStore`] extends the same idea over a real `JsonFileStorage`: it holds
 //! the apply's lock window open long enough for a second writer to try to write
@@ -34,29 +35,42 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 /// Predicate deciding which `save_issue` call to fail.
 type SavePredicate = Arc<dyn Fn(&Issue) -> bool + Send + Sync>;
 
-/// An [`IssueStore`] that delegates to `InMemoryStorage` but, once ARMED, fails
-/// the first `save_issue` whose issue matches `fail_on`.
+/// An [`IssueStore`] that delegates to an inner store but, once ARMED, fails the
+/// first `save_issue` whose issue matches `fail_on`.
 ///
 /// Arming separates fixture setup from the apply under test. Failing once
 /// (rather than always) is what makes the injected fault a TRANSIENT write
 /// failure: the apply's compensating writes still land, so the test observes the
 /// rollback the engine performs rather than a store wedged by the injector.
+///
+/// Generic over the inner store so one rollback assertion runs against both
+/// `InMemoryStorage` and the real `JsonFileStorage`, which is the only way an
+/// in-memory atomicity test says anything about the file backend.
 #[derive(Clone)]
-struct FaultyStore {
-    inner: InMemoryStorage,
+struct FaultyStore<S: IssueStore> {
+    inner: S,
     fail_on: SavePredicate,
     armed: Arc<AtomicBool>,
     fired: Arc<AtomicBool>,
+    /// Ids the ARMED store saw go through `save_issue`, i.e. the apply's own
+    /// writes. A rollback assertion over an issue absent here would be vacuous.
+    saved: Arc<Mutex<Vec<String>>>,
 }
 
-impl FaultyStore {
-    fn new(fail_on: impl Fn(&Issue) -> bool + Send + Sync + 'static) -> Self {
+impl<S: IssueStore> FaultyStore<S> {
+    fn new(inner: S, fail_on: impl Fn(&Issue) -> bool + Send + Sync + 'static) -> Self {
         Self {
-            inner: InMemoryStorage::new(),
+            inner,
             fail_on: Arc::new(fail_on),
             armed: Arc::new(AtomicBool::new(false)),
             fired: Arc::new(AtomicBool::new(false)),
+            saved: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Whether the apply under test wrote `id` before its injected failure.
+    fn saved(&self, id: &str) -> bool {
+        self.saved.lock().unwrap().iter().any(|saved| saved == id)
     }
 
     /// Start honoring the failure predicate (called once the fixture is built).
@@ -71,7 +85,7 @@ impl FaultyStore {
     }
 }
 
-impl IssueStore for FaultyStore {
+impl<S: IssueStore> IssueStore for FaultyStore<S> {
     /// Delegated, so the apply under test holds the SAME repository write lock the
     /// wrapped store's write paths take.
     fn acquire_repo_write_lock(&self) -> Result<jit::storage::RepoWriteGuard> {
@@ -86,7 +100,17 @@ impl IssueStore for FaultyStore {
             self.fired.store(true, Ordering::SeqCst);
             return Err(anyhow!("injected write failure saving issue {}", issue.id));
         }
+        if self.armed.load(Ordering::SeqCst) {
+            self.saved.lock().unwrap().push(issue.id.clone());
+        }
         self.inner.save_issue(issue)
+    }
+
+    /// Delegated, never failed: the rollback's compensating writes must land so a
+    /// test observes the engine's rollback rather than a store wedged by the
+    /// injector.
+    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
+        self.inner.restore_issue_verbatim(issue)
     }
 
     fn init(&self) -> Result<()> {
@@ -199,7 +223,9 @@ applies_to  = ["epic"]
 /// plus the config-declared `repo-validate` gate the template's anchor names.
 /// Arms the store on the way out, so only the apply under test can trip the
 /// injected failure. Returns the executor, the container id, and the upstream id.
-fn fixture(store: FaultyStore) -> (CommandExecutor<FaultyStore>, String, String) {
+fn fixture<S: IssueStore>(
+    store: FaultyStore<S>,
+) -> (CommandExecutor<FaultyStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     store.init().unwrap();
     let executor = CommandExecutor::new(store.clone());
@@ -259,8 +285,8 @@ fn type_of(issue: &Issue) -> Option<&str> {
 
 /// Assert the store holds exactly the pre-apply shape: `C` and `U` only, `C`
 /// still depending on `U`, no scaffold node, no anchor gate attached.
-fn assert_pre_apply_shape(
-    executor: &CommandExecutor<FaultyStore>,
+fn assert_pre_apply_shape<S: IssueStore>(
+    executor: &CommandExecutor<FaultyStore<S>>,
     container: &str,
     upstream: &str,
 ) {
@@ -299,7 +325,9 @@ fn assert_pre_apply_shape(
 fn test_apply_rolls_back_created_nodes_when_a_node_write_fails() {
     // The injected failure lands on the SECOND created node, after the first was
     // persisted: the rollback must delete the orphaned first node.
-    let store = FaultyStore::new(|issue| issue.labels.iter().any(|l| l == "type:breakdown"));
+    let store = FaultyStore::new(InMemoryStorage::new(), |issue| {
+        issue.labels.iter().any(|l| l == "type:breakdown")
+    });
     let (executor, container, upstream) = fixture(store.clone());
 
     let err = executor
@@ -318,7 +346,9 @@ fn test_apply_rolls_back_nodes_and_edges_when_an_edge_write_fails() {
     // nodes exist and the internal edge `B → P` is persisted, so the rollback has
     // to delete two issues and revert the edge writes.
     let container_title = "Auth epic";
-    let store = FaultyStore::new(move |issue| issue.title == container_title);
+    let store = FaultyStore::new(InMemoryStorage::new(), move |issue| {
+        issue.title == container_title
+    });
     let (executor, container, upstream) = fixture(store.clone());
 
     let err = executor
@@ -344,12 +374,72 @@ fn test_apply_rolls_back_nodes_and_edges_when_an_edge_write_fails() {
     assert_eq!(deleted, 2, "P and B were each deleted by the rollback");
 }
 
+/// Drive an apply that mutates the pre-existing container and then fails, and
+/// assert the rollback puts every pre-existing record back FIELD FOR FIELD.
+///
+/// The injected failure lands on the anchor-gate write, the last step of the
+/// commit. By then the apply has rewritten the container twice (adding `C → B`,
+/// removing `C → U`), so the rollback has to restore a genuinely mutated
+/// pre-existing issue. Comparing whole `Issue` values is the point: a rollback
+/// that writes the snapshot back through `save_issue` restores the content and
+/// leaves a fresh `updated_at`, which `jit issue show --json` and
+/// `jit graph export --full` both surface, so the store is observably changed by
+/// an apply that failed (REQ-2).
+fn check_rollback_restores_records_verbatim<S: IssueStore>(inner: S) {
+    let store = FaultyStore::new(inner, |issue| {
+        issue.gates_required.iter().any(|g| g == "repo-validate")
+    });
+    let (executor, container, _upstream) = fixture(store.clone());
+
+    let sorted_records = || {
+        let mut issues = executor.storage().list_issues().unwrap();
+        issues.sort_by(|a, b| a.id.cmp(&b.id));
+        issues
+    };
+    let before = sorted_records();
+
+    let err = executor
+        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .unwrap_err();
+
+    assert!(store.fired(), "the injected write failure must be reached");
+    assert!(err.to_string().contains("injected write failure"), "{err}");
+
+    // The apply really did write the pre-existing container before failing, so the
+    // assertion below exercises the restore path rather than an untouched store.
+    assert!(
+        store.saved(&container),
+        "the apply must have mutated the pre-existing container"
+    );
+
+    assert_eq!(
+        sorted_records(),
+        before,
+        "every pre-existing record must survive a failed apply unchanged, \
+         `updated_at` included"
+    );
+}
+
+#[test]
+fn test_rollback_restores_pre_existing_records_verbatim_in_memory() {
+    check_rollback_restores_records_verbatim(InMemoryStorage::new());
+}
+
+#[test]
+fn test_rollback_restores_pre_existing_records_verbatim_on_disk() {
+    // The same assertion over the real file backend: both stores must stamp
+    // `updated_at` on `save_issue` and preserve it on `restore_issue_verbatim`,
+    // or the in-memory test above proves nothing about `.jit/issues/<id>.json`.
+    let temp = TempDir::new().unwrap();
+    check_rollback_restores_records_verbatim(JsonFileStorage::new(temp.path().join(".jit")));
+}
+
 #[test]
 fn test_apply_succeeds_and_wires_the_spine_when_no_write_fails() {
     // The control case: with no injected failure the same fixture and template
     // produce the `C → B → P → U` spine, so the rollback tests above are pinned
     // against a working apply rather than a broken engine.
-    let store = FaultyStore::new(|_| false);
+    let store = FaultyStore::new(InMemoryStorage::new(), |_| false);
     let (executor, container, upstream) = fixture(store);
 
     let (result, _warnings) = executor
@@ -474,6 +564,12 @@ impl IssueStore for StallingStore {
 
         std::thread::sleep(self.stall_for);
         Err(anyhow!("injected write failure saving issue {}", issue.id))
+    }
+
+    /// Delegated, never stalled: this is the rollback's compensating write, which
+    /// runs after the stall inside the same lock window.
+    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
+        self.inner.restore_issue_verbatim(issue)
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {

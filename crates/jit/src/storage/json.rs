@@ -178,6 +178,37 @@ impl JsonFileStorage {
             .join(GATE_RUN_RESULT_FILE)
     }
 
+    /// Write `issue` to its file and register it in the index, taking the
+    /// repository, index and issue locks in that order.
+    ///
+    /// The single write path behind [`IssueStore::save_issue`] and
+    /// [`IssueStore::restore_issue_verbatim`], which differ only in whether the
+    /// caller's `updated_at` is stamped before the write reaches here.
+    fn persist_issue(&self, issue: &Issue) -> Result<()> {
+        let issue_path = self.issue_path(&issue.id);
+        let index_lock_path = self.root.join(".index.lock");
+        let issue_lock_path = issue_path.with_extension("lock");
+
+        // Lock order: repository write lock first, then index, then issue.
+        // Use separate .lock files to avoid conflicts with atomic writes
+        let _repo_lock = self.repo_lock.acquire()?;
+        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
+        let mut index = self.load_index()?;
+        let needs_index_update = !index.all_ids.contains(&issue.id);
+
+        // Lock the issue (exclusive) and write
+        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
+        self.write_json(&issue_path, issue)?;
+
+        // Update index if this is a new issue
+        if needs_index_update {
+            index.all_ids.push(issue.id.clone());
+            self.save_index(&index)?;
+        }
+
+        Ok(())
+    }
+
     fn write_json<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
         let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
 
@@ -517,29 +548,11 @@ impl IssueStore for JsonFileStorage {
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
+        self.persist_issue(&issue)
+    }
 
-        let issue_path = self.issue_path(&issue.id);
-        let index_lock_path = self.root.join(".index.lock");
-        let issue_lock_path = issue_path.with_extension("lock");
-
-        // Lock order: repository write lock first, then index, then issue.
-        // Use separate .lock files to avoid conflicts with atomic writes
-        let _repo_lock = self.repo_lock.acquire()?;
-        let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
-        let mut index = self.load_index()?;
-        let needs_index_update = !index.all_ids.contains(&issue.id);
-
-        // Lock the issue (exclusive) and write
-        let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
-        self.write_json(&issue_path, &issue)?;
-
-        // Update index if this is a new issue
-        if needs_index_update {
-            index.all_ids.push(issue.id.clone());
-            self.save_index(&index)?;
-        }
-
-        Ok(())
+    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
+        self.persist_issue(&issue)
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {
