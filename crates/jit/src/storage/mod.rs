@@ -135,6 +135,50 @@ pub trait IssueStore: Clone {
     /// Returns an error if the issue cannot be serialized or persisted.
     fn save_issue(&self, issue: Issue) -> Result<()>;
 
+    /// Persist `issue` exactly as given, `updated_at` included.
+    ///
+    /// This is the COMPENSATING write of a multi-write sequence that failed
+    /// partway (`jit apply`'s rollback), and it exists because
+    /// [`save_issue`](IssueStore::save_issue) stamps `updated_at` with the current
+    /// time. That stamping is right for a write that carries a content change and
+    /// wrong for one that undoes it: an issue whose content the sequence restored
+    /// would still carry a fresh `updated_at`, and `jit issue show --json` and
+    /// `jit graph export --full` would report the failed sequence as a change to
+    /// that issue.
+    ///
+    /// Restoring a snapshot is the only correct use. A write that carries an
+    /// intended change belongs in `save_issue`, which owns the timestamp: passing
+    /// such a write here freezes `updated_at` at whatever the caller happened to
+    /// hold, which every consumer of the timestamp then reads as "untouched".
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the issue cannot be serialized or persisted.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::storage::{InMemoryStorage, IssueStore};
+    ///
+    /// let storage = InMemoryStorage::new();
+    /// storage.init().unwrap();
+    ///
+    /// let snapshot = Issue::new("Fix bug".to_string(), "Details".to_string());
+    /// storage.save_issue(snapshot.clone()).unwrap();
+    ///
+    /// // An ordinary write moves `updated_at` forward.
+    /// let mut edited = storage.load_issue(&snapshot.id).unwrap();
+    /// edited.title = "Half-applied edit".to_string();
+    /// storage.save_issue(edited).unwrap();
+    /// assert!(storage.load_issue(&snapshot.id).unwrap().updated_at > snapshot.updated_at);
+    ///
+    /// // Restoring the snapshot puts every field back, timestamp included.
+    /// storage.restore_issue_verbatim(snapshot.clone()).unwrap();
+    /// assert_eq!(storage.load_issue(&snapshot.id).unwrap(), snapshot);
+    /// ```
+    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()>;
+
     /// Load an issue by ID.
     ///
     /// # Errors
@@ -532,6 +576,39 @@ mod tests {
         }
 
         // Test with both backends
+        let temp_dir = tempfile::tempdir().unwrap();
+        test_with_storage(JsonFileStorage::new(temp_dir.path()));
+        test_with_storage(InMemoryStorage::new());
+    }
+
+    #[test]
+    fn test_trait_restore_issue_verbatim_preserves_updated_at() {
+        fn test_with_storage<S: IssueStore>(storage: S) {
+            storage.init().unwrap();
+
+            let seed = Issue::new("Snapshot".to_string(), "Original".to_string());
+            storage.save_issue(seed.clone()).unwrap();
+            let snapshot = storage.load_issue(&seed.id).unwrap();
+
+            let mut edited = snapshot.clone();
+            edited.description = "Half-applied edit".to_string();
+            storage.save_issue(edited).unwrap();
+            let after_edit = storage.load_issue(&seed.id).unwrap();
+            assert!(
+                after_edit.updated_at > snapshot.updated_at,
+                "an ordinary write owns the timestamp"
+            );
+
+            storage.restore_issue_verbatim(snapshot.clone()).unwrap();
+            assert_eq!(
+                storage.load_issue(&seed.id).unwrap(),
+                snapshot,
+                "a restoring write lands the snapshot field for field"
+            );
+        }
+
+        // Both backends must agree, or an in-memory atomicity test says nothing
+        // about what a failed apply leaves in `.jit/issues/<id>.json`.
         let temp_dir = tempfile::tempdir().unwrap();
         test_with_storage(JsonFileStorage::new(temp_dir.path()));
         test_with_storage(InMemoryStorage::new());

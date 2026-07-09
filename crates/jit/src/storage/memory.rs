@@ -94,6 +94,19 @@ impl InMemoryStorage {
             .unwrap()
             .insert(rel_path.to_string(), content.to_string());
     }
+
+    /// Insert `issue` under the repository write lock.
+    ///
+    /// The single write path behind [`IssueStore::save_issue`] and
+    /// [`IssueStore::restore_issue_verbatim`], which differ only in whether the
+    /// caller's `updated_at` is stamped before the write reaches here. Both
+    /// backends must agree on that, or the atomicity tests over this one prove
+    /// nothing about [`JsonFileStorage`](crate::storage::JsonFileStorage).
+    fn persist_issue(&self, issue: Issue) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
+        self.issues.lock().unwrap().insert(issue.id.clone(), issue);
+        Ok(())
+    }
 }
 
 impl Default for InMemoryStorage {
@@ -116,10 +129,11 @@ impl IssueStore for InMemoryStorage {
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
+        self.persist_issue(issue)
+    }
 
-        let _repo_lock = self.repo_lock.acquire()?;
-        self.issues.lock().unwrap().insert(issue.id.clone(), issue);
-        Ok(())
+    fn restore_issue_verbatim(&self, issue: Issue) -> Result<()> {
+        self.persist_issue(issue)
     }
 
     fn load_issue(&self, id: &str) -> Result<Issue> {

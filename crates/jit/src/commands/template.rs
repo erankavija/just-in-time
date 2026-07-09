@@ -16,9 +16,10 @@
 //!    the outermost lock of every ordinary issue/dependency write, so no other
 //!    writer can interleave with the apply. A validation or write failure inside
 //!    the lock leaves the issue store as it was: created nodes are deleted and
-//!    mutated issues are reverted from a pre-mutation snapshot before the error is
-//!    returned. Because no concurrent writer could land inside the window, the
-//!    rollback can only undo writes the apply itself made.
+//!    mutated issues are rewritten from a pre-mutation snapshot, field for field
+//!    down to `updated_at`, before the error is returned. Because no concurrent
+//!    writer could land inside the window, the rollback can only undo writes the
+//!    apply itself made.
 //!
 //! Committing the delta produces the plan-before-fan-out scaffold: the
 //! `C → B → P` bracket. Nodes are created with interpolated descriptions and
@@ -548,8 +549,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Restore the issue store to `pre_apply_issues`: revert every issue whose
-    /// content changed, then delete every issue the apply created.
+    /// Restore the issue store to `pre_apply_issues`: rewrite every issue the
+    /// apply touched back to its snapshot, then delete every issue it created.
+    ///
+    /// A touched issue is rewritten through
+    /// [`restore_issue_verbatim`](crate::storage::IssueStore::restore_issue_verbatim), so its
+    /// `updated_at` returns to the snapshot's value along with its content.
+    /// `save_issue` would stamp the restoring write with the current time and
+    /// leave a fresh `updated_at` on an issue the failed apply promised to leave
+    /// alone (REQ-2). The compensating `issue_updated` event names the CONTENT
+    /// fields the apply had changed, so an apply that only moved the timestamp
+    /// logs no event.
     fn restore_issue_snapshot(&self, pre_apply_issues: &[Issue]) -> Result<()> {
         let prior: BTreeMap<&str, &Issue> = pre_apply_issues
             .iter()
@@ -559,15 +569,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         for current in self.storage.list_issues()? {
             match prior.get(current.id.as_str()) {
                 Some(original) => {
-                    let fields = changed_fields(original, &current);
-                    if !fields.is_empty() {
-                        self.storage.save_issue((*original).clone())?;
-                        self.storage
-                            .append_event(&crate::domain::Event::new_issue_updated(
-                                current.id.clone(),
-                                APPLY_ACTOR.to_string(),
-                                fields,
-                            ))?;
+                    if current != **original {
+                        self.storage.restore_issue_verbatim((*original).clone())?;
+                        let fields = changed_fields(original, &current);
+                        if !fields.is_empty() {
+                            self.storage
+                                .append_event(&crate::domain::Event::new_issue_updated(
+                                    current.id.clone(),
+                                    APPLY_ACTOR.to_string(),
+                                    fields,
+                                ))?;
+                        }
                     }
                 }
                 None => {
@@ -799,9 +811,10 @@ fn project_planned_issue(planned: &PlannedNode) -> Issue {
 /// The names of the fields in which `current` differs from `original`, ignoring
 /// storage-owned timestamps.
 ///
-/// Drives rollback: an empty result means the apply never touched this issue, so
-/// it needs neither a restoring write nor a compensating event. The names are the
-/// ones the `issue_updated` event records.
+/// Drives the rollback's event log: an empty result means the apply changed no
+/// content on this issue, so undoing it warrants no compensating event. The names
+/// are the ones the `issue_updated` event records. Whether the restoring WRITE
+/// happens is a separate question, decided on the whole `Issue` value.
 fn changed_fields(original: &Issue, current: &Issue) -> Vec<String> {
     [
         ("title", original.title != current.title),
