@@ -11,10 +11,14 @@
 //!    no storage access.
 //! 2. **Commit** — the executor validates the delta (gates resolve, each
 //!    projected issue would pass write validation, the prospective graph is
-//!    acyclic) and then commits it, all while holding ONE repository write lock.
-//!    A validation or write failure inside the lock leaves the issue store as it
-//!    was: created nodes are deleted and mutated issues are reverted from a
-//!    pre-mutation snapshot before the error is returned.
+//!    acyclic) and then commits it, all while holding ONE repository write lock:
+//!    [`IssueStore::acquire_repo_write_lock`](crate::storage::IssueStore::acquire_repo_write_lock),
+//!    the outermost lock of every ordinary issue/dependency write, so no other
+//!    writer can interleave with the apply. A validation or write failure inside
+//!    the lock leaves the issue store as it was: created nodes are deleted and
+//!    mutated issues are reverted from a pre-mutation snapshot before the error is
+//!    returned. Because no concurrent writer could land inside the window, the
+//!    rollback can only undo writes the apply itself made.
 //!
 //! Committing the delta produces the plan-before-fan-out scaffold: the
 //! `C → B → P` bracket. Nodes are created with interpolated descriptions and
@@ -47,10 +51,6 @@ use super::template_expand::{
 use super::*;
 use crate::templates::{GraphTemplate, BREAKDOWN_ROLE};
 use serde::Serialize;
-
-/// Name of the repository write lock `jit apply` holds across its whole commit
-/// phase, in the git control plane (`.git/jit/locks/`).
-const APPLY_LOCK: &str = "apply.lock";
 
 /// Actor recorded on the events the apply engine appends directly.
 const APPLY_ACTOR: &str = "agent:apply";
@@ -163,9 +163,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`apply_template`](Self::apply_template).
     ///
     /// Separated so the engine is testable without an on-disk `templates.toml`.
-    /// The whole call runs under ONE repository write lock, so a concurrent
-    /// process observes the store before the apply or after it, never midway.
-    /// Steps:
+    /// The whole call runs under ONE repository write lock — the one every
+    /// ordinary writer takes — so a concurrent writer observes the store before
+    /// the apply or after it, never midway. Steps:
     ///
     /// 1. **Resolve** — the container type is in the template's `applies_to`;
     ///    every declared anchor is bound and resolves to an existing issue; each
@@ -225,10 +225,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         // One repository write lock for the whole apply: the reads that validation
         // depends on (the store snapshot the cycle check simulates over, the
         // already-applied probe) and every write that follows are serialized
-        // against concurrent `jit` processes. Without it, a mutation landing
-        // between the snapshot and the writes could invalidate the checks the
-        // writes rely on.
-        let _repo_lock = self.repo_write_lock(APPLY_LOCK)?;
+        // against every other writer. It is the SAME lock the ordinary
+        // issue/dependency write path takes as its outermost lock, so no
+        // concurrent `jit issue create` / `jit dep add` can interleave: a mutation
+        // landing between the snapshot and the writes could otherwise invalidate
+        // the checks the writes rely on, and the compensating rollback would
+        // revert work this apply never made. Reentrant, so the nested storage
+        // writes below take it again without deadlocking.
+        let _repo_lock = self.storage.acquire_repo_write_lock()?;
 
         // === 1. Resolve the container and the anchor bindings ===
         let full_container_id = self.storage.resolve_issue_id(container_id)?;

@@ -979,7 +979,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // writes, so two concurrent `jit init` runs cannot both pass the
         // absent-file check and then race on the fixed temp paths for rules.toml
         // and the schema files (MF4: materialize under the write lock).
-        let _guard = self.repo_write_lock("rules.lock")?;
+        let _guard = self.control_plane_write_lock("rules.lock")?;
 
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
@@ -1039,19 +1039,26 @@ impl<S: IssueStore> CommandExecutor<S> {
         )
     }
 
-    /// Acquire the repository-wide write lock named `lock_file`, held until the
-    /// returned guard drops. Returns `None` when this storage root's working tree
-    /// is not a git repository of its own: it then has no control plane and no
-    /// cross-process concurrency to guard, so the caller proceeds lockless.
+    /// Acquire the control-plane lock named `lock_file`, held until the returned
+    /// guard drops. Returns `None` when this storage root's working tree is not a
+    /// git repository of its own: it then has no control plane, so the caller
+    /// proceeds lockless.
     ///
     /// The lock lives in the repo's git control plane (`.git/jit/locks/`), the
     /// same plane claims coordination uses, derived from the repository that OWNS
     /// this storage root rather than the process's ambient cwd (see
-    /// [`repo_control_plane_dir`](Self::repo_control_plane_dir)). Callers that
-    /// perform a multi-write sequence hold one such guard across the whole
-    /// sequence, so a concurrent process observes the sequence's start or its end,
-    /// never a midpoint.
-    fn repo_write_lock(&self, lock_file: &str) -> Result<Option<crate::storage::lock::LockGuard>> {
+    /// [`repo_control_plane_dir`](Self::repo_control_plane_dir)).
+    ///
+    /// It guards control-plane state, NOT the issue store: no `IssueStore` write
+    /// path takes it, and it is absent outside git. A sequence that mutates issues,
+    /// gates, or events must instead hold
+    /// [`IssueStore::acquire_repo_write_lock`](crate::storage::IssueStore::acquire_repo_write_lock),
+    /// the lock every ordinary writer takes, which lives in the storage root and
+    /// exists with or without git (`@/charter/D-4`).
+    fn control_plane_write_lock(
+        &self,
+        lock_file: &str,
+    ) -> Result<Option<crate::storage::lock::LockGuard>> {
         use crate::storage::FileLocker;
         use std::time::Duration;
 

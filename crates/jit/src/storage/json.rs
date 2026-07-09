@@ -9,7 +9,8 @@
 use crate::domain::{Event, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
-    IssueNotFoundError, IssueStore, RepositoryFormatTooNewError, RepositoryNotFoundError,
+    IssueNotFoundError, IssueStore, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
+    RepositoryNotFoundError,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// On-disk repository-format version this binary writes and understands.
@@ -87,6 +89,9 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 /// All file writes are atomic (write to temp file, then rename).
 ///
 /// File locking is used to prevent race conditions in concurrent access:
+/// - Every mutating path first takes the repository write lock
+///   ([`RepoWriteLock`], `.repo-write.lock`), so a caller holding it across a
+///   multi-write sequence excludes all other writers for the whole sequence
 /// - Index updates are protected with exclusive locks
 /// - Individual issue updates use per-file locks
 /// - Gate registry and event log use exclusive locks for writes
@@ -94,6 +99,9 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 pub struct JsonFileStorage {
     root: PathBuf,
     locker: FileLocker,
+    /// Shared by every clone of this instance, so a nested write inside a
+    /// sequence that already holds the lock reenters it instead of deadlocking.
+    repo_lock: Arc<RepoWriteLock>,
 }
 
 impl JsonFileStorage {
@@ -106,8 +114,10 @@ impl JsonFileStorage {
             .map(Duration::from_secs)
             .unwrap_or(Duration::from_secs(5));
 
+        let root = root.as_ref().to_path_buf();
         Self {
-            root: root.as_ref().to_path_buf(),
+            repo_lock: RepoWriteLock::for_storage_root(&root, timeout),
+            root,
             locker: FileLocker::new(timeout),
         }
     }
@@ -500,6 +510,10 @@ impl IssueStore for JsonFileStorage {
         Ok(())
     }
 
+    fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
+        self.repo_lock.acquire()
+    }
+
     fn save_issue(&self, mut issue: Issue) -> Result<()> {
         // Update the updated_at timestamp (storage responsibility)
         issue.updated_at = chrono::Utc::now();
@@ -508,8 +522,9 @@ impl IssueStore for JsonFileStorage {
         let index_lock_path = self.root.join(".index.lock");
         let issue_lock_path = issue_path.with_extension("lock");
 
-        // Lock order: index first (to prevent deadlock), then issue
+        // Lock order: repository write lock first, then index, then issue.
         // Use separate .lock files to avoid conflicts with atomic writes
+        let _repo_lock = self.repo_lock.acquire()?;
         let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
         let mut index = self.load_index()?;
         let needs_index_update = !index.all_ids.contains(&issue.id);
@@ -646,7 +661,8 @@ impl IssueStore for JsonFileStorage {
         let index_lock_path = self.root.join(".index.lock");
         let issue_lock_path = issue_path.with_extension("lock");
 
-        // Lock in order: index first, then issue
+        // Lock in order: repository write lock, then index, then issue
+        let _repo_lock = self.repo_lock.acquire()?;
         let _index_lock = self.locker.lock_exclusive(&index_lock_path)?;
         let _issue_lock = self.locker.lock_exclusive(&issue_lock_path)?;
 
@@ -696,12 +712,14 @@ impl IssueStore for JsonFileStorage {
 
     fn save_gate_registry(&self, registry: &GateRegistry) -> Result<()> {
         let gates_lock_path = self.root.join(".gates.lock");
+        let _repo_lock = self.repo_lock.acquire()?;
         let _lock = self.locker.lock_exclusive(&gates_lock_path)?;
         crate::storage::gate_store::save_gate_registry(&self.root, registry)
     }
 
     fn append_event(&self, event: &Event) -> Result<()> {
         let events_lock_path = self.root.join(".events.lock");
+        let _repo_lock = self.repo_lock.acquire()?;
         let _lock = self.locker.lock_exclusive(&events_lock_path)?;
 
         let events_path = self.root.join(EVENTS_FILE);

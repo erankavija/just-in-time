@@ -787,6 +787,10 @@ impl IssueStore for FailingSaveStorage {
         self.inner.init()
     }
 
+    fn acquire_repo_write_lock(&self) -> anyhow::Result<jit::storage::RepoWriteGuard> {
+        self.inner.acquire_repo_write_lock()
+    }
+
     fn save_issue(&self, _issue: Issue) -> anyhow::Result<()> {
         Err(anyhow::anyhow!("simulated save failure"))
     }
