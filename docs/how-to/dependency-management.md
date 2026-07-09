@@ -332,21 +332,21 @@ graph TD
 
 ### Understanding Graph Output
 
-**Node representation:**
-```
-┌─────────────────────┐
-│ abc123              │  ← Short hash
-│ Implement feature X │  ← Title
-│ [in_progress]       │  ← Current state
-└─────────────────────┘
+**Node representation:** short hash, title, current state.
+
+```mermaid
+flowchart TD
+    N["abc123<br/>Implement feature X<br/>in_progress"]
 ```
 
 **Edge representation:**
+
+```mermaid
+flowchart LR
+    FROM --> TO
 ```
-FROM ──→ TO
-"FROM depends on TO"
-"FROM is blocked until TO reaches a terminal state"
-```
+
+An edge reads "FROM depends on TO": FROM is blocked until TO reaches a terminal state.
 
 **Graph reading tips:**
 - **No incoming edges** = Root issue (can start immediately)
@@ -513,12 +513,20 @@ done | sort -rn
 
 The **minimal set of edges** that preserves reachability:
 
+```mermaid
+flowchart LR
+    subgraph Before["Before (redundant)"]
+        A1[A] --> B1[B]
+        B1 --> C1[C]
+        A1 --> C1
+    end
+    subgraph After["After (reduced)"]
+        A2[A] --> B2[B]
+        B2 --> C2[C]
+    end
 ```
-Before (redundant):          After (reduced):
-A → B                        A → B
-B → C                        B → C
-A → C  ← redundant          (A → C removed, still reachable via B)
-```
+
+The direct edge from A to C is dropped. C stays reachable from A through B.
 
 ### Why Simplification Matters
 

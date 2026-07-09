@@ -284,20 +284,11 @@ jit query available --json | \
 
 The architecture is layered:
 
-```
-┌─────────────────────────────────────┐
-│  Web UI (jit-server)                │  ← Visualization layer
-│  http://localhost:8080              │
-├─────────────────────────────────────┤
-│  MCP Server (mcp-server/)           │  ← AI agent integration
-│  Model Context Protocol             │
-├─────────────────────────────────────┤
-│  CLI (jit)                          │  ← Foundation
-│  Command-line interface             │
-├─────────────────────────────────────┤
-│  Core Library (crates/jit)          │  ← Business logic
-│  Storage, graph, validation         │
-└─────────────────────────────────────┘
+```mermaid
+flowchart TD
+    W["Web UI (jit-server)<br/>visualization layer"] --> C
+    M["MCP Server (mcp-server/)<br/>AI agent integration"] --> C
+    C["CLI (jit)<br/>foundation"] --> L["Core Library (crates/jit)<br/>storage, graph, validation"]
 ```
 
 **Benefits:**
@@ -477,20 +468,13 @@ Documents for issue d820155f:
 
 ### Continuous Improvement Loop
 
-```
-┌─────────────────────────────────────────┐
-│  1. Use JIT to build JIT                │
-├─────────────────────────────────────────┤
-│  2. Experience pain points              │
-├─────────────────────────────────────────┤
-│  3. Track improvements as issues        │
-├─────────────────────────────────────────┤
-│  4. Implement fixes                     │
-├─────────────────────────────────────────┤
-│  5. Validate fixes in our workflow      │
-└──────────────┬──────────────────────────┘
-               │
-               └─→ Loop back to step 1
+```mermaid
+flowchart TD
+    S1["1. Use JIT to build JIT"] --> S2["2. Experience pain points"]
+    S2 --> S3["3. Track improvements as issues"]
+    S3 --> S4["4. Implement fixes"]
+    S4 --> S5["5. Validate fixes in our workflow"]
+    S5 --> S1
 ```
 
 **Example:** The `--json` flag everywhere came from agents needing structured output while building JIT features. We felt the pain, added JSON output, and now all users benefit.

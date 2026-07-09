@@ -180,16 +180,17 @@ git worktree remove my-feature
 
 ## How It All Works Together
 
-```
-Main Worktree                    Secondary Worktree
-─────────────                    ──────────────────
-.jit/                            .jit/
-├── issues/                      ├── issues/
-│   └── task-1.json              │   └── (reads from main)
-│                                │
-.git/jit/  ◄────── Shared ──────►  (uses same control plane)
-├── claims.jsonl                  
-└── claims.index.json             
+```mermaid
+flowchart LR
+    subgraph Main["Main worktree"]
+        MI[".jit/issues/task-1.json"]
+    end
+    subgraph Secondary["Secondary worktree"]
+        SI[".jit/issues/ (reads from main)"]
+    end
+    CP[".git/jit/<br/>claims.jsonl<br/>claims.index.json"]
+    MI -->|shared| CP
+    SI -->|shared| CP
 ```
 
 - **Issue data** is per-worktree (isolated)

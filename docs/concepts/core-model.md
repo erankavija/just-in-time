@@ -202,12 +202,15 @@ Flexible key-value storage for agent-specific data (optional).
 
 Issues progress through states as work advances:
 
-```
-Creation → Backlog → Ready → In Progress → Done
-                        ↓           ↓
-                    Gated ←─────────┘
-                        ↓
-                      Done
+```mermaid
+flowchart LR
+    C[Creation] --> B[Backlog]
+    B --> R[Ready]
+    R --> P[In Progress]
+    P --> D[Done]
+    R --> G[Gated]
+    P --> G
+    G --> D
 ```
 
 **1. Creation**
@@ -437,42 +440,32 @@ Epic: Auth System
 
 ### Same Direction, Different Meanings
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                Task: Implement Login                    │
-│                                                         │
-│  Label: "epic:auth"                                    │
-│  └─→ "This task belongs to auth epic" (membership)    │
-│                                                         │
-│  Dependency of: Epic                                    │
-│  └─→ "Epic requires this task to be terminal" (order) │
-└─────────────────────────────────────────────────────────┘
-                         ↓ flows into
-┌─────────────────────────────────────────────────────────┐
-│                Epic: Auth System                        │
-│                                                         │
-│  Label: "milestone:v1.0"                               │
-│  └─→ "This epic belongs to v1.0" (membership)         │
-│                                                         │
-│  Dependency of: Milestone                               │
-│  └─→ "Milestone requires this epic" (order)           │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    T["Task: Implement Login"]
+    E["Epic: Auth System"]
+    M["Milestone: v1.0"]
+    T -->|"label epic:auth (membership)"| E
+    T -->|"dependency (order)"| E
+    E -->|"label milestone:v1.0 (membership)"| M
+    E -->|"dependency (order)"| M
 ```
 
-Both flow the same way, but labels organize while dependencies control workflow.
+The label says "this task belongs to the auth epic". The dependency says "the epic
+requires this task to reach a terminal state". Both flow the same way, but labels
+organize while dependencies control workflow.
 
 ### Asymmetry: Dependencies Are More Flexible
 
 Labels follow strict hierarchy (task → epic → milestone), but dependencies allow arbitrary DAG relationships:
 
+```mermaid
+flowchart LR
+    V1["v1.0 Release (completed)"] -->|blocks| V2["v2.0 Planning Task"]
 ```
-Sequential releases (dependencies work, labels don't):
 
-v1.0 Release (completed) ──→ blocks ──→ v2.0 Planning Task
-
-Valid dependency: Future work waits for past release
-Invalid label: v1.0 cannot "belong to" v2.0 task
-```
+The dependency is valid: future work waits for a past release. The label would be
+invalid: v1.0 cannot "belong to" a v2.0 task.
 
 ### When to Use What
 
@@ -531,10 +524,12 @@ Gates exist in three states:
 3. **Failed** - Gate check failed (automated only)
 
 **State transitions:**
-```
-Required → Passed    (check succeeds or manual approval)
-Required → Failed    (automated check fails)
-Failed → Passed      (fix issue, re-run check)
+
+```mermaid
+stateDiagram-v2
+    Required --> Passed: check succeeds or manual approval
+    Required --> Failed: automated check fails
+    Failed --> Passed: fix issue, re-run check
 ```
 
 ### Gate Types: Prechecks vs Postchecks
@@ -552,12 +547,13 @@ Gates run at two stages in the issue lifecycle:
 - Validate deliverables complete
 
 **Example workflow:**
-```
-backlog → [PRECHECK: tdd-reminder] → in_progress
-          ↓
-          work happens
-          ↓
-in_progress → [POSTCHECK: tests, clippy, code-review] → gated → done
+
+```mermaid
+flowchart LR
+    B[backlog] -->|"precheck: tdd-reminder"| P[in_progress]
+    P --> W[work happens]
+    W -->|"postcheck: tests, clippy, code-review"| G[gated]
+    G --> D[done]
 ```
 
 ### Gate Modes: Manual vs Automated
@@ -661,36 +657,15 @@ jit issue update --filter "epic:auth" --add-gate tests
 
 Gates influence state transitions:
 
-```
-                    ┌──────────┐
-                    │ Backlog  │
-                    └────┬─────┘
-                         │
-                    [prechecks]
-                         │
-                         v
-                    ┌──────────┐
-                    │  Ready   │
-                    └────┬─────┘
-                         │
-                         v
-                  ┌─────────────┐
-                  │ In Progress │
-                  └──────┬──────┘
-                         │
-                    [postchecks]
-                         │
-                         v
-                    ┌─────────┐
-                    │  Gated  │ ← Waiting for gates
-                    └────┬────┘
-                         │
-                  [all gates pass]
-                         │
-                         v
-                    ┌────────┐
-                    │  Done  │
-                    └────────┘
+```mermaid
+stateDiagram-v2
+    Backlog --> Ready: prechecks
+    Ready --> InProgress
+    InProgress --> Gated: postchecks
+    Gated --> Done: all gates pass
+    note right of Gated
+        Waiting for gates
+    end note
 ```
 
 **Key behaviors:**
@@ -866,13 +841,14 @@ Labels provide organizational membership using `namespace:value` format for filt
 ### Required Labels
 
 **Every issue must have exactly ONE**:
-```
-type:*
-├─ type:milestone    Release/time-bound goal
-├─ type:epic         Large feature  
-├─ type:task         Concrete work item
-├─ type:research     Time-boxed investigation
-└─ type:bug          Defect to fix
+```mermaid
+flowchart LR
+    T["type:*"]
+    T --> M["type:milestone<br/>release goal"]
+    T --> E["type:epic<br/>large feature"]
+    T --> K["type:task<br/>concrete work item"]
+    T --> R["type:research<br/>time-boxed investigation"]
+    T --> B["type:bug<br/>defect to fix"]
 ```
 
 **Exception:** Use `--orphan` flag to explicitly allow issues without type label.
@@ -1060,13 +1036,15 @@ jit issue assign abc123 bot:ci-automation
 
 In multi-agent scenarios, multiple agents may query for ready work simultaneously. Without atomic operations, race conditions occur:
 
-```
-Time   Agent 1                Agent 2
------------------------------------------
-T1     query ready → [abc123]
-T2                           query ready → [abc123]
-T3     claim abc123 ✓
-T4                           claim abc123 ✓  ← Duplicate work!
+```mermaid
+sequenceDiagram
+    participant A1 as Agent 1
+    participant A2 as Agent 2
+    A1->>A1: query ready, gets abc123
+    A2->>A2: query ready, gets abc123
+    A1->>A1: claim abc123 succeeds
+    A2->>A2: claim abc123 succeeds
+    Note over A1,A2: Duplicate work
 ```
 
 **JIT's solution: File-based atomic claiming**

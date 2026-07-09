@@ -42,11 +42,15 @@ jit issue create --title "Add login" \
 - Blocks workflow until complete
 
 **Example:**
+```mermaid
+flowchart LR
+    T["Task: Implement JWT"]
+    T -->|"label epic:auth (membership)"| E["Auth epic"]
+    T -->|"dependency (blocking)"| D["Setup DB"]
 ```
-Task: "Implement JWT"
-  ├─ label "epic:auth"      → belongs to Auth epic (membership)
-  └─ dependency on "Setup DB" → cannot start until DB ready (blocking)
-```
+
+The label makes the task a member of the Auth epic. The dependency stops the task from
+starting until "Setup DB" is ready.
 
 Both can flow the same direction (task → epic → milestone) but serve different purposes and can be used independently.
 
