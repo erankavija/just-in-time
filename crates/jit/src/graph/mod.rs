@@ -10,6 +10,33 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 pub mod hierarchy;
+pub mod keyed;
+
+pub use keyed::find_keyed_cycle;
+
+/// Which way a traversal follows dependency edges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// Outgoing edges: the nodes a node depends on.
+    Dependencies,
+    /// Incoming edges: the nodes that depend on a node.
+    Dependents,
+}
+
+/// One node of a depth-bounded unfolding of the graph ([`DependencyGraph::expand`]).
+///
+/// The unfolding is a tree: a node reachable by several paths appears once per
+/// path, each occurrence carrying its own `level` (1 for a direct neighbour of
+/// the expansion root).
+#[derive(Debug)]
+pub struct Expansion<'a, T> {
+    /// The node this occurrence stands for.
+    pub node: &'a T,
+    /// Distance from the expansion root, counting from 1.
+    pub level: u32,
+    /// Occurrences of this node's own neighbours, empty at the depth bound.
+    pub children: Vec<Expansion<'a, T>>,
+}
 
 /// Trait for types that can participate in a dependency graph
 ///
@@ -51,6 +78,149 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect();
 
         Self { nodes: nodes_map }
+    }
+
+    /// Adjacency in `direction`, indexed by node id.
+    ///
+    /// Building it once amortizes the reverse lookup that
+    /// [`get_dependents`](Self::get_dependents) pays per call. Neighbour lists
+    /// keep dependency-declaration order for [`Direction::Dependencies`] and are
+    /// sorted by id for [`Direction::Dependents`], so a traversal is
+    /// deterministic in either direction.
+    fn neighbors(&self, direction: Direction) -> HashMap<&'a str, Vec<&'a str>> {
+        match direction {
+            Direction::Dependencies => self
+                .nodes
+                .values()
+                .map(|node| {
+                    (
+                        node.id(),
+                        node.dependencies().iter().map(String::as_str).collect(),
+                    )
+                })
+                .collect(),
+            Direction::Dependents => {
+                let mut index: HashMap<&'a str, Vec<&'a str>> = self
+                    .nodes
+                    .values()
+                    .map(|node| (node.id(), Vec::new()))
+                    .collect();
+                for node in self.nodes.values() {
+                    for dep in node.dependencies() {
+                        if let Some(dependents) = index.get_mut(dep.as_str()) {
+                            dependents.push(node.id());
+                        }
+                    }
+                }
+                index
+                    .values_mut()
+                    .for_each(|dependents| dependents.sort_unstable());
+                index
+            }
+        }
+    }
+
+    /// Walk the graph from `start` in `direction`, stopping at `max_depth`.
+    ///
+    /// Returns each reachable node once, in depth-first preorder, excluding
+    /// `start` itself. `max_depth` counts edges from `start`: 1 yields the
+    /// immediate neighbours, 0 is unlimited. Edges pointing at absent nodes are
+    /// skipped.
+    ///
+    /// At `max_depth = 0` and [`Direction::Dependencies`] this returns the same
+    /// nodes as [`get_transitive_dependencies`](Self::get_transitive_dependencies).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::{DependencyGraph, Direction};
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let immediate = graph.traverse(&c.id, Direction::Dependencies, 1);
+    /// assert_eq!(immediate.len(), 1);
+    /// assert_eq!(immediate[0].id, b.id);
+    /// assert_eq!(graph.traverse(&c.id, Direction::Dependencies, 0).len(), 2);
+    /// ```
+    pub fn traverse(&self, start: &str, direction: Direction, max_depth: u32) -> Vec<&'a T> {
+        let neighbors = self.neighbors(direction);
+        let frontier = |id: &str, depth: u32| -> Vec<(&'a str, u32)> {
+            neighbors
+                .get(id)
+                .into_iter()
+                .flat_map(|ids| ids.iter().rev().map(move |id| (*id, depth)))
+                .collect()
+        };
+
+        // Reverse-push so the stack pops neighbours in adjacency order; seeding
+        // `visited` with `start` keeps the root out of its own result.
+        let mut stack = frontier(start, 1);
+        let mut visited: HashSet<&str> = HashSet::from([start]);
+        let mut reached = Vec::new();
+
+        while let Some((id, depth)) = stack.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            let Some(node) = self.nodes.get(id).copied() else {
+                continue;
+            };
+            reached.push(node);
+            if max_depth == 0 || depth < max_depth {
+                stack.extend(frontier(id, depth + 1));
+            }
+        }
+
+        reached
+    }
+
+    /// Unfold the graph from `start` in `direction` into a tree, stopping at
+    /// `max_depth`.
+    ///
+    /// Returns the occurrences of `start`'s neighbours; `start` itself is not in
+    /// the result. Unlike [`traverse`](Self::traverse), a node reached by several
+    /// paths is unfolded once per path, which is what a dependency tree renders.
+    /// `max_depth` counts edges from `start`, 0 being unlimited.
+    pub fn expand(
+        &self,
+        start: &str,
+        direction: Direction,
+        max_depth: u32,
+    ) -> Vec<Expansion<'a, T>> {
+        self.expand_from(start, 1, max_depth, &self.neighbors(direction))
+    }
+
+    /// Unfold the neighbours of `id` at `level`, recursing until `max_depth`.
+    ///
+    /// Terminates on any acyclic graph: every step descends one level, and a
+    /// non-zero `max_depth` bounds the descent regardless.
+    fn expand_from(
+        &self,
+        id: &str,
+        level: u32,
+        max_depth: u32,
+        neighbors: &HashMap<&'a str, Vec<&'a str>>,
+    ) -> Vec<Expansion<'a, T>> {
+        neighbors
+            .get(id)
+            .into_iter()
+            .flatten()
+            .filter_map(|neighbor| self.nodes.get(*neighbor).copied())
+            .map(|node| Expansion {
+                node,
+                level,
+                children: match max_depth == 0 || level < max_depth {
+                    true => self.expand_from(node.id(), level + 1, max_depth, neighbors),
+                    false => Vec::new(),
+                },
+            })
+            .collect()
     }
 
     /// Validate that adding a dependency would not create a cycle
@@ -450,6 +620,36 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         }
         redundant.sort();
         redundant
+    }
+}
+
+impl<'a, T: GraphNode> Expansion<'a, T> {
+    /// How many occurrences each node id has across `forest`.
+    ///
+    /// A count above 1 marks a node shared between paths, the diamonds a
+    /// dependency tree flags.
+    pub fn occurrences(forest: &[Self]) -> HashMap<&'a str, usize> {
+        let mut counts: HashMap<&'a str, usize> = HashMap::new();
+        let mut stack: Vec<&Self> = forest.iter().collect();
+        while let Some(occurrence) = stack.pop() {
+            *counts.entry(occurrence.node.id()).or_insert(0) += 1;
+            stack.extend(occurrence.children.iter());
+        }
+        counts
+    }
+
+    /// Rebuild this occurrence bottom-up in the caller's shape.
+    ///
+    /// `build` receives a node, its level, and its already-built children. It
+    /// lets a command project an expansion into a view type without walking the
+    /// tree itself.
+    pub fn fold<N>(&self, build: &impl Fn(&'a T, u32, Vec<N>) -> N) -> N {
+        let children = self
+            .children
+            .iter()
+            .map(|child| child.fold(build))
+            .collect();
+        build(self.node, self.level, children)
     }
 }
 
@@ -910,6 +1110,215 @@ mod tests {
         assert!(isolated_ids.contains(&"D"));
     }
 
+    // Tests for depth-bounded traversal and expansion
+
+    fn ids(nodes: &[&TestNode]) -> Vec<String> {
+        nodes.iter().map(|node| node.id().to_string()).collect()
+    }
+
+    fn sorted_ids(nodes: &[&TestNode]) -> Vec<String> {
+        let mut ids = ids(nodes);
+        ids.sort();
+        ids
+    }
+
+    /// A → B → C → D chain plus a shortcut A → C, exercising depth bounds and
+    /// the shared node C.
+    fn chain_with_shortcut() -> (TestNode, TestNode, TestNode, TestNode) {
+        (
+            TestNode::new("A", vec!["B", "C"]),
+            TestNode::new("B", vec!["C"]),
+            TestNode::new("C", vec!["D"]),
+            TestNode::new("D", vec![]),
+        )
+    }
+
+    #[test]
+    fn test_traverse_dependencies_depth_one_returns_immediate_neighbors() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        assert_eq!(
+            ids(&graph.traverse("A", Direction::Dependencies, 1)),
+            vec!["B", "C"]
+        );
+    }
+
+    #[test]
+    fn test_traverse_dependencies_respects_depth_bound() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        // Depth 2 reaches C (via B or the shortcut) but stops before D.
+        assert_eq!(
+            sorted_ids(&graph.traverse("A", Direction::Dependencies, 2)),
+            vec!["B", "C"]
+        );
+        assert_eq!(
+            sorted_ids(&graph.traverse("A", Direction::Dependencies, 3)),
+            vec!["B", "C", "D"]
+        );
+    }
+
+    #[test]
+    fn test_traverse_dependencies_visits_each_node_once() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        // C is reachable as A→C and A→B→C; it is returned once.
+        assert_eq!(
+            sorted_ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            vec!["B", "C", "D"]
+        );
+    }
+
+    #[test]
+    fn test_traverse_excludes_start_node() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        assert!(graph
+            .traverse("A", Direction::Dependencies, 0)
+            .iter()
+            .all(|node| node.id() != "A"));
+        assert!(graph
+            .traverse("D", Direction::Dependents, 0)
+            .iter()
+            .all(|node| node.id() != "D"));
+    }
+
+    #[test]
+    fn test_traverse_dependents_walks_incoming_edges() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        assert_eq!(
+            ids(&graph.traverse("C", Direction::Dependents, 1)),
+            vec!["A", "B"]
+        );
+        assert_eq!(
+            sorted_ids(&graph.traverse("D", Direction::Dependents, 0)),
+            vec!["A", "B", "C"]
+        );
+        assert_eq!(
+            ids(&graph.traverse("D", Direction::Dependents, 1)),
+            vec!["C"]
+        );
+    }
+
+    #[test]
+    fn test_traverse_dependents_matches_transitive_dependents() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        let mut expected: Vec<String> = graph
+            .get_transitive_dependents("D")
+            .iter()
+            .map(|node| node.id().to_string())
+            .collect();
+        expected.sort();
+
+        assert_eq!(
+            sorted_ids(&graph.traverse("D", Direction::Dependents, 0)),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_traverse_skips_edges_to_absent_nodes() {
+        let a = TestNode::new("A", vec!["missing", "B"]);
+        let b = TestNode::new("B", vec![]);
+        let graph = DependencyGraph::new(&[&a, &b]);
+
+        assert_eq!(
+            ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            vec!["B"]
+        );
+    }
+
+    #[test]
+    fn test_traverse_unknown_start_returns_nothing() {
+        let a = TestNode::new("A", vec![]);
+        let graph = DependencyGraph::new(&[&a]);
+
+        assert!(graph
+            .traverse("nonexistent", Direction::Dependencies, 0)
+            .is_empty());
+    }
+
+    // REQ-4: unlimited forward traversal agrees with the transitive-dependencies
+    // primitive on a hand-built diamond, and (below) on arbitrary DAGs.
+    #[test]
+    fn test_traverse_unlimited_matches_transitive_dependencies() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        let mut expected: Vec<String> = graph
+            .get_transitive_dependencies("A")
+            .iter()
+            .map(|node| node.id().to_string())
+            .collect();
+        expected.sort();
+
+        assert_eq!(
+            sorted_ids(&graph.traverse("A", Direction::Dependencies, 0)),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_expand_unfolds_shared_node_once_per_path() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        let forest = graph.expand("A", Direction::Dependencies, 0);
+        // A's neighbours, in declaration order.
+        assert_eq!(
+            forest.iter().map(|e| e.node.id()).collect::<Vec<_>>(),
+            vec!["B", "C"]
+        );
+        assert!(forest.iter().all(|e| e.level == 1));
+        // B's subtree re-unfolds C, so C occurs twice overall (and D with it).
+        let counts = Expansion::occurrences(&forest);
+        assert_eq!(counts.get("C"), Some(&2));
+        assert_eq!(counts.get("D"), Some(&2));
+        assert_eq!(counts.get("B"), Some(&1));
+    }
+
+    #[test]
+    fn test_expand_stops_at_depth_bound() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        let forest = graph.expand("A", Direction::Dependencies, 1);
+        assert_eq!(forest.len(), 2);
+        assert!(forest.iter().all(|e| e.children.is_empty()));
+
+        let forest = graph.expand("A", Direction::Dependencies, 2);
+        let b_node = forest.iter().find(|e| e.node.id() == "B").unwrap();
+        assert_eq!(b_node.children.len(), 1);
+        assert_eq!(b_node.children[0].node.id(), "C");
+        assert_eq!(b_node.children[0].level, 2);
+        assert!(b_node.children[0].children.is_empty());
+    }
+
+    #[test]
+    fn test_expand_fold_rebuilds_tree_bottom_up() {
+        let (a, b, c, d) = chain_with_shortcut();
+        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
+
+        let render = |node: &TestNode, level: u32, children: Vec<String>| {
+            format!("{}@{}{}", node.id(), level, children.join(""))
+        };
+        let rendered: Vec<String> = graph
+            .expand("A", Direction::Dependencies, 0)
+            .iter()
+            .map(|expansion| expansion.fold(&render))
+            .collect();
+
+        assert_eq!(rendered, vec!["B@1C@2D@3", "C@1D@2"]);
+    }
+
     #[test]
     fn test_get_isolated_nodes_with_issues() {
         // Test with actual Issue type
@@ -925,5 +1334,61 @@ mod tests {
         let isolated = graph.get_isolated_nodes();
         assert_eq!(isolated.len(), 1);
         assert_eq!(isolated[0].id, issue3.id);
+    }
+
+    /// Random DAG: node `i` may only depend on nodes `< i`, so `edges[i]` is the
+    /// mask of admissible predecessors, keeping the graph acyclic by construction.
+    fn dag_from_masks(masks: &[u32]) -> Vec<TestNode> {
+        masks
+            .iter()
+            .enumerate()
+            .map(|(index, mask)| {
+                let deps: Vec<String> = (0..index)
+                    .filter(|earlier| mask & (1 << earlier) != 0)
+                    .map(|earlier| earlier.to_string())
+                    .collect();
+                TestNode {
+                    id: index.to_string(),
+                    deps,
+                }
+            })
+            .collect()
+    }
+
+    proptest::proptest! {
+        /// REQ-4: on any DAG, unlimited forward traversal reaches exactly the
+        /// nodes `get_transitive_dependencies` reports.
+        #[test]
+        fn prop_traverse_unlimited_matches_transitive_dependencies(
+            masks in proptest::collection::vec(0u32..128, 1..8),
+        ) {
+            let nodes = dag_from_masks(&masks);
+            let refs: Vec<&TestNode> = nodes.iter().collect();
+            let graph = DependencyGraph::new(&refs);
+
+            for node in &nodes {
+                let traversed = sorted_ids(&graph.traverse(node.id(), Direction::Dependencies, 0));
+                let mut expected: Vec<String> = graph
+                    .get_transitive_dependencies(node.id())
+                    .iter()
+                    .map(|n| n.id().to_string())
+                    .collect();
+                expected.sort();
+                proptest::prop_assert_eq!(traversed, expected);
+            }
+        }
+
+        /// A DAG built with only backward edges has no cycle, whatever the mask.
+        #[test]
+        fn prop_find_keyed_cycle_reports_none_for_dags(
+            masks in proptest::collection::vec(0u32..128, 1..8),
+        ) {
+            let nodes = dag_from_masks(&masks);
+            let adjacency: Vec<(String, Vec<String>)> = nodes
+                .into_iter()
+                .map(|node| (node.id, node.deps))
+                .collect();
+            proptest::prop_assert_eq!(find_keyed_cycle(&adjacency), None);
+        }
     }
 }
