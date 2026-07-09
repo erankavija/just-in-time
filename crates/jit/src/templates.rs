@@ -15,6 +15,7 @@
 //! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
 //!   a declared node role / anchor name;
 //! - each node `type` exists in the configured `[type_hierarchy].types`;
+//! - each transform `kind` is a supported [`TransformKind`];
 //! - the internal `depends_on` edges form a DAG (no cycle).
 //!
 //! Following the [`RuleSet::load`](crate::validation::rules::RuleSet::load)
@@ -150,12 +151,81 @@ pub enum TemplateConfigError {
         role: String,
     },
 
+    /// A transform declares a `kind` outside the supported set
+    /// ([`TransformKind`]).
+    #[error(
+        "template '{template}': unsupported transform kind '{kind}'; supported kinds: {supported}"
+    )]
+    UnknownTransformKind {
+        /// Name of the offending template.
+        template: String,
+        /// The unsupported kind string.
+        kind: String,
+        /// Comma-separated list of the kinds the engine supports.
+        supported: String,
+    },
+
     /// `applies_to` is empty: a template must name at least one container type.
     #[error("template '{template}': applies_to must list at least one container type")]
     EmptyAppliesTo {
         /// Name of the offending template.
         template: String,
     },
+}
+
+/// A supported graph-transform kind, parsed from a [`Transform::kind`] string.
+///
+/// The registry loader rejects any other kind ([`TemplateConfigError::UnknownTransformKind`]),
+/// so a template that reaches `jit apply` declares only kinds the engine can
+/// dispatch. Dispatch is by variant, keeping the transform set extensible.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::TransformKind;
+///
+/// assert_eq!(
+///     TransformKind::from_kind("move-upstream-to-role"),
+///     Some(TransformKind::MoveUpstreamToRole),
+/// );
+/// assert_eq!(TransformKind::from_kind("teleport"), None);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransformKind {
+    /// Move the container's pre-apply upstream deps onto a named role's node.
+    MoveUpstreamToRole,
+}
+
+impl TransformKind {
+    /// The `kind` string of [`TransformKind::MoveUpstreamToRole`].
+    pub const MOVE_UPSTREAM_TO_ROLE: &'static str = "move-upstream-to-role";
+
+    /// Every supported `kind` string, for error messages and documentation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TransformKind;
+    ///
+    /// assert!(TransformKind::SUPPORTED.contains(&"move-upstream-to-role"));
+    /// ```
+    pub const SUPPORTED: &'static [&'static str] = &[Self::MOVE_UPSTREAM_TO_ROLE];
+
+    /// Parse a transform `kind` string, or `None` when the kind is unsupported.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TransformKind;
+    ///
+    /// assert!(TransformKind::from_kind("move-upstream-to-role").is_some());
+    /// ```
+    pub fn from_kind(kind: &str) -> Option<Self> {
+        match kind {
+            Self::MOVE_UPSTREAM_TO_ROLE => Some(Self::MoveUpstreamToRole),
+            _ => None,
+        }
+    }
 }
 
 /// A loaded, validated set of graph templates from `.jit/templates.toml`.
@@ -332,9 +402,9 @@ pub struct AnchorEdge {
 
 /// A graph transform applied after nodes are created and edges wired.
 ///
-/// The only `kind` shipped this epic is `move-upstream-to-role`, which moves the
-/// container's pre-apply upstream dependencies onto the node of the named role.
-/// Dispatch is by `kind` string, kept extensible for future transforms.
+/// `kind` names a [`TransformKind`]; the loader rejects any other value. The
+/// shipped kind is `move-upstream-to-role`, which moves the container's pre-apply
+/// upstream dependencies onto the node of the named role.
 ///
 /// # Examples
 ///
@@ -783,8 +853,18 @@ impl GraphTemplate {
             }
         }
 
-        // transforms reference a declared node role.
+        // transforms declare a supported kind and reference a declared node role.
+        // The kind check belongs here, with the other structural checks: an
+        // unsupported kind is a static config error, so `jit` fails at load and
+        // the apply engine only ever dispatches kinds it can execute.
         for transform in &self.transforms {
+            if TransformKind::from_kind(&transform.kind).is_none() {
+                return Err(TemplateConfigError::UnknownTransformKind {
+                    template: self.name.clone(),
+                    kind: transform.kind.clone(),
+                    supported: TransformKind::SUPPORTED.join(", "),
+                });
+            }
             if !roles.contains(transform.role.as_str()) {
                 return Err(TemplateConfigError::UnknownRole {
                     template: self.name.clone(),
@@ -1129,6 +1209,49 @@ role = "ghost"
             TemplateConfigError::UnknownRole { role, .. } => assert_eq!(role, "ghost"),
             other => panic!("expected UnknownRole, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_unknown_transform_kind_rejected() {
+        // A transform kind the engine cannot dispatch is a static config error:
+        // load fails, naming both the template and the offending kind, so the
+        // apply engine never receives it.
+        let toml = r#"
+[[template]]
+name = "weird"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.transforms]]
+kind = "teleport"
+role = "planning"
+"#;
+        let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
+        match &err {
+            TemplateConfigError::UnknownTransformKind {
+                template,
+                kind,
+                supported,
+            } => {
+                assert_eq!(template, "weird");
+                assert_eq!(kind, "teleport");
+                assert!(supported.contains("move-upstream-to-role"), "{supported}");
+            }
+            other => panic!("expected UnknownTransformKind, got {other:?}"),
+        }
+        let msg = err.to_string();
+        assert!(msg.contains("weird"), "{msg}");
+        assert!(msg.contains("teleport"), "{msg}");
+    }
+
+    #[test]
+    fn test_supported_transform_kind_accepted() {
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        assert_eq!(
+            TransformKind::from_kind(&reg.templates[0].transforms[0].kind),
+            Some(TransformKind::MoveUpstreamToRole)
+        );
     }
 
     #[test]

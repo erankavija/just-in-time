@@ -127,6 +127,35 @@ depends_on = ["a"]
 }
 
 #[test]
+fn test_config_load_fails_on_unknown_transform_kind() {
+    // An unsupported transform kind is a static config error: config load fails,
+    // naming the template and the kind, so `jit apply` never receives it
+    // (jit:2f447380 — REQ-3).
+    let bad = r#"
+[[template]]
+name = "weird"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.transforms]]
+kind = "teleport"
+role = "planning"
+"#;
+    let temp = setup(CONFIG_WITH_HIERARCHY, Some(bad));
+    let err = JitConfig::load(temp.path()).unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("weird"),
+        "error should name the template: {msg}"
+    );
+    assert!(
+        msg.contains("teleport"),
+        "error should name the offending kind: {msg}"
+    );
+}
+
+#[test]
 fn test_config_load_fails_on_malformed_templates_toml() {
     let temp = setup(CONFIG_WITH_HIERARCHY, Some("[[template"));
     assert!(JitConfig::load(temp.path()).is_err());

@@ -1045,26 +1045,11 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
 #[test]
 fn test_apply_rejects_unknown_transform_kind_and_creates_nothing() {
     let h = TestHarness::new();
-    // A template declaring an unsupported transform kind. The loader validates
-    // the transform's ROLE but not its KIND, so the engine must reject it — and,
-    // per validate-before-mutate, BEFORE creating any node.
-    let toml = r#"
-[[template]]
-name        = "weird"
-applies_to  = ["epic"]
-  [[template.nodes]]
-  role        = "planning"
-  type        = "planning"
-  description = "Plan {container.title}."
-  [[template.transforms]]
-  kind = "teleport"
-  role = "planning"
-"#;
-    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-        .unwrap()
-        .get("weird")
-        .unwrap()
-        .clone();
+    // The registry loader rejects an unsupported transform kind, so a template
+    // reaching the engine can only carry one by being hand-built. Expansion is the
+    // engine's defensive gate for that case, and it runs BEFORE any mutation.
+    let mut template = plan_template();
+    template.transforms[0].kind = "teleport".to_string();
     let epic = create_epic(&h, "Weird epic");
 
     let before = h.all_issues().len();
@@ -1073,9 +1058,30 @@ applies_to  = ["epic"]
         .apply_template_with(&template, &epic, &container_binding(&epic), false)
         .unwrap_err();
     assert!(err.to_string().contains("teleport"), "{err}");
-    // The unknown kind is caught in the precondition phase, before any mutation:
+    // The unknown kind is caught during expansion, before any mutation:
     // ZERO new issues (and thus zero edges) were created.
     assert_eq!(h.all_issues().len(), before);
+}
+
+#[test]
+fn test_template_registry_rejects_unknown_transform_kind_at_load() {
+    // The kind is a static config error: `jit` fails at registry load, naming the
+    // template and the offending kind, so `jit apply` never sees it.
+    let toml = r#"
+[[template]]
+name        = "weird"
+applies_to  = ["epic"]
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  [[template.transforms]]
+  kind = "teleport"
+  role = "planning"
+"#;
+    let err = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("weird"), "{msg}");
+    assert!(msg.contains("teleport"), "{msg}");
 }
 
 // === APPLY-04: a prospective cycle is caught before any mutation ===
