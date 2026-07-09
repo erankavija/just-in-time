@@ -2,24 +2,30 @@
   "id": "69ffdcf8-eb81-47be-bd94-35ced4963408",
   "title": "Unify the dependency-met predicate across all surfaces",
   "description": "Define \"this dependency is met\" once in the domain layer and route every consumer through it, eliminating the Done-vs-terminal drift between blocking, blocked-reason reporting, transition errors, and rendering.\n\n## Background\n\nThe rule (dependency met = target state is terminal: Done or Rejected) lives in `Issue::is_blocked` (`domain/types.rs:586`) but is re-encoded independently: `query_blocked`'s reason enumeration tests `!= Done` (`domain/queries.rs:219`), `blocking_dependencies` re-implements the predicate for transition errors (`commands/issue.rs:421-435`), `output.rs:1200` re-derives unmet dependencies for rendering, and `claim_next` inlines the ready predicate (`commands/issue.rs:1088`) instead of calling `query_ready`. The `BlockingReason::Dependency` doc comment says \"anything other than Done\", contradicting the actual rule.\n\n## Success Criteria\n\n- [hard] REQ-1: One domain helper expresses dependency satisfaction; `is_blocked`, the blocked-reason enumeration, transition blockers, and unmet-dependency rendering all call it.\n- [hard] REQ-2: A Rejected dependency is treated as met on every surface (blocked query reasons, issue show output, state transitions), each covered by a test.\n- [hard] REQ-3: Next-issue claiming selects via the domain ready-query predicate; the inline copy is gone.\n- [hard] REQ-4: Doc comments state the terminal-state rule; no comment or help text describes the rule as \"not Done\".\n\n## Notes\n\nThis is behavior-preserving for `is_blocked` itself; the observable fix is in reason reporting where a Rejected dependency was previously listed as blocking. Sweep for stale narrative in the same change.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "code-review",
-    "cargo-ci"
+    "cargo-ci",
+    "mcp-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
+    "mcp-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T21:58:38.586214706Z"
+      "updated_at": "2026-07-09T22:55:39.385609610Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-09T22:47:30.794246758Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T22:54:15.597719121Z"
     }
   },
   "context": {},
@@ -31,7 +37,8 @@
     "satisfies:REQ-3"
   ],
   "created_at": "2026-07-05T22:31:18.722364067Z",
-  "updated_at": "2026-07-09T22:54:15.477784174Z",
+  "updated_at": "2026-07-09T22:55:40.412864417Z",
   "first_ready_at": "2026-07-05T22:31:18.722364367Z",
-  "claimed_at": "2026-07-09T14:14:14.297182930Z"
+  "claimed_at": "2026-07-09T14:14:14.297182930Z",
+  "done_at": "2026-07-09T22:55:40.412864017Z"
 }
