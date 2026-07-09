@@ -2,6 +2,9 @@
 
 > **Diátaxis Type:** Explanation
 
+This note specifies the facts the resolver derives; [Containment and
+Completion](containment-and-completion.md) states the model they come from.
+
 JIT expresses containment two ways, and they can disagree. This note states the
 canonical model: **the dependency DAG is authoritative; membership labels are
 advisory.** The resolution lives in the core library
@@ -40,8 +43,8 @@ For every node the resolver produces four facts:
 
 | Fact | Definition |
 |------|------------|
-| **parent** | The *nearest dominating container*: among all containers whose dependency closure includes the node, the one with the deepest level (the most-tactical container that still contains it). Ties break deterministically — fewer hops, then the lexicographically smallest container id. `null` for a root. |
-| **children** | The inverse of `parent`: the nodes whose resolved parent is this node, sorted by id. `parent`/`children` therefore form a consistent forest. |
+| **parent** | The *nearest dominating container*: among all containers whose dependency closure includes the node, the one that most directly contains it. A container linked by a **direct** dependency edge outranks one that reaches the node only transitively. Among equally-direct candidates the deepest level wins, then the fewest hops, then the lexicographically smallest container id. `null` for a root. |
+| **children** | The inverse of `parent`: the nodes whose resolved parent is this node, sorted by id. A node that is a direct dependency of a container but resolves to a nearer container is that nearer container's child, so `parent`/`children` form a consistent forest. |
 | **cluster** | The strategic root of the parent chain: follow `parent` pointers up to the topmost container. A leaf with no container ancestor has no cluster; a root container is its own cluster. |
 | **rank** | The longest dependency-path length from the node to a sink (a node with no in-set dependencies). Sinks have rank `0`. A stable layout depth. |
 
@@ -57,17 +60,17 @@ For every node the resolver produces four facts:
   DAG descendants; a consumer that wants to hide such subtrees filters by state
   itself.
 
-## Deliberate divergence from the web UI's historical clustering
+## Resolution versus presentation
 
-The web UI's original clustering (for display) picked the epic level as its top
-render cluster and treated milestones as visible nodes rather than containers.
-The canonical core instead treats **every** non-leaf level as a container, so a
-task under an epic under a milestone clusters to the *milestone* (the strategic
-root). The DAG-authoritative rule wins; the UI's level choice is a presentation
-concern layered on top. The web now shares the canonical resolver
-(`web/src/utils/hierarchyResolution.ts`), pinned to the core by the shared
-fixture `test-vectors/hierarchy_resolution.json` (asserted from both Rust and
-vitest).
+The core treats **every** non-leaf level as a container, so a task under an epic
+under a milestone clusters to the *milestone* (the strategic root). A renderer is
+free to draw a shallower grouping, choosing which level it visually clusters at.
+That choice is a presentation concern layered on top of the resolved hierarchy;
+the DAG-authoritative rule decides containment either way.
+
+The web shares the canonical resolver (`web/src/utils/hierarchyResolution.ts`),
+pinned to the core by the shared fixture
+`test-vectors/hierarchy_resolution.json` (asserted from both Rust and vitest).
 
 ## Where it surfaces
 

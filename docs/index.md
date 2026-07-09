@@ -11,6 +11,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 - [Overview](concepts/overview.md) - What is JIT and why it exists
 - [Core Model](concepts/core-model.md) - Issues, dependencies, gates, states
+- [Containment and Completion](concepts/containment-and-completion.md) - One edge kind, derived containment, why containers finish last
 - [Hierarchy Resolution](concepts/hierarchy-resolution.md) - Why the dependency DAG, not labels, defines containment
 - [Scope](concepts/scope.md) - Domain coverage and boundaries
 - [System Guarantees](concepts/guarantees.md) - Invariants and consistency
@@ -46,6 +47,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
 - [Configuration](reference/configuration.md) - config.toml and settings
+- [Item Addresses](reference/item-addresses.md) - Address grammar for addressable structured items
 - [Glossary](reference/glossary.md) - Term definitions
 - [Claim System](reference/claim.md) - Leases and coordination
 - [Example Config](reference/example-config.toml) - Sample configuration

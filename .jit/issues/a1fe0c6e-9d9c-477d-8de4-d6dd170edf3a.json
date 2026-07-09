@@ -11,7 +11,90 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/concepts/containment-and-completion.md",
+      "commit": null,
+      "label": "Documentation",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "hierarchy-resolution.md",
+          "resolved_path": "docs/concepts/hierarchy-resolution.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "9117c502ef7ac41095f765b8d42464ec852f0ef6186fbbad52fe0fec1dfb4e2f",
+          "is_shared": false
+        },
+        {
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "12153be512f7b220dce9bb5eb9c004d1e510c26d242595f085a45e5c6caf97d9",
+          "is_shared": false
+        },
+        {
+          "original_path": "../reference/item-addresses.md",
+          "resolved_path": "docs/reference/item-addresses.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "99ed80962935264e23e8e7e1300a5019a2ca4c02b4a52bd94856448d8a1e63ac",
+          "is_shared": false
+        },
+        {
+          "original_path": "../reference/labels.md",
+          "resolved_path": "docs/reference/labels.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
+          "is_shared": false
+        }
+      ]
+    },
+    {
+      "path": "docs/reference/item-addresses.md",
+      "commit": null,
+      "label": "Documentation",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "b3759815b5f944fb5aa2bf554375439d819444ff1c6badd60d5e621b0eea2a36",
+          "is_shared": false
+        },
+        {
+          "original_path": "../concepts/containment-and-completion.md",
+          "resolved_path": "docs/concepts/containment-and-completion.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "c837fca5d0e0c9d7215b9593b18a0885068d833c8f3b58c67b5d9d2b15df53e7",
+          "is_shared": false
+        },
+        {
+          "original_path": "labels.md",
+          "resolved_path": "docs/reference/labels.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
+          "is_shared": false
+        },
+        {
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "2b0e85a05bb20f712ce8183066ae503f9795f8f3ed70a55ee98b81b4f2e2435e",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "epic:work-graph-integrity",
@@ -19,7 +102,7 @@
     "satisfies:REQ-8"
   ],
   "created_at": "2026-07-05T22:31:18.727973291Z",
-  "updated_at": "2026-07-09T14:14:14.367631181Z",
+  "updated_at": "2026-07-09T14:26:23.285858203Z",
   "first_ready_at": "2026-07-05T22:31:18.727973821Z",
   "claimed_at": "2026-07-09T14:14:14.367631061Z"
 }
