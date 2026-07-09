@@ -170,17 +170,20 @@ jit events query --event-type IssueUpdated
 
 JIT is designed as a standalone issue tracker that *enhances* git workflows but doesn't require them. This supports use cases beyond software development.
 
+Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository for worktree identity and branch tracking, and fail with a typed `ClaimRequiresGitError` (exit code 10) when run outside one.
+
 **What works without git:**
 
 ✅ Issue creation, updates, queries  
 ✅ Dependency management  
 ✅ Quality gates (automated and manual)  
-✅ Agent claiming and coordination  
+✅ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`)  
 ✅ Event logging and queries  
 ✅ Status and visualization  
 
 **What requires git:**
 
+❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`ClaimRequiresGitError`, exit code 10)  
 ❌ `jit doc show --at <commit>` - View document at specific git revision  
 ❌ `jit doc archive` - Track document history across moves  
 ❌ `jit snapshot export --at <tag>` - Export from specific git revision  
@@ -193,21 +196,29 @@ When git is unavailable:
 - **Document operations:** Fall back to working tree only
 - **Snapshot export:** Export from current working tree
 - **History commands:** Return error with helpful message
+- **Advisory leases:** Fail outright with `ClaimRequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative
 
 **Example:**
 
 ```bash
-# Without git - core functionality works
+# Without git - core functionality and issue assignment work
 mkdir my-project && cd my-project
 jit init
 jit issue create --title "Task 1"
 jit issue create --title "Task 2"
 jit dep add <task1> <task2>
 jit query available
-# ✓ All basic operations work
+jit issue claim <task1> agent:worker-1
+# ✓ All basic operations and issue assignment work
 
-# With git - enhanced document management
+jit claim acquire <task1>
+# ✗ Error: Claims and leases require a git repository (exit code 10)
+
+# With git - advisory leases and document history
 git init
+jit claim acquire <task1>
+# ✓ Advisory lease acquired
+
 jit doc add <issue> path/to/design.md
 jit doc show <issue> path/to/design.md --at HEAD~3
 # ✓ History and versioning available
@@ -289,11 +300,10 @@ Understanding limitations prevents incorrect assumptions:
 **✓ Safe patterns:**
 
 ```bash
-# Claim-based coordination (atomic)
-jit claim acquire <issue>
+# Claim-based coordination (atomic, works without git)
+jit issue claim <issue> agent:worker-1
 # Work on issue
 jit issue update <issue> --state done
-jit claim release <issue-id>
 
 # Polling for ready work (eventually consistent)
 while true; do
@@ -313,8 +323,8 @@ state=$(jit issue show abc123 --json | jq -r '.state')
 # ✗ State may change before next operation
 jit issue update abc123 --state in_progress  # Race condition!
 
-# Correct approach: use atomic claim
-jit claim acquire abc123  # Prevents concurrent modification
+# Correct approach: claim the issue instead of updating state directly
+jit issue claim abc123 agent:worker-1  # Fails if already assigned to someone else
 ```
 
 ### File-Based Synchronization
