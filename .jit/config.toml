@@ -195,15 +195,16 @@ source-of-truth = "markdown-first"
 # entries live under `## Decision Details`, a `###`-heading section the kind does
 # not scan. Reuses the `per` link namespace, so an issue carries `per:@/charter/D-N`
 # (resolution is by qualified id, unambiguous alongside the issue-scope `decision`
-# kind). `jit item list --kind charter`. The source path is derived: first entry
-# of `permanent_paths` + `<strategic-anchor-short-id>-charter.md`.
+# kind). `jit item list --kind charter`. The source is the charter of strategic
+# anchor `9db27a3a`, kept under `dev/vision/` with this repository's other
+# forward-looking vision documents.
 [item_kinds.charter]
 section = "decision_log"
 id-pattern = "D-[0-9]+"
 markers = []
 link-namespaces = ["per"]
 scope = "project"
-source = "docs/9db27a3a-charter.md"
+source = "dev/vision/9db27a3a-charter.md"
 source-of-truth = "markdown-first"
 
 [invariant_projection]

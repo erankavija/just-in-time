@@ -1,7 +1,7 @@
 # jit-execution-lead — Eval Results
 
 Adjudicated baseline for the scenarios in [`evals.json`](evals.json), graded under the
-method in [`docs/reference/skill-eval-adjudication.md`](../../../../docs/reference/skill-eval-adjudication.md):
+method in [`dev/eval/skill-eval-adjudication.md`](../../../../dev/eval/skill-eval-adjudication.md):
 each scenario's `expected_output` is decomposed into an itemized checklist and every item
 is scored against observable repo-state evidence from a recorded run.
 
@@ -144,5 +144,5 @@ not the human. Truncate criteria: unmodified.
    scratch repo path for `{REPO_PATH}` and the epic ID the setup script printed.
 3. Re-score the checklist above against the final repo state.
 
-See [`docs/reference/skill-eval-adjudication.md`](../../../../docs/reference/skill-eval-adjudication.md)
+See [`dev/eval/skill-eval-adjudication.md`](../../../../dev/eval/skill-eval-adjudication.md)
 for the full method.

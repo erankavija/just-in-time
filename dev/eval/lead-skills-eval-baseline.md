@@ -8,7 +8,7 @@ verdict. This baseline is a record of what was run, not a reusable framework.
 
 ## Scenario evals (adjudicated against `expected_output`)
 
-Method: [`docs/reference/skill-eval-adjudication.md`](skill-eval-adjudication.md) —
+Method: [`dev/eval/skill-eval-adjudication.md`](skill-eval-adjudication.md) —
 each scenario's `expected_output` is decomposed into an itemized checklist and
 scored against observable final repo state from a fresh-context runner (not the
 run's self-report).

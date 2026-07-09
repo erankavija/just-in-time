@@ -24,9 +24,10 @@ directory.
 The short id comes from the steward anchor container resolved in tier derivation
 (`jit issue show <container-id> --json` → `short_id`).
 
-> This-repo example (`.jit/config.toml`): `permanent_paths = ["docs/"]`, so the
-> charter for strategic container `9db27a3a` lands at
-> `docs/9db27a3a-charter.md`. Do not copy the literal `docs/`; derive it.
+> Example: with `permanent_paths = ["notes/"]`, the charter for strategic
+> container `9db27a3a` lands at `notes/9db27a3a-charter.md`. Derive the root from
+> the project's own config; a literal directory name from an example is wrong for
+> every other project.
 
 ## Structure
 

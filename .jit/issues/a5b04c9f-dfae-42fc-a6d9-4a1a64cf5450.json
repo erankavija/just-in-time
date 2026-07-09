@@ -21,7 +21,7 @@
   "context": {},
   "documents": [
     {
-      "path": "docs/reference/skill-eval-adjudication.md",
+      "path": "dev/eval/skill-eval-adjudication.md",
       "commit": null,
       "label": "Scenario-Eval Adjudication Method",
       "doc_type": "reference",
@@ -35,7 +35,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.307671849Z",
-  "updated_at": "2026-07-05T19:51:13.049674411Z",
+  "updated_at": "2026-07-09T23:21:36.248705843Z",
   "first_ready_at": "2026-07-02T08:23:44.421062978Z",
   "claimed_at": "2026-07-02T08:24:45.513061713Z",
   "done_at": "2026-07-02T20:46:17.590977690Z"

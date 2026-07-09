@@ -34,6 +34,18 @@
       "doc_type": "eval"
     },
     {
+      "path": ".claude/skills/jit-project-lead/trigger_eval.json",
+      "commit": null,
+      "label": "jit-project-lead trigger eval set",
+      "doc_type": "eval"
+    },
+    {
+      "path": ".claude/skills/jit-project-lead/trigger_eval_results.json",
+      "commit": null,
+      "label": "jit-project-lead trigger eval results (17/17)",
+      "doc_type": "eval"
+    },
+    {
       "path": ".claude/skills/jit-project-lead/evals/results.md",
       "commit": null,
       "label": "jit-project-lead skeleton eval verdicts (all PASS)",
@@ -41,11 +53,19 @@
       "format": "markdown",
       "assets": [
         {
-          "original_path": "transcripts/tier-derivation-collapsed.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/tier-derivation-collapsed.completion-report.md",
+          "original_path": "transcripts/routing-mode-1.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-1.completion-report.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
-          "content_hash": "286cf19f68b624e00b5c43fe1f8a95333dc2c518b397a556f3a9e67e5b149268",
+          "content_hash": "d50328655e617f8f5189c1f438d28d6814cf5ae202940fa803ae9d494fbce43d",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-2.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-2.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "83ca4fa30d0762525e706a00044b72251585e817b5634f803ea9906da576f735",
           "is_shared": false
         },
         {
@@ -57,27 +77,11 @@
           "is_shared": false
         },
         {
-          "original_path": "../../../../docs/reference/skill-eval-adjudication.md",
-          "resolved_path": "docs/reference/skill-eval-adjudication.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "67fdbe5a6ccc3cd05fe0e061574f2f3a9b7e96daaf0c18371796b92d674b86d9",
-          "is_shared": false
-        },
-        {
           "original_path": "evals.json",
           "resolved_path": ".claude/skills/jit-project-lead/evals/evals.json",
           "asset_type": "local",
           "mime_type": null,
-          "content_hash": "d58fb1d4539d98a4944ca20ccf2e0589f5f330b4d6c2295290953d56168c971c",
-          "is_shared": false
-        },
-        {
-          "original_path": "transcripts/activation-and-preflight.completion-report.md",
-          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/activation-and-preflight.completion-report.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "b9eeb2f53cc1821224a27fae898550f5e2e0c11987769130187ce56ea842d5fc",
+          "content_hash": "1025c2d43a0e48414de25f1254374c69cbfc9f2c2d87bbe8b83f8ae2caf1ff9c",
           "is_shared": false
         },
         {
@@ -85,7 +89,23 @@
           "resolved_path": ".claude/skills/jit-project-lead/evals/setup-test-repo.sh",
           "asset_type": "local",
           "mime_type": null,
-          "content_hash": "f60e81a9d7d1c3e24a5906479ee0620aa5db20427796af41dc4a7270fe8aa65b",
+          "content_hash": "699e4bec171d3b4a7c15a36df0984b02ccf9849e1269c9194dc82a9b5ae2877b",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/tier-derivation-collapsed.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/tier-derivation-collapsed.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "992f685b9366d2f507bef4d1c82702a8707d9c74e57c94a06574332f0da0fe73",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-3.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-3.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "97c7dfe10a4806ea8134e471427242b8bd0d9938889d229a93f627431a403ec2",
           "is_shared": false
         },
         {
@@ -93,22 +113,34 @@
           "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/tier-derivation-two-tier.completion-report.md",
           "asset_type": "local",
           "mime_type": "text/markdown",
-          "content_hash": "27d73c35b38c7eadc1b2833877f03caad456dacb666e8c13de2ad025c60b80b0",
+          "content_hash": "23f56156b5e6ad1e5ce64f854626a9239be5ef42ff2daa074338645388cfc509",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/activation-and-preflight.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/activation-and-preflight.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "c7432ec80d131592e99d80c4c049df9a5c85b9e8072c3d83f742270a201b51fd",
+          "is_shared": false
+        },
+        {
+          "original_path": "transcripts/routing-mode-4.completion-report.md",
+          "resolved_path": ".claude/skills/jit-project-lead/evals/transcripts/routing-mode-4.completion-report.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "08b703774fb71dc2235767994e6bb22375d427c6550f846f978c16d9ccc9046d",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../../../dev/eval/skill-eval-adjudication.md",
+          "resolved_path": "dev/eval/skill-eval-adjudication.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "0bb2f6d199851514d528aa77c18c8d193f49631f18578d12864929de5c0ac2d9",
           "is_shared": false
         }
       ]
-    },
-    {
-      "path": ".claude/skills/jit-project-lead/trigger_eval.json",
-      "commit": null,
-      "label": "jit-project-lead trigger eval set",
-      "doc_type": "eval"
-    },
-    {
-      "path": ".claude/skills/jit-project-lead/trigger_eval_results.json",
-      "commit": null,
-      "label": "jit-project-lead trigger eval results (17/17)",
-      "doc_type": "eval"
     }
   ],
   "labels": [
@@ -118,7 +150,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-01T22:19:45.521406995Z",
-  "updated_at": "2026-07-05T19:51:12.893070047Z",
+  "updated_at": "2026-07-09T23:38:08.807700469Z",
   "first_ready_at": "2026-07-02T20:46:17.616311708Z",
   "claimed_at": "2026-07-02T20:49:27.992267135Z",
   "done_at": "2026-07-02T21:28:57.774098384Z"

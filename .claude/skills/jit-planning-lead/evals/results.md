@@ -1,7 +1,7 @@
 # jit-planning-lead — Eval Results
 
 Adjudicated baseline for the scenarios in [`evals.json`](evals.json), graded under the
-method in [`docs/reference/skill-eval-adjudication.md`](../../../../docs/reference/skill-eval-adjudication.md):
+method in [`dev/eval/skill-eval-adjudication.md`](../../../../dev/eval/skill-eval-adjudication.md):
 each scenario's `expected_output` is decomposed into an itemized checklist and every item
 is scored against observable repo-state evidence from a recorded run.
 
@@ -201,5 +201,5 @@ finding resolved on the skill side).
    tree. Record the verdict here with its run date, run-record location, and the inlined
    checklist.
 
-See [`docs/reference/skill-eval-adjudication.md`](../../../../docs/reference/skill-eval-adjudication.md)
+See [`dev/eval/skill-eval-adjudication.md`](../../../../dev/eval/skill-eval-adjudication.md)
 for the full method.
