@@ -267,7 +267,7 @@ jit issue update $TASK4 --state done
 # Check status
 jit status
 jit query blocked
-# Epic should now be unblocked (all dependencies done)
+# Epic should now be unblocked (all dependencies reached a terminal state)
 ```
 
 **What we did:**

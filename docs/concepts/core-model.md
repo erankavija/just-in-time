@@ -445,7 +445,7 @@ Epic: Auth System
 │  └─→ "This task belongs to auth epic" (membership)    │
 │                                                         │
 │  Dependency of: Epic                                    │
-│  └─→ "Epic requires this task to complete" (order)    │
+│  └─→ "Epic requires this task to be terminal" (order) │
 └─────────────────────────────────────────────────────────┘
                          ↓ flows into
 ┌─────────────────────────────────────────────────────────┐
@@ -757,7 +757,7 @@ stateDiagram-v2
 
 ### State Descriptions
 
-**Backlog**: Issue is not yet ready to work on. Dependencies are incomplete or issue is explicitly marked as future work.
+**Backlog**: Issue is not yet ready to work on. Dependencies have not all reached a terminal state, or the issue is explicitly marked as future work.
 
 **Ready**: Issue is unblocked (all dependencies satisfied), has no assignee, and is available to claim. This is the state agents query to find work.
 
@@ -790,7 +790,7 @@ Done and Rejected do not transition directly to active states. Archiving is avai
 ### State Transitions
 
 **Auto-transitions:**
-- `Backlog → Ready`: When all dependencies complete
+- `Backlog → Ready`: When all dependencies reach a terminal state (done or rejected)
 - `Gated → Done`: When all required gates pass
 
 **Manual transitions:**
@@ -992,11 +992,11 @@ See [Dependencies vs Labels](#dependencies-vs-labels-understanding-the-differenc
 # Task belongs to auth epic (label)
 jit issue create --title "JWT utils" --label "epic:auth"
 
-# Epic requires task to complete (dependency)
+# Epic requires task to reach a terminal state (dependency)
 jit dep add <epic-id> <task-id>
 
 # Query by label: "epic:auth" → Shows all auth work
-# Query ready: → Shows task if unblocked, epic if task done
+# Query ready: → Shows task if unblocked, epic once task is terminal
 ```
 
 ### Label Namespaces Discovery
@@ -1088,7 +1088,7 @@ Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed by 
 **`jit issue claim`** - Atomic operation (race-safe)
 - Verifies the issue is unassigned, or already assigned to the same claimant
 - Claims for specified assignee
-- Returns an error only when the issue is already assigned to a *different* assignee; re-claiming as the current assignee is idempotent (it promotes the assignment, e.g. into an `in_progress` transition once dependencies complete)
+- Returns an error only when the issue is already assigned to a *different* assignee; re-claiming as the current assignee is idempotent (it promotes the assignment, e.g. into an `in_progress` transition once dependencies reach a terminal state)
 - Use for multi-agent coordination
 
 **`jit issue assign`** - Force assignment (overwrites)

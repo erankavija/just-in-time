@@ -345,7 +345,7 @@ graph TD
 ```
 FROM ──→ TO
 "FROM depends on TO"
-"FROM is blocked until TO completes"
+"FROM is blocked until TO reaches a terminal state"
 ```
 
 **Graph reading tips:**
