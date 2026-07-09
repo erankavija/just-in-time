@@ -15,6 +15,21 @@ pub mod keyed;
 pub use keyed::find_keyed_cycle;
 
 /// Which way a traversal follows dependency edges.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::graph::{DependencyGraph, Direction};
+///
+/// let a = Issue::new("A".into(), "".into());
+/// let mut b = Issue::new("B".into(), "".into());
+/// b.dependencies.push(a.id.clone());
+///
+/// let graph = DependencyGraph::new(&[&a, &b]);
+/// assert_eq!(graph.traverse(&b.id, Direction::Dependencies, 1).len(), 1);
+/// assert_eq!(graph.traverse(&a.id, Direction::Dependents, 1).len(), 1);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     /// Outgoing edges: the nodes a node depends on.
@@ -28,6 +43,23 @@ pub enum Direction {
 /// The unfolding is a tree: a node reachable by several paths appears once per
 /// path, each occurrence carrying its own `level` (1 for a direct neighbour of
 /// the expansion root).
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::Issue;
+/// use jit::graph::{DependencyGraph, Direction};
+///
+/// let a = Issue::new("A".into(), "".into());
+/// let mut b = Issue::new("B".into(), "".into());
+/// b.dependencies.push(a.id.clone());
+///
+/// let graph = DependencyGraph::new(&[&a, &b]);
+/// let forest = graph.expand(&b.id, Direction::Dependencies, 0);
+/// assert_eq!(forest[0].node.id, a.id);
+/// assert_eq!(forest[0].level, 1);
+/// assert!(forest[0].children.is_empty());
+/// ```
 #[derive(Debug)]
 pub struct Expansion<'a, T> {
     /// The node this occurrence stands for.
@@ -187,6 +219,30 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// the result. Unlike [`traverse`](Self::traverse), a node reached by several
     /// paths is unfolded once per path, which is what a dependency tree renders.
     /// `max_depth` counts edges from `start`, 0 being unlimited.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::{DependencyGraph, Direction};
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let forest = graph.expand(&c.id, Direction::Dependencies, 0);
+    /// // `a` is reachable both directly and via `b`, so it is unfolded twice.
+    /// let occurrences_of_a = forest
+    ///     .iter()
+    ///     .flat_map(|root| std::iter::once(root).chain(root.children.iter()))
+    ///     .filter(|occurrence| occurrence.node.id == a.id)
+    ///     .count();
+    /// assert_eq!(occurrences_of_a, 2);
+    /// ```
     pub fn expand(
         &self,
         start: &str,
@@ -628,6 +684,26 @@ impl<'a, T: GraphNode> Expansion<'a, T> {
     ///
     /// A count above 1 marks a node shared between paths, the diamonds a
     /// dependency tree flags.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::{DependencyGraph, Direction, Expansion};
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// let mut c = Issue::new("C".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    /// c.dependencies.push(a.id.clone());
+    /// c.dependencies.push(b.id.clone());
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
+    /// let forest = graph.expand(&c.id, Direction::Dependencies, 0);
+    /// let counts = Expansion::occurrences(&forest);
+    /// assert_eq!(counts.get(a.id.as_str()), Some(&2));
+    /// assert_eq!(counts.get(b.id.as_str()), Some(&1));
+    /// ```
     pub fn occurrences(forest: &[Self]) -> HashMap<&'a str, usize> {
         let mut counts: HashMap<&'a str, usize> = HashMap::new();
         let mut stack: Vec<&Self> = forest.iter().collect();
@@ -643,6 +719,25 @@ impl<'a, T: GraphNode> Expansion<'a, T> {
     /// `build` receives a node, its level, and its already-built children. It
     /// lets a command project an expansion into a view type without walking the
     /// tree itself.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::Issue;
+    /// use jit::graph::{DependencyGraph, Direction};
+    ///
+    /// let a = Issue::new("A".into(), "".into());
+    /// let mut b = Issue::new("B".into(), "".into());
+    /// b.dependencies.push(a.id.clone());
+    ///
+    /// let graph = DependencyGraph::new(&[&a, &b]);
+    /// let forest = graph.expand(&b.id, Direction::Dependencies, 0);
+    /// let render = |node: &Issue, level: u32, children: Vec<String>| {
+    ///     format!("{}@{}{}", node.id, level, children.join(""))
+    /// };
+    /// let rendered: Vec<String> = forest.iter().map(|e| e.fold(&render)).collect();
+    /// assert_eq!(rendered, vec![format!("{}@1", a.id)]);
+    /// ```
     pub fn fold<N>(&self, build: &impl Fn(&'a T, u32, Vec<N>) -> N) -> N {
         let children = self
             .children
