@@ -10,7 +10,13 @@
     "jit-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "jit-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T23:48:52.914509098Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,7 +26,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.883006375Z",
-  "updated_at": "2026-07-09T23:14:07.862399708Z",
+  "updated_at": "2026-07-09T23:48:53.589708179Z",
   "first_ready_at": "2026-07-06T15:39:58.883006625Z",
   "claimed_at": "2026-07-09T23:14:07.862399448Z"
 }
