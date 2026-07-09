@@ -280,31 +280,32 @@ jit query available --json | \
 - No API versioning headaches
 - No network latency
 
-### MCP and Web UI Built on CLI
+### Every Surface Runs on the Core Library
 
-The architecture is layered:
+The MCP server drives the `jit` binary. The web UI server embeds the core library in
+process. Both reach the same storage, graph, and validation code:
 
 ```mermaid
 flowchart TD
-    W["Web UI (jit-server)<br/>visualization layer"] --> C
+    W["Web UI (jit-server)<br/>visualization layer"] --> L
     M["MCP Server (mcp-server/)<br/>AI agent integration"] --> C
-    C["CLI (jit)<br/>foundation"] --> L["Core Library (crates/jit)<br/>storage, graph, validation"]
+    C["CLI (jit)<br/>command-line interface"] --> L["Core Library (crates/jit)<br/>storage, graph, validation"]
 ```
 
 **Benefits:**
-- All features available via CLI first
-- Web UI and MCP never ahead of CLI
 - Single source of truth (core library)
+- MCP exposes exactly the capabilities the CLI exposes
+- Behavior stays identical whichever surface a user or agent reaches for
 
 **Example:**
 ```bash
-# CLI (foundation)
+# CLI
 jit issue create --title "Feature X" --priority high
 
-# MCP server (calls CLI internally)
+# MCP server (calls the CLI internally)
 Jit-jit_issue_create(title="Feature X", priority="high")
 
-# Web UI (calls CLI via jit-server)
+# Web UI (jit-server, calls the core library in process)
 POST /api/issues {"title": "Feature X", "priority": "high"}
 ```
 
