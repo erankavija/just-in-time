@@ -11,7 +11,8 @@
         {"id": "50677708-4fce-42d6-8b43-5b486ab216bb", "short_id": "50677708", "title": "Move traversal and keyed acyclicity primitives into the graph layer", "classification": "implementation", "status": "pending"},
         {"id": "2f447380-e004-40bf-b452-eb0ff6106500", "short_id": "2f447380", "title": "Pure template expansion with atomic apply", "classification": "implementation", "status": "pending"},
         {"id": "a4e8d5ac-c3f7-40bb-b4ea-108283bcf611", "short_id": "a4e8d5ac", "title": "Align MCP system prompt with DAG-authoritative containment", "classification": "implementation", "status": "pending"},
-        {"id": "a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a", "short_id": "a1fe0c6e", "title": "Document the containment and completion model", "classification": "documentation", "status": "pending"}
+        {"id": "a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a", "short_id": "a1fe0c6e", "title": "Document the containment and completion model", "classification": "documentation", "status": "pending"},
+        {"id": "c291e95c-82f0-437f-8b58-264ac73e27b2", "short_id": "c291e95c", "title": "Refresh MCP curated tool set for the expanded CLI surface", "classification": "implementation", "status": "pending", "note": "Absorbed from epic:core-maintenance by invoker approval; a4e8d5ac's REQ-3 depends on it. Added mid-wave-1, anchored at 78cba087."}
       ]
     },
     {
@@ -45,8 +46,19 @@
       ]
     }
   ],
-  "created_during_execution": [],
-  "escalations": [],
+  "created_during_execution": [
+    {"short_id": "950256ae", "title": "Gate npm-ci does not cover the mcp-server test suite", "type": "bug", "epic": "6eb585bc", "reason": "npm-ci's checker runs only the web workspace, so a4e8d5ac's gates were blind to the failing mcp-server suite. Filed rather than fixed: gate definitions are shared infrastructure (escalation category 8)."}
+  ],
+  "escalations": [
+    {
+      "wave": 1,
+      "category": "2 — cross-epic dependency discovered",
+      "issue": "a4e8d5ac",
+      "situation": "a4e8d5ac REQ-3 requires 'MCP server tests pass'. The mcp-server integration test 'tools/list returns curated default set with correct shape' fails on clean main (expects <50 curated tools, gets 70), independently verified by the lead with zero worker changes applied. The failure is owned by c291e95c under epic:core-maintenance.",
+      "resolution": "Invoker chose: absorb c291e95c into this run. Dependency edge a4e8d5ac -> c291e95c added; c291e95c claimed and dispatched as an extra wave-1 worker.",
+      "second_finding": "npm-ci gate coverage hole; invoker chose file-do-not-fix. Filed as 950256ae under epic 6eb585bc."
+    }
+  ],
   "rework_counts": {},
   "started_at": "2026-07-09T00:00:00+00:00"
 }
