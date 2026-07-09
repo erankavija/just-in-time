@@ -103,6 +103,27 @@ use chrono::Utc;
 use serde::Serialize;
 use std::sync::OnceLock;
 
+/// The unpassed gates of `issue` paired with their current status, in the order
+/// [`Issue::get_unpassed_gates`] reports them.
+///
+/// A required gate with no recorded run counts as [`GateStatus::Pending`]. Shared
+/// by the transition guard and the gate-diversion path so both describe a
+/// gate-blocked completion with the same blockers.
+fn unpassed_gate_blockers(issue: &Issue) -> Vec<(String, GateStatus)> {
+    issue
+        .get_unpassed_gates()
+        .into_iter()
+        .map(|gate_key| {
+            let status = issue
+                .gates_status
+                .get(&gate_key)
+                .map(|gate| gate.status)
+                .unwrap_or(GateStatus::Pending);
+            (gate_key, status)
+        })
+        .collect()
+}
+
 /// Information about a git commit
 #[derive(Debug, Clone, Serialize)]
 pub struct CommitInfo {
@@ -625,7 +646,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **No-op guard.** If `issue.state == target` there is nothing to
     ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
-    /// 2. **Graph-rule enforcement.** Runs
+    /// 2. **Dependency and gate guards.** Runs
+    ///    [`transition_blockers`](Self::transition_blockers): a transition into
+    ///    [`State::Ready`] or [`State::Done`] requires every dependency met, and
+    ///    [`State::Done`] additionally requires every required gate passed
+    ///    (`@/inv/gate-semantics`). A blocker returns a
+    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError)
+    ///    carrying the structured blockers and persists NOTHING. Callers that
+    ///    divert an unpassed-gate `done` into `gated` resolve that target BEFORE
+    ///    calling in, so they reach the chokepoint with the target they intend to
+    ///    land; the guard is a pure read, so running it there as well is
+    ///    idempotent.
+    /// 3. **Graph-rule enforcement.** Runs
     ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
     ///    on the issue projected into its TARGET state, EXCEPT when `target` is
     ///    [`State::Rejected`] — rejection deliberately bypasses validation
@@ -634,8 +666,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    (or fail to skip) on rejection. A blocking enforce rule returns a
     ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
     ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
-    /// 3. **State mutation.** Sets `issue.state = target`.
-    /// 4. **Persistence + audit (when `persist`).** When `persist` is true, saves
+    /// 4. **State mutation.** Sets `issue.state = target`.
+    /// 5. **Persistence + audit (when `persist`).** When `persist` is true, saves
     ///    the issue and appends the `issue_state_changed` event (plus
     ///    `issue_completed` when landing [`State::Done`]). Including the event
     ///    write here — not only at call sites — means a future caller that forgets
@@ -671,6 +703,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         if old_state == target {
             return Ok(Vec::new());
         }
+
+        // Dependency and gate guards, ahead of any mutation.
+        self.transition_blockers(issue, target)?;
 
         // Rejection deliberately bypasses graph-rule enforcement; every other
         // target runs it against the TARGET-state projection of the issue.
@@ -712,6 +747,50 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(warnings)
+    }
+
+    /// The dependency and gate guards a transition must clear, evaluated against
+    /// `issue` in its CURRENT state.
+    ///
+    /// Invoked exclusively by [`apply_state_transition`](Self::apply_state_transition):
+    /// entering [`State::Ready`] or [`State::Done`] requires every dependency to
+    /// have reached a terminal state, and entering [`State::Done`] additionally
+    /// requires every required gate to have passed (`@/inv/gate-semantics`).
+    /// Dependencies are checked before gates, so an issue that is both
+    /// dependency-blocked and gate-blocked reports its dependencies.
+    ///
+    /// Every other target (including [`State::Rejected`], which abandons an issue)
+    /// is unguarded. `force` has no bearing here: it overrides validation rules,
+    /// never the graph's own semantics.
+    fn transition_blockers(&self, issue: &Issue, target: State) -> Result<()> {
+        if !matches!(target, State::Ready | State::Done) {
+            return Ok(());
+        }
+
+        let issues = self.storage.list_issues()?;
+        let resolved = crate::domain::queries::build_issue_map(&issues);
+        let blockers = self.blocking_dependencies(issue, &resolved);
+        if !blockers.is_empty() {
+            return Err(crate::errors::TransitionBlockedError::dependencies(
+                issue.id.clone(),
+                target,
+                issue.state,
+                blockers,
+            )
+            .into());
+        }
+
+        if target == State::Done && issue.has_unpassed_gates() {
+            return Err(crate::errors::TransitionBlockedError::gates(
+                issue.id.clone(),
+                State::Done,
+                issue.state,
+                unpassed_gate_blockers(issue),
+            )
+            .into());
+        }
+
+        Ok(())
     }
 
     /// Enforce the graph rules applicable to an issue at a state transition (CC-2).

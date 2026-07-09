@@ -207,12 +207,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: this does NOT call `update_issue_state()` (it skips that path's
     /// prechecks/postchecks/gate-diversion — see the DESIGN DECISION below), but
-    /// the literal state change is still routed through the single
-    /// `apply_state_transition` chokepoint so transition-time graph-rule
-    /// enforcement (CC-2) cannot be bypassed by the bulk path (jit bc86f54c).
-    /// A blocking enforce rule fails THIS issue's update like any other per-issue
-    /// failure; `apply_bulk_update` records it in `errors` and continues
-    /// best-effort with the remaining matched issues.
+    /// the literal state change is routed through the single
+    /// `apply_state_transition` chokepoint, so the dependency and gate guards and
+    /// transition-time graph-rule enforcement (CC-2) hold on the bulk path with
+    /// exactly the semantics of a single-issue transition (jit bc86f54c,
+    /// jit b6eb2585). A blocked transition or a blocking enforce rule fails THIS
+    /// issue's update like any other per-issue failure; `apply_bulk_update` records
+    /// it in `errors` and continues best-effort with the remaining matched issues.
     fn apply_operations_to_issue(
         &mut self,
         issue: &Issue,
@@ -237,12 +238,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Load fresh copy of issue
         let mut updated = self.storage.load_issue(&issue.id)?;
 
+        // Field edits other than the state change, reported in the `issue_updated`
+        // event exactly as the single-issue update path reports them: the state
+        // change is audited by its own `issue_state_changed` event, never twice.
         let mut modified_fields = Vec::new();
         // Warnings from non-enforcing graph rules fired during the state transition.
         let mut transition_warnings: Vec<String> = Vec::new();
-        // Pending state-change event: captured here, emitted AFTER save_issue so a
+        // Pending state-change events: captured here, emitted AFTER save_issue so a
         // failed write never leaves a ghost event in the log.
-        let mut pending_state_event: Option<Event> = None;
+        let mut pending_state_events: Vec<Event> = Vec::new();
         // Pending claim event for a first assignee set on this update, emitted with
         // the same deferred-after-save discipline. Coupled to the `claimed_at`
         // stamp below (@/inv/event-log) and folded by the lifecycle-timestamp
@@ -265,33 +269,44 @@ impl<S: IssueStore> CommandExecutor<S> {
         // 4. Composability: Users can layer operations (bulk update → bulk gate status)
         // 5. Precedent: Bulk tools (SQL UPDATE, jq, sed) use literal semantics
         //
-        // Validation still occurs (dependencies, gate requirements) but no
-        // automatic gate execution or state orchestration.
+        // The chokepoint's dependency and gate guards still hold (a bulk `done`
+        // over an issue with unpassed gates fails that item rather than moving it
+        // to Gated), but there is no automatic gate execution or state
+        // orchestration.
         //
         // See issue 40f594a7 for full decision rationale.
+        let mut state_changed = false;
         if let Some(new_state) = operations.state {
             if updated.state != new_state {
                 let old_state = updated.state;
-                // Route the literal state change through the single chokepoint so
-                // graph-rule enforcement (CC-2) runs on the bulk path too. A
-                // blocking enforce rule returns an error, failing this issue's
-                // update (recorded in `errors` by the caller). Non-enforcing rules
-                // return warnings that are surfaced in `BulkUpdateResult::warnings`.
-                // `persist = false`: the combined save and the state-change event
+                // Route the literal state change through the single chokepoint, so
+                // the dependency and gate guards and graph-rule enforcement (CC-2)
+                // run on the bulk path with exactly the semantics of a single-issue
+                // transition. A blocked transition or a blocking enforce rule
+                // returns an error, failing THIS issue's update (recorded in
+                // `errors` by the caller, which continues with the remaining
+                // matched issues). Non-enforcing rules return warnings that are
+                // surfaced in `BulkUpdateResult::warnings`.
+                // `persist = false`: the combined save and the transition events
                 // are emitted below alongside the other field edits, ensuring the
-                // event is only appended AFTER save_issue commits successfully.
+                // events are only appended AFTER save_issue commits successfully.
                 let warnings =
                     self.apply_state_transition(&mut updated, new_state, force, false, |_| {})?;
                 transition_warnings.extend(warnings);
-                modified_fields.push("state".to_string());
+                state_changed = true;
 
-                // Defer the state-change event until after save_issue succeeds so a
-                // failed write never leaves a ghost event in the event log.
-                pending_state_event = Some(Event::new_issue_state_changed(
+                // Defer the transition events until after save_issue succeeds so a
+                // failed write never leaves a ghost event in the event log. The
+                // sequence mirrors the chokepoint's own `persist = true` audit:
+                // the state change, then completion when the issue lands Done.
+                pending_state_events.push(Event::new_issue_state_changed(
                     issue.id.clone(),
                     old_state,
                     new_state,
                 ));
+                if new_state == State::Done {
+                    pending_state_events.push(Event::new_issue_completed(issue.id.clone()));
+                }
             }
         }
 
@@ -354,13 +369,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Save if modified
-        if !modified_fields.is_empty() {
+        let modified = state_changed || !modified_fields.is_empty();
+        if modified {
             self.storage.save_issue(updated)?;
 
-            // Emit the deferred state-change event AFTER the save commits, so a
+            // Emit the deferred transition events AFTER the save commits, so a
             // failed write never leaves a ghost event in the event log.
-            if let Some(event) = pending_state_event {
-                self.storage.append_event(&event)?;
+            for event in &pending_state_events {
+                self.storage.append_event(event)?;
             }
 
             // Emit the deferred claim event (first assignee set) after the save,
@@ -369,12 +385,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 self.storage.append_event(&event)?;
             }
 
-            // Log update event
-            self.storage.append_event(&Event::new_issue_updated(
-                issue.id.clone(),
-                "bulk-update".to_string(),
-                modified_fields.clone(),
-            ))?;
+            // Log the field-edit event for the edits beyond the state change.
+            if !modified_fields.is_empty() {
+                self.storage.append_event(&Event::new_issue_updated(
+                    issue.id.clone(),
+                    "bulk-update".to_string(),
+                    modified_fields,
+                ))?;
+            }
         }
 
         // Emit any `--force` bypass events after the (conditional) save, so a
@@ -383,7 +401,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // a no-op write. No-op on an empty `bypassed_rules`.
         self.log_rule_bypasses(&issue.id, &validation.bypassed_rules)?;
 
-        Ok((!modified_fields.is_empty(), transition_warnings))
+        Ok((modified, transition_warnings))
     }
 
     /// Preview bulk update without applying changes (dry-run)
@@ -402,8 +420,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             let changes = self.compute_changes(issue, operations)?;
 
             // Check for validation errors. Preview is read-only: pass force=false
-            // so blocking rules surface as would-fail and nothing is logged.
-            if let Err(e) = self.validate_update(issue, operations, false) {
+            // so blocking rules surface as would-fail and nothing is logged. The
+            // transition guards the write path reaches through the chokepoint are
+            // replayed here as the pure read they are, so a dependency- or
+            // gate-blocked item is reported before anyone runs the update.
+            let blocked = operations
+                .state
+                .filter(|target| *target != issue.state)
+                .map(|target| self.transition_blockers(issue, target))
+                .unwrap_or(Ok(()));
+
+            if let Err(e) = blocked.and_then(|()| self.validate_update(issue, operations, false)) {
                 preview.would_fail.push((issue.id.clone(), e.to_string()));
             } else if changes.is_empty() {
                 // No changes - would be skipped
@@ -520,7 +547,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         updated
     }
 
-    /// Validate that update can be applied to issue.
+    /// Validate the field operations of an update: gate keys, assignee format, and
+    /// the local rules evaluated against the post-update shape. The dependency and
+    /// gate guards on a state change live in the `apply_state_transition`
+    /// chokepoint, which the write path routes the state change through.
     ///
     /// Returns the [`WriteValidation`] outcome (non-blocking warnings plus any
     /// `--force`-bypassed enforce rules). The caller emits the bypass events only
@@ -552,29 +582,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::labels::validate_assignee_format(assignee)?;
         }
 
-        // Validate state transition
-        if let Some(new_state) = operations.state {
-            // Check if blocked by dependencies
-            if matches!(new_state, State::Ready | State::Done) {
-                let all_issues = self.storage.list_issues()?;
-                let context = crate::query_engine::QueryContext::from_issues(&all_issues);
-
-                if issue.is_blocked(&context.all_issues) {
-                    return Err(anyhow::anyhow!(
-                        "Cannot transition to {:?}: blocked by dependencies",
-                        new_state
-                    ));
-                }
-            }
-
-            // Check gates for Done state
-            if new_state == State::Done && issue.has_unpassed_gates() {
-                return Err(anyhow::anyhow!(
-                    "Cannot transition to Done: {} gates pending",
-                    issue.get_unpassed_gates().len()
-                ));
-            }
-        }
+        // The dependency and gate guards on a state change belong to the
+        // `apply_state_transition` chokepoint, which the write path routes every
+        // bulk state change through.
 
         // Enforce declarative local rules (and the legacy validator) against the
         // POST-update shape so the batch path (`jit issue update --filter`)
@@ -887,7 +897,9 @@ mod tests {
         assert_eq!(result.summary.total_matched, 1);
         assert_eq!(result.summary.total_modified, 0);
         assert_eq!(result.summary.total_errors, 1);
-        assert!(result.errors[0].1.contains("gates pending"));
+        // The typed gate blocker from the transition chokepoint, rendered.
+        assert!(result.errors[0].1.contains("1 gate(s) not passed"));
+        assert!(result.errors[0].1.contains("tests [pending]"));
     }
 
     #[test]
@@ -1052,6 +1064,199 @@ mod tests {
         // Verify assignee set correctly
         let updated = executor.get_issue("1").unwrap();
         assert_eq!(updated.assignee, Some("agent:copilot".parse().unwrap()));
+    }
+
+    /// Strip the volatile fields (event id, timestamp) so two event logs
+    /// recorded by different executors compare on their semantic payload.
+    fn event_payload(event: &Event) -> serde_json::Value {
+        let mut value = serde_json::to_value(event).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("id");
+        object.remove("timestamp");
+        value
+    }
+
+    /// Every event the log recorded for `issue_id`, in order, payload-normalized.
+    fn event_payloads_for(
+        storage: &crate::storage::InMemoryStorage,
+        issue_id: &str,
+    ) -> Vec<String> {
+        use crate::storage::IssueStore;
+        storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .map(event_payload)
+            .filter(|value| value["issue_id"] == issue_id)
+            .map(|value| value.to_string())
+            .collect()
+    }
+
+    /// REQ-3: a bulk state transition emits the same event sequence per issue as
+    /// the equivalent single-issue transition. Both runs start from an identical
+    /// repository, so any divergence is the transition path's own doing.
+    #[test]
+    fn test_bulk_transition_emits_same_events_as_single_transitions() {
+        use crate::query_engine::QueryFilter;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let seed = |storage: &InMemoryStorage| {
+            for id in ["aaaa1111", "bbbb2222"] {
+                storage
+                    .save_issue(create_test_issue(id, State::Ready, vec!["type:task"]))
+                    .unwrap();
+            }
+        };
+
+        let bulk_storage = InMemoryStorage::new();
+        seed(&bulk_storage);
+        let bulk_reader = bulk_storage.clone();
+        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+        let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+        assert_eq!(result.summary.total_modified, 2);
+
+        let single_storage = InMemoryStorage::new();
+        seed(&single_storage);
+        let single_reader = single_storage.clone();
+        let single = crate::commands::CommandExecutor::new(single_storage);
+        for id in ["aaaa1111", "bbbb2222"] {
+            single
+                .update_issue(
+                    id,
+                    None,
+                    None,
+                    None,
+                    Some(State::Done),
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap();
+        }
+
+        for id in ["aaaa1111", "bbbb2222"] {
+            assert_eq!(
+                event_payloads_for(&bulk_reader, id),
+                event_payloads_for(&single_reader, id),
+                "event sequence for issue {id} diverges between bulk and single transition"
+            );
+        }
+    }
+
+    /// REQ-2: a dependency-blocked bulk item carries the same typed blockers as
+    /// the equivalent single-issue transition.
+    #[test]
+    fn test_apply_operations_dependency_blocked_reports_same_typed_blockers() {
+        use crate::errors::TransitionBlockedError;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let seed = |storage: &InMemoryStorage| {
+            storage
+                .save_issue(create_test_issue(
+                    "aaaa1111",
+                    State::Backlog,
+                    vec!["type:task"],
+                ))
+                .unwrap();
+            let mut blocked = create_test_issue("bbbb2222", State::Ready, vec!["type:task"]);
+            blocked.dependencies = vec!["aaaa1111".to_string()];
+            storage.save_issue(blocked).unwrap();
+        };
+
+        let bulk_storage = InMemoryStorage::new();
+        seed(&bulk_storage);
+        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let issue = bulk.get_issue("bbbb2222").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+        let bulk_error = bulk
+            .apply_operations_to_issue(&issue, &ops, false)
+            .unwrap_err()
+            .downcast::<TransitionBlockedError>()
+            .expect("bulk reports a typed transition blocker");
+
+        let single_storage = InMemoryStorage::new();
+        seed(&single_storage);
+        let single = crate::commands::CommandExecutor::new(single_storage);
+        let single_error = single
+            .update_issue(
+                "bbbb2222",
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap_err()
+            .downcast::<TransitionBlockedError>()
+            .expect("single-issue update reports a typed transition blocker");
+
+        assert_eq!(bulk_error.blockers(), single_error.blockers());
+        assert_eq!(bulk_error.requested_state(), single_error.requested_state());
+    }
+
+    /// REQ-2, gate arm: an unpassed gate blocks the bulk item with the same typed
+    /// blockers the single-issue transition reports.
+    #[test]
+    fn test_apply_operations_gate_blocked_reports_same_typed_blockers() {
+        use crate::errors::TransitionBlockedError;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let seed = |storage: &InMemoryStorage| {
+            let mut gated = create_test_issue("aaaa1111", State::Ready, vec!["type:task"]);
+            gated.gates_required = vec!["tests".to_string()];
+            storage.save_issue(gated).unwrap();
+        };
+
+        let bulk_storage = InMemoryStorage::new();
+        seed(&bulk_storage);
+        let mut bulk = crate::commands::CommandExecutor::new(bulk_storage);
+        let issue = bulk.get_issue("aaaa1111").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            ..Default::default()
+        };
+        let bulk_error = bulk
+            .apply_operations_to_issue(&issue, &ops, false)
+            .unwrap_err()
+            .downcast::<TransitionBlockedError>()
+            .expect("bulk reports a typed transition blocker");
+
+        let single_storage = InMemoryStorage::new();
+        seed(&single_storage);
+        let single = crate::commands::CommandExecutor::new(single_storage);
+        let single_error = single
+            .update_issue(
+                "aaaa1111",
+                None,
+                None,
+                None,
+                Some(State::Done),
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap_err()
+            .downcast::<TransitionBlockedError>()
+            .expect("single-issue update reports a typed transition blocker");
+
+        assert_eq!(bulk_error.blockers(), single_error.blockers());
+        assert_eq!(bulk_error.requested_state(), single_error.requested_state());
     }
 
     #[test]
