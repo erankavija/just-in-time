@@ -1194,12 +1194,12 @@ impl IssueShowResponse {
             .cloned()
             .collect();
 
-        // Unmet = resolved dependency whose state is not terminal, the same
-        // met/unmet test `Issue::is_blocked` / `query_ready` apply. Dangling ids
-        // are reported separately above rather than projected here.
+        // Unmet by the one predicate `Issue::is_blocked` and the transition
+        // blockers apply. Dangling ids are reported separately above rather than
+        // projected here.
         let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
             .iter()
-            .filter(|dep| !dep.state.is_terminal())
+            .filter(|dep| !crate::domain::is_dependency_met(dep.state))
             .map(UnmetDependency::from)
             .collect();
 
@@ -2301,6 +2301,35 @@ mod tests {
             v["dangling_dependency_ids"],
             serde_json::json!(["dangling-id"]),
             "the dangling id must be reported, not silently dropped"
+        );
+    }
+
+    #[test]
+    fn test_show_response_omits_rejected_dependency_from_unmet() {
+        use crate::domain::{Issue, State};
+
+        let mut issue = Issue::new("Parent".to_string(), "Body".to_string());
+        issue.dependencies = vec!["rejected-id".to_string(), "pending-id".to_string()];
+
+        let mut rejected = Issue::new("Abandoned".to_string(), String::new());
+        rejected.id = "rejected-id".to_string();
+        rejected.state = State::Rejected;
+        let mut pending = Issue::new("Upstream".to_string(), String::new());
+        pending.id = "pending-id".to_string();
+        pending.state = State::InProgress;
+        let enriched_deps = vec![MinimalIssue::from(&rejected), MinimalIssue::from(&pending)];
+
+        let resp = IssueShowResponse::from_issue(issue, enriched_deps, &[]);
+
+        let unmet: Vec<&str> = resp
+            .unmet_dependencies
+            .iter()
+            .map(|dep| dep.id.as_str())
+            .collect();
+        assert_eq!(
+            unmet,
+            vec!["pending-id"],
+            "a Rejected dependency is met and must not render as unmet"
         );
     }
 

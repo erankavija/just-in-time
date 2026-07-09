@@ -110,8 +110,8 @@ stateDiagram-v2
 ```
 
 **States:**
-- **backlog** — Has incomplete dependencies
-- **ready** — Dependencies done, available to claim
+- **backlog** — Has unmet dependencies
+- **ready** — Every dependency is terminal (done or rejected), available to claim
 - **in_progress** — Work actively happening
 - **gated** — Work complete, awaiting quality gate approval
 - **done** — All gates passed, complete (terminal)

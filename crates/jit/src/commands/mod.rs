@@ -83,7 +83,9 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 // Common imports used across modules
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
-use crate::domain::{Event, Gate, GateState, GateStatus, Issue, LabelNamespaces, Priority, State};
+use crate::domain::{
+    is_dependency_met, Event, Gate, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
+};
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
 use crate::storage::IssueStore;
