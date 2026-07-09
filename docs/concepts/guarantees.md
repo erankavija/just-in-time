@@ -170,7 +170,7 @@ jit events query --event-type IssueUpdated
 
 JIT is designed as a standalone issue tracker that *enhances* git workflows but doesn't require them. This supports use cases beyond software development.
 
-Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository for worktree identity and branch tracking, and fail with a typed `ClaimRequiresGitError` (exit code 10) when run outside one.
+Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository with a resolvable `HEAD` for worktree identity and branch tracking. A missing repository and a repository with zero commits both fail with a typed `ClaimRequiresGitError` (exit code 10): `git init` alone is not enough, since `HEAD` does not resolve to a branch until the first commit exists.
 
 **What works without git:**
 
@@ -208,20 +208,27 @@ jit issue create --title "Task 1"
 jit issue create --title "Task 2"
 jit dep add <task1> <task2>
 jit query available
-jit issue claim <task1> agent:worker-1
-# ✓ All basic operations and issue assignment work
+jit issue claim <task2> agent:worker-1
+# ✓ All basic operations and issue assignment work (task2 has no unmet dependencies)
 
-jit claim acquire <task1>
+jit claim acquire <task2> --agent-id agent:worker-1
 # ✗ Error: Claims and leases require a git repository (exit code 10)
 
-# With git - advisory leases and document history
+# git init alone is not enough - HEAD must resolve to a commit
 git init
-jit claim acquire <task1>
+jit claim acquire <task2> --agent-id agent:worker-1
+# ✗ Error: Claims and leases require a git repository (exit code 10) - no commits yet
+
+git commit --allow-empty -m "Initial commit"
+jit claim acquire <task2> --agent-id agent:worker-1
 # ✓ Advisory lease acquired
 
-jit doc add <issue> path/to/design.md
-jit doc show <issue> path/to/design.md --at HEAD~3
-# ✓ History and versioning available
+jit doc add <task2> path/to/design.md
+git add -A && git commit -m "Add design doc"
+echo "Revised notes" >> path/to/design.md
+git add -A && git commit -m "Revise design doc"
+jit doc show <task2> path/to/design.md --at HEAD~1
+# ✓ Shows the version from before the revision
 ```
 
 **Design rationale:**
