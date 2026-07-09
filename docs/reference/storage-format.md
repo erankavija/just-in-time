@@ -8,18 +8,32 @@ JIT stores all data in the `.jit/` directory at the repository root.
 
 ```
 .jit/
-├── config.toml        # Repository configuration
-├── index.json         # Issue index for fast queries
-├── events.jsonl       # Append-only event log
-├── gates.toml         # Gate registry definitions
-├── worktree.json      # Worktree metadata (if using git worktrees)
-├── claims.jsonl       # Active lease records
-├── issues/            # One JSON file per issue
-│   ├── <uuid>.json    # Issue data
-│   └── <uuid>.lock    # File lock for atomic operations
-└── gate-runs/         # Gate execution logs
-    └── <issue-id>/    # Per-issue gate run history
+├── index.json        # Issue index for fast queries; carries the format version
+├── config.toml       # Repository configuration
+├── gates.toml        # Gate registry definitions
+├── templates.toml    # Graph template registry
+├── rules.toml        # Validation rules
+├── invariants.toml   # Invariants registry
+├── events.jsonl      # Append-only event log
+├── issues/           # One JSON file per issue
+│   ├── <uuid>.json   # Issue data
+│   └── <uuid>.lock   # File lock for atomic operations
+├── gate-runs/        # Recorded gate runs
+│   └── <issue-id>/   # Per-issue gate run history
+└── schemas/          # JSON Schema files referenced by rules.toml
 ```
+
+`templates.toml` and `invariants.toml` are authored per project; `jit init`
+does not scaffold either one. `config.toml`, the empty `gates.toml`, and
+`rules.toml` (with a default ruleset and its `schemas/` files) are scaffolded
+by `jit init`.
+
+A live repository also carries gitignored, machine-local files directly under
+`.jit/`: `worktree.json`, `server.log`, `server.pid.json`, `*.lock`, and
+`tmp/`. These are runtime state, not part of the versioned data format.
+
+Lease records live under `.git/jit/`, not `.jit/`. See
+[The `.git/jit/` control plane](#the-gitjit-control-plane) below.
 
 ## Issue JSON Schema
 
@@ -164,6 +178,100 @@ type            = "exec"
 command         = "cargo test"
 timeout_seconds = 300
 ```
+
+## Validation Rules Registry
+
+`rules.toml` stores the ruleset `jit validate` enforces, as a `[[rules]]` array
+of tables. A rule pairs a selector (which issues it applies to) with an
+assertion (what must hold); `severity` controls whether a violation blocks a
+write or is advisory. Assertions that reference a raw JSON Schema point at a
+file under `schemas/`.
+
+The rule anatomy, selector predicates, assertion kinds, and worked examples are
+documented in full in the
+[Validation Rules how-to](../how-to/validation-rules.md).
+
+## Graph Template Registry
+
+`templates.toml` declares named, parameterized subgraphs that
+`jit apply <template> <container>` instantiates onto a container issue: nodes
+with anchors, roles, dependency edges, and optional document/label transforms.
+Nothing in the mechanism is hardcoded; templates are entirely repository
+configuration.
+
+The template anatomy and a worked example are documented in
+[Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md); the
+plan-before-fan-out concept it typically encodes is introduced in
+[The Planning Bracket](../concepts/planning-bracket.md).
+
+## Invariants Registry
+
+`invariants.toml` declares project invariants as a `[[invariants]]` array of
+tables. Each entry is a project-scoped addressable item at `@/invariant/<id>`
+(see [Item Addresses](item-addresses.md)):
+
+```toml
+[[invariants]]
+id          = "dag-acyclic"
+statement   = "Cycle detection runs before every dependency operation; the graph stays acyclic."
+kind        = "enforced"
+enforced-by = "@/gate/cargo-ci"
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Self-id; the invariant's address is `@/invariant/<id>` |
+| `statement` | string | The invariant's canonical statement |
+| `kind` | enum | `enforced` (a named rule or gate mechanically guards it) or `advisory` (documented intent, not yet mechanically asserted) |
+| `enforced-by` | string? | Address of the rule or gate that enforces it, when `kind = "enforced"` |
+
+`jit invariant check` surfaces enforcement drift between this registry and the
+rule/gate registries; `jit invariant render` projects it into a target
+document (see [Guarantees](../concepts/guarantees.md) for the concept and an
+example projection target).
+
+## The `.git/jit/` Control Plane
+
+Multi-agent coordination state (claim leases, heartbeats, locks) lives under
+`.git/jit/`, the **shared control plane**, not `.jit/`. `.jit/` is per-worktree
+data; `.git/jit/` is shared across every worktree of the same repository (via
+git's common directory), because a lease must be visible to every worktree
+racing to claim the same issue. `jit claim` requires a git repository for this
+reason: outside one, it fails with a typed `ClaimRequiresGitError` (exit code
+10) rather than falling back to a per-worktree lease store.
+
+```
+.git/jit/
+├── claims.jsonl         # Append-only audit log of claim operations
+├── claims.index.json    # Derived cache of currently active leases
+├── heartbeat/           # One file per agent, tracking liveness
+│   └── <agent-id>.json
+└── locks/               # Advisory lock files guarding claim-log operations
+    └── claims.lock
+```
+
+- **`claims.jsonl`**: an append-only, newline-delimited log of claim
+  operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
+  `ForceEvict`), each entry carrying a monotonic `seq` for total ordering
+  (`crates/jit/src/storage/claim_coordinator.rs:104-155`).
+- **`claims.index.json`**: a cache of active leases derived from
+  `claims.jsonl`, rebuilt (not hand-edited) as operations are appended
+  (`crates/jit/src/storage/claim_coordinator.rs:157-173,654-656`). Each lease
+  record carries `lease_id`, `issue_id`, `agent_id`, `worktree_id`, `branch`,
+  `ttl_secs`, `acquired_at`, `expires_at`, `last_beat`, and `stale`
+  (`crates/jit/src/storage/claim_coordinator.rs:33-55`).
+  A `ttl_secs` of `0` marks an indefinite lease, kept alive by heartbeats
+  instead of expiry.
+- **`heartbeat/<agent-id>.json`** (colons in the agent id replaced with
+  hyphens): process-liveness records (`pid`, `last_beat`, `interval_secs`)
+  for agents holding indefinite leases
+  (`crates/jit/src/storage/heartbeat.rs:56-74,256-260`).
+- **`locks/claims.lock`**: an advisory file lock guarding atomic reads and
+  appends against `claims.jsonl` and `claims.index.json`
+  (`crates/jit/src/storage/claim_coordinator.rs:400`).
+
+`jit claim` command usage (acquire, release, renew, heartbeat, status, list,
+force-evict) is documented in the [Claim reference](claim.md).
 
 ## Versioning
 
