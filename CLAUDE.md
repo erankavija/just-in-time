@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for AI agent workflows. It features dependency DAGs with cycle detection, quality gates, machine-consumable JSON storage in `.jit/`, event logging, and multi-agent coordination with file locking. All data is plain JSON versioned with git—no external database.
+Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for AI agent workflows. It features dependency DAGs with cycle detection, quality gates, machine-consumable JSON storage in `.jit/`, event logging, and multi-agent coordination with file locking. All data is plain JSON versioned with git—no external database (`@/charter/D-1`).
 
 ## Build & Test Commands
 
@@ -77,7 +77,7 @@ Adjacent subsystems include `validation/` (rules engine), `document/` (linked do
 .jit/
 ├── index.json          # Repository metadata (incl. format version)
 ├── config.toml         # Configuration
-├── gates.toml          # Gate registry
+├── gates.toml          # Gate registry (`@/charter/D-2`)
 ├── templates.toml      # Graph template registry (this repo declares the `plan` bracket)
 ├── rules.toml          # Validation rules
 ├── invariants.toml     # Invariants registry (rendered to the `[invariant_projection]` target; here CLAUDE.md)
@@ -91,14 +91,14 @@ A live repo also carries gitignored machine-local files in `.jit/` (`worktree.js
 
 ### Addressable Items
 
-Structured lines in issue descriptions and project registries carry a self-id and are addressable via qualified ids: `@/<kind>/<self-id>` (project scope, e.g. `@/invariant/dag-acyclic`), `@/issue/<short-id>/<kind>/<self-id>` (issue scope), with `<short-id>/<self-id>` as input sugar. Kinds (requirement, decision, risk, invariant, …) and their aliases (`@/inv/…`) are declared in `[item_kinds]` in `.jit/config.toml`; beyond the six kinds `jit init` scaffolds, this repo adds a `definition` kind over `docs/reference/glossary.md`. Each kind declares its source of truth: markdown-first for description-embedded items (requirement, decision, risk), registry-first for TOML registries (invariant, rule, gate — `jit invariant render` projects the registry into markdown); the item index is always a projection. Citations like `@/inv/gate-semantics` in docs and issue text resolve through this scheme; `jit validate` flags dangling item links (`dangling-item-link`).
+Structured lines in issue descriptions and project registries carry a self-id and are addressable via qualified ids: `@/<kind>/<self-id>` (project scope, e.g. `@/invariant/dag-acyclic`), `@/issue/<short-id>/<kind>/<self-id>` (issue scope), with `<short-id>/<self-id>` as input sugar. Kinds (requirement, decision, risk, invariant, …) and their aliases (`@/inv/…`) are declared in `[item_kinds]` in `.jit/config.toml`; beyond the kinds `jit init` scaffolds, this repo adds a `definition` kind over `docs/reference/glossary.md` and a `charter` kind over the v1.0 vision charter (`docs/9db27a3a-charter.md`), whose decisions are citable as `@/charter/D-N` via `per:` labels (`@/charter/D-7`). Each kind declares its source of truth (`@/charter/D-6`): markdown-first for description-embedded items (requirement, decision, risk), registry-first for TOML registries (invariant, rule, gate — `jit invariant render` and `jit reference render` project the registries into markdown); the item index is always a projection. Citations like `@/inv/gate-semantics` in docs and issue text resolve through this scheme; `jit validate` flags dangling item links (`dangling-item-link`).
 
 ## Dogfooding Setup
 
 This repository tracks jit's own development with jit: `.jit/` here is project configuration, distinct from what the product ships.
 
-- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (4-type hierarchy, 7 namespaces, 6 item kinds), `rules.toml` with 8 default rules. Gate presets (`rust-tdd`, `minimal`, the planning-bracket trio) live in code; `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
-- **This repo's local layer**: 13 gates wired to repo scripts (`cargo-ci`, `npm-ci`, `jit-validate`, `code-review` via `./scripts/ai-review.sh`); `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:` namespaces; the `plan` template; the `definition` item kind; the invariant projection into this file; the `dev/` doc lifecycle.
+- **`jit init` ships**: `index.json`, an empty `gates.toml`, `events.jsonl`, a template-generated `config.toml` (milestone/epic/story/task hierarchy plus the namespace and item-kind registries), `rules.toml` with the default ruleset (format, registry, hierarchy, and per-namespace uniqueness checks). Gate presets (language starter bundles like `rust-tdd`, plus `minimal`, `security-audit`, and the planning-bracket trio) live in code and materialize only via `jit gate preset apply`; `templates.toml`, `invariants.toml`, and the projection tables are authored per project, never scaffolded.
+- **This repo's local layer**: gates wired to repo scripts (`cargo-ci`, `npm-ci`, `jit-validate`, `code-review` via `./scripts/ai-review.sh`); `planning`/`breakdown`/`bug`/`enhancement` types; `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the invariant projection into this file and the rules-gates projection into `docs/reference/rules-and-gates.md`; the `dev/` doc lifecycle.
 
 When editing docs or config, keep this boundary explicit: adopter-facing text describes the shipped surface, repo-local values are signalled as this project's configuration.
 
@@ -114,7 +114,7 @@ All commands support `--json` (envelope spec under Coding Conventions).
 - `jit gate evaluate <id> <gate>` runs a checker; `jit gate status` reads results; `--findings` prints structured findings
 - `jit config get <dotted.key>` — config values
 - `jit graph export --format json --full` — full records incl. lifecycle timestamps
-- `jit apply <template> <container>` — instantiate a graph template from `.jit/templates.toml` (plan-before-fan-out scaffold)
+- `jit apply <template> <container>` — instantiate a graph template from `.jit/templates.toml` (plan-before-fan-out scaffold, `@/charter/D-3`)
 - `jit issue batch-create --from-json <file>` — create many issues plus dependency edges from one JSON payload
 - `jit item show @/inv/dag-acyclic` — resolve a qualified id; `jit item list --kind <k>` / `jit item search <text>` to discover
 - `jit --schema` — JSON shapes + exit-code taxonomy
@@ -156,7 +156,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
-- **git is optional** — jit must work without git unless a feature strictly requires it. Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
+- **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
 ### Domain Invariants
 
