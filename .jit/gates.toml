@@ -164,6 +164,26 @@ pass_context = false
 
 [[gates]]
 version = 1
+key = "mcp-ci"
+title = "MCP CI (mcp-server test suite)"
+description = "MCP server workspace checks: the mcp-server unit and integration suites both pass. Covers the workspace that npm-ci (web) and cargo-ci (Rust crates) leave unexercised."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "exec"
+command = "cd mcp-server && npm test"
+timeout_seconds = 600
+pass_context = false
+
+[gates.checker.env]
+
+[gates.reserved]
+
+[[gates]]
+version = 1
 key = "npm-ci"
 title = "NPM CI (test + lint + build)"
 description = "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci."

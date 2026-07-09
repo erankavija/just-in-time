@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "b3cd6a4b-490f-4af1-9bfa-4f807531d06e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c291e95c-82f0-437f-8b58-264ac73e27b2",
+  "commit": "c11f4e627c3293c241336f6590a1451a88dac63a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T21:03:36.841556306Z",
+  "completed_at": "2026-07-09T21:06:08.866596355Z",
+  "duration_ms": 152025,
+  "exit_code": 1,
+  "stdout": "**Acceptance Criteria**\n\nREQ-01 passes. [mcp-server/curated-tools.json](/home/vkaskivuo/Projects/just-in-time/mcp-server/curated-tools.json:11) explicitly includes/excludes the generated tools with rationales, and the manifest covers the current live schema with no stale or undecided entries.\n\nREQ-03 passes. [mcp-server/curated-tools.json](/home/vkaskivuo/Projects/just-in-time/mcp-server/curated-tools.json:8) documents the headroom policy, and line 10 sets `max_curated_tools` to 55 while the current curated set is 44.\n\nREQ-02 fails on evidence. [mcp-server/package.json](/home/vkaskivuo/Projects/just-in-time/mcp-server/package.json:12) defines the MCP npm suite as `node test-unit.js && node test-integration.js`, but the recorded npm gate I found is [`.jit/gate-runs/9634ce60-000c-46ce-aebf-3f4f86f4ad8e/result.json`](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/9634ce60-000c-46ce-aebf-3f4f86f4ad8e/result.json:16), whose command is `cd web && npm test -- --run && npm run lint && npm run build`. The issue’s own metadata only records `cargo-ci` as passed, with no `mcp-server npm test` result.\n\n**Architecture And Separation**\n\nNo Rust architecture boundary violations found. The change is confined to `mcp-server/` curation data, tests, README, and the JavaScript tool generator.\n\n**Functional Paradigm**\n\nNo blocking issue. The curation filter uses data-driven membership in [tool-generator.js](/home/vkaskivuo/Projects/just-in-time/mcp-server/lib/tool-generator.js:237), and the coverage check uses set operations at line 250.\n\n**Correctness And Invariants**\n\nNo new file-write, event-log, gate-transition, assignee/label, PID, or unsafe-code issue found in the reviewed change. The manifest narrows the advertised MCP list without changing CLI state behavior.\n\n**Safety**\n\nNo Rust unsafe code is introduced by this MCP-server change.\n\n**Testing**\n\n`cargo-ci` is recorded passed for this issue: [`.jit/gate-runs/8c94ef70-6573-411e-beb1-5847b26f4cc2/result.json`](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/8c94ef70-6573-411e-beb1-5847b26f4cc2/result.json:9) shows `status: passed`, and line 14 reports `3496 passed, 0 failed`.\n\nI did not run the test suites because the issue has a succeeded `cargo-ci` gate. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Error Handling**\n\nNo new Rust fallible operations are introduced. The JavaScript manifest load remains a startup-time JSON read in [tool-generator.js](/home/vkaskivuo/Projects/just-in-time/mcp-server/lib/tool-generator.js:15).\n\n**CLI Contract**\n\nNo CLI command surface changed. The MCP default listing is curated; full tool generation remains available through `generateTools`.\n\n**Documentation**\n\nThe README now documents the curated default listing and manifest workflow at [mcp-server/README.md](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:103). No public Rust API documentation changes are involved.\n\n**Prior Review Feedback**\n\n`run_history` is empty, so there are no prior findings for this issue to verify.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed. Labels use the required namespace format.\n\n1. REQ-02 is not met by the provided/recorded evidence: the only relevant committed npm gate result runs the `web` workspace command, not `cd mcp-server && npm test`, while the issue’s own gate status records only `cargo-ci` as passed. This leaves the hard requirement “mcp-server npm test passes” unproven.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The curation manifest is reviewable and bounded, but the required mcp-server npm test pass is not evidenced.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"REQ-02 is not met by recorded evidence: npm-ci ran the web workspace, not mcp-server npm test.\",\"file\":\".jit/gate-runs/9634ce60-000c-46ce-aebf-3f4f86f4ad8e/result.json\",\"line\":16}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8345 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f48b1-7a4e-7ee0-881c-9cd15a6fb105\n--------\nuser\n--- 8332 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The curation manifest is reviewable and bounded, but the required mcp-server npm test pass is not evidenced.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "REQ-02 is not met by recorded evidence: npm-ci ran the web workspace, not mcp-server npm test.",
+        "file": ".jit/gate-runs/9634ce60-000c-46ce-aebf-3f4f86f4ad8e/result.json",
+        "line": 16
+      }
+    ]
+  }
+}

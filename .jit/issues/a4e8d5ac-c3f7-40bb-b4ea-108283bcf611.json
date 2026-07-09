@@ -10,13 +10,24 @@
   ],
   "gates_required": [
     "npm-ci",
-    "code-review"
+    "code-review",
+    "mcp-ci"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T21:03:37.905055809Z"
+    },
     "npm-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-09T21:01:55.754635788Z"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T21:38:26.137424132Z"
     }
   },
   "context": {},
@@ -28,7 +39,7 @@
     "satisfies:REQ-8"
   ],
   "created_at": "2026-07-05T22:31:18.726402160Z",
-  "updated_at": "2026-07-09T21:03:15.753262681Z",
+  "updated_at": "2026-07-09T21:38:27.041204849Z",
   "first_ready_at": "2026-07-05T22:31:18.726402700Z",
   "claimed_at": "2026-07-09T14:14:14.350574129Z"
 }
