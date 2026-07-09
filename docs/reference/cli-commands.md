@@ -60,7 +60,7 @@ Dependency-blocked example:
 {
   "error": {
     "code": "BLOCKED",
-    "message": "Cannot transition to 'ready': issue blocked by 1 incomplete dependencies",
+    "message": "Cannot transition to 'ready': issue blocked by 1 unmet dependencies",
     "details": {
       "issue_id": "blocked-work-id",
       "requested_state": "ready",
@@ -637,7 +637,7 @@ the same payload shape the corresponding CLI command prints with `--json`.
   success: false,
   error: {
     code: "BLOCKED",
-    message: "Cannot transition to 'ready': issue blocked by 1 incomplete dependencies",
+    message: "Cannot transition to 'ready': issue blocked by 1 unmet dependencies",
     details: {
       issue_id: "blocked-work-id",
       requested_state: "ready",
@@ -1391,7 +1391,7 @@ jit issue claim $ISSUE agent:worker-1 --assign-only
 `ready` (e.g. still `backlog` behind dependencies) without forcing a transition.
 
 **Dependency-blocked claims:** `jit issue claim` fails (exit 4) when the issue is
-still `backlog` behind incomplete dependencies, because it cannot transition to
+still `backlog` behind unmet dependencies, because it cannot transition to
 `in_progress`. The error (in both human and `--json` output) names how to assign
 without starting work:
 
@@ -2441,7 +2441,7 @@ jit dep rm epic-123 task-1 task-2
 ```
 
 Removing a dependency can unblock the issue; a removal that clears the last
-incomplete dependency auto-transitions a `backlog` issue to `ready`.
+unmet dependency auto-transitions a `backlog` issue to `ready`.
 
 ## Query Commands
 
@@ -3076,7 +3076,7 @@ machine-readable source of the same taxonomy.
 
 Exit `4` covers several validation failures that share the code but carry a
 distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would
-create a cycle), `BLOCKED` (a state transition blocked by incomplete
+create a cycle), `BLOCKED` (a state transition blocked by unmet
 dependencies), `GATE_FAILED` (a gate-blocked transition), and the generic
 `VALIDATION_FAILED` (e.g. a redundant dependency edge).
 

@@ -39,7 +39,7 @@ const SERVER_INSTRUCTIONS = `JIT (Just-In-Time) is a repository-local issue trac
 
 Key concepts:
 - Issues have states: backlog → ready → in_progress → done (or rejected)
-- Dependencies are CRITICAL: use jit_dep_add to express "B needs A done first"
+- Dependencies are CRITICAL: use jit_dep_add to express "B waits until A reaches a terminal state (done or rejected)"
 - Gates are quality checkpoints (tests, clippy, fmt, code-review) that must pass
 - Labels are advisory metadata for grouping and search; the label vocabulary and any type hierarchy come from this repository's configuration, not from the engine
 - Claims/leases prevent concurrent edits across multiple agents

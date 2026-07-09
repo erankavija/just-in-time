@@ -824,7 +824,7 @@ impl TransitionBlockedError {
             )
         } else {
             format!(
-                "Cannot transition to '{}': issue blocked by {} incomplete dependencies",
+                "Cannot transition to '{}': issue blocked by {} unmet dependencies",
                 requested,
                 self.blockers.len()
             )
@@ -842,7 +842,7 @@ impl TransitionBlockedError {
             _ => format!("jit graph deps {}", self.issue_id),
         };
 
-        // When the transition is blocked by an incomplete (or missing)
+        // When the transition is blocked by an unmet (or missing)
         // dependency, surface how to assign the issue without starting work.
         // This is the actionable answer to a failed `jit issue claim`.
         let assign_hint = self.is_dependency_blocked().then(|| {
@@ -883,7 +883,7 @@ impl TransitionBlockedError {
             .collect()
     }
 
-    /// True when any blocker is an incomplete or missing dependency.
+    /// True when any blocker is an unmet or missing dependency.
     ///
     /// Used to gate the "assign without starting work" remediation so it only
     /// appears for the dependency-blocked (claim-blocked) case, not for gate or
@@ -1195,7 +1195,7 @@ mod tests {
         assert!(rendered.contains("jit validate --explain issue-123"));
         assert!(rendered.contains("--force"));
         // It is NOT misreported as a gate or dependency block.
-        assert!(!rendered.contains("incomplete dependencies"));
+        assert!(!rendered.contains("unmet dependencies"));
         assert!(!rendered.contains("gate(s) not passed"));
     }
 

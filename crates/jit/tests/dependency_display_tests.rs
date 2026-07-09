@@ -150,7 +150,7 @@ fn test_issue_show_enriched_dependencies() {
     assert!(stdout.contains("[ready]"));
 
     // Should show summary
-    assert!(stdout.contains("1/2 complete") || stdout.contains("1 of 2 complete"));
+    assert!(stdout.contains("1/2 met") || stdout.contains("1 of 2 met"));
 }
 
 #[test]

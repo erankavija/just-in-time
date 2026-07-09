@@ -143,7 +143,7 @@ jit issue complete $ISSUE
 
 ```
     ┌──────────┐
-    │ backlog  │  Has incomplete dependencies
+    │ backlog  │  Has unmet dependencies
     └─────┬────┘
           │
           │ (dependencies complete)
@@ -180,9 +180,9 @@ jit issue complete $ISSUE
 ### Detailed Transition Flow
 
 ```
-backlog (incomplete dependencies)
+backlog (unmet dependencies)
   ↓
-[dependencies complete]
+[dependencies reach a terminal state]
   ↓
 ready (available to claim and start)
   ↓
@@ -965,8 +965,8 @@ See [gate-examples.md](gate-examples.md) for comprehensive examples including:
 
 | State | Meaning | Typical Duration |
 |-------|---------|------------------|
-| **backlog** | Has incomplete dependencies | Until dependencies complete |
-| **ready** | Dependencies done, can start work | Until claimed/started |
+| **backlog** | Has unmet dependencies | Until dependencies reach a terminal state |
+| **ready** | Dependencies terminal, can start work | Until claimed/started |
 | **in_progress** | Work actively happening | Hours to days |
 | **gated** | Work done, awaiting gates | Minutes (auto) to days (manual) |
 | **done** | Complete and verified | Permanent |

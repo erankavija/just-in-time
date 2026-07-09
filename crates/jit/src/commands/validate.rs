@@ -1566,12 +1566,13 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Check for and fix pending state transitions.
     ///
-    /// After worktree merges, issues in backlog state may have all dependencies
-    /// completed but never auto-transition to ready. This method detects and fixes
-    /// those pending transitions.
+    /// After worktree merges, issues in backlog state may have every dependency
+    /// in a terminal state but never auto-transition to ready. This method detects
+    /// and fixes those pending transitions.
     ///
-    /// Uses multiple passes to handle cascading transitions (e.g., when tasks complete,
-    /// stories become ready, then epics that depend on those stories also become ready).
+    /// Uses multiple passes to handle cascading transitions (e.g., when tasks reach a
+    /// terminal state, stories become ready, then epics that depend on those stories
+    /// also become ready).
     ///
     /// # Arguments
     ///

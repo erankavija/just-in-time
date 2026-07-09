@@ -104,7 +104,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 
 **Coordination:**
 - Issues move through states: `backlog → ready → in_progress → gated → done`
-- Dependencies block issues until prerequisites complete
+- Dependencies block issues until prerequisites reach a terminal state
 - Gates block completion until quality standards met
 - Assignees prevent duplicate work (one issue, one worker)
 - Events log all changes for observability

@@ -579,9 +579,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// but for a whole batch of new edges applied to `full_issue_id` at once:
     /// sets `full_issue_id`'s dependencies to `reduced_from` (its transitive
     /// reduction over `candidate_issues`), demotes it when any newly-added
-    /// dependency isn't `Done`, and drops now-redundant edges from every other
-    /// node exactly like the single-edge path. Only called once every edge in
-    /// the batch has already validated, so this never partially applies.
+    /// dependency is outside a terminal state (`Done` or `Rejected`), and drops
+    /// now-redundant edges from every other node exactly like the single-edge
+    /// path. Only called once every edge in the batch has already validated, so
+    /// this never partially applies.
     fn apply_batch_dependency_add(
         &self,
         original_issues: &[Issue],

@@ -310,7 +310,7 @@ fn test_all_valid_batch_applies_everything_with_one_event() {
     assert!(loaded_a.dependencies.contains(&b));
     assert!(loaded_a.dependencies.contains(&c));
 
-    // A fresh, dependency-free issue is `ready`; gaining two incomplete
+    // A fresh, dependency-free issue is `ready`; gaining two unmet
     // dependencies in the same batch demotes it to `backlog` (one
     // `IssueStateChanged` event) alongside the single `IssueUpdated`
     // (`dependency-add`) event covering BOTH new edges — not one

@@ -310,7 +310,7 @@ Issues are the central concept that ties together all other JIT features:
 **Dependencies** control workflow:
 ```
 Issue A depends on Issue B
-  → A cannot complete until B is done
+  → A stays blocked until B reaches a terminal state (done or rejected)
   → Determines what work is available (ready vs blocked)
 ```
 

@@ -37,8 +37,8 @@ Issue (stored per-file)
 - title: string - one-line summary
 - description: string - task details, acceptance criteria, context for agents/humans
 - state: enum {backlog, ready, in_progress, gated, done, archived}
-  - backlog: Created but has incomplete dependencies
-  - ready: Dependencies done, available to start work (gates don't block this)
+  - backlog: Created but has unmet dependencies
+  - ready: Dependencies terminal (done or rejected), available to start work (gates don't block this)
   - in_progress: Currently being worked on
   - gated: Work complete, awaiting quality gate approval
   - done: Completed successfully
@@ -97,7 +97,7 @@ Rationale: fewer conflicts in collaborative edits, smaller diffs, easy partial r
 - Derived rules:
   - If any dependency is not `done`, the dependent issue is considered `blocked` for purposes of readiness.
   - `ready` becomes achievable only when dependencies are `done` and required gates are `passed`.
-- Commands must expose reasons for blocked/not-ready (list failing gates, incomplete deps).
+- Commands must expose reasons for blocked/not-ready (list failing gates, unmet deps).
 
 ---
 
