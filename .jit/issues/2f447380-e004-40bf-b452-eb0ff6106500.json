@@ -14,7 +14,7 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T20:45:25.507129614Z"
+      "updated_at": "2026-07-09T21:57:18.550396076Z"
     },
     "code-review": {
       "status": "failed",
@@ -31,7 +31,7 @@
     "satisfies:REQ-5"
   ],
   "created_at": "2026-07-05T22:31:18.724369749Z",
-  "updated_at": "2026-07-09T20:48:42.823352687Z",
+  "updated_at": "2026-07-09T21:58:31.619425560Z",
   "first_ready_at": "2026-07-05T22:31:18.724370209Z",
   "claimed_at": "2026-07-09T14:14:14.333901077Z"
 }
