@@ -129,7 +129,7 @@ User: Show me all ready issues
 Claude: [calls jit_query_available]
 
 User: Add a dependency - the auth issue depends on the database setup
-Claude: [calls jit_dep_add with from="AUTH_ID", to="DB_ID"]
+Claude: [calls jit_dep_add with from_id="AUTH_ID", to_ids=["DB_ID"]]
 ```
 
 ## Implementation Details
@@ -209,9 +209,10 @@ if (!validation.success) {
 Each command execution includes timeout and concurrency controls:
 
 ```javascript
-// Execute with concurrency limiting and timeout
+// Execute with concurrency limiting and a per-command timeout
+const timeout = getTimeoutForCommand(cmdPath);
 const result = await concurrencyLimiter.run(async () => {
-  return await executeCommand(cmdPath, args, cmdDef, 30000); // 30s timeout
+  return await executeCommand(cmdPath, args, cmdDef, timeout);
 });
 ```
 
@@ -242,12 +243,9 @@ MCP responses mark errors with `isError: true` for proper client handling.
 
 ### Updating Tools
 
-Tools are automatically synchronized with the CLI schema. The server prefers loading schema from `jit --schema` at runtime, but you can update the bundled fallback:
-
-```bash
-cd ..
-./target/release/jit --schema > mcp-server/jit-schema.json
-```
+Tools are generated at server startup directly from `jit --schema`; no schema file is bundled
+with the server. To pick up a new or changed CLI command, rebuild `jit` and make sure the
+updated binary is the one on `PATH`, then restart the MCP server.
 
 ### Testing
 
@@ -269,9 +267,10 @@ The test suite verifies:
 - Tool listing matches the `curated-tools.json` include set and stays under its ceiling
 - Every generated tool is decided by the curation manifest, with a rationale
 - Nested subcommand tool generation and CLI mapping
+- outputSchema resolution against the live CLI schema
 - Input validation with Zod (required fields, type checking)
 - Structured error responses with proper envelopes
-- Schema correctness (new `backlog` and `gated` states)
+- Concurrency limiter behavior (bounding, queueing, error propagation)
 - Tool execution and error handling
 - Invalid tool/argument rejection
 
@@ -304,10 +303,10 @@ export PATH="/path/to/just-in-time/target/release:$PATH"
 source ~/.bashrc  # or ~/.zshrc
 ```
 
-Alternatively, modify `index.js` to use absolute path:
+Alternatively, hardcode an absolute path in the `execFile('jit', ...)` calls in
+`lib/schema-loader.js` and `lib/cli-executor.js`:
 ```javascript
-// Change in runJitCommand():
-const cmd = `/absolute/path/to/jit ${args}${jsonFlag}`;
+const { stdout } = await execFileAsync('/absolute/path/to/jit', [...args]);
 ```
 
 ### Module not found
@@ -327,56 +326,35 @@ node --version  # Should be v16 or later
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ AI Agent (Claude Desktop, GitHub Copilot, etc.)       │
-└────────────────────┬────────────────────────────────────┘
-                     │ MCP Protocol (JSON-RPC over stdio)
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│ MCP Server (index.js)                                   │
-│                                                          │
-│  ┌─────────────────────────────────────────────┐        │
-│  │ Schema Loader                               │        │
-│  │ - Reads jit --schema at startup             │        │
-│  │ - Fails fast when jit is absent from PATH   │        │
-│  └─────────────────────────────────────────────┘        │
-│                     │                                    │
-│  ┌─────────────────▼─────────────────────┐              │
-│  │ Tool Generator                        │              │
-│  │ - Recursive generation (nested cmds)  │              │
-│  │ - Curates the advertised listing      │              │
-│  └─────────────────────────────────────┬─┘              │
-│                                        │                 │
-│  ┌─────────────────▼─────────────────┐ │                │
-│  │ Validator (Zod)                   │ │                │
-│  │ - Validates args before execution │ │                │
-│  │ - Returns structured errors       │ │                │
-│  └─────────────────────────────────┬─┘ │                │
-│                                    │   │                 │
-│  ┌─────────────────▼───────────────▼─┐                  │
-│  │ CLI Executor                      │                  │
-│  │ - Maps tool calls to CLI args     │                  │
-│  │ - 30s timeout per command         │                  │
-│  │ - Structured error responses      │                  │
-│  └─────────────────┬─────────────────┘                  │
-│                    │                                     │
-│  ┌─────────────────▼─────────────────┐                  │
-│  │ Concurrency Limiter               │                  │
-│  │ - Max 10 concurrent commands      │                  │
-│  └─────────────────┬─────────────────┘                  │
-└────────────────────┼─────────────────────────────────────┘
-                     │ execFile('jit', [...args])
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│ jit CLI (with --json flag)                              │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Agent["AI Agent<br/>(Claude Desktop, GitHub Copilot, etc.)"]
+    CLI["jit CLI (with --json flag)"]
+
+    Agent -->|"MCP Protocol<br/>(JSON-RPC over stdio)"| Loader
+
+    subgraph Server["MCP Server (index.js)"]
+        direction TB
+        Loader["Schema Loader<br/>Reads jit --schema at startup;<br/>fails fast when jit is absent from PATH"]
+        Generator["Tool Generator<br/>Recursive generation (nested cmds);<br/>curates the advertised listing"]
+        Validator["Validator (Zod)<br/>Validates args before execution;<br/>returns structured errors"]
+        Limiter["Concurrency Limiter<br/>Bounds concurrent commands"]
+        Executor["CLI Executor<br/>Maps tool calls to CLI args;<br/>per-command timeout;<br/>structured error responses"]
+
+        Loader --> Generator
+        Generator --> Validator
+        Validator --> Limiter
+        Limiter --> Executor
+    end
+
+    Executor -->|"execFile('jit', [...args])"| CLI
 ```
 
 ## Version
 
-MCP Server Version: 0.1.0
-JIT CLI Version: 0.2.0
+MCP server version tracks `mcp-server/package.json`. The server logs the JIT CLI version
+it loaded (from `jit --schema`) to stderr at startup; run `jit --version` to check the
+installed CLI directly.
 
 ## License
 
