@@ -8,8 +8,10 @@
 //! `.jit/templates.toml`.
 //!
 //! This module defines the MODEL ([`GraphTemplate`], [`TemplateNode`],
-//! [`AnchorSlot`], [`AnchorEdge`], [`Transform`]) and the LOADER
-//! ([`TemplateRegistry::load`]) with load-time **structural validation**:
+//! [`AnchorSlot`], [`AnchorEdge`], [`Transform`]), the BINDINGS
+//! ([`RoleBindings`], [`AnchorBindings`]) that name the roles and anchor the
+//! bracket tooling reaches for, and the LOADER ([`TemplateRegistry::load`]) with
+//! load-time **structural validation**:
 //!
 //! - node `role`s are unique within a template;
 //! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
@@ -29,7 +31,7 @@
 //! task (W2). The reference-integrity checks above are all resolvable from the
 //! template file plus the type hierarchy alone.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -228,11 +230,12 @@ impl TransformKind {
     }
 }
 
-/// A loaded, validated set of graph templates from `.jit/templates.toml`.
+/// A loaded, validated set of graph templates from `.jit/templates.toml`, plus
+/// the repository's [`RoleBindings`] and [`AnchorBindings`].
 ///
 /// Built by [`TemplateRegistry::load`] (file → registry) or
 /// [`TemplateRegistry::from_toml_str`] (string → registry). An absent file
-/// yields an empty registry.
+/// yields an empty registry with default bindings.
 ///
 /// # Examples
 ///
@@ -240,18 +243,187 @@ impl TransformKind {
 /// use jit::templates::TemplateRegistry;
 ///
 /// let toml = r#"
+/// [roles]
+/// planning = "spec"
+///
 /// [[template]]
 /// name = "plan"
 /// applies_to = ["epic"]
 /// "#;
 /// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
 /// assert_eq!(reg.templates.len(), 1);
+/// assert_eq!(reg.roles.planning_role(), "spec");
+/// // Bindings left undeclared keep their defaults.
+/// assert_eq!(reg.anchors.container_anchor(), "container");
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateRegistry {
+    /// Repository names for the node roles the bracket tooling reaches for
+    /// (the `[roles]` table). Absent keys resolve to their defaults.
+    #[serde(default)]
+    pub roles: RoleBindings,
+    /// Repository names for the anchors the CLI binds implicitly (the
+    /// `[anchors]` table). Absent keys resolve to their defaults.
+    #[serde(default)]
+    pub anchors: AnchorBindings,
     /// The declared templates, in authored order.
     #[serde(default, rename = "template")]
     pub templates: Vec<GraphTemplate>,
+}
+
+/// The role name [`RoleBindings::planning_role`] resolves to when `[roles]
+/// planning` is undeclared. The SOLE place this name lives.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::{RoleBindings, DEFAULT_PLANNING_ROLE};
+///
+/// assert_eq!(RoleBindings::default().planning_role(), DEFAULT_PLANNING_ROLE);
+/// ```
+pub const DEFAULT_PLANNING_ROLE: &str = "planning";
+
+/// The role name [`RoleBindings::breakdown_role`] resolves to when `[roles]
+/// breakdown` is undeclared. The SOLE place this name lives.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::{RoleBindings, DEFAULT_BREAKDOWN_ROLE};
+///
+/// assert_eq!(RoleBindings::default().breakdown_role(), DEFAULT_BREAKDOWN_ROLE);
+/// ```
+pub const DEFAULT_BREAKDOWN_ROLE: &str = "breakdown";
+
+/// The anchor name [`AnchorBindings::container_anchor`] resolves to when
+/// `[anchors] container` is undeclared. The SOLE place this name lives.
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::{AnchorBindings, DEFAULT_CONTAINER_ANCHOR};
+///
+/// assert_eq!(
+///     AnchorBindings::default().container_anchor(),
+///     DEFAULT_CONTAINER_ANCHOR,
+/// );
+/// ```
+pub const DEFAULT_CONTAINER_ANCHOR: &str = "container";
+
+/// The repository's names for the two template node roles the bracket tooling
+/// reaches for by meaning: the node that holds the plan, and the node that holds
+/// the fan-out.
+///
+/// Declared in `.jit/templates.toml` as a top-level `[roles]` table; an absent
+/// table (or an absent key) resolves to [`DEFAULT_PLANNING_ROLE`] /
+/// [`DEFAULT_BREAKDOWN_ROLE`], so a repository that names its roles the usual way
+/// declares nothing. Binding these keeps `jit apply`, bracket breakdown, forced
+/// refresh, and validation free of any role literal (`@/inv/domain-agnostic`).
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::RoleBindings;
+///
+/// // A template registry that renames both roles.
+/// let bindings: RoleBindings =
+///     toml::from_str("planning = \"spec\"\nbreakdown = \"split\"\n").unwrap();
+/// assert_eq!(bindings.planning_role(), "spec");
+/// assert_eq!(bindings.breakdown_role(), "split");
+///
+/// // Undeclared keys keep the default names.
+/// assert_eq!(RoleBindings::default().planning_role(), "planning");
+/// assert_eq!(RoleBindings::default().breakdown_role(), "breakdown");
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoleBindings {
+    /// Name of the role carried by the planning node `P`. Resolve it with
+    /// [`RoleBindings::planning_role`], which supplies the default.
+    #[serde(default)]
+    pub planning: Option<String>,
+    /// Name of the role carried by the breakdown node `B`. Resolve it with
+    /// [`RoleBindings::breakdown_role`], which supplies the default.
+    #[serde(default)]
+    pub breakdown: Option<String>,
+}
+
+impl RoleBindings {
+    /// The role the planning node `P` carries, defaulting to
+    /// [`DEFAULT_PLANNING_ROLE`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::RoleBindings;
+    ///
+    /// let bindings: RoleBindings = toml::from_str("planning = \"spec\"").unwrap();
+    /// assert_eq!(bindings.planning_role(), "spec");
+    /// ```
+    pub fn planning_role(&self) -> &str {
+        self.planning.as_deref().unwrap_or(DEFAULT_PLANNING_ROLE)
+    }
+
+    /// The role the breakdown node `B` carries, defaulting to
+    /// [`DEFAULT_BREAKDOWN_ROLE`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::RoleBindings;
+    ///
+    /// let bindings: RoleBindings = toml::from_str("breakdown = \"split\"").unwrap();
+    /// assert_eq!(bindings.breakdown_role(), "split");
+    /// ```
+    pub fn breakdown_role(&self) -> &str {
+        self.breakdown.as_deref().unwrap_or(DEFAULT_BREAKDOWN_ROLE)
+    }
+}
+
+/// The repository's names for the template anchors the CLI binds implicitly.
+///
+/// Declared in `.jit/templates.toml` as a top-level `[anchors]` table. The single
+/// implicit binding is the CONTAINER anchor: `jit apply <template> <container>`
+/// binds it to the positional `<container>` argument, so a template whose
+/// container anchor is named `target` needs no `--anchor target=…`. An absent
+/// table (or key) resolves to [`DEFAULT_CONTAINER_ANCHOR`].
+///
+/// # Examples
+///
+/// ```
+/// use jit::templates::AnchorBindings;
+///
+/// let bindings: AnchorBindings = toml::from_str("container = \"target\"").unwrap();
+/// assert_eq!(bindings.container_anchor(), "target");
+///
+/// // Undeclared keeps the default name.
+/// assert_eq!(AnchorBindings::default().container_anchor(), "container");
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnchorBindings {
+    /// Name of the anchor bound to `jit apply`'s positional `<container>`.
+    /// Resolve it with [`AnchorBindings::container_anchor`], which supplies the
+    /// default.
+    #[serde(default)]
+    pub container: Option<String>,
+}
+
+impl AnchorBindings {
+    /// The anchor bound to `jit apply`'s positional `<container>` argument,
+    /// defaulting to [`DEFAULT_CONTAINER_ANCHOR`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::AnchorBindings;
+    ///
+    /// let bindings: AnchorBindings = toml::from_str("container = \"target\"").unwrap();
+    /// assert_eq!(bindings.container_anchor(), "target");
+    /// ```
+    pub fn container_anchor(&self) -> &str {
+        self.container
+            .as_deref()
+            .unwrap_or(DEFAULT_CONTAINER_ANCHOR)
+    }
 }
 
 /// A named, parameterized subgraph applied to a container by `jit apply`.
@@ -600,61 +772,8 @@ impl TemplateRegistry {
     }
 }
 
-/// Conventional role of the planning node within a `plan`-shaped template.
-///
-/// Roles are template metadata (not stored on created issues); the `plan`
-/// template models the planning node `P` with this role. Accessors that derive
-/// the bracket vocabulary (planning type, doc location) look it up by name.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::PLANNING_ROLE;
-///
-/// assert_eq!(PLANNING_ROLE, "planning");
-/// ```
-pub const PLANNING_ROLE: &str = "planning";
-
-/// Conventional role of the breakdown node within a `plan`-shaped template.
-///
-/// The breakdown node `B` carries this role. Accessors that derive the
-/// breakdown type look it up by name.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::BREAKDOWN_ROLE;
-///
-/// assert_eq!(BREAKDOWN_ROLE, "breakdown");
-/// ```
-pub const BREAKDOWN_ROLE: &str = "breakdown";
-
 impl GraphTemplate {
     /// The node carrying the given `role`, or `None` if no node declares it.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::{TemplateRegistry, PLANNING_ROLE};
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// let template = reg.get("plan").unwrap();
-    /// assert_eq!(template.node(PLANNING_ROLE).unwrap().type_name, "planning");
-    /// assert!(template.node("missing").is_none());
-    /// ```
-    pub fn node(&self, role: &str) -> Option<&TemplateNode> {
-        self.nodes.iter().find(|n| n.role == role)
-    }
-
-    /// The planning node `P` ([`PLANNING_ROLE`]), or `None` if the template has none.
     ///
     /// # Examples
     ///
@@ -670,13 +789,40 @@ impl GraphTemplate {
     /// type = "planning"
     /// "#;
     /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().planning_node().unwrap().role, "planning");
+    /// let template = reg.get("plan").unwrap();
+    /// assert_eq!(template.node(reg.roles.planning_role()).unwrap().type_name, "planning");
+    /// assert!(template.node("missing").is_none());
     /// ```
-    pub fn planning_node(&self) -> Option<&TemplateNode> {
-        self.node(PLANNING_ROLE)
+    pub fn node(&self, role: &str) -> Option<&TemplateNode> {
+        self.nodes.iter().find(|n| n.role == role)
     }
 
-    /// The breakdown node `B` ([`BREAKDOWN_ROLE`]), or `None` if the template has none.
+    /// The planning node `P` ([`RoleBindings::planning_role`]), or `None` if the
+    /// template has none.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::templates::TemplateRegistry;
+    ///
+    /// let toml = r#"
+    /// [[template]]
+    /// name = "plan"
+    /// applies_to = ["epic"]
+    /// [[template.nodes]]
+    /// role = "planning"
+    /// type = "planning"
+    /// "#;
+    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
+    /// let template = reg.get("plan").unwrap();
+    /// assert_eq!(template.planning_node(&reg.roles).unwrap().role, "planning");
+    /// ```
+    pub fn planning_node(&self, roles: &RoleBindings) -> Option<&TemplateNode> {
+        self.node(roles.planning_role())
+    }
+
+    /// The breakdown node `B` ([`RoleBindings::breakdown_role`]), or `None` if the
+    /// template has none.
     ///
     /// # Examples
     ///
@@ -692,10 +838,11 @@ impl GraphTemplate {
     /// type = "breakdown"
     /// "#;
     /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().breakdown_node().unwrap().role, "breakdown");
+    /// let template = reg.get("plan").unwrap();
+    /// assert_eq!(template.breakdown_node(&reg.roles).unwrap().role, "breakdown");
     /// ```
-    pub fn breakdown_node(&self) -> Option<&TemplateNode> {
-        self.node(BREAKDOWN_ROLE)
+    pub fn breakdown_node(&self, roles: &RoleBindings) -> Option<&TemplateNode> {
+        self.node(roles.breakdown_role())
     }
 
     /// The issue type carried by the planning node `P` (e.g. `"planning"`).
@@ -714,10 +861,10 @@ impl GraphTemplate {
     /// type = "planning"
     /// "#;
     /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().planning_type(), Some("planning"));
+    /// assert_eq!(reg.get("plan").unwrap().planning_type(&reg.roles), Some("planning"));
     /// ```
-    pub fn planning_type(&self) -> Option<&str> {
-        self.planning_node().map(|n| n.type_name.as_str())
+    pub fn planning_type(&self, roles: &RoleBindings) -> Option<&str> {
+        self.planning_node(roles).map(|n| n.type_name.as_str())
     }
 
     /// The issue type carried by the breakdown node `B` (e.g. `"breakdown"`).
@@ -736,10 +883,10 @@ impl GraphTemplate {
     /// type = "breakdown"
     /// "#;
     /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().breakdown_type(), Some("breakdown"));
+    /// assert_eq!(reg.get("plan").unwrap().breakdown_type(&reg.roles), Some("breakdown"));
     /// ```
-    pub fn breakdown_type(&self) -> Option<&str> {
-        self.breakdown_node().map(|n| n.type_name.as_str())
+    pub fn breakdown_type(&self, roles: &RoleBindings) -> Option<&str> {
+        self.breakdown_node(roles).map(|n| n.type_name.as_str())
     }
 
     /// The planning node's doc-location template (e.g.
@@ -762,12 +909,12 @@ impl GraphTemplate {
     /// "#;
     /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
     /// assert_eq!(
-    ///     reg.get("plan").unwrap().plan_doc_location(),
+    ///     reg.get("plan").unwrap().plan_doc_location(&reg.roles),
     ///     Some("dev/active/{container.id}-plan.md"),
     /// );
     /// ```
-    pub fn plan_doc_location(&self) -> Option<&str> {
-        self.planning_node().and_then(|n| n.doc.as_deref())
+    pub fn plan_doc_location(&self, roles: &RoleBindings) -> Option<&str> {
+        self.planning_node(roles).and_then(|n| n.doc.as_deref())
     }
 
     /// Validate one template's internal structure: unique roles/anchors, every
@@ -878,56 +1025,29 @@ impl GraphTemplate {
         Ok(())
     }
 
-    /// Detect a cycle in the internal `depends_on` edges via DFS with a
-    /// recursion stack. Returns the first role found on a back-edge.
+    /// Detect a cycle in the internal `depends_on` edges over the role adjacency,
+    /// reporting the first role on the closed path (`@/inv/dag-acyclic`).
     fn check_acyclic(&self) -> Result<(), TemplateConfigError> {
-        let adjacency: HashMap<&str, &[String]> = self
+        let adjacency: Vec<(&str, Vec<&str>)> = self
             .nodes
             .iter()
-            .map(|n| (n.role.as_str(), n.depends_on.as_slice()))
+            .map(|n| {
+                (
+                    n.role.as_str(),
+                    n.depends_on.iter().map(String::as_str).collect(),
+                )
+            })
             .collect();
 
-        // 0 = unvisited, 1 = on stack, 2 = done.
-        let mut state: HashMap<&str, u8> = HashMap::new();
-
-        for node in &self.nodes {
-            if let Some(role) = visit_cycle(node.role.as_str(), &adjacency, &mut state) {
-                return Err(TemplateConfigError::CyclicDependsOn {
-                    template: self.name.clone(),
-                    role: role.to_string(),
-                });
-            }
-        }
-        Ok(())
-    }
-}
-
-/// DFS helper for [`GraphTemplate::check_acyclic`]. Returns the role on a
-/// detected back-edge, or `None` if the subtree rooted at `role` is acyclic.
-fn visit_cycle<'a>(
-    role: &'a str,
-    adjacency: &HashMap<&'a str, &'a [String]>,
-    state: &mut HashMap<&'a str, u8>,
-) -> Option<&'a str> {
-    match state.get(role) {
-        Some(2) => return None,       // already fully explored
-        Some(1) => return Some(role), // back-edge: cycle
-        _ => {}
-    }
-    state.insert(role, 1);
-    if let Some(deps) = adjacency.get(role) {
-        for dep in deps.iter() {
-            // Resolve to the borrowed key so lifetimes line up; a dep referencing
-            // an undeclared role is caught by reference validation before this runs.
-            if let Some((&key, _)) = adjacency.get_key_value(dep.as_str()) {
-                if let Some(found) = visit_cycle(key, adjacency, state) {
-                    return Some(found);
-                }
-            }
+        match crate::graph::find_keyed_cycle(&adjacency) {
+            Some(cycle) => Err(TemplateConfigError::CyclicDependsOn {
+                template: self.name.clone(),
+                // The cycle is a closed path, so its first key is on the cycle.
+                role: cycle.first().map(|r| (*r).to_string()).unwrap_or_default(),
+            }),
+            None => Ok(()),
         }
     }
-    state.insert(role, 2);
-    None
 }
 
 #[cfg(test)]
@@ -1382,8 +1502,110 @@ depends_on = ["a"]
             .get("plan")
             .expect("repo .jit/templates.toml declares a `plan` template");
         assert_eq!(plan.applies_to, vec!["epic"]);
-        assert_eq!(plan.planning_type(), Some("planning"));
-        assert_eq!(plan.breakdown_type(), Some("breakdown"));
+        assert_eq!(plan.planning_type(&reg.roles), Some("planning"));
+        assert_eq!(plan.breakdown_type(&reg.roles), Some("breakdown"));
+    }
+
+    // BIND-01: role and anchor bindings parse, and an absent table defaults to
+    // today's names, so an existing repository behaves unchanged.
+
+    #[test]
+    fn test_absent_binding_tables_default_to_shipped_names() {
+        let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
+        assert_eq!(reg.roles.planning_role(), DEFAULT_PLANNING_ROLE);
+        assert_eq!(reg.roles.breakdown_role(), DEFAULT_BREAKDOWN_ROLE);
+        assert_eq!(reg.anchors.container_anchor(), DEFAULT_CONTAINER_ANCHOR);
+        // The shipped defaults are exactly the names the bracket has always used.
+        assert_eq!(DEFAULT_PLANNING_ROLE, "planning");
+        assert_eq!(DEFAULT_BREAKDOWN_ROLE, "breakdown");
+        assert_eq!(DEFAULT_CONTAINER_ANCHOR, "container");
+    }
+
+    #[test]
+    fn test_declared_bindings_rename_roles_and_anchor() {
+        let toml = r#"
+[roles]
+planning  = "spec"
+breakdown = "split"
+
+[anchors]
+container = "target"
+
+[[template]]
+name       = "plan"
+applies_to = ["epic"]
+
+  [[template.anchors]]
+  name = "target"
+
+  [[template.nodes]]
+  role = "spec"
+  type = "planning"
+  doc  = "dev/{container.id}.md"
+
+  [[template.nodes]]
+  role       = "split"
+  type       = "breakdown"
+  depends_on = ["spec"]
+
+  [[template.anchor_edges]]
+  from = "target"
+  to   = "split"
+"#;
+        let reg = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert_eq!(reg.roles.planning_role(), "spec");
+        assert_eq!(reg.roles.breakdown_role(), "split");
+        assert_eq!(reg.anchors.container_anchor(), "target");
+
+        // The bracket accessors resolve through the bindings, not literals.
+        let plan = reg.get("plan").unwrap();
+        assert_eq!(plan.planning_node(&reg.roles).unwrap().role, "spec");
+        assert_eq!(plan.breakdown_node(&reg.roles).unwrap().role, "split");
+        assert_eq!(plan.planning_type(&reg.roles), Some("planning"));
+        assert_eq!(plan.breakdown_type(&reg.roles), Some("breakdown"));
+        assert_eq!(
+            plan.plan_doc_location(&reg.roles),
+            Some("dev/{container.id}.md")
+        );
+
+        // With the DEFAULT bindings, the same template exposes no bracket nodes.
+        let defaults = RoleBindings::default();
+        assert!(plan.planning_node(&defaults).is_none());
+        assert!(plan.breakdown_node(&defaults).is_none());
+    }
+
+    #[test]
+    fn test_partial_role_binding_defaults_the_other_role() {
+        let toml = r#"
+[roles]
+breakdown = "split"
+
+[[template]]
+name       = "plan"
+applies_to = ["epic"]
+"#;
+        let reg = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        assert_eq!(reg.roles.planning_role(), DEFAULT_PLANNING_ROLE);
+        assert_eq!(reg.roles.breakdown_role(), "split");
+    }
+
+    #[test]
+    fn test_bindings_roundtrip_through_json() {
+        let toml = r#"
+[roles]
+planning = "spec"
+
+[anchors]
+container = "target"
+
+[[template]]
+name       = "plan"
+applies_to = ["epic"]
+"#;
+        let reg = TemplateRegistry::from_toml_str(toml, &HIERARCHY).unwrap();
+        let back: TemplateRegistry = serde_json::from_str(&serde_json::to_string(&reg).unwrap())
+            .expect("registry with bindings round-trips");
+        assert_eq!(reg, back);
     }
 
     // REGB-02: the registry yields, for a container type, the applicable template
@@ -1421,10 +1643,10 @@ applies_to = ["epic"]
     fn test_accessors_derive_bracket_vocabulary_for_epic() {
         let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
         let t = reg.template_for_container("epic").unwrap();
-        assert_eq!(t.planning_type(), Some("planning"));
-        assert_eq!(t.breakdown_type(), Some("breakdown"));
+        assert_eq!(t.planning_type(&reg.roles), Some("planning"));
+        assert_eq!(t.breakdown_type(&reg.roles), Some("breakdown"));
         assert_eq!(
-            t.plan_doc_location(),
+            t.plan_doc_location(&reg.roles),
             Some("dev/active/{container.id}-plan.md")
         );
         assert_eq!(reg.breakable_types(), vec!["epic".to_string()]);
@@ -1434,8 +1656,14 @@ applies_to = ["epic"]
     fn test_node_lookup_by_role() {
         let reg = TemplateRegistry::from_toml_str(plan_template_toml(), &HIERARCHY).unwrap();
         let t = reg.get("plan").unwrap();
-        assert_eq!(t.node(PLANNING_ROLE).unwrap().type_name, "planning");
-        assert_eq!(t.node(BREAKDOWN_ROLE).unwrap().type_name, "breakdown");
+        assert_eq!(
+            t.node(reg.roles.planning_role()).unwrap().type_name,
+            "planning"
+        );
+        assert_eq!(
+            t.node(reg.roles.breakdown_role()).unwrap().type_name,
+            "breakdown"
+        );
         assert!(t.node("nonexistent").is_none());
     }
 

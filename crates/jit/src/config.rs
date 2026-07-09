@@ -2682,8 +2682,9 @@ depends_on = ["planning"]
             .templates
             .get("plan")
             .expect("templates.toml is loaded even without config.toml");
-        assert_eq!(plan.planning_type(), Some("planning"));
-        assert_eq!(plan.breakdown_type(), Some("breakdown"));
+        let roles = &config.templates.roles;
+        assert_eq!(plan.planning_type(roles), Some("planning"));
+        assert_eq!(plan.breakdown_type(roles), Some("breakdown"));
         assert_eq!(config.templates.breakable_types(), vec!["epic".to_string()]);
     }
 

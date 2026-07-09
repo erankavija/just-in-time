@@ -91,7 +91,8 @@ pub enum Commands {
     /// `<container>`: creates the template's typed nodes (with their gate
     /// presets, docs, and interpolated descriptions), wires the declared edges,
     /// and runs its transforms (e.g. moving the container's upstream deps onto
-    /// the planning node). The `container` anchor is auto-bound to the positional
+    /// the planning node). The repository's container anchor (`.jit/templates.toml`
+    /// `[anchors] container`, default `container`) is auto-bound to the positional
     /// `<container>`; bind any additional anchors with `--anchor role=id`.
     ///
     /// The container's `type:` label must be one of the template's `applies_to`
@@ -109,9 +110,9 @@ pub enum Commands {
         /// Container issue ID to apply the template to
         container: String,
 
-        /// Bind a template anchor: `role=id` (repeatable). The `container` anchor
-        /// is auto-bound to `<container>`; an explicit `--anchor container=…`
-        /// overrides it.
+        /// Bind a template anchor: `role=id` (repeatable). The repository's
+        /// container anchor is auto-bound to `<container>`; binding it explicitly
+        /// overrides that.
         #[arg(long, value_name = "ROLE=ID")]
         anchor: Vec<String>,
 

@@ -98,6 +98,11 @@ The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
 `breakdown`, and the preset names are all read from the template. To make `P`'s
 plan an inline body rather than an external file, omit the `doc` field.
 
+The `planning` / `breakdown` node `role`s and the `container` anchor `name` above
+are the defaults the bracket tooling assumes. To use your own vocabulary, name
+them in `.jit/templates.toml`'s top-level `[roles]` and `[anchors]` tables — see
+[Template bindings](../reference/configuration.md#template-bindings-jittemplatestoml).
+
 > **Sync the type-known schema.** Adding a type to `[type_hierarchy].types`
 > updates the graph hierarchy, but if your project has a baked
 > `.jit/schemas/default-type-hierarchy-known.json`, the write path reads *that*

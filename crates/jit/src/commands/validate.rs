@@ -841,7 +841,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             // No `doc` on the planning-node template (an inline plan): skip — the
             // engine uses the description.
-            if template.plan_doc_location().is_none() {
+            if template.plan_doc_location(&templates.roles).is_none() {
                 continue;
             }
 
@@ -849,7 +849,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // node's `plan` reference points, not the template path. With no
             // planning node, or none carrying an external plan reference, the plan
             // is inline — skip so the engine reads the container's description.
-            let planning = find_planning_node(issue, template, &by_id);
+            let planning = find_planning_node(issue, template, &templates.roles, &by_id);
             let Some(plan_path) = planning.and_then(planning_node_plan_path) else {
                 continue;
             };
@@ -1101,7 +1101,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let breakdown_type = container_type
             .as_deref()
             .and_then(|ty| templates.template_for_container(ty))
-            .and_then(|t| t.breakdown_type())
+            .and_then(|t| t.breakdown_type(&templates.roles))
             .map(str::to_string);
 
         let scope_ids = crate::domain::queries::bracket_scope_ids(
@@ -1760,14 +1760,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// absent). The lookup is over the WHOLE store (`by_id`) so it stays consistent
 /// when the caller's slice bounds out the bracket infrastructure.
 ///
-/// Domain-agnostic: the planning type is read from the container's template, not
-/// hardcoded.
+/// Domain-agnostic: the planning type is read from the container's template
+/// (selected by the repository's planning-role binding), not hardcoded.
 fn find_planning_node<'a>(
     container: &Issue,
     template: &crate::templates::GraphTemplate,
+    roles: &crate::templates::RoleBindings,
     by_id: &std::collections::HashMap<&str, &'a Issue>,
 ) -> Option<&'a Issue> {
-    let planning_type = template.planning_type()?;
+    let planning_type = template.planning_type(roles)?;
     let bracket_label = format!("brackets:{}", container.short_id());
     let planning_type_label = label_utils::type_label(planning_type);
 
