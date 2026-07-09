@@ -9,7 +9,9 @@
 //! - `breakdown`: Bracket-aware breakdown operations
 //! - `template`: Graph-template apply engine (`jit apply <template> <container>`):
 //!   the plan-before-fan-out scaffold (planning node `P` + breakdown node `B`),
-//!   validating, snapshotting anchors, and instantiating the template's nodes
+//!   validating, snapshotting anchors, and committing the expanded delta
+//! - `template_expand`: pure expansion of a graph template into the delta the
+//!   apply engine commits (issues to create, edges to add/remove, anchor gates)
 //! - `config`: `jit config set` write (target-file resolution, typed value
 //!   validation incl. `project.name`, atomic write) and `jit config get`'s
 //!   generic dotted-path accessor over the whole configuration surface
@@ -51,6 +53,7 @@ mod search;
 pub mod serve;
 pub mod snapshot;
 mod template;
+pub mod template_expand;
 mod validate;
 pub mod worktree;
 
@@ -75,6 +78,10 @@ pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
 pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;
+pub use template_expand::{
+    expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
+    TemplateDelta,
+};
 pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE};
 
 // Re-export WorktreeIdentity for init return type
@@ -964,33 +971,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// is the sole source and is left untouched), so re-init never clobbers user
     /// edits. Returns `true` when it wrote the file, `false` when it was a no-op.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
-        use crate::storage::FileLocker;
-        use std::time::Duration;
-
         let jit_root = self.storage.root();
 
         // Hold the repo write lock across the existence check AND the scaffold
         // writes, so two concurrent `jit init` runs cannot both pass the
         // absent-file check and then race on the fixed temp paths for rules.toml
-        // and the schema files (MF4: materialize under the write lock). The lock
-        // lives in the repo's git control plane (`.git/jit/locks/`), the same
-        // plane claims coordination uses.
-        //
-        // The control plane is derived from the repository that OWNS this storage
-        // root (its working tree's own `.git`), NOT from the process's ambient
-        // cwd: initializing a `.jit` that happens to be nested under an unrelated
-        // ancestor git repo must never borrow that ancestor's control plane. A
-        // working tree with no `.git` of its own has no control plane and no
-        // cross-process concurrency to guard, so it scaffolds lockless.
-        let _guard = match self.repo_control_plane_dir() {
-            Some(control_plane) => {
-                let lock_path = control_plane.join("locks").join("rules.lock");
-                std::fs::create_dir_all(lock_path.parent().unwrap())
-                    .context("Failed to create control-plane locks directory")?;
-                Some(FileLocker::new(Duration::from_secs(5)).lock_exclusive(&lock_path)?)
-            }
-            None => None,
-        };
+        // and the schema files (MF4: materialize under the write lock).
+        let _guard = self.repo_write_lock("rules.lock")?;
 
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
@@ -1048,6 +1035,33 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE,
             &crate::validation::serialize::type_hierarchy_schema_content(&namespaces),
         )
+    }
+
+    /// Acquire the repository-wide write lock named `lock_file`, held until the
+    /// returned guard drops. Returns `None` when this storage root's working tree
+    /// is not a git repository of its own: it then has no control plane and no
+    /// cross-process concurrency to guard, so the caller proceeds lockless.
+    ///
+    /// The lock lives in the repo's git control plane (`.git/jit/locks/`), the
+    /// same plane claims coordination uses, derived from the repository that OWNS
+    /// this storage root rather than the process's ambient cwd (see
+    /// [`repo_control_plane_dir`](Self::repo_control_plane_dir)). Callers that
+    /// perform a multi-write sequence hold one such guard across the whole
+    /// sequence, so a concurrent process observes the sequence's start or its end,
+    /// never a midpoint.
+    fn repo_write_lock(&self, lock_file: &str) -> Result<Option<crate::storage::lock::LockGuard>> {
+        use crate::storage::FileLocker;
+        use std::time::Duration;
+
+        let Some(control_plane) = self.repo_control_plane_dir() else {
+            return Ok(None);
+        };
+        let locks_dir = control_plane.join("locks");
+        std::fs::create_dir_all(&locks_dir)
+            .context("Failed to create control-plane locks directory")?;
+        FileLocker::new(Duration::from_secs(5))
+            .lock_exclusive(&locks_dir.join(lock_file))
+            .map(Some)
     }
 
     /// Resolve the git control-plane dir (`<git-common-dir>/jit`) for the
