@@ -1,0 +1,24 @@
+{
+  "id": "894337e2-e708-466b-ac25-3aed102a166f",
+  "title": "find_available_port races between probe and bind",
+  "description": "The port chosen by `find_available_port` is released before the caller binds it, so any process that grabs it in between makes the caller fail. The workspace test suite hits this as a flaky failure under parallel load.\n\n## Background\n\n`crates/jit/src/commands/serve.rs:249` probes a port by binding a `TcpListener`, drops the listener when `is_ok()` returns, and hands the bare port number back:\n\n```rust\n(start..=start.saturating_add(99))\n    .find(|&port| TcpListener::bind((\"127.0.0.1\", port)).is_ok())\n```\n\nThe returned port is unowned by the time the caller sees it. `jit serve` then binds it a second time, and that second bind can fail even though the probe succeeded.\n\n`test_find_available_port_returns_free_port` (`serve.rs:712`) reproduces the window: it calls `find_available_port(3000)`, then binds the result. Observed failing once in a full parallel `cargo test` run and passing when run alone. The sibling test `test_find_available_port_skips_bound_port` binds ports in the same range concurrently, which is one of the racing parties.\n\n## Success Criteria\n\n- [hard] REQ-1: The port-selection API hands the caller an owned, already-bound listener rather than a port number the caller must re-bind.\n- [hard] REQ-2: `jit serve` binds exactly once; no code path re-binds a port that a probe reported as free.\n- [hard] REQ-3: The port-selection tests pass deterministically under parallel execution, and no test in the suite binds a fixed port range that a sibling test also binds.\n\n## Notes\n\nReturning `TcpListener` instead of `u16` closes the window at the type level. Discovered during epic dbe1e821 execution by a rework agent whose full-suite run failed on this test and passed on rerun; the flake is a symptom, the unowned-port handoff is the defect.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:cli",
+    "type:bug"
+  ],
+  "created_at": "2026-07-09T22:08:16.103860513Z",
+  "updated_at": "2026-07-09T22:08:16.105470634Z",
+  "first_ready_at": "2026-07-09T22:08:16.103865943Z"
+}

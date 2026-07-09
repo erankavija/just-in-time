@@ -5800,3 +5800,10 @@
 {"type":"gate_passed","id":"7633aa6f-8024-40fe-8c69-9383ca185faa","issue_id":"69ffdcf8-eb81-47be-bd94-35ced4963408","timestamp":"2026-07-09T21:56:08.447337749Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"6462f639-f273-44f3-a8ba-63fd46196b5e","issue_id":"50677708-4fce-42d6-8b43-5b486ab216bb","timestamp":"2026-07-09T21:57:18.521312295Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"5e1b2041-4237-432c-9cd6-fd09fb641612","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T21:58:31.619631050Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"d1641659-6919-4400-ac24-bc6662ff2954","issue_id":"69ffdcf8-eb81-47be-bd94-35ced4963408","timestamp":"2026-07-09T22:00:02.621956915Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"5d0a4c20-cb5c-4879-8230-c225f870ae96","issue_id":"50677708-4fce-42d6-8b43-5b486ab216bb","timestamp":"2026-07-09T22:01:55.923197285Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"48ccee99-74e5-4edc-81ef-61e5870bc4fc","issue_id":"2f447380-e004-40bf-b452-eb0ff6106500","timestamp":"2026-07-09T22:04:19.554015040Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"6cc772e7-ce09-4805-b166-bf61341caad1","issue_id":"50677708-4fce-42d6-8b43-5b486ab216bb","timestamp":"2026-07-09T22:05:30.002457038Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"fbcc7dc5-b1d5-4d0d-ac11-8ae2c107b1a9","issue_id":"50677708-4fce-42d6-8b43-5b486ab216bb","timestamp":"2026-07-09T22:05:30.002489578Z"}
+{"type":"issue_created","id":"25942ab5-95ae-4b96-9eee-2eb9b04d4563","issue_id":"894337e2-e708-466b-ac25-3aed102a166f","timestamp":"2026-07-09T22:08:16.105783344Z","title":"find_available_port races between probe and bind","priority":"normal"}
+{"type":"issue_updated","id":"59e30dc2-39b4-4e7c-82bd-80365f47bda4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-09T22:08:23.782367927Z","updated_by":"dependency-add","fields":["dependencies"]}

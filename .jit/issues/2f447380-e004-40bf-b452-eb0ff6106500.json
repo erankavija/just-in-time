@@ -19,7 +19,7 @@
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T20:47:13.375395323Z"
+      "updated_at": "2026-07-09T22:01:55.950796955Z"
     }
   },
   "context": {},
@@ -31,7 +31,7 @@
     "satisfies:REQ-5"
   ],
   "created_at": "2026-07-05T22:31:18.724369749Z",
-  "updated_at": "2026-07-09T21:58:31.619425560Z",
+  "updated_at": "2026-07-09T22:04:19.553851150Z",
   "first_ready_at": "2026-07-05T22:31:18.724370209Z",
   "claimed_at": "2026-07-09T14:14:14.333901077Z"
 }

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "e122805b-7451-4ad3-9185-ac7077cf4403",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "69ffdcf8-eb81-47be-bd94-35ced4963408",
+  "commit": "350e9f99477582ba029ac503d4f06b7ba9933a74",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T21:58:38.586214706Z",
+  "completed_at": "2026-07-09T22:00:02.620865544Z",
+  "duration_ms": 84034,
+  "exit_code": 1,
+  "stdout": "**Architecture And Separation Of Concerns**\nThe dependency satisfaction helper lives in the domain layer at [crates/jit/src/domain/types.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:117). The main consumers I checked route through it: `Issue::is_blocked`, `query_blocked`, transition blockers, output unmet rendering, and dependency-add demotion. `claim_next` uses `query_ready` at [crates/jit/src/commands/issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:1088). No boundary violation found.\n\n**Functional Correctness**\nRejected dependencies are treated as met in the core implementation paths and are covered by focused tests in [crates/jit/tests/dependency_met_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/dependency_met_tests.rs:20). However, REQ-4 is not fully satisfied because stale comments/docs still describe the old Done-only or incomplete-dependency model.\n\n**Tests And Gates**\nI did not rerun cargo tests because the issue has a passed `cargo-ci` gate. Recorded evidence shows `cargo-ci` passed with exit code 0 on 2026-07-09. I did run `./scripts/jit-validate.sh`; it passed.\n\n**Prior Review Feedback**\nThe prior failed review asked for stale dependency wording to be swept. Some locations were fixed, but the issue remains in command docs/comments and user-facing docs.\n\n**Correctness And Invariants**\nNo new atomic-write, event logging, gate-semantics, assignee/label format, PID-safety, unsafe-code, or error-handling violation found in the reviewed dependency-met changes.\n\n**CLI Contract**\nNo missing `--json` support found in the reviewed surfaces.\n\n**Documentation**\nDocumentation is the blocking area: the implementation docs mostly state the terminal-state rule, but stale Done-only and “incomplete dependencies” wording remains.\n\n1. [crates/jit/src/commands/dependency.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:582) still says batch dependency add “demotes it when any newly-added dependency isn’t `Done`.” That directly contradicts REQ-4’s terminal-state rule because a `Rejected` dependency is also met and must not demote a ready issue. Severity: medium.\n2. Stale user-facing/docs wording from the prior review remains: [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1394) says claims are blocked behind “incomplete dependencies,” [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2444) says removing the last “incomplete dependency” unblocks, [docs/how-to/troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:32) shows the same stale phrasing, and [crates/jit/src/commands/issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:1563) repeats it in a test comment. This leaves the prior review feedback unresolved. Severity: low.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Core dependency-met routing is correct, but stale Done-only/incomplete-dependency wording remains and violates REQ-4 plus prior review feedback.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"Batch dependency-add doc comment still describes demotion as depending on whether a dependency is not Done instead of not terminal Done-or-Rejected.\",\"file\":\"crates/jit/src/commands/dependency.rs\",\"line\":582},{\"id\":\"F2\",\"severity\":\"low\",\"summary\":\"Stale incomplete-dependency wording remains in user-facing docs and a test comment, leaving prior review feedback unresolved.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1394}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1818 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f48e3-d91d-7de2-9df8-e402ba6007b8\n--------\nuser\n--- 1805 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Core dependency-met routing is correct, but stale Done-only/incomplete-dependency wording remains and violates REQ-4 plus prior review feedback.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "Batch dependency-add doc comment still describes demotion as depending on whether a dependency is not Done instead of not terminal Done-or-Rejected.",
+        "file": "crates/jit/src/commands/dependency.rs",
+        "line": 582
+      },
+      {
+        "id": "F2",
+        "severity": "low",
+        "summary": "Stale incomplete-dependency wording remains in user-facing docs and a test comment, leaving prior review feedback unresolved.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1394
+      }
+    ]
+  }
+}

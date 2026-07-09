@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "64f01b08-c94a-4267-8d73-fe8143a5fdb5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "2f447380-e004-40bf-b452-eb0ff6106500",
+  "commit": "350e9f99477582ba029ac503d4f06b7ba9933a74",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T22:01:55.950796955Z",
+  "completed_at": "2026-07-09T22:04:19.551798728Z",
+  "duration_ms": 143601,
+  "exit_code": 1,
+  "stdout": "**Architecture and Separation of Concerns**\n\nThe pure expansion split is present in `crates/jit/src/commands/template_expand.rs`, and storage access remains in the command executor/storage layers. The prior lock-separation finding has been addressed for normal issue/dependency writers: `apply_template_with` holds `IssueStore::acquire_repo_write_lock`, and `JsonFileStorage::save_issue`, `delete_issue`, `save_gate_registry`, and `append_event` now participate in the same repository write lock.\n\n**Functional Paradigm**\n\nNo blocking functional-style regression found in the reviewed path. The imperative loops in commit/rollback are command-layer orchestration.\n\n**Correctness and Invariants**\n\nREQ-1 and REQ-3 are implemented. REQ-2 is still not fully met: rollback does not restore pre-existing issues exactly because it uses `save_issue`, which rewrites `updated_at`.\n\n**Safety**\n\nNo unsafe-code issue found in the reviewed changes.\n\n**Testing**\n\nI did not rerun cargo tests because the provided `cargo-ci` gate passed on 2026-07-09. I did run `./scripts/jit-validate.sh`; it passed. The new atomicity tests cover created-node rollback and failure on the first container write, but they do not cover a failure after an existing issue has already been successfully mutated and then restored.\n\n**Error Handling**\n\nNo new library `unwrap()`/`expect()` issue found in the reviewed production paths. Registry load errors for unsupported transform kinds include the template and kind.\n\n**CLI Contract**\n\nNo CLI `--json` regression found in the reviewed scope.\n\n**Documentation**\n\nNew public lock and delta APIs include doc comments and examples.\n\n**Prior Review Feedback**\n\nThe prior finding about `apply.lock` not being shared with ordinary issue/dependency writers is addressed by the shared `.repo-write.lock` path.\n\n**Jit Issue Management**\n\n`issue.dependencies` is empty. `./scripts/jit-validate.sh` passed; label warnings are allowed and none blocked the review.\n\n1. **F1 [high] REQ-2 is not fully satisfied because rollback changes `updated_at` on pre-existing issues it restores.** `restore_issue_snapshot` restores changed pre-existing issues by calling `self.storage.save_issue((*original).clone())` at `crates/jit/src/commands/template.rs:564`, but both file and memory storage overwrite `updated_at` inside `save_issue` at `crates/jit/src/storage/json.rs:519` and `crates/jit/src/storage/memory.rs:118`. If apply successfully mutates an existing issue, then a later write fails, rollback restores the content fields but leaves that issue with a new timestamp. `updated_at` is persisted and visible to users/machine-readable output, so the issue store is not observably unchanged after the failed apply. The new tests do not catch this because the injected container failure happens before the container save succeeds.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-2 is not fully met: rollback restores pre-existing issues through save_issue, which rewrites updated_at and leaves observable issue state changed after a failed apply.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Rollback changes updated_at on restored pre-existing issues because restore_issue_snapshot calls save_issue, whose storage implementations stamp updated_at with now.\",\"file\":\"crates/jit/src/commands/template.rs\",\"line\":564}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 18056 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.142.5\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.5\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f48e6-d8a1-7d12-9d35-33ad00c699de\n--------\nuser\n--- 18043 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-2 is not fully met: rollback restores pre-existing issues through save_issue, which rewrites updated_at and leaves observable issue state changed after a failed apply.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Rollback changes updated_at on restored pre-existing issues because restore_issue_snapshot calls save_issue, whose storage implementations stamp updated_at with now.",
+        "file": "crates/jit/src/commands/template.rs",
+        "line": 564
+      }
+    ]
+  }
+}
