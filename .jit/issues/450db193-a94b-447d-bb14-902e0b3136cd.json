@@ -1,0 +1,39 @@
+{
+  "id": "450db193-a94b-447d-bb14-902e0b3136cd",
+  "title": "Generic config-declared projection tables spanning registry- and markdown-first item kinds",
+  "description": "Replace the bespoke `[invariant_projection]` and `[rules_gates_projection]` tables with generic `[projection.<name>]` config so any addressable-item kind can render its rows into a delimited region of a target document, and dogfood the first markdown-first projection: the charter decision log into CLAUDE.md.\n\n## Background\n\nTwo documentation projections exist, each with its own config table and command: `[invariant_projection]` (`jit invariant render`, invariants registry → CLAUDE.md region) and `[rules_gates_projection]` (`jit reference render`, rule + gate registries → docs/reference/rules-and-gates.md). Both cover registry-first kinds only. Markdown-first kinds have no projection path: the `charter` kind (@/charter/D-7) makes the v1.0 decision log addressable and citable, but its one-liners cannot be rendered into the always-loaded agent context (CLAUDE.md) without hand-copying, which per-kind source-of-truth (@/charter/D-6) rules out.\n\nThe region machinery is kind-independent already: markers wrap the rendered block, bytes outside stay byte-exact, writes go through storage atomically (@/inv/atomic-writes). What is bespoke is the config shape (one named table per projection) and the command surface (one subcommand per projection). A new one-off table and subcommand per future projection does not scale.\n\n## Success Criteria\n\n- [hard] REQ-01: A generic `[projection.<name>]` config table declares `kind`, `mode`, `target`, and `style`; one command (`jit project render [--name <name>]`) renders all declared projections or the named one.\n- [hard] REQ-02: Markdown-first kinds project their addressable rows (self-id and text, per the kind's declared `section` and `id-pattern`) from the kind's source document; registry-first kinds project from their TOML registry; both flow through the same table shape and command.\n- [hard] REQ-03: Region mode replaces only the block between `<!-- jit:<name>:begin -->` and `<!-- jit:<name>:end -->` markers in the target, keeps every byte outside the markers intact, and writes atomically through storage (@/inv/atomic-writes).\n- [hard] REQ-04: The existing `id-anchor` and `full` styles are supported generically; the migrated invariants and rules-gates projections reproduce their current rendered regions in their current targets under projection names `invariants` and `rules-and-gates` (existing marker strings unchanged).\n- [hard] REQ-05: `[invariant_projection]` and `[rules_gates_projection]` are removed from the config surface and `jit invariant render` / `jit reference render` from the CLI, replaced by `[projection.*]` and `jit project render`; this repository's `.jit/config.toml` is migrated in the same change.\n- [hard] REQ-06: This repository declares `[projection.charter]` rendering the charter decision log as id-anchor bullets (`- **D-N** — <one-liner>`) into a new `### Charter Decisions` subsection of CLAUDE.md under Key Design Principles, adjacent to Domain Invariants.\n- [hard] REQ-07: Rendering fails with a typed error (nonzero exit per the exit-code taxonomy) on an unknown kind, a missing source or target, or absent markers in region mode; nothing is partially written.\n- [hard] REQ-08: Harness tests cover a markdown-first projection round-trip, byte-exactness outside markers, and output parity for the two migrated projections.\n\n## Notes\n\nDecisions pinned during intake:\n\n- **Config shape: generic `[projection.<name>]` tables with migration.** Rejected: keeping the two bespoke tables alongside a new generic mechanism — two coexisting config shapes for one concept; and a charter-specific `[charter_projection]` third table — one-off growth per projection.\n- **Command surface: `jit project render`, replacing `jit invariant render` and `jit reference render`.** One render verb over the declared projection set instead of one subcommand per projection.\n- **Dogfood target: a dedicated `### Charter Decisions` section in CLAUDE.md.** The decisions bind design scope, so they sit with Domain Invariants under Key Design Principles. Rejected: rendering into the Dogfooding section — that placement frames the decisions as repo-local configuration trivia; and an engine-only issue with repo wiring deferred — the render target is a user-level decision, pinned here.\n- **Pre-v1.0 config break accepted.** The migration replaces tables and commands outright, with no compatibility aliases.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-09T11:21:19.715437842Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-09T11:21:19.715488522Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "milestone:v1.0",
+    "component:cli",
+    "per:@/charter/D-6",
+    "per:@/charter/D-7",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "created_at": "2026-07-09T11:21:10.588643085Z",
+  "updated_at": "2026-07-09T11:30:10.896611314Z",
+  "first_ready_at": "2026-07-09T11:21:10.588652835Z"
+}

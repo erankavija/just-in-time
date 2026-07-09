@@ -1,0 +1,37 @@
+{
+  "id": "52665a07-3d30-47e5-a3c7-d2aacc63cec5",
+  "title": "Remove language-flavored builtin gate presets; presets resolve project-declared bundles",
+  "description": "Remove the language- and content-flavored builtin gate presets from engine code; presets stay as a mechanism resolving project-declared bundles.\n\n## Background\n\n`crates/jit/src/gate_presets/builtin.rs` compiles domain vocabulary into the binary: `rust-tdd`, `python-tdd`, `js-tdd`, `minimal`, and `security-audit` bundle hardcoded gate keys, titles, and checkers. This predates the current design: the preset system landed 2026-02-10 under production-polish, months before config-declared gates (@/charter/D-2) and the domain-agnostic invariant (@/inv/domain-agnostic: gate keys come from repository configuration, never from hardcoded domain assumptions). D-2's rejection rationale — every new or tuned gate requires recompiling — describes builtin bundles exactly.\n\nThe surrounding machinery is already domain-agnostic and stays: storage lists builtin and custom presets, `save_gate_preset` persists project-defined bundles, and graph templates resolve node/anchor gate names through the preset manager. The planning-bracket presets (`plan-review`, `breakdown-review`, `coverage-preview`) are workflow infrastructure of the plan bracket (@/charter/D-3), not domain vocabulary; they are what the bracket genuinely needs from this module.\n\n## Success Criteria\n\n- [hard] REQ-01: The builtin preset set no longer contains language- or content-flavored bundles (`rust-tdd`, `python-tdd`, `js-tdd`, `minimal`, `security-audit`); `jit gate preset list` shows project-defined presets plus the planning-bracket presets only.\n- [hard] REQ-02: The preset mechanism is unchanged for project-defined presets: save, list, show, apply, and template gate-name resolution all work against project-declared bundles; harness tests cover a project-defined preset end to end.\n- [hard] REQ-03: The planning-bracket presets remain available to template role resolution, and their retention as workflow infrastructure (rather than domain content) is stated where the domain-agnostic boundary is documented.\n- [hard] REQ-04: Every reference to a removed preset name is swept from CLI help text, docs/, and CLAUDE.md; `jit validate` and repo-wide search find no dangling mentions.\n- [hard] REQ-05: Adopter documentation shows how to declare an equivalent bundle as a project-defined preset, replacing the removed builtins.\n\n## Notes\n\nDecisions pinned during intake:\n\n- **Remove, in v1.0 scope.** A binary shipping baked-in domain vocabulary undercuts the charter's domain-agnostic claim at release. Rejected: filing without a milestone — presets are opt-in, but the contradiction is with the release's own invariant projection; and documenting a boundary exception — the invariant wording admits none for gate keys.\n- **The mechanism survives, the content goes.** Project-defined presets and template resolution are config-driven and consistent with @/inv/domain-agnostic; only the compiled-in bundles violate it.\n- **Planning-bracket trio retained.** `plan-review`, `breakdown-review`, `coverage-preview` encode jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-09T11:25:06.721789985Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-09T11:25:06.721752485Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:core-maintenance",
+    "milestone:v1.0",
+    "component:gates",
+    "per:@/charter/D-2"
+  ],
+  "created_at": "2026-07-09T11:25:06.642012697Z",
+  "updated_at": "2026-07-09T11:25:06.721807665Z",
+  "first_ready_at": "2026-07-09T11:25:06.642021737Z"
+}
