@@ -89,17 +89,23 @@ File locking prevents race conditions during concurrent updates:
 
 **Example - Two agents claiming simultaneously:**
 
-```bash
-# Agent 1                          # Agent 2
-jit claim acquire abc123           jit claim acquire abc123
-  ↓ acquire claims.index.lock        ↓ (blocked waiting for lock)
-  ↓ read claims index
-  ↓ verify issue unassigned
-  ↓ write new claim
-  ↓ release lock                     ↓ acquire claims.index.lock
-                                     ↓ read claims index
-                                     ↓ verify issue unassigned
-                                     ✗ ERROR: Already claimed
+```mermaid
+sequenceDiagram
+    participant A1 as Agent 1
+    participant L as claims.index.lock
+    participant A2 as Agent 2
+    A1->>L: jit claim acquire abc123
+    A2->>L: jit claim acquire abc123
+    L-->>A1: lock acquired
+    Note over A2: blocked waiting for lock
+    A1->>A1: read claims index
+    A1->>A1: verify issue unassigned
+    A1->>A1: write new claim
+    A1->>L: release lock
+    L-->>A2: lock acquired
+    A2->>A2: read claims index
+    A2->>A2: verify issue unassigned
+    Note over A2: ERROR: Already claimed
 ```
 
 **Benefits:**
