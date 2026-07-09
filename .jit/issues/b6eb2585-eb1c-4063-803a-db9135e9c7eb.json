@@ -2,9 +2,9 @@
   "id": "b6eb2585-eb1c-4063-803a-db9135e9c7eb",
   "title": "Route bulk state updates through the transition chokepoint",
   "description": "Make bulk state updates use the same transition path as single-issue updates instead of re-checking blocking and gates manually.\n\n## Background\n\n`bulk_update.rs:556-576` manually re-checks `is_blocked` plus `has_unpassed_gates()` before Ready/Done transitions instead of routing through `apply_state_transition` in `commands/mod.rs` (the documented state chokepoint that also enforces graph rules and emits events). It reuses the domain predicates, so it agrees today, but it is a second enforcement point that will drift as transition rules evolve.\n\n## Success Criteria\n\n- [hard] REQ-1: Bulk updates perform state transitions through the same chokepoint as single-issue transitions; the manual pre-check block is removed.\n- [hard] REQ-2: A bulk item that cannot transition reports the same typed blockers as the equivalent single-issue transition.\n- [hard] REQ-3: A bulk transition emits the same event sequence per issue as the equivalent single transitions, verified by a test comparing event logs.\n\n## Notes\n\nBulk semantics stay per-item best-effort (one failing item does not abort the batch) unless existing tests specify otherwise; only the enforcement path changes.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [],
   "gates_required": [
     "code-review",
@@ -26,6 +26,7 @@
     "satisfies:REQ-3"
   ],
   "created_at": "2026-07-05T22:31:18.723314448Z",
-  "updated_at": "2026-07-06T16:09:15.929904158Z",
-  "first_ready_at": "2026-07-05T22:31:18.723314718Z"
+  "updated_at": "2026-07-09T22:56:14.782894360Z",
+  "first_ready_at": "2026-07-05T22:31:18.723314718Z",
+  "claimed_at": "2026-07-09T22:56:14.782894140Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
   "epic_short_id": "dbe1e821",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -12,7 +12,7 @@
           "short_id": "69ffdcf8",
           "title": "Unify the dependency-met predicate across all surfaces",
           "classification": "implementation",
-          "status": "rework-2"
+          "status": "done"
         },
         {
           "id": "50677708-4fce-42d6-8b43-5b486ab216bb",
@@ -26,7 +26,7 @@
           "short_id": "2f447380",
           "title": "Pure template expansion with atomic apply",
           "classification": "implementation",
-          "status": "rework-2"
+          "status": "done"
         },
         {
           "id": "a4e8d5ac-c3f7-40bb-b4ea-108283bcf611",
@@ -126,6 +126,13 @@
       "type": "bug",
       "epic": "6eb585bc",
       "reason": "npm-ci's checker runs only the web workspace, so a4e8d5ac's gates were blind to the failing mcp-server suite. Filed rather than fixed: gate definitions are shared infrastructure (escalation category 8)."
+    },
+    {
+      "short_id": "894337e2",
+      "title": "find_available_port races between probe and bind",
+      "type": "bug",
+      "epic": "6eb585bc",
+      "reason": "Surfaced by a rework agent's flaky cargo test run. serve.rs:249 returns a port it no longer holds; the test flake is a symptom of a TOCTOU race in shipped code."
     }
   ],
   "escalations": [
@@ -146,9 +153,11 @@
   "note_max_rework": "MAX_REWORK_ATTEMPTS=2. Both 69ffdcf8 and 2f447380 are on their final attempt; a third failure escalates to the human. 69ffdcf8's stale-wording finding has recurred twice, so it also approaches MAX_SAME_FINDING_REPEATS=3.",
   "review_findings": {
     "a1fe0c6e": "PASS on first review. Gates green, criteria met, sweeps clean.",
-    "69ffdcf8": "R1 FAIL [low]: stale dependency wording at docs/tutorials/first-workflow.md:270 describes readiness as dependencies 'done' rather than terminal. REQ-4 is a sweep criterion; the worker's sweep and the lead's Tier 2.5 sweep both grepped 'not Done' patterns and missed 'all dependencies done'.",
-    "50677708": "R1 FAIL [medium]: newly public graph APIs lack the mandatory '# Examples' doc sections (scripts/code-review-prompt.md:61). Functional criteria all met.",
-    "2f447380": "R1 FAIL [high]: apply holds .git/jit/locks/apply.lock while ordinary writers hold .jit/.index.lock, so the apply lock excludes no one and compensation-rollback can erase concurrent writes. Also absent entirely outside a git repo. Lead confirmed independently against storage/json.rs:508 and commands/mod.rs:1054."
+    "69ffdcf8": "R1 FAIL [low]: stale dependency wording at docs/tutorials/first-workflow.md:270 describes readiness as dependencies 'done' rather than terminal. REQ-4 is a sweep criterion; the worker's sweep and the lead's Tier 2.5 sweep both grepped 'not Done' patterns and missed 'all dependencies done'. R2 FAIL: dependency.rs doc comment + docs echoes. Lead traced root cause to errors.rs:827 shipping the literal string 'incomplete dependencies'. Fixed at source to 'unmet dependencies', matching the existing unmet_dependencies JSON field. R3 PASS.",
+    "50677708": "R1 FAIL [medium]: newly public graph APIs lack the mandatory '# Examples' doc sections (scripts/code-review-prompt.md:61). Functional criteria all met. R2 PASS.",
+    "2f447380": "R1 FAIL [high]: apply holds .git/jit/locks/apply.lock while ordinary writers hold .jit/.index.lock, so the apply lock excludes no one and compensation-rollback can erase concurrent writes. Also absent entirely outside a git repo. Lead confirmed independently against storage/json.rs:508 and commands/mod.rs:1054. R2 FAIL [high]: rollback restored via save_issue, which stamps updated_at, so a failed apply left observable change. Fixed with IssueStore::restore_issue_verbatim. R3 PASS.",
+    "c291e95c": "R1 FAIL [high]: REQ-02 unevidenced because no gate ran the mcp-server suite. Resolved by defining the mcp-ci gate (invoker-approved). R2 PASS.",
+    "a4e8d5ac": "R1 FAIL [high]: prerequisite c291e95c still in_progress. Sequencing artifact, not worker fault; not counted as rework. PASS after c291e95c closed."
   },
   "started_at": "2026-07-09T00:00:00+00:00"
 }
