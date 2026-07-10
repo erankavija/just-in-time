@@ -123,10 +123,9 @@ jit issue update <id> --label "milestone-v1.0"
 ### Core Namespaces (Built-in)
 
 Namespaces are declared in `.jit/config.toml` under `[namespaces.<name>]` tables.
-The older `.jit/label-namespaces.json` file is no longer used; `jit init` now
-seeds a starter registry directly in the generated `config.toml`. A fresh repo
-ships with `type`, `component`, `priority`, `team`, `milestone`, and `resolution`
-pre-declared and ready to customize.
+`jit init` seeds a starter registry directly in the generated `config.toml`, with
+these namespaces pre-declared and ready to customize: `type`, `component`,
+`priority`, `team`, `milestone`, `resolution`, and `enforces`.
 
 ```toml
 [namespaces.type]
@@ -158,6 +157,11 @@ examples = ["team:backend", "team:platform"]
 description = "Reason for issue closure (used with rejected state)."
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate"]
+
+[namespaces.enforces]
+description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
+unique = false
+examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 ```
 
 Membership namespaces for parent types (`epic:*`, `story:*`, `milestone:*`
@@ -196,15 +200,12 @@ enforce several items.
 > **Enforcement lives in `.jit/rules.toml`, the single source of truth.** Allowed
 > values, value patterns, required namespaces, the canonical label format, and the
 > orphan-leaf / strategic-consistency warnings are declarative rules there
-> (scaffolded by `jit init`). The former per-namespace `values`/`pattern`/
-> `required` fields and the `[validation]` enforcement flags
-> (`require_type_label`, `label_regex`, `reject_malformed_labels`,
-> `enforce_namespace_registry`, `warn_orphaned_leaves`,
-> `warn_strategic_consistency`) were removed. To restrict a namespace's values,
+> (scaffolded by `jit init`). A `[namespaces.<name>]` table declares taxonomy
+> only: description, uniqueness, and examples. To restrict a namespace's values,
 > author a rule in `rules.toml`, e.g.:
 
 ```toml
-# .jit/rules.toml — restrict type:* to a fixed set (authored, not config-derived)
+# .jit/rules.toml: restrict type:* to a fixed set (authored, not config-derived)
 [[rules]]
 name = "type-allowed-values"
 severity = "error"
