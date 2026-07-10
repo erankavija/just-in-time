@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "cdd7a11b-a505-441a-98bd-2eafc15298b8",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+  "commit": "0d70022285a4f18e3f02d62db1136288391b7d2c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T15:55:38.691443305Z",
+  "completed_at": "2026-07-10T15:56:36.506997747Z",
+  "duration_ms": 57815,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nPass. Documented CLI behavior, JSON contracts, storage layout, event taxonomy, workspace structure, Docker initialization, and runtime prerequisites match the current source and manifests. The latest review’s eight findings are resolved.\n\n## 2. Adopter surface versus repo-local dogfood configuration\n\nPass. Repository-specific types, namespaces, templates, rules, gates, scripts, and item kinds are explicitly signalled as this repository’s configuration or presented as optional examples.\n\n## 3. Current behavior only\n\nPass. Historical/future-marker matches occur only in examples, status vocabulary, comments, or descriptions of current behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass. Numeric claims are configured values, examples, stable workflow structures, or runtime output—not volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nPass. Repository-relative links, heading anchors, and cited paths resolve. All concrete addressable-item citations resolve; `@/issue/REQ-01` is explicitly an invalid-address example.\n\n## 6. Content-standards conformance\n\nPass. Authored diagrams use Mermaid. Plain-text tree blocks are directory or CLI listings, and no non-LaTeX mathematical equations remain.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shipped documentation matches the current product surface and all findings from the latest review are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The shipped documentation matches the current product surface and all findings from the latest review are resolved.",
+    "findings": []
+  }
+}
