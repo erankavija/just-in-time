@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "01bc27d6-cdb4-4477-9f85-03a34af9d989",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "e486a854-1860-4d25-8cc5-c26715192088",
+  "commit": "dcd57fb43d98f3b1d94407e4b53e2d207b7a3294",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T08:26:26.918368588Z",
+  "completed_at": "2026-07-10T08:27:56.905448225Z",
+  "duration_ms": 89987,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\n- REQ-1 met: `GET /graph` exposes resolved `parent`, `children`, `cluster`, `rank`, and `type`, using the core hierarchy resolver at [routes.rs](/home/vkaskivuo/Projects/just-in-time/crates/server/src/routes.rs:185).\n- REQ-2 met: `graph_tree` publishes `GraphTreeResponse` through the schema command at [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:429).\n- REQ-3 met: full JSON export flattens the shared four-field hierarchy representation at [visualization.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/visualization.rs:223).\n- REQ-4 met: scoped-resolution behavior is documented for export and tree at [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2960) and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2985).\n- The required list envelope is restored: `count` is `nodes.len()` at [routes.rs](/home/vkaskivuo/Projects/just-in-time/crates/server/src/routes.rs:221).\n\n## Architecture and Separation of Concerns\n\nHierarchy resolution remains in the domain graph module. The server and commands only orchestrate storage and project resolved data. No boundary violation found.\n\n## Functional Paradigm\n\nThe new hierarchy projections use iterator transformations and immutable resolved values. No blocking functional-style concern found.\n\n## Correctness and Invariants\n\nThe prior review finding is resolved. The endpoint test deliberately uses three nodes and one edge, confirming that `count` describes the primary node collection.\n\nNo persistence, transition, event-log, gate, assignee, label, or PID behavior is changed.\n\n## Safety\n\nNo unsafe code was introduced.\n\n## Testing\n\nTests were not rerun because the issue has a succeeded `cargo-ci` gate, as instructed. Recorded evidence reports formatting and Clippy successful, with 3,528 tests passed, 0 failed, and 12 ignored.\n\nCoverage includes hierarchy fields, schema publication, export/tree field agreement, and the corrected graph response count.\n\n## Error Handling\n\nFallible configuration loading is propagated as an HTTP error with server-side context. No new production `unwrap()` or `expect()` was introduced.\n\n## CLI Contract\n\nAffected CLI commands retain `--json` support. The tree response schema is retrievable through the schema command.\n\n## Documentation\n\nThe shared hierarchy contract and scoped-export caveat are documented for both required surfaces. Relevant public hierarchy types have descriptive documentation and examples.\n\n## Prior Review Feedback\n\nThe sole prior finding—missing `count` in `GET /graph`—has been fixed at [routes.rs](/home/vkaskivuo/Projects/just-in-time/crates/server/src/routes.rs:125) and covered by a focused endpoint test.\n\n## Jit Issue Management\n\n`./scripts/jit-validate.sh` passes. The issue declares no dependencies or unmet prerequisites.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, and the prior GET /graph list-envelope finding has been resolved with focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, and the prior GET /graph list-envelope finding has been resolved with focused coverage.",
+    "findings": []
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "2263972b-1930-42f1-a2f4-4fd37fd9a819",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "136268f8-5aed-4f36-9c10-46019c98ca76",
+  "commit": "8c186b174751ab9183219bd593a26078ffd67f07",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T08:07:34.949473688Z",
+  "completed_at": "2026-07-10T08:08:44.040442849Z",
+  "duration_ms": 69090,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-1 and REQ-3 are implemented: repository bindings flow through breakdown, refresh, and validation, with centralized defaults in `templates.rs`.\n\nREQ-2 is not fully verified. The new integration test manually constructs the anchor map instead of invoking the CLI’s changed auto-binding path.\n\nREQ-4 is partially inaccurate: the configuration reference attributes transform behavior to `roles.planning`, although transforms select their target using their own `role` field.\n\n## Architecture and separation of concerns\n\nThe boundaries remain sound:\n\n- Binding models and lookup live in `templates.rs`.\n- Commands consume resolved bindings without parsing CLI arguments.\n- CLI auto-binding remains in `main.rs`.\n- No new persistence bypass was introduced in production code.\n\n## Functional paradigm\n\nThe implementation generally follows the project’s expression-oriented and iterator-based style. No blocking functional-style concerns found.\n\n## Correctness and invariants\n\nNo new unsafe code, PID handling, state-transition, gate-semantics, label-format, or production file-write violations were identified.\n\nThe prerequisite issue `2f447380` is complete, and this change builds on its template apply/refresh work.\n\n## Safety\n\nThe workspace continues to prohibit unsafe code. No unsafe blocks were introduced.\n\n## Testing\n\nThe recorded `cargo-ci` gate passed on 2026-07-10, so tests were not rerun as instructed. There are no prior review findings in `run_history`.\n\nThe required `./scripts/jit-validate.sh` completed successfully.\n\nCoverage is incomplete at the CLI boundary: the test calls `container_anchor()` and manually inserts that value into `BTreeMap`, reproducing rather than exercising the logic changed in `main.rs`.\n\n## Error handling\n\nNo new `unwrap()` or `expect()` was introduced in non-test library code. New production fallible operations propagate contextual errors.\n\n## CLI contract\n\nThe existing `apply --json` contract remains present. However, the configured-anchor auto-binding behavior changed in the CLI and lacks a CLI integration test.\n\n## Documentation\n\nThe new keys and defaults are documented, but the stated relationship between `roles.planning` and `move-upstream-to-role` is incorrect. The transform target remains independently selected by `[[template.transforms]].role`.\n\n## Findings\n\n1. **F1 — High:** REQ-2’s integration coverage does not exercise the configured container-anchor auto-binding at the CLI boundary. The test obtains `executor.container_anchor()` and manually builds the same binding map that production builds, so a regression or removal of `main.rs`’s auto-binding would leave the test green. Add a CLI integration test that invokes `jit apply plan <container>` without `--anchor target=…`, then completes breakdown and `apply --force`. ([crates/jit/tests/template_binding_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/template_binding_tests.rs:165))\n2. **F2 — Medium:** The configuration reference incorrectly says `roles.planning` controls where `move-upstream-to-role` moves dependencies. That transform resolves its independently configured `[[template.transforms]].role`; changing `roles.planning` alone does not retarget it. This fails REQ-4’s requirement to document what each binding controls accurately. ([docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:147))\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"CLI auto-binding lacks integration coverage and the planning-role binding documentation overstates its control of transforms.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"REQ-2 integration coverage manually reproduces configured anchor auto-binding instead of exercising the CLI path.\",\"file\":\"crates/jit/tests/template_binding_tests.rs\",\"line\":165},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"Configuration reference incorrectly states that roles.planning controls the move-upstream-to-role transform target.\",\"file\":\"docs/reference/configuration.md\",\"line\":147}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6359 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4b11-55e2-7b73-87f0-ece88af66950\n--------\nuser\n--- 6346 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "CLI auto-binding lacks integration coverage and the planning-role binding documentation overstates its control of transforms.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "REQ-2 integration coverage manually reproduces configured anchor auto-binding instead of exercising the CLI path.",
+        "file": "crates/jit/tests/template_binding_tests.rs",
+        "line": 165
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "Configuration reference incorrectly states that roles.planning controls the move-upstream-to-role transform target.",
+        "file": "docs/reference/configuration.md",
+        "line": 147
+      }
+    ]
+  }
+}

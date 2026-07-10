@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "659a5f42-58b6-4cfa-a208-e51e71edcbae",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "136268f8-5aed-4f36-9c10-46019c98ca76",
+  "commit": "eab2247705cf21c05bd82c3d91b84bc77d330170",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T08:40:30.859779452Z",
+  "completed_at": "2026-07-10T08:44:15.070583503Z",
+  "duration_ms": 224210,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nAll acceptance criteria are met:\n\n- REQ-1: Configured bindings flow through apply, breakdown, forced refresh, validation, and CLI auto-binding. Defaults remain centralized in `crates/jit/src/templates.rs`.\n- REQ-2: `crates/jit/tests/template_binding_cli_tests.rs` exercises the real CLI without `--anchor`; `crates/jit/tests/template_binding_tests.rs` covers the complete apply, breakdown, and forced-refresh flow.\n- REQ-3: Engine consumers use resolved bindings rather than hardcoded role or anchor names.\n- REQ-4: `docs/reference/configuration.md` accurately documents keys, defaults, and responsibilities.\n\nBoth findings from the prior review are resolved.\n\n## Architecture and separation of concerns\n\nResponsibilities remain appropriately separated. Binding definitions and defaults live in the template/configuration layer, commands consume resolved bindings, and positional CLI auto-binding remains in `crates/jit/src/main.rs:2747`. No persistence boundary violations were found.\n\n## Functional paradigm\n\nThe changes follow the existing expression-oriented style. No unnecessary imperative logic or new technical debt was identified.\n\n## Correctness and invariants\n\nNo regressions were found in atomic writes, event logging, gates, identifiers, labels, or PID handling. The completed dependency `2f447380` is correctly built upon.\n\n## Safety\n\nNo unsafe code was introduced. No new production `unwrap()` or `expect()` calls were found.\n\n## Testing\n\nThe recorded `cargo-ci` gate passed, so the test suite was not rerun. The new CLI coverage directly exercises configured anchor auto-binding and forced refresh. The command harness covers renamed-role breakdown, which has no CLI surface.\n\n`./scripts/jit-validate.sh` passed.\n\n## Error handling\n\nFallible production paths continue to return contextual errors. No blocking error-handling issues were found.\n\n## CLI contract\n\nThe affected `apply` command retains `--json`. Its configured-anchor behavior is now covered through the real binary.\n\n## Documentation\n\nPublic binding APIs include documentation and examples. The configuration reference now correctly explains that `move-upstream-to-role` uses its transform-local `role`, independently of `roles.planning`.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, prior findings are resolved, cargo-ci evidence passed, and repository validation succeeds.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, prior findings are resolved, cargo-ci evidence passed, and repository validation succeeds.",
+    "findings": []
+  }
+}
