@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "5dd9e267-90a9-4594-9a59-1908e80829c3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "bbaedb0f-952b-4578-8e25-9a394f926fe7",
+  "commit": "19be716327890bfa92b7052167d1479eb319ebd5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T10:36:42.954910884Z",
+  "completed_at": "2026-07-10T10:37:46.344731509Z",
+  "duration_ms": 63389,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-1 through REQ-4 are satisfied:\n\n- Type taxonomy and `HierarchyConfig` moved to `domain/type_taxonomy.rs`.\n- The storage-reading loader moved to `config_manager.rs`; the preset module now contains pure preset data.\n- Git validation uses `--branch-drift`; legacy `--divergence` returns a targeted hint, and CLI documentation distinguishes membership divergence.\n- `validation::rules::Scope` became `RuleScope`; only `domain::item::Scope` remains.\n\nREQ-5 is not fully satisfied because current documentation still references superseded names and locations.\n\n## Architecture and separation of concerns\n\nThe changed code respects the intended boundaries. Taxonomy logic remains pure, graph hierarchy resolution depends on the domain taxonomy, and configuration loading is outside the preset module.\n\n## Functional paradigm\n\nThe renames and moves preserve the existing functional style. No blocking regression was identified.\n\n## Correctness and invariants\n\nThis is behavior-preserving refactoring. No changes compromise atomic writes, event logging, gate semantics, label or assignee formats, PID safety, or other domain invariants.\n\n## Safety\n\nNo unsafe code was introduced.\n\n## Testing\n\nThe succeeded cargo-ci gate is the primary evidence, so tests were not rerun:\n\n- Formatting: passed\n- Clippy: passed\n- Tests: 3,553 passed, 0 failed, 12 ignored\n- Gate commit: `9877639d46a9ca5ebd9c009182aad097616cf529`\n\n`./scripts/jit-validate.sh` also passes.\n\n## Error handling\n\nThe legacy flag returns a contextual error naming both valid alternatives. No new library `unwrap()` or `expect()` was introduced by the issue changes.\n\n## CLI contract\n\n`jit validate --branch-drift` retains the command’s `--json` support. The hidden legacy spelling is explicitly handled rather than becoming an ambiguous Clap error.\n\n## Documentation\n\nThe principal CLI references and `CLAUDE.md` were updated, but current project documentation still contains obsolete architecture identifiers. This violates the hard requirement that the architecture narrative state only the current structure.\n\n## Issue management and dependencies\n\nThe issue has no dependencies or unmet prerequisites. Its cargo-ci gate passed, and repository validation passed.\n\n## Findings\n\n1. **F1 — High:** REQ-5 is incomplete. [TESTING.md](/home/vkaskivuo/Projects/just-in-time/TESTING.md:67) still identifies `crates/jit/src/type_hierarchy.rs`, which no longer exists. Current active/design documentation also retains obsolete names: `dev/active/planning-bracket-design.md:215` cites `type_hierarchy.rs`, and `dev/design/worktree-parallel-work.md:2624` presents `jit validate --divergence` as the command rather than `--branch-drift`. These stale current-structure references must be updated.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-5 is incomplete because current documentation retains obsolete module paths and CLI naming.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Current documentation still references the removed type_hierarchy.rs module and obsolete validate --divergence command name.\",\"file\":\"TESTING.md\",\"line\":67}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5120 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4b99-e306-7e62-b586-b63a59d6f19d\n--------\nuser\n--- 5107 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-5 is incomplete because current documentation retains obsolete module paths and CLI naming.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Current documentation still references the removed type_hierarchy.rs module and obsolete validate --divergence command name.",
+        "file": "TESTING.md",
+        "line": 67
+      }
+    ]
+  }
+}
