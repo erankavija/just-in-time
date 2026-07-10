@@ -2,7 +2,7 @@
   "id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
   "title": "Rewrite TESTING.md for the current workspace layout",
   "description": "TESTING.md still describes the pre-workspace repository: a cli/ crate root, flat module files, dated test counts, property-based testing listed as future work, and a TestHarness API sketch that does not match the actual harness.\n\n## Success Criteria\n\n- [hard] REQ-01: All paths in TESTING.md point at crates/jit/ locations that exist\n- [hard] REQ-02: The document contains no dated or hardcoded test counts\n- [hard] REQ-03: Property-based testing is described as current practice\n- [hard] REQ-04: The TestHarness description matches the actual API in crates/jit/tests/harness.rs (in-memory backing, real method set)\n- [hard] REQ-05: Every link in the document resolves",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -37,7 +37,8 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.876375510Z",
-  "updated_at": "2026-07-10T00:12:59.524532218Z",
+  "updated_at": "2026-07-10T10:33:04.082503385Z",
   "first_ready_at": "2026-07-06T15:39:58.876375790Z",
-  "claimed_at": "2026-07-09T23:14:07.720989415Z"
+  "claimed_at": "2026-07-09T23:14:07.720989415Z",
+  "done_at": "2026-07-10T10:33:04.082502935Z"
 }

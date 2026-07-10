@@ -2,7 +2,7 @@
   "id": "a6e1ae3d-169c-4959-b105-66a418ddc022",
   "title": "Complete the CLI command reference",
   "description": "docs/reference/cli-commands.md is billed as the complete command reference but ships empty stub sections (Document Commands; Status and Validation — README links into one), and omits entire command families: item, invariant, reference, apply, snapshot, hooks, top-level search, and even issue create and update.\n\n## Success Criteria\n\n- [hard] REQ-01: No empty stub sections remain\n- [hard] REQ-02: issue create and issue update are documented\n- [hard] REQ-03: The item, invariant, reference, apply, snapshot, hooks, and search families each have reference coverage\n- [hard] REQ-04: Every anchor that other docs link into resolves\n- [hard] REQ-05: Documented flags and arguments match the current CLI definitions",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -31,7 +31,8 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.880602343Z",
-  "updated_at": "2026-07-09T23:56:15.847171698Z",
+  "updated_at": "2026-07-10T10:33:03.537356278Z",
   "first_ready_at": "2026-07-06T15:39:58.880602713Z",
-  "claimed_at": "2026-07-09T23:14:07.628906608Z"
+  "claimed_at": "2026-07-09T23:14:07.628906608Z",
+  "done_at": "2026-07-10T10:33:03.537355518Z"
 }
