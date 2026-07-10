@@ -53,6 +53,19 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
 - [Content Standards](reference/jit-content-standards.md) - Authoring standards for issue descriptions and markdown documents
+- [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
+- [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
+
+### 🧪 [Examples](examples/) - Sample Configurations
+*Runnable `.jit/` configurations for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
+
+- [sdd](examples/sdd/) - Spec-Driven Development
+- [bug-repro](examples/bug-repro/) - bug triage
+- [release-checklist](examples/release-checklist/) - release gating
+- [fresh-evidence](examples/fresh-evidence/) - fresh-evidence-before-done
+- [nyquist](examples/nyquist/) - criteria-to-check mapping
+- [cross-epic](examples/cross-epic/) - cross-epic requirement-id collision detection
+- [research](examples/research/) - research program: non-software hierarchy with `type:goal` / `type:experiment` and `hyp:` / `tests:` namespaces
 
 ### 📄 Additional Resources
 
