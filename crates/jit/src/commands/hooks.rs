@@ -7,13 +7,13 @@ use std::path::{Path, PathBuf};
 const PRE_COMMIT_HOOK: &str = include_str!("../../../../scripts/hooks/pre-commit");
 const PRE_PUSH_HOOK: &str = include_str!("../../../../scripts/hooks/pre-push");
 
-/// Install git hooks for lease and divergence validation
+/// Install git hooks for lease and branch-drift validation
 ///
 /// Copies hook templates to `.git/hooks/` directory and makes them executable.
 ///
 /// # Hooks Installed
 ///
-/// - **pre-commit**: Validates leases and divergence before commit
+/// - **pre-commit**: Validates leases and branch drift before commit
 /// - **pre-push**: Validates leases before push
 ///
 /// # Errors

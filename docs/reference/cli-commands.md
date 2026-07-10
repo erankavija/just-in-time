@@ -141,6 +141,14 @@ through the wrong command:
 | `jit label add <id> <label>` | `jit issue update <id> --label <namespace:value>` |
 | `jit label rm`/`remove <id> <label>` | `jit issue update <id> --remove-label <namespace:value>` |
 
+One flag hints the same way. `jit validate --divergence` (exit code 2) names
+both commands that word could mean:
+
+```
+$ jit validate --divergence
+Error: `--divergence` is not a `jit validate` flag. Use `jit validate --branch-drift` for git branch drift, or `jit query divergence` for membership labels the DAG does not back.
+```
+
 `jit label` itself only inspects the namespace registry (`jit label
 namespaces`, `jit label values`) — it never touches an issue's labels. See
 `jit label --help`.
@@ -3064,7 +3072,7 @@ jit validate [<ID>] [--json]
 jit validate <ID> --explain [--json]
 jit validate --scope <ID> [--json]
 jit validate --fix [--dry-run] [--json]
-jit validate --divergence [--leases] [--json]
+jit validate --branch-drift [--leases] [--json]
 ```
 
 | Mode | What it does |
@@ -3074,14 +3082,20 @@ jit validate --divergence [--leases] [--json]
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean. |
 | `--fix` | Apply the automatic fixes (e.g. dropping transitively redundant edges). `--dry-run` reports what would be fixed and writes nothing. |
-| `--divergence` | Check that the branch has not diverged from `origin/main`. Requires git. |
+| `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check that active leases are consistent and not stale. |
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
-`--fix`/`--divergence`/`--leases`/`--explain`. `--fix`, `--divergence`, and
+`--fix`/`--branch-drift`/`--leases`/`--explain`. `--fix`, `--branch-drift`, and
 `--leases` are repository-wide, so combining any of them with a positional id is
 a usage error rather than a silently ignored argument. `--dry-run` requires
 `--fix`.
+
+**Two distinct concepts.** `--branch-drift` is about git: it asks whether the
+current branch still sits on top of `origin/main`. Membership divergence is
+about the work graph: a membership label the DAG does not back, reported by
+[`jit query divergence`](#membership-divergence-jit-query-divergence) and
+mirrored in this command's advisory `divergence_count`.
 
 Whole-repository JSON reports both the integrity verdict and the rule findings in
 one object:

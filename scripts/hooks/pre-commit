@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit hook for JIT: Validate leases and divergence
+# Pre-commit hook for JIT: Validate leases and branch drift
 #
 # This hook enforces:
 # 1. Global operations (.jit/config, gates/registry) require common history with main

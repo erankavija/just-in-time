@@ -5776,10 +5776,26 @@ fn run() -> Result<()> {
             explain,
             fix,
             dry_run,
+            branch_drift,
             divergence,
             leases,
             scope,
         } => {
+            // `--divergence` is a hidden stub (cli.rs): the word names the
+            // membership-vs-DAG report of `jit query divergence`, so the git
+            // check owns `--branch-drift` and this spelling only hints.
+            if divergence {
+                return Err(invalid_argument(
+                    "`--divergence` is not a `jit validate` flag. Use \
+                     `jit validate --branch-drift` for git branch drift, or \
+                     `jit query divergence` for membership labels the DAG does \
+                     not back."
+                        .to_string(),
+                    "validate",
+                    json,
+                ));
+            }
+
             // Validate dry_run requires fix
             if dry_run && !fix {
                 return Err(anyhow!("--dry-run requires --fix to be specified"));
@@ -5790,22 +5806,22 @@ fn run() -> Result<()> {
             // error-severity finding) and is mutually exclusive with the other
             // validate modes, so it is dispatched FIRST after the combo checks
             // below reject conflicting flags.
-            if scope.is_some() && (id.is_some() || fix || divergence || leases || explain) {
+            if scope.is_some() && (id.is_some() || fix || branch_drift || leases || explain) {
                 return Err(anyhow!(
                     "`--scope` cannot be combined with a positional id or with \
-                     `--fix`/`--divergence`/`--leases`/`--explain`"
+                     `--fix`/`--branch-drift`/`--leases`/`--explain`"
                 ));
             }
 
-            // `--fix`, `--divergence`, and `--leases` are repo-wide operations and
+            // `--fix`, `--branch-drift`, and `--leases` are repo-wide operations and
             // are NOT scoped to a single issue. Combining any of them with a
             // positional issue id is rejected explicitly: previously the id was
             // silently ignored and the command ran repo-wide, which is dangerous
             // for `--fix` (it could mutate the entire repository when the user
             // believed they had scoped it to one issue).
-            if id.is_some() && (fix || divergence || leases) {
+            if id.is_some() && (fix || branch_drift || leases) {
                 return Err(anyhow!(
-                    "`--fix`/`--divergence`/`--leases` cannot be combined with a \
+                    "`--fix`/`--branch-drift`/`--leases` cannot be combined with a \
                      positional issue id (they are repo-wide)"
                 ));
             }
@@ -5924,7 +5940,7 @@ fn run() -> Result<()> {
             }
 
             // Per-issue rule run: `jit validate <id>`. Incompatible flag combos
-            // (`--fix`/`--divergence`/`--leases` + id) were already rejected above,
+            // (`--fix`/`--branch-drift`/`--leases` + id) were already rejected above,
             // so a present id here is always a pure per-issue rule run.
             if id.is_some() {
                 let report = executor.run_rules(id.as_deref())?;
@@ -5961,22 +5977,22 @@ fn run() -> Result<()> {
             }
 
             // Handle specific validations if requested
-            if divergence || leases {
+            if branch_drift || leases {
                 let mut validation_results = Vec::new();
 
-                if divergence {
-                    match executor.validate_divergence() {
+                if branch_drift {
+                    match executor.validate_branch_drift() {
                         Ok(()) => {
                             if !json {
                                 println!("✓ Branch is up-to-date with origin/main");
                             }
-                            validation_results.push(("divergence", true, String::new()));
+                            validation_results.push(("branch_drift", true, String::new()));
                         }
                         Err(e) => {
                             if json {
-                                validation_results.push(("divergence", false, e.to_string()));
+                                validation_results.push(("branch_drift", false, e.to_string()));
                             } else {
-                                eprintln!("❌ Divergence validation failed:\n{}", e);
+                                eprintln!("❌ Branch-drift validation failed:\n{}", e);
                                 std::process::exit(1);
                             }
                         }

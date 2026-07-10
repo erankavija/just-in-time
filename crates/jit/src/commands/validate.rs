@@ -1626,14 +1626,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok((total_fixed, messages))
     }
 
-    /// Validate branch hasn't diverged from main.
+    /// Validate that the branch still sits on top of `origin/main`.
     ///
-    /// Checks that the current branch shares common history with origin/main
-    /// by comparing merge-base with the main commit.
+    /// Compares the merge-base of HEAD and `origin/main` against the
+    /// `origin/main` commit: they agree exactly when `origin/main` is an
+    /// ancestor of HEAD. This is git branch drift, a concern separate from the
+    /// membership-label-vs-DAG divergence that `jit query divergence` reports.
     ///
     /// # Returns
-    /// Ok(()) if branch is up-to-date, Err with helpful message if diverged
-    pub fn validate_divergence(&self) -> Result<()> {
+    /// Ok(()) when the branch is up-to-date, Err naming both commits and the
+    /// rebase that reconciles them when it has drifted.
+    pub fn validate_branch_drift(&self) -> Result<()> {
         use std::process::Command;
 
         // Get merge-base between HEAD and origin/main
@@ -2014,7 +2017,7 @@ mod tests {
     use super::*;
     use chrono::Duration;
 
-    // Note: validate_leases() and validate_divergence() require git repository setup
+    // Note: validate_leases() and validate_branch_drift() require git repository setup
     // and are integration-tested through manual testing and real usage.
     // Unit tests focus on pure functions like format_duration().
 

@@ -359,7 +359,7 @@ pub enum Commands {
         /// `type:breakdown` node, bounded there), excluding whole-repo rules.
         /// Exits 4 with findings shown when an enforcing rule fails, 0 when
         /// clean. Mutually exclusive with a positional id and with
-        /// `--fix`/`--divergence`/`--leases`/`--explain`.
+        /// `--fix`/`--branch-drift`/`--leases`/`--explain`.
         #[arg(long, value_name = "ID")]
         scope: Option<String>,
 
@@ -371,8 +371,15 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
 
-        /// Validate branch hasn't diverged from main
+        /// Validate that git's `origin/main` is an ancestor of the current
+        /// branch, so the branch still sits on top of it. This is the git
+        /// concern; membership labels the DAG does not back are reported by
+        /// `jit query divergence`. Requires git.
         #[arg(long)]
+        branch_drift: bool,
+
+        /// Hidden stub: fails with a hint naming `--branch-drift`
+        #[arg(long, hide = true)]
         divergence: bool,
 
         /// Validate active leases are consistent and not stale
@@ -2741,12 +2748,12 @@ pub enum WorktreeCommands {
 /// Git hooks commands
 #[derive(Debug, Subcommand)]
 pub enum HooksCommands {
-    /// Install git hooks for lease and divergence validation
+    /// Install git hooks for lease and branch-drift validation
     ///
     /// Copies hook templates to .git/hooks/ and makes them executable.
     ///
     /// Hooks installed:
-    ///   - pre-commit: Validates leases and divergence before commit
+    ///   - pre-commit: Validates leases and branch drift before commit
     ///   - pre-push: Validates leases before push
     ///
     /// Examples:

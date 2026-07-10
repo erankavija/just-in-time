@@ -480,13 +480,11 @@ fn test_validate_json_output() {
 }
 
 #[test]
-fn test_validate_divergence_success() {
+fn test_validate_branch_drift_success() {
     let temp = setup_repo();
 
-    // Create a local branch to compare against (no remote needed)
-    // The test should pass when there's no divergence from the base
-    // Skip this test if no origin/main - divergence needs a remote
-    // Instead, test that validate runs without --divergence
+    // `--branch-drift` compares against origin/main, so it needs a remote.
+    // Here we assert only that a plain `validate` run succeeds.
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["validate"])
@@ -496,10 +494,25 @@ fn test_validate_divergence_success() {
 
 #[test]
 #[ignore = "requires git remote origin/main which is complex to set up in tests"]
-fn test_validate_divergence_detects_diverged_branch() {
+fn test_validate_branch_drift_detects_drifted_branch() {
     // This test would require setting up a remote repository
-    // which is complex in a temp directory. The divergence
+    // which is complex in a temp directory. Branch-drift
     // validation is tested manually and in CI with real remotes.
+}
+
+#[test]
+fn test_validate_divergence_spelling_hints_branch_drift() {
+    let temp = setup_repo();
+
+    // `--divergence` names the membership-vs-DAG report, so `jit validate`
+    // rejects it with a hint rather than a bare clap error.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["validate", "--divergence"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("jit validate --branch-drift"))
+        .stderr(predicates::str::contains("jit query divergence"));
 }
 
 #[test]

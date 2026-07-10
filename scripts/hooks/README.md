@@ -1,6 +1,6 @@
 # Git Hooks for JIT Enforcement
 
-This directory contains git hook templates for enforcing lease requirements and branch divergence rules.
+This directory contains git hook templates for enforcing lease requirements and branch-drift rules.
 
 ## Quick Install
 

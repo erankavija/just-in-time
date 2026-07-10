@@ -492,13 +492,13 @@ fn test_validate_id_with_fix_is_rejected() {
 }
 
 #[test]
-fn test_validate_id_with_divergence_is_rejected() {
-    // Finding #2: `--divergence` is repo-wide and incompatible with a positional id.
+fn test_validate_id_with_branch_drift_is_rejected() {
+    // Finding #2: `--branch-drift` is repo-wide and incompatible with a positional id.
     let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
     let id = create_epic(&temp, true);
     bin()
         .current_dir(temp.path())
-        .args(["validate", &id, "--divergence"])
+        .args(["validate", &id, "--branch-drift"])
         .assert()
         .failure()
         .stderr(predicate::str::contains(
