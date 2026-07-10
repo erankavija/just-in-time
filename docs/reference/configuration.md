@@ -144,7 +144,7 @@ applies_to = ["epic"]
 
 | Key | Default | What it binds |
 |-----|---------|---------------|
-| `roles.planning` | `planning` | The node whose `doc` locates the plan, whose first gate is the plan-quality gate breakdown requires, and onto which `move-upstream-to-role` moves the container's upstream deps |
+| `roles.planning` | `planning` | The node whose `doc` gives the plan document's location, whose first gate is the plan-quality gate bracket breakdown requires, and whose `type` locates the applied bracket's planning node |
 | `roles.breakdown` | `breakdown` | The node bracket breakdown consumes, whose type bounds `jit validate --scope`, and which `jit apply --force` locates the applied bracket by |
 | `anchors.container` | `container` | The anchor `jit apply <template> <container>` binds to its positional `<container>` argument, so no `--anchor` flag is needed |
 
@@ -157,6 +157,12 @@ truth.
 A binding names a role or anchor; it never invents one. If `roles.breakdown` names
 a role no template node declares, that template simply has no breakdown node, and
 the commands that need one say so.
+
+These bindings are the only names the bracket tooling reads from configuration.
+Everything else a template refers to by role names it in place: a
+`[[template.transforms]]` entry carries its own `role` field naming the node it
+targets, so `move-upstream-to-role` moves the container's pre-apply upstream
+dependencies onto whichever declared role that entry names.
 
 ### Rule selectors (`.jit/rules.toml` `when`)
 

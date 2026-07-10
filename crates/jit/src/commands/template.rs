@@ -75,8 +75,9 @@ enum TemplateGateResolution {
 /// Names the template applied and the anchor bindings used, maps each created
 /// node's template ROLE to the id of the issue created (or refreshed) for it,
 /// and carries the PRE-APPLY snapshot of each bound anchor's dependencies. The
-/// snapshot is what the `move-upstream-to-role` transform moves onto the planning
-/// node; capturing it before any mutation is what lets the transform move exactly
+/// snapshot is what the `move-upstream-to-role` transform moves onto the node of
+/// the role its own `role` field names; capturing it before any mutation is what
+/// lets the transform move exactly
 /// the container's ORIGINAL upstream deps (and never the freshly-wired scaffold
 /// edges). It is also surfaced for callers/tests that inspect the pre-apply
 /// shape.
