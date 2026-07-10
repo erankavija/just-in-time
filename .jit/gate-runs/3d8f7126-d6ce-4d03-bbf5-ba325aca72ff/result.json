@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "3d8f7126-d6ce-4d03-bbf5-ba325aca72ff",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "2b9a80fb-5d06-40e8-b3a0-ef23534cd89a",
+  "commit": "eb451e1870e5f850532cd347ac9751ee5c7c407e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T23:31:26.421939482Z",
+  "completed_at": "2026-07-10T23:31:26.724448532Z",
+  "duration_ms": 302,
+  "exit_code": 1,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nMISSING: .jit/claims.jsonl\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "stderr": "",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}
