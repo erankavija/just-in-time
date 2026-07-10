@@ -16,13 +16,12 @@ Two worked rulesets ship it: [`docs/examples/sdd/`](../examples/sdd/config.toml)
 (research, `goal` breakable, no `epic` anywhere). To adopt it in your own project,
 see [How-To: Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md).
 
-**A project that never adopted the bracket needs no migration.** It is purely
-additive configuration: a project with no `planning`/`breakdown` types and no
-`plan` template behaves exactly as before, and `jit apply plan` simply has no
-template to apply. Adopting it is opt-in — declare the `planning` and `breakdown`
+**The bracket is optional configuration.** A project with no `planning`/`breakdown`
+types and no `plan` template has no template for `jit apply plan` to apply, and its
+issues carry no bracket. Adopting it is opt-in: declare the `planning` and `breakdown`
 types in the type hierarchy and add a `plan` template to `.jit/templates.toml`
 (plus the two coverage rules), then `jit apply plan <C>` on a container scaffolds
-the bracket. Existing issues are untouched until you bracket them. The
+the bracket. Issues stay untouched until you bracket them. The
 [how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
 
 ## The problem it solves

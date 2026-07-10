@@ -568,25 +568,20 @@ Gate presets are pre-configured bundles of quality gates that dramatically reduc
 
 ### Using Builtin Presets
 
-JIT includes eight builtin presets — five general workflows plus the three
-[planning-bracket](../concepts/planning-bracket.md) gates:
+JIT ships builtin presets covering language TDD workflows (`rust-tdd`,
+`python-tdd`, `js-tdd`), a `security-audit` workflow, a `minimal` review-only
+workflow, and the three [planning-bracket](../concepts/planning-bracket.md) gates
+(`plan-review`, `coverage-preview`, `breakdown-review`). `jit gate preset list` is
+the authoritative source; each line reports a preset name, its description, and its
+gate count:
 
 **List available presets:**
 ```bash
 jit gate preset list
 ```
 
-**Output:**
-```
-[builtin] rust-tdd - Test-driven development workflow for Rust projects (5 gates)
-[builtin] python-tdd - Test-driven development workflow for Python (5 gates)
-[builtin] js-tdd - Test-driven development workflow for JavaScript/TypeScript (4 gates)
-[builtin] security-audit - Security review workflow (3 gates)
-[builtin] minimal - Minimal workflow with just code review (1 gate)
-[builtin] plan-review - Agent plan-quality review on the planning node (1 gate)
-[builtin] coverage-preview - Deterministic coverage check on the breakdown node (1 gate)
-[builtin] breakdown-review - Agent decomposition-quality review on the breakdown node (1 gate)
-```
+Each line is prefixed `[builtin]` and names one preset. To inspect the gates a
+preset carries, run `jit gate preset show <name>`.
 
 **View preset details:**
 ```bash
@@ -617,7 +612,7 @@ Gates:
 # Create issue
 jit issue create --title "Implement user authentication"
 
-# Apply rust-tdd preset (adds all 5 gates at once)
+# Apply the rust-tdd preset (adds its gates in one command)
 jit gate preset apply rust-tdd abc123
 ```
 
@@ -793,25 +788,12 @@ jit gate add doc-issue spell-check
 jit gate preset apply team-infra infra-issue
 ```
 
-**Migration from Manual Setup:**
-```bash
-# Old way (slow, error-prone):
-jit gate define tests --mode auto --checker-command "cargo test" ...
-jit gate define clippy --mode auto --checker-command "cargo clippy" ...
-jit gate define fmt --mode auto --checker-command "cargo fmt --check" ...
-jit gate add $ISSUE tests clippy fmt code-review
-# 4+ commands, easy to forget gates
-
-# New way (fast, consistent):
-jit gate preset apply rust-tdd $ISSUE
-# 1 command, guaranteed completeness
-```
-
 ### Comparing with Manual Gate Definitions
 
-Below shows the manual approach for reference, but **use presets instead** for consistency and speed:
+Presets and manual definitions reach the same gate set. Prefer presets for
+consistency and speed; reach for manual definitions when a gate has no preset.
 
-**Manual approach (old):**
+**Manual approach:**
 ```bash
 # Define each gate individually
 jit gate define tests \
@@ -836,14 +818,14 @@ jit gate define clippy \
 jit gate add $ISSUE tests clippy fmt code-review
 ```
 
-**Preset approach (new):**
+**Preset approach:**
 ```bash
 # One command
 jit gate preset apply rust-tdd $ISSUE
 ```
 
 **Benefits:**
-- **10x faster**: 1 command vs 10+ commands
+- **Fewer commands**: one preset apply instead of a separate define and add per gate
 - **No mistakes**: Preset definitions are tested and proven
 - **Consistent**: Same gates on every issue
 - **Shareable**: Team uses identical workflows
@@ -968,14 +950,6 @@ jit label values epic
 ```
 
 ## Advanced Topics
-
-### Gate System Extensibility
-
-**Potential extensions** (not yet implemented):
-- **Conditional gates**: Apply different gates based on issue labels or properties
-- **Gate dependencies**: Enforce gate ordering (e.g., tests before code-review)
-- **Parallel execution**: Run multiple automated gates concurrently
-- **Custom gate stages**: Beyond precheck/postcheck for complex pipelines
 
 ### Adapting Gates to Your Domain
 
