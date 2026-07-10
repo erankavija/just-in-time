@@ -1,0 +1,43 @@
+{
+  "epic_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "epic_short_id": "2d109173",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "99f4a2b4", "short_id": "99f4a2b4", "title": "Committed documentation mechanical-check gate", "classification": "implementation", "status": "pending"},
+        {"id": "d24008f0", "short_id": "d24008f0", "title": "Documentation review prompt amendment", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "pending"},
+        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "pending"},
+        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "pending"},
+        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "pending"},
+        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "pending"},
+        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "pending"},
+        {"id": "adc4c6ef", "short_id": "adc4c6ef", "title": "Root documentation relocations", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "36d5451e", "short_id": "36d5451e", "title": "Root and component documentation audit", "classification": "documentation", "status": "pending"},
+        {"id": "8682e95a", "short_id": "8682e95a", "title": "Command-family reference gap-fill", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "6d82de03", "short_id": "6d82de03", "title": "File follow-ups for engine gaps and missing projection surfaces", "classification": "documentation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-11T00:00:00Z"
+}
