@@ -6193,3 +6193,11 @@
 {"type":"issue_state_changed","id":"f246cb6d-5526-4815-93ea-580945d34f3e","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-10T23:27:46.672728775Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"405d7b15-d153-46b3-9189-38fda2ea987f","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-10T23:27:46.700564305Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"b8165d2a-0001-4055-b272-6a5f36f77539","issue_id":"b8924a6d-a15a-4880-b5c0-bc0ad4563da4","timestamp":"2026-07-10T23:27:46.727921645Z","from":"backlog","to":"ready"}
+{"type":"gate_added","id":"05e4e5ac-05af-4ab2-ac03-04df68eda952","issue_id":"2b9a80fb-5d06-40e8-b3a0-ef23534cd89a","timestamp":"2026-07-10T23:29:24.128308603Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"5e35e3eb-859e-4d8a-aa0c-b42d9af1c11c","issue_id":"736a069e-0f58-48ec-bdc4-7a8eb2500afd","timestamp":"2026-07-10T23:29:24.136730579Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"769dc9f6-5bd6-4b34-bc7e-db11a1d3f4b1","issue_id":"7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c","timestamp":"2026-07-10T23:29:24.144685864Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"86d9be72-8eff-4fa7-b52a-f098a6644e5a","issue_id":"b8924a6d-a15a-4880-b5c0-bc0ad4563da4","timestamp":"2026-07-10T23:29:24.152093360Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"061998a5-9e70-455e-9eec-bcab9551d6c8","issue_id":"4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57","timestamp":"2026-07-10T23:29:24.159794175Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"cb40dc63-1237-45fe-b022-948139d998b2","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-10T23:29:24.167608561Z","gate_key":"docs-mechanical"}
+{"type":"gate_added","id":"c10f2604-0895-4e89-be36-fd5df3e5eb2c","issue_id":"2d109173-91b2-49b1-9ef6-7d5a0f5a4b22","timestamp":"2026-07-10T23:29:24.175653707Z","gate_key":"docs-mechanical"}
+{"type":"gate_failed","id":"f1bb31ee-29cb-4f6d-90d1-5c0077812942","issue_id":"4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57","timestamp":"2026-07-10T23:29:24.286446148Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}

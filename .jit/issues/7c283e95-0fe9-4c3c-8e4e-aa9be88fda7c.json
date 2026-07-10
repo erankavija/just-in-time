@@ -11,9 +11,16 @@
   ],
   "gates_required": [
     "repo-validate",
-    "doc-review"
+    "doc-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T23:29:24.144683864Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -36,6 +43,6 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.659631192Z",
-  "updated_at": "2026-07-10T23:27:46.618562296Z",
+  "updated_at": "2026-07-10T23:29:24.144722435Z",
   "first_ready_at": "2026-07-10T20:21:17.659631442Z"
 }
