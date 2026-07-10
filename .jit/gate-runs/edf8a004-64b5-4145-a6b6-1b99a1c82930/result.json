@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "edf8a004-64b5-4145-a6b6-1b99a1c82930",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
+  "commit": "f7868ff6d4c70ce9e391503ccb55ea3256a9365f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T10:52:34.958296898Z",
+  "completed_at": "2026-07-10T10:53:46.569030781Z",
+  "duration_ms": 71610,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\n- REQ-01 met: the charter and evaluation records reside under `dev/vision/` and `dev/eval/`. Issue documents, active progress, evaluation assets, transcripts, and handoff records reference their final paths.\n- REQ-02 met: `README.md` contains no repository-local skills-sync convention.\n- REQ-03 met: `docs/reference/rules-and-gates.md:5-20` presents `jit reference render` as the shipped projection mechanism and identifies the rendered region as this repository’s live example.\n- REQ-04 met: `.jit/config.toml:221-229` still targets the existing `docs/reference/rules-and-gates.md`.\n\n## Architecture and separation of concerns\n\nThe issue-specific changes affect documentation and tracker metadata only. No Rust architecture boundaries are violated.\n\n## Functional paradigm\n\nNo relevant Rust implementation changes.\n\n## Correctness and invariants\n\nIssue metadata changes have corresponding event-log entries. The configured charter and projection paths resolve. No state-transition, gate, label, assignee, atomic-write, or PID behavior was changed.\n\n## Safety\n\nNo unsafe Rust or PID-related code was introduced.\n\n## Testing and linting\n\n- `cargo-ci` passed on 2026-07-10; tests were not rerun as instructed.\n- `jit-validate` passed on 2026-07-10.\n- The earlier test failures are superseded by the successful current `cargo-ci` evidence.\n\n## Error handling and CLI contract\n\nNo implementation, error-handling, or CLI behavior changed.\n\n## Documentation\n\nThe adopter-facing `docs/` tree no longer contains the three repository-local records. The active references previously reported at `dev/active/f2532a2d-handoff.md` and `dev/active/f2532a2d-handoff-2.md` now point to `dev/eval/`.\n\n## Prior feedback and dependencies\n\n- Previous active charter-path finding: resolved at `dev/active/9db27a3a-progress.json:4`.\n- Previous handoff findings: resolved at `dev/active/f2532a2d-handoff.md:32,58` and `dev/active/f2532a2d-handoff-2.md:23,58-59`.\n- Previous test failures: resolved by the succeeded `cargo-ci` gate.\n- The issue declares no dependencies.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, prior findings are resolved, and the supplied cargo-ci and jit-validate gates passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, prior findings are resolved, and the supplied cargo-ci and jit-validate gates passed.",
+    "findings": []
+  }
+}

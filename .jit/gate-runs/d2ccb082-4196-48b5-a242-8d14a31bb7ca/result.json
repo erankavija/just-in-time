@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "d2ccb082-4196-48b5-a242-8d14a31bb7ca",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "313a7f3a-c6db-4adc-8934-36a7874287ed",
+  "commit": "79f2880d5ceef1bc116203015a487ced5f1c8b53",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T10:48:44.436713568Z",
+  "completed_at": "2026-07-10T10:49:40.103105507Z",
+  "duration_ms": 55666,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\n- REQ-01 met: [guarantees.md:179](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:179) distinguishes git-free issue assignment from advisory leases and documents typed exit-10 failures for missing repositories and unresolved `HEAD`.\n- REQ-02 met: [guarantees.md:190](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:190) lists every advisory-lease command as requiring git.\n- REQ-03 met: the example demonstrates git-free assignment, both lease failure modes, successful acquisition after an initial commit, and valid document history.\n\n## Architecture and separation of concerns\n\nDocumentation-only changes. No domain, storage, command, CLI, or output boundary violations were introduced.\n\n## Functional paradigm\n\nNo Rust implementation changed; not applicable.\n\n## Correctness and invariants\n\nNo atomic-write, event-log, gate-transition, identifier-format, PID, or other runtime behavior changed. The documented lease prerequisites agree with branch detection in [claim.rs:39](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:39).\n\n## Safety\n\nNo unsafe or safety-sensitive code changed.\n\n## Testing\n\n- The supplied `cargo-ci` gate passed with exit code 0. Per instruction, I did not rerun tests.\n- The supplied `jit-validate` gate passed with exit code 0.\n- No test failures appear in the current evidence.\n- This documentation-only correction does not require new Rust tests.\n\n## Error handling\n\nThe documented `ClaimRequiresGitError` and exit code 10 match the implementation. No error-handling code changed.\n\n## CLI contract\n\nNo CLI behavior changed. The documented command syntax agrees with the current CLI.\n\n## Documentation\n\nThe latest prior finding is resolved at [guarantees.md:234](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:234): the example creates `path/to` and the initial document before `jit doc add`. It also configures a repository-local Git identity before committing.\n\nNo public APIs were added or changed.\n\n## Prior review feedback and dependencies\n\nBoth previous findings are resolved:\n\n- The lease example creates an initial commit before acquisition.\n- The document-history example creates its parent directory and initial file.\n\nThe issue declares no dependencies or unmet dependencies.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, prior review findings are resolved, and the supplied validation and cargo-ci gates passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, prior review findings are resolved, and the supplied validation and cargo-ci gates passed.",
+    "findings": []
+  }
+}
