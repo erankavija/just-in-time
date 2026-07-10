@@ -176,8 +176,7 @@ already says "inspection only, non-mutating"). `gate evaluate` / `gate fail` /
 `gate evaluate-all` run checkers, record verdicts, and can transition the issue. The
 two must never be conflated: an inspection verb that quietly re-runs a checker, or
 an execution verb dressed as a "check", is nonconforming. This configuration ÷
-execution ÷ inspection partition is the contract the gate rename sweep applies to
-regroup the flat enum.
+execution ÷ inspection partition is the contract the gate surface holds to.
 
 ### Notes for the gate surface
 
