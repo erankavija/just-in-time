@@ -18,14 +18,14 @@ set -uo pipefail
 #   1. positional args "$@", if any;                      else
 #   2. the DOCS_FOOTPRINT env var (space-separated), if set — the lead's
 #      per-issue scoping knob;                             else
-#   3. a whole-surface footprint DERIVED LIVE from configuration (never a
-#      hardcoded path list): the `[documentation].permanent_paths` roots, PLUS
-#      repository-root and immediate-subdirectory markdown that lies outside the
-#      contributor `development_root`. Both come from `jit config get
-#      documentation`; the second set is expressed as a git-derived PATTERN
-#      (tracked `*.md` at path depth ≤ 2, excluding the dev root and the
-#      permanent roots), NOT a filename list — it re-derives itself when doc
-#      roots move, so it encodes a pattern class, not product facts (REQ-01).
+#   3. a default footprint DERIVED LIVE from configuration (never a hardcoded
+#      path list, depth, or count): the `[documentation].permanent_paths` roots
+#      read from `jit config get documentation` (currently `docs/`). Adopter
+#      documents outside the permanent roots (the root and component READMEs,
+#      INSTALL.md, …) are a curated set the caller supplies explicitly via
+#      positional args or DOCS_FOOTPRINT — the container's full-surface run and
+#      each area audit pass their own footprint — so that scope is caller input,
+#      not a fact embedded in this checker (REQ-01).
 #
 # Exit codes (child semantics are preserved, exit 2 dominates — F4):
 #   0 — all three checks passed
