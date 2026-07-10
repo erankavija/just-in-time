@@ -23,10 +23,9 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 > `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
 > `schemas/` directory to `.jit/schemas/`.
 
-**No migration needed to skip the bracket.** The bracket is purely additive
-configuration. A project that never adopts it — no `planning`/`breakdown` types
-and no `plan` template — keeps working exactly as before; nothing in this guide is
-required. The opt-in path is the three additions below: declare the `planning` and
+**Bracket configuration is optional and affects issues only when applied.** A
+project with no `planning`/`breakdown` types and no `plan` template needs nothing
+in this guide. The opt-in path is the three additions below: declare the `planning` and
 `breakdown` types ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
 add a `plan` template ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
 and add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)).

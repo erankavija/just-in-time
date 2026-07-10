@@ -252,9 +252,9 @@ The epic carries `req:REQ-01`; a child that implements it carries
 The SDD ruleset is designed so **planning is quiet and the done transition is
 where coverage bites**:
 
-- During planning (any state other than `done`) an in-flight epic with incomplete
-  children — correct structure, matching `req:` labels, children still in progress
-  — produces **zero error-severity graph findings** from `jit validate`. Only the
+- During planning (any state other than `done`) an epic with incomplete children,
+  correct structure, matching `req:` labels, and children still in progress
+  produces **zero error-severity graph findings** from `jit validate`. Only the
   stray-req check (`criteria-label-match`) fires immediately for fabricated ids.
 - The done transition runs coverage and derivation rules with `enforce = true`,
   blocking (exit 4) if any `[hard]` criterion is uncovered or any `req:` is
@@ -387,8 +387,9 @@ vocabulary:
   `hyp:H-99` not present in the body is reported immediately as stray.
 - **`label-coverage`** (graph, scoped `state = "done"`, `enforce = true`) — when
   a goal reaches done, every `[hard]` hypothesis must be tested by at least one
-  done experiment carrying `tests:<id>`. An in-flight goal produces zero error
-  findings because the rule does not match until the done transition.
+  done experiment carrying `tests:<id>`. A goal in any state other than `done`
+  produces zero error findings because the rule does not match until the done
+  transition.
 - **`label-reference`** (graph, warn) — every `tests:<id>` on an experiment
   resolves to a declared `hyp:<id>` on the linked goal. A typo surfaces as a
   warning without blocking.

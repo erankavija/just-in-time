@@ -104,9 +104,10 @@ missing `## Success Criteria` section or a malformed requirement item blocks the
 save. A `criteria-label-match` rule (`sdd-req-matches-a-criterion`) fires at any
 state and compares each `req:<id>` label value directly against the ids extracted
 from the criteria prose; a fabricated `req:REQ-77` absent from the criteria is
-reported as a stray immediately, without waiting for a done transition. An
-in-flight epic with correct structure, matching `req:` labels, and children still
-in progress produces **zero error-severity graph findings** from `jit validate`.
+reported as a stray immediately, without waiting for a done transition. An epic in
+any state other than `done`, with correct structure, matching `req:` labels, and
+children still in progress, produces **zero error-severity graph findings** from
+`jit validate`.
 
 **Done transition:**
 A `label-coverage` graph rule (`sdd-hard-criteria-covered`) and a `label-reference`
