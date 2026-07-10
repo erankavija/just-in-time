@@ -1301,11 +1301,11 @@ jit issue show abc123 def456 --json          # -> {"count":2,"issues":[ {...}, {
   (exit code `2`).
 
 **Dangling dependencies:** the response includes a `dangling_dependency_ids`
-array listing any ids in the issue's stored `dependencies` whose target issue
-no longer exists. It is omitted when empty. Deleting an issue strips its id
-from every dependent, so this array is normally absent; it surfaces only
-pre-existing corruption (e.g. a repository hand-edited or written by an older
-binary) rather than silently hiding those ids from the `dependencies` view.
+array: the ids in the issue's stored `dependencies` whose target issue is
+absent from the repository. It is omitted when empty. Deleting an issue strips
+its id from every dependent, so a populated array marks stored dependencies
+that point at a missing target, keeping those ids visible alongside the
+`dependencies` view.
 
 **Unmet dependencies:** the `issue show --json` object also carries an
 `unmet_dependencies` array: the subset of `dependencies` that are not yet **met**.
@@ -2357,45 +2357,48 @@ Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are auto
 
 ### Builtin Presets
 
-JIT includes eight builtin presets embedded in the binary:
+JIT embeds a set of builtin presets in the binary. `jit gate preset list`
+enumerates them with a one-line summary each, `jit gate preset show <name>`
+prints a preset's full gate list, and the builtin preset registry is
+authoritative for their names and contents.
 
-**`rust-tdd`** - Test-driven development workflow for Rust (5 gates)
+**`rust-tdd`** - Test-driven development workflow for Rust
 - `tdd-reminder` - Manual reminder to write tests first (precheck)
 - `tests` - Automated test suite check (postcheck, 300s timeout)
 - `clippy` - Automated linter check (postcheck, 120s timeout)
 - `fmt` - Automated formatter check (postcheck, 30s timeout)
 - `code-review` - Manual code review requirement (postcheck)
 
-**`python-tdd`** - Test-driven development workflow for Python (5 gates)
+**`python-tdd`** - Test-driven development workflow for Python
 - `tdd-reminder` - Manual reminder to write tests first (precheck)
 - `pytest` - Automated test suite check (postcheck, 300s timeout)
 - `black` - Automated formatter check (postcheck, 30s timeout)
 - `mypy` - Automated type checking (postcheck, 120s timeout)
 - `code-review` - Manual code review requirement (postcheck)
 
-**`js-tdd`** - Test-driven development workflow for JavaScript/TypeScript (4 gates)
+**`js-tdd`** - Test-driven development workflow for JavaScript/TypeScript
 - `tdd-reminder` - Manual reminder to write tests first (precheck)
 - `jest` - Automated test suite check (postcheck, 300s timeout)
 - `eslint` - Automated linter check (postcheck, 120s timeout)
 - `code-review` - Manual code review requirement (postcheck)
 
-**`security-audit`** - Security review workflow (3 gates)
+**`security-audit`** - Security review workflow
 - `security-review` - Manual security vulnerability review (precheck)
 - `secret-detection` - Automated secret detection via gitleaks (postcheck, 20s timeout)
 - `dependency-audit` - Automated dependency vulnerability audit (postcheck, 60s timeout)
 
-**`minimal`** - Minimal workflow with just code review (1 gate)
+**`minimal`** - Minimal workflow with just code review
 - `code-review` - Manual code review requirement (postcheck)
 
-The remaining three are the [planning-bracket](../concepts/planning-bracket.md) gates, attached automatically when a breakable container is bracketed:
+The [planning-bracket](../concepts/planning-bracket.md) presets attach automatically when a breakable container is bracketed:
 
-**`plan-review`** - Agent plan-quality review on the planning node `P` (1 gate)
+**`plan-review`** - Agent plan-quality review on the planning node `P`
 - `plan-review` - AI review of the plan/design before fan-out (postcheck, auto)
 
-**`coverage-preview`** - Deterministic coverage check on the breakdown node `B` (1 gate)
+**`coverage-preview`** - Deterministic coverage check on the breakdown node `B`
 - `coverage-preview` - Scoped `jit validate` over the drafted decomposition; blocks when a `[hard]` criterion is uncovered (postcheck, auto)
 
-**`breakdown-review`** - Agent decomposition-quality review on the breakdown node `B` (1 gate)
+**`breakdown-review`** - Agent decomposition-quality review on the breakdown node `B`
 - `breakdown-review` - AI review of the breakdown against the design and content standards: per-child content standards, dependency-DAG coherence, right-sized depth (postcheck, auto)
 
 **Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
@@ -2672,7 +2675,7 @@ It is advisory and read-only: only the "label claims membership, DAG disagrees"
 direction is flagged. A DAG descendant that does not repeat its container's label
 is **not** reported (labels are advisory; children normally rely on the DAG), and
 a label with no owning container is left to
-[membership-reference validation](validation-rules.md).
+[membership-reference validation](../how-to/validation-rules.md).
 
 ```bash
 jit query divergence
@@ -3188,7 +3191,8 @@ kind-segmented qualified id:
 
 - `@/<kind>/<self-id>` for a project item, e.g. `@/invariant/dag-acyclic`.
 - `@/issue/<short-id>/<kind>/<self-id>` for an issue item, e.g.
-  `@/issue/56ab0224/requirement/REQ-01`.
+  `@/issue/<short-id>/requirement/REQ-01`, where `<short-id>` stands for a real
+  issue's short id.
 - `<short-id>/<self-id>` as input sugar, where the kind is inferred from the
   self-id's shape.
 
@@ -3223,10 +3227,10 @@ think in terms of resolving an address. JSON returns
 project item, which no single issue owns.
 
 ```bash
-jit item show @/issue/56ab0224/requirement/REQ-01
+jit item show @/issue/<short-id>/requirement/REQ-01   # <short-id> is a placeholder
 jit item show @/invariant/dag-acyclic
 jit item show @/inv/dag-acyclic          # alias of the same address
-jit item show 56ab0224/REQ-01 --json
+jit item show <short-id>/REQ-01 --json
 ```
 
 ### `jit item search`
