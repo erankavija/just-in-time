@@ -186,20 +186,24 @@ Algorithm: Check if FROM is reachable from TO
 ```
 
 **Example:**
+
+The current graph chains A to B to C. Adding an edge from C back to A closes a loop:
+
+```mermaid
+flowchart LR
+    A --> B
+    B --> C
+    C -.->|attempted| A
 ```
-Current graph:
-  A → B → C
 
-Attempt: Add C → A
+Check: is A reachable from C?
 
-Check: Is A reachable from C?
-  Start at C
-  → Follow edge to B
-  → Follow edge to A
-  → Found A! (reachable)
+1. Start at C
+2. Follow the edge to B
+3. Follow the edge to A
+4. Found A, so A is reachable
 
-Result: CYCLE - reject the add operation
-```
+Result: CYCLE, reject the add operation.
 
 ### Validate Repository Health
 
