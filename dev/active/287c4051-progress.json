@@ -1,7 +1,7 @@
 {
   "epic_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
   "epic_short_id": "287c4051",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -74,21 +74,21 @@
           "short_id": "7eec3d59",
           "title": "Remove legacy narration from shipped reference docs",
           "classification": "documentation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
           "short_id": "5514e4f5",
           "title": "Repair the dev index and stray plan files",
           "classification": "documentation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
           "short_id": "f7c50538",
           "title": "Consolidate the docs landing pages",
           "classification": "documentation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -101,7 +101,7 @@
           "short_id": "6ce0f14e",
           "title": "Documentation review gate",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     }
@@ -229,6 +229,9 @@
     },
     "wave1_final": {
       "note": "All 8 wave-1 issues done. Rework rounds: c7f0f690 x2 (sweep gap, then f2532a2d handoff dangling paths), 313a7f3a x2 (git-init HEAD, then missing-file example), f5eb11a2 x2 (false layer edge + guarantees arrow art, then cycle-graph arrow art), d48906de x1 (source line-range citations) + escalation-approved deletion of dead storage::claims_log module to resolve the seq/sequence gate finding, c29118f9 x1 (false filesystem claims). a6e1ae3d and 287f7bc9 passed first time."
+    },
+    "wave2_final": {
+      "note": "7eec3d59, 5514e4f5, f7c50538 done. 7eec3d59 needed 2 lead-applied narration fixes beyond its own sweep (the 'downstream gate rename sweep regroups the flat enum' passage appeared twice at cli-command-grammar.md; both restated as current grammar) plus an em-dash-in-table-cell cleanup. f7c50538 and 5514e4f5 passed first review; 5514e4f5 archived 3 done-issue plans with jit doc re-links."
     }
   }
 }
