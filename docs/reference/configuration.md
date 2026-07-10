@@ -14,6 +14,7 @@ Complete reference for JIT configuration options.
 | File | Purpose |
 |------|---------|
 | `.jit/config.toml` | Repository config (schema + runtime) |
+| `.jit/templates.toml` | Graph templates and their [role/anchor bindings](#template-bindings-jittemplatestoml) |
 | `~/.config/jit/config.toml` | User defaults |
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
@@ -114,6 +115,48 @@ Rule names are colon-free slugs (`namespace-registry`, `namespace-unique-team`,
 `bracket` for those a bracket criterion installs) is a separate `origin` field
 on its `.jit/rules.toml` entry, not part of its name. Every rule is addressable
 at `@/rule/<self-id>` (`self-id` being its `name`), e.g. `@/rule/label-format`.
+
+### Template bindings (`.jit/templates.toml`)
+
+A `[[template]]` names its own nodes with arbitrary `role`s and its own anchor
+slots with arbitrary `name`s. Three of those names carry MEANING for the bracket
+tooling, and the top-level `[roles]` and `[anchors]` tables tell jit which ones:
+
+```toml
+# .jit/templates.toml
+[roles]
+planning  = "spec"     # the role of the node that holds the plan
+breakdown = "split"    # the role of the node that holds the fan-out
+
+[anchors]
+container = "target"   # the anchor `jit apply <template> <container>` auto-binds
+
+[[template]]
+name       = "plan"
+applies_to = ["epic"]
+  [[template.anchors]]
+  name = "target"
+  [[template.nodes]]
+  role = "spec"
+  type = "planning"
+  # ...
+```
+
+| Key | Default | What it binds |
+|-----|---------|---------------|
+| `roles.planning` | `planning` | The node whose `doc` locates the plan, whose first gate is the plan-quality gate breakdown requires, and onto which `move-upstream-to-role` moves the container's upstream deps |
+| `roles.breakdown` | `breakdown` | The node bracket breakdown consumes, whose type bounds `jit validate --scope`, and which `jit apply --force` locates the applied bracket by |
+| `anchors.container` | `container` | The anchor `jit apply <template> <container>` binds to its positional `<container>` argument, so no `--anchor` flag is needed |
+
+Both tables are optional, and so is each key within them. A repository that names
+its roles and anchor the default way declares neither table. The defaults are the
+`DEFAULT_PLANNING_ROLE`, `DEFAULT_BREAKDOWN_ROLE`, and `DEFAULT_CONTAINER_ANCHOR`
+constants in `crates/jit/src/templates.rs`, which are their single source of
+truth.
+
+A binding names a role or anchor; it never invents one. If `roles.breakdown` names
+a role no template node declares, that template simply has no breakdown node, and
+the commands that need one say so.
 
 ### Rule selectors (`.jit/rules.toml` `when`)
 

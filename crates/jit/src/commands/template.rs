@@ -38,10 +38,11 @@
 //!
 //! No `epic` / `planning` / `breakdown` literal is hardcoded. Node types, gates
 //! (preset or registry key), doc locations, descriptions, and labels all come
-//! from the template; the only roles this engine reaches for by name are the
-//! conventional [`PLANNING_ROLE`](crate::templates::PLANNING_ROLE) /
-//! [`BREAKDOWN_ROLE`](crate::templates::BREAKDOWN_ROLE), and only on the
-//! `--force` refresh path to locate already-applied nodes.
+//! from the template; the roles this engine reaches for by meaning (the planning
+//! and breakdown nodes) are named by the repository's
+//! [`RoleBindings`](crate::templates::RoleBindings), and the anchor the CLI binds
+//! to the positional `<container>` is named by its
+//! [`AnchorBindings`](crate::templates::AnchorBindings) (`@/inv/domain-agnostic`).
 
 use std::collections::BTreeMap;
 
@@ -50,7 +51,7 @@ use super::template_expand::{
     PlannedNode, TemplateDelta,
 };
 use super::*;
-use crate::templates::{GraphTemplate, BREAKDOWN_ROLE};
+use crate::templates::{GraphTemplate, RoleBindings};
 use serde::Serialize;
 
 /// Actor recorded on the events the apply engine appends directly.
@@ -115,14 +116,44 @@ pub struct TemplateApplyResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// The repository's [`RoleBindings`]: the names its templates give the
+    /// planning and breakdown nodes (`.jit/templates.toml`'s `[roles]` table).
+    ///
+    /// The single lookup every consumer (apply, refresh, breakdown, validation)
+    /// asks for the bracket roles through, so no command reads the config keys
+    /// itself.
+    pub(crate) fn template_roles(&self) -> Result<&RoleBindings> {
+        Ok(&self.cached_config()?.templates.roles)
+    }
+
+    /// The repository's name for the anchor `jit apply <template> <container>`
+    /// binds to its positional `<container>` argument
+    /// (`.jit/templates.toml`'s `[anchors] container`, defaulting to
+    /// [`DEFAULT_CONTAINER_ANCHOR`](crate::templates::DEFAULT_CONTAINER_ANCHOR)).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use jit::commands::CommandExecutor;
+    /// use jit::storage::JsonFileStorage;
+    ///
+    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
+    /// // A repository that declares no `[anchors]` table keeps the shipped name.
+    /// assert_eq!(executor.container_anchor().unwrap(), "container");
+    /// ```
+    pub fn container_anchor(&self) -> Result<&str> {
+        Ok(self.cached_config()?.templates.anchors.container_anchor())
+    }
+
     /// Apply a graph template named `template_name` to `container_id`
     /// (`jit apply <template> <container>`).
     ///
     /// Reads the template from the cached [`TemplateRegistry`](crate::templates::TemplateRegistry)
     /// (`.jit/templates.toml`) and delegates to
     /// [`apply_template_with`](Self::apply_template_with). `anchor_bindings` maps
-    /// each declared anchor name to an issue id; the `container` anchor is
-    /// commonly bound to `container_id` by the CLI before calling.
+    /// each declared anchor name to an issue id; the CLI binds the container
+    /// anchor ([`container_anchor`](Self::container_anchor)) to `container_id`
+    /// before calling.
     ///
     /// # Examples
     ///
@@ -164,6 +195,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`apply_template`](Self::apply_template).
     ///
     /// Separated so the engine is testable without an on-disk `templates.toml`.
+    /// The role names it locates the bracket by still come from the repository's
+    /// [`RoleBindings`] ([`template_roles`](Self::template_roles)), which default
+    /// to the shipped names when the repository declares none.
     /// The whole call runs under ONE repository write lock — the one every
     /// ordinary writer takes — so a concurrent writer observes the store before
     /// the apply or after it, never midway. Steps:
@@ -234,6 +268,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         // revert work this apply never made. Reentrant, so the nested storage
         // writes below take it again without deadlocking.
         let _repo_lock = self.storage.acquire_repo_write_lock()?;
+
+        // The repository's names for the bracket roles. Cloned rather than
+        // borrowed so the config cache is not held across the writes below.
+        let roles = self.template_roles()?.clone();
 
         // === 1. Resolve the container and the anchor bindings ===
         let full_container_id = self.storage.resolve_issue_id(container_id)?;
@@ -328,7 +366,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Already-applied detection: the breakdown node carries
         // `brackets:<container-short-id>` and sits among the container's deps.
-        let existing_breakdown = self.find_applied_breakdown(template, &container)?;
+        let existing_breakdown = self.find_applied_breakdown(template, &roles, &container)?;
         if existing_breakdown.is_some() && !force {
             return Err(anyhow!(
                 "container {full_container_id} already has template '{}' applied; \
@@ -346,7 +384,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // targets the refresh path, which requires a breakdown node to locate the
         // bracket, so it cannot adopt a legacy P-only container either.)
         if existing_breakdown.is_none() {
-            if let Some(planning_type) = template.planning_type() {
+            if let Some(planning_type) = template.planning_type(&roles) {
                 let existing_planning = container.dependencies.iter().find_map(|dep_id| {
                     let dep = self.storage.load_issue(dep_id).ok()?;
                     (label_utils::type_label_value(&dep.labels) == Some(planning_type))
@@ -389,7 +427,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // live deps and move `B` onto `P`, breaking the spine. Refresh only
             // re-seeds prose.
             Some(breakdown_id) => self
-                .refresh_template_nodes(template, &breakdown_id, &container)
+                .refresh_template_nodes(template, &roles, &breakdown_id, &container)
                 .map_err(|e| self.restore_or_report(&pre_apply_issues, e))?,
 
             // === Expand, validate the delta, then commit it ===
@@ -609,17 +647,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn refresh_template_nodes(
         &self,
         template: &GraphTemplate,
+        roles: &RoleBindings,
         breakdown_id: &str,
         container: &Issue,
     ) -> Result<BTreeMap<String, String>> {
         let context = InterpolationContext::for_container(container);
         let mut existing: BTreeMap<String, String> = BTreeMap::new();
-        existing.insert(BREAKDOWN_ROLE.to_string(), breakdown_id.to_string());
+        existing.insert(roles.breakdown_role().to_string(), breakdown_id.to_string());
 
         // Reach the breakdown node's template `depends_on` roles through the
         // persisted breakdown issue's dependencies, matching each role's node by
         // its `type:` label. The plan template wires `B → P`, so this resolves P.
-        if let Some(breakdown_node) = template.node(BREAKDOWN_ROLE) {
+        if let Some(breakdown_node) = template.breakdown_node(roles) {
             let breakdown_node_issue = self.storage.load_issue(breakdown_id)?;
             for dep_role in &breakdown_node.depends_on {
                 if let Some(dep_node) = template.node(dep_role) {
@@ -754,9 +793,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn find_applied_breakdown(
         &self,
         template: &GraphTemplate,
+        roles: &RoleBindings,
         container: &Issue,
     ) -> Result<Option<String>> {
-        let Some(breakdown_node) = template.node(BREAKDOWN_ROLE) else {
+        let Some(breakdown_node) = template.breakdown_node(roles) else {
             return Ok(None);
         };
         let bracket_label = format!("brackets:{}", container.short_id());

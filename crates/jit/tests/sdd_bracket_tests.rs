@@ -161,22 +161,22 @@ fn test_sdd_example_declares_planning_template() {
         "the SDD example declares epic as its breakable container"
     );
     assert_eq!(
-        plan.planning_type(),
+        plan.planning_type(&reg.roles),
         Some("planning"),
         "the planning bracket node type"
     );
     assert_eq!(
-        plan.breakdown_type(),
+        plan.breakdown_type(&reg.roles),
         Some("breakdown"),
         "the breakdown bracket node type"
     );
     assert_eq!(
-        plan.planning_node().map(|n| n.gates.as_slice()),
+        plan.planning_node(&reg.roles).map(|n| n.gates.as_slice()),
         Some(["plan-review".to_string()].as_slice()),
         "plan-review wired on the planning node",
     );
     assert!(
-        plan.breakdown_node()
+        plan.breakdown_node(&reg.roles)
             .is_some_and(|n| n.gates.iter().any(|g| g == "coverage-preview")),
         "coverage-preview wired on the breakdown node",
     );

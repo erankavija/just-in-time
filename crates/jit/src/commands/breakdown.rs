@@ -11,12 +11,14 @@
 //!
 //! The bracket-aware path reads its vocabulary (planning/breakdown types, the
 //! plan-quality gate) from the [`TemplateRegistry`](crate::templates::TemplateRegistry)
-//! / [`GraphTemplate`](crate::templates::GraphTemplate) — the same source the
+//! / [`GraphTemplate`](crate::templates::GraphTemplate), and the role names that
+//! select those nodes from the repository's
+//! [`RoleBindings`](crate::templates::RoleBindings) — the same sources the
 //! `jit apply plan` scaffold uses, so the two halves of the workflow agree on the
 //! `C → B → P` shape.
 
 use super::*;
-use crate::templates::{GraphTemplate, BREAKDOWN_ROLE, PLANNING_ROLE};
+use crate::templates::GraphTemplate;
 use serde::Serialize;
 
 /// One drafted implementation child for [`bracket_breakdown`].
@@ -351,20 +353,21 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        // The template must declare the conventional planning + breakdown nodes;
-        // their types name what we locate among the scaffold's nodes.
-        let breakdown_type = template.breakdown_type().ok_or_else(|| {
+        // The template must declare the bound planning + breakdown roles; their
+        // types name what we locate among the scaffold's nodes.
+        let roles = self.template_roles()?;
+        let breakdown_type = template.breakdown_type(roles).ok_or_else(|| {
             anyhow!(
                 "template '{}' declares no '{}' node; bracket breakdown needs a breakdown node",
                 template.name,
-                BREAKDOWN_ROLE
+                roles.breakdown_role()
             )
         })?;
-        let planning_type = template.planning_type().ok_or_else(|| {
+        let planning_type = template.planning_type(roles).ok_or_else(|| {
             anyhow!(
                 "template '{}' declares no '{}' node; bracket breakdown needs a planning node",
                 template.name,
-                PLANNING_ROLE
+                roles.planning_role()
             )
         })?;
 
@@ -385,7 +388,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         //     have PASSED. Breakdown consumes an approved plan; a pending/unset
         //     plan gate rejects with no partial state created.
         let plan_gate = template
-            .planning_node()
+            .planning_node(roles)
             .and_then(|n| n.gates.first())
             .ok_or_else(|| {
                 anyhow!(
@@ -410,7 +413,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // `jit apply plan`); breakdown does NOT re-create B or re-attach its gates.
         // Report the gate-preset names B carries for `--json` consumers.
         let breakdown_gates = template
-            .breakdown_node()
+            .breakdown_node(roles)
             .map(|n| n.gates.clone())
             .unwrap_or_default();
         let coverage_gate_preset = breakdown_gates.first().cloned().unwrap_or_default();
