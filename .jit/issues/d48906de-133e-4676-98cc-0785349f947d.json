@@ -12,6 +12,11 @@
     "cargo-ci"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T00:11:11.866824552Z"
+    },
     "jit-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -32,7 +37,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.880071113Z",
-  "updated_at": "2026-07-10T00:11:03.374351426Z",
+  "updated_at": "2026-07-10T00:12:11.237696545Z",
   "first_ready_at": "2026-07-06T15:39:58.880071573Z",
   "claimed_at": "2026-07-09T23:14:07.761564464Z"
 }

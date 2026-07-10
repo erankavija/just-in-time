@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "dbcb2964-70a7-4b30-b662-8ef63a8a037b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
+  "commit": "2331d71848f9a75c08c8763a7a2a83eaec8b3b76",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T00:12:11.266371496Z",
+  "completed_at": "2026-07-10T00:12:59.524344098Z",
+  "duration_ms": 48257,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01: Pass. Every documented `crates/jit/` path exists.\n- REQ-02: Pass. No dated or hardcoded test counts remain.\n- REQ-03: Pass. Property-based testing is described as current practice at `TESTING.md:56-78`, with accurate source locations.\n- REQ-04: Pass. The API inventory at `TESTING.md:90-118` matches `crates/jit/tests/harness.rs`. The filesystem behavior is now accurately disclosed at `TESTING.md:85-88`.\n- REQ-05: Pass. All local links resolve, and the external `proptest` documentation link resolves.\n- Dependencies: Pass. The issue declares no prerequisites.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only changes introduce no violations of domain, storage, command, CLI, or output boundaries.\n\n## Functional Paradigm\n\nNot applicable to this documentation-only issue.\n\n## Correctness and Invariants\n\nNo executable behavior or repository invariants changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing\n\nPass. The supplied `cargo-ci` gate succeeded with exit code 0 on 2026-07-10, so tests were not rerun. The supplied `jit-validate` gate also passed with exit code 0.\n\n## Error Handling\n\nNo error-handling code changed.\n\n## CLI Contract\n\nNo CLI behavior changed.\n\n## Documentation\n\nThe rewritten guide accurately reflects the workspace layout, current property-based testing practice, harness API, and relevant filesystem behavior. All referenced paths and links resolve.\n\n## Prior Review Feedback\n\nBoth previous findings are resolved:\n\n- The blanket claim that harness tests never touch the filesystem was replaced with an accurate explanation of the `config.toml` write.\n- The blanket claim that unit tests need no filesystem was scoped to pure domain and graph tests, while TempDir-backed storage and command tests are explicitly documented.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, both prior documentation inaccuracies are corrected, and the supplied cargo-ci and jit-validate gates pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, both prior documentation inaccuracies are corrected, and the supplied cargo-ci and jit-validate gates pass.",
+    "findings": []
+  }
+}

@@ -12,20 +12,20 @@
     "cargo-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "failed",
+    "cargo-ci": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T23:54:10.410332193Z"
+      "updated_at": "2026-07-10T00:07:27.266549708Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T00:12:11.266371496Z"
     },
     "jit-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-10T00:11:03.404648488Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T00:07:27.266549708Z"
     }
   },
   "context": {},
@@ -37,7 +37,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.876375510Z",
-  "updated_at": "2026-07-10T00:11:03.506862963Z",
+  "updated_at": "2026-07-10T00:12:59.524532218Z",
   "first_ready_at": "2026-07-06T15:39:58.876375790Z",
   "claimed_at": "2026-07-09T23:14:07.720989415Z"
 }

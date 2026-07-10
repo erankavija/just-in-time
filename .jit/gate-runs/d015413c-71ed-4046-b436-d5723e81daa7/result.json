@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "d015413c-71ed-4046-b436-d5723e81daa7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d48906de-133e-4676-98cc-0785349f947d",
+  "commit": "2331d71848f9a75c08c8763a7a2a83eaec8b3b76",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T00:11:11.866824552Z",
+  "completed_at": "2026-07-10T00:12:11.237469735Z",
+  "duration_ms": 59370,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01 met: the `.jit/` diagram removes lease records and includes `rules.toml`, `templates.toml`, `invariants.toml`, and `schemas/` with purposes.\n- REQ-02 met structurally: a dedicated `.git/jit/` subsection documents the required claim log, index, heartbeat directory, and locks.\n- REQ-03 met: registry formats are documented directly or linked to existing documentation.\n- No prior review findings were supplied.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only changes introduce no domain, storage, command, CLI, or output-layer violations.\n\n## Functional Paradigm\n\nNot applicable to the documentation-only change.\n\n## Correctness and Invariants\n\nThe control-plane documentation contains one incorrect serialized field name. The implementation exposes `ClaimLogEntry::sequence`, not `seq`.\n\nNo changes affect atomic writes, event emission, gate transitions, assignee or label validation, PID handling, or unsafe-code policy.\n\n## Safety\n\nNo Rust or unsafe code was added.\n\n## Testing\n\nThe supplied `cargo-ci` gate passed at `2026-07-10T00:05:33Z`; per instruction, it was not rerun. The supplied `jit-validate` gate also passed at `2026-07-10T00:11:03Z`. No failed run history exists.\n\n## Error Handling\n\nNo executable error-handling changes were made.\n\n## CLI Contract\n\nNo CLI commands or JSON-output behavior were changed.\n\n## Documentation\n\nThe new cross-links resolve, and the registry descriptions are appropriately placed. However, the backticked `seq` field is inaccurate and makes the storage-format reference unreliable for consumers implementing or inspecting the JSONL format.\n\n## Jit Issue Management\n\nThe issue has no dependencies or unmet prerequisites. Both available prerequisite gates passed.\n\n## Findings\n\n1. **F1 — High:** The control-plane reference states that each `claims.jsonl` entry carries a monotonic field named `seq`, but the serialized `ClaimLogEntry` field is named `sequence` in `crates/jit/src/storage/claims_log.rs`. Because this is a storage-format reference and the name is presented as an exact backticked field, readers following it will expect the wrong JSON schema. (`docs/reference/storage-format.md:255`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required layout documentation is present, but the claims log schema documents the serialized sequence field under the wrong name.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"claims.jsonl entries are documented with a `seq` field, while the serialized field is `sequence`\",\"file\":\"docs/reference/storage-format.md\",\"line\":255}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4886 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f495d-3205-7f22-8742-8a004cc6c4fc\n--------\nuser\n--- 4873 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The required layout documentation is present, but the claims log schema documents the serialized sequence field under the wrong name.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "claims.jsonl entries are documented with a `seq` field, while the serialized field is `sequence`",
+        "file": "docs/reference/storage-format.md",
+        "line": 255
+      }
+    ]
+  }
+}
