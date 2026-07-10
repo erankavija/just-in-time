@@ -78,6 +78,28 @@ printf 'Config `crates/jit/Cargo.toml` and template `.jit/issues/{id}.json`.\n' 
 assert_rc 0 $? "citations: real path resolves, placeholder suppressed"
 echo
 
+echo "== footprint error handling (env errors, never a false-green pass) =="
+# Nonexistent footprint path → exit 2 for both footprint-taking checkers.
+"$links" "$scratch/no_such_path_zzz" >/dev/null 2>&1
+assert_rc 2 $? "links: nonexistent footprint path is an env error"
+"$citations" "$scratch/no_such_path_zzz" >/dev/null 2>&1
+assert_rc 2 $? "citations: nonexistent footprint path is an env error"
+# Unreadable footprint file → exit 2. Skipped where the read bit is not enforced
+# (e.g. running as root, which bypasses permission checks).
+noread="$scratch/unreadable.md"
+printf '# x\n' >"$noread"
+chmod 000 "$noread"
+if [ ! -r "$noread" ]; then
+  "$links" "$noread" >/dev/null 2>&1
+  assert_rc 2 $? "links: unreadable footprint file is an env error"
+  "$citations" "$noread" >/dev/null 2>&1
+  assert_rc 2 $? "citations: unreadable footprint file is an env error"
+else
+  echo "SKIP: read bit not enforced here (likely root) — unreadable-file assertions skipped"
+fi
+chmod 644 "$noread" 2>/dev/null || true
+echo
+
 echo "== M5 docs-check-projections.sh =="
 # The projection check renders into tracked targets, so it is exercised inside a
 # throwaway clone of THIS repo — the real index and working tree are never

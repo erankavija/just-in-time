@@ -70,12 +70,22 @@ command -v jq >/dev/null 2>&1 || {
   exit 2
 }
 
-# A footprint entry that resolves to nothing is a usage/environment error, not a
-# clean pass — grep over a mistyped path would emit a discarded error and the
-# checker would exit 0 without inspecting anything (a false-green gate).
+# A footprint entry that resolves to nothing — nonexistent OR unreadable — is a
+# usage/environment error, not a clean pass: grep over such a path would emit a
+# discarded error and the checker would exit 0 without inspecting anything (a
+# false-green gate).
 for fp in "$@"; do
   [ -e "$fp" ] || {
     echo "docs-check-citations: footprint path does not exist: $fp" >&2
+    exit 2
+  }
+  [ -r "$fp" ] || {
+    echo "docs-check-citations: footprint path is not readable: $fp" >&2
+    exit 2
+  }
+  # Directories additionally need traversal (execute) to be walked by grep -r.
+  { [ ! -d "$fp" ] || [ -x "$fp" ]; } || {
+    echo "docs-check-citations: footprint directory is not traversable: $fp" >&2
     exit 2
   }
 done
@@ -90,6 +100,20 @@ leaders=$(jit config get item_kinds | jq -r 'to_entries[] | ([.key] + (.value.al
 roots=$(git ls-files | awk -F/ '{print $1}' | sort -u)
 
 status=0
+
+# Scan the footprint once for backtick spans and once for @/ citations, in the
+# MAIN shell (not a process substitution) so a grep error can exit the script.
+# The `|| rc=$?` idiom captures grep's exit without tripping `set -e` on grep's
+# normal exit 1 (no matches). A grep exit >= 2 (e.g. an unreadable file met
+# during recursion) is an environment error; surface it as exit 2 rather than
+# letting the checker go false-green.
+grc=0
+# shellcheck disable=SC2016  # the backticks in the grep regex are literal, not expansion
+backtick_raw=$(grep -rhoE '`[^`]+`' "$@") || grc=$?
+[ "$grc" -ge 2 ] && { echo "docs-check-citations: read error scanning footprint for citations" >&2; exit 2; }
+grc=0
+item_raw=$(grep -rhoE '@/[a-z][a-z-]*/[a-zA-Z0-9-]+' "$@") || grc=$?
+[ "$grc" -ge 2 ] && { echo "docs-check-citations: read error scanning footprint for @/ items" >&2; exit 2; }
 
 # 1. Repo-rooted file-path citations in backtick spans (see header for the
 # four-part rule and the deferral classes).
@@ -120,7 +144,7 @@ while IFS= read -r token; do
     echo "MISSING: $token"
     status=1
   }
-done < <(grep -rhoE '`[^`]+`' "$@" | tr -d '`' | grep '/' | sort -u)
+done < <(printf '%s\n' "$backtick_raw" | tr -d '`' | grep '/' | sort -u)
 
 # 2. Addressable-item citations under a registered kind.
 while IFS= read -r item; do
@@ -132,7 +156,7 @@ while IFS= read -r item; do
     echo "DANGLING: $item"
     status=1
   }
-done < <(grep -rhoE '@/[a-z][a-z-]*/[a-zA-Z0-9-]+' "$@" | sort -u)
+done < <(printf '%s\n' "$item_raw" | sort -u)
 
 if [ "$status" -eq 0 ]; then
   echo "OK: all cited paths and @/ items resolve"

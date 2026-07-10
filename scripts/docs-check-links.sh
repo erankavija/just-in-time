@@ -57,14 +57,18 @@ if not roots:
     print("usage: docs-check-links.sh [PATH ...]", file=sys.stderr)
     sys.exit(2)
 
-# A footprint entry that resolves to nothing is a usage/environment error, not a
-# clean pass — silently skipping a mistyped path would let the gate go false-green
-# without checking anything.
-missing = [r for r in roots if not os.path.isfile(r) and not os.path.isdir(r)]
-if missing:
-    for r in missing:
+# A footprint entry that resolves to nothing — nonexistent OR unreadable — is a
+# usage/environment error, not a clean pass. Silently skipping a mistyped or
+# unreadable path would let the gate go false-green without checking anything.
+for r in roots:
+    if not os.path.isfile(r) and not os.path.isdir(r):
         print(f"docs-check-links: footprint path does not exist: {r}", file=sys.stderr)
-    sys.exit(2)
+        sys.exit(2)
+    # Files need read access; directories additionally need traversal (execute).
+    need = os.R_OK | (os.X_OK if os.path.isdir(r) else 0)
+    if not os.access(r, need):
+        print(f"docs-check-links: footprint path is not readable: {r}", file=sys.stderr)
+        sys.exit(2)
 
 # Collect markdown files from the footprint: files taken as-is, directories
 # walked for *.md.
@@ -108,8 +112,12 @@ def scan(path):
     slugs, links, deftgts, deflbls, refuses, fence = set(), [], [], set(), [], False
     try:
         text = open(path, encoding='utf-8').read()
-    except OSError:
-        return slugs, links, deftgts, deflbls, refuses
+    except OSError as e:
+        # A file we collected from the footprint but cannot read is an
+        # environment error, not an empty (clean) parse — surface it as exit 2
+        # rather than letting the gate go false-green.
+        print(f"docs-check-links: cannot read {path}: {e}", file=sys.stderr)
+        sys.exit(2)
     for line in text.splitlines():
         if line.lstrip().startswith('```'):
             fence = not fence

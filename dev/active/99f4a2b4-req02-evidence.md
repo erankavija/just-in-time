@@ -48,6 +48,12 @@ PASS: links: clean footprint resolves (exit 0)
 PASS: citations: dangling repo-rooted path is MISSING (exit 1)
 PASS: citations: real path resolves, placeholder suppressed (exit 0)
 
+== footprint error handling (env errors, never a false-green pass) ==
+PASS: links: nonexistent footprint path is an env error (exit 2)
+PASS: citations: nonexistent footprint path is an env error (exit 2)
+PASS: links: unreadable footprint file is an env error (exit 2)
+PASS: citations: unreadable footprint file is an env error (exit 2)
+
 == M5 docs-check-projections.sh ==
 PASS: projections: fresh (rendered==staged) tree is clean (exit 0)
 PASS: projections: drifted target region is a finding (exit 1)
