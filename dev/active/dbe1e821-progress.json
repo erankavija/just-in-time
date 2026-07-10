@@ -61,21 +61,21 @@
           "short_id": "b6eb2585",
           "title": "Route bulk state updates through the transition chokepoint",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "e486a854-1860-4d25-8cc5-c26715192088",
           "short_id": "e486a854",
           "title": "Expose resolved hierarchy through the server API and output schemas",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "136268f8-5aed-4f36-9c10-46019c98ca76",
           "short_id": "136268f8",
           "title": "Config-declared template role and anchor bindings",
           "classification": "implementation",
-          "status": "pending"
+          "status": "rework-1"
         }
       ]
     },
@@ -148,7 +148,9 @@
   "rework_counts": {
     "69ffdcf8": 2,
     "50677708": 1,
-    "2f447380": 2
+    "2f447380": 2,
+    "e486a854": 1,
+    "136268f8": 1
   },
   "note_max_rework": "MAX_REWORK_ATTEMPTS=2. Both 69ffdcf8 and 2f447380 are on their final attempt; a third failure escalates to the human. 69ffdcf8's stale-wording finding has recurred twice, so it also approaches MAX_SAME_FINDING_REPEATS=3.",
   "review_findings": {
@@ -157,7 +159,12 @@
     "50677708": "R1 FAIL [medium]: newly public graph APIs lack the mandatory '# Examples' doc sections (scripts/code-review-prompt.md:61). Functional criteria all met. R2 PASS.",
     "2f447380": "R1 FAIL [high]: apply holds .git/jit/locks/apply.lock while ordinary writers hold .jit/.index.lock, so the apply lock excludes no one and compensation-rollback can erase concurrent writes. Also absent entirely outside a git repo. Lead confirmed independently against storage/json.rs:508 and commands/mod.rs:1054. R2 FAIL [high]: rollback restored via save_issue, which stamps updated_at, so a failed apply left observable change. Fixed with IssueStore::restore_issue_verbatim. R3 PASS.",
     "c291e95c": "R1 FAIL [high]: REQ-02 unevidenced because no gate ran the mcp-server suite. Resolved by defining the mcp-ci gate (invoker-approved). R2 PASS.",
-    "a4e8d5ac": "R1 FAIL [high]: prerequisite c291e95c still in_progress. Sequencing artifact, not worker fault; not counted as rework. PASS after c291e95c closed."
+    "a4e8d5ac": "R1 FAIL [high]: prerequisite c291e95c still in_progress. Sequencing artifact, not worker fault; not counted as rework. PASS after c291e95c closed.",
+    "b6eb2585": "PASS on first review, zero findings. blocking_dependencies shared as pub(super); TransitionBlocker gained PartialEq so bulk-vs-single blockers compare as values.",
+    "e486a854": "R1 FAIL [high]: GET /graph omits the {\"count\": N, ...} list envelope required by the issue Notes and CLAUDE.md. Substantive work (core resolver called from server, one serialization path, graph_tree schema arm, scoped caveat on both surfaces) all verified met.",
+    "136268f8": "R1 FAIL: [high] REQ-2's end-to-end test rebuilds main.rs:2747's binding map by hand instead of driving the CLI, so a regression in the auto-bind would not be caught. [medium] configuration.md wrongly claims roles.planning controls the move-upstream-to-role target, which is named by the transform's own role field."
   },
-  "started_at": "2026-07-09T00:00:00+00:00"
+  "started_at": "2026-07-09T00:00:00+00:00",
+  "concurrency_note": "A second jit-execution-lead is driving epic:docs-accuracy in the same working tree and on main, concurrently. Invoker approved continuing with strict write discipline: stage only own paths (never `git add -A .jit`), never run `jit recover` (it deletes locks owned by the other lead). Their commits interleave with mine; all my work verified present in HEAD.",
+  "style_note": "Lead considered enforcing the no-em-dash writing rule on wave-2 output, then reversed: the repo already carries em-dashes in pre-existing code that passed review, the instances were appositives rather than the redundant paraphrase the rule targets, and selective enforcement would be churn. If wanted, it belongs in rules.toml or the review prompt as a declared standard."
 }
