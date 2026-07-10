@@ -8,17 +8,12 @@ import {
   type GraphFilter,
   type LabelFilterConfig,
 } from './graphFilter';
+import { graphNode } from '../test/graphNode';
 import type { GraphNode, GraphEdge } from '../types/models';
 
 // Test fixtures
-const createNode = (id: string, labels: string[]): GraphNode => ({
-  id,
-  label: `Issue ${id}`,
-  state: 'ready',
-  priority: 'normal',
-  labels,
-  blocked: false,
-});
+const createNode = (id: string, labels: string[]): GraphNode =>
+  graphNode(id, { label: `Issue ${id}`, labels });
 
 const createEdge = (from: string, to: string): GraphEdge => ({
   from,

@@ -1,5 +1,5 @@
 {
-  "description": "Shared test vectors for canonical DAG-authoritative hierarchy resolution. Consumed by the Rust core test (crates/jit/src/graph/hierarchy.rs, via tests/hierarchy_vectors_test.rs) and the web port (web/src/utils/hierarchyResolution.test.ts). Both implementations must produce `expected` from `nodes` under `hierarchy`. See docs/concepts/hierarchy-resolution.md for the model.",
+  "description": "Test vectors for canonical DAG-authoritative hierarchy resolution. Consumed by the Rust core test (crates/jit/src/graph/hierarchy.rs, via tests/hierarchy_vectors_test.rs), the sole implementation of the rule: it must produce `expected` from `nodes` under `hierarchy`. Every other consumer (CLI output, graph export, the web server's /graph payload) projects that result. See docs/concepts/hierarchy-resolution.md for the model.",
   "hierarchy": { "milestone": 1, "epic": 2, "story": 3, "task": 4 },
   "nodes": [
     { "id": "m", "type": "milestone", "dependencies": ["e1", "tA"] },

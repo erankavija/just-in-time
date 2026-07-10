@@ -68,9 +68,10 @@ free to draw a shallower grouping, choosing which level it visually clusters at.
 That choice is a presentation concern layered on top of the resolved hierarchy;
 the DAG-authoritative rule decides containment either way.
 
-The web shares the canonical resolver (`web/src/utils/hierarchyResolution.ts`),
-pinned to the core by the shared fixture
-`test-vectors/hierarchy_resolution.json` (asserted from both Rust and vitest).
+The web UI takes that choice: it clusters at the epic level, reading each node's
+`parent`, `cluster`, and `rank` from `GET /graph`. The core resolver is the only
+implementation of the rule; the fixture `test-vectors/hierarchy_resolution.json`
+pins its output.
 
 ## Where it surfaces
 

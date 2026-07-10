@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prepareClusteredGraphForReactFlow } from './clusteredGraphLayout';
+import { graphNode } from '../test/graphNode';
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyLevelMap, ExpansionState } from '../types/subgraphCluster';
 
@@ -13,22 +14,8 @@ describe('clusteredGraphLayout', () => {
 
     it('should convert simple graph to clustered format', () => {
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['task-1'], cluster: 'epic-1', rank: 1 }),
+        graphNode('task-1', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 0 }),
       ];
 
       const edges: GraphEdge[] = [
@@ -50,30 +37,9 @@ describe('clusteredGraphLayout', () => {
 
     it('should hide children when container is collapsed', () => {
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
-        {
-          id: 'task-2',
-          label: 'Task 2',
-          state: 'ready',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['task-1', 'task-2'], cluster: 'epic-1', rank: 1 }),
+        graphNode('task-1', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 0 }),
+        graphNode('task-2', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 0 }),
       ];
 
       const edges: GraphEdge[] = [
@@ -95,38 +61,10 @@ describe('clusteredGraphLayout', () => {
     it('should create virtual edges for collapsed containers', () => {
       // Setup: epic-1 contains task-1, which depends on epic-2's task-2
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'epic-2',
-          label: 'Epic 2',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
-        {
-          id: 'task-2',
-          label: 'Task 2',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['task-1'], cluster: 'epic-1', rank: 2 }),
+        graphNode('epic-2', { type: 'epic', children: ['task-2'], cluster: 'epic-2', rank: 1 }),
+        graphNode('task-1', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 1 }),
+        graphNode('task-2', { type: 'task', parent: 'epic-2', cluster: 'epic-2', rank: 0 }),
       ];
 
       const edges: GraphEdge[] = [
@@ -148,7 +86,7 @@ describe('clusteredGraphLayout', () => {
       expect(result.virtualEdges[0].from).toBe('epic-1');
       expect(result.virtualEdges[0].to).toBe('task-2');
       expect(result.virtualEdges[0].count).toBe(1);
-      
+
       // Visible nodes: epic-1, epic-2, task-2 (task-1 hidden)
       expect(result.visibleNodes).toHaveLength(3);
       expect(result.visibleNodes.map(n => n.id).sort()).toEqual(['epic-1', 'epic-2', 'task-2']);
@@ -156,38 +94,10 @@ describe('clusteredGraphLayout', () => {
 
     it('should handle multiple clusters with cross-cluster edges', () => {
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'epic-2',
-          label: 'Epic 2',
-          state: 'ready',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
-        {
-          id: 'task-2',
-          label: 'Task 2',
-          state: 'ready',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['task-1'], cluster: 'epic-1', rank: 1 }),
+        graphNode('epic-2', { type: 'epic', children: ['task-2'], cluster: 'epic-2', rank: 2 }),
+        graphNode('task-1', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 0 }),
+        graphNode('task-2', { type: 'task', parent: 'epic-2', cluster: 'epic-2', rank: 1 }),
       ];
 
       const edges: GraphEdge[] = [
@@ -205,7 +115,7 @@ describe('clusteredGraphLayout', () => {
 
       expect(result.clusters.length).toBe(2);
       expect(result.visibleNodes).toHaveLength(4); // All nodes visible
-      
+
       // Should have cross-cluster edge preserved
       const crossEdge = result.visibleEdges.find(
         e => e.from === 'task-2' && e.to === 'task-1'
@@ -215,38 +125,10 @@ describe('clusteredGraphLayout', () => {
 
     it('should provide cluster metadata for UI rendering', () => {
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'story-1',
-          label: 'Story 1',
-          state: 'in_progress',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:story'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
-        {
-          id: 'task-2',
-          label: 'Task 2',
-          state: 'ready',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['story-1'], cluster: 'epic-1', rank: 2 }),
+        graphNode('story-1', { type: 'story', parent: 'epic-1', children: ['task-1', 'task-2'], cluster: 'epic-1', rank: 1 }),
+        graphNode('task-1', { type: 'task', parent: 'story-1', cluster: 'epic-1', rank: 0 }),
+        graphNode('task-2', { type: 'task', parent: 'story-1', cluster: 'epic-1', rank: 0 }),
       ];
 
       const edges: GraphEdge[] = [
@@ -265,7 +147,7 @@ describe('clusteredGraphLayout', () => {
       const cluster = result.clusters.find(c => c.containerId === 'epic-1')!;
       expect(cluster).toBeDefined();
       expect(cluster.nodes).toHaveLength(4); // All 4 nodes in cluster
-      
+
       // Visible nodes should be epic + story (tasks hidden by collapsed story)
       expect(result.visibleNodes).toHaveLength(2);
       expect(result.visibleNodes.map(n => n.id).sort()).toEqual(['epic-1', 'story-1']);
@@ -273,22 +155,8 @@ describe('clusteredGraphLayout', () => {
 
     it('should handle empty expansion state (all expanded by default)', () => {
       const nodes: GraphNode[] = [
-        {
-          id: 'epic-1',
-          label: 'Epic 1',
-          state: 'in_progress',
-          priority: 'high',
-          blocked: false,
-          labels: ['type:epic'],
-        },
-        {
-          id: 'task-1',
-          label: 'Task 1',
-          state: 'done',
-          priority: "normal",
-          blocked: false,
-          labels: ['type:task'],
-        },
+        graphNode('epic-1', { type: 'epic', children: ['task-1'], cluster: 'epic-1', rank: 1 }),
+        graphNode('task-1', { type: 'task', parent: 'epic-1', cluster: 'epic-1', rank: 0 }),
       ];
 
       const edges: GraphEdge[] = [

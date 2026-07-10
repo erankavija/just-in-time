@@ -47,10 +47,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
     `jit validate` surfaces the same as an advisory `divergence_count` that never
     changes its exit status.
 
-  The web UI shares the canonical resolver (`web/src/utils/hierarchyResolution.ts`),
-  pinned to the core by a shared fixture (`test-vectors/hierarchy_resolution.json`)
-  asserted from both Rust and vitest. See
-  [Hierarchy Resolution](docs/concepts/hierarchy-resolution.md).
+  The web UI reads those served fields; the core resolver is the sole
+  implementation, pinned by the fixture `test-vectors/hierarchy_resolution.json`.
+  See [Hierarchy Resolution](docs/concepts/hierarchy-resolution.md).
 
 - **Full-record bulk graph export (`jit graph export --format json --full`) and
   issue lifecycle timestamps.** The JSON graph export gains a `--full` flag that

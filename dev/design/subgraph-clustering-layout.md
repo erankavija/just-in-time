@@ -85,11 +85,10 @@ for each child C of S:
   - **Files:** `web/src/types/subgraphCluster.ts`
 
 - [x] **1.2** Implement hierarchy derivation from config ✅
-  - `extractNodeType(node)` - extracts type from type:X label
-  - `getNodeLevel(node, hierarchy)` - determines node's level from type label
+  - `getNodeLevel(node, hierarchy)` - maps the node's served `type` to its level
   - Handle multiple types per level (task=4, bug=4)
   - Returns Infinity for unknown/missing types
-  - **Tests:** 9 tests covering various configs, edge cases
+  - **Tests:** 6 tests covering various configs, edge cases
   - **Files:** `web/src/utils/subgraphClustering.ts`
 
 - [x] **1.3** Implement subgraph assignment algorithm ✅

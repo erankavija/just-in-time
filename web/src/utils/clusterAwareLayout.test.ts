@@ -4,6 +4,7 @@ import {
   layoutNodesWithinCluster,
   createClusterAwareLayout,
 } from './clusterAwareLayout';
+import { graphNode } from '../test/graphNode';
 import type { SubgraphCluster } from '../types/subgraphCluster';
 import type { GraphNode, GraphEdge } from '../types/models';
 
@@ -13,7 +14,7 @@ describe('computeClusterPositions', () => {
       {
         containerId: 'epic1',
         containerLevel: 2,
-        nodes: [{ id: 'epic1', labels: ['type:epic'] } as GraphNode],
+        nodes: [graphNode('epic1')],
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
@@ -22,7 +23,7 @@ describe('computeClusterPositions', () => {
       {
         containerId: 'epic2',
         containerLevel: 2,
-        nodes: [{ id: 'epic2', labels: ['type:epic'] } as GraphNode],
+        nodes: [graphNode('epic2')],
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
@@ -45,7 +46,7 @@ describe('computeClusterPositions', () => {
       {
         containerId: 'epic1',
         containerLevel: 2,
-        nodes: [{ id: 'epic1', labels: ['type:epic'] } as GraphNode],
+        nodes: [graphNode('epic1')],
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
@@ -54,7 +55,7 @@ describe('computeClusterPositions', () => {
       {
         containerId: 'epic2',
         containerLevel: 2,
-        nodes: [{ id: 'epic2', labels: ['type:epic'] } as GraphNode],
+        nodes: [graphNode('epic2')],
         internalEdges: [],
         outgoingEdges: [],
         incomingEdges: [],
@@ -71,9 +72,9 @@ describe('computeClusterPositions', () => {
 
   it('should handle transitive dependencies (A→B→C should order C,B,A)', () => {
     const clusters: SubgraphCluster[] = [
-      { containerId: 'A', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'A', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
-      { containerId: 'B', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'B', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
-      { containerId: 'C', containerLevel: 2, parentClusterId: null, nodes: [{ id: 'C', labels: ['type:epic'] } as GraphNode], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'A', containerLevel: 2, parentClusterId: null, nodes: [graphNode('A')], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'B', containerLevel: 2, parentClusterId: null, nodes: [graphNode('B')], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
+      { containerId: 'C', containerLevel: 2, parentClusterId: null, nodes: [graphNode('C')], internalEdges: [], outgoingEdges: [], incomingEdges: [] },
     ];
     
     const crossClusterEdges: GraphEdge[] = [
@@ -91,10 +92,10 @@ describe('computeClusterPositions', () => {
 describe('layoutNodesWithinCluster', () => {
   it('should layout nodes vertically in a compact stack', () => {
     const nodes: GraphNode[] = [
-      { id: 'task1', labels: ['type:task'] },
-      { id: 'task2', labels: ['type:task'] },
-      { id: 'task3', labels: ['type:task'] },
-    ] as GraphNode[];
+      graphNode('task1'),
+      graphNode('task2'),
+      graphNode('task3'),
+    ];
     
     const internalEdges: GraphEdge[] = [];
     
@@ -115,8 +116,8 @@ describe('layoutNodesWithinCluster', () => {
 
   it('should handle single-node clusters', () => {
     const nodes: GraphNode[] = [
-      { id: 'epic1', labels: ['type:epic'] },
-    ] as GraphNode[];
+      graphNode('epic1'),
+    ];
     
     const layout = layoutNodesWithinCluster(nodes, []);
     
@@ -132,8 +133,8 @@ describe('createClusterAwareLayout', () => {
         containerId: 'epic1',
         containerLevel: 2,
         nodes: [
-          { id: 'epic1', labels: ['type:epic'] } as GraphNode,
-          { id: 'task1', labels: ['type:task'] } as GraphNode,
+          graphNode('epic1'),
+          graphNode('task1'),
         ],
         internalEdges: [
           { from: 'epic1', to: 'task1' },

@@ -59,6 +59,12 @@ export interface Issue {
   updated_at: string;
 }
 
+/**
+ * One node of `GET /graph`: display fields plus the DAG-resolved placement the
+ * server computes with the core resolver. `type`, `parent`, `children`,
+ * `cluster`, and `rank` are authoritative; the client reads them and derives
+ * none of them.
+ */
 export interface GraphNode {
   id: string;
   label: string;
@@ -67,6 +73,16 @@ export interface GraphNode {
   assignee?: string;
   labels: string[];
   blocked: boolean;
+  /** The node's `type:` label value, or `null` when it carries none. */
+  type: string | null;
+  /** Nearest dominating container, or `null` for a root. */
+  parent: string | null;
+  /** Inverse of `parent`, sorted by id. */
+  children: string[];
+  /** Strategic root of the parent chain, or `null` for an orphan. */
+  cluster: string | null;
+  /** Longest dependency-path length from this node to a sink. */
+  rank: number;
 }
 
 export interface GraphEdge {
@@ -75,6 +91,8 @@ export interface GraphEdge {
 }
 
 export interface GraphData {
+  /** Number of entries in `nodes`. */
+  count: number;
   nodes: GraphNode[];
   edges: GraphEdge[];
 }

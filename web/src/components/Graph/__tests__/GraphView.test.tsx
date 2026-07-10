@@ -35,6 +35,7 @@ vi.mock('dagre', () => ({
 vi.mock('../../../api/client', () => ({
   apiClient: {
     getGraph: vi.fn(() => Promise.resolve({
+      count: 3,
       nodes: [
         {
           id: '1',
@@ -43,6 +44,11 @@ vi.mock('../../../api/client', () => ({
           priority: 'high',
           labels: ['milestone:v1.0'],
           blocked: false,
+          type: 'milestone',
+          parent: null,
+          children: ['2'],
+          cluster: '1',
+          rank: 2,
         },
         {
           id: '2',
@@ -51,6 +57,11 @@ vi.mock('../../../api/client', () => ({
           priority: 'high',
           labels: ['epic:auth'],
           blocked: false,
+          type: 'epic',
+          parent: '1',
+          children: ['3'],
+          cluster: '1',
+          rank: 1,
         },
         {
           id: '3',
@@ -59,6 +70,11 @@ vi.mock('../../../api/client', () => ({
           priority: 'normal',
           labels: ['component:backend'],
           blocked: false,
+          type: 'task',
+          parent: '2',
+          children: [],
+          cluster: '1',
+          rank: 0,
         },
       ],
       edges: [

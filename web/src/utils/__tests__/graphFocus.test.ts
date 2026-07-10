@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { findParentClusters } from '../graphFocus';
+import { graphNode } from '../../test/graphNode';
 import type { SubgraphCluster } from '../../types/subgraphCluster';
 
 describe('graphFocus', () => {
@@ -11,9 +12,9 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: null,
           nodes: [
-            { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-2', label: 'Task 2', state: 'backlog', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-1'),
+            graphNode('task-1'),
+            graphNode('task-2'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -32,9 +33,9 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: null,
           nodes: [
-            { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-2', label: 'Task 2', state: 'backlog', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-1'),
+            graphNode('task-1'),
+            graphNode('task-2'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -53,7 +54,7 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: null,
           nodes: [
-            { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-1'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -64,9 +65,9 @@ describe('graphFocus', () => {
           containerLevel: 3,
           parentClusterId: 'epic-1',
           nodes: [
-            { id: 'story-1', label: 'Story 1', state: 'ready', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-1', label: 'Task 1', state: 'backlog', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-2', label: 'Task 2', state: 'backlog', priority: 'normal', labels: [], blocked: false },
+            graphNode('story-1'),
+            graphNode('task-1'),
+            graphNode('task-2'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -86,8 +87,8 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: null,
           nodes: [
-            { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-1', label: 'Task 1', state: 'ready', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-1'),
+            graphNode('task-1'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -98,9 +99,9 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: null,
           nodes: [
-            { id: 'epic-2', label: 'Epic 2', state: 'ready', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-2', label: 'Task 2', state: 'backlog', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-3', label: 'Task 3', state: 'backlog', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-2'),
+            graphNode('task-2'),
+            graphNode('task-3'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -119,7 +120,7 @@ describe('graphFocus', () => {
           containerLevel: 1,
           parentClusterId: null,
           nodes: [
-            { id: 'milestone-1', label: 'Milestone 1', state: 'in_progress', priority: 'critical', labels: [], blocked: false },
+            graphNode('milestone-1'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -130,7 +131,7 @@ describe('graphFocus', () => {
           containerLevel: 2,
           parentClusterId: 'milestone-1',
           nodes: [
-            { id: 'epic-1', label: 'Epic 1', state: 'in_progress', priority: 'normal', labels: [], blocked: false },
+            graphNode('epic-1'),
           ],
           internalEdges: [],
           incomingEdges: [],
@@ -141,8 +142,8 @@ describe('graphFocus', () => {
           containerLevel: 3,
           parentClusterId: 'epic-1',
           nodes: [
-            { id: 'story-1', label: 'Story 1', state: 'ready', priority: 'normal', labels: [], blocked: false },
-            { id: 'task-1', label: 'Task 1', state: 'backlog', priority: 'normal', labels: [], blocked: false },
+            graphNode('story-1'),
+            graphNode('task-1'),
           ],
           internalEdges: [],
           incomingEdges: [],

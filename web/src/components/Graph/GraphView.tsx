@@ -138,18 +138,12 @@ const getClusterAwareLayout = (
       } else {
         // Keep cluster info for child→container mapping
         collapsedClusters.push(cluster);
-        
+
         // Treat collapsed cluster container as an orphan node
-        const containerNode = nodes.find(n => n.id === cluster.containerId);
+        const containerNode = cluster.nodes.find(n => n.id === cluster.containerId);
         if (containerNode) {
-          collapsedAsOrphans.push({
-            id: cluster.containerId,
-            label: containerNode.data?.label || cluster.containerId,
-            state: containerNode.data?.state || 'backlog',
-            priority: containerNode.data?.priority || 'normal',
-            labels: containerNode.data?.labels || [],
-            blocked: false, // Collapsed clusters are never blocked (the container itself is shown)
-          });
+          // Collapsed clusters are never blocked (the container itself is shown)
+          collapsedAsOrphans.push({ ...containerNode, blocked: false });
         }
       }
     });
@@ -269,8 +263,9 @@ const getClusterAwareLayout = (
 
 // Compact layered layout - vertical stacking within ranks
 const getCompactLayout = (
-  nodes: Node[], 
+  nodes: Node[],
   edges: Edge[],
+  ranks: ReadonlyMap<string, number>,
   clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
   allOriginalEdges?: GraphEdge[],
   expansionState?: ExpansionState
@@ -285,82 +280,20 @@ const getCompactLayout = (
   }
 
   // Otherwise fall back to basic rank-based layout
-  return getBasicRankLayout(nodes, edges);
+  return getBasicRankLayout(nodes, edges, ranks);
 };
 
-// Extract the existing compact layout logic to a separate function
-const getBasicRankLayout = (nodes: Node[], edges: Edge[]) => {
-
-  // Build adjacency list (source -> targets, where source depends on targets)
-  const dependsOn = new Map<string, Set<string>>();
-  const dependedBy = new Map<string, Set<string>>();
-  
-  nodes.forEach(node => {
-    dependsOn.set(node.id, new Set());
-    dependedBy.set(node.id, new Set());
-  });
-
-  edges.forEach(edge => {
-    // edge.source is the dependency, edge.target is the dependent
-    // so target depends on source
-    dependsOn.get(edge.target)?.add(edge.source);
-    dependedBy.get(edge.source)?.add(edge.target);
-  });
-
-  // Compute ranks via topological sort (BFS from roots)
-  const ranks = new Map<string, number>();
-  const nodeSet = new Set(nodes.map(n => n.id));
-  
-  // Find roots (nodes with no dependencies within our visible set)
-  const roots: string[] = [];
-  nodes.forEach(node => {
-    const deps = dependsOn.get(node.id);
-    const visibleDeps = deps ? [...deps].filter(d => nodeSet.has(d)) : [];
-    if (visibleDeps.length === 0) {
-      roots.push(node.id);
-    }
-  });
-
-  // BFS to assign ranks
-  const queue = [...roots];
-  roots.forEach(id => ranks.set(id, 0));
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const currentRank = ranks.get(current)!;
-    
-    const dependents = dependedBy.get(current) || new Set();
-    dependents.forEach(dep => {
-      if (!nodeSet.has(dep)) return;
-      
-      // Rank is max of all dependency ranks + 1
-      const existingRank = ranks.get(dep) ?? -1;
-      const newRank = currentRank + 1;
-      
-      if (newRank > existingRank) {
-        ranks.set(dep, newRank);
-        // Re-process this node's dependents
-        if (!queue.includes(dep)) {
-          queue.push(dep);
-        }
-      }
-    });
-  }
-
-  // Handle any unranked nodes (disconnected or cycles)
-  nodes.forEach(node => {
-    if (!ranks.has(node.id)) {
-      ranks.set(node.id, 0);
-    }
-  });
-
+// Rank-column layout: one column per dependency depth, driven by the `rank` the
+// server resolved for each node (longest dependency path to a sink).
+const getBasicRankLayout = (nodes: Node[], edges: Edge[], ranks: ReadonlyMap<string, number>) => {
   // Group nodes by rank
   const nodesByRank = new Map<number, string[]>();
-  ranks.forEach((rank, nodeId) => {
+  nodes.forEach(node => {
+    const rank = ranks.get(node.id) ?? 0;
     if (!nodesByRank.has(rank)) {
       nodesByRank.set(rank, []);
     }
-    nodesByRank.get(rank)!.push(nodeId);
+    nodesByRank.get(rank)!.push(node.id);
   });
 
   // Sort ranks
@@ -422,16 +355,17 @@ const getBasicRankLayout = (nodes: Node[], edges: Edge[]) => {
 
 // Main layout function
 const getLayoutedElements = (
-  nodes: Node[], 
-  edges: Edge[], 
+  nodes: Node[],
+  edges: Edge[],
   algorithm: LayoutAlgorithm = 'dagre',
+  ranks: ReadonlyMap<string, number>,
   clusterData?: ReturnType<typeof prepareClusteredGraphForReactFlow> | null,
   allOriginalEdges?: GraphEdge[],
   expansionState?: ExpansionState
 ) => {
   switch (algorithm) {
     case 'compact':
-      return getCompactLayout(nodes, edges, clusterData, allOriginalEdges, expansionState);
+      return getCompactLayout(nodes, edges, ranks, clusterData, allOriginalEdges, expansionState);
     case 'dagre':
     default:
       return getDagreLayout(nodes, edges);
@@ -725,8 +659,8 @@ export function GraphView({
         const filterResult = nodeFilterResults.get(node.id)!;
         const isDimmed = filterResult.dimmed;
 
-        // Get icon for this node's type
-        const nodeType = node.labels.find(l => l.startsWith('type:'))?.substring(5);
+        // Get icon for this node's server-resolved type
+        const nodeType = node.type;
         const typeIcon = nodeType && hierarchyConfig?.icons?.[nodeType];
         
         // Check if this node is a cluster container
@@ -904,7 +838,8 @@ export function GraphView({
       } else {
         // Full layout: topology changed (first load, node added/removed, edge
         // added/removed, or filter/view-mode change).
-        const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, clusterData, data.edges, expansionState);
+        const ranks = new Map(data.nodes.map(node => [node.id, node.rank]));
+        const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, ranks, clusterData, data.edges, expansionState);
 
         // Filter nodes to only show visible ones (respecting expansion state)
         const visibleNodeIds = clusterData
