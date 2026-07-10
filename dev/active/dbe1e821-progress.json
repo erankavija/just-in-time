@@ -1,7 +1,7 @@
 {
   "epic_id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
   "epic_short_id": "dbe1e821",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -101,7 +101,7 @@
           "short_id": "b24ce11b",
           "title": "Canonicalize hierarchy resolution on the reduced dependency graph",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -170,7 +170,8 @@
     "b6eb2585": "PASS on first review, zero findings. blocking_dependencies shared as pub(super); TransitionBlocker gained PartialEq so bulk-vs-single blockers compare as values.",
     "e486a854": "R1 FAIL [high]: GET /graph omits the {\"count\": N, ...} list envelope required by the issue Notes and CLAUDE.md. Substantive work (core resolver called from server, one serialization path, graph_tree schema arm, scoped caveat on both surfaces) all verified met. R2 PASS, zero findings.",
     "136268f8": "R1 FAIL: [high] REQ-2's end-to-end test rebuilds main.rs:2747's binding map by hand instead of driving the CLI, so a regression in the auto-bind would not be caught. [medium] configuration.md wrongly claims roles.planning controls the move-upstream-to-role target, which is named by the transform's own role field. R2 PASS, zero findings; the fix swept the doc error into commands/template.rs unprompted.",
-    "d91ea408": "R1 FAIL [high]: GraphView's layout memo fingerprinted only node ids and edges, so a served cluster/parent/rank change with fixed topology (e.g. relabelling type:task -> type:story) rendered stale clusters. Fixed by fingerprinting the five served fields; position-preservation for presentational updates pinned by its own test. R2 PASS, zero findings."
+    "d91ea408": "R1 FAIL [high]: GraphView's layout memo fingerprinted only node ids and edges, so a served cluster/parent/rank change with fixed topology (e.g. relabelling type:task -> type:story) rendered stale clusters. Fixed by fingerprinting the five served fields; position-preservation for presentational updates pinned by its own test. R2 PASS, zero findings.",
+    "b24ce11b": "PASS on first review, zero findings. Property test prop_resolution_ignores_redundant_edges calls the real resolver over closure-supersets; REQ-4 held with additions-only to the fixture; updated docs/concepts/hierarchy-resolution.md in the same change."
   },
   "started_at": "2026-07-09T00:00:00+00:00",
   "concurrency_note": "A second jit-execution-lead is driving epic:docs-accuracy in the same working tree and on main, concurrently. Invoker approved continuing with strict write discipline: stage only own paths (never `git add -A .jit`), never run `jit recover` (it deletes locks owned by the other lead). Their commits interleave with mine; all my work verified present in HEAD.",
