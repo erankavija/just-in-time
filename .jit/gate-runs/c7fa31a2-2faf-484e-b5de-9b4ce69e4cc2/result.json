@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "c7fa31a2-2faf-484e-b5de-9b4ce69e4cc2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
+  "commit": "944deaf9064f3cb42987999019cebe7a8f7b5032",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T11:17:25.262941812Z",
+  "completed_at": "2026-07-10T11:18:12.134313275Z",
+  "duration_ms": 46871,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01: Met. [dev/index.md](/home/vkaskivuo/Projects/just-in-time/dev/index.md:19) describes all 11 top-level directories, and every local link resolves.\n- REQ-02: Met. All three loose plans were moved into appropriate archive lifecycle directories. Their owning issues were re-pointed to the new paths.\n- REQ-03: Met. `dev/` contains only `index.md` and `authoring-conventions.md` at its root.\n- The issue has no dependencies.\n\n## Architecture and Separation of Concerns\n\nDocumentation and issue metadata only; no Rust architecture boundaries were changed.\n\n## Functional Paradigm\n\nNo executable code was changed.\n\n## Correctness and Invariants\n\nIssue document updates have corresponding `issue_updated` events in `.jit/events.jsonl`. Assignee and labels remain correctly formatted. No other runtime invariants are affected.\n\n## Safety\n\nNo unsafe code or PID-handling changes.\n\n## Testing\n\nThe succeeded cargo-ci gate is the primary evidence: formatting and Clippy passed, with 3,545 tests passed, 0 failed, and 12 ignored. Tests were not rerun. `./scripts/jit-validate.sh` also passed during review.\n\n## Error Handling\n\nNo error-handling code was changed.\n\n## CLI Contract\n\nNo CLI behavior was changed.\n\n## Documentation\n\nAll local links in `dev/index.md` resolve. Directory descriptions, lifecycle placement, and issue document references are consistent. No public APIs were introduced.\n\n## Prior Review Feedback\n\n`run_history` is empty, so there are no prior findings to revisit.\n\n## Findings\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; documentation links, lifecycle moves, issue references, validation, and cargo-ci evidence are clean.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; documentation links, lifecycle moves, issue references, validation, and cargo-ci evidence are clean.",
+    "findings": []
+  }
+}
