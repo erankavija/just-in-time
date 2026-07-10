@@ -37,10 +37,10 @@ Existing issues are untouched until you bracket one with `jit apply plan <C>`.
 - A methodology already expressed (or about to be) as a ruleset — the bracket
   *adds to* a coverage ruleset; it does not replace one. If you are starting from
   scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale and
-  skip to [Step 5](#step-5-scaffold-a-container).
+  skip to [Step 5](#step-5--scaffold-a-container).
 - `jq` and an agent CLI on `PATH` if you want the `plan-review` and
   `breakdown-review` agent gates to actually invoke a reviewer (see
-  [Step 4](#step-4-supply-the-gate-checker-scripts)).
+  [Step 4](#step-4--supply-the-gate-checker-scripts)).
 
 ## Step 1 — Declare the breakable container and the two bracket types
 

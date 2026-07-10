@@ -1039,11 +1039,15 @@ sequenceDiagram
 
 **JIT's solution: File-based atomic claiming**
 
-Claiming uses atomic file operations (rename is atomic in POSIX):
+Advisory locks serialize the writes; the POSIX `rename()` makes each write
+atomic. A claim takes the repository, index, and issue locks, then:
 1. Read issue file
 2. Verify the issue is unassigned, or already assigned to the same claimant
 3. Write temp file with new assignee
-4. **Atomic rename** (succeeds for one agent, fails for others)
+4. **Atomic rename** (the file is replaced whole, never partially)
+
+Because the locks serialize step 2 against step 4, the second agent reads the
+issue only after the first agent's claim has landed, and its verification fails.
 
 ```bash
 # Both agents try simultaneously, for two DIFFERENT assignees

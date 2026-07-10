@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "dda073e9-2621-4f37-8715-af80ecaa7800",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+  "commit": "fd7a12838e8b3aa391553e80a41bd144e54eb366",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T15:36:18.859008292Z",
+  "completed_at": "2026-07-10T15:38:53.504313496Z",
+  "duration_ms": 154645,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail.\n\n- `docs/concepts/core-model.md:1042-1046` incorrectly says an atomic POSIX rename “succeeds for one agent, fails for others.” The persistence path instead takes repository, index, and issue advisory locks before performing atomic file replacement (`crates/jit/src/storage/json.rs:181-202`). Remediation: explain that advisory locking serializes writes and rename provides atomic replacement; do not claim competing renames fail.\n\nThe documented CLI surface, JSON contracts, storage layout, workspace members, and component boundaries otherwise match the current source and manifests.\n\n## 2. Adopter surface versus repo-local dogfood configuration\n\nPass.\n\nRepository-specific types, namespaces, gates, rules, templates, and item kinds are presented as optional examples or explicitly identified as this repository’s configuration.\n\n## 3. Current behavior only\n\nPass.\n\nMatches for historical or future-looking terms occur in illustrative examples, current status descriptions, or the current idempotent migration command. No adopter-facing prose narrates superseded or promised JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass.\n\nRemaining numeric statements describe fixed workflow structures, configured values, example output, or runtime quantities—not volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nFail.\n\n- `docs/how-to/adopt-planning-bracket.md:40` links to nonexistent anchor `#step-5-scaffold-a-container`. The heading at line 237 generates `#step-5--scaffold-a-container`. Remediation: update the fragment to the generated anchor.\n- `docs/how-to/adopt-planning-bracket.md:43` links to nonexistent anchor `#step-4-supply-the-gate-checker-scripts`. The heading at line 188 generates `#step-4--supply-the-gate-checker-scripts`. Remediation: update the fragment to the generated anchor.\n\nOther Markdown links, referenced repository paths, and anchors resolve.\n\n## 6. Content-standards conformance\n\nPass.\n\nAuthored diagrams use Mermaid. Detected box-drawing blocks are directory trees or verbatim CLI output, which the standard exempts. No remaining plain-text equation defect was found. `jit validate --json` reports no dangling item links; all concrete citations resolve, with `@/issue/REQ-01` correctly serving as an explicit invalid-address example.\n\nAll ten findings from the most recent review have been addressed.\n\n## Findings\n\n1. **F1 — High:** `docs/concepts/core-model.md:1046` incorrectly attributes competing-claim exclusion to POSIX rename failure. Describe advisory locking as the serialization mechanism and rename as atomic replacement.\n2. **F2 — High:** `docs/how-to/adopt-planning-bracket.md:40` targets the nonexistent Step 5 anchor. Change it to `#step-5--scaffold-a-container`.\n3. **F3 — High:** `docs/how-to/adopt-planning-bracket.md:43` targets the nonexistent Step 4 anchor. Change it to `#step-4--supply-the-gate-checker-scripts`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking documentation defects remain: one incorrect atomic-claim mechanism and two broken intra-document anchors.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Core model incorrectly says POSIX rename makes competing claims fail\",\"file\":\"docs/concepts/core-model.md\",\"line\":1046},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Step 5 link targets a nonexistent heading anchor\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":40},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Step 4 link targets a nonexistent heading anchor\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":43}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3781 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4cac-2950-77f0-b46c-5424065dc0d0\n--------\nuser\n--- 3768 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking documentation defects remain: one incorrect atomic-claim mechanism and two broken intra-document anchors.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Core model incorrectly says POSIX rename makes competing claims fail",
+        "file": "docs/concepts/core-model.md",
+        "line": 1046
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Step 5 link targets a nonexistent heading anchor",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "line": 40
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Step 4 link targets a nonexistent heading anchor",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "line": 43
+      }
+    ]
+  }
+}
