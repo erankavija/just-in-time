@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "run_id": "75e39381-6fc7-476b-b7aa-72dc607abcd0",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "30f4aab0cb7321ef564bf9f0f4d1a03590551372",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T11:32:09.845102059Z",
+  "completed_at": "2026-07-10T11:34:42.566829494Z",
+  "duration_ms": 152721,
+  "exit_code": 1,
+  "stdout": "# Documentation Review\n\n## 1. Claims match the current source tree\n\nFail.\n\n- `README.md` incorrectly says all state is plain JSON, although project configuration and registries use TOML and the event log uses JSONL.\n- `docs/concepts/overview.md` presents an incomplete `.jit/` layout, omitting shipped files such as `index.json` and `rules.toml`.\n- `web/README.md` is still the generic Vite template rather than documentation for the shipped JIT web component.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass.\n\nPlanning-bracket vocabulary and repository-specific gates are either identified as this repository’s configuration or presented as opt-in examples. I found no unsignalled claim that these values are `jit init` defaults.\n\n## 3. Current behavior only\n\nFail.\n\nSeveral documents contain migration history, past-state narration, or proposed future features instead of describing only current behavior. The literal “in-flight” occurrences also violate the supplied current-behavior rule even though they mean “not done.”\n\n## 4. No hardcoded counts that silently rot\n\nFail.\n\nThe gate-preset documentation manually maintains builtin-preset and gate totals even though these values come from the builtin preset registry. The same how-to also contains an unsupported “10x faster” count.\n\n## 5. Links and referenced paths resolve\n\nFail.\n\nSeven repository-relative links/anchors do not resolve. A concrete example issue-item address also fails `jit item show`.\n\n## 6. Content-standards conformance\n\nFail.\n\nNo non-Mermaid authored diagrams were found: the detected plain-text blocks are directory trees or verbatim CLI output and are allowed. No definite plain-text mathematics defect was found. Current-behavior prose violations remain content-standards failures.\n\n## Findings\n\n1. **F1 — Incorrect storage serialization claim.** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:24) says “All state” is plain JSON, but `.jit/config.toml`, `gates.toml`, `rules.toml`, optional registries, and `events.jsonl` are not JSON. Remediation: describe the repository state as plain, diffable JSON/JSONL/TOML files rather than all JSON.\n2. **F2 — Component README does not describe the shipped web component.** [web/README.md](/home/vkaskivuo/Projects/just-in-time/web/README.md:1) is generic React/Vite starter text and even discusses plugins not present in `web/package.json`. Remediation: replace it with adopter-facing JIT web UI documentation matching the package scripts, runtime boundary, and actual component.\n3. **F3 — Incomplete storage layout is presented as the `.jit/` mental model.** [docs/concepts/overview.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/overview.md:88) omits `index.json`, `rules.toml`, gate-run storage, and other documented parts of the current layout. Remediation: align the listing with `docs/reference/storage-format.md`, or explicitly label it as a deliberately partial illustration rather than the directory layout.\n4. **F4 — Two MCP “See Also” links target absent files.** [mcp-server/README.md](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:366) links to nonexistent `docs/json-schema-api.md`, and line 367 links to nonexistent `docs/cli-and-mcp-strategy.md`. Remediation: point both entries to current documentation or remove them.\n5. **F5 — Contributor quickstart link is dangling.** [docs/concepts/design-philosophy.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:489) targets absent `CONTRIBUTOR-QUICKSTART.md`. Remediation: update it to an existing contributor document or remove it.\n6. **F6 — Validation reference uses the wrong relative path.** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2675) targets `docs/reference/validation-rules.md`, which does not exist. Remediation: link to `../how-to/validation-rules.md`.\n7. **F7 — Custom-gates anchor does not exist.** [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:710) links to `custom-gates.md#beyond-software-development`, but that heading is absent. Remediation: target an existing heading or add the referenced section.\n8. **F8 — Software-development anchor does not exist.** [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1218) links to `software-development.md#multi-agent-workflows`, but that heading is absent. Remediation: link to the existing multi-contributor section or add the promised heading.\n9. **F9 — Concrete issue-item example is dangling.** [docs/reference/item-addresses.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/item-addresses.md:56) uses `@/issue/56ab0224/requirement/REQ-01`; `jit item show` cannot resolve it. The same fictitious address family recurs later in that reference and in the CLI reference. Remediation: use an address that exists in the live tracker, or convert the value into an unmistakable placeholder that is not presented as a resolvable citation.\n10. **F10 — Planning-bracket concept contains migration narration.** [docs/concepts/planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/planning-bracket.md:19) says no migration is needed and that projects behave “exactly as before.” Remediation: state the current fact directly: the feature is optional configuration and projects without the configuration do not have an applicable template.\n11. **F11 — Planning-bracket how-to contains migration narration.** [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:26) uses “No migration needed” and “exactly as before.” Remediation: replace this with a direct statement that bracket configuration is optional and affects issues only when applied.\n12. **F12 — Gate how-to narrates an old/new transition.** [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:796) contains “Migration from Manual Setup,” “Old way,” “New way,” and “Manual approach (old).” Remediation: describe manual definitions and presets as two current alternatives without historical framing.\n13. **F13 — Core-model documentation advertises unimplemented future behavior.** [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:701) lists “Potential future enhancements (not yet implemented),” with another future-enhancement section near line 1204. Remediation: remove roadmap material from adopter documentation or move it to an appropriate planning surface.\n14. **F14 — Custom-gates documentation advertises unimplemented extensions.** [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:974) contains “Potential extensions (not yet implemented).” Remediation: remove the future-facing section and document only supported extension mechanisms.\n15. **F15 — Design philosophy narrates feature history.** [docs/concepts/design-philosophy.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:481) explains that JSON output “came from” prior agent needs and “we … added” it. Remediation: state directly that structured JSON output serves agent automation.\n16. **F16 — CLI reference narrates legacy/corrupt repository history.** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1305) says a target “no longer exists” and cites repositories written by “an older binary.” Remediation: describe `dangling_dependency_ids` solely as the current representation of stored unresolved dependency IDs.\n17. **F17 — Validation-rules how-to uses prohibited “in-flight” behavior narration.** [docs/how-to/validation-rules.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/validation-rules.md:255), repeated near line 390, describes “in-flight” issues. Remediation: state the exact current-state predicate, such as “an epic whose state is not `done`.”\n18. **F18 — Validation-engine concept uses prohibited “in-flight” behavior narration.** [docs/concepts/validation-engine.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/validation-engine.md:108) describes an “in-flight epic.” Remediation: replace it with the precise configured state condition.\n19. **F19 — Gate how-to hardcodes volatile preset totals.** [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:571) manually claims eight builtin presets, and lines 581–588 and 620 repeat gate totals. Remediation: make `jit gate preset list/show` or the builtin registry authoritative and avoid prose totals; enumerate gate names without independently maintained counts.\n20. **F20 — CLI reference hardcodes volatile preset totals.** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2360) manually claims eight builtin presets and repeats per-preset gate totals through line 2398. Remediation: cite the builtin preset registry/schema and list preset contents without hand-maintained totals.\n21. **F21 — Gate how-to contains a rotting and unsupported performance count.** [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:846) claims “10x faster: 1 command vs 10+ commands,” while the immediately preceding manual example shows four-plus commands. Remediation: replace the numeric claim with the current mechanism-level benefit: one preset application replaces repeated definitions and attachments.\n\nTotal findings: 21\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shipped documentation has 21 findings across source accuracy, current-state prose, volatile counts, and unresolved references.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README incorrectly claims all repository state is plain JSON\",\"file\":\"README.md\",\"line\":24},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Web component README is unrelated generic Vite template documentation\",\"file\":\"web/README.md\",\"line\":1},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Concept overview presents an incomplete .jit storage layout\",\"file\":\"docs/concepts/overview.md\",\"line\":88},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"MCP README contains two links to absent documentation files\",\"file\":\"mcp-server/README.md\",\"line\":366},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Design philosophy links to absent CONTRIBUTOR-QUICKSTART.md\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":489},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"CLI reference links to validation-rules.md at the wrong relative path\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2675},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Core model links to a nonexistent custom-gates anchor\",\"file\":\"docs/concepts/core-model.md\",\"line\":710},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Core model links to a nonexistent software-development anchor\",\"file\":\"docs/concepts/core-model.md\",\"line\":1218},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"Concrete issue-item example does not resolve through jit item show\",\"file\":\"docs/reference/item-addresses.md\",\"line\":56},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"Planning-bracket concept contains migration and past-state narration\",\"file\":\"docs/concepts/planning-bracket.md\",\"line\":19},{\"id\":\"F11\",\"severity\":\"high\",\"summary\":\"Planning-bracket how-to contains migration and past-state narration\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":26},{\"id\":\"F12\",\"severity\":\"high\",\"summary\":\"Custom-gates how-to describes old and new workflows as a migration\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":796},{\"id\":\"F13\",\"severity\":\"high\",\"summary\":\"Core model advertises unimplemented future enhancements\",\"file\":\"docs/concepts/core-model.md\",\"line\":701},{\"id\":\"F14\",\"severity\":\"high\",\"summary\":\"Custom-gates how-to advertises unimplemented extensions\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":974},{\"id\":\"F15\",\"severity\":\"high\",\"summary\":\"Design philosophy narrates the historical introduction of JSON output\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":481},{\"id\":\"F16\",\"severity\":\"high\",\"summary\":\"CLI reference narrates legacy binary and prior dependency state\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1305},{\"id\":\"F17\",\"severity\":\"high\",\"summary\":\"Validation-rules how-to uses prohibited in-flight behavior narration\",\"file\":\"docs/how-to/validation-rules.md\",\"line\":255},{\"id\":\"F18\",\"severity\":\"high\",\"summary\":\"Validation-engine concept uses prohibited in-flight behavior narration\",\"file\":\"docs/concepts/validation-engine.md\",\"line\":108},{\"id\":\"F19\",\"severity\":\"high\",\"summary\":\"Custom-gates how-to hardcodes volatile builtin preset and gate totals\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":571},{\"id\":\"F20\",\"severity\":\"high\",\"summary\":\"CLI reference hardcodes volatile builtin preset and gate totals\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2360},{\"id\":\"F21\",\"severity\":\"high\",\"summary\":\"Custom-gates how-to makes an unsupported 10x performance count\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":846}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3516 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4bcc-a296-7831-989b-731f4ebd0d91\n--------\nuser\n--- 3503 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The shipped documentation has 21 findings across source accuracy, current-state prose, volatile counts, and unresolved references.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README incorrectly claims all repository state is plain JSON",
+        "file": "README.md",
+        "line": 24
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Web component README is unrelated generic Vite template documentation",
+        "file": "web/README.md",
+        "line": 1
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Concept overview presents an incomplete .jit storage layout",
+        "file": "docs/concepts/overview.md",
+        "line": 88
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "MCP README contains two links to absent documentation files",
+        "file": "mcp-server/README.md",
+        "line": 366
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "Design philosophy links to absent CONTRIBUTOR-QUICKSTART.md",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 489
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "CLI reference links to validation-rules.md at the wrong relative path",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2675
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Core model links to a nonexistent custom-gates anchor",
+        "file": "docs/concepts/core-model.md",
+        "line": 710
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Core model links to a nonexistent software-development anchor",
+        "file": "docs/concepts/core-model.md",
+        "line": 1218
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "Concrete issue-item example does not resolve through jit item show",
+        "file": "docs/reference/item-addresses.md",
+        "line": 56
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "Planning-bracket concept contains migration and past-state narration",
+        "file": "docs/concepts/planning-bracket.md",
+        "line": 19
+      },
+      {
+        "id": "F11",
+        "severity": "high",
+        "summary": "Planning-bracket how-to contains migration and past-state narration",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "line": 26
+      },
+      {
+        "id": "F12",
+        "severity": "high",
+        "summary": "Custom-gates how-to describes old and new workflows as a migration",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 796
+      },
+      {
+        "id": "F13",
+        "severity": "high",
+        "summary": "Core model advertises unimplemented future enhancements",
+        "file": "docs/concepts/core-model.md",
+        "line": 701
+      },
+      {
+        "id": "F14",
+        "severity": "high",
+        "summary": "Custom-gates how-to advertises unimplemented extensions",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 974
+      },
+      {
+        "id": "F15",
+        "severity": "high",
+        "summary": "Design philosophy narrates the historical introduction of JSON output",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 481
+      },
+      {
+        "id": "F16",
+        "severity": "high",
+        "summary": "CLI reference narrates legacy binary and prior dependency state",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1305
+      },
+      {
+        "id": "F17",
+        "severity": "high",
+        "summary": "Validation-rules how-to uses prohibited in-flight behavior narration",
+        "file": "docs/how-to/validation-rules.md",
+        "line": 255
+      },
+      {
+        "id": "F18",
+        "severity": "high",
+        "summary": "Validation-engine concept uses prohibited in-flight behavior narration",
+        "file": "docs/concepts/validation-engine.md",
+        "line": 108
+      },
+      {
+        "id": "F19",
+        "severity": "high",
+        "summary": "Custom-gates how-to hardcodes volatile builtin preset and gate totals",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 571
+      },
+      {
+        "id": "F20",
+        "severity": "high",
+        "summary": "CLI reference hardcodes volatile builtin preset and gate totals",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2360
+      },
+      {
+        "id": "F21",
+        "severity": "high",
+        "summary": "Custom-gates how-to makes an unsupported 10x performance count",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 846
+      }
+    ]
+  }
+}
