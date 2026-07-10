@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "d2dd5d86-f6e6-4354-86d2-d118dee1eebf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d24008f0-ecec-4f08-900b-9d686e9a5051",
+  "commit": "c3a648530e67beea19805e1fe686fa62903bdc35",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T23:00:48.020103880Z",
+  "completed_at": "2026-07-10T23:01:21.574553290Z",
+  "duration_ms": 33554,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01 is satisfied. [scripts/doc-review-prompt.md:27](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:27) restricts findings to an explicit description-declared file/directory scope and preserves the full enumerated surface when no scope is declared.\n\nThe mechanism trace and real scoped reviewer run are documented accurately in [dev/active/d24008f0-req01-evidence.md:3](/home/vkaskivuo/Projects/just-in-time/dev/active/d24008f0-req01-evidence.md:3). The live unscoped comparison is explicitly deferred under the owner-amended criterion.\n\n## Architecture and separation of concerns\n\nNo violations. The functional change is confined to the documentation-review prompt and introduces no runtime code, persistence, parsing, or output concerns.\n\n## Functional paradigm\n\nNot applicable to this prompt-only change.\n\n## Correctness and invariants\n\nThe scoped-audit instruction is explicit and internally consistent. Runtime invariants—including atomic writes, event logging, gate transitions, assignee and label formats, and PID safety—are unaffected.\n\nIssue metadata changes have corresponding `issue_updated` events in `.jit/events.jsonl`.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing\n\nThe supplied `repo-validate` gate passed with exit code 0. Tests and validation were not rerun, as instructed. No test failure appears in the supplied evidence; the recorded failures are prior code-review verdicts.\n\n## Error handling\n\nNot applicable; no executable code changed.\n\n## CLI contract\n\nNot applicable; no CLI command or output behavior changed.\n\n## Documentation\n\nThe original review-surface enumeration remains unchanged, including the intentional omission of root `TESTING.md`.\n\nThe prior contradictory evidence has been corrected:\n\n- [dev/active/d24008f0-req01-evidence.md:10](/home/vkaskivuo/Projects/just-in-time/dev/active/d24008f0-req01-evidence.md:10) clearly identifies the unscoped exercise as mechanism-only.\n- [dev/active/d24008f0-req01-evidence.md:182](/home/vkaskivuo/Projects/just-in-time/dev/active/d24008f0-req01-evidence.md:182) accurately summarizes the evidence and deferral.\n- The linked issue-document label now describes “mechanism trace + real scoped run.”\n\n## Prior review feedback\n\nThe latest F1 is resolved. The evidence no longer claims that the `REVIEWER_AGENT=cat` exercise was a live unscoped behavioral run.\n\n## Jit issue management\n\nDependency `c939d0b6` is complete and no unmet dependency is recorded. Assignee and labels use valid formats. The supplied repository-validation gate passed.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"REQ-01 is implemented and evidenced under the amended criterion, and the prior contradictory documentation has been corrected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "REQ-01 is implemented and evidenced under the amended criterion, and the prior contradictory documentation has been corrected.",
+    "findings": []
+  }
+}
