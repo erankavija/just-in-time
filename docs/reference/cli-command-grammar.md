@@ -142,10 +142,8 @@ Each short flag above binds one meaning across the whole CLI.
 
 ## Gate command grouping: configuration vs execution vs inspection
 
-The gate surface is one flat `gate` enum today that interleaves three distinct
-responsibilities. The standard separates them, because the downstream gate rename
-sweep regroups commands along exactly this boundary. Every gate verb belongs to
-exactly one of three groups:
+The `gate` verbs divide by responsibility along one boundary. Every gate verb
+belongs to exactly one of three groups:
 
 **1. Configuration** shapes *what gates exist and which issues require them*.
 Mutating the registry, attaching gates to issues, and managing presets.
