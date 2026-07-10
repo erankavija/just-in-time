@@ -114,7 +114,9 @@
           "short_id": "bbaedb0f",
           "title": "Disambiguate hierarchy-adjacent module and CLI naming",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched",
+          "worktree": ".claude/worktrees/agent-bbaedb0f",
+          "base_sha": "c3cef8feef5025060fccb372a4696d1ecf0c460a"
         }
       ]
     }
