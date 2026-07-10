@@ -1,0 +1,39 @@
+{
+  "id": "c939d0b6-ad59-44ef-9ac1-63b7365f8521",
+  "title": "breakdown: Exhaustive documentation audit and drift removal",
+  "description": "Breakdown node bracketing Exhaustive documentation audit and drift removal (2d109173). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T19:06:12.823799663Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T19:06:12.824514633Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:docs-exhaustive-audit",
+    "component:docs",
+    "type:breakdown",
+    "brackets:2d109173"
+  ],
+  "created_at": "2026-07-10T19:06:12.822746712Z",
+  "updated_at": "2026-07-10T19:06:12.841962846Z",
+  "first_ready_at": "2026-07-10T19:06:12.822747172Z"
+}

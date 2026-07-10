@@ -1,0 +1,30 @@
+{
+  "id": "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94",
+  "title": "planning: Exhaustive documentation audit and drift removal",
+  "description": "Planning node for Exhaustive documentation audit and drift removal (2d109173). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2d109173-plan.md and link it to this node once written.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T19:06:12.822614722Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "milestone:v1.0",
+    "epic:docs-exhaustive-audit",
+    "component:docs",
+    "type:planning"
+  ],
+  "created_at": "2026-07-10T19:06:12.821478531Z",
+  "updated_at": "2026-07-10T19:06:12.822631072Z",
+  "first_ready_at": "2026-07-10T19:06:12.821478971Z"
+}
