@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "7eb38b60-2528-4772-99e4-cbc830e44ef3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "f4642390480e71c8add184a68057b95fff46a7bc",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T23:26:57.254074909Z",
+  "completed_at": "2026-07-10T23:27:33.820573109Z",
+  "duration_ms": 36566,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nAll hard requirements are met:\n\n- REQ-01: checker inputs, tracked roots, item kinds, projection targets, and default permanent paths are derived live. Caller-supplied footprint semantics are documented consistently.\n- REQ-02: committed evidence records clean, seeded-defect, missing-path, unreadable-file, and unreadable-nested-directory cases with expected exit codes.\n- REQ-03: `.jit/gates.toml` registers the aggregate `docs-mechanical` exec gate.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries are affected. Changes are appropriately confined to documentation tooling, gate configuration, evidence, and issue metadata.\n\n## Functional Paradigm\n\nThe imperative shell and Python are appropriate for filesystem traversal, process orchestration, and test setup. No unnecessary mutable or statement-oriented Rust code was introduced.\n\n## Correctness and Invariants\n\nThe latest prior-review defects are resolved:\n\n- `scripts/docs-check-links.sh:78` supplies an `os.walk` error callback.\n- `scripts/docs-check-links.sh:86` uses that callback during recursive traversal, preventing unreadable nested directories from being silently skipped.\n- `scripts/docs-check-selftest.sh:98`–`:110` exercises nested traversal failures for both footprint-based checkers.\n\nNo issue transitions, event semantics, assignee/label validation, PID handling, or application persistence behavior changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced. Projection self-testing remains isolated in a disposable clone, preserving the active worktree and index.\n\n## Testing\n\nThe supplied evidence records all clean, seeded-defect, and footprint-error assertions passing. No test failure appears in the current evidence.\n\nLightweight review checks passed:\n\n- `./scripts/jit-validate.sh`\n- `bash -n` for affected scripts\n- `shellcheck scripts/docs-*.sh`\n- `git diff --check`\n\nThe Rust test suite was not run.\n\n## Error Handling\n\nBoth footprint checkers now fail closed with exit code 2 for missing, unreadable, or untraversable inputs. The aggregate script preserves findings as exit 1 while allowing environment errors to dominate as exit 2.\n\n## CLI Contract\n\nNo user-facing CLI command was introduced or changed. The `--json` command requirement is not applicable to repository gate scripts.\n\n## Documentation\n\nThe checker headers, gate description, amended issue contract, and execution evidence consistently describe the live-derived default footprint and caller-supplied adopter-document scope.\n\n## Prior Review Feedback\n\nAll findings from the latest review are resolved:\n\n- Unreadable nested directories are surfaced through `os.walk` error handling.\n- Committed regression coverage now includes nested-directory traversal failures.\n\nEarlier footprint, citation, reference-link, cleanup-safety, evidence, and exit-status findings remain resolved.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is complete, `unmet_dependencies` is empty, and repository validation passes.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, prior review findings are resolved, and the supplied evidence and validation checks pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, prior review findings are resolved, and the supplied evidence and validation checks pass.",
+    "findings": []
+  }
+}

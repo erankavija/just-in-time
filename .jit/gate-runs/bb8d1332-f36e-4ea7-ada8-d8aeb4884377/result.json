@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "bb8d1332-f36e-4ea7-ada8-d8aeb4884377",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "eef3930fd5c5bb5e92d6cb594b4bfc67d85f20a6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T23:14:36.220486017Z",
+  "completed_at": "2026-07-10T23:15:23.194733636Z",
+  "duration_ms": 46974,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-01, REQ-02, and REQ-03 are met under the amended owner-approved contract:\n\n- The default footprint is derived live from `[documentation].permanent_paths`; additional adopter documents are caller-supplied.\n- The committed self-test records clean and seeded-defect behavior for all three checkers.\n- `.jit/gates.toml` registers `docs-mechanical` and invokes the aggregate script.\n\nHowever, the implementation introduces contradictory documentation, which is technical debt and therefore blocking under the review standard.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries were changed. The work is appropriately confined to repository scripts, gate configuration, evidence, and issue metadata.\n\n## Functional Paradigm\n\nThe imperative shell and embedded Python are appropriate for filesystem scanning and process orchestration. No blocking functional-style issue was identified.\n\n## Correctness and Invariants\n\nThe aggregate script runs all three checkers and preserves finding versus environment-error exit semantics.\n\nProjection testing is isolated in a disposable clone. No issue-state transitions, event logging, gate semantics, assignee/label validation, PID handling, atomic persistence, or other application invariants were changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced. The self-test does not alter the active repository index or working tree.\n\n## Testing\n\nThe committed evidence records all six clean/seeded assertions passing and shellcheck succeeding. No failed test appears in the latest evidence.\n\nAs directed, I did not run the Rust test suite. The required validation and lightweight checks passed:\n\n- `./scripts/jit-validate.sh`\n- `bash -n scripts/docs-*.sh`\n- `git diff --check`\n\n## Error Handling\n\nThe orchestrator correctly maps child findings to exit code 1 and unexpected/environment failures to exit code 2. No blocking error-handling defect was identified.\n\n## CLI Contract\n\nNo user-facing CLI command was added or changed. The `--json` requirement is not applicable to these gate scripts.\n\n## Documentation\n\nThe gate description and amended issue correctly state that the default footprint is limited to configured permanent roots and that other adopter files are caller-supplied.\n\nThe header in `docs-mechanical.sh` still documents the superseded behavior: it claims the default additionally discovers root and immediate-subdirectory Markdown files through a depth-limited Git pattern. The implementation instead reads only `permanent_paths`. This leaves two incompatible footprint contracts in the same script.\n\n## Prior Review Feedback\n\n- The prior hardcoded-depth finding is resolved in implementation.\n- The later full-surface finding is resolved by the explicit owner amendment making non-`docs/` adopter files caller-supplied.\n- Citation deferrals, reference links, self-test isolation, execution evidence, and aggregate exit handling remain resolved.\n- The obsolete depth-based contract remains in the aggregate script’s documentation and was not updated with the implementation.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is complete and there are no unmet dependencies. Repository validation passes.\n\n## Findings\n\n1. **F1 — Medium:** `scripts/docs-mechanical.sh:21`–`28` still claims the default footprint includes repository-root and immediate-subdirectory Markdown through a depth-limited Git-derived pattern. The actual implementation at line 62 uses only configured `permanent_paths`, consistent with the amended issue and gate description. This contradictory, obsolete contract is technical debt and can mislead callers about which documents the automatic gate checks.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The acceptance behavior is implemented, but docs-mechanical.sh retains a contradictory obsolete default-footprint contract, introducing blocking technical debt.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"The script header documents a superseded depth-based default footprint that the implementation no longer provides.\",\"file\":\"scripts/docs-mechanical.sh\",\"line\":21}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1554 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e4f-bcdd-7642-ba3a-f7d1e9c8b48f\n--------\nuser\n--- 1541 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The acceptance behavior is implemented, but docs-mechanical.sh retains a contradictory obsolete default-footprint contract, introducing blocking technical debt.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "The script header documents a superseded depth-based default footprint that the implementation no longer provides.",
+        "file": "scripts/docs-mechanical.sh",
+        "line": 21
+      }
+    ]
+  }
+}

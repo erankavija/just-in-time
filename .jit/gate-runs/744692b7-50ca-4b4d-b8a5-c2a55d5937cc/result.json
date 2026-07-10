@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "744692b7-50ca-4b4d-b8a5-c2a55d5937cc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "91059da19cc08cf4cd90281e83fd6270ad8be58a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T23:25:07.402541318Z",
+  "completed_at": "2026-07-10T23:25:49.276305087Z",
+  "duration_ms": 41873,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-01 and REQ-03 are met. REQ-02’s clean/seeded-defect evidence remains valid for the three defect classes.\n\nHowever, unreadable nested directories can still make the link checker return a false-green result, so the required error-handling hardening is incomplete.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries were changed. The work remains appropriately confined to repository scripts, gate configuration, documentation, and issue metadata.\n\n## Functional Paradigm\n\nThe imperative shell and Python are reasonable for filesystem scanning and process orchestration. No blocking functional-style concern was identified.\n\n## Correctness and Invariants\n\nThe citation checker now propagates recursive `grep` errors correctly.\n\nThe link checker validates access only on each footprint root, then calls `os.walk()` without an `onerror` callback. Python silently skips nested directories that cannot be traversed. I reproduced this with an accessible documentation root containing a mode-`000` child directory:\n\n```text\nOK: all links and anchors resolve\nlinks_rc=0\n```\n\nThe citation checker returned exit 2 for the same footprint.\n\nNo issue-state, event-log, gate-transition, assignee, label, PID, atomic-write, or other application invariant changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced. Projection self-testing remains isolated from the active worktree.\n\n## Testing\n\nThe supplied evidence records the clean and seeded-defect checks passing. No failed test result appears in that evidence.\n\nThe latest regression test covers only a directly supplied unreadable file. It does not exercise an unreadable nested directory, which is the traversal failure still mishandled by the link checker.\n\nAs instructed, I did not run the Rust test suite. These checks passed:\n\n- `./scripts/jit-validate.sh`\n- Shell syntax validation\n- `shellcheck scripts/docs-*.sh`\n- `git diff --check`\n\n## Error Handling\n\n`scripts/docs-check-links.sh` does not satisfy its documented exit-2 contract for traversal errors below a readable footprint root. `os.walk()` requires an `onerror` handler or equivalent explicit traversal error propagation.\n\nThe citation checker’s updated main-shell `grep` handling correctly returns exit 2 for this case.\n\n## CLI Contract\n\nNo user-facing CLI command was added or changed. The `--json` requirement is not applicable to repository gate scripts.\n\n## Documentation\n\nThe footprint contract and default configuration behavior are documented consistently. The documented environment-error behavior remains inaccurate for nested traversal failures in the link checker.\n\n## Prior Review Feedback\n\n- Directly supplied nonexistent and unreadable files are now handled.\n- Citation scan errors are now propagated.\n- The prior unreadable-directory concern remains unresolved for nested directories in the link checker.\n- Regression coverage was added for unreadable files, but not directory traversal errors.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is done and `unmet_dependencies` is empty.\n\n`./scripts/jit-validate.sh` passes.\n\n## Findings\n\n1. **F1 — High:** `os.walk()` silently skips unreadable nested directories because no `onerror` handler is supplied. A readable footprint root containing an inaccessible child therefore makes `docs-check-links.sh` report success without scanning the complete footprint, leaving the prior false-green directory-traversal finding unresolved.\n2. **F2 — Medium:** The new regression assertions cover only a directly supplied unreadable file. They do not cover an unreadable nested directory, allowing the remaining link-checker traversal defect to escape the committed self-test.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The link checker still returns false-green success when a readable footprint contains an unreadable nested directory, and that case lacks regression coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Unreadable nested directories are silently skipped by os.walk, allowing an incomplete link scan to pass.\",\"file\":\"scripts/docs-check-links.sh\",\"line\":80},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The self-test covers unreadable files but not nested directory traversal failures.\",\"file\":\"scripts/docs-check-selftest.sh\",\"line\":89}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1153 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e59-5e6b-7fe2-ac47-b997cc6ccaa9\n--------\nuser\n--- 1140 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The link checker still returns false-green success when a readable footprint contains an unreadable nested directory, and that case lacks regression coverage.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Unreadable nested directories are silently skipped by os.walk, allowing an incomplete link scan to pass.",
+        "file": "scripts/docs-check-links.sh",
+        "line": 80
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The self-test covers unreadable files but not nested directory traversal failures.",
+        "file": "scripts/docs-check-selftest.sh",
+        "line": 89
+      }
+    ]
+  }
+}

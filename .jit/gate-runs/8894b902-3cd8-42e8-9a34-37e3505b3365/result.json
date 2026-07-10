@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "8894b902-3cd8-42e8-9a34-37e3505b3365",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "07d278fb0ec08890852712e89d9fa9f5ab51da3d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T23:16:00.609840893Z",
+  "completed_at": "2026-07-10T23:17:58.310315502Z",
+  "duration_ms": 117700,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-01, REQ-02, and REQ-03 are substantively implemented. The prior contradictory footprint documentation is corrected.\n\nHowever, invalid caller-supplied footprints are treated as clean, allowing the gate to pass without checking any documentation. This introduces blocking technical debt.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries were changed. The changes remain appropriately scoped to repository scripts, gate configuration, and evidence.\n\n## Functional Paradigm\n\nThe imperative shell and embedded Python are reasonable for filesystem-oriented checkers.\n\n## Correctness and Invariants\n\nBoth footprint-based checkers return success for a nonexistent footprint:\n\n```text\ndocs-check-links.sh ...: OK: all links and anchors resolve (exit 0)\ndocs-check-citations.sh ...: grep: ... No such file or directory\n                            OK: all cited paths and @/ items resolve (exit 0)\n```\n\nThe link checker explicitly skips nonexistent entries at `scripts/docs-check-links.sh:61`, while the citation checker loses `grep` failures through process substitution at `scripts/docs-check-citations.sh:113` and `:125`. Therefore, a typo in positional arguments, `DOCS_FOOTPRINT`, or configured permanent roots can make `docs-mechanical` falsely pass.\n\nNo issue-state, event-log, transition, assignee, label, PID, atomic-write, or application invariant changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced. Projection self-testing remains isolated in a disposable clone.\n\n## Testing\n\nThe committed evidence records all six clean/seeded assertions passing and shellcheck succeeding. The supplied `repo-validate` gate passed.\n\nI did not run the Rust test suite. The required validator passed:\n\n```text\n✓ Repository validation passed\n```\n\nShell syntax validation and `git diff --check` also passed. The self-test lacks coverage for missing or unreadable footprint arguments.\n\n## Error Handling\n\nThe documented exit-code contract says environment and usage failures return `2`, but nonexistent footprint paths return `0`. The citation checker additionally prints filesystem errors followed by a contradictory success message.\n\n## CLI Contract\n\nNo user-facing CLI command changed; `--json` is not applicable to these gate scripts.\n\n## Documentation\n\nThe previous obsolete depth-based footprint documentation is fixed and now matches the amended caller-supplied/default-permanent-roots contract.\n\nThe checkers’ exit-code documentation does not match their behavior for invalid footprint paths.\n\n## Prior Review Feedback\n\nThe most recent finding is resolved: `scripts/docs-mechanical.sh:21`–`:28` now accurately documents the live `permanent_paths` default and caller-supplied adopter files.\n\nEarlier citation-scope, reference-link, destructive-cleanup, evidence, and aggregation findings remain resolved.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is done, `unmet_dependencies` is empty, and `./scripts/jit-validate.sh` passes.\n\n## Findings\n\n1. **F1 — High:** Nonexistent caller-supplied footprint paths are treated as a clean footprint. The link checker silently skips them, while citation `grep` errors are discarded through process substitution; both checkers return `0`, so a misspelled path can make `docs-mechanical` pass without checking anything. This contradicts the documented environment-error semantics and introduces a false-green gate.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The documentation gate can falsely pass when its caller supplies a nonexistent footprint path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Nonexistent footprint paths are silently treated as clean, allowing docs-mechanical to pass without checking documentation.\",\"file\":\"scripts/docs-check-citations.sh\",\"line\":113}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1000 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e51-0680-7c83-8ab9-32b09b8eaca5\n--------\nuser\n--- 987 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The documentation gate can falsely pass when its caller supplies a nonexistent footprint path.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Nonexistent footprint paths are silently treated as clean, allowing docs-mechanical to pass without checking documentation.",
+        "file": "scripts/docs-check-citations.sh",
+        "line": 113
+      }
+    ]
+  }
+}
