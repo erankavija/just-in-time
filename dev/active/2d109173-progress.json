@@ -1,13 +1,15 @@
 {
   "epic_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
   "epic_short_id": "2d109173",
-  "current_wave": 1,
+  "current_wave": 2,
+  "wave_2_ready": true,
+  "docs_mechanical_scoping": "Evaluate docs-mechanical on each audit task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` — VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). Whole-surface (no env) fails on the real .jit/claims.jsonl defect until 2b9a80fb fixes it. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75 + container 2d109173. STILL NEED to attach it to adc4c6ef, 8682e95a, 36d5451e when their waves come up (per plan they carry it too).",
   "waves": [
     {
       "wave_number": 1,
       "note": "Enablers. Both block all Wave 2 audits.",
       "issues": [
-        {"id": "99f4a2b4", "short_id": "99f4a2b4", "title": "Committed documentation mechanical-check gate", "classification": "implementation", "status": "rework-1", "note": "merged to main; code-review FAIL F1-F4 (hardcoded footprint, citation false-negatives, no durable seeded evidence, exit-2 collapse); rework dispatched"},
+        {"id": "99f4a2b4", "short_id": "99f4a2b4", "title": "Committed documentation mechanical-check gate", "classification": "implementation", "status": "done", "note": "DONE after 8 code-review rounds. REQ-01/REQ-02 amended (owner) to codify plan M3 repo-rooted auditor-adjudicated citation design + clean-footprint zero-exit. Checkers: scripts/docs-check-{links,citations,projections}.sh + docs-mechanical.sh orchestrator + docs-check-selftest.sh (12 assertions). FP-free: adopter surface flags only real .jit/claims.jsonl."},
         {"id": "d24008f0", "short_id": "d24008f0", "title": "Documentation review prompt amendment", "classification": "implementation", "status": "done", "note": "DONE. REQ-01 amended (owner 2026-07-11: unscoped behavioral demo deferred to audit tasks). Evidence = mechanism trace + real scoped run. Both gates pass."}
       ]
     },
