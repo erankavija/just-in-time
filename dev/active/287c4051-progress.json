@@ -74,21 +74,21 @@
           "short_id": "7eec3d59",
           "title": "Remove legacy narration from shipped reference docs",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
           "short_id": "5514e4f5",
           "title": "Repair the dev index and stray plan files",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
           "short_id": "f7c50538",
           "title": "Consolidate the docs landing pages",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
