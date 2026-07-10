@@ -159,7 +159,7 @@ If any review returns FAIL, execute Section 8 for that issue.
 ### 5e. Complete passing issues
 For each issue that passes review, follow jit-manage Workflow E:
 - Verify success criteria met (already done in review).
-- Run `jit gate check-all <id>` (already done in review).
+- Confirm readiness with `jit gate status-all <id>` (inspection only; the gates were evaluated during review).
 - Transition: `jit issue update <id> --state done`.
 - Commit JIT state per jit-manage's state-commit-patterns.
 
@@ -262,7 +262,7 @@ After all waves are complete:
 
 2. **Map success criteria.** For each criterion in the epic's description, identify which child issue(s) deliver it. If any criterion is not covered, stop and assess — create an additional task if needed, or escalate if the gap is significant.
 
-3. **Run epic gates.** `jit gate check-all <epic-id>`. Handle gate results per jit-manage Workflow E.
+3. **Run epic gates.** `jit gate evaluate-all <epic-id>` runs the checkers; `jit gate status-all <epic-id>` then reports readiness without re-running anything. Handle gate results per jit-manage Workflow E.
 
 4. **Produce completion report.** Read `references/completion-report-template.md`. Fill it with:
    - Metrics: children completed, waves, rework cycles, escalations, dispatches

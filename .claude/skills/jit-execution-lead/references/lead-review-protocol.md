@@ -4,7 +4,7 @@ The lead reviews every sub-agent's output before accepting it. This review has s
 
 ## Tier 1: Gate Verification
 
-Run `jit gate check-all <issue-id>` (or `jit issue show <issue-id> --json` and inspect the `gates` field).
+Run `jit gate status-all <issue-id>` (or `jit issue show <issue-id> --json` and inspect the `gates` field). Both are inspection only: they report readiness from recorded results and run no checker. Evaluating a gate is `jit gate evaluate <issue-id> <gate-key>`, which the lead owns.
 
 - Every gate defined on the issue must show status `passed`.
 - If any gate is `pending` or `failed`, the verdict is **FAIL**.
@@ -20,15 +20,19 @@ Run:
 
 ```bash
 # Enumerate prior failing runs for this issue's code-review gate
-jit gate runs <issue-id> --gate code-review --json \
-  | jq -r '.runs[] | select(.status=="failed") | .run_id' \
+jit gate status <issue-id> --gate code-review --all --status failed --json \
+  | jq -r '.results[].run_id' \
   | while read run; do
       echo "=== run $run ==="
-      cat .jit/gate-runs/$run/result.json \
-        | jq -r '.stdout' \
-        | grep -E '^(\*\*(Problem|Fail):|##\s+Issue:)'
+      jq -r '.findings.findings[]? | "[\(.severity)] \(.id): \(.summary) (\(.file // "-"):\(.line // "-"))"' \
+        ".jit/gate-runs/$run/result.json"
     done
 ```
+
+The gate-run envelope is `{"count": N, "results": [...]}`, and each `result.json`
+carries the reviewer's structured findings under `.findings.findings[]`. A run's
+`stdout` holds the same findings as prose; the structured block is the one to
+parse.
 
 Build a **cumulative resolution table** with one row per finding across all rounds, each with a file:line cite at HEAD. The resolution table must be part of your review verdict; see "Recording the Verdict" below.
 

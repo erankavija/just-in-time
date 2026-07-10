@@ -14,13 +14,12 @@ Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's quality 
 
 ```bash
 # 1. Enumerate every prior code-review failure for this issue
-jit gate runs [SHORT_ID] --gate code-review --json \
-  | jq -r '.runs[] | select(.status=="failed") | .run_id' \
+jit gate status [SHORT_ID] --gate code-review --all --status failed --json \
+  | jq -r '.results[].run_id' \
   | while read run; do
       echo "=== prior run $run ==="
-      cat .jit/gate-runs/$run/result.json \
-        | jq -r '.stdout' \
-        | grep -E '^(\*\*(Problem|Fail):|##\s+Issue:|\- \*\*Fail)'
+      jq -r '.findings.findings[]? | "[\(.severity)] \(.id): \(.summary) (\(.file // "-"):\(.line // "-"))"' \
+        ".jit/gate-runs/$run/result.json"
     done
 
 # 2. List every design doc the worker produced for this issue

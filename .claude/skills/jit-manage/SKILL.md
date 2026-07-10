@@ -425,8 +425,12 @@ Gate enforcement, success criteria verification, state transition, commit.
 
 4. Run automated gates:
    ```bash
-   jit gate check-all <id> --json
+   jit gate evaluate-all <id> --json
    ```
+   `evaluate-all` runs each required gate's checker, fail-fast, and records the
+   results. `status-all` (alias `check-all`) only reports readiness from already
+   recorded results and runs nothing, so it belongs in step 5's verification,
+   never here.
 
 5. Handle gate results:
    - All pass -> proceed to step 7
