@@ -71,13 +71,19 @@ for r in roots:
         sys.exit(2)
 
 # Collect markdown files from the footprint: files taken as-is, directories
-# walked for *.md.
+# walked for *.md. os.walk swallows traversal errors (e.g. an unreadable nested
+# directory) by default, which would silently shrink the footprint and let the
+# gate go false-green; the onerror handler turns any such error into exit 2.
+def _walk_error(err):
+    print(f"docs-check-links: cannot traverse footprint: {err}", file=sys.stderr)
+    sys.exit(2)
+
 files = []
 for r in roots:
     if os.path.isfile(r):
         files.append(r)
     elif os.path.isdir(r):
-        for dp, _, fns in os.walk(r):
+        for dp, _, fns in os.walk(r, onerror=_walk_error):
             files += [os.path.join(dp, f) for f in fns if f.endswith('.md')]
 
 INLINE_CODE = re.compile(r'`[^`]*`')

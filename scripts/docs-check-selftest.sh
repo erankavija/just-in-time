@@ -94,8 +94,24 @@ if [ ! -r "$noread" ]; then
   assert_rc 2 $? "links: unreadable footprint file is an env error"
   "$citations" "$noread" >/dev/null 2>&1
   assert_rc 2 $? "citations: unreadable footprint file is an env error"
+  # A READABLE footprint root containing an UNREADABLE nested directory must not
+  # be silently scanned as complete — both checkers must exit 2.
+  nest="$scratch/nest"
+  mkdir -p "$nest/sub"
+  printf '# ok\n' >"$nest/top.md"
+  printf '# hidden\n' >"$nest/sub/inner.md"
+  chmod 000 "$nest/sub"
+  if [ ! -r "$nest/sub" ]; then
+    "$links" "$nest" >/dev/null 2>&1
+    assert_rc 2 $? "links: unreadable nested directory is an env error"
+    "$citations" "$nest" >/dev/null 2>&1
+    assert_rc 2 $? "citations: unreadable nested directory is an env error"
+  else
+    echo "SKIP: read bit not enforced on nested dir — nested-traversal assertions skipped"
+  fi
+  chmod 755 "$nest/sub" 2>/dev/null || true
 else
-  echo "SKIP: read bit not enforced here (likely root) — unreadable-file assertions skipped"
+  echo "SKIP: read bit not enforced here (likely root) — unreadable-path assertions skipped"
 fi
 chmod 644 "$noread" 2>/dev/null || true
 echo

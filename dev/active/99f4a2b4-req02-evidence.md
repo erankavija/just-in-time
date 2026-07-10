@@ -53,6 +53,8 @@ PASS: links: nonexistent footprint path is an env error (exit 2)
 PASS: citations: nonexistent footprint path is an env error (exit 2)
 PASS: links: unreadable footprint file is an env error (exit 2)
 PASS: citations: unreadable footprint file is an env error (exit 2)
+PASS: links: unreadable nested directory is an env error (exit 2)
+PASS: citations: unreadable nested directory is an env error (exit 2)
 
 == M5 docs-check-projections.sh ==
 PASS: projections: fresh (rendered==staged) tree is clean (exit 0)
