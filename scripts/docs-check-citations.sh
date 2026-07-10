@@ -70,6 +70,16 @@ command -v jq >/dev/null 2>&1 || {
   exit 2
 }
 
+# A footprint entry that resolves to nothing is a usage/environment error, not a
+# clean pass — grep over a mistyped path would emit a discarded error and the
+# checker would exit 0 without inspecting anything (a false-green gate).
+for fp in "$@"; do
+  [ -e "$fp" ] || {
+    echo "docs-check-citations: footprint path does not exist: $fp" >&2
+    exit 2
+  }
+done
+
 # Live set of addressable-item leaders (registered kind names + their aliases).
 # The reserved `issue` scope segment is absent by construction.
 leaders=$(jit config get item_kinds | jq -r 'to_entries[] | ([.key] + (.value.aliases // [])) | .[]' | sort -u)

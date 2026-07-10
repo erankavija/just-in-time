@@ -57,9 +57,17 @@ if not roots:
     print("usage: docs-check-links.sh [PATH ...]", file=sys.stderr)
     sys.exit(2)
 
+# A footprint entry that resolves to nothing is a usage/environment error, not a
+# clean pass — silently skipping a mistyped path would let the gate go false-green
+# without checking anything.
+missing = [r for r in roots if not os.path.isfile(r) and not os.path.isdir(r)]
+if missing:
+    for r in missing:
+        print(f"docs-check-links: footprint path does not exist: {r}", file=sys.stderr)
+    sys.exit(2)
+
 # Collect markdown files from the footprint: files taken as-is, directories
-# walked for *.md. A non-existent footprint entry is skipped here — path
-# existence is the citation checker's (M3) concern, not this resolver's.
+# walked for *.md.
 files = []
 for r in roots:
     if os.path.isfile(r):
