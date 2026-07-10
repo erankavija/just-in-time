@@ -190,7 +190,7 @@ examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format",
 [item_kinds.requirement]
 section = "success_criteria"
 id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
-markers = ["[hard]"]
+markers = ["[hard]", "[aspirational]"]
 link-namespaces = ["satisfies"]
 scope = "issue"
 source-of-truth = "markdown-first"
@@ -502,7 +502,7 @@ mod tests {
 [item_kinds.requirement]
 section = \"success_criteria\"
 id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\"
-markers = [\"[hard]\"]
+markers = [\"[hard]\", \"[aspirational]\"]
 link-namespaces = [\"satisfies\"]
 scope = \"issue\"
 source-of-truth = \"markdown-first\"
