@@ -1,0 +1,35 @@
+{
+  "id": "8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06",
+  "title": "Gate command timeout never applies after the gate verb rename",
+  "description": "The MCP server grants gate commands a ten-minute timeout, but the condition that selects them tests verbs the CLI no longer exposes, so every gate command runs under the default thirty-second timeout.\n\n## Background\n\n`getTimeoutForCommand` in the MCP server's CLI executor selects a long timeout for gate subcommands. Its condition compares the subcommand against `check`, `check-all`, and `pass`. The gate verbs are `evaluate`, `evaluate-all`, `status`, and `status-all`. No real command matches, so `jit gate evaluate` and `jit gate evaluate-all` are killed at the default timeout, well inside the window a checker script needs. The condition is also written so that only its first comparison is a comparison; the remaining operands are truthy string literals, which makes the branch depend solely on the first verb.\n\nNo test covers `getTimeoutForCommand`.\n\n## Success Criteria\n\n- [hard] REQ-01: Gate subcommands invoked through the MCP server run under the long timeout\n- [hard] REQ-02: The timeout selection is driven by the CLI's current gate verbs\n- [hard] REQ-03: A test asserts the timeout chosen for each gate verb and for a non-gate command\n- [hard] REQ-04: The selection logic compares each candidate verb, so adding a verb cannot silently disable the branch",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T00:04:05.589815393Z"
+    },
+    "mcp-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T00:04:05.580911697Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "component:mcp",
+    "type:bug"
+  ],
+  "created_at": "2026-07-10T00:04:01.947276575Z",
+  "updated_at": "2026-07-10T00:04:05.589875033Z",
+  "first_ready_at": "2026-07-10T00:04:01.947282485Z"
+}

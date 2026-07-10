@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "53b13d36-06a3-464d-9e11-e97cffece143",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
+  "commit": "315d21be39abfd96407f1b27a92471143b1e847c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T23:54:10.410332193Z",
+  "completed_at": "2026-07-09T23:56:16.943412205Z",
+  "duration_ms": 126533,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01: Pass. All referenced `crates/jit/` paths exist.\n- REQ-02: Pass. No dated or hardcoded test counts remain.\n- REQ-03: Pass. Property-based testing is documented as current practice with accurate source locations.\n- REQ-04: Fail. The API inventory matches, but the harness behavior is described inaccurately.\n- REQ-05: Pass. All local links exist, and the external [`proptest`](https://docs.rs/proptest) link resolves.\n- Dependencies: Pass. The issue declares no prerequisites.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only change; no production architecture boundaries were modified.\n\n## Functional Paradigm\n\nNot applicable to this documentation-only change.\n\n## Correctness and Invariants\n\nNo executable invariant-related code changed. The documentation contains incorrect filesystem claims, detailed below.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing\n\nThe supplied history contains no failed runs. The recorded `jit-validate` gate passed with exit code 0 on 2026-07-09. Per instruction, tests were not rerun.\n\n## Error Handling\n\nNo error-handling code changed.\n\n## CLI Contract\n\nNo CLI behavior changed.\n\n## Documentation\n\nThe workspace paths, links, property-testing status, and `TestHarness` method inventory were updated successfully. However, two claims misrepresent the actual tests and harness implementation, introducing documentation debt.\n\n## Prior Review Feedback\n\nNo prior code-review runs were supplied.\n\n## Findings\n\n1. **F1 — High:** `TESTING.md:82` says harness tests run “without touching the filesystem,” but `TestHarness::with_item_kinds()` explicitly creates a directory and writes `config.toml` through `std::fs` at `crates/jit/tests/harness.rs:68`. This makes the TestHarness behavioral description inaccurate and fails hard criterion REQ-04.\n2. **F2 — Medium:** `TESTING.md:43` categorically says unit tests “need no filesystem,” while unit-test modules under `crates/jit/src/` use `TempDir` and filesystem operations—for example `crates/jit/src/commands/claim.rs:861`. The testing guide therefore misstates current unit-test practice.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"TESTING.md updates paths and APIs but retains inaccurate claims that unit and harness tests do not touch the filesystem.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The TestHarness description incorrectly claims harness workflows never touch the filesystem, although with_item_kinds writes config.toml using std::fs.\",\"file\":\"TESTING.md\",\"line\":82},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The unit-test description incorrectly claims unit tests need no filesystem despite source unit tests using TempDir and filesystem operations.\",\"file\":\"TESTING.md\",\"line\":43}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2118 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f494e-81dd-70e3-8a98-ae19f2a825f8\n--------\nuser\n--- 2105 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "TESTING.md updates paths and APIs but retains inaccurate claims that unit and harness tests do not touch the filesystem.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The TestHarness description incorrectly claims harness workflows never touch the filesystem, although with_item_kinds writes config.toml using std::fs.",
+        "file": "TESTING.md",
+        "line": 82
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The unit-test description incorrectly claims unit tests need no filesystem despite source unit tests using TempDir and filesystem operations.",
+        "file": "TESTING.md",
+        "line": 43
+      }
+    ]
+  }
+}

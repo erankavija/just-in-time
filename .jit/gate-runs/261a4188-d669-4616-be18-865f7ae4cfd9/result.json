@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "261a4188-d669-4616-be18-865f7ae4cfd9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
+  "commit": "315d21be39abfd96407f1b27a92471143b1e847c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-09T23:54:10.410333953Z",
+  "completed_at": "2026-07-09T23:56:31.932382955Z",
+  "duration_ms": 141522,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\n- REQ-01 met: [mcp-server/README.md](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:100) describes schema-driven generation without a hardcoded inventory count.\n- REQ-02 met: the README accurately distinguishes all generated/callable leaf commands from the curated `tools/list` subset.\n- The enumeration commands at lines 113–118 match `JIT_MCP_ALL_TOOLS` handling in `mcp-server/index.js`.\n- No unmet dependencies are recorded.\n\n## Architecture and separation of concerns\n\nDocumentation-only changes do not alter domain, storage, command, CLI, or output boundaries. No violation found.\n\n## Functional paradigm\n\nNo production logic changed. No functional-style concern found.\n\n## Correctness and invariants\n\nNo persistence, state-transition, gate, PID, assignee, or label logic changed. The updated documentation agrees with recursive leaf-command generation and runtime schema loading.\n\n## Safety\n\nNo Rust or unsafe code changed.\n\n## Testing\n\n- Provided `run_history` is empty, with no recorded failures.\n- The issue’s `jit-validate` gate passed.\n- `./scripts/jit-validate.sh` was run and passed.\n- The change is documentation-only; no missing feature test was identified.\n\n## Error handling\n\nNo error-handling code changed.\n\n## CLI contract\n\nNo CLI commands or JSON behavior changed.\n\n## Documentation\n\nThe stale counts are removed, current generation behavior is explained, and adjacent examples were corrected without introducing another manually maintained inventory.\n\n## Prior review feedback\n\nNo prior review runs or unresolved findings were provided.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; the README contains no stale hardcoded tool count and accurately documents schema generation and curated listing behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; the README contains no stale hardcoded tool count and accurately documents schema generation and curated listing behavior.",
+    "findings": []
+  }
+}

@@ -7,42 +7,215 @@
       "wave_number": 1,
       "rationale": "Eight dependency-free tasks with disjoint file footprints. a6e1ae3d owns docs/reference/cli-commands.md; c7f0f690 owns the charter/eval relocation plus README.md, docs/index.md delisting, docs/reference/rules-and-gates.md and .jit/config.toml; c29118f9 owns TESTING.md; d48906de owns docs/reference/storage-format.md; 313a7f3a owns docs/concepts/guarantees.md; f5eb11a2 owns the five ASCII-diagram docs (core-model, design-philosophy, dependency-management, parallel-work-worktrees, labels); 287f7bc9 owns mcp-server/README.md; f1aaaca7 owns crates/jit/src/storage/json.rs and .gitignore. c7f0f690 is the sole .jit/ writer this wave.",
       "issues": [
-        {"id": "a6e1ae3d-169c-4959-b105-66a418ddc022", "short_id": "a6e1ae3d", "title": "Complete the CLI command reference", "classification": "documentation", "status": "pending"},
-        {"id": "c7f0f690-d147-4a72-abf7-d93ea06ac8cd", "short_id": "c7f0f690", "title": "Relocate self-documentation out of the adopter docs tree", "classification": "documentation", "status": "pending"},
-        {"id": "c29118f9-72e5-4d20-a20a-4de58cce4b33", "short_id": "c29118f9", "title": "Rewrite TESTING.md for the current workspace layout", "classification": "documentation", "status": "pending"},
-        {"id": "d48906de-133e-4676-98cc-0785349f947d", "short_id": "d48906de", "title": "Correct the storage-format reference layout", "classification": "documentation", "status": "pending"},
-        {"id": "313a7f3a-c6db-4adc-8934-36a7874287ed", "short_id": "313a7f3a", "title": "Correct git-requirement claims in the guarantees doc", "classification": "documentation", "status": "pending"},
-        {"id": "f5eb11a2-d368-4ede-aa9f-abdc1343236e", "short_id": "f5eb11a2", "title": "Convert ASCII diagrams in docs to Mermaid", "classification": "documentation", "status": "pending"},
-        {"id": "287f7bc9-c185-49a7-bc68-0102aaada58d", "short_id": "287f7bc9", "title": "Refresh mcp-server README tool statements", "classification": "documentation", "status": "pending"},
-        {"id": "f1aaaca7-84ad-4985-96f8-20b1cd94fadf", "short_id": "f1aaaca7", "title": "Fix stale storage comment and unignored jit tmp directory", "classification": "implementation", "status": "pending"}
+        {
+          "id": "a6e1ae3d-169c-4959-b105-66a418ddc022",
+          "short_id": "a6e1ae3d",
+          "title": "Complete the CLI command reference",
+          "classification": "documentation",
+          "status": "reviewed-pass"
+        },
+        {
+          "id": "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
+          "short_id": "c7f0f690",
+          "title": "Relocate self-documentation out of the adopter docs tree",
+          "classification": "documentation",
+          "status": "rework"
+        },
+        {
+          "id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
+          "short_id": "c29118f9",
+          "title": "Rewrite TESTING.md for the current workspace layout",
+          "classification": "documentation",
+          "status": "rework"
+        },
+        {
+          "id": "d48906de-133e-4676-98cc-0785349f947d",
+          "short_id": "d48906de",
+          "title": "Correct the storage-format reference layout",
+          "classification": "documentation",
+          "status": "rework"
+        },
+        {
+          "id": "313a7f3a-c6db-4adc-8934-36a7874287ed",
+          "short_id": "313a7f3a",
+          "title": "Correct git-requirement claims in the guarantees doc",
+          "classification": "documentation",
+          "status": "rework"
+        },
+        {
+          "id": "f5eb11a2-d368-4ede-aa9f-abdc1343236e",
+          "short_id": "f5eb11a2",
+          "title": "Convert ASCII diagrams in docs to Mermaid",
+          "classification": "documentation",
+          "status": "rework"
+        },
+        {
+          "id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
+          "short_id": "287f7bc9",
+          "title": "Refresh mcp-server README tool statements",
+          "classification": "documentation",
+          "status": "reviewed-pass"
+        },
+        {
+          "id": "f1aaaca7-84ad-4985-96f8-20b1cd94fadf",
+          "short_id": "f1aaaca7",
+          "title": "Fix stale storage comment and unignored jit tmp directory",
+          "classification": "implementation",
+          "status": "in-progress"
+        }
       ]
     },
     {
       "wave_number": 2,
       "rationale": "Sequenced after wave 1 by file conflict, not by DAG edge. 7eec3d59 edits docs/reference/labels.md (also owned by f5eb11a2) and docs/reference/cli-commands.md (also owned by a6e1ae3d), so it must follow both. 5514e4f5 repairs dev/index.md and must see the files c7f0f690 relocates into dev/. f7c50538 relists every reference doc and must see c7f0f690's removals. The three are mutually disjoint.",
       "issues": [
-        {"id": "7eec3d59-60ab-448c-9334-50c5cb93d4bd", "short_id": "7eec3d59", "title": "Remove legacy narration from shipped reference docs", "classification": "documentation", "status": "pending"},
-        {"id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0", "short_id": "5514e4f5", "title": "Repair the dev index and stray plan files", "classification": "documentation", "status": "pending"},
-        {"id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171", "short_id": "f7c50538", "title": "Consolidate the docs landing pages", "classification": "documentation", "status": "pending"}
+        {
+          "id": "7eec3d59-60ab-448c-9334-50c5cb93d4bd",
+          "short_id": "7eec3d59",
+          "title": "Remove legacy narration from shipped reference docs",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0",
+          "short_id": "5514e4f5",
+          "title": "Repair the dev index and stray plan files",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
+          "short_id": "f7c50538",
+          "title": "Consolidate the docs landing pages",
+          "classification": "documentation",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 3,
       "rationale": "The documentation review gate depends on all eleven cleanup tasks (real DAG edges): its REQ-03 requires the gate to pass on the repository's documentation tree at completion time.",
       "issues": [
-        {"id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e", "short_id": "6ce0f14e", "title": "Documentation review gate", "classification": "implementation", "status": "pending"}
+        {
+          "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+          "short_id": "6ce0f14e",
+          "title": "Documentation review gate",
+          "classification": "implementation",
+          "status": "pending"
+        }
       ]
     }
   ],
   "lead_decisions": [
-    {"id": "LD-1", "decision": "The v1.0 milestone charter relocates to dev/vision/9db27a3a-charter.md; dev/vision/ is documented as forward-looking vision documents and the charter is exactly that. .jit/config.toml [item_kinds.charter] source is repointed and its derived-path comment corrected.", "for": "c7f0f690"},
-    {"id": "LD-2", "decision": "The two skill-eval records relocate to dev/eval/ (skill-eval-adjudication.md, lead-skills-eval-baseline.md), joining the existing dev/eval/ subtree.", "for": "c7f0f690"},
-    {"id": "LD-3", "decision": "docs/index.md is the surviving authoritative landing page; docs/README.md becomes a short pointer to it. index.md is the richer page and is the one dev/index.md and README.md link to.", "for": "f7c50538"},
-    {"id": "LD-4", "decision": "The documentation review gate is keyed doc-review, backed by ./scripts/ai-review.sh with a new ./scripts/doc-review-prompt.md, matching the code-review / plan-review / breakdown-review pattern.", "for": "6ce0f14e"},
-    {"id": "LD-5", "decision": "Workers do not write .jit/ except where a success criterion requires it (c7f0f690 doc relinks + config; 5514e4f5 doc relinks). The lead adds doc links, runs gates, and transitions state. This keeps eight concurrent worktrees from conflicting on .jit/events.jsonl."}
+    {
+      "id": "LD-1",
+      "decision": "The v1.0 milestone charter relocates to dev/vision/9db27a3a-charter.md; dev/vision/ is documented as forward-looking vision documents and the charter is exactly that. .jit/config.toml [item_kinds.charter] source is repointed and its derived-path comment corrected.",
+      "for": "c7f0f690"
+    },
+    {
+      "id": "LD-2",
+      "decision": "The two skill-eval records relocate to dev/eval/ (skill-eval-adjudication.md, lead-skills-eval-baseline.md), joining the existing dev/eval/ subtree.",
+      "for": "c7f0f690"
+    },
+    {
+      "id": "LD-3",
+      "decision": "docs/index.md is the surviving authoritative landing page; docs/README.md becomes a short pointer to it. index.md is the richer page and is the one dev/index.md and README.md link to.",
+      "for": "f7c50538"
+    },
+    {
+      "id": "LD-4",
+      "decision": "The documentation review gate is keyed doc-review, backed by ./scripts/ai-review.sh with a new ./scripts/doc-review-prompt.md, matching the code-review / plan-review / breakdown-review pattern.",
+      "for": "6ce0f14e"
+    },
+    {
+      "id": "LD-5",
+      "decision": "Workers do not write .jit/ except where a success criterion requires it (c7f0f690 doc relinks + config; 5514e4f5 doc relinks). The lead adds doc links, runs gates, and transitions state. This keeps eight concurrent worktrees from conflicting on .jit/events.jsonl."
+    },
+    {
+      "id": "LD-6",
+      "decision": "Path-reference policy for the relocation: repoint live pointers (jit doc links, issue descriptions, .jit/config.toml, CLAUDE.md, README, docs/, skill evals). Leave historical records verbatim (dev/archive/**, session handoffs, and the audit-findings doc, where the old path is the finding itself).",
+      "for": "c7f0f690"
+    },
+    {
+      "id": "LD-7",
+      "decision": "Add a cargo-ci gate to a docs issue before re-running code-review. The reviewer skips cargo test when a succeeded cargo-ci gate exists; without it, concurrent gate runs trip the known find_available_port race (894337e2) and produce spurious test-failure findings.",
+      "for": "all"
+    }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "8d7fc762",
+      "title": "Gate command timeout never applies after the gate verb rename",
+      "type": "bug",
+      "epic": "6eb585bc",
+      "reason": "Surfaced by 287f7bc9 while re-verifying mcp-server/README.md against the code. getTimeoutForCommand tests the retired check/check-all/pass verbs, so gate commands run under the 30s default. Filed rather than fixed: mcp-server timeout policy is outside this epic's docs scope."
+    }
+  ],
   "escalations": [],
-  "rework_counts": {},
-  "started_at": "2026-07-10T00:00:00Z"
+  "rework_counts": {
+    "c7f0f690": 1,
+    "c29118f9": 1,
+    "d48906de": 1,
+    "313a7f3a": 1,
+    "f5eb11a2": 1
+  },
+  "started_at": "2026-07-10T00:00:00Z",
+  "reviewed": {
+    "313a7f3a": {
+      "round": 1,
+      "verdict": "FAIL",
+      "source": "code-review gate",
+      "findings": [
+        "git init alone leaves HEAD unresolvable; the lease example cannot run as written",
+        "jit doc show --at HEAD~3 needs four commits",
+        "REQ-01 must name the resolvable-HEAD precondition (GitRequirementGap::NoCommits)"
+      ]
+    },
+    "287f7bc9": {
+      "round": 1,
+      "verdict": "PASS",
+      "note": "jit-validate + code-review green. Also corrected six further stale statements and one inverted architecture diagram in mcp-server/README.md."
+    },
+    "c29118f9": {
+      "round": 1,
+      "verdict": "FAIL",
+      "source": "code-review gate",
+      "findings": [
+        "TESTING.md:82 claims the harness never touches the filesystem; with_item_kinds writes config.toml",
+        "TESTING.md:43 claims unit tests need no filesystem; command-layer unit tests use TempDir"
+      ]
+    },
+    "a6e1ae3d": {
+      "round": 1,
+      "verdict": "PASS",
+      "note": "jit-validate + code-review green. All seven inbound anchors resolve; snapshot/hooks/item/invariant/reference/apply/search verified against --help."
+    },
+    "c7f0f690": {
+      "round": 1,
+      "verdict": "FAIL",
+      "source": "code-review gate + lead sweep",
+      "findings": [
+        "dev/active/9db27a3a-progress.json charter_path still points at docs/",
+        "path sweep incomplete: each eval transcript repointed once, several hold more than one occurrence",
+        "gate finding F2 (7 test failures) disproved: cargo-ci on main is 3521 passed / 0 failed; reviewer ran cargo test concurrently with four other gate runs"
+      ]
+    },
+    "d48906de": {
+      "round": 1,
+      "verdict": "FAIL",
+      "source": "lead review",
+      "findings": [
+        "five crates/jit/src line-range citations introduced into an adopter reference: volatile facts hand-copied into prose, and an audience-boundary leak"
+      ]
+    },
+    "f5eb11a2": {
+      "round": 1,
+      "verdict": "FAIL",
+      "source": "lead review",
+      "findings": [
+        "design-philosophy.md layer diagram asserts Web UI --> CLI; crates/server embeds CommandExecutor in-process",
+        "guarantees.md lock-sequence arrow art remains; REQ-03 is tree-wide"
+      ]
+    }
+  }
 }

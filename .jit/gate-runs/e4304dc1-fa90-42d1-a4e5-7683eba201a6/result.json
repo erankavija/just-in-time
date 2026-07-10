@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e4304dc1-fa90-42d1-a4e5-7683eba201a6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a6e1ae3d-169c-4959-b105-66a418ddc022",
+  "commit": "315d21be39abfd96407f1b27a92471143b1e847c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-09T23:54:10.409489233Z",
+  "completed_at": "2026-07-09T23:56:15.846372287Z",
+  "duration_ms": 125436,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nAll hard requirements are met:\n\n- Empty stub sections were replaced.\n- `issue create` and `issue update` are documented.\n- Item, invariant, reference, apply, snapshot, hooks, and top-level search have reference coverage.\n- Inbound documentation anchors resolve.\n- Documented syntax aligns with the current Clap definitions.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only change. No domain, storage, command, CLI, or output boundaries were altered.\n\n## Functional Paradigm\n\nNot applicable to the Markdown-only change.\n\n## Correctness and Invariants\n\nThe reference accurately describes state transitions, gate behavior, assignee and label formats, persistence-related commands, and PID-aware recovery. No implementation invariants were changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing and Validation\n\n- The issue records a successful `jit-validate` gate.\n- `run_history` contains no failed test or lint evidence.\n- Tests were not rerun during this review.\n- The issue has no unmet dependencies.\n\n## Error Handling\n\nDocumented error envelopes and contextual failure behavior are consistent with the CLI implementation. No error-handling code changed.\n\n## CLI Contract\n\nThe newly covered command families document their machine-readable `--json` behavior.\n\n## Documentation\n\nThe command reference is now substantive rather than stubbed, and the added arguments, aliases, defaults, JSON shapes, and examples match the current CLI definitions.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; the completed CLI reference matches current command definitions and validation evidence is clean.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; the completed CLI reference matches current command definitions and validation evidence is clean.",
+    "findings": []
+  }
+}

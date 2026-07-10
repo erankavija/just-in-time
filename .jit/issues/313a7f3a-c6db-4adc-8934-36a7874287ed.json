@@ -15,6 +15,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-09T23:48:52.531645729Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-09T23:49:15.862514015Z"
     }
   },
   "context": {},
@@ -26,7 +31,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.879453893Z",
-  "updated_at": "2026-07-09T23:48:52.634084734Z",
+  "updated_at": "2026-07-09T23:51:39.854879003Z",
   "first_ready_at": "2026-07-06T15:39:58.879454223Z",
   "claimed_at": "2026-07-09T23:14:07.796527010Z"
 }

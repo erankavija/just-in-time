@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "dfd47604-435e-44e2-bbd2-a34a18131231",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "313a7f3a-c6db-4adc-8934-36a7874287ed",
+  "commit": "315d21be39abfd96407f1b27a92471143b1e847c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-09T23:49:15.862514015Z",
+  "completed_at": "2026-07-09T23:51:39.824466091Z",
+  "duration_ms": 143961,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\n- REQ-01 is met: [docs/concepts/guarantees.md:173](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:173) distinguishes issue assignment from advisory leases and documents the typed exit-10 failure.\n- REQ-02 is met: [docs/concepts/guarantees.md:184](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:184) lists all lease subcommands as requiring git.\n- REQ-03 is not met: the git-enabled example is not executable as written.\n\n## Architecture and separation of concerns\n\nDocumentation-only change. No architecture or separation-of-concerns violations were introduced.\n\n## Functional paradigm\n\nNo Rust implementation changed; not applicable.\n\n## Correctness and invariants\n\nNo persistence, event logging, gate-transition, identifier-validation, PID, or unsafe-code behavior changed.\n\nThe documentation correctly distinguishes assignment from leases, but understates the lease precondition: lease commands require a resolvable `HEAD`, not merely an initialized repository.\n\n## Safety\n\nNo unsafe code or safety-sensitive implementation changes were introduced.\n\n## Testing\n\n- `run_history` is empty, so there are no recorded test failures.\n- The supplied issue metadata records `jit-validate` as passed with exit code 0.\n- I did not rerun the succeeded validation gate.\n- The documentation error is independently established by [claim.rs:37](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:37), where branch detection requires `HEAD`, and the explicit `NoCommits` handling documented in [errors.rs:349](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:349).\n\n## Error handling\n\nThe documented `ClaimRequiresGitError` and exit code 10 agree with the implementation for missing repositories. No error-handling code changed.\n\n## CLI contract\n\nNo CLI commands or JSON-output paths changed.\n\n## Documentation\n\nThe example at [docs/concepts/guarantees.md:218](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:218) runs `git init` and immediately claims success from `jit claim acquire`. A newly initialized repository has no commits, so `get_current_branch()` cannot resolve `HEAD` and returns `ClaimRequiresGitError`. The example needs an initial commit before lease acquisition, and the prose should state that leases require a repository with a resolvable `HEAD`.\n\n## Prior review feedback and dependencies\n\n- There is no prior review history to address.\n- The issue declares no dependencies or unmet dependencies.\n\n## Findings\n\n1. **F1 — High:** The advisory-lease example is incorrect as written. After `git init`, the repository has no commits, while lease commands require a resolvable `HEAD`; therefore `jit claim acquire <task1>` fails instead of producing the documented success. This violates hard criterion REQ-03. Add an initial commit before acquisition and clarify the resolvable-`HEAD` requirement. ([docs/concepts/guarantees.md:218](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:218))\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The git-enabled lease example fails because git init alone does not provide the resolvable HEAD required by lease commands.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The lease example runs claim acquire immediately after git init, but lease commands require an initial commit and resolvable HEAD.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":218}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1060 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4949-d366-7621-9c3f-0498cc0a5cb7\n--------\nuser\n--- 1047 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The git-enabled lease example fails because git init alone does not provide the resolvable HEAD required by lease commands.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The lease example runs claim acquire immediately after git init, but lease commands require an initial commit and resolvable HEAD.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 218
+      }
+    ]
+  }
+}
