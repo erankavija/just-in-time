@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "8a80679e-e493-482d-aaad-65e33a9bd46e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "c5809a4c992ce504c547c39daf90ce42cd27c7f5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T14:47:59.406241009Z",
+  "completed_at": "2026-07-10T14:50:02.370718696Z",
+  "duration_ms": 122964,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 through REQ-05 are implemented:\n\n- `doc-review` is an automatic gate using `scripts/ai-review.sh` and the documentation-specific prompt at [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:1).\n- The prompt requires structured JSON findings.\n- The latest documentation review passed with zero findings.\n- The registry explains when the gate applies at [.jit/gates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/gates.toml:127).\n- The documentation-cleanup epic requires `doc-review` at [.jit/issues/287c4051-22f8-4e86-bf3a-5006907dcb85.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/287c4051-22f8-4e86-bf3a-5006907dcb85.json:11).\n- All listed dependencies are complete.\n\n## Architecture and separation of concerns\n\nNo blocking boundary violations found. The feature is repository configuration and documentation; it does not introduce domain, storage, command, or CLI coupling.\n\n## Functional paradigm\n\nNo problematic imperative or side-effect-heavy Rust implementation was introduced.\n\n## Correctness and invariants\n\nGate registration and state changes are represented in the repository event log. No changes compromise atomic writes, event semantics, transitions, assignee/label formats, or PID safety.\n\n## Safety\n\nNo unsafe code was introduced.\n\n## Testing\n\nFormatting and Clippy passed, but the workspace test suite failed with seven tests failing:\n\n- Four claim tests beginning at [crates/jit/src/commands/issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:1258).\n- Three server/port tests beginning at [crates/jit/src/commands/serve.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:712).\n\nThe result was 1,538 passed and 7 failed. The review contract explicitly requires failure for any test failure, including pre-existing or environment-sensitive failures.\n\n## Error handling\n\nNo new library error-handling violations found.\n\n## CLI contract\n\nNo CLI command was added or changed by the documentation-review gate feature.\n\n## Documentation\n\nThe final `doc-review` evidence passed with no findings. The latest run resolves the findings recorded by all earlier failed documentation-review runs.\n\n## Jit issue management\n\n`./scripts/jit-validate.sh` passed. The issue-level `jit-validate` and `doc-review` gates also passed, and prerequisite issues are complete.\n\n## Technical debt\n\nNo additional technical debt found beyond the blocking unresolved test failures.\n\n## Findings\n\n1. **F1 — High:** The workspace test suite is not green: `cargo test --workspace` reports seven failures (1,538 passed, 7 failed), including claim precheck/assignment tests and server port/process tests. The acceptance contract requires all failures, even pre-existing ones, to be resolved.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The documentation gate meets its functional criteria, but the workspace test suite has seven failures.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Workspace test suite fails with seven claim and server/port test failures\",\"file\":\"crates/jit/src/commands/issue.rs\",\"line\":1258}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1512 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4c7f-eb4a-7672-b152-d85a2d583b3d\n--------\nuser\n--- 1499 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The documentation gate meets its functional criteria, but the workspace test suite has seven failures.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Workspace test suite fails with seven claim and server/port test failures",
+        "file": "crates/jit/src/commands/issue.rs",
+        "line": 1258
+      }
+    ]
+  }
+}

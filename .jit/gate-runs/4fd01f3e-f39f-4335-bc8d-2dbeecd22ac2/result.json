@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "4fd01f3e-f39f-4335-bc8d-2dbeecd22ac2",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "c5809a4c992ce504c547c39daf90ce42cd27c7f5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T14:45:30.800698207Z",
+  "completed_at": "2026-07-10T14:47:11.192617979Z",
+  "duration_ms": 100391,
+  "exit_code": 0,
+  "stdout": "# Documentation Review\n\n## 1. Claims match the current source tree\n\nPass. Documented CLI commands, flags, storage layout, workspace structure, and component boundaries match the current source and manifests.\n\nThe latest run’s labels-reference and storage-migration defects are resolved.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-specific types, namespaces, rules, templates, item kinds, and gates are clearly identified as repository-local configuration or worked examples.\n\n## 3. Current behavior only\n\nPass. The historical and future-facing narration reported previously has been removed. Remaining marker matches occur in illustrative output or describe current status rather than product history.\n\n## 4. No hardcoded counts that silently rot\n\nPass. Numeric counts found are generated output, configuration values, limits, or illustrative examples—not hand-maintained product totals.\n\n## 5. Links and referenced paths resolve\n\nPass. Repository-relative Markdown links and anchors resolve. Addressable-item citations resolve with `jit item show`; `@/issue/REQ-01` is explicitly documented as a parse-error example. `jit validate --json` reports zero errors.\n\n## 6. Content-standards conformance\n\nPass. No prohibited non-Mermaid fenced diagrams, definite plain-text mathematics defects, or present-state prose violations remain. Box-drawing content is limited to permitted directory trees and verbatim CLI output.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The adopter-facing documentation matches the current shipped product and passes all reviewed documentation dimensions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The adopter-facing documentation matches the current shipped product and passes all reviewed documentation dimensions.",
+    "findings": []
+  }
+}
