@@ -47,31 +47,21 @@ resolve_footprint() {
     echo "docs-mechanical: 'jq' not found on PATH (needed to derive the footprint)" >&2
     exit 2
   }
-  local doc_json dev_root perm extra
+  local doc_json perm
   doc_json=$(jit config get documentation) || {
     echo "docs-mechanical: 'jit config get documentation' failed" >&2
     exit 2
   }
-  dev_root=$(printf '%s' "$doc_json" | jq -r '.development_root')
-  # (1) configured permanent documentation roots (currently docs/).
+  # The derived default is the configured permanent documentation roots
+  # (currently docs/), read live from [documentation].permanent_paths — no path
+  # list, depth, count, or filename assumption, so it cannot rot as the repo
+  # changes. Adopter documents that live outside the permanent roots (the root
+  # and component READMEs, INSTALL.md, …) are a curated set the caller supplies
+  # explicitly via positional arguments or the DOCS_FOOTPRINT environment
+  # variable; that scope is caller input, not a fact embedded in this checker.
   perm=$(printf '%s' "$doc_json" | jq -r '.permanent_paths[]')
-  # (2) root + immediate-subdir markdown OUTSIDE the contributor dev root and not
-  # already covered by a permanent root. This is a PATTERN — tracked *.md at path
-  # depth ≤ 2 minus the excluded roots — NOT a product fact / filename list.
-  extra=$(git ls-files '*.md' | awk -F/ -v dev="$dev_root" -v perm="$perm" '
-    BEGIN { n = split(perm, P, "\n") }
-    NF > 2 { next }        # deeper than an immediate subdirectory
-    $1 == dev { next }     # under the contributor development root
-    {
-      for (i = 1; i <= n; i++) {
-        pr = P[i]; sub(/\/+$/, "", pr)               # strip trailing slash
-        if (pr != "" && index($0, pr "/") == 1) next # covered by a permanent root
-      }
-      print
-    }')
   FOOTPRINT=()
   while IFS= read -r p; do [ -n "$p" ] && FOOTPRINT+=("$p"); done <<<"$perm"
-  while IFS= read -r f; do [ -n "$f" ] && FOOTPRINT+=("$f"); done <<<"$extra"
 }
 
 if [ "$#" -gt 0 ]; then
