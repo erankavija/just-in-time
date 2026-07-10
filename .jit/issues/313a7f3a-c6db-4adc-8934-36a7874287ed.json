@@ -8,13 +8,19 @@
   "dependencies": [],
   "gates_required": [
     "jit-validate",
-    "code-review"
+    "code-review",
+    "cargo-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T00:08:41.449488112Z"
+    },
     "jit-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T23:48:52.531645729Z"
+      "updated_at": "2026-07-10T00:11:03.536658344Z"
     },
     "code-review": {
       "status": "failed",
@@ -31,7 +37,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.879453893Z",
-  "updated_at": "2026-07-09T23:51:39.854879003Z",
+  "updated_at": "2026-07-10T00:11:03.639052759Z",
   "first_ready_at": "2026-07-06T15:39:58.879454223Z",
   "claimed_at": "2026-07-09T23:14:07.796527010Z"
 }
