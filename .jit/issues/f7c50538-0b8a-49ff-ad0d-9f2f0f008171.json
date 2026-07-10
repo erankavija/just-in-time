@@ -2,7 +2,7 @@
   "id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
   "title": "Consolidate the docs landing pages",
   "description": "docs/README.md and docs/index.md duplicate each other (quick links, structure diagram, getting-started list) and must be kept in sync by hand; both omit docs/examples/ and several existing reference docs.\n\n## Success Criteria\n\n- [hard] REQ-01: One authoritative landing page remains; any second file is a pointer to it\n- [hard] REQ-02: The landing page lists docs/examples/ and every existing reference doc\n- [hard] REQ-03: All landing-page links resolve",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-10T11:10:29.817989560Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T11:10:29.993483588Z"
     },
     "cargo-ci": {
       "status": "passed",
@@ -32,7 +37,8 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-06T15:39:58.882052514Z",
-  "updated_at": "2026-07-10T11:10:29.920621075Z",
+  "updated_at": "2026-07-10T11:11:43.433071511Z",
   "first_ready_at": "2026-07-06T15:39:58.882052774Z",
-  "claimed_at": "2026-07-10T11:03:56.092913093Z"
+  "claimed_at": "2026-07-10T11:03:56.092913093Z",
+  "done_at": "2026-07-10T11:11:43.433070821Z"
 }

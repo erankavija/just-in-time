@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e9787d8d-9019-4b6e-bc35-d64f2846735f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f7c50538-0b8a-49ff-ad0d-9f2f0f008171",
+  "commit": "a5b01044fec1a56660334dd8ff2d49618a1d3ee0",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T11:10:29.993483588Z",
+  "completed_at": "2026-07-10T11:11:31.373042641Z",
+  "duration_ms": 61379,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01 met: [docs/README.md](/home/vkaskivuo/Projects/just-in-time/docs/README.md:1) is now only a pointer to the authoritative [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:1).\n- REQ-02 met: the landing page lists all 12 existing reference documents at lines 46–57 and all seven `docs/examples/` directories at lines 59–68.\n- REQ-03 met: every local landing-page link resolves. The sole external link, [Diátaxis](https://diataxis.fr/), also resolves.\n\n## Architecture and Functional Style\n\nDocumentation-only changes introduce no domain, storage, command, CLI, output, I/O, or functional-style violations.\n\n## Correctness and Safety\n\nNo executable code or persistence behavior changed. Atomic writes, event logging, gate semantics, identifier formats, PID safety, and unsafe-code restrictions are unaffected.\n\n## Testing and Validation\n\n- The supplied `cargo-ci` gate passed with exit code 0; tests were not rerun.\n- The supplied `jit-validate` gate passed with exit code 0.\n- A read-only link inventory check found no broken local links.\n- No dependencies are declared for this issue.\n- No prior review findings exist in `run_history`.\n\n## Error Handling and CLI Contract\n\nNo fallible operations, errors, or CLI commands were added or changed.\n\n## Documentation Quality\n\nThe duplication was removed cleanly, the authoritative page is explicit, and the missing reference and example entries were added without introducing a second maintained index.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; documentation is consolidated, complete, and free of broken links.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; documentation is consolidated, complete, and free of broken links.",
+    "findings": []
+  }
+}
