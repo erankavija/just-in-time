@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 07792225d50431ec95c62298f1295851f171b292d0ae23233a4e550ac0b182fa # shrinks to spec = [(Some("epic"), []), (Some("milestone"), [0]), (Some("task"), [0]), (Some("story"), [1, 2]), (Some("epic"), [3]), (None, [0, 2, 3])], mask = 9124879943969719636

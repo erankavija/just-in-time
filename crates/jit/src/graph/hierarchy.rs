@@ -18,9 +18,21 @@
 //! [`detect_membership_divergences`]) rather than silently reconciled — the label
 //! does not change the resolved hierarchy.
 //!
-//! Historically this logic lived only in the web UI's TypeScript, so any other
-//! tool had to re-port it to match jit's semantics. Lifting it into the core
-//! library gives the CLI, the web UI, and exports one canonical resolver.
+//! The core library holds the one canonical resolver; the CLI, the web UI, and
+//! exports all project its result.
+//!
+//! # Resolution is defined on the transitively-reduced graph
+//!
+//! [`resolve_hierarchy`] reduces the input edge set before resolving, so every
+//! resolved fact is a function of the **reachability relation** alone. Two edge
+//! sets with the same reachability, a graph and any transitively-redundant
+//! superset of it, resolve identically. This decouples resolution from edge
+//! hygiene: `jit dep add` rejects or reduces away a redundant edge by policy and
+//! `jit validate --fix` removes any that reach storage, and whether either has
+//! run yet cannot move a node's parent.
+//!
+//! The reduction is internal. A caller's stored `dependencies` are read, never
+//! rewritten, and the resolver's signature is unchanged.
 //!
 //! # What "container" means
 //!
@@ -39,13 +51,14 @@
 //!
 //! - **parent** — the *nearest dominating container*: among all containers whose
 //!   dependency closure includes the node, the one that most directly contains
-//!   it. A container linked by a **direct** dependency edge (it lists the node
-//!   among its own dependencies) outranks one that only reaches the node
-//!   transitively through a cross-cutting dependency — so a task stays under the
-//!   epic that directly owns it even when a deeper container elsewhere reaches it
-//!   via a cross edge. Among equally-direct candidates the deepest level wins,
-//!   then the fewest hops from container to node, then the lexicographically
-//!   smallest container id.
+//!   it. Directness is read off the reduced graph, where a **direct** edge is an
+//!   irreducible one: the container reaches the node by no other route. Such an
+//!   edge outranks a container that reaches the node through intermediate nodes,
+//!   so a task stays under the epic that solely owns it even when a deeper
+//!   container elsewhere reaches it via a cross edge. A redundant direct edge is
+//!   gone by then and confers no claim. Among equally-direct candidates the
+//!   deepest level wins, then the fewest hops from container to node, then the
+//!   lexicographically smallest container id.
 //! - **children** — the inverse of `parent`: the nodes whose resolved parent is
 //!   this node, sorted by id. A node that is a direct dependency of a container
 //!   but resolves to a *nearer* container is that nearer container's child, so
@@ -54,8 +67,8 @@
 //!   pointers upward to the topmost container. A leaf with no container ancestor
 //!   has no cluster (`None`); a root container is its own cluster.
 //! - **rank** — the longest dependency path length from the node to a sink (a
-//!   node with no in-set dependencies). Sinks have rank `0`. Used as a stable
-//!   layout depth.
+//!   node with no in-set dependencies), measured on the reduced graph. Sinks have
+//!   rank `0`. Used as a stable layout depth.
 //!
 //! ## Defined edge cases
 //!
@@ -70,10 +83,10 @@
 //!   contains its DAG descendants; consumers that want to hide such subtrees
 //!   filter by state themselves.
 //!
-//! ## Deliberate divergence from the web UI's historical clustering
+//! ## Deliberate divergence from the web UI's clustering
 //!
-//! The TypeScript UI, for display, picks the epic level (level 2) as its top
-//! render cluster and treats milestones as visible nodes rather than containers.
+//! The web UI, for display, picks the epic level (level 2) as its top render
+//! cluster and treats milestones as visible nodes rather than containers.
 //! The canonical core instead treats **every** non-leaf level as a container, so
 //! a task under an epic under a milestone clusters to the *milestone* (the
 //! strategic root). The DAG-authoritative rule wins; the UI's level choice is a
@@ -110,6 +123,7 @@
 //! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
 //! ```
 
+use crate::graph::{DependencyGraph, GraphNode};
 use crate::type_hierarchy::HierarchyConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -409,10 +423,11 @@ impl HierarchyResolution {
 
 /// Resolve the canonical hierarchy for `nodes` using the dependency DAG.
 ///
-/// Pure and deterministic: the result depends only on the node ids, their
-/// dependency edges, and their configured type levels. Membership labels are not
-/// consulted. See the [module docs](self) for the resolution rules and edge-case
-/// semantics.
+/// The input edge set is transitively reduced first, so the result depends only
+/// on the node ids, the *reachability relation* their edges induce, and their
+/// configured type levels. Pure and deterministic; membership labels are not
+/// consulted and the input is left untouched. See the [module docs](self) for the
+/// resolution rules and edge-case semantics.
 ///
 /// # Examples
 ///
@@ -445,6 +460,10 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     config: &HierarchyConfig,
 ) -> HierarchyResolution {
     let by_id: HashMap<&str, &T> = nodes.iter().map(|n| (n.id(), *n)).collect();
+    // Canonical edge set: the transitive reduction, computed once for the whole
+    // input and read by every step below. Reducing here makes every fact a
+    // function of the reachability relation alone.
+    let edges = transitively_reduced_edges(nodes);
     let leaf_level = config.types().map(|(_, l)| *l).max();
 
     let level_of = |id: &str| -> Option<u8> {
@@ -482,10 +501,9 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
         let mut queue: VecDeque<(&str, usize)> = VecDeque::new();
         queue.push_back((cid, 0));
         while let Some((cur, dist)) = queue.pop_front() {
-            let Some(node) = by_id.get(cur) else { continue };
-            for dep in node.dependencies() {
-                let dep = dep.as_str();
-                if !by_id.contains_key(dep) || !visited.insert(dep) {
+            let Some(deps) = edges.get(cur) else { continue };
+            for &dep in deps {
+                if !visited.insert(dep) {
                     continue;
                 }
                 let ndist = dist + 1;
@@ -535,7 +553,7 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     for &node in nodes {
         let id = node.id();
         let mut visiting: HashSet<String> = HashSet::new();
-        let rank = longest_path(id, &by_id, &mut rank_memo, &mut visiting);
+        let rank = longest_path(id, &edges, &mut rank_memo, &mut visiting);
         resolved.insert(
             id.to_string(),
             NodeHierarchy {
@@ -550,11 +568,62 @@ pub fn resolve_hierarchy<T: HierarchyNode>(
     HierarchyResolution { nodes: resolved }
 }
 
-/// Whether parent candidate `a` beats `b`.
+/// The transitive reduction of the in-set dependency edges, keyed by node id.
 ///
-/// A **direct** container edge (distance 1 — the container lists the node among
-/// its own dependencies) is genuine containment and outranks a container that
-/// only reaches the node transitively through a cross-cutting dependency. Among
+/// Computed once per resolution; the parent search and the rank walk read this
+/// map rather than recomputing a reduction per node. Edges to ids absent from
+/// `nodes` are dropped: the reduction is taken over the subgraph the caller
+/// supplied. The caller's nodes are read-only here; the reduced relation lives in
+/// the returned map.
+fn transitively_reduced_edges<'a, T: HierarchyNode>(
+    nodes: &[&'a T],
+) -> HashMap<&'a str, Vec<&'a str>> {
+    /// The dependency-graph view of a hierarchy node, borrowing its edge slice.
+    struct EdgeView<'a> {
+        id: &'a str,
+        deps: &'a [String],
+    }
+
+    impl GraphNode for EdgeView<'_> {
+        fn id(&self) -> &str {
+            self.id
+        }
+        fn dependencies(&self) -> &[String] {
+            self.deps
+        }
+    }
+
+    let views: Vec<EdgeView<'a>> = nodes
+        .iter()
+        .map(|n| EdgeView {
+            id: n.id(),
+            deps: n.dependencies(),
+        })
+        .collect();
+    let view_refs: Vec<&EdgeView<'a>> = views.iter().collect();
+    let graph = DependencyGraph::new(&view_refs);
+    let present: HashSet<&str> = nodes.iter().map(|n| n.id()).collect();
+
+    nodes
+        .iter()
+        .map(|node| {
+            let kept = graph.compute_transitive_reduction(node.id());
+            let deps = node
+                .dependencies()
+                .iter()
+                .map(String::as_str)
+                .filter(|dep| present.contains(dep) && kept.contains(*dep))
+                .collect();
+            (node.id(), deps)
+        })
+        .collect()
+}
+
+/// Whether parent candidate `a` beats `b`, both drawn from the reduced graph.
+///
+/// A **direct** edge (distance 1) there is an irreducible containment claim: the
+/// container reaches the node by no other route. It outranks a container that
+/// reaches the node through intermediate nodes, whatever their levels. Among
 /// equally-direct candidates: deeper level, then fewer hops, then smaller id.
 fn is_better_parent(a: (u8, usize, &str), b: (u8, usize, &str)) -> bool {
     use std::cmp::Reverse;
@@ -563,10 +632,10 @@ fn is_better_parent(a: (u8, usize, &str), b: (u8, usize, &str)) -> bool {
     (a.1 == 1, a.0, Reverse(a.1), Reverse(a.2)) > (b.1 == 1, b.0, Reverse(b.1), Reverse(b.2))
 }
 
-/// Longest dependency-path length from `id` to an in-set sink (memoized).
-fn longest_path<T: HierarchyNode>(
+/// Longest path length from `id` to a sink of the reduced graph (memoized).
+fn longest_path(
     id: &str,
-    by_id: &HashMap<&str, &T>,
+    edges: &HashMap<&str, Vec<&str>>,
     memo: &mut HashMap<String, u32>,
     visiting: &mut HashSet<String>,
 ) -> u32 {
@@ -576,14 +645,13 @@ fn longest_path<T: HierarchyNode>(
     if !visiting.insert(id.to_string()) {
         return 0; // defensive cycle guard; the DAG invariant forbids this
     }
-    let mut best = 0;
-    if let Some(node) = by_id.get(id) {
-        for dep in node.dependencies() {
-            if by_id.contains_key(dep.as_str()) {
-                best = best.max(1 + longest_path(dep, by_id, memo, visiting));
-            }
-        }
-    }
+    let best = edges
+        .get(id)
+        .into_iter()
+        .flatten()
+        .map(|dep| 1 + longest_path(dep, edges, memo, visiting))
+        .max()
+        .unwrap_or(0);
     visiting.remove(id);
     memo.insert(id.to_string(), best);
     best
@@ -856,6 +924,41 @@ mod tests {
         );
         assert_eq!(r.parent("ty"), Some("sy"));
         assert_eq!(r.children("ex"), ["tx".to_string()]);
+    }
+
+    #[test]
+    fn test_redundant_container_edge_does_not_capture_parent() {
+        // The epic reaches `t1` twice: directly, and through its story
+        // (fe → fs → t2 → t1). The direct edge is transitively redundant, so
+        // resolution ignores it and the story keeps `t1`.
+        let fe = TestNode::new("fe", Some("epic"), &["fs", "t1"]);
+        let fs = TestNode::new("fs", Some("story"), &["t2"]);
+        let t2 = TestNode::new("t2", Some("task"), &["t1"]);
+        let t1 = TestNode::new("t1", Some("task"), &[]);
+        let r = resolve_hierarchy(&[&fe, &fs, &t2, &t1], &default_config());
+
+        assert_eq!(r.parent("t1"), Some("fs"));
+        assert_eq!(r.children("fs"), ["t1".to_string(), "t2".to_string()]);
+        assert_eq!(r.children("fe"), ["fs".to_string()]);
+        // The redundant edge leaves rank untouched: the longest path still runs
+        // through the story.
+        assert_eq!(r.rank("fe"), Some(3));
+    }
+
+    #[test]
+    fn test_redundant_edge_does_not_mutate_input() {
+        // Reduction is internal to resolution; the caller's edge list survives.
+        let mut epic = Issue::new("Epic".into(), String::new());
+        epic.labels = vec!["type:epic".into()];
+        let mut story = Issue::new("Story".into(), String::new());
+        story.labels = vec!["type:story".into()];
+        let task = Issue::new("Task".into(), String::new());
+        story.dependencies = vec![task.id.clone()];
+        epic.dependencies = vec![story.id.clone(), task.id.clone()];
+
+        let before = epic.dependencies.clone();
+        let _ = resolve_hierarchy(&[&epic, &story, &task], &default_config());
+        assert_eq!(epic.dependencies, before);
     }
 
     #[test]
@@ -1134,6 +1237,58 @@ mod proptests {
                 if let Some(parent) = resolution.parent(node.id()) {
                     prop_assert!(resolution.children(parent).iter().any(|c| c == node.id()));
                 }
+            }
+        }
+
+        /// Resolution is invariant under transitively-redundant edges: adding any
+        /// subset of the closure edges leaves the reachability relation untouched,
+        /// so every resolved fact is unchanged. This is the canonicalization
+        /// property — resolution is defined on the transitive reduction.
+        #[test]
+        fn prop_resolution_ignores_redundant_edges(spec in arbitrary_dag(), mask in any::<u64>()) {
+            let config = HierarchyConfig::default();
+            let base = build(&spec);
+            let base_refs: Vec<&PropNode> = base.iter().collect();
+            let baseline = resolve_hierarchy(&base_refs, &config);
+
+            // Every closure edge that is not already declared is transitively
+            // redundant: adding it preserves both acyclicity and reachability.
+            let by_id: HashMap<&str, &PropNode> = base.iter().map(|n| (n.id(), n)).collect();
+            let mut bit = 0u32;
+            let redundant: Vec<PropNode> = base
+                .iter()
+                .map(|node| {
+                    let closure = dependency_closure(node.id(), &by_id);
+                    let mut deps = node.deps.clone();
+                    let mut extra: Vec<String> = closure
+                        .into_iter()
+                        .filter(|id| !node.deps.contains(id))
+                        .filter(|_| {
+                            let selected = mask & (1u64 << (bit % 64)) != 0;
+                            bit += 1;
+                            selected
+                        })
+                        .collect();
+                    extra.sort();
+                    deps.extend(extra);
+                    PropNode {
+                        id: node.id.clone(),
+                        deps,
+                        type_name: node.type_name.clone(),
+                    }
+                })
+                .collect();
+
+            let redundant_refs: Vec<&PropNode> = redundant.iter().collect();
+            let widened = resolve_hierarchy(&redundant_refs, &config);
+
+            for node in &base {
+                prop_assert_eq!(
+                    baseline.get(node.id()),
+                    widened.get(node.id()),
+                    "resolution differs for {} once redundant edges are added",
+                    node.id()
+                );
             }
         }
 
