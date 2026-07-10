@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "c73aab89-c2e3-4e4c-a7ea-ca42a9238723",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "f3b0ec2b95b78a1ffc6b85265292bcfcd778d9cf",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T23:11:32.620637328Z",
+  "completed_at": "2026-07-10T23:12:23.706811926Z",
+  "duration_ms": 51086,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-02 is met by the committed, re-runnable self-test evidence. REQ-03 is met structurally: `.jit/gates.toml` registers the three-checker aggregate script.\n\nREQ-01 is not met. The default gate footprint now resolves exclusively to `[documentation].permanent_paths`, currently `docs/`. It omits the plan’s adopter-facing root/component documents: `README.md`, `INSTALL.md`, `mcp-server/README.md`, and `web/README.md`.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries were changed. The implementation remains confined to scripts, documentation, gate configuration, and issue metadata.\n\n## Functional Paradigm\n\nThe shell and embedded Python use pragmatic imperative filesystem/process handling. No blocking functional-style issue was identified.\n\n## Correctness and Invariants\n\nThe aggregate script preserves child finding versus environment-error semantics. Projection self-testing remains isolated in a disposable clone.\n\nHowever, the no-argument gate no longer checks its declared full adopter-documentation surface. At [scripts/docs-mechanical.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-mechanical.sh:62), only `permanent_paths` are collected. This contradicts both the script’s own lines 21–28 and the gate description at `.jit/gates.toml:151`.\n\nNo issue-state, event-log, transition, assignee, label, PID, atomic-write, or unsafe Rust implementation changed.\n\n## Safety\n\nNo unsafe code was introduced. The self-test does not mutate the active repository worktree or index.\n\n## Testing\n\nThe supplied evidence records all six clean/seeded self-test assertions passing and shellcheck succeeding. No failed test result appears in the latest test evidence.\n\nPer instruction, I did not run the Rust test suite. I ran the required validator:\n\n`✓ Repository validation passed`\n\nShell syntax validation and `git diff --check` also passed.\n\n## Error Handling\n\nThe aggregate script correctly maps findings to exit code 1 and environment or unexpected errors to exit code 2. No new error-handling defect was found.\n\n## CLI Contract\n\nNo user-facing CLI command was added or changed. The universal `--json` requirement is not applicable to repository gate scripts.\n\n## Documentation\n\nThe current footprint documentation is internally contradictory. Lines 21–28 still claim the default includes repository-root and immediate-subdirectory Markdown, while the implementation and later comment say only configured permanent roots are included.\n\nMore importantly, `.jit/gates.toml` still describes a no-argument run as checking the “full adopter doc surface,” which the implementation no longer does.\n\n## Prior Review Feedback\n\nThe latest prior finding—the hardcoded depth cutoff—was removed. The replacement introduces a broader coverage regression: all adopter-facing documents outside `docs/` are now omitted from automatic gate runs.\n\nEarlier citation, reference-link, destructive-cleanup, execution-evidence, and aggregate-exit-status findings remain resolved under the amended owner-approved criteria.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is complete and there are no unmet dependencies. `./scripts/jit-validate.sh` passes.\n\n## Findings\n\n1. **F1 — High:** The no-argument `docs-mechanical` gate no longer covers the full adopter documentation surface. `resolve_footprint` collects only `documentation.permanent_paths` at `scripts/docs-mechanical.sh:62`, currently just `docs/`, omitting `README.md`, `INSTALL.md`, `mcp-server/README.md`, and `web/README.md` from automatic checks. This conflicts with the plan’s audited surface, the gate description, and the script’s own footprint contract; hard REQ-01 therefore remains unmet.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The default docs-mechanical gate silently omits adopter-facing root and component documentation outside the configured permanent docs root.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The default gate footprint includes only permanent_paths and omits required root and component adopter documentation.\",\"file\":\"scripts/docs-mechanical.sh\",\"line\":62}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1415 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e4c-efad-7300-a29f-e8e16d7d1ab7\n--------\nuser\n--- 1402 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The default docs-mechanical gate silently omits adopter-facing root and component documentation outside the configured permanent docs root.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The default gate footprint includes only permanent_paths and omits required root and component adopter documentation.",
+        "file": "scripts/docs-mechanical.sh",
+        "line": 62
+      }
+    ]
+  }
+}
