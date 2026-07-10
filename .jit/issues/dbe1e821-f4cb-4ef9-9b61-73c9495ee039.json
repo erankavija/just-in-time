@@ -2,7 +2,7 @@
   "id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
   "title": "Work-graph abstraction integrity",
   "description": "Close the semantic and boundary gaps found in the July 2026 work-graph architecture review: containment stability under transitive reduction, a single hierarchy-resolution implementation across all consumers, one blocking predicate, graph primitives owned by the graph layer, atomic template instantiation with config-declared role bindings, and unambiguous naming.\n\n## Background\n\nThe review confirmed the core model is sound: one persisted edge primitive (`Issue.dependencies`), hierarchy derived from the DAG plus type levels, labels advisory, all edge writes funneled through one cycle-checked path. It also found structural weaknesses: transitive reduction deletes the direct edges the hierarchy resolver treats as containment signal; the web UI hand-maintains a TypeScript port of the resolver because no API serves resolution; the dependency-met rule is encoded four times with drift; command handlers hand-roll graph traversal; template apply is non-atomic and reaches for hardcoded role names; four module/CLI name collisions invite conflation.\n\n## Success Criteria\n\n- [hard] REQ-1: Resolved hierarchy (parent, children, cluster, rank) is invariant under addition or removal of transitively-redundant dependency edges.\n- [hard] REQ-2: Exactly one implementation of hierarchy resolution exists in the repository, and every consumer (CLI, HTTP server, web UI) consumes its output.\n- [hard] REQ-3: The dependency-met rule is defined once in the domain layer and reused by every surface that reports or enforces blocking.\n- [hard] REQ-4: Graph traversal and acyclicity primitives live in the graph layer; command handlers contain no hand-rolled graph walks.\n- [hard] REQ-5: Template application validates fully before mutating and applies its writes atomically under a single lock.\n- [hard] REQ-6: Template role and anchor names consumed by commands are declared in repository configuration.\n- [hard] REQ-7: No two distinct hierarchy-related concepts share a module, type, or CLI-surface name.\n- [hard] REQ-8: External-facing docs and the MCP system prompt describe DAG-authoritative containment and the container completion model.\n\n## Notes\n\nDecisions fixed at epic creation: hierarchy resolution canonicalizes on the transitively-reduced graph (rather than exempting containment edges from reduction); template role bindings become configuration with defaults preserving current names.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
@@ -18,16 +18,38 @@
   "gates_required": [
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T10:48:52.054301407Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/archive/features/dbe1e821/dbe1e821-completion-report.md",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    },
+    {
+      "path": "dev/archive/features/dbe1e821/dbe1e821-progress.json",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "type:epic",
     "epic:work-graph-integrity",
     "milestone:v1.0"
   ],
   "created_at": "2026-07-05T22:31:18.719062335Z",
-  "updated_at": "2026-07-09T14:13:28.446202688Z",
+  "updated_at": "2026-07-10T10:50:50.062402980Z",
   "first_ready_at": "2026-07-05T22:31:18.719062985Z",
-  "claimed_at": "2026-07-09T14:13:28.446202178Z"
+  "claimed_at": "2026-07-09T14:13:28.446202178Z",
+  "done_at": "2026-07-10T10:50:43.803588229Z"
 }
