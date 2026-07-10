@@ -41,12 +41,15 @@ crates/jit/src/
 ```
 
 Unit tests are the right home for edge cases: cycles, empty inputs, boundary values,
-malformed configuration. They run in the same process as the code, need no filesystem, and
-report failures at the exact function that broke.
+malformed configuration. They run in the same process as the code and report failures at the
+exact function that broke.
 
-Domain logic and graph algorithms are pure and free of I/O by design, which is what makes
-this layer cheap. When a behavior is hard to unit test, that is usually a signal that side
-effects have leaked out of the storage boundary.
+Domain logic and graph algorithms are pure and free of I/O by design, so their tests need
+nothing beyond the values they construct. Tests over `storage/` and over the command modules
+that read repository configuration set up a `TempDir` and work against real files, which is
+what those modules exist to do. When a behavior in `domain/` or `graph/` is hard to test
+without a filesystem, that is a signal that side effects have leaked out of the storage
+boundary.
 
 Run them with `cargo test --lib`.
 
@@ -80,8 +83,9 @@ Location: `crates/jit/tests/harness.rs` (the harness) and `crates/jit/tests/harn
 (tests that use it).
 
 `TestHarness` backs a real `CommandExecutor` with `InMemoryStorage`, so a test drives command
-logic end to end without touching the filesystem or spawning a process. Each harness gets its
-own isolated storage.
+logic end to end in the calling process, with issue state held in memory. Each harness gets
+its own isolated storage. Repository configuration still lives on disk: `with_item_kinds()`
+writes `config.toml` under the storage root.
 
 ### TestHarness API
 
