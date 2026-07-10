@@ -32,6 +32,23 @@
       "label": null,
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "scripts/docs-check-selftest.sh",
+      "commit": null,
+      "label": "docs-mechanical self-test (REQ-02 evidence)",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "./no-such-file-zzz.md",
+          "resolved_path": "scripts/no-such-file-zzz.md",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -41,7 +58,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-10T20:21:17.655916429Z",
-  "updated_at": "2026-07-10T22:17:23.950692443Z",
+  "updated_at": "2026-07-10T22:38:27.377145406Z",
   "first_ready_at": "2026-07-10T20:21:17.655916689Z",
   "claimed_at": "2026-07-10T21:51:58.257049744Z"
 }
