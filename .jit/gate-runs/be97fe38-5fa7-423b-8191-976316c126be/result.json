@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "be97fe38-5fa7-423b-8191-976316c126be",
+  "gate_key": "repo-validate",
+  "stage": "postcheck",
+  "issue_id": "d24008f0-ecec-4f08-900b-9d686e9a5051",
+  "commit": "1e246786aede35d27cb4dd97681104b78cd377eb",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T22:31:12.490826657Z",
+  "completed_at": "2026-07-10T22:31:12.793540837Z",
+  "duration_ms": 302,
+  "exit_code": 0,
+  "stdout": "✓ Repository validation passed\n",
+  "stderr": "",
+  "command": "jit validate",
+  "by": "auto:executor",
+  "message": null
+}

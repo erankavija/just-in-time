@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "d641c2ae-d016-4c01-a77a-2588065cd28f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d24008f0-ecec-4f08-900b-9d686e9a5051",
+  "commit": "1e246786aede35d27cb4dd97681104b78cd377eb",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T22:31:16.136611128Z",
+  "completed_at": "2026-07-10T22:31:42.657423934Z",
+  "duration_ms": 26520,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nThe prompt correctly defines both scoped and default behavior at `scripts/doc-review-prompt.md:27-29`. However, hard REQ-01 remains incomplete: the evidence contains a real scoped review, but no real unscoped reviewer run demonstrating full-surface findings.\n\n## Architecture and separation of concerns\n\nNo violations. The functional change is confined to the documentation-review prompt and introduces no runtime dependencies or I/O.\n\n## Functional paradigm\n\nNot applicable to this documentation-only change.\n\n## Correctness and invariants\n\nThe prompt wording correctly restricts findings to an explicit description-declared footprint and preserves the enumerated full surface when no scope exists. Runtime invariants are unaffected.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing\n\nThe recorded `repo-validate` gate passed with exit code 0. Per instruction, tests were not rerun.\n\nThe scoped behavioral execution is documented at `dev/active/d24008f0-req01-evidence.md:91-174`. The purported unscoped run at lines 40-57 uses `REVIEWER_AGENT=cat`; it proves only that the assembled input omits a scope declaration. It does not run the reviewer or demonstrate that the resulting review covers the full surface.\n\n## Error handling\n\nNot applicable; no executable code changed.\n\n## CLI contract\n\nNot applicable; no CLI behavior changed.\n\n## Documentation\n\nThe enumerated review surface remains unchanged, including the intentional omission of root `TESTING.md`. The added scoped-audit instruction is concise and unambiguous.\n\n## Prior review feedback\n\nThe previous F1 is only partially resolved. Durable evidence now exists for the scoped execution, but the required unscoped behavioral execution is still absent.\n\n## Jit issue management\n\nThe prerequisite `c939d0b6` is complete and `unmet_dependencies` is empty. Repository validation passed. The issue remains `in_progress`, appropriately reflecting the incomplete hard criterion.\n\n## Findings\n\n1. **F1 — High:** Hard REQ-01 still lacks an unscoped reviewer execution demonstrating full-surface behavior. `dev/active/d24008f0-req01-evidence.md:40-57` substitutes `REVIEWER_AGENT=cat`, which only verifies prompt assembly; lines 91-174 explicitly provide a real reviewer execution only for the scoped case. Run the configured reviewer with an unscoped context and retain output showing that findings span the default full surface.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The scoped behavior is demonstrated, but hard REQ-01 still lacks a real unscoped full-surface reviewer run.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Hard REQ-01 lacks an unscoped reviewer execution demonstrating full-surface behavior.\",\"file\":\"dev/active/d24008f0-req01-evidence.md\",\"line\":40}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1260 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e28-1054-7d41-af3b-059a77af4253\n--------\nuser\n--- 1247 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The scoped behavior is demonstrated, but hard REQ-01 still lacks a real unscoped full-surface reviewer run.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Hard REQ-01 lacks an unscoped reviewer execution demonstrating full-surface behavior.",
+        "file": "dev/active/d24008f0-req01-evidence.md",
+        "line": 40
+      }
+    ]
+  }
+}
