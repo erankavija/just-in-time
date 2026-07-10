@@ -391,7 +391,7 @@ schema, so each tool mirrors the command of the same name:
 |------|---------|
 | `jit_label_namespaces` | List declared namespaces, so an agent writes a label the `namespace-registry` rule accepts |
 | `jit_label_values` | List values in use in a namespace, so an agent reuses the project vocabulary |
-| `jit_issue_update` | Add (`label`) and remove (`remove_label`) labels on an issue |
+| `jit_issue_update` | Add (`label`) and remove (`remove-label`) labels on an issue |
 | `jit_query_all` | Find issues by label pattern, including `namespace:*` wildcards |
 
 ### Agent Prompt Additions
