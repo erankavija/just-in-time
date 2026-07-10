@@ -153,7 +153,7 @@ fn test_explain_lists_matched_rules_and_outcomes() {
         .iter()
         .find(|o| o.rule == "epic-needs-req")
         .expect("epic-needs-req outcome present");
-    assert_eq!(outcome.scope, jit::validation::rules::Scope::Local);
+    assert_eq!(outcome.scope, jit::validation::rules::RuleScope::Local);
     assert_eq!(outcome.severity, jit::validation::rules::Severity::Error);
     assert_eq!(outcome.selector, "type=epic");
     assert!(!outcome.passed, "rule failed for this issue");

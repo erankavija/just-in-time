@@ -1241,7 +1241,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: PathBuf::from("inline"),
                 schema: serde_json::json!({ "type": "object", "required": ["alpha"] }),
             }),
-            scope: crate::validation::rules::Scope::Local,
+            scope: crate::validation::rules::RuleScope::Local,
         };
         let rule_beta = Rule {
             name: "dup".to_string(),
@@ -1255,7 +1255,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: PathBuf::from("inline"),
                 schema: serde_json::json!({ "type": "object", "required": ["beta"] }),
             }),
-            scope: crate::validation::rules::Scope::Local,
+            scope: crate::validation::rules::RuleScope::Local,
         };
         let set = RuleSet {
             rules: vec![rule_alpha, rule_beta],
@@ -1535,7 +1535,7 @@ assert = { json-schema = "schemas/b.json" }
                     schema,
                 },
             ),
-            scope: crate::validation::rules::Scope::Local,
+            scope: crate::validation::rules::RuleScope::Local,
         };
         let set = RuleSet { rules: vec![rule] };
 
@@ -1605,7 +1605,7 @@ assert = { json-schema = "schemas/b.json" }
                     schema,
                 },
             ),
-            scope: crate::validation::rules::Scope::Local,
+            scope: crate::validation::rules::RuleScope::Local,
         };
 
         // Warm the cache on an engine with NO custom keyword: the unknown
@@ -1685,7 +1685,7 @@ assert = { json-schema = "schemas/b.json" }
                 path: std::path::PathBuf::from("inline"),
                 schema,
             }),
-            scope: crate::validation::rules::Scope::Local,
+            scope: crate::validation::rules::RuleScope::Local,
         }
     }
 

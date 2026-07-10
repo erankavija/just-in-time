@@ -15,7 +15,7 @@ use jit::document::{
 };
 use jit::domain::{project, Issue};
 use jit::validation::engine::{Finding, SchemaEngine};
-use jit::validation::rules::{Assertion, Rule, SchemaSource, Scope, Selector, Severity};
+use jit::validation::rules::{Assertion, Rule, RuleScope, SchemaSource, Selector, Severity};
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -191,7 +191,7 @@ fn hard_criterion_rule() -> Rule {
             path: PathBuf::from("schemas/hard.json"),
             schema,
         }),
-        scope: Scope::Local,
+        scope: RuleScope::Local,
     }
 }
 

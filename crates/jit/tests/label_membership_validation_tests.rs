@@ -4,10 +4,10 @@
 //! reference actual issues with matching types.
 
 use jit::commands::CommandExecutor;
+use jit::domain::type_taxonomy::{detect_membership_issues, HierarchyConfig, ValidationIssue};
 use jit::domain::Issue;
 use jit::storage::json::JsonFileStorage;
 use jit::storage::IssueStore;
-use jit::type_hierarchy::{detect_membership_issues, HierarchyConfig, ValidationIssue};
 use std::collections::HashMap;
 use tempfile::TempDir;
 

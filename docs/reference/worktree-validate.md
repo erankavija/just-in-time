@@ -164,7 +164,7 @@ Checks the JIT repository for consistency issues including:
 - Corrupted or inconsistent claims index
 - Sequence gaps in audit logs
 - Stale leases (with `--leases`)
-- Branch divergence from main (with `--divergence`)
+- Branch drift from `origin/main` (with `--branch-drift`)
 
 Can optionally fix detected issues with `--fix`.
 
@@ -174,7 +174,7 @@ Can optionally fix detected issues with `--fix`.
 |--------|-------------|
 | `--fix` | Attempt to automatically fix validation issues |
 | `--dry-run` | Show what would be fixed without applying (requires `--fix`) |
-| `--divergence` | Validate branch hasn't diverged from main |
+| `--branch-drift` | Validate `origin/main` is an ancestor of the current branch |
 | `--leases` | Validate active leases are consistent and not stale |
 | `--json` | Output as JSON |
 
@@ -184,8 +184,8 @@ Can optionally fix detected issues with `--fix`.
 # Basic validation
 jit validate
 
-# Check everything including leases and divergence
-jit validate --divergence --leases
+# Check everything including leases and branch drift
+jit validate --branch-drift --leases
 
 # See what would be fixed
 jit validate --fix --dry-run
@@ -242,7 +242,7 @@ With `--fix`:
 | Stale indefinite | Finds TTL=0 leases without recent heartbeat | Reports only |
 | Ownership | Verifies lease metadata consistency | Reports only |
 
-#### With `--divergence`
+#### With `--branch-drift`
 
 | Check | Description | Auto-Fix |
 |-------|-------------|----------|

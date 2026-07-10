@@ -803,7 +803,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Behavior (CC-2 / CC-2a):
     ///
-    /// - Selects `Scope::Graph` rules (severity != `off`) whose `when` matches the
+    /// - Selects `RuleScope::Graph` rules (severity != `off`) whose `when` matches the
     ///   issue in its target state, SKIPPING rules with repo-wide semantics
     ///   ([`Assertion::is_repo_wide_at_transition`]) — those stay `jit validate`
     ///   concerns because they need the whole repository, not a slice.
@@ -832,7 +832,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         force: bool,
     ) -> Result<Vec<String>> {
         use crate::validation::graph::evaluate_graph;
-        use crate::validation::rules::{Scope, Severity};
+        use crate::validation::rules::{RuleScope, Severity};
 
         let ruleset = self.effective_rules()?;
 
@@ -841,7 +841,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let rules: Vec<&crate::validation::rules::Rule> = ruleset
             .rules
             .iter()
-            .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
+            .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
             .filter(|rule| !rule.assert.is_repo_wide_at_transition())
             .filter(|rule| rule.when.matches(issue))
             .collect();

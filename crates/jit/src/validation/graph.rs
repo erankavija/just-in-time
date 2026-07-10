@@ -46,16 +46,16 @@ use chrono::{DateTime, Utc};
 
 use crate::document::content_parser_for;
 use crate::domain::item::{parse_kind_segmented_address, AddressScope, PROJECT_SCOPE_SENTINEL};
-use crate::domain::{project, ContentFormat, Issue};
-use crate::graph::DependencyGraph;
-use crate::type_hierarchy::{
+use crate::domain::type_taxonomy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
+use crate::domain::{project, ContentFormat, Issue};
+use crate::graph::DependencyGraph;
 use std::collections::HashMap;
 
 use crate::validation::engine::Finding;
 use crate::validation::rules::{
-    Assertion, Rule, Scope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
 };
 
 /// Default label namespace whose values are criterion ids a child claims to
@@ -214,7 +214,7 @@ pub enum ChildLink {
 ///
 /// ```
 /// use jit::domain::{ContentFormat, Issue};
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::{evaluate_graph, GraphFinding};
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -361,7 +361,7 @@ impl ChildLink {
 /// Evaluate all graph rules over the given issue set, returning one [`Finding`]
 /// per violation (and a `config-error` finding per malformed rule config).
 ///
-/// Only rules whose [`Rule::scope`] is [`Scope::Graph`] are evaluated; any
+/// Only rules whose [`Rule::scope`] is [`RuleScope::Graph`] are evaluated; any
 /// non-graph rule passed in is ignored (so callers may hand the full rule set).
 /// Rules whose severity is [`Severity::Off`] are skipped entirely. This function
 /// is pure: it reads nothing but the supplied slices.
@@ -373,7 +373,7 @@ impl ChildLink {
 ///
 /// ```
 /// use jit::domain::Issue;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::evaluate_graph;
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -441,7 +441,7 @@ pub fn evaluate_graph(
 ) -> Vec<GraphFinding> {
     rules
         .iter()
-        .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
+        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
         .flat_map(|rule| {
             evaluate_one(
                 rule,
@@ -1527,7 +1527,7 @@ fn describe_missing(id: &str, gate_prefix: Option<&str>, check_namespace: Option
 
 /// Evaluate a built-in `type-hierarchy` rule (orphan-leaf or
 /// strategic-consistency) by REUSING the existing
-/// [`crate::type_hierarchy`] domain functions over each issue, converting their
+/// [`crate::domain::type_taxonomy`] domain functions over each issue, converting their
 /// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
 ///
 /// This carries no hierarchy logic of its own: `OrphanLeaf` delegates to
@@ -2039,7 +2039,7 @@ source-of-truth = "markdown-first"
         // container must not spuriously credit coverage.
         let rule = coverage_rule("child-state = \"done\"");
         let epic = epic_with_criteria(&["REQ-01"]);
-        // Scope points at an unrelated issue id, not this epic.
+        // The address scope points at an unrelated issue id, not this epic.
         let mut child = issue("child", &["satisfies:deadbeef/REQ-01"]);
         child.dependencies = vec![epic.id.clone()];
         child.state = State::Done;

@@ -37,7 +37,7 @@
 //! # What "container" means
 //!
 //! Container-ness comes from the configured [type hierarchy
-//! levels](crate::type_hierarchy::HierarchyConfig), never from label namespaces
+//! levels](crate::domain::type_taxonomy::HierarchyConfig), never from label namespaces
 //! (@/inv/domain-agnostic). A type is a **container** iff its level is strictly
 //! less than the deepest (leaf) configured level. With the default
 //! `milestone=1, epic=2, story=3, task=4`, the leaf level is `4`, so
@@ -97,7 +97,7 @@
 //! ```
 //! use jit::domain::Issue;
 //! use jit::graph::hierarchy::resolve_hierarchy;
-//! use jit::type_hierarchy::HierarchyConfig;
+//! use jit::domain::type_taxonomy::HierarchyConfig;
 //!
 //! // milestone → epic → task (each container depends on what it contains)
 //! let mut milestone = Issue::new("Release".into(), String::new());
@@ -123,8 +123,8 @@
 //! assert_eq!(resolution.cluster(&task.id), Some(milestone.id.as_str()));
 //! ```
 
+use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::graph::{DependencyGraph, GraphNode};
-use crate::type_hierarchy::HierarchyConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -238,7 +238,7 @@ pub struct NodeHierarchy {
 /// ```
 /// use jit::domain::Issue;
 /// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 ///
 /// let mut epic = Issue::new("Epic".into(), String::new());
 /// epic.labels = vec!["type:epic".into()];
@@ -265,7 +265,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -287,7 +287,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -308,7 +308,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -333,7 +333,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -354,7 +354,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -376,7 +376,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let mut epic = Issue::new("Epic".into(), String::new());
     /// epic.labels = vec!["type:epic".into()];
     /// let task = Issue::new("Task".into(), String::new());
@@ -396,7 +396,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let task = Issue::new("Task".into(), String::new());
     /// let r = resolve_hierarchy(&[&task], &HierarchyConfig::default());
     /// assert_eq!(r.len(), 1);
@@ -412,7 +412,7 @@ impl HierarchyResolution {
     /// ```
     /// # use jit::domain::Issue;
     /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::type_hierarchy::HierarchyConfig;
+    /// # use jit::domain::type_taxonomy::HierarchyConfig;
     /// let empty = resolve_hierarchy::<Issue>(&[], &HierarchyConfig::default());
     /// assert!(empty.is_empty());
     /// ```
@@ -434,7 +434,7 @@ impl HierarchyResolution {
 /// ```
 /// use jit::domain::Issue;
 /// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 ///
 /// // A diamond: two epics both depend on the same task.
 /// let mut e1 = Issue::new("E1".into(), String::new());
@@ -678,7 +678,7 @@ pub struct MembershipDivergence {
 /// Report membership labels that disagree with DAG-resolved containment.
 ///
 /// For each configured membership namespace (from
-/// [`label_associations`](crate::type_hierarchy::HierarchyConfig::membership_namespaces)),
+/// [`label_associations`](crate::domain::type_taxonomy::HierarchyConfig::membership_namespaces)),
 /// the *anchor* of a label `ns:val` is the container issue whose type maps to
 /// `ns` and that carries `ns:val` (e.g. the `type:epic` issue labeled
 /// `epic:auth`). An issue that carries `ns:val` but does not sit in any such
@@ -697,7 +697,7 @@ pub struct MembershipDivergence {
 /// ```
 /// use jit::domain::Issue;
 /// use jit::graph::hierarchy::detect_membership_divergences;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 ///
 /// let config = HierarchyConfig::default();
 ///
@@ -1074,9 +1074,9 @@ mod tests {
 #[cfg(test)]
 mod proptests {
     //! Property-based coverage for hierarchy resolution over arbitrary DAGs,
-    //! mirroring the graph proptest suite in [`crate::type_hierarchy`].
+    //! mirroring the graph proptest suite in [`crate::domain::type_taxonomy`].
     use super::*;
-    use crate::type_hierarchy::HierarchyConfig;
+    use crate::domain::type_taxonomy::HierarchyConfig;
     use proptest::prelude::*;
     use std::collections::{HashMap, HashSet};
 

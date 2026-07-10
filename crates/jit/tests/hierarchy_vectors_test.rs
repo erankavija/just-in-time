@@ -11,8 +11,8 @@
 
 use std::collections::HashMap;
 
+use jit::domain::type_taxonomy::HierarchyConfig;
 use jit::graph::hierarchy::{resolve_hierarchy, HierarchyNode};
-use jit::type_hierarchy::HierarchyConfig;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

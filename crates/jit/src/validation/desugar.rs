@@ -332,7 +332,7 @@ fn desugar_require_doc_type(doc_type: &str) -> Value {
 mod tests {
     use super::*;
     use crate::validation::engine::SchemaEngine;
-    use crate::validation::rules::{Assertion, Rule, SchemaSource, Scope, Selector, Severity};
+    use crate::validation::rules::{Assertion, Rule, RuleScope, SchemaSource, Selector, Severity};
     use serde_json::Value;
     use std::path::PathBuf;
 
@@ -351,7 +351,7 @@ mod tests {
                 path: PathBuf::from("inline"),
                 schema,
             }),
-            scope: Scope::Local,
+            scope: RuleScope::Local,
         }
     }
 

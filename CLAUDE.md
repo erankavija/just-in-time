@@ -54,7 +54,7 @@ Cargo workspace with two crates plus Node.js and React components:
 
 1. **CLI** (`cli.rs`) — Clap command definitions and argument parsing.
 2. **Commands** (`commands/`) — Business logic per command: `issue.rs`, `gate.rs`, `dependency.rs`, `claim.rs`, `document.rs`, `query.rs`, `validate.rs`, etc.
-3. **Domain** (`domain/types.rs`, `domain/queries.rs`) — Core types (`Issue`, `State`, `Priority`, `GateStatus`) and pure query functions (`query_ready`, `query_blocked`, `query_by_assignee`).
+3. **Domain** (`domain/types.rs`, `domain/queries.rs`, `domain/type_taxonomy.rs`) — Core types (`Issue`, `State`, `Priority`, `GateStatus`), pure query functions (`query_ready`, `query_blocked`, `query_by_assignee`), and the taxonomy of type labels and their levels (`HierarchyConfig`), which `config_manager.rs` loads from `[type_hierarchy]` in `config.toml`.
 4. **Storage** (`storage/`) — `IssueStore` trait with `JsonFileStorage` (file-based, `.jit/` directory) and `InMemoryStorage` (testing). Also contains `claim_coordinator.rs` (lease system), `lock.rs` (file locking).
 5. **Graph** (`graph/`) — DAG construction, cycle detection, blocking analysis, transitive reduction, and DAG-authoritative hierarchy resolution (`graph/hierarchy.rs`).
 6. **Output** (`output.rs`) — JSON serialization and structured output formatting.

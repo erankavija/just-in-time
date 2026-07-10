@@ -176,7 +176,7 @@ fn test_html_repo_default_uses_html_parser_in_production() {
 #[cfg(feature = "html")]
 #[test]
 fn test_html_graph_label_coverage_uses_html_parser_in_production() {
-    use jit::type_hierarchy::HierarchyConfig;
+    use jit::domain::type_taxonomy::HierarchyConfig;
     use jit::validation::graph::evaluate_graph;
 
     let rule = RuleSet::from_toml_str(

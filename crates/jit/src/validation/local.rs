@@ -5,7 +5,7 @@
 //!
 //! 1. project the [`Issue`](crate::domain::Issue) into the canonical
 //!    [`Projection`](crate::domain::Projection) (cheap selector fields only);
-//! 2. select the [`Scope::Local`] rules whose selector matches the issue —
+//! 2. select the [`RuleScope::Local`] rules whose selector matches the issue —
 //!    graph-scope rules are SKIPPED entirely on write (DR §7.4);
 //! 3. lazily add the parsed `sections` view to the projection ONLY when a
 //!    matching rule actually needs body content (a `require-section` shorthand,
@@ -37,7 +37,7 @@ use crate::validation::desugar::desugar;
 use crate::validation::engine::{
     render_finding_message, Finding, SchemaCompileError, SchemaEngine,
 };
-use crate::validation::rules::{Assertion, Rule, RuleSet, Scope, Severity};
+use crate::validation::rules::{Assertion, Rule, RuleScope, RuleSet, Severity};
 
 /// Error raised while evaluating local rules against an issue.
 ///
@@ -230,7 +230,7 @@ impl LocalEvaluation {
 
 /// Evaluate an issue against the local rules in `rules`, returning the findings.
 ///
-/// Builds the projection, selects [`Scope::Local`] rules whose selector matches
+/// Builds the projection, selects [`RuleScope::Local`] rules whose selector matches
 /// the issue (graph rules are skipped), lazily parses the description into
 /// `sections` only if a matching rule needs body content, then validates the
 /// projection against each rule's JSON Schema via a locally-constructed
@@ -277,7 +277,7 @@ pub fn evaluate_local(
     let local_rules: Vec<&Rule> = rules
         .matching_rules(issue)
         .into_iter()
-        .filter(|rule| rule.scope == Scope::Local && rule.severity != Severity::Off)
+        .filter(|rule| rule.scope == RuleScope::Local && rule.severity != Severity::Off)
         .collect();
 
     if local_rules.is_empty() {
@@ -635,7 +635,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         let resolved: Vec<_> = rules
             .matching_rules(&issue)
             .into_iter()
-            .filter(|r| r.scope == Scope::Local && r.severity != Severity::Off)
+            .filter(|r| r.scope == RuleScope::Local && r.severity != Severity::Off)
             .filter_map(rule_schema)
             .collect();
         assert!(

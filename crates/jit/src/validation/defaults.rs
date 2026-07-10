@@ -31,20 +31,20 @@
 //!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
 //!    the write and fails `jit validate`.
 //! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
-//!    `enforce = false`, UNCONDITIONAL. Built-in [`Scope::Graph`] rules whose
+//!    `enforce = false`, UNCONDITIONAL. Built-in [`RuleScope::Graph`] rules whose
 //!    evaluation REUSES the existing
-//!    [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
-//!    / [`validate_strategic_labels`](crate::type_hierarchy::validate_strategic_labels)
+//!    [`type_taxonomy::validate_orphans`](crate::domain::type_taxonomy::validate_orphans)
+//!    / [`validate_strategic_labels`](crate::domain::type_taxonomy::validate_strategic_labels)
 //!    domain functions.
 //!
 //! DROPPED (no longer config-derivable): `require-type-label`,
 //! `label-format-custom`, and the per-namespace `values`/`pattern`/`required`
 //! rules. A repo wanting those authors them directly in `rules.toml`.
 
+use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
-use crate::type_hierarchy::HierarchyConfig;
 use crate::validation::rules::{
-    Assertion, Rule, RuleSet, SchemaSource, Scope, Selector, Severity, TypeHierarchyKind,
+    Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
 };
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
@@ -185,7 +185,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 
     // (5) Type-hierarchy GRAPH warnings: orphan-leaf + strategic-consistency.
     // Built-in GRAPH rules whose evaluation REUSES the existing
-    // `type_hierarchy::validate_orphans` / `validate_strategic_labels` domain
+    // `type_taxonomy::validate_orphans` / `validate_strategic_labels` domain
     // functions (see `validation::graph`). Each is `severity = warn` /
     // `enforce = false` and UNCONDITIONAL (the former `warn_*` toggles defaulted
     // true, so unconditional preserves behavior). The repo `HierarchyConfig` is
@@ -279,7 +279,11 @@ fn local_rule(
     assert: Assertion,
 ) -> Rule {
     let scope = assert.scope();
-    debug_assert_eq!(scope, Scope::Local, "default rules are local-scope only");
+    debug_assert_eq!(
+        scope,
+        RuleScope::Local,
+        "default rules are local-scope only"
+    );
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
@@ -293,10 +297,14 @@ fn local_rule(
 }
 
 /// Construct a built-in graph-scope rule (warn-only, never blocking). Used for
-/// the type-hierarchy defaults, whose assertions are [`Scope::Graph`].
+/// the type-hierarchy defaults, whose assertions are [`RuleScope::Graph`].
 fn graph_rule(name: &str, description: &str, severity: Severity, assert: Assertion) -> Rule {
     let scope = assert.scope();
-    debug_assert_eq!(scope, Scope::Graph, "graph default rules are graph-scope");
+    debug_assert_eq!(
+        scope,
+        RuleScope::Graph,
+        "graph default rules are graph-scope"
+    );
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
@@ -330,7 +338,7 @@ fn json_schema_rule(
             path: std::path::PathBuf::from(format!("<default:{name}>")),
             schema,
         }),
-        scope: Scope::Local,
+        scope: RuleScope::Local,
     }
 }
 
@@ -652,7 +660,7 @@ mod tests {
         assert!(rules
             .rules
             .iter()
-            .filter(|r| r.scope == Scope::Graph)
+            .filter(|r| r.scope == RuleScope::Graph)
             .all(|r| r.name == "orphan-leaf" || r.name == "strategic-consistency"));
         assert!(rules
             .rules

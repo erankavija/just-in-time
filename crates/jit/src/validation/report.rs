@@ -11,7 +11,7 @@
 use serde::Serialize;
 
 use crate::validation::engine::Finding;
-use crate::validation::rules::{Scope, Severity};
+use crate::validation::rules::{RuleScope, Severity};
 
 /// One reported finding, scoped to the issue it concerns (if any).
 ///
@@ -170,11 +170,11 @@ impl RuleReport {
 ///
 /// ```
 /// use jit::validation::report::RuleOutcome;
-/// use jit::validation::rules::{Scope, Severity};
+/// use jit::validation::rules::{RuleScope, Severity};
 ///
 /// let outcome = RuleOutcome {
 ///     rule: "epic-needs-req".to_string(),
-///     scope: Scope::Local,
+///     scope: RuleScope::Local,
 ///     severity: Severity::Error,
 ///     selector: "type=epic".to_string(),
 ///     matched: true,
@@ -191,7 +191,7 @@ pub struct RuleOutcome {
     /// Name of the rule.
     pub rule: String,
     /// Evaluation scope. Serializes as `"local"`/`"graph"`.
-    pub scope: Scope,
+    pub scope: RuleScope,
     /// Severity. Serializes as `"off"`/`"warn"`/`"error"`.
     pub severity: Severity,
     /// Human-readable rendering of the rule's authored selector.
@@ -243,13 +243,13 @@ impl ExplainReport {
     /// ```
     /// use jit::validation::report::{ExplainReport, RuleOutcome};
     ///
-    /// use jit::validation::rules::{Scope, Severity};
+    /// use jit::validation::rules::{RuleScope, Severity};
     ///
     /// let report = ExplainReport {
     ///     issue_id: "x".to_string(),
     ///     outcomes: vec![RuleOutcome {
     ///         rule: "r".to_string(),
-    ///         scope: Scope::Local,
+    ///         scope: RuleScope::Local,
     ///         severity: Severity::Warn,
     ///         selector: "*".to_string(),
     ///         matched: true,
@@ -286,7 +286,7 @@ impl ExplainReport {
 mod tests {
     use super::*;
     use crate::validation::engine::Finding;
-    use crate::validation::rules::{Scope, Severity};
+    use crate::validation::rules::{RuleScope, Severity};
 
     // --- ReportedFinding JSON byte-identical round-trip ----------------------
 
@@ -345,7 +345,7 @@ mod tests {
     fn test_rule_outcome_json_scope_severity_byte_identical() {
         let outcome = RuleOutcome {
             rule: "r".into(),
-            scope: Scope::Graph,
+            scope: RuleScope::Graph,
             severity: Severity::Warn,
             selector: "*".into(),
             matched: true,
@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(back["severity"], "warn", "severity token changed: {json}");
         // Local scope too.
         let local = RuleOutcome {
-            scope: Scope::Local,
+            scope: RuleScope::Local,
             severity: Severity::Error,
             ..outcome.clone()
         };
@@ -413,7 +413,7 @@ mod tests {
     fn test_explain_report_has_errors_enum_comparison() {
         let outcome_with = |sev: Severity, passed: bool| RuleOutcome {
             rule: "r".into(),
-            scope: Scope::Local,
+            scope: RuleScope::Local,
             severity: sev,
             selector: "*".into(),
             matched: true,

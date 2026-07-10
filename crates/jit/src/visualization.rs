@@ -194,7 +194,7 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 /// ```
 /// use jit::visualization;
 /// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::{graph::DependencyGraph, Issue};
 ///
 /// let mut epic = Issue::new("Epic".to_string(), String::new());
@@ -402,7 +402,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::type_hierarchy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::default(),
         );
         let doc: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
@@ -431,7 +431,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::type_hierarchy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::default(),
         );
 
         let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
@@ -456,7 +456,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::type_hierarchy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::default(),
         );
 
         let full: serde_json::Value =
@@ -506,7 +506,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::type_hierarchy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::default(),
         );
         let facts = resolution.get(&task.id).cloned().unwrap_or_default();
 
