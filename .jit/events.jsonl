@@ -5969,3 +5969,9 @@
 {"type":"issue_claimed","id":"83c907b0-325d-44de-9a2a-4f005f05b2be","issue_id":"5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0","timestamp":"2026-07-10T11:03:56.076343951Z","assignee":"agent:claude"}
 {"type":"issue_state_changed","id":"631a9c85-fa99-4513-bb7e-a977a9fb5412","issue_id":"f7c50538-0b8a-49ff-ad0d-9f2f0f008171","timestamp":"2026-07-10T11:03:56.092853693Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"64334d8a-48ce-4032-8cf3-86af9f85ca34","issue_id":"f7c50538-0b8a-49ff-ad0d-9f2f0f008171","timestamp":"2026-07-10T11:03:56.093052163Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"276d4d0b-42ef-42da-bac8-6457c553c266","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-07-10T11:07:32.470682047Z","updated_by":"doc-remove","fields":["documents"]}
+{"type":"issue_updated","id":"510336b6-7e6e-4e3d-b646-61ae56573151","issue_id":"cfb3ba94-7406-4bc3-9f36-cecdcebacf0e","timestamp":"2026-07-10T11:07:32.478685543Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"9721e31e-02e5-4fdd-917d-d1752944350c","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-07-10T11:07:32.486478619Z","updated_by":"doc-remove","fields":["documents"]}
+{"type":"issue_updated","id":"f76d5f7e-bf86-49be-9aec-166ef0bf834d","issue_id":"d0b85bff-68a3-49c1-bdfb-31a7a5b6a890","timestamp":"2026-07-10T11:07:32.494224034Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"1ae78789-2fe2-4e00-90ae-4a397f072fa5","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-07-10T11:07:32.501737500Z","updated_by":"doc-remove","fields":["documents"]}
+{"type":"issue_updated","id":"06369b8d-997c-44ed-820f-54b6a45221e9","issue_id":"f766b092-5eec-4537-b391-ae7017965835","timestamp":"2026-07-10T11:07:32.509103185Z","updated_by":"doc-add","fields":["documents"]}

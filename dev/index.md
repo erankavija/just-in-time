@@ -25,6 +25,12 @@ Design documents for **features currently in progress**, linked to open issues i
 
 **Examples:** Feature designs, implementation plans for open issues
 
+### 🎨 [design/](design/) - Design Explorations
+Feature and interface design proposals: web UI interaction models and CLI quality explorations.
+
+### 🗂️ [plans/](plans/) - Implementation Plans
+Implementation plans for scoped work items, each keyed to its issue id.
+
 ### 🏗️ [architecture/](architecture/) - System Architecture
 **Permanent internal reference** for core system design and architecture.
 
@@ -36,12 +42,12 @@ Design documents for **features currently in progress**, linked to open issues i
 - [graph-filtering-architecture.md](architecture/graph-filtering-architecture.md) - Graph query design
 - [cli-and-mcp-strategy.md](architecture/cli-and-mcp-strategy.md) - CLI and MCP integration
 
-### 🔮 [vision/](vision/) - Future Planning
-**Forward-looking explorations** and vision documents for future features.
+### 🔮 [vision/](vision/) - Vision & Charter
+**Forward-looking explorations** and vision documents for future features, plus the v1.0 [charter](vision/9db27a3a-charter.md).
 
 **Lifecycle:** May archive if abandoned, otherwise permanent
 
-**Examples:** Future feature proposals, strategic planning documents
+**Examples:** Future feature proposals, strategic planning documents, the product charter
 
 ### 🔬 [studies/](studies/) - Investigations & Reference
 **Completed investigations, analyses**, and active reference guides.
@@ -50,12 +56,21 @@ Design documents for **features currently in progress**, linked to open issues i
 
 **Examples:** Performance analyses, design explorations, coding conventions, quick references
 
+### 🧪 [eval/](eval/) - Skill Evaluations
+Evaluation records and harnesses for the project's agent skills: baselines, adjudications, and the trigger and steering eval runners.
+
+### ⚗️ [experiments/](experiments/) - Coordination Experiments
+Records of process and coordination experiments, such as manual worktree parallel-work trials.
+
 ### 📝 [sessions/](sessions/) - Session Notes
 **Development session notes** documenting work-in-progress.
 
 **Lifecycle:** Archived to `archive/sessions/` after 1-2 releases
 
 **Naming:** `session-YYYY-MM-DD-topic.md`
+
+### 🎞️ [presentations/](presentations/) - Talk Decks
+Reveal.js presentation decks and their assets.
 
 ### 📦 [archive/](archive/) - Completed Work
 **Archived documentation** from completed work, organized by category.
@@ -97,7 +112,7 @@ archive/        → After 1-2 releases
 ### Development Guides
 - See [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md) - Getting started (10 min)
 - See [docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference) - MCP tools for agents
-- See [AGENTS.md](../AGENTS.md) - Agent quick start guide
+- See [../CLAUDE.md](../CLAUDE.md) - Contributor and agent guidance for this repository
 
 ### Reference
 - [studies/architecture-pitfalls.md](studies/architecture-pitfalls.md) - Common pitfalls
@@ -112,7 +127,7 @@ archive/        → After 1-2 releases
 ## For Contributors
 
 **Getting Started:**
-1. Read [AGENTS.md](../AGENTS.md)
+1. Read [../CLAUDE.md](../CLAUDE.md)
 2. Review [architecture/core-system-design.md](architecture/core-system-design.md)
 3. Use `jit query available` to find tasks
 
