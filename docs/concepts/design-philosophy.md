@@ -280,40 +280,32 @@ jit query available --json | \
 - No API versioning headaches
 - No network latency
 
-### MCP and Web UI Built on CLI
+### Every Surface Runs on the Core Library
 
-The architecture is layered:
+The MCP server drives the `jit` binary. The web UI server embeds the core library in
+process. Both reach the same storage, graph, and validation code:
 
-```
-┌─────────────────────────────────────┐
-│  Web UI (jit-server)                │  ← Visualization layer
-│  http://localhost:8080              │
-├─────────────────────────────────────┤
-│  MCP Server (mcp-server/)           │  ← AI agent integration
-│  Model Context Protocol             │
-├─────────────────────────────────────┤
-│  CLI (jit)                          │  ← Foundation
-│  Command-line interface             │
-├─────────────────────────────────────┤
-│  Core Library (crates/jit)          │  ← Business logic
-│  Storage, graph, validation         │
-└─────────────────────────────────────┘
+```mermaid
+flowchart TD
+    W["Web UI (jit-server)<br/>visualization layer"] --> L
+    M["MCP Server (mcp-server/)<br/>AI agent integration"] --> C
+    C["CLI (jit)<br/>command-line interface"] --> L["Core Library (crates/jit)<br/>storage, graph, validation"]
 ```
 
 **Benefits:**
-- All features available via CLI first
-- Web UI and MCP never ahead of CLI
 - Single source of truth (core library)
+- MCP exposes exactly the capabilities the CLI exposes
+- Behavior stays identical whichever surface a user or agent reaches for
 
 **Example:**
 ```bash
-# CLI (foundation)
+# CLI
 jit issue create --title "Feature X" --priority high
 
-# MCP server (calls CLI internally)
+# MCP server (calls the CLI internally)
 Jit-jit_issue_create(title="Feature X", priority="high")
 
-# Web UI (calls CLI via jit-server)
+# Web UI (jit-server, calls the core library in process)
 POST /api/issues {"title": "Feature X", "priority": "high"}
 ```
 
@@ -477,20 +469,13 @@ Documents for issue d820155f:
 
 ### Continuous Improvement Loop
 
-```
-┌─────────────────────────────────────────┐
-│  1. Use JIT to build JIT                │
-├─────────────────────────────────────────┤
-│  2. Experience pain points              │
-├─────────────────────────────────────────┤
-│  3. Track improvements as issues        │
-├─────────────────────────────────────────┤
-│  4. Implement fixes                     │
-├─────────────────────────────────────────┤
-│  5. Validate fixes in our workflow      │
-└──────────────┬──────────────────────────┘
-               │
-               └─→ Loop back to step 1
+```mermaid
+flowchart TD
+    S1["1. Use JIT to build JIT"] --> S2["2. Experience pain points"]
+    S2 --> S3["3. Track improvements as issues"]
+    S3 --> S4["4. Implement fixes"]
+    S4 --> S5["5. Validate fixes in our workflow"]
+    S5 --> S1
 ```
 
 **Example:** The `--json` flag everywhere came from agents needing structured output while building JIT features. We felt the pain, added JSON output, and now all users benefit.
