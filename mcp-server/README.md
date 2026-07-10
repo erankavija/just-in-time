@@ -363,6 +363,6 @@ MIT OR Apache-2.0 (matches parent project)
 ## See Also
 
 - [JIT CLI Documentation](../README.md)
-- [JSON Schema API](../docs/json-schema-api.md)
-- [CLI & MCP Strategy](../docs/cli-and-mcp-strategy.md)
+- [MCP Tools Reference](../docs/reference/cli-commands.md#mcp-tools-reference)
+- [CLI and MCP Strategy](../dev/architecture/cli-and-mcp-strategy.md)
 - [Model Context Protocol](https://modelcontextprotocol.io/)

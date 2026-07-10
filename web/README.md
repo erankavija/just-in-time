@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# JIT Web UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React, TypeScript, and Vite single-page app for visualizing a JIT issue tracker. It renders the dependency DAG, per-issue detail, linked documents, and label groupings from a JIT repository, reading everything over the HTTP API exposed by `jit-server`.
 
-Currently, two official plugins are available:
+## How it fits together
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The web UI is a static front end. It holds no data of its own: at runtime it calls the JIT REST API under `/api` on its own origin, and the `jit-server` binary (`crates/server/`) serves that API by embedding the core `jit` library in-process, reading the repository's `.jit/` directory directly.
 
-## React Compiler
+```mermaid
+flowchart LR
+    Browser["Web UI (this package)<br/>React + Vite SPA"]
+    Server["jit-server<br/>(crates/server)"]
+    Lib["jit library<br/>(CommandExecutor)"]
+    Data[".jit/ repository"]
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+    Browser -->|"HTTP /api"| Server
+    Server --> Lib
+    Lib --> Data
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`jit-server` can serve the built assets itself: when the web UI is built and compiled in with the `embed-web` feature, the server serves the SPA at `/` alongside the API at `/api`. It also accepts a `--web-dir` pointing at a `dist/` directory to serve from the filesystem. A live event stream (`/api/events/stream`) drives updates as the repository changes.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## What it renders
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Graph view** (`src/components/Graph`) lays out the dependency DAG with `reactflow` and `dagre`.
+- **Issue view** (`src/components/Issue`) shows issue detail, state, gates, and dependencies.
+- **Documents** (`src/components/Document`) render linked markdown with `react-markdown`, GitHub-flavored markdown, Mermaid diagrams, and KaTeX math.
+- **Labels** (`src/components/Labels`) and **Search** (`src/components/Search`) navigate issues by label namespace and free text.
+
+## Scripts
+
+Defined in `package.json`:
+
+```bash
+npm run dev          # Start the Vite dev server with hot reload
+npm run build        # Type-check (tsc -b) and produce a production build in dist/
+npm run preview      # Serve the production build locally
+npm run lint         # Run ESLint over the sources
+npm test             # Run the Vitest unit tests once
+npm run test:watch   # Run Vitest in watch mode
 ```
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+Run `jit-server` against the repository you want to inspect so the UI has an API to call. For a full walkthrough, including building `dist/` and serving it behind a static file server or `jit-server`, see the [deployment how-to guide](../docs/how-to/deployment.md).
+
+## License
+
+MIT OR Apache-2.0 (matches parent project)
