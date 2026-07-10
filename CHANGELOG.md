@@ -34,9 +34,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **`jit graph tree [<root-id>] --json`** emits the resolved parent/children/
     cluster/rank per node (`{count, root, nodes}` envelope); a root id scopes the
     view to that node's dependency closure.
-  - **`jit graph export --format json --full`** nodes gain two additive fields,
-    `resolved_parent` and `cluster`. The default summary shape is byte-for-byte
-    unchanged.
+  - **`jit graph export --format json --full`** nodes gain the same four
+    additive resolution fields as `graph tree` (`parent`, `children`, `cluster`,
+    `rank`). The default summary shape is byte-for-byte unchanged.
+  - **`GET /graph`** on the web server carries each node's resolved `parent`,
+    `children`, `cluster`, `rank`, and `type` value, computed by the core
+    resolver over the repository's configured type levels.
+  - **`jit --schema`** publishes the `graph tree` response shape
+    (`GraphTreeResponse`) alongside the other command output schemas.
   - **`jit query divergence [--json]`** reports membership labels the DAG does not
     back (an issue labeled `epic:foo` that the `foo` epic does not depend on).
     `jit validate` surfaces the same as an advisory `divergence_count` that never

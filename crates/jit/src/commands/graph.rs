@@ -200,8 +200,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
     /// assert_eq!(response.count, 2);
     /// let epic_view = response.nodes.iter().find(|n| n.id == epic).unwrap();
-    /// assert_eq!(epic_view.children, vec![task.clone()]);
-    /// assert_eq!(epic_view.parent, None);
+    /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
+    /// assert_eq!(epic_view.hierarchy.parent, None);
     /// ```
     pub fn resolve_hierarchy_tree(
         &self,
@@ -236,18 +236,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut nodes: Vec<HierarchyNodeView> = issues
             .iter()
             .filter(|issue| in_scope(&issue.id))
-            .map(|issue| {
-                let facts = resolution.get(&issue.id);
-                HierarchyNodeView {
-                    short_id: issue.short_id(),
-                    id: issue.id.clone(),
-                    title: issue.title.clone(),
-                    type_name: crate::labels::type_label_value(&issue.labels).map(str::to_string),
-                    parent: facts.and_then(|f| f.parent.clone()),
-                    children: facts.map(|f| f.children.clone()).unwrap_or_default(),
-                    cluster: facts.and_then(|f| f.cluster.clone()),
-                    rank: facts.map(|f| f.rank).unwrap_or(0),
-                }
+            .map(|issue| HierarchyNodeView {
+                short_id: issue.short_id(),
+                id: issue.id.clone(),
+                title: issue.title.clone(),
+                type_name: crate::labels::type_label_value(&issue.labels).map(str::to_string),
+                hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
             })
             .collect();
         nodes.sort_by(|a, b| a.short_id.cmp(&b.short_id));

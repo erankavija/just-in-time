@@ -2948,18 +2948,22 @@ record, byte-for-byte the fields of the on-disk `issues/<id>.json` file
 `gates_required`, `gates_status` with each gate's `status`/`updated_by`/
 `updated_at`, `context`, `documents`, `labels`, `created_at`, `updated_at`, and
 the lifecycle timestamps `first_ready_at`/`claimed_at`/`done_at` when present),
-**plus two additive resolved-hierarchy fields**:
-
-| Field | Meaning |
-|-------|---------|
-| `resolved_parent` | The node's nearest dominating container id (the [DAG-resolved](../concepts/hierarchy-resolution.md) parent), or `null` for a root. |
-| `cluster` | The node's strategic root container id, or `null` for an orphan leaf. |
+**plus the four additive [resolved-hierarchy](../concepts/hierarchy-resolution.md)
+fields** — the same field set, with the same meanings, that
+[`jit graph tree`](#jit-graph-tree) emits per node: `parent`, `children`,
+`cluster`, and `rank`.
 
 This lets a bulk consumer read every node's full record **and** its canonical
 placement in one call instead of globbing the issue files or re-deriving
 containment. The `edges` list is the same as the summary shape.
 
-The default (no `--full`) output stays in the lean summary shape; the two
+Resolution is always computed over the **whole repository**, never over a subset
+of nodes. Export emits every issue, so its resolution fields always name emitted
+nodes; once you filter the exported nodes downstream, a kept node's `parent`,
+`cluster`, or `children` can reference ids you dropped. The same caveat applies
+to `jit graph tree <root-id>`, which scopes the listed nodes.
+
+The default (no `--full`) output stays in the lean summary shape; the four
 hierarchy fields appear only in the `--full` shape. See
 [storage-format § Issue JSON Schema](storage-format.md#issue-json-schema) for the
 full field reference.
@@ -2976,9 +2980,14 @@ jit graph tree [<root-id>] [--json]
 ```
 
 With no id the whole repository is resolved; with a root id the view is the root
-plus its transitive dependency closure (the DAG subtree it contains). Each node
-still carries its repository-wide resolution, so a scoped node's `parent` may
-reference a container outside the listed subtree.
+plus its transitive dependency closure (the DAG subtree it contains).
+
+Scoping filters which nodes are **listed**, not how they **resolve**: resolution
+always runs over the whole repository. A scoped node therefore keeps its
+repository-wide `parent`, `cluster`, and `children`, any of which may name an
+issue outside the listed subtree — the root's own `parent` is the usual case.
+The same caveat applies to any consumer that filters the nodes of
+[`jit graph export --full`](#jit-graph-export).
 
 JSON uses the list envelope `{"count": N, "root": <id|null>, "nodes": [...]}`,
 where each node is:

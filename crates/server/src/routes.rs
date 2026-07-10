@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Gate, Issue, Priority, State as IssueState};
+use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::GateRunSummary;
 use jit::search::{SearchOptions, SearchResult};
 use jit::storage::{IssueStore, PathReadError};
@@ -104,6 +105,13 @@ pub struct GraphData {
     pub edges: Vec<GraphEdge>,
 }
 
+/// One graph node: its display fields plus its DAG-resolved placement.
+///
+/// `type` is the value of the node's `type:` label, resolved from repository
+/// configuration rather than parsed by the client. `parent`, `children`,
+/// `cluster`, and `rank` are flattened from [`NodeHierarchy`], the same
+/// serialization `jit graph tree` emits, so a consumer never re-derives
+/// containment.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,
@@ -113,6 +121,12 @@ pub struct GraphNode {
     pub assignee: Option<String>,
     pub labels: Vec<String>,
     pub blocked: bool,
+    /// The node's `type:` label value, or `null` when it carries none.
+    #[serde(rename = "type")]
+    pub type_name: Option<String>,
+    /// DAG-resolved parent, children, cluster, and rank.
+    #[serde(flatten)]
+    pub hierarchy: NodeHierarchy,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,6 +136,11 @@ pub struct GraphEdge {
 }
 
 /// Get dependency graph
+///
+/// Each node carries the canonical hierarchy resolved by the jit library
+/// (`jit::graph::hierarchy::resolve_hierarchy`) over the repository's configured
+/// type levels. Resolution is repository-wide, matching `jit graph tree` with no
+/// root.
 async fn get_graph<S: IssueStore>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
@@ -134,6 +153,15 @@ async fn get_graph<S: IssueStore>(
     let issue_map: std::collections::HashMap<String, &Issue> =
         issues.iter().map(|i| (i.id.clone(), i)).collect();
 
+    // Resolve the hierarchy with the core resolver, over the repo's type levels.
+    let issue_refs: Vec<&Issue> = issues.iter().collect();
+    let config =
+        jit::hierarchy_templates::get_hierarchy_config(state.executor.storage()).map_err(|e| {
+            tracing::error!("Failed to load hierarchy configuration: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
+
     // Create nodes
     let nodes: Vec<GraphNode> = issues
         .iter()
@@ -145,6 +173,8 @@ async fn get_graph<S: IssueStore>(
             assignee: issue.assignee.as_ref().map(|a| a.to_string()),
             labels: issue.labels.clone(),
             blocked: issue.is_blocked(&issue_map),
+            type_name: jit::labels::type_label_value(&issue.labels).map(str::to_string),
+            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
         })
         .collect();
 
@@ -1125,6 +1155,117 @@ enforce_leases = "off"
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.edges[0].from, id2);
         assert_eq!(graph.edges[0].to, id1);
+    }
+
+    /// Every node carries the core-resolved parent, children, cluster, rank, and
+    /// type value, so the client derives none of them.
+    #[tokio::test]
+    async fn test_get_graph_nodes_carry_resolved_hierarchy() {
+        let storage = InMemoryStorage::new();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let new = |title: &str, labels: Vec<String>| {
+            executor
+                .create_issue(
+                    title.to_string(),
+                    String::new(),
+                    Priority::Normal,
+                    vec![],
+                    labels,
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .0
+        };
+        let epic = new("Epic", vec!["type:epic".to_string()]);
+        let task = new("Task", vec!["type:task".to_string()]);
+        executor.add_dependency(&epic, &task).unwrap();
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server.get("/graph").await;
+        response.assert_status_ok();
+        let body: serde_json::Value = response.json();
+        let node = |id: &str| -> serde_json::Value {
+            body["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|n| n["id"] == serde_json::Value::String(id.to_string()))
+                .expect("node in payload")
+                .clone()
+        };
+
+        let task_node = node(&task);
+        assert_eq!(task_node["type"], "task");
+        assert_eq!(task_node["parent"], epic);
+        assert_eq!(task_node["cluster"], epic);
+        assert_eq!(task_node["children"], serde_json::json!([]));
+        assert_eq!(task_node["rank"], 0);
+
+        let epic_node = node(&epic);
+        assert_eq!(epic_node["type"], "epic");
+        assert_eq!(epic_node["parent"], serde_json::Value::Null);
+        assert_eq!(epic_node["cluster"], epic);
+        assert_eq!(epic_node["children"], serde_json::json!([task]));
+        assert_eq!(epic_node["rank"], 1);
+    }
+
+    /// A node with no `type:` label reports a null type and an orphan resolution.
+    #[tokio::test]
+    async fn test_get_graph_untyped_node_has_null_type() {
+        let storage = InMemoryStorage::new();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let executor = Arc::new(CommandExecutor::new(storage));
+        executor
+            .create_issue(
+                "Untyped".to_string(),
+                String::new(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server.get("/graph").await;
+        response.assert_status_ok();
+        let body: serde_json::Value = response.json();
+        let node = &body["nodes"][0];
+        assert_eq!(node["type"], serde_json::Value::Null);
+        assert_eq!(node["parent"], serde_json::Value::Null);
+        assert_eq!(node["cluster"], serde_json::Value::Null);
+        assert_eq!(node["rank"], 0);
     }
 
     #[tokio::test]

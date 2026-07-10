@@ -76,8 +76,10 @@ pinned to the core by the shared fixture
 
 - **`jit graph tree [<root-id>] --json`** — resolved parent/children/cluster/rank
   per node.
-- **`jit graph export --format json --full`** — each node gains `resolved_parent`
-  and `cluster` (additive; the default summary shape is unchanged).
+- **`jit graph export --format json --full`** — each node gains the same four
+  resolution fields (additive; the default summary shape is unchanged).
+- **`GET /graph`** (web server) — each node carries the four resolution fields
+  plus its resolved `type` value.
 - **`jit query divergence`** — membership labels not backed by the DAG.
 - **`jit validate`** — an advisory `divergence_count` (never changes the exit
   status).

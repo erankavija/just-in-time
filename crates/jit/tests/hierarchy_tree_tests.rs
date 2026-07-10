@@ -115,14 +115,57 @@ fn test_graph_export_full_carries_resolved_fields() {
     let doc = run_json(&temp, &["graph", "export", "--format", "json", "--full"]);
     let nodes = doc["nodes"].as_array().unwrap();
     let task_node = nodes.iter().find(|n| n["id"] == task).unwrap();
-    assert_eq!(task_node["resolved_parent"], epic);
+    assert_eq!(task_node["parent"], epic);
     assert_eq!(task_node["cluster"], epic);
+    assert_eq!(task_node["children"], serde_json::json!([]));
+    assert_eq!(task_node["rank"], 0);
+
+    let epic_node = nodes.iter().find(|n| n["id"] == epic).unwrap();
+    assert_eq!(epic_node["children"], serde_json::json!([task]));
+    assert_eq!(epic_node["rank"], 1);
 
     // Default summary shape stays free of the resolved fields.
     let summary = run_json(&temp, &["graph", "export", "--format", "json"]);
     let summary_node = &summary["nodes"][0];
-    assert!(summary_node.get("resolved_parent").is_none());
-    assert!(summary_node.get("cluster").is_none());
+    for field in ["parent", "children", "cluster", "rank"] {
+        assert!(summary_node.get(field).is_none());
+    }
+}
+
+/// The `--full` export and `graph tree` agree, node for node, on all four
+/// resolution fields: they share one serialization path.
+#[test]
+fn test_graph_export_full_and_tree_agree_on_resolution_fields() {
+    let temp = setup_test_repo();
+    let milestone = create(&temp, "Milestone", &["type:milestone"]);
+    let epic = create(&temp, "Epic", &["type:epic"]);
+    let task = create(&temp, "Task", &["type:task"]);
+    add_dep(&temp, &milestone, &epic);
+    add_dep(&temp, &epic, &task);
+
+    let export = run_json(&temp, &["graph", "export", "--format", "json", "--full"]);
+    let tree = run_json(&temp, &["graph", "tree", "--json"]);
+
+    let pick = |node: &serde_json::Value| {
+        serde_json::json!({
+            "parent": node["parent"],
+            "children": node["children"],
+            "cluster": node["cluster"],
+            "rank": node["rank"],
+        })
+    };
+
+    let tree_nodes = tree["nodes"].as_array().unwrap();
+    assert_eq!(tree_nodes.len(), 3);
+    for tree_node in tree_nodes {
+        let export_node = export["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["id"] == tree_node["id"])
+            .expect("every tree node is exported");
+        assert_eq!(pick(export_node), pick(tree_node), "id {}", tree_node["id"]);
+    }
 }
 
 #[test]

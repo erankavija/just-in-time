@@ -4257,6 +4257,7 @@ fn run() -> Result<()> {
                     } else {
                         for node in &response.nodes {
                             let parent = node
+                                .hierarchy
                                 .parent
                                 .as_deref()
                                 .map(|p| &p[..8.min(p.len())])
@@ -4265,8 +4266,8 @@ fn run() -> Result<()> {
                                 "  {} | parent={} children={} rank={} | {}",
                                 node.short_id,
                                 parent,
-                                node.children.len(),
-                                node.rank,
+                                node.hierarchy.children.len(),
+                                node.hierarchy.rank,
                                 node.title
                             );
                         }
