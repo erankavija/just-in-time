@@ -1,10 +1,10 @@
 //! Validation and status operations
 
 use super::*;
-use crate::domain::SHORT_ID_LENGTH;
-use crate::type_hierarchy::{
+use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
+use crate::domain::SHORT_ID_LENGTH;
 use anyhow::Context;
 
 /// Rule name carried by every finding the built-in dangling-item-link pass emits

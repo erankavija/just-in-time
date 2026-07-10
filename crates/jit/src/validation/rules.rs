@@ -735,7 +735,7 @@ pub enum Assertion {
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
     /// kind, and also constructed programmatically as a built-in default rule
     /// (see [`default_ruleset`](crate::validation::defaults::default_ruleset)).
-    /// Evaluation reuses the existing [`crate::type_hierarchy`] domain functions
+    /// Evaluation reuses the existing [`crate::domain::type_taxonomy`] domain functions
     /// rather than reimplementing the hierarchy logic; the repo's
     /// [`HierarchyConfig`] is NOT stored in the parsed rule — it is injected by
     /// the graph evaluator at evaluation time (see
@@ -827,8 +827,8 @@ pub enum Assertion {
 /// [`Assertion::TypeHierarchy`].
 ///
 /// Each variant reuses one existing domain function over the whole issue set:
-/// `OrphanLeaf` -> [`crate::type_hierarchy::validate_orphans`],
-/// `StrategicConsistency` -> [`crate::type_hierarchy::validate_strategic_labels`].
+/// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
+/// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
 ///
 /// # Examples
 ///

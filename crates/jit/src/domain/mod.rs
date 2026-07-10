@@ -7,6 +7,7 @@
 //!   from issue descriptions
 //! - **gate_findings**: Pure parser extracting structured findings from checker stdout
 //! - **queries**: Pure query operations on issue collections
+//! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
 //! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
 //! - **validation**: Issue validation against configuration rules
 //! - **labels**: Label parsing, matching, and validation utilities
@@ -18,6 +19,7 @@ pub mod gate_findings;
 pub mod item;
 pub mod projection;
 pub mod queries;
+pub mod type_taxonomy;
 pub mod types;
 
 // Re-export all types for backward compatibility

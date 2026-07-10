@@ -33,16 +33,16 @@
 //! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
 //!    `enforce = false`, UNCONDITIONAL. Built-in [`Scope::Graph`] rules whose
 //!    evaluation REUSES the existing
-//!    [`type_hierarchy::validate_orphans`](crate::type_hierarchy::validate_orphans)
-//!    / [`validate_strategic_labels`](crate::type_hierarchy::validate_strategic_labels)
+//!    [`type_taxonomy::validate_orphans`](crate::domain::type_taxonomy::validate_orphans)
+//!    / [`validate_strategic_labels`](crate::domain::type_taxonomy::validate_strategic_labels)
 //!    domain functions.
 //!
 //! DROPPED (no longer config-derivable): `require-type-label`,
 //! `label-format-custom`, and the per-namespace `values`/`pattern`/`required`
 //! rules. A repo wanting those authors them directly in `rules.toml`.
 
+use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
-use crate::type_hierarchy::HierarchyConfig;
 use crate::validation::rules::{
     Assertion, Rule, RuleSet, SchemaSource, Scope, Selector, Severity, TypeHierarchyKind,
 };
@@ -185,7 +185,7 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 
     // (5) Type-hierarchy GRAPH warnings: orphan-leaf + strategic-consistency.
     // Built-in GRAPH rules whose evaluation REUSES the existing
-    // `type_hierarchy::validate_orphans` / `validate_strategic_labels` domain
+    // `type_taxonomy::validate_orphans` / `validate_strategic_labels` domain
     // functions (see `validation::graph`). Each is `severity = warn` /
     // `enforce = false` and UNCONDITIONAL (the former `warn_*` toggles defaulted
     // true, so unconditional preserves behavior). The repo `HierarchyConfig` is

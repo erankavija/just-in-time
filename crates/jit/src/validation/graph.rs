@@ -46,11 +46,11 @@ use chrono::{DateTime, Utc};
 
 use crate::document::content_parser_for;
 use crate::domain::item::{parse_kind_segmented_address, AddressScope, PROJECT_SCOPE_SENTINEL};
-use crate::domain::{project, ContentFormat, Issue};
-use crate::graph::DependencyGraph;
-use crate::type_hierarchy::{
+use crate::domain::type_taxonomy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
+use crate::domain::{project, ContentFormat, Issue};
+use crate::graph::DependencyGraph;
 use std::collections::HashMap;
 
 use crate::validation::engine::Finding;
@@ -214,7 +214,7 @@ pub enum ChildLink {
 ///
 /// ```
 /// use jit::domain::{ContentFormat, Issue};
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::{evaluate_graph, GraphFinding};
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -373,7 +373,7 @@ impl ChildLink {
 ///
 /// ```
 /// use jit::domain::Issue;
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use jit::validation::graph::evaluate_graph;
 /// use jit::validation::rules::RuleSet;
 /// use std::path::Path;
@@ -1527,7 +1527,7 @@ fn describe_missing(id: &str, gate_prefix: Option<&str>, check_namespace: Option
 
 /// Evaluate a built-in `type-hierarchy` rule (orphan-leaf or
 /// strategic-consistency) by REUSING the existing
-/// [`crate::type_hierarchy`] domain functions over each issue, converting their
+/// [`crate::domain::type_taxonomy`] domain functions over each issue, converting their
 /// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
 ///
 /// This carries no hierarchy logic of its own: `OrphanLeaf` delegates to

@@ -389,7 +389,7 @@ source-of-truth = "registry-first"
 /// or returns the default config.
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
-) -> anyhow::Result<crate::type_hierarchy::HierarchyConfig> {
+) -> anyhow::Result<crate::domain::type_taxonomy::HierarchyConfig> {
     use crate::config_manager::ConfigManager;
     let config_mgr = ConfigManager::new(storage.root());
     let namespaces = config_mgr.get_namespaces()?;
@@ -399,15 +399,14 @@ pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
         let label_associations = namespaces.label_associations.unwrap_or_default();
 
         // Convert to HierarchyConfig
-        crate::type_hierarchy::HierarchyConfig::new(type_hierarchy, label_associations).map_err(
-            |e| {
+        crate::domain::type_taxonomy::HierarchyConfig::new(type_hierarchy, label_associations)
+            .map_err(|e| {
                 crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}"))
                     .into()
-            },
-        )
+            })
     } else {
         // Return default config
-        Ok(crate::type_hierarchy::HierarchyConfig::default())
+        Ok(crate::domain::type_taxonomy::HierarchyConfig::default())
     }
 }
 

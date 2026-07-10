@@ -1,6 +1,11 @@
-//! Type hierarchy validation for issue labels.
+//! The taxonomy of type labels and their levels, and validation against it.
 //!
-//! # CRITICAL: Type Hierarchy is Orthogonal to the Dependency DAG
+//! Pure domain code: the taxonomy comes from the `[type_hierarchy]` section of
+//! `.jit/config.toml`, carried here as a [`HierarchyConfig`]. Resolving the work
+//! graph's containment structure is a separate concern living in
+//! [`crate::graph::hierarchy`].
+//!
+//! # CRITICAL: The Type Taxonomy is Orthogonal to the Dependency DAG
 //!
 //! This module validates **type labels only**. It does NOT validate dependencies.
 //!
@@ -13,7 +18,7 @@
 //!    - ✅ milestone → task (milestone needs task completed)
 //!    - **NO RESTRICTIONS** - any issue can depend on any other for work flow
 //!
-//! 2. **Type Hierarchy** (organizational labels - future validation):
+//! 2. **Type Taxonomy** (organizational labels - future validation):
 //!    - Expresses "what belongs to what" via labels (`epic:auth`, `milestone:v1.0`)
 //!    - ✅ task with `epic:auth` = task belongs to auth epic (future validation)
 //!    - ❌ epic with `task:xyz` = nonsensical (future validation)
@@ -32,7 +37,7 @@
 //! # Examples
 //!
 //! ```
-//! use jit::type_hierarchy::{extract_type, HierarchyConfig};
+//! use jit::domain::type_taxonomy::{extract_type, HierarchyConfig};
 //!
 //! let config = HierarchyConfig::default();
 //!
@@ -127,7 +132,7 @@ pub enum ConfigError {
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::HierarchyConfig;
+/// use jit::domain::type_taxonomy::HierarchyConfig;
 /// use std::collections::HashMap;
 ///
 /// let config = HierarchyConfig::default();
@@ -222,7 +227,7 @@ impl HierarchyConfig {
     /// # Examples
     ///
     /// ```
-    /// use jit::type_hierarchy::HierarchyConfig;
+    /// use jit::domain::type_taxonomy::HierarchyConfig;
     ///
     /// let config = HierarchyConfig::default();
     /// assert_eq!(config.get_membership_namespace("epic"), Some("epic"));
@@ -300,7 +305,7 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 /// # Examples
 ///
 /// ```
-/// use jit::type_hierarchy::{suggest_type_fix, HierarchyConfig};
+/// use jit::domain::type_taxonomy::{suggest_type_fix, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 ///
@@ -401,7 +406,7 @@ pub fn detect_validation_issues(
 ///
 /// ```
 /// use jit::domain::Issue;
-/// use jit::type_hierarchy::{validate_strategic_labels, HierarchyConfig};
+/// use jit::domain::type_taxonomy::{validate_strategic_labels, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
@@ -464,7 +469,7 @@ pub fn validate_strategic_labels(
 ///
 /// ```
 /// use jit::domain::Issue;
-/// use jit::type_hierarchy::{validate_orphans, HierarchyConfig};
+/// use jit::domain::type_taxonomy::{validate_orphans, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
@@ -538,7 +543,7 @@ pub fn validate_orphans(
 ///
 /// ```
 /// use jit::domain::Issue;
-/// use jit::type_hierarchy::{detect_membership_issues, HierarchyConfig};
+/// use jit::domain::type_taxonomy::{detect_membership_issues, HierarchyConfig};
 ///
 /// let config = HierarchyConfig::default();
 /// let mut task = Issue::new("Login".to_string(), "Task description".to_string());

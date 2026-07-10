@@ -68,7 +68,7 @@ fn issue_graph_findings(rules: &[&Rule], issues: &[Issue]) -> Vec<GraphFinding> 
     let findings = evaluate_graph(
         rules,
         issues,
-        &jit::type_hierarchy::HierarchyConfig::default(),
+        &jit::domain::type_taxonomy::HierarchyConfig::default(),
         ContentFormat::Markdown,
         fixed_now(),
         &std::collections::HashMap::new(),
