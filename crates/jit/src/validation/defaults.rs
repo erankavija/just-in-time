@@ -31,7 +31,7 @@
 //!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
 //!    the write and fails `jit validate`.
 //! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
-//!    `enforce = false`, UNCONDITIONAL. Built-in [`Scope::Graph`] rules whose
+//!    `enforce = false`, UNCONDITIONAL. Built-in [`RuleScope::Graph`] rules whose
 //!    evaluation REUSES the existing
 //!    [`type_taxonomy::validate_orphans`](crate::domain::type_taxonomy::validate_orphans)
 //!    / [`validate_strategic_labels`](crate::domain::type_taxonomy::validate_strategic_labels)
@@ -44,7 +44,7 @@
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
 use crate::validation::rules::{
-    Assertion, Rule, RuleSet, SchemaSource, Scope, Selector, Severity, TypeHierarchyKind,
+    Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
 };
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
@@ -279,7 +279,11 @@ fn local_rule(
     assert: Assertion,
 ) -> Rule {
     let scope = assert.scope();
-    debug_assert_eq!(scope, Scope::Local, "default rules are local-scope only");
+    debug_assert_eq!(
+        scope,
+        RuleScope::Local,
+        "default rules are local-scope only"
+    );
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
@@ -293,10 +297,14 @@ fn local_rule(
 }
 
 /// Construct a built-in graph-scope rule (warn-only, never blocking). Used for
-/// the type-hierarchy defaults, whose assertions are [`Scope::Graph`].
+/// the type-hierarchy defaults, whose assertions are [`RuleScope::Graph`].
 fn graph_rule(name: &str, description: &str, severity: Severity, assert: Assertion) -> Rule {
     let scope = assert.scope();
-    debug_assert_eq!(scope, Scope::Graph, "graph default rules are graph-scope");
+    debug_assert_eq!(
+        scope,
+        RuleScope::Graph,
+        "graph default rules are graph-scope"
+    );
     Rule {
         name: name.to_string(),
         origin: Some(DEFAULT_ORIGIN.to_string()),
@@ -330,7 +338,7 @@ fn json_schema_rule(
             path: std::path::PathBuf::from(format!("<default:{name}>")),
             schema,
         }),
-        scope: Scope::Local,
+        scope: RuleScope::Local,
     }
 }
 
@@ -652,7 +660,7 @@ mod tests {
         assert!(rules
             .rules
             .iter()
-            .filter(|r| r.scope == Scope::Graph)
+            .filter(|r| r.scope == RuleScope::Graph)
             .all(|r| r.name == "orphan-leaf" || r.name == "strategic-consistency"));
         assert!(rules
             .rules

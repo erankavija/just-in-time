@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 
 use jit::domain::{ContentFormat, Issue, State};
 use jit::validation::graph::{evaluate_graph, GraphFinding};
-use jit::validation::rules::{Rule, RuleSet, Scope};
+use jit::validation::rules::{Rule, RuleScope, RuleSet};
 
 /// Absolute path to a `docs/examples/<name>` directory, resolved from the crate
 /// manifest dir so the test is independent of the working directory.
@@ -60,7 +60,7 @@ fn load_example(name: &str) -> RuleSet {
 fn graph_rules(set: &RuleSet) -> Vec<&Rule> {
     set.rules
         .iter()
-        .filter(|r| r.scope == Scope::Graph)
+        .filter(|r| r.scope == RuleScope::Graph)
         .collect()
 }
 
@@ -127,7 +127,7 @@ fn test_research_example_declares_preview_coverage_rule() {
         .expect(
             "research example must define the preview rule research-hypotheses-covered-preview",
         );
-    assert_eq!(preview.scope, Scope::Graph);
+    assert_eq!(preview.scope, RuleScope::Graph);
     assert_eq!(preview.severity, jit::validation::rules::Severity::Error);
 
     // Structural assertions on the authored TOML: the preview rule is keyed on

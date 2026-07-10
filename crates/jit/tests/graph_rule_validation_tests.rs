@@ -1,4 +1,4 @@
-//! End-to-end tests proving that `Scope::Graph` rules defined in
+//! End-to-end tests proving that `RuleScope::Graph` rules defined in
 //! `.jit/rules.toml` actually RUN inside the `jit validate` execution path
 //! (`CommandExecutor::validate_silent`) and affect its pass/fail result.
 //!

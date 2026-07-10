@@ -55,7 +55,7 @@ use std::collections::HashMap;
 
 use crate::validation::engine::Finding;
 use crate::validation::rules::{
-    Assertion, Rule, Scope, Selector, Severity, StatePredicate, TypeHierarchyKind,
+    Assertion, Rule, RuleScope, Selector, Severity, StatePredicate, TypeHierarchyKind,
 };
 
 /// Default label namespace whose values are criterion ids a child claims to
@@ -361,7 +361,7 @@ impl ChildLink {
 /// Evaluate all graph rules over the given issue set, returning one [`Finding`]
 /// per violation (and a `config-error` finding per malformed rule config).
 ///
-/// Only rules whose [`Rule::scope`] is [`Scope::Graph`] are evaluated; any
+/// Only rules whose [`Rule::scope`] is [`RuleScope::Graph`] are evaluated; any
 /// non-graph rule passed in is ignored (so callers may hand the full rule set).
 /// Rules whose severity is [`Severity::Off`] are skipped entirely. This function
 /// is pure: it reads nothing but the supplied slices.
@@ -441,7 +441,7 @@ pub fn evaluate_graph(
 ) -> Vec<GraphFinding> {
     rules
         .iter()
-        .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
+        .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
         .flat_map(|rule| {
             evaluate_one(
                 rule,
@@ -2039,7 +2039,7 @@ source-of-truth = "markdown-first"
         // container must not spuriously credit coverage.
         let rule = coverage_rule("child-state = \"done\"");
         let epic = epic_with_criteria(&["REQ-01"]);
-        // Scope points at an unrelated issue id, not this epic.
+        // The address scope points at an unrelated issue id, not this epic.
         let mut child = issue("child", &["satisfies:deadbeef/REQ-01"]);
         child.dependencies = vec![epic.id.clone()];
         child.state = State::Done;

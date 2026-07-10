@@ -566,7 +566,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// LONGER here — they were migrated to default rules and are evaluated by the
     /// local/graph rule engine in `validate_silent` (see the NOTE in that
     /// method). It deliberately
-    /// excludes the `Scope::Graph` declarative rules so a caller can render those
+    /// excludes the `RuleScope::Graph` declarative rules so a caller can render those
     /// as structured findings (e.g. whole-repo `jit validate --json`) and decide
     /// the exit status AFTER output, rather than aborting before the rule report
     /// is built.
@@ -669,7 +669,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Evaluate every `Scope::Graph` rule from `.jit/rules.toml` over the supplied
+    /// Evaluate every `RuleScope::Graph` rule from `.jit/rules.toml` over the supplied
     /// issue set, returning one
     /// [`GraphFinding`](crate::validation::graph::GraphFinding) per violation
     /// (including `config-error` findings for malformed rules). Each finding
@@ -698,7 +698,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issues: &[Issue],
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
-        use crate::validation::rules::Scope;
+        use crate::validation::rules::RuleScope;
 
         // Surface a misconfigured rules.toml instead of swallowing it.
         let ruleset = self.effective_rules()?;
@@ -706,7 +706,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
             .rules
             .iter()
-            .filter(|rule| rule.scope == Scope::Graph)
+            .filter(|rule| rule.scope == RuleScope::Graph)
             .collect();
 
         // The repo HierarchyConfig is injected into `type-hierarchy` rules at
@@ -1079,7 +1079,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         container_id: &str,
     ) -> Result<crate::validation::report::RuleReport> {
         use crate::validation::report::{ReportedFinding, RuleReport};
-        use crate::validation::rules::{Scope, Severity};
+        use crate::validation::rules::{RuleScope, Severity};
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
@@ -1117,7 +1117,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut findings: Vec<ReportedFinding> = Vec::new();
 
         // Local rules: evaluate each in-slice issue against its matching local
-        // rules. (`evaluate_local` itself selects only `Scope::Local`,
+        // rules. (`evaluate_local` itself selects only `RuleScope::Local`,
         // non-`off` rules whose selector matches.)
         for issue in &slice {
             let evaluation = crate::validation::evaluate_local(issue, ruleset, repo_format)
@@ -1138,7 +1138,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let graph_rules: Vec<&crate::validation::rules::Rule> = ruleset
             .rules
             .iter()
-            .filter(|rule| rule.scope == Scope::Graph && rule.severity != Severity::Off)
+            .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
             .filter(|rule| !rule.assert.is_repo_wide_at_transition())
             .filter(|rule| slice.iter().any(|issue| rule.when.matches(issue)))
             .collect();
@@ -1220,7 +1220,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
-        use crate::validation::rules::Scope;
+        use crate::validation::rules::RuleScope;
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
@@ -1278,10 +1278,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                     // Selector matched: PASS/FAIL from the evaluated findings.
                     None => {
                         let messages = match rule.scope {
-                            Scope::Local => {
+                            RuleScope::Local => {
                                 local_messages.get(&rule.name).cloned().unwrap_or_default()
                             }
-                            Scope::Graph => {
+                            RuleScope::Graph => {
                                 graph_messages.get(&rule.name).cloned().unwrap_or_default()
                             }
                         };

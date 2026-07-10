@@ -477,7 +477,7 @@ mod tests {
     use super::*;
     use crate::domain::{LabelNamespace, LabelNamespaces};
     use crate::validation::defaults::default_ruleset;
-    use crate::validation::rules::{RuleSet, Scope, Severity};
+    use crate::validation::rules::{RuleScope, RuleSet, Severity};
     use std::collections::HashMap;
     use std::path::Path;
 
@@ -823,7 +823,7 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
         assert_eq!(set.rules.len(), 2);
-        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Graph);
         assert_round_trips(&set);
     }
 

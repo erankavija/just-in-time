@@ -206,7 +206,7 @@ impl Severity {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::rules::{RuleSet, Scope};
+/// use jit::validation::rules::{RuleSet, RuleScope};
 /// use std::path::Path;
 ///
 /// let toml = r#"
@@ -215,32 +215,32 @@ impl Severity {
 /// assert = { require-label = { label = "type:*" } }
 /// "#;
 /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-/// assert_eq!(set.rules[0].scope, Scope::Local);
+/// assert_eq!(set.rules[0].scope, RuleScope::Local);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Scope {
+pub enum RuleScope {
     /// Per-issue, runs on write.
     Local,
     /// Aggregate/graph, runs only on demand.
     Graph,
 }
 
-impl Scope {
+impl RuleScope {
     /// Stable snake_case token for this scope, matching the TOML grammar.
     ///
     /// # Examples
     ///
     /// ```
-    /// use jit::validation::rules::Scope;
+    /// use jit::validation::rules::RuleScope;
     ///
-    /// assert_eq!(Scope::Local.token(), "local");
-    /// assert_eq!(Scope::Graph.token(), "graph");
+    /// assert_eq!(RuleScope::Local.token(), "local");
+    /// assert_eq!(RuleScope::Graph.token(), "graph");
     /// ```
     pub fn token(self) -> &'static str {
         match self {
-            Scope::Local => "local",
-            Scope::Graph => "graph",
+            RuleScope::Local => "local",
+            RuleScope::Graph => "graph",
         }
     }
 }
@@ -659,12 +659,12 @@ pub struct SchemaSource {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::rules::{Assertion, Scope};
+/// use jit::validation::rules::{Assertion, RuleScope};
 ///
 /// let assertion = Assertion::RequireSection {
 ///     heading: "Success Criteria".to_string(),
 /// };
-/// assert_eq!(assertion.scope(), Scope::Local);
+/// assert_eq!(assertion.scope(), RuleScope::Local);
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum Assertion {
@@ -833,13 +833,13 @@ pub enum Assertion {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::rules::{Assertion, Scope, TypeHierarchyKind};
+/// use jit::validation::rules::{Assertion, RuleScope, TypeHierarchyKind};
 ///
 /// let assertion = Assertion::TypeHierarchy {
 ///     kind: TypeHierarchyKind::OrphanLeaf,
 /// };
 /// // Type-hierarchy checks need the whole issue set, so they are graph-scoped.
-/// assert_eq!(assertion.scope(), Scope::Graph);
+/// assert_eq!(assertion.scope(), RuleScope::Graph);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeHierarchyKind {
@@ -852,20 +852,20 @@ pub enum TypeHierarchyKind {
 impl Assertion {
     /// The evaluation scope implied by this assertion kind.
     ///
-    /// Shorthand and file-schema kinds are [`Scope::Local`]; the aggregate graph
-    /// kinds are [`Scope::Graph`].
+    /// Shorthand and file-schema kinds are [`RuleScope::Local`]; the aggregate graph
+    /// kinds are [`RuleScope::Graph`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use jit::validation::rules::{Assertion, Scope};
+    /// use jit::validation::rules::{Assertion, RuleScope};
     ///
     /// let local = Assertion::RequireDocType {
     ///     doc_type: "design".to_string(),
     /// };
-    /// assert_eq!(local.scope(), Scope::Local);
+    /// assert_eq!(local.scope(), RuleScope::Local);
     /// ```
-    pub fn scope(&self) -> Scope {
+    pub fn scope(&self) -> RuleScope {
         match self {
             Assertion::LabelCoverage { .. }
             | Assertion::LabelReference { .. }
@@ -873,9 +873,9 @@ impl Assertion {
             | Assertion::GateRecency { .. }
             | Assertion::TypeHierarchy { .. }
             | Assertion::CriteriaLabelMatch { .. }
-            | Assertion::LabelUniqueness { .. } => Scope::Graph,
-            Assertion::CriteriaToCheck { .. } => Scope::Graph,
-            _ => Scope::Local,
+            | Assertion::LabelUniqueness { .. } => RuleScope::Graph,
+            Assertion::CriteriaToCheck { .. } => RuleScope::Graph,
+            _ => RuleScope::Local,
         }
     }
 
@@ -939,7 +939,7 @@ impl Assertion {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::rules::{RuleSet, Scope, Severity};
+/// use jit::validation::rules::{RuleSet, RuleScope, Severity};
 /// use std::path::Path;
 ///
 /// let toml = r#"
@@ -955,7 +955,7 @@ impl Assertion {
 /// assert_eq!(rule.name, "epic-needs-req");
 /// assert_eq!(rule.severity, Severity::Error);
 /// assert!(rule.enforce);
-/// assert_eq!(rule.scope, Scope::Local);
+/// assert_eq!(rule.scope, RuleScope::Local);
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
@@ -983,7 +983,7 @@ pub struct Rule {
     /// The assertion to evaluate.
     pub assert: Assertion,
     /// Evaluation scope, derived from the assertion kind.
-    pub scope: Scope,
+    pub scope: RuleScope,
 }
 
 /// A parsed set of rules, ready for selector matching.
@@ -2170,8 +2170,8 @@ name = "graph"
 assert = { label-coverage = { source = "req", child-state = "done" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].scope, Scope::Local);
-        assert_eq!(set.rules[1].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Local);
+        assert_eq!(set.rules[1].scope, RuleScope::Graph);
     }
 
     // --- Guards ------------------------------------------------------------
@@ -2352,7 +2352,7 @@ name = "orphan-leaf-fixture"
 assert = { type-hierarchy = { kind = "orphan-leaf" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Graph);
         assert!(matches!(
             set.rules[0].assert,
             Assertion::TypeHierarchy {
@@ -2420,7 +2420,7 @@ enforce = true
 assert = { gate-recency = { max-age-days = 7, gates = ["code-review"] } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::GateRecency {
                 max_age_hours,
@@ -2555,7 +2555,7 @@ severity = "error"
 assert = { criteria-label-match = { namespace = "req" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::CriteriaLabelMatch {
                 namespace,
@@ -2857,7 +2857,7 @@ severity = "error"
 assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 "#;
         let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-        assert_eq!(set.rules[0].scope, Scope::Graph);
+        assert_eq!(set.rules[0].scope, RuleScope::Graph);
         match &set.rules[0].assert {
             Assertion::LabelUniqueness { namespace } => {
                 assert_eq!(namespace, "req");

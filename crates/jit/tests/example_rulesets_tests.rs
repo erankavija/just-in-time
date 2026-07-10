@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use jit::domain::{ContentFormat, DocumentReference, Issue, State};
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
-use jit::validation::rules::{Rule, RuleSet, Scope};
+use jit::validation::rules::{Rule, RuleScope, RuleSet};
 
 // Transition-enforcement tests (research module) drive the executor directly.
 use jit::commands::CommandExecutor;
@@ -45,7 +45,7 @@ fn load_example(name: &str) -> RuleSet {
 fn graph_rules(set: &RuleSet) -> Vec<&Rule> {
     set.rules
         .iter()
-        .filter(|r| r.scope == Scope::Graph)
+        .filter(|r| r.scope == RuleScope::Graph)
         .collect()
 }
 
@@ -572,7 +572,7 @@ mod sdd_criteria_label_match {
             .iter()
             .find(|r| r.name == "sdd-req-matches-a-criterion")
             .expect("sdd example must define sdd-req-matches-a-criterion");
-        assert_eq!(rule.scope, Scope::Graph);
+        assert_eq!(rule.scope, RuleScope::Graph);
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
     }
 
@@ -982,7 +982,7 @@ mod fresh_evidence {
             .expect("example must define fresh-evidence-before-done");
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
         assert!(rule.enforce, "the example deliberately enforces at done");
-        assert_eq!(rule.scope, Scope::Graph);
+        assert_eq!(rule.scope, RuleScope::Graph);
     }
 }
 
@@ -1133,7 +1133,7 @@ mod nyquist {
             .expect("example must define nyquist-criteria-verified-at-done");
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped rule must enforce");
-        assert_eq!(rule.scope, Scope::Graph);
+        assert_eq!(rule.scope, RuleScope::Graph);
     }
 }
 
@@ -1161,7 +1161,7 @@ mod cross_epic {
         );
         // The rule must be graph-scoped (label-uniqueness is always graph-scoped).
         assert!(
-            set.rules.iter().any(|r| r.scope == Scope::Graph),
+            set.rules.iter().any(|r| r.scope == RuleScope::Graph),
             "cross-epic example must define a graph rule"
         );
     }
@@ -1365,11 +1365,11 @@ mod research {
         );
         // Must have both local and graph rules.
         assert!(
-            set.rules.iter().any(|r| r.scope == Scope::Local),
+            set.rules.iter().any(|r| r.scope == RuleScope::Local),
             "research example must define at least one local rule"
         );
         assert!(
-            set.rules.iter().any(|r| r.scope == Scope::Graph),
+            set.rules.iter().any(|r| r.scope == RuleScope::Graph),
             "research example must define at least one graph rule"
         );
     }
@@ -1735,6 +1735,6 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
             .expect("research example must define research-hard-hypotheses-covered-at-done");
         assert_eq!(rule.severity, jit::validation::rules::Severity::Error);
         assert!(rule.enforce, "the done-scoped coverage rule must enforce");
-        assert_eq!(rule.scope, Scope::Graph);
+        assert_eq!(rule.scope, RuleScope::Graph);
     }
 }
