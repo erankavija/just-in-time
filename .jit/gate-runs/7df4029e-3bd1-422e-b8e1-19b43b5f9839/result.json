@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "run_id": "7df4029e-3bd1-422e-b8e1-19b43b5f9839",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "0a91d5e4888dd4faf7cc0945157e1710bb855c2f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T14:24:55.645300221Z",
+  "completed_at": "2026-07-10T14:27:25.227777684Z",
+  "duration_ms": 149582,
+  "exit_code": 1,
+  "stdout": "# Documentation Review\n\n## 1. Claims match the current source tree\n\nFail.\n\n- `docs/reference/labels.md` documents label-management commands and issue-update flags absent from `cli.rs`.\n- `docs/reference/storage-format.md` claims older repositories may be automatically migrated and have their format marker bumped. The storage loader accepts older versions unchanged; only the explicit lifecycle-timestamp migration exists.\n\nThe five findings from the most recent review run are resolved, including the control-plane layout defect.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass.\n\nRepository-specific types, namespaces, rules, templates, item kinds, and gates are identified as repository-local configuration or clearly marked worked examples. No dogfood value is presented as a `jit init` default.\n\n## 3. Current behavior only\n\nFail.\n\nFuture-facing product narration remains in the root README, installation guide, and guarantees concept. Historical replacement and legacy-alias narration also remains in worked configurations and references.\n\n## 4. No hardcoded counts that silently rot\n\nPass.\n\nThe remaining numeric counts are command output, limits, configuration values, or illustrative data rather than hand-maintained product totals.\n\n## 5. Links and referenced paths resolve\n\nPass.\n\nRepository-relative Markdown targets and anchors resolve. All actual addressable-item citations resolve through `jit item show`; `@/issue/REQ-01` is explicitly presented as a parse-error example rather than a citation. `jit validate --json` reports zero errors.\n\n## 6. Content-standards conformance\n\nFail.\n\nNo prohibited non-Mermaid diagram or definite plain-text mathematics defect remains. Plain-text box-drawing blocks are permitted directory trees or CLI output. The current-behavior narration findings below violate the present-state documentation standard.\n\n## Findings\n\n1. **F1 — Labels reference documents a nonexistent CLI surface.** [docs/reference/labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:328) uses nonexistent `--replace-label`; line 355 uses nonexistent `jit label suggest`; lines 384 and 479–517 document nonexistent namespace-management, audit, fix, and removal commands; line 639 uses `jit graph downstream` correctly as an alias, but line 702 adds nonexistent `jit label schema`. The actual label surface is only `jit label namespaces` and `jit label values`, while issue labels are changed with `--label` and `--remove-label`. Remediation: rewrite every command and workflow example around the exposed CLI, replacing a label with paired `--remove-label`/`--label`, and remove unsupported discovery, mutation, audit, fix, and schema claims.\n2. **F2 — Storage reference claims automatic format migration that is not implemented.** [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:285) says writing with a newer binary may migrate older data and bump `schema_version`. `ensure_supported_index_version` accepts an older index unchanged, and no generic automatic migration performs this bump. Remediation: state that equal and older supported versions are accepted unchanged, newer repository versions are rejected, and name only explicit migration commands that currently exist.\n3. **F3 — Root README advertises unspecified future product work.** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:240) tells adopters to expect new features and bug fixes before 1.0. Remediation: replace the roadmap-style statement with the product’s current stability/version status.\n4. **F4 — Installation guide presents an in-flight publication state.** [INSTALL.md](/home/vkaskivuo/Projects/just-in-time/INSTALL.md:211) labels the npm installation path “After Publishing,” describing a future distribution state. Remediation: document the currently available installation method directly; remove the npm-global pathway if it is not currently published.\n5. **F5 — Guarantees document advertises unimplemented future capabilities.** [docs/concepts/guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:121) says the event log supports future undo/replay capabilities, and line 158 advertises undo, replay, and time-travel debugging. No adopter-facing commands implement these capabilities. Remediation: describe the current append-only audit and query behavior only, removing roadmap items.\n6. **F6 — Research worked configuration narrates a historical configuration replacement.** [docs/examples/research/templates.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/research/templates.toml:9) calls the template model a replacement for an “old flat planning config block.” Remediation: state directly that this file declares the research planning bracket and demonstrates domain-agnostic templates.\n7. **F7 — SDD worked configuration narrates a historical configuration replacement.** [docs/examples/sdd/templates.toml](/home/vkaskivuo/Projects/just-in-time/docs/examples/sdd/templates.toml:9) repeats the “replacement for the old” transition narrative. Remediation: describe only the current SDD template and the graph it instantiates.\n8. **F8 — Command grammar uses historical framing for current aliases.** [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:160) calls `pass`, `pass-all`, `check`, and `check-all` “legacy” verbs. Remediation: list them simply as accepted aliases of the canonical current commands.\n9. **F9 — CLI reference uses historical framing for a current alias.** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1806) calls `check` a “Legacy alias.” Remediation: state directly that `check` is an alias of `status`.\n\nTotal findings: 9\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Nine blocking defects remain: two source-surface inaccuracies and seven instances of future or historical product narration.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Labels reference documents numerous nonexistent commands and flags\",\"file\":\"docs/reference/labels.md\",\"line\":328},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Storage reference incorrectly claims automatic migration and schema-version bumping\",\"file\":\"docs/reference/storage-format.md\",\"line\":285},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Root README advertises unspecified future product changes\",\"file\":\"README.md\",\"line\":240},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Installation guide presents npm installation as a future publishing step\",\"file\":\"INSTALL.md\",\"line\":211},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Guarantees document advertises unimplemented undo, replay, and time-travel capabilities\",\"file\":\"docs/concepts/guarantees.md\",\"line\":121},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"Research template example narrates replacement of an old configuration model\",\"file\":\"docs/examples/research/templates.toml\",\"line\":9},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"SDD template example narrates replacement of an old configuration model\",\"file\":\"docs/examples/sdd/templates.toml\",\"line\":9},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Command grammar historically frames currently supported gate aliases as legacy\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":160},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"CLI reference historically frames the current check alias as legacy\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1806}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2942 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4c6a-ce14-75b2-a574-737959bcb4e2\n--------\nuser\n--- 2929 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Nine blocking defects remain: two source-surface inaccuracies and seven instances of future or historical product narration.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Labels reference documents numerous nonexistent commands and flags",
+        "file": "docs/reference/labels.md",
+        "line": 328
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Storage reference incorrectly claims automatic migration and schema-version bumping",
+        "file": "docs/reference/storage-format.md",
+        "line": 285
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Root README advertises unspecified future product changes",
+        "file": "README.md",
+        "line": 240
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Installation guide presents npm installation as a future publishing step",
+        "file": "INSTALL.md",
+        "line": 211
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "Guarantees document advertises unimplemented undo, replay, and time-travel capabilities",
+        "file": "docs/concepts/guarantees.md",
+        "line": 121
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "Research template example narrates replacement of an old configuration model",
+        "file": "docs/examples/research/templates.toml",
+        "line": 9
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "SDD template example narrates replacement of an old configuration model",
+        "file": "docs/examples/sdd/templates.toml",
+        "line": 9
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Command grammar historically frames currently supported gate aliases as legacy",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 160
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "CLI reference historically frames the current check alias as legacy",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1806
+      }
+    ]
+  }
+}
