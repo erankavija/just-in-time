@@ -1,11 +1,11 @@
-//! REQ-03 shared-test-vector equivalence (Rust side).
+//! REQ-03 test-vector conformance.
 //!
-//! Loads the shared fixture `test-vectors/hierarchy_resolution.json` and asserts
-//! the core resolver [`jit::graph::hierarchy::resolve_hierarchy`] reproduces the
-//! committed `expected` output. The web port
-//! (`web/src/utils/hierarchyResolution.test.ts`) asserts the SAME fixture, so a
-//! passing pair proves the two implementations agree on the canonical
-//! DAG-authoritative resolution.
+//! Loads the fixture `test-vectors/hierarchy_resolution.json` and asserts the
+//! core resolver [`jit::graph::hierarchy::resolve_hierarchy`] reproduces the
+//! committed `expected` output. `resolve_hierarchy` is the sole implementation
+//! of the canonical DAG-authoritative resolution; every consumer (CLI output,
+//! graph export, the web server's `/graph` payload) projects its result, so
+//! this fixture pins the rule for all of them.
 
 use std::collections::HashMap;
 

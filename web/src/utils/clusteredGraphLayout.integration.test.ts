@@ -1,26 +1,20 @@
 /**
  * Integration tests for clusteredGraphLayout using realistic repository data.
- * 
+ *
  * These tests use structures similar to actual epics in the jit repository
  * to verify the clustering algorithm works correctly with real-world complexity.
+ *
+ * Every node carries the resolution the server ships for that graph
+ * (`type`/`parent`/`children`/`cluster`/`rank`), stated literally.
  */
 
 import { describe, it, expect } from 'vitest';
+import { graphNode } from '../test/graphNode';
 import type { GraphNode, GraphEdge } from '../types/models';
 import type { HierarchyLevelMap } from '../types/subgraphCluster';
 import { prepareClusteredGraphForReactFlow } from './clusteredGraphLayout';
 
 describe('clusteredGraphLayout - Integration Tests', () => {
-  // Helper to create nodes
-  const node = (id: string, type: string): GraphNode => ({
-    id,
-    label: `${type} ${id}`,
-    state: 'ready',
-    priority: 'normal',
-    labels: [`type:${type}`],
-    blocked: false,
-  });
-
   // Helper to create edges
   const edge = (from: string, to: string): GraphEdge => ({ from, to });
 
@@ -37,7 +31,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
     /**
      * Simulates Epic ad601a15 "Enable parallel multi-agent work with git worktrees"
      * which has 55 transitive dependencies across 3 stories with many tasks.
-     * 
+     *
      * Structure:
      * - Epic E1 (parallel-work)
      *   - Story S1 (recovery)
@@ -47,25 +41,25 @@ describe('clusteredGraphLayout - Integration Tests', () => {
      *   - Story S3 (worktree-foundation)
      *     - Task T7, T8
      * - Epic E2 (other epic) with Task T9
-     * 
+     *
      * Cross-epic dependency: T4 → T9 (Epic E1's task depends on Epic E2's task)
      */
 
     const nodes: GraphNode[] = [
-      node('E1', 'epic'),
-      node('S1', 'story'),
-      node('S2', 'story'),
-      node('S3', 'story'),
-      node('T1', 'task'),
-      node('T2', 'task'),
-      node('T3', 'task'),
-      node('T4', 'task'),
-      node('T5', 'task'),
-      node('T6', 'task'),
-      node('T7', 'task'),
-      node('T8', 'task'),
-      node('E2', 'epic'),
-      node('T9', 'task'),
+      graphNode('E1', { type: 'epic', children: ['S1', 'S2', 'S3'], cluster: 'E1', rank: 4 }),
+      graphNode('S1', { type: 'story', parent: 'E1', children: ['T1', 'T2', 'T3'], cluster: 'E1', rank: 2 }),
+      graphNode('S2', { type: 'story', parent: 'E1', children: ['T4', 'T5', 'T6'], cluster: 'E1', rank: 3 }),
+      graphNode('S3', { type: 'story', parent: 'E1', children: ['T7', 'T8'], cluster: 'E1', rank: 1 }),
+      graphNode('T1', { type: 'task', parent: 'S1', cluster: 'E1', rank: 0 }),
+      graphNode('T2', { type: 'task', parent: 'S1', cluster: 'E1', rank: 1 }),
+      graphNode('T3', { type: 'task', parent: 'S1', cluster: 'E1', rank: 0 }),
+      graphNode('T4', { type: 'task', parent: 'S2', cluster: 'E1', rank: 1 }),
+      graphNode('T5', { type: 'task', parent: 'S2', cluster: 'E1', rank: 2 }),
+      graphNode('T6', { type: 'task', parent: 'S2', cluster: 'E1', rank: 0 }),
+      graphNode('T7', { type: 'task', parent: 'S3', cluster: 'E1', rank: 0 }),
+      graphNode('T8', { type: 'task', parent: 'S3', cluster: 'E1', rank: 0 }),
+      graphNode('E2', { type: 'epic', children: ['T9'], cluster: 'E2', rank: 1 }),
+      graphNode('T9', { type: 'task', parent: 'E2', cluster: 'E2', rank: 0 }),
     ];
 
     const edges: GraphEdge[] = [
@@ -102,7 +96,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
     // Primary: E1, E2
     // Sub: S1, S2, S3 (stories within E1)
     expect(result.clusters).toHaveLength(5);
-    
+
     // Check we have the expected cluster container IDs
     const clusterIds = result.clusters.map(c => c.containerId).sort();
     expect(clusterIds).toEqual(['E1', 'E2', 'S1', 'S2', 'S3']);
@@ -133,23 +127,23 @@ describe('clusteredGraphLayout - Integration Tests', () => {
   it('should aggregate edges when story is collapsed', () => {
     /**
      * When Story S1 is collapsed, edges from its tasks should bubble up to S1.
-     * 
+     *
      * Before collapse:
      *   Epic E1 → Story S1 → Task T1 → Task T9 (in Epic E2)
      *                      → Task T2
-     * 
+     *
      * After collapse:
      *   Epic E1 → Story S1 ⊞ → Task T9 (in Epic E2)
      *   (T1, T2 hidden; edge T1→T9 becomes S1→T9)
      */
 
     const nodes: GraphNode[] = [
-      node('E1', 'epic'),
-      node('S1', 'story'),
-      node('T1', 'task'),
-      node('T2', 'task'),
-      node('E2', 'epic'),
-      node('T9', 'task'),
+      graphNode('E1', { type: 'epic', children: ['S1'], cluster: 'E1', rank: 3 }),
+      graphNode('S1', { type: 'story', parent: 'E1', children: ['T1', 'T2'], cluster: 'E1', rank: 2 }),
+      graphNode('T1', { type: 'task', parent: 'S1', cluster: 'E1', rank: 1 }),
+      graphNode('T2', { type: 'task', parent: 'S1', cluster: 'E1', rank: 0 }),
+      graphNode('E2', { type: 'epic', children: ['T9'], cluster: 'E2', rank: 1 }),
+      graphNode('T9', { type: 'task', parent: 'E2', cluster: 'E2', rank: 0 }),
     ];
 
     const edges: GraphEdge[] = [
@@ -187,21 +181,21 @@ describe('clusteredGraphLayout - Integration Tests', () => {
     /**
      * When Epic E1 is collapsed, ALL its children (stories + tasks) should be hidden.
      * Edges from hidden tasks should bubble all the way up to E1.
-     * 
+     *
      * Before collapse:
      *   Epic E1 → Story S1 → Task T1 → Task T9 (in Epic E2)
-     * 
+     *
      * After collapse:
      *   Epic E1 ⊞ → Task T9 (in Epic E2)
      *   (S1, T1 hidden; edge T1→T9 becomes E1→T9)
      */
 
     const nodes: GraphNode[] = [
-      node('E1', 'epic'),
-      node('S1', 'story'),
-      node('T1', 'task'),
-      node('E2', 'epic'),
-      node('T9', 'task'),
+      graphNode('E1', { type: 'epic', children: ['S1'], cluster: 'E1', rank: 3 }),
+      graphNode('S1', { type: 'story', parent: 'E1', children: ['T1'], cluster: 'E1', rank: 2 }),
+      graphNode('T1', { type: 'task', parent: 'S1', cluster: 'E1', rank: 1 }),
+      graphNode('E2', { type: 'epic', children: ['T9'], cluster: 'E2', rank: 1 }),
+      graphNode('T9', { type: 'task', parent: 'E2', cluster: 'E2', rank: 0 }),
     ];
 
     const edges: GraphEdge[] = [
@@ -236,21 +230,21 @@ describe('clusteredGraphLayout - Integration Tests', () => {
   it('should handle milestone → epic → story → task hierarchy', () => {
     /**
      * Full 4-level hierarchy as configured in jit.
-     * 
+     *
      * Milestone M1 → Epic E1 → Story S1 → Task T1
      *                                    → Task T2
      *             → Epic E2 → Story S2 → Task T3
      */
 
     const nodes: GraphNode[] = [
-      node('M1', 'milestone'),
-      node('E1', 'epic'),
-      node('E2', 'epic'),
-      node('S1', 'story'),
-      node('S2', 'story'),
-      node('T1', 'task'),
-      node('T2', 'task'),
-      node('T3', 'task'),
+      graphNode('M1', { type: 'milestone', children: ['E1', 'E2'], cluster: 'M1', rank: 3 }),
+      graphNode('E1', { type: 'epic', parent: 'M1', children: ['S1'], cluster: 'M1', rank: 2 }),
+      graphNode('E2', { type: 'epic', parent: 'M1', children: ['S2'], cluster: 'M1', rank: 2 }),
+      graphNode('S1', { type: 'story', parent: 'E1', children: ['T1', 'T2'], cluster: 'M1', rank: 1 }),
+      graphNode('S2', { type: 'story', parent: 'E2', children: ['T3'], cluster: 'M1', rank: 1 }),
+      graphNode('T1', { type: 'task', parent: 'S1', cluster: 'M1', rank: 0 }),
+      graphNode('T2', { type: 'task', parent: 'S1', cluster: 'M1', rank: 0 }),
+      graphNode('T3', { type: 'task', parent: 'S2', cluster: 'M1', rank: 0 }),
     ];
 
     const edges: GraphEdge[] = [
@@ -289,7 +283,7 @@ describe('clusteredGraphLayout - Integration Tests', () => {
     expect(e2Cluster!.nodes.map(n => n.id)).toContain('E2');
     expect(e2Cluster!.nodes.map(n => n.id)).toContain('S2');
     expect(e2Cluster!.nodes.map(n => n.id)).toContain('T3');
-    
+
     // Milestone M1 should be an orphan node (not in any cluster)
     expect(result.orphanNodes.map(n => n.id)).toContain('M1');
 
@@ -304,12 +298,12 @@ describe('clusteredGraphLayout - Integration Tests', () => {
      */
 
     const nodes: GraphNode[] = [
-      node('E1', 'epic'),
-      node('T1', 'task'),
-      node('T2', 'task'),
-      node('E2', 'epic'),
-      node('T3', 'task'),
-      node('T4', 'task'),
+      graphNode('E1', { type: 'epic', children: ['T1', 'T2'], cluster: 'E1', rank: 2 }),
+      graphNode('T1', { type: 'task', parent: 'E1', cluster: 'E1', rank: 1 }),
+      graphNode('T2', { type: 'task', parent: 'E1', cluster: 'E1', rank: 1 }),
+      graphNode('E2', { type: 'epic', children: ['T3', 'T4'], cluster: 'E2', rank: 1 }),
+      graphNode('T3', { type: 'task', parent: 'E2', cluster: 'E2', rank: 0 }),
+      graphNode('T4', { type: 'task', parent: 'E2', cluster: 'E2', rank: 0 }),
     ];
 
     const edges: GraphEdge[] = [
@@ -343,14 +337,14 @@ describe('clusteredGraphLayout - Integration Tests', () => {
 
   it('should handle orphan nodes (no epic parent)', () => {
     /**
-     * Task T1 has no epic parent (orphaned).
+     * Task T2 has no epic parent (orphaned).
      * Should be tracked separately in orphanNodes.
      */
 
     const nodes: GraphNode[] = [
-      node('E1', 'epic'),
-      node('T1', 'task'),
-      node('T2', 'task'), // Orphan
+      graphNode('E1', { type: 'epic', children: ['T1'], cluster: 'E1', rank: 1 }),
+      graphNode('T1', { type: 'task', parent: 'E1', cluster: 'E1', rank: 0 }),
+      graphNode('T2', { type: 'task', rank: 0 }), // Orphan: no parent, no cluster
     ];
 
     const edges: GraphEdge[] = [
