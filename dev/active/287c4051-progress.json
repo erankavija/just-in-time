@@ -1,7 +1,7 @@
 {
   "epic_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
   "epic_short_id": "287c4051",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -114,25 +114,29 @@
           "short_id": "dw-a",
           "files": "README.md, web/README.md, mcp-server/README.md",
           "findings": "F1,F2,F4",
-          "status": "dispatched"
+          "status": "merged",
+          "commit": "582fcbb2"
         },
         {
           "short_id": "dw-b",
           "files": "docs/concepts/{overview,design-philosophy,core-model}.md",
           "findings": "F3,F5,F7,F8,F13,F15",
-          "status": "dispatched"
+          "status": "merged",
+          "commit": "d6ec733a"
         },
         {
           "short_id": "dw-c",
           "files": "docs/reference/{cli-commands,item-addresses}.md",
           "findings": "F6,F9,F16,F20",
-          "status": "dispatched"
+          "status": "merged",
+          "commit": "9698278a"
         },
         {
           "short_id": "dw-d",
           "files": "planning-bracket, adopt-planning-bracket, custom-gates, validation-rules, validation-engine",
           "findings": "F10,F11,F12,F14,F17,F18,F19,F21",
-          "status": "dispatched"
+          "status": "merged",
+          "commit": "aa8e2e03"
         }
       ]
     }
@@ -186,6 +190,11 @@
       "id": "LD-10",
       "decision": "User-approved (2026-07-10): the doc-review gate's 21 findings are fixed as wave 4 under this epic rather than deferred, including rewriting web/README.md for the jit web UI and removing two 'not yet implemented' roadmap lists. Framed as 6ce0f14e REQ-03 gate-driven rework (no new issues); re-run doc-review to green, then complete.",
       "for": "6ce0f14e"
+    },
+    {
+      "id": "LD-11",
+      "decision": "No em-dash sweep. dw-d found 153 pre-existing em-dashes across its 5 files and asked whether to remove them. The doc-review gate does NOT grep em-dashes: its content-standards dimension (6) checks Mermaid diagrams and LaTeX math only, and jit-content-standards.md does not ban em-dashes. The em-dash ban is the lead's/global personal style rule, not this epic's contract; a ~150-line mechanical rewrite for zero gate benefit was declined. My wave-4 dispatch prompts overstated 'No em-dashes (gate greps —)'. Em-dashes workers removed as a side effect of narration rewrites are kept; no blanket sweep.",
+      "for": "wave-4"
     }
   ],
   "created_during_execution": [
@@ -268,6 +277,9 @@
     },
     "wave2_final": {
       "note": "7eec3d59, 5514e4f5, f7c50538 done. 7eec3d59 needed 2 lead-applied narration fixes beyond its own sweep (the 'downstream gate rename sweep regroups the flat enum' passage appeared twice at cli-command-grammar.md; both restated as current grammar) plus an em-dash-in-table-cell cleanup. f7c50538 and 5514e4f5 passed first review; 5514e4f5 archived 3 done-issue plans with jit doc re-links."
+    },
+    "wave4_merge": {
+      "note": "All 4 wave-4 workers (dw-a/b/c/d) fixed their assigned findings and committed on disjoint doc files (only dev/active/287c4051-progress.json overlapped; resolved to lead's copy each merge). Merged sequentially into main; final HEAD carries changes to docs/ + README/mcp-server-README/web-README only, no source leak (verified against pre-wave base abf8e27b). Cross-worker anchor hazard cleared: dw-b repointed core-model.md:700 to custom-gates.md#adapting-gates-to-your-domain; dw-d's edits moved that heading from :980 to :954 but preserved it, and #environment-variables (core-model.md:571) also resolves. dw-c state-predicate fix ('any state other than done') independently checked against docs/examples/sdd/rules.toml and research/rules.toml. Re-running doc-review on the merged tree for REQ-03 green."
     }
   }
 }
