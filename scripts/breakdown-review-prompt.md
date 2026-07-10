@@ -34,6 +34,7 @@ Each area is verdict-affecting; a serious defect in any one is a blocking failur
 ### Structural integrity
 
 - Decomposition **depth suits the work size** (large work is multi-level — epic → story → task — not a flat layer of leaves); the spine/containment is intact; this breakdown introduced no isolated or dangling issues. (Repository-wide `jit validate` greenness is enforced separately at container completion, not by the per-issue `jit-validate` gate — here, judge structure and levels.)
+- **A flat layer is acceptable when the design states a rationale that holds.** When the approved plan explicitly chooses a flat tier and records why (e.g. every leaf is one coherent, independently landable deliverable and intermediate containers would each own a single child), judge that rationale on its merits instead of requiring layers mechanically. Fail the shape only when the rationale is absent or does not hold — a leaf that bundles several distinct deliverables, or one whose scope exceeds what a single owner can coherently land, contradicts the "one coherent deliverable" claim and remains a blocking defect. Name which leaf breaks the rationale and why.
 
 ## Prior review feedback
 

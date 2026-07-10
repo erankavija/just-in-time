@@ -1,0 +1,41 @@
+{
+  "id": "6d82de03-1018-47bc-ae0b-659366ad3f44",
+  "title": "File follow-ups for engine gaps and missing projection surfaces",
+  "description": "Record a separately owned follow-up for every engine-side gap and missing documentation-projection surface the exhaustive documentation audit uncovered, so none is silently dropped once the audit closes.\n\n## Background\n\nThe exhaustive documentation audit fixes documentation drift but explicitly does not fix the engine defects and missing projection surfaces its verification work surfaces — those are out of scope for a docs-only effort. The audit sweeps the adopter-facing documentation in disjoint areas; each sweep cites any volatile fact with no existing projection surface to its source and records it for follow-up rather than building the projection itself. Those recorded facts, plus a known set of engine-side gaps already identified during planning, are this work's input:\n\n- **Generated CLI schema completeness.** The schema's `State` enum is missing the `rejected` value (compare the hardcoded list in `crates/jit/src/schema.rs:463-469` against the real 7-value enum in `crates/jit/src/domain/types.rs:28-42`). Separately, clap `visible_alias` flag forms and the global flags are absent from the schema's flag listing (e.g. `--add-label`, `crates/jit/src/cli.rs:986`; `--title`, `cli.rs:1827`) — fixing this is also what makes a committed schema-vs-docs flag differ trivial to add later, rather than leaving flag adjudication a judgment call in every future doc audit.\n- **Missing projection surfaces for storage specifics** — the ID scheme, event shape, and gate-runs layout currently have no projection surface and must be cited to source in documentation rather than hand-copied.\n- **The CLI's issue-creation `--description` flag help string** describes the content format rather than describing the flag itself (`crates/jit/src/cli.rs`) — a CLI polish defect outside docs scope.\n\n## Success Criteria\n\n- [hard] REQ-01: Each known engine-side gap named above has a separately owned follow-up describing its source location and the correction it defers.\n- [hard] REQ-02: Every missing-projection-surface fact recorded during the audit's area sweeps has a separately owned follow-up covering it; none is dropped.\n\n## Notes\n\nNo documentation or source files change as part of this work; the deliverable is the recorded follow-ups themselves.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "b8924a6d-a15a-4880-b5c0-bc0ad4563da4",
+    "736a069e-0f58-48ec-bdc4-7a8eb2500afd",
+    "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+    "8682e95a-bb8a-4c73-8a48-ed712e8b08b0",
+    "a70bac75-7669-4b60-a2a3-24efb33ad704",
+    "7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c",
+    "4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57"
+  ],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/2d109173-plan.md",
+      "commit": null,
+      "label": null,
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "type:task",
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:docs",
+    "satisfies:REQ-06"
+  ],
+  "created_at": "2026-07-10T20:21:17.662218874Z",
+  "updated_at": "2026-07-10T20:45:18.305785165Z",
+  "first_ready_at": "2026-07-10T20:21:17.662219284Z"
+}
