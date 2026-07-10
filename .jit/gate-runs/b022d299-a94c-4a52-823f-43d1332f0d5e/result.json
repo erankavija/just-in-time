@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "b022d299-a94c-4a52-823f-43d1332f0d5e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7eec3d59-60ab-448c-9334-50c5cb93d4bd",
+  "commit": "96c59201018971c833f457ad6397f970ab23be16",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T11:22:09.859384203Z",
+  "completed_at": "2026-07-10T11:22:57.427100044Z",
+  "duration_ms": 47567,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01: **Not met.** Legacy/in-flight narration remains in the command-grammar reference.\n- REQ-02: **Not met.** The grammar still describes future regrouping and a downstream rename sweep.\n- REQ-03: **Met.** `labels.md` lists all scaffolded namespaces, including `enforces`, matching `hierarchy_templates.rs`.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only changes introduce no architecture boundary violations.\n\n## Functional Paradigm\n\nNot applicable to the documentation-only diff.\n\n## Correctness and Invariants\n\nNo runtime logic or invariants were changed. The namespace reference matches the init scaffold.\n\n## Safety\n\nNo Rust or unsafe code was added.\n\n## Testing and Validation\n\nThe provided evidence reports:\n\n- `cargo-ci`: passed\n- `jit-validate`: passed\n- Dependencies: none\n- Prior review history: empty\n\nPer instruction, tests were not rerun.\n\n## Error Handling\n\nNot applicable to the documentation-only diff.\n\n## CLI Contract\n\nNo CLI implementation or JSON behavior changed. However, the canonical grammar remains inaccurate as a current-behavior reference.\n\n## Documentation\n\nThe labels reference now states current namespace behavior and includes `enforces`. The command-grammar reference remains partially framed as unfinished conformance work.\n\n## Findings\n\n1. **F1 — High:** The command-grammar reference still says the gate surface “is one flat `gate` enum today” which “the downstream gate rename sweep regroups,” and later says the partition is a contract that sweep “applies to regroup the flat enum.” This is explicitly in-flight/future conformance narration, so hard requirements REQ-01 and REQ-02 are not satisfied. See `docs/reference/cli-command-grammar.md:145` and the repeated narration at line 181.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The command-grammar reference still contains in-flight gate-regrouping narration, violating hard requirements REQ-01 and REQ-02.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Command grammar still describes a downstream gate rename sweep and future regrouping instead of current grammar.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":145}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2712 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4bc3-7b16-7073-983a-4de2fbea8701\n--------\nuser\n--- 2699 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The command-grammar reference still contains in-flight gate-regrouping narration, violating hard requirements REQ-01 and REQ-02.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Command grammar still describes a downstream gate rename sweep and future regrouping instead of current grammar.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 145
+      }
+    ]
+  }
+}

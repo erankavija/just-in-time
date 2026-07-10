@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "62e74f20-54e6-4314-a5bc-bd9eb0e87c3d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7eec3d59-60ab-448c-9334-50c5cb93d4bd",
+  "commit": "5ba6618251d266e5bd08fe484d3eb89e8e2c0153",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T11:24:01.174626769Z",
+  "completed_at": "2026-07-10T11:24:33.621811174Z",
+  "duration_ms": 32447,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\n- REQ-01: **Not met.** Future migration narration remains in the shipped command-grammar reference.\n- REQ-02: **Not met.** The document still describes the partition as something a future “rename sweep” will apply.\n- REQ-03: **Met.** `docs/reference/labels.md` includes `enforces` in the pre-declared namespace list and configuration example.\n\n## Architecture and Separation of Concerns\n\nDocumentation-only changes introduce no boundary violations.\n\n## Functional Paradigm\n\nNot applicable to this documentation-only change.\n\n## Correctness and Invariants\n\nNo runtime behavior or persistence logic changed. The documented namespace list includes the required `enforces` namespace.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing and Validation\n\n- The supplied `cargo-ci` gate passed; tests were not rerun as instructed.\n- The supplied `jit-validate` gate passed.\n- `./scripts/jit-validate.sh` also passes against the current workspace.\n- The issue has no dependencies.\n- No test failures appear in the provided evidence.\n\n## Error Handling\n\nNot applicable to this documentation-only change.\n\n## CLI Contract\n\nNo CLI implementation or JSON-output behavior changed.\n\n## Documentation\n\nThe latest commit corrected the first occurrence identified by the prior review at line 145. However, the repeated future-work narration at lines 179–180 remains, leaving the prior finding unresolved.\n\n## Findings\n\n1. **F1 — High:** `docs/reference/cli-command-grammar.md:179` says the partition is a contract that “the gate rename sweep applies to regroup the flat enum.” This describes pending migration work rather than current behavior, violating hard requirements REQ-01 and REQ-02 and leaving the most recent review finding unresolved.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Future gate-regrouping narration remains in the command-grammar reference, so hard requirements REQ-01 and REQ-02 are unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Command grammar still describes a gate rename sweep regrouping the flat enum instead of stating current behavior only.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":179}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 682 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4bc5-2dde-7bb2-9895-7d4f5e809f6a\n--------\nuser\n--- 669 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Future gate-regrouping narration remains in the command-grammar reference, so hard requirements REQ-01 and REQ-02 are unmet.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Command grammar still describes a gate rename sweep regrouping the flat enum instead of stating current behavior only.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 179
+      }
+    ]
+  }
+}
