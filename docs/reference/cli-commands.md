@@ -1803,8 +1803,8 @@ Gate: tests
 
 ### `jit gate status`
 
-The unified gate-run inspection surface (inspection only, non-mutating). Legacy
-alias: `check`. It offers four views over the stored run records: the latest
+The unified gate-run inspection surface (inspection only, non-mutating). Alias:
+`check`. It offers four views over the stored run records: the latest
 run (default), prior runs (history), the raw report text (flat), and the
 structured findings (findings). All are read-only and reuse already-recorded
 runs; none executes a checker or mutates gate state. Unlike
@@ -1904,7 +1904,7 @@ jit gate status abc123 code-review --findings
 ### `jit gate status-all`
 
 Report the readiness of every required gate on an issue (inspection only,
-non-mutating). Legacy alias: `check-all`.
+non-mutating). Alias: `check-all`.
 
 **Usage:**
 ```bash
@@ -1948,7 +1948,7 @@ Gate 'clippy' has not been run yet for issue abc123. Use 'jit gate evaluate' to 
 
 Run the checker (auto gates) or record attestation (manual gates) for a gate on
 an issue. This produces a verdict (which may be *fail*), so it is not an
-override. Legacy alias: `pass`; short alias: `eval`.
+override. Aliases: `pass`; short alias `eval`.
 
 **Usage:**
 ```bash
@@ -2044,8 +2044,8 @@ jit gate evaluate abc123 tests --json
 
 ### `jit gate evaluate-all`
 
-Evaluate all of an issue's required gates in one command, **fail-fast**. Legacy
-alias: `pass-all`.
+Evaluate all of an issue's required gates in one command, **fail-fast**. Alias:
+`pass-all`.
 
 **Usage:**
 ```bash

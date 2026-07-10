@@ -208,13 +208,6 @@ npm run dev
 
 **For AI agent integration via Model Context Protocol.**
 
-### Install from NPM (After Publishing)
-
-```bash
-npm install -g @erankavija/jit-mcp-server
-jit-mcp-server
-```
-
 ### Install from Source
 
 ```bash

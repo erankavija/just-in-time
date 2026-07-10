@@ -237,7 +237,7 @@ See the [Configuration Reference](docs/reference/configuration.md) and [Example 
 
 ## Project Status
 
-JIT is in active development, and anything may change or break at any time. The core concepts and architecture are stable, but expect ongoing improvements, new features, and bug fixes before reaching 1.0.
+JIT is pre-1.0 (`0.2.x`) and under active development. The core concepts and architecture are stable; the CLI surface and on-disk format may change between releases. The repository format carries a version marker, and `jit` refuses to operate on a repository written by a newer binary rather than misreading it.
 
 ## License
 

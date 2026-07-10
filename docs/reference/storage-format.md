@@ -282,8 +282,9 @@ on-disk layout or interpretation changes. On startup every command that opens
 the repository compares it against the format version the running `jit` binary
 supports:
 
-- Binary support **≥** repository version: operates normally. Writing with a
-  newer binary may migrate the data and bump the marker.
+- Binary support **≥** repository version: operates normally. An older
+  repository is read as-is and keeps its marker; `jit` performs no implicit
+  migration. Data migrations are explicit and idempotent — see `jit migrate`.
 - Binary support **<** repository version: the binary refuses to operate and
   exits nonzero (exit code 10, external-dependency family) with a single-line
   error naming both the repository's format version and the version the binary

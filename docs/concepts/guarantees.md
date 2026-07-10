@@ -118,7 +118,7 @@ sequenceDiagram
 
 **Guarantee:** All state changes are logged to `.jit/events.jsonl` as an append-only audit trail. (`@/invariant/event-log`)
 
-Every operation that modifies issue state, dependencies, or gates emits an event. The event log provides complete observability and supports future undo/replay capabilities.
+Every operation that modifies issue state, dependencies, or gates emits an event. The event log provides complete observability over how the repository reached its current state.
 
 **Event types:**
 
@@ -155,7 +155,7 @@ Events are stored as newline-delimited JSON (JSONL):
 
 - **Observability:** Debug workflows by examining event history
 - **Audit trail:** Compliance requirements satisfied
-- **Future capabilities:** Undo operations, replay history, time-travel debugging
+- **Reconstruction:** Derived state is rebuilt from the log (`jit migrate lifecycle-timestamps` backfills lifecycle timestamps from it)
 
 **Query examples:**
 

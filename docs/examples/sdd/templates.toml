@@ -6,10 +6,9 @@
 # depends_on/anchor_edges/transforms reference declared roles/anchors; node `type`s
 # exist in [type_hierarchy]; internal edges acyclic.
 #
-# This is the template-model replacement for the old flat planning config block: the
-# plan-before-fan-out bracket of a planning node P and a breakdown node B over the
-# SDD container type `epic`. Copy this file to `.jit/templates.toml` alongside the
-# example `config.toml`.
+# This file declares the SDD planning bracket: a plan-before-fan-out bracket of a
+# planning node P and a breakdown node B over the SDD container type `epic`. Copy
+# this file to `.jit/templates.toml` alongside the example `config.toml`.
 
 [[template]]
 name        = "plan"
