@@ -443,9 +443,10 @@ export function GraphView({
   const savedViewportRef = useRef<SavedViewportData | null>(null);
   const clusterDataRef = useRef<ReturnType<typeof prepareClusteredGraphForReactFlow> | null>(null);
   const [isRenderable, setIsRenderable] = useState(true); // Control rendering during viewport restoration
-  // Stable-layout: tracks the topology fingerprint of the last full Dagre run so
-  // we can skip re-layout when only node data (state, labels, gate results) changed.
-  const prevTopologyKeyRef = useRef<string>('');
+  // Stable-layout: fingerprints every input to clustering and layout as of the
+  // last full Dagre run, so a refresh that only carries node data (state,
+  // labels, gate results) reuses the computed positions.
+  const prevLayoutInputsKeyRef = useRef<string>('');
   // Once the graph has loaded once, background SSE refreshes should not show
   // the full-page loading overlay (which blanks out the graph and causes flashing).
   const hasLoadedOnceRef = useRef(false);
@@ -808,22 +809,36 @@ export function GraphView({
         })
         .filter((edge): edge is Edge => edge !== null);
 
-      // Apply layout algorithm — but only when the graph topology has actually
-      // changed (nodes added/removed or edges rewired).  For SSE events that
-      // only change node *data* (state colour, labels, gate results) we update
-      // each node's data/style in-place, preserving the existing Dagre-computed
-      // positions so the graph doesn't jump around.
-      const topologyKey = [
-        ...flowNodes.map(n => n.id).sort(),
+      // Apply the layout algorithm only when an input to clustering or layout
+      // has changed.  Those inputs are the visible node set, the edge set, and
+      // the placement the server resolved for each node (`type`, `parent`,
+      // `children`, `cluster`, `rank`), all of which feed Dagre and the cluster
+      // assignment.  For refreshes that only change presentational node data
+      // (state colour, labels, gate results, assignee) we update each node's
+      // data/style in-place, preserving the existing Dagre-computed positions so
+      // the graph doesn't jump around.
+      const layoutInputsKey = [
+        ...nodesToRender
+          .map(node =>
+            [
+              node.id,
+              node.type ?? '',
+              node.parent ?? '',
+              node.cluster ?? '',
+              node.rank,
+              node.children.join('/'),
+            ].join(':')
+          )
+          .sort(),
         '|',
         ...flowEdges.map(e => `${e.source}->${e.target}`).sort(),
       ].join(',');
 
-      const topologyUnchanged =
-        prevTopologyKeyRef.current !== '' &&
-        topologyKey === prevTopologyKeyRef.current;
+      const layoutInputsUnchanged =
+        prevLayoutInputsKeyRef.current !== '' &&
+        layoutInputsKey === prevLayoutInputsKeyRef.current;
 
-      if (topologyUnchanged) {
+      if (layoutInputsUnchanged) {
         // Patch node data/style in-place — positions are NOT touched.
         setNodes(prev =>
           prev.map(existing => {
@@ -836,8 +851,9 @@ export function GraphView({
         // the edge objects only updates their visual style (dimming, colour).
         setEdges(flowEdges);
       } else {
-        // Full layout: topology changed (first load, node added/removed, edge
-        // added/removed, or filter/view-mode change).
+        // Full layout: a layout input changed (first load, node added/removed,
+        // edge added/removed, served hierarchy resolution changed, or
+        // filter/view-mode change).
         const ranks = new Map(data.nodes.map(node => [node.id, node.rank]));
         const layouted = getLayoutedElements(flowNodes, flowEdges, layoutAlgorithm, ranks, clusterData, data.edges, expansionState);
 
@@ -856,7 +872,7 @@ export function GraphView({
 
         setNodes(finalNodes);
         setEdges(layouted.edges);
-        prevTopologyKeyRef.current = topologyKey;
+        prevLayoutInputsKeyRef.current = layoutInputsKey;
 
         // Only fit view on first load if no saved viewport exists
         if (!hasInitialFit && finalNodes.length > 0) {
@@ -881,11 +897,11 @@ export function GraphView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNodes, setEdges, labelFilters, layoutAlgorithm, hierarchyConfig, expansionState, version]);
 
-  // Reset the stable-layout topology fingerprint whenever view settings that
-  // affect the rendered structure change.  This forces a full Dagre run on the
-  // next loadGraph call so the layout reflects the new configuration.
+  // Reset the stable-layout fingerprint whenever view settings that affect the
+  // rendered structure change.  This forces a full Dagre run on the next
+  // loadGraph call so the layout reflects the new configuration.
   useEffect(() => {
-    prevTopologyKeyRef.current = '';
+    prevLayoutInputsKeyRef.current = '';
   }, [labelFilters, layoutAlgorithm, hierarchyConfig, expansionState]);
 
   useEffect(() => {
