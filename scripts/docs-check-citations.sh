@@ -5,30 +5,43 @@ set -euo pipefail
 # Mechanical check M3 of the `docs-mechanical` gate (epic 2d109173).
 #
 # Two comparisons, both derived live so the check encodes no product facts:
-#   1. File-path tokens inside backtick spans must exist on disk. A token is
-#      treated as a file citation — a pattern class, not an allowlist — when
-#      (a) it contains a `/`, (b) its final segment carries an extension
-#      (a `.<ext>` suffix), and (c) it is not placeholder/glob notation. Any
-#      such token that does not exist on disk is a MISSING finding, regardless
-#      of whether its leading segment names a tracked repo root: a citation
-#      under a misspelled/nonexistent root (e.g. `crate/jit/src/foo.rs`) is
-#      exactly the dangling reference REQ-01 requires us to surface. The
-#      extension requirement is deliberate — an extensionless token is a
-#      directory / conceptual reference, mechanically out of reach, so those
-#      are deferred to the doc-review reviewer rather than flagged here. This
-#      rejects prose, flags, and MIME types (`application/json`) without any
-#      hardcoded path or extension list. Broad flagging that surfaces
-#      auditor-adjudicated lines is intended (plan §2 M3).
+#   1. Repo-rooted file-path tokens inside backtick spans must exist on disk. A
+#      backtick token is reported MISSING iff ALL of the following hold — each a
+#      pattern class, never a file allowlist (REQ-01):
+#        (a) it is NOT placeholder / glob notation (`<…>`, `{…}`, `*`);
+#        (b) it is NOT an external / command token — it does not start with `~`
+#            (home-relative), does not start with `/` (absolute), does not
+#            contain `://` (URL / scheme), and contains no whitespace or `|`
+#            (a shell command line, not a path);
+#        (c) it contains a `/` AND its FIRST path segment is a real tracked
+#            top-level repo entry (the live set is `git ls-files` first segments,
+#            derived below) — this is the repo-root requirement;
+#        (d) it does NOT exist on disk — REGARDLESS of whether the final segment
+#            carries an extension, so an extensionless repo-rooted citation such
+#            as `crates/jit/NOTICE` is caught, not skipped.
 #   2. `@/<kind>/<self-id>` addressable-item citations must resolve through
 #      `jit item show`, but only for a `<kind>` that is a live registered item
 #      kind or alias (derived from `item_kinds` config). This skips the
 #      reserved `issue` scope segment — `@/issue/REQ-01` and friends are
 #      documented parse-error examples, not project-scope citations.
 #
-# Placeholder filter: a pattern CLASS, never a file allowlist (REQ-01). Path
-# notation containing `<…>`, `{…}`, `}` or a glob `*` (e.g. `.jit/issues/{id}.json`,
-# `.jit/schemas/*.json`) is placeholder syntax and is suppressed mechanically.
-# A mis-cited real path that is NOT placeholder notation is reported.
+# DEFERRED to the semantic doc-review reviewer (NOT silently ignored) — per the
+# plan's auditor-adjudicated M3 design (`dev/active/2d109173-plan.md` §2, M3):
+#   (i)   bare filenames with no `/` (e.g. `Cargo.toml` in prose);
+#   (ii)  tokens rooted at a segment that is NOT a tracked repo top-level entry —
+#         relative-to-subdirectory citations (`schemas/spec-body.json`,
+#         `lib/cli-executor.js`) and misspelled-root citations
+#         (`crate/jit/src/foo.rs`); and
+#   (iii) trailing-slash directory references (e.g. `.jit/config/gate-presets/`,
+#         a lazily-created config dir) — directory / structural references are
+#         conceptual, not file citations, so they are out of mechanical reach.
+# The mechanical check cannot distinguish those from ordinary prose or from
+# paths relative to some other cwd without producing false positives, so it
+# leaves them to the reviewer rather than flagging them. The repo-root
+# requirement in (c) is exactly what keeps this check low-false-positive: it
+# fired 13 spurious MISSING lines on the adopter surface (external `~/.config`
+# and `/etc` paths, a `curl … | jq` command, subdir-relative paths) when an
+# earlier revision dropped it.
 #
 # Usage:
 #   docs-check-citations.sh PATH [PATH ...]
@@ -61,29 +74,38 @@ command -v jq >/dev/null 2>&1 || {
 # The reserved `issue` scope segment is absent by construction.
 leaders=$(jit config get item_kinds | jq -r 'to_entries[] | ([.key] + (.value.aliases // [])) | .[]' | sort -u)
 
+# Live set of tracked top-level repo entries: the first path segment of every
+# tracked file (so `crates`, `docs`, `README.md`, `.jit`, …). Derived, not a
+# hardcoded list — it re-derives itself as the repo layout changes (REQ-01).
+roots=$(git ls-files | awk -F/ '{print $1}' | sort -u)
+
 status=0
 
-# 1. File-path citations in backtick spans.
+# 1. Repo-rooted file-path citations in backtick spans (see header for the
+# four-part rule and the deferral classes).
 # shellcheck disable=SC2016  # the backticks in the grep regex are literal, not expansion
 while IFS= read -r token; do
   [ -n "$token" ] || continue
   # Strip an optional `:line` / `:line-range` suffix before testing existence.
   path=${token%%:[0-9]*}
-  # Placeholder / glob notation is a pattern class, not a defect (REQ-01).
+  # (a) Placeholder / glob notation is a pattern class, not a defect.
   case "$path" in
     *'<'* | *'{'* | *'}'* | *'*'*) continue ;;
   esac
-  # Must look like a file path: contains a '/' (the feed already requires this)
-  # and the final segment carries an extension. No leading-segment / tracked-root
-  # filter — a citation under a misspelled or nonexistent root is a real dangling
-  # reference and must be surfaced. An extensionless token is a directory /
-  # conceptual reference, mechanically out of reach: deferred to doc-review.
-  case "$path" in */*) ;; *) continue ;; esac
-  last=${path##*/}
-  case "$last" in
-    *.*) ;;
-    *) continue ;;
+  # Trailing-slash directory reference — conceptual / structural, deferred.
+  case "$path" in */) continue ;; esac
+  # (b) External / command tokens by pattern class: home-relative, absolute,
+  # a URL/scheme, or a shell command line (whitespace or a pipe). Deferred.
+  case "$path" in
+    '~'* | /* | *'://'* | *'|'* | *[[:space:]]*) continue ;;
   esac
+  # (c) Must contain a '/' (the feed requires this) AND its first segment must
+  # be a real tracked top-level repo entry. A bare filename or a token rooted at
+  # a non-repo / misspelled segment is deferred to the doc-review reviewer.
+  case "$path" in */*) ;; *) continue ;; esac
+  first=${path%%/*}
+  printf '%s\n' "$roots" | grep -qxF -- "$first" || continue
+  # (d) Existence — regardless of whether the final segment has an extension.
   [ -e "$path" ] || {
     echo "MISSING: $token"
     status=1
