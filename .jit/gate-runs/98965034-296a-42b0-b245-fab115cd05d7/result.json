@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "run_id": "98965034-296a-42b0-b245-fab115cd05d7",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "84359f2f382c56dce7e6b62e61c0627a5d704048",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T12:02:38.828486242Z",
+  "completed_at": "2026-07-10T12:04:42.626544975Z",
+  "duration_ms": 123798,
+  "exit_code": 1,
+  "stdout": "# Documentation Review\n\n## 1. Claims match the current source tree\n\nFail.\n\n- `docs/concepts/guarantees.md` places `.git/jit/` beneath `.jit/` and names `heartbeats/`. The implementation writes the shared control plane at repository-root `.git/jit/`, using singular `heartbeat/` (`crates/jit/src/storage/control_plane.rs:32`, `crates/jit/src/storage/claim_coordinator.rs:377`). The authoritative storage reference documents the correct location and name.\n\nThe previously reported JSON serialization claim, incomplete overview layout, and generic web README have been corrected.\n\n## 2. Adopter surface versus repo-local dogfood configuration\n\nPass.\n\nRepository-specific types, namespaces, rules, templates, and gates are identified as repository-local configuration or explicitly labelled examples. I found no remaining claim that these values are `jit init` defaults.\n\n## 3. Current behavior only\n\nFail.\n\nMigration narration remains in the example configuration, while historical comparisons and the prohibited “in-flight” terminology remain in the gate how-to and worked rule configurations.\n\nOccurrences such as “no longer blocked” in tutorial output, `resolution:obsolete` descriptions, the freshness example, migration-domain examples, and the literal warning “will be cleaned” describe current status or verbatim output rather than product history, so they are not findings.\n\n## 4. No hardcoded counts that silently rot\n\nPass.\n\nThe prior builtin-preset totals and unsupported “10x faster” claim were removed. Remaining numerical examples are command output, configuration values, limits, or illustrative preset contents rather than hand-maintained product totals.\n\n## 5. Links and referenced paths resolve\n\nPass.\n\nRepository-relative Markdown targets resolve. The previously dangling MCP, contributor, validation-rule, and concept links have been repaired. The planning-bracket anchors match GitHub’s punctuation-derived anchors.\n\nConcrete addressable-item citations resolve through `jit item show`; issue-scoped examples now use explicit placeholders. `jit validate --json` also reports zero errors, including no `dangling-item-link` findings.\n\n## 6. Content-standards conformance\n\nFail.\n\nNo prohibited non-Mermaid diagram remains. Plain-text blocks containing box-drawing characters are directory trees or verbatim CLI output and therefore exempt. I found no definite plain-text mathematics violation and no excessive heading depth.\n\nThe current-behavior violations below remain content-standards defects.\n\n## Findings\n\n1. **F1 — Shared control-plane storage layout is incorrect.** `docs/concepts/guarantees.md:352` depicts `.git/jit/` as a child of `.jit/`, and line 360 names `heartbeats/`. The code writes repository-root `.git/jit/heartbeat/`. Remediation: show `.jit/` and `.git/jit/` as separate repository-root trees and rename `heartbeats/` to `heartbeat/`.\n2. **F2 — Example configuration contains removed-key migration history.** `docs/reference/example-config.toml:105` calls several keys “former” and says they “were removed.” Remediation: delete the removed-key history and state only that label/type enforcement is configured in `.jit/rules.toml` while `[validation]` contains the current behavioral keys.\n3. **F3 — Gate how-to compares current structured output with past behavior.** `docs/how-to/custom-gates.md:223` says checkers without a findings block work “exactly as before.” Remediation: state directly that a checker without a findings block retains raw stdout and has no structured finding fields.\n4. **F4 — Research worked configuration repeatedly uses prohibited current-state narration.** `docs/examples/research/rules.toml:50`, lines 65, 195, and 207 describe “in-flight” work; line 227 says behavior is “exactly as before.” Remediation: replace each “in-flight” phrase with the precise non-`done` states or “work in progress,” and state directly that exclusion is a no-op for an unbracketed goal.\n5. **F5 — SDD worked configuration uses prohibited “in-flight” behavior narration.** `docs/examples/sdd/rules.toml:47` and line 191 describe an “in-flight epic.” Remediation: describe the exact applicable lifecycle states, such as an epic whose state is not `done`.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Five blocking documentation defects remain: one incorrect shared-control-plane layout and four current-behavior narration defects.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Guarantees document places .git/jit under .jit and uses the wrong heartbeat directory name\",\"file\":\"docs/concepts/guarantees.md\",\"line\":352},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Example configuration narrates the removal of former validation keys\",\"file\":\"docs/reference/example-config.toml\",\"line\":105},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Custom-gates how-to compares current checker behavior with a past state\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":223},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Research worked configuration uses in-flight and exactly-as-before narration\",\"file\":\"docs/examples/research/rules.toml\",\"line\":50},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"SDD worked configuration uses prohibited in-flight behavior narration\",\"file\":\"docs/examples/sdd/rules.toml\",\"line\":47}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2025 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4be8-8b0a-73f2-b52b-a09173399bf0\n--------\nuser\n--- 2012 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Five blocking documentation defects remain: one incorrect shared-control-plane layout and four current-behavior narration defects.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Guarantees document places .git/jit under .jit and uses the wrong heartbeat directory name",
+        "file": "docs/concepts/guarantees.md",
+        "line": 352
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Example configuration narrates the removal of former validation keys",
+        "file": "docs/reference/example-config.toml",
+        "line": 105
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Custom-gates how-to compares current checker behavior with a past state",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 223
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Research worked configuration uses in-flight and exactly-as-before narration",
+        "file": "docs/examples/research/rules.toml",
+        "line": 50
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "SDD worked configuration uses prohibited in-flight behavior narration",
+        "file": "docs/examples/sdd/rules.toml",
+        "line": 47
+      }
+    ]
+  }
+}

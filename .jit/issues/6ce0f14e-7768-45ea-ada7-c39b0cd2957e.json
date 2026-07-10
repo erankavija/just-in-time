@@ -27,7 +27,7 @@
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T11:32:09.845102059Z"
+      "updated_at": "2026-07-10T12:02:38.828486242Z"
     }
   },
   "context": {},
@@ -39,7 +39,7 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-06T15:39:58.883953366Z",
-  "updated_at": "2026-07-10T11:34:42.567129885Z",
+  "updated_at": "2026-07-10T12:04:42.626760325Z",
   "first_ready_at": "2026-07-06T15:39:58.883953626Z",
   "claimed_at": "2026-07-10T11:26:54.096308974Z"
 }
