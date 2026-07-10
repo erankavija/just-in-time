@@ -98,10 +98,36 @@ async fn get_issue<S: IssueStore>(
     })
 }
 
-/// Graph data for visualization
+/// Graph data for visualization: one node per issue, one edge per dependency.
+///
+/// List envelope: `count` is the number of entries in `nodes`, the primary
+/// collection. `edges` is a secondary collection, counted by its own length.
+/// This matches [`jit::output::GraphTreeResponse`], where `count` likewise
+/// counts `nodes`, and [`jit::output::IssueChildrenResponse`], where `count`
+/// counts the primary `issues` collection and leaves the secondary `dangling`
+/// list uncounted.
+///
+/// # Examples
+///
+/// ```
+/// use jit_server::routes::GraphData;
+///
+/// let data = GraphData {
+///     count: 0,
+///     nodes: vec![],
+///     edges: vec![],
+/// };
+/// let json = serde_json::to_value(&data).unwrap();
+/// assert_eq!(json["count"], 0);
+/// assert!(json["nodes"].as_array().unwrap().is_empty());
+/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphData {
+    /// Number of entries in `nodes` (equals `nodes.len()`).
+    pub count: usize,
+    /// One entry per issue in the repository.
     pub nodes: Vec<GraphNode>,
+    /// One entry per dependency edge between issues.
     pub edges: Vec<GraphEdge>,
 }
 
@@ -136,6 +162,9 @@ pub struct GraphEdge {
 }
 
 /// Get dependency graph
+///
+/// Responds with the [`GraphData`] list envelope: `count` entries in `nodes`,
+/// plus the `edges` between them.
 ///
 /// Each node carries the canonical hierarchy resolved by the jit library
 /// (`jit::graph::hierarchy::resolve_hierarchy`) over the repository's configured
@@ -189,7 +218,11 @@ async fn get_graph<S: IssueStore>(
         }
     }
 
-    Ok(Json(GraphData { nodes, edges }))
+    Ok(Json(GraphData {
+        count: nodes.len(),
+        nodes,
+        edges,
+    }))
 }
 
 /// Status summary
@@ -1155,6 +1188,55 @@ enforce_leases = "off"
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.edges[0].from, id2);
         assert_eq!(graph.edges[0].to, id1);
+    }
+
+    /// The response body carries the `count` envelope field, and it counts
+    /// `nodes` rather than `edges` (which differ in number here).
+    #[tokio::test]
+    async fn test_get_graph_body_carries_node_count() {
+        let storage = InMemoryStorage::new();
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(
+            storage.root().join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+
+        let executor = Arc::new(CommandExecutor::new(storage));
+        let new = |title: &str| {
+            executor
+                .create_issue(
+                    title.to_string(),
+                    String::new(),
+                    Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .0
+        };
+        let (id1, id2) = (new("Issue 1"), new("Issue 2"));
+        new("Issue 3");
+        // One edge over three nodes, so a `count` of edges could not pass.
+        executor.add_dependency(&id2, &id1).unwrap();
+
+        let state = AppState {
+            executor,
+            tracker: Arc::new(ChangeTracker::new(16)),
+            project_name: "test-project".to_string(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+
+        let response = server.get("/graph").await;
+        response.assert_status_ok();
+        let body: serde_json::Value = response.json();
+
+        assert_eq!(body["count"], 3);
+        assert_eq!(body["nodes"].as_array().unwrap().len(), 3);
+        assert_eq!(body["edges"].as_array().unwrap().len(), 1);
     }
 
     /// Every node carries the core-resolved parent, children, cluster, rank, and
