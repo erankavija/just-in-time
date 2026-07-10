@@ -21,7 +21,7 @@ Labels are **namespace:value** pairs that provide:
 **Example:**
 ```bash
 jit issue create --title "Add login" \
-  --label type:task \
+  --type task \
   --label epic:auth \
   --label component:backend \
   --label milestone:v1.0
@@ -65,17 +65,22 @@ Both can flow the same direction (task → epic → milestone) but serve differe
 
 Where:
 - namespace: [a-z][a-z0-9-]* (lowercase, alphanumeric, hyphens)
-- value: [a-zA-Z0-9][a-zA-Z0-9._-]* (alphanumeric, dots, hyphens, underscores)
+- value:     [a-zA-Z0-9][a-zA-Z0-9._/-]*   (alphanumeric, dots, hyphens,
+                                            underscores, slashes)
+             or an item address (see below)
 - separator: exactly one colon ':'
 ```
+
+A value never contains a colon: the colon is reserved as the sole namespace separator.
 
 **Examples of VALID labels:**
 - ✅ `milestone:v1.0`
 - ✅ `epic:user-auth`
 - ✅ `component:backend`
-- ✅ `type:feature`
+- ✅ `type:task`
 - ✅ `priority:p0`
 - ✅ `team:platform-eng`
+- ✅ `enforces:@/rule/label-format`
 
 **Examples of INVALID labels:**
 - ❌ `auth` (no namespace)
@@ -84,37 +89,31 @@ Where:
 - ❌ `milestone:` (empty value)
 - ❌ `milestone:v1.0:extra` (multiple colons)
 
-### Validation
+### Values that carry item addresses
 
-```rust
-use regex::Regex;
+The value half may be a qualified [item address](item-addresses.md) instead of a
+plain word, so a label can link an issue to a rule, gate, invariant, or to a
+structured item inside another issue's description:
 
-pub fn validate_label(label: &str) -> Result<(), String> {
-    let re = Regex::new(r"^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$").unwrap();
-    
-    if !re.is_match(label) {
-        return Err(format!(
-            "Invalid label format: '{}'. Expected format: 'namespace:value' \
-             where namespace is lowercase alphanumeric+hyphens, \
-             value is alphanumeric with dots/hyphens/underscores",
-            label
-        ));
-    }
-    
-    Ok(())
-}
-```
+- `enforces:@/rule/label-format` — project-scoped address (`@/<kind>/<self-id>`)
+- `enforces:@myproject/gate/cargo-ci` — address qualified by project name
+- `satisfies:56ab0224/REQ-01` — `<short-id>/<self-id>`, an item inside an issue
 
-**CLI enforcement:**
+The `satisfies:` namespace above is this repository's own configuration, not a
+`jit init` default; the address *form* of a value is part of the shipped format.
+
+### Enforcement
+
+The `label-format` rule in `.jit/rules.toml` checks every label on write. A
+malformed label blocks the write and names the offending label:
+
 ```bash
 jit issue update <id> --label "Auth"
-# Error: Invalid label format: 'Auth'. Expected: 'namespace:value'
-# Did you mean: 'epic:auth' or 'component:auth'?
-
-jit issue update <id> --label "milestone-v1.0"
-# Error: Invalid label format: 'milestone-v1.0'. 
-# Did you mean: 'milestone:v1.0'?
+# Error: Blocked by validation rule(s); pass --force to override:
+#   - [label-format] at raw_labels.0: "Auth" is not valid under the given pattern
 ```
+
+The command exits 4 (validation failure) and the issue is left untouched.
 
 ---
 
@@ -123,9 +122,10 @@ jit issue update <id> --label "milestone-v1.0"
 ### Core Namespaces (Built-in)
 
 Namespaces are declared in `.jit/config.toml` under `[namespaces.<name>]` tables.
-`jit init` seeds a starter registry directly in the generated `config.toml`, with
-these namespaces pre-declared and ready to customize: `type`, `component`,
-`priority`, `team`, `milestone`, `resolution`, and `enforces`.
+`jit init` seeds a starter registry directly in the generated `config.toml`, ready
+to customize. To see what the current repository declares, run `jit label namespaces`.
+
+An excerpt of the generated registry:
 
 ```toml
 [namespaces.type]
@@ -134,7 +134,7 @@ unique = true
 examples = ["type:task", "type:story", "type:epic"]
 
 [namespaces.priority]
-description = "Work priority (orthogonal to the issue priority field; used for filtering)."
+description = "Work priority. Orthogonal to issue priority field; used for filtering."
 unique = true
 examples = ["priority:high", "priority:low"]
 
@@ -176,7 +176,11 @@ Each `[namespaces.<name>]` table declares TAXONOMY only:
 - **unique** (bool, required): If true, an issue can carry at most one label from this namespace. Drives the `namespace-unique-<ns>` rule.
 - **examples** (list of string, optional): Documentation-only examples; not enforced.
 
-The registry drives two fixed default rules in `.jit/rules.toml`:
+To add a namespace, add a `[namespaces.<name>]` table to `.jit/config.toml`. To
+retire one, delete its table once no issue carries a label from it — `jit validate`
+reports any label whose namespace is undeclared.
+
+The registry drives default rules in `.jit/rules.toml`:
 `namespace-registry` (an undeclared namespace fails `jit validate`) and
 `namespace-unique-<ns>` (a unique namespace blocks a second label on
 write).
@@ -215,21 +219,31 @@ assert = { label-value-pattern = { namespace = "type", regex = '^(epic|story|tas
 
 When `jit validate` reports an unregistered namespace, the `namespace-registry` rule names the offending label so typos are caught.
 
-### Standard Work Item Types
+### Type Labels
 
-**CRITICAL: Every issue MUST have exactly ONE `type:*` label.**
+**CRITICAL: Every issue carries exactly ONE `type:*` label.**
 
-The `type:*` namespace defines the kind of work an issue represents:
+The `type:*` namespace defines the kind of work an issue represents. The set of
+valid type values is not built in: it is whatever `[type_hierarchy].types`
+declares in `.jit/config.toml` (`@/inv/domain-agnostic`). The `jit init` scaffold
+declares a four-level `milestone → epic → story → task` hierarchy; a project that
+needs `bug`, `research`, or `theme` types adds them there. See
+[Configuration](#configuration) below.
 
-| Type | Description | Typical Use | Time-boxed? |
-|------|-------------|-------------|-------------|
-| `type:idea` | Exploratory concept, not yet validated | Early-stage thoughts needing validation | No |
-| `type:research` | Time-boxed investigation or feasibility study | Technical feasibility, user research, literature review | Yes (recommended) |
-| `type:task` | Concrete implementation work | Coding, configuration, deployment | No |
-| `type:epic` | Large, coherent body of work | Major features spanning multiple tasks | No |
-| `type:milestone` | Time-bound release goal | Version releases, quarterly goals | Yes (by definition) |
-| `type:bug` | Defect or error to fix | Production issues, broken functionality | No |
-| `type:feature` | New functionality or enhancement | User-facing additions | No |
+Write the type with `--type <kind>`, which is validated against the declared
+types and rejects an undeclared kind:
+
+```bash
+jit issue create "Implement login endpoint" --type task
+jit issue update <id> --type story
+```
+
+`jit issue create` without `--type` (and without a `type:*` label) applies
+`[validation].default_type`.
+
+**Note on "research" vs "spike":** both name a time-boxed investigation
+("spike" is the Agile term used in Jira, Rally, and similar tools). Pick one as
+the declared type name and use the other only in prose.
 
 ### Epic and Milestone Labels: Membership vs Type
 
@@ -247,7 +261,7 @@ The `type:*` namespace defines the kind of work an issue represents:
 # Epic issue itself
 jit issue create \
   --title "User Authentication System" \
-  --label "type:epic" \
+  --type epic \
   --label "epic:auth" \
   --label "milestone:v1.0"
 # type:epic = this IS an epic
@@ -257,7 +271,7 @@ jit issue create \
 # Task under that epic
 jit issue create \
   --title "Implement login endpoint" \
-  --label "type:task" \
+  --type task \
   --label "epic:auth" \
   --label "milestone:v1.0" \
   --label "component:backend"
@@ -267,98 +281,78 @@ jit issue create \
 ```
 
 **Strategic View Filtering:**
-- Shows issues with `type:epic` OR `type:milestone` labels
-- Alternative: Shows issues with `epic:*` OR `milestone:*` labels (catches all strategic work)
-- Recommendation: Use the latter to include epics and their container milestones
 
-**Note on "research" vs "spike":**
-- `type:research` is the standard term for time-boxed investigations
-- "Spike" is Agile jargon with the same meaning (used in Jira, Rally, etc.)
-- Both terms acceptable in descriptions; use `type:research` for the label
+`jit query strategic` selects issues whose `type:*` label names one of the types
+in `[type_hierarchy].strategic_types`. To select by membership instead — every
+issue that contributes to an epic, whatever its own type — filter on the
+membership namespace with a wildcard:
 
-**Example research task:**
 ```bash
-jit issue create \
-  --title "Research: Evaluate vector database options" \
-  --description "Compare Qdrant, Milvus, pgvector. Time-box: 2 days" \
-  --label "type:research" \
-  --label "component:search"
+jit query strategic                    # the epics and milestones themselves
+jit query all --label "epic:*"         # everything filed under any epic
 ```
 
-**Validation rules:**
-```rust
-pub fn validate_issue_labels(issue: &Issue, registry: &NamespaceRegistry) -> Result<()> {
-    let mut namespace_counts = HashMap::new();
-    
-    for label in &issue.labels {
-        let (namespace, _value) = parse_label(label)?;
-        *namespace_counts.entry(namespace).or_insert(0) += 1;
-        
-        // Check if namespace is registered
-        if let Some(ns_def) = registry.get(&namespace) {
-            // Check uniqueness constraint
-            if ns_def.unique && namespace_counts[&namespace] > 1 {
-                return Err(format!(
-                    "Issue can only have one label from namespace '{}'. Found: {}",
-                    namespace,
-                    issue.labels.iter()
-                        .filter(|l| l.starts_with(&format!("{}:", namespace)))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
-        }
-    }
-    
-    Ok(())
-}
-```
+### Uniqueness and changing a unique label
 
-**CLI behavior:**
+A namespace declared `unique = true` admits at most one label per issue. Adding a
+second one blocks the write (exit 4):
+
 ```bash
-# Trying to add second unique namespace label
-jit issue update <id> --label "type:feature"
 jit issue update <id> --label "type:bug"
-# Error: Issue already has label 'type:feature'. Namespace 'type' allows only one label.
-# Use --remove-label first or --replace-label to change it.
+# Error: Blocked by validation rule(s); pass --force to override:
+#   - [namespace-unique-type] at labels.type: ["task","bug"] has more than 1 item
+```
 
-# Correct way
-jit issue update <id> --remove-label "type:feature" --label "type:bug"
-# Or shortcut:
-jit issue update <id> --replace-label "type:bug"
+To change the value, remove the old label and add the new one in a single
+invocation. `--remove-label` is applied after `--label`, so pairing them swaps
+the value regardless of flag order, in one atomic write:
+
+```bash
+jit issue update <id> --remove-label "type:task" --label "type:bug"
+```
+
+For the `type` namespace specifically, prefer `--type`: it replaces the existing
+`type:*` label in place and rejects a kind that `[type_hierarchy]` does not
+declare, which the generic label flags do not.
+
+```bash
+jit issue update <id> --type bug
 ```
 
 ---
 
 ## Agent-Friendly CLI
 
-### Autocomplete & Suggestions
+### Discovery
 
 ```bash
-# Show available namespaces
+# Show declared namespaces with description and uniqueness
 jit label namespaces
 # Output:
-# milestone     Release or time-bounded goal
-# epic          Large feature or initiative  
-# component     Technical area or subsystem
-# type          Work item type
-# team          Owning team or group
+# Label Namespaces:
+#
+#   type
+#     Description: Issue type (hierarchical). Exactly one per issue.
+#     Unique: true
+#
+#   milestone
+#     Description: Release milestone membership (version tag).
+#     Unique: false
+#   ...
 
 # Show existing values for a namespace
 jit label values milestone
 # Output:
-# milestone:v1.0
-# milestone:v2.0
-# milestone:q1-2026
-
-# Suggest labels based on issue content
-jit label suggest <id>
-# Analyzes title/description and suggests:
-# Suggested labels:
-# - component:backend (keyword: "API", "server")
-# - type:feature (keyword: "implement", "add")
-# - epic:auth (keyword: "authentication")
+# Values in namespace 'milestone':
+#
+#   v1.0
+#   v2.0
+#
+# Total: 2
 ```
+
+Both accept `--json` and emit the list envelope:
+`{"count": N, "namespaces": [...]}` and `{"count": N, "namespace": "...", "values": [...]}`.
 
 ### Atomic Label Operations
 
@@ -368,77 +362,37 @@ jit issue update <id> --label "epic:auth"
 # If already present, no error (idempotent)
 
 # Add multiple labels atomically (comma-separated)
-jit issue update <id> --label epic:auth,component:backend,type:feature
+jit issue update <id> --label epic:auth,component:backend
 # Or use repeated flags
-jit issue update <id> --label epic:auth --label component:backend --label type:feature
+jit issue update <id> --label epic:auth --label component:backend
 # All or nothing - if any invalid, none added
-
-# Replace label in namespace
-jit issue update <id> --replace-label "type:bug"
-# Removes existing type:* label and adds type:bug
 
 # Remove label
 jit issue update <id> --remove-label "epic:auth"
 
-# Remove all labels from namespace
-jit issue update <id> --remove-namespace "epic"
-# Removes all epic:* labels
+# Swap a value within a namespace (one write)
+jit issue update <id> --remove-label "epic:auth" --label "epic:billing"
+
+# Replace the type label
+jit issue update <id> --type bug
 ```
+
+`--label` has the alias `--add-label` and the short form `-l`. Both `--label` and
+`--remove-label` are repeatable and accept comma-separated values.
 
 ---
 
-## MCP Tool Schema
+## MCP Tools
 
-### Clear Tool Definitions for AI Agents
+The [MCP server](../../mcp-server/README.md) generates its tools from the CLI
+schema, so each tool mirrors the command of the same name:
 
-```typescript
-// MCP tool: label_add
-{
-  name: "label_add",
-  description: "Add labels to an issue. Labels MUST be in format 'namespace:value'",
-  inputSchema: {
-    type: "object",
-    properties: {
-      issue_id: { type: "string", description: "Issue ID" },
-      labels: {
-        type: "array",
-        items: { type: "string" },
-        description: "Array of labels in format 'namespace:value'. Examples: ['milestone:v1.0', 'epic:auth']"
-      }
-    },
-    required: ["issue_id", "labels"]
-  },
-  examples: [
-    {
-      input: { issue_id: "01ABC", labels: ["milestone:v1.0", "component:backend"] },
-      output: "Added 2 labels to issue 01ABC"
-    }
-  ]
-}
-
-// MCP tool: label_list_namespaces
-{
-  name: "label_list_namespaces",
-  description: "List all available label namespaces with descriptions and examples",
-  inputSchema: { type: "object", properties: {} }
-}
-
-// MCP tool: label_query
-{
-  name: "label_query",
-  description: "Find issues by label. Supports wildcards: 'milestone:*' finds all milestones",
-  inputSchema: {
-    type: "object",
-    properties: {
-      pattern: {
-        type: "string",
-        description: "Label pattern. Use 'namespace:*' for all in namespace, or exact match 'namespace:value'"
-      }
-    },
-    required: ["pattern"]
-  }
-}
-```
+| Tool | Purpose |
+|------|---------|
+| `jit_label_namespaces` | List declared namespaces, so an agent writes a label the `namespace-registry` rule accepts |
+| `jit_label_values` | List values in use in a namespace, so an agent reuses the project vocabulary |
+| `jit_issue_update` | Add (`label`) and remove (`remove_label`) labels on an issue |
+| `jit_query_all` | Find issues by label pattern, including `namespace:*` wildcards |
 
 ### Agent Prompt Additions
 
@@ -451,70 +405,19 @@ In the MCP server description or system prompt:
    - ✅ Correct: "milestone:v1.0", "epic:auth"
    - ❌ Wrong: "auth", "milestone-v1.0"
 
-2. **Standard Namespaces**:
-   - `milestone:*` - Release goals (strategic)
-   - `epic:*` - Large features (strategic)
-   - `component:*` - Technical areas
-   - `type:*` - Work type (unique, only one per issue)
-   - `team:*` - Owning team
+2. **Namespaces**: Call `jit_label_namespaces` before writing a label —
+   the registry is per-repository, and an undeclared namespace fails validation.
 
-3. **Strategic Issues**: Issues with `milestone:*` or `epic:*` labels appear in strategic view
+3. **Type**: `type:*` is unique. Change it with `jit_issue_update`'s `type`
+   argument, not by adding a second `type:*` label.
 
-4. **Check Before Adding**: Use `label_list_namespaces` to see available namespaces
+4. **Strategic Issues**: `jit_query_strategic` returns the issues whose type is
+   declared strategic (epics and milestones, by default).
 
 5. **Query Examples**:
-   - All milestones: `label_query("milestone:*")`
-   - Specific epic: `label_query("epic:auth")`
-   - Backend work: `label_query("component:backend")`
-```
-
----
-
-## Namespace Management
-
-### CLI Commands
-
-```bash
-# List all namespaces
-jit label namespaces list
-# Or: jit label ns list
-
-# Show namespace details
-jit label namespace show milestone
-# Output:
-# Namespace: milestone
-# Description: Release or time-bounded goal
-# Unique: false (issues can have multiple)
-# Strategic: true (appears in strategic view)
-# Examples: milestone:v1.0, milestone:q1-2026
-# Current values in use:
-# - milestone:v1.0 (12 issues)
-# - milestone:v2.0 (3 issues)
-
-# Add custom namespace
-jit label namespace add platform \
-  --description "Platform-specific labels" \
-  --examples "platform:web,platform:mobile" \
-  --unique
-
-# Remove namespace (must have no issues using it)
-jit label namespace remove old-namespace
-```
-
-### Migration Helper
-
-```bash
-# Find issues with malformed labels
-jit label audit
-# Output:
-# Found 5 issues with malformed labels:
-# Issue 01ABC: "auth" (missing namespace)
-#   Suggestion: Remove and add "epic:auth" or "component:auth"?
-# Issue 02DEF: "milestone-v1.0" (wrong format)
-#   Suggestion: Remove and add "milestone:v1.0"?
-
-# Auto-fix with prompts
-jit label fix --interactive
+   - All milestone members: `jit_query_all` with label `milestone:*`
+   - Specific epic: `jit_query_all` with label `epic:auth`
+   - Backend work: `jit_query_all` with label `component:backend`
 ```
 
 ---
@@ -533,6 +436,7 @@ Both can coexist:
 ```bash
 jit issue create \
   --title "Backend Infrastructure Epic" \
+  --type epic \
   --label "epic:backend" \
   --label "component:infra"
 ```
@@ -544,22 +448,25 @@ jit issue create \
 **Solution**: Exact string match
 - These are DIFFERENT milestones
 - Convention: Use consistent naming (recommend `v1.0` format)
-- Tool can warn about similar values:
+- Values are matched literally; there is no fuzzy matching, so check the
+  vocabulary already in use before inventing a value:
 
 ```bash
-jit issue update <id> --label "milestone:1.0"
-# Warning: Similar milestone exists: "milestone:v1.0"
-# Did you mean that one? (y/n)
+jit label values milestone
 ```
+
+To restrict a namespace to a fixed vocabulary, author a `label-value-pattern`
+rule in `.jit/rules.toml` (see [The `enforces:` namespace](#the-enforces-namespace)).
 
 ### 3. Case Sensitivity
 
-**Solution**: Namespaces are lowercase-only (enforced)
+**Solution**: Namespaces are lowercase-only (enforced by the `label-format` rule)
 Values are case-sensitive:
 
 ```bash
 jit issue update <id> --label "Epic:auth"
-# Error: Namespace must be lowercase. Did you mean "epic:auth"?
+# Error: Blocked by validation rule(s); pass --force to override:
+#   - [label-format] at raw_labels.0: "Epic:auth" is not valid under the given pattern
 
 jit issue update <id> --label "epic:Auth"
 # OK - value can be mixed case
@@ -573,11 +480,9 @@ jit issue update <id> --label "epic:Auth"
 ```bash
 # What milestones exist?
 jit label values milestone
-# Output: v1.0, v2.0, q1-2026
 
 # What epics exist?
 jit label values epic
-# Output: auth, api, dashboard
 
 # What labels does this issue have?
 jit issue show <id> --json | jq '.labels'
@@ -590,12 +495,13 @@ jit issue show <id> --json | jq '.labels'
 ### Example 1: Create Epic with Tasks
 
 ```bash
-# 1. Agent checks available namespaces
-jit label namespaces list
+# 1. Agent checks declared namespaces
+jit label namespaces
 
 # 2. Creates epic issue
 EPIC=$(jit issue create \
   --title "User Authentication System" \
+  --type epic \
   --priority high \
   --label "epic:auth" \
   --label "milestone:v1.0" \
@@ -609,7 +515,7 @@ for title in \
   "Password reset flow"; do
   TASK=$(jit issue create \
     --title "$title" \
-    --label "type:task" \
+    --type task \
     --label "epic:auth" \
     --label "milestone:v1.0" \
     --json | jq -r '.id')
@@ -620,10 +526,9 @@ done
 # - epic:auth
 # - milestone:v1.0
 
-# 4. Agent can add component labels to tasks
-TASK_IDS=$(jit query all --json | jq -r '.[] | select(.dependencies[] == "'$EPIC'") | .id')
-for task in $TASK_IDS; do
-  jit issue update $task --label "component:backend"
+# 4. Agent adds component labels to the epic's tasks
+for task in $(jit graph deps "$EPIC" --json | jq -r '.nodes[].id'); do
+  jit issue update "$task" --label "component:backend"
 done
 ```
 
@@ -631,14 +536,13 @@ done
 
 ```bash
 # Agent wants to see high-level progress
-jit query all --label "milestone:*" --or label "epic:*"
-# Returns all strategic issues
+jit query strategic
+# Returns the epics and milestones themselves
 
-# Check milestone progress
-MILESTONE_ID=$(jit query all --label "milestone:v1.0" --json | jq -r '.[0].id')
-jit graph downstream $MILESTONE_ID --json | \
-  jq '[.[] | .state] | group_by(.) | map({state: .[0], count: length})'
-# Returns: {"state":"done","count":12}, {"state":"in_progress","count":5}, ...
+# Check milestone progress: counts by state over the milestone's members
+jit query count --by state --label "milestone:v1.0" --json
+# {"total":17,"done":12,"open":5,"percent":70,
+#  "by_state":[{"state":"done","count":12}, ...]}
 ```
 
 ### Example 3: Error Handling
@@ -646,23 +550,21 @@ jit graph downstream $MILESTONE_ID --json | \
 ```bash
 # Agent tries malformed label
 jit issue update <id> --label "backend"
-# Error with clear guidance:
-# Invalid label format: 'backend'. Expected: 'namespace:value'
-# Available namespaces: milestone, epic, component, type, team
-# Did you mean: 'component:backend' or 'epic:backend'?
+# Error: Blocked by validation rule(s); pass --force to override:
+#   - [label-format] at raw_labels.0: "backend" is not valid under the given pattern
+# Exit code 4; nothing written.
 
 # Agent corrects
 jit issue update <id> --label "component:backend"
 # Success
 
-# Agent tries duplicate unique label
+# Agent tries a second label in the unique `type` namespace
 jit issue update <id> --label "type:bug"
-# Error: Issue already has label 'type:feature'. 
-# Namespace 'type' allows only one label.
-# To replace: jit issue update <id> --replace-label "type:bug"
+# Error: Blocked by validation rule(s); pass --force to override:
+#   - [namespace-unique-type] at labels.type: ["feature","bug"] has more than 1 item
 
 # Agent corrects
-jit issue update <id> --replace-label "type:bug"
+jit issue update <id> --type bug
 # Success
 ```
 
@@ -670,13 +572,16 @@ jit issue update <id> --replace-label "type:bug"
 
 ## Validation Integration
 
+`jit validate` checks every issue against `.jit/rules.toml`, including the
+`label-format` and `namespace-registry` rules. It exits 0 when the repository is
+clean and non-zero when a rule error is found, so it drops straight into a hook
+or a CI job.
+
 ### Pre-commit Validation
 
 ```bash
 # In .git/hooks/pre-commit
-jit label audit --check
-# Exit code 0: all labels valid
-# Exit code 1: malformed labels found
+jit validate
 ```
 
 ### CI Validation
@@ -684,54 +589,23 @@ jit label audit --check
 ```yaml
 # .github/workflows/validate.yml
 - name: Validate labels
-  run: |
-    jit label audit
-    if [ $? -ne 0 ]; then
-      echo "Found invalid labels. Run: jit label fix --interactive"
-      exit 1
-    fi
+  run: jit validate
 ```
 
 ---
 
-## JSON Schema for Agents
+## Machine-Readable Label Rules
 
-Provide machine-readable schema:
+Agents discover the label vocabulary and its constraints from three places:
 
 ```bash
-jit label schema --json
+jit label namespaces --json     # {"count": N, "namespaces": [...]}
+jit label values <ns> --json    # {"count": N, "namespace": "...", "values": [...]}
+jit --schema                    # JSON output shapes and the exit-code taxonomy
 ```
 
-Output:
-```json
-{
-  "version": 1,
-  "format": {
-    "pattern": "^[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$",
-    "examples": ["milestone:v1.0", "epic:auth", "component:backend"]
-  },
-  "namespaces": {
-    "milestone": {
-      "description": "Release or time-bounded goal",
-      "unique": false,
-      "strategic": true,
-      "values_in_use": ["v1.0", "v2.0", "q1-2026"]
-    },
-    "epic": {
-      "description": "Large feature or initiative",
-      "unique": false,
-      "strategic": true,
-      "values_in_use": ["auth", "api", "dashboard"]
-    }
-  }
-}
-```
-
-Agents can parse this to:
-- Validate format before sending
-- Discover available namespaces
-- See existing values
-- Understand strategic labels
+The rules themselves — format pattern, uniqueness, allowed values — are readable
+as data in `.jit/rules.toml`, the single source of truth.
 
 ---
 
@@ -747,7 +621,7 @@ types = { milestone = 1, epic = 2, story = 3, task = 4 }
 # List of type names that are considered strategic (for query strategic)
 strategic_types = ["milestone", "epic"]
 
-# Type name to membership label namespace mapping
+# Maps each parent type to its membership namespace
 [type_hierarchy.label_associations]
 epic = "epic"
 milestone = "milestone"
@@ -797,13 +671,13 @@ release = "milestone" # Map release type to milestone namespace
 
 ### The Golden Rules
 
-**Rule 1: Every Issue MUST Have a Type**
+**Rule 1: Every Issue Carries Exactly One Type**
 ```bash
-# ❌ WRONG - No type label
-jit issue create --title "Login API" --label "epic:auth"
+# Explicit — validated against [type_hierarchy].types
+jit issue create --title "Login API" --type task --label "epic:auth"
 
-# ✅ CORRECT - Has type label
-jit issue create --title "Login API" --label "type:task" --label "epic:auth"
+# Implicit — [validation].default_type is applied
+jit issue create --title "Login API" --label "epic:auth"
 ```
 
 **Rule 2: Type vs Membership Labels**
@@ -820,7 +694,7 @@ jit issue create --title "Login API" --label "type:task" --label "epic:auth"
 ```bash
 jit issue create \
   --title "User Authentication System" \
-  --label "type:epic" \         # This IS an epic
+  --type epic \                  # This IS an epic
   --label "epic:auth" \          # This epic is about auth (group ID)
   --label "milestone:v1.0"       # This epic is part of v1.0
 ```
@@ -834,7 +708,7 @@ Why both `type:epic` and `epic:auth`?
 ```bash
 jit issue create \
   --title "Implement JWT validation" \
-  --label "type:task" \          # This IS a task
+  --type task \                   # This IS a task
   --label "epic:auth" \           # Belongs to auth epic
   --label "milestone:v1.0" \      # Belongs to v1.0 milestone
   --label "component:backend"     # Additional metadata
@@ -844,44 +718,49 @@ jit issue create \
 ```bash
 jit issue create \
   --title "Release v1.0" \
-  --label "type:milestone" \     # This IS a milestone
+  --type milestone \             # This IS a milestone
   --label "milestone:v1.0"       # Self-referential group ID
 ```
 
 ### Namespace Reference Table
 
-**Required on Every Issue:**
+The registry is per-repository; `jit label namespaces` is authoritative for yours.
+The namespaces `jit init` scaffolds behave as follows.
+
+**Carried by every issue:**
 
 | Namespace | Unique? | Examples | Purpose |
 |-----------|---------|----------|---------|
 | `type:*` | ✅ Yes | `type:task`, `type:epic`, `type:milestone` | Defines what the issue IS |
 
-**Optional Strategic Labels:**
+**Membership labels (namespaces inferred from `label_associations`):**
 
 | Namespace | Unique? | Examples | Purpose |
 |-----------|---------|----------|---------|
 | `epic:*` | ❌ No | `epic:auth`, `epic:billing` | Groups work under an epic |
 | `milestone:*` | ❌ No | `milestone:v1.0`, `milestone:q1-2026` | Groups work in a release |
+| `story:*` | ❌ No | `story:login-form` | Groups work under a story |
 
-**Optional Metadata Labels:**
+**Metadata labels:**
 
 | Namespace | Unique? | Examples | Purpose |
 |-----------|---------|----------|---------|
 | `component:*` | ❌ No | `component:backend`, `component:frontend` | Technical area |
 | `team:*` | ✅ Yes | `team:platform`, `team:api` | Owning team |
 | `priority:*` | ✅ Yes | `priority:p0`, `priority:p1` | Priority level |
-| `status:*` | ✅ Yes | `status:needs-review`, `status:blocked` | Additional status markers |
+| `resolution:*` | ✅ Yes | `resolution:wont-fix` | Reason for closure |
+| `enforces:*` | ❌ No | `enforces:@/rule/label-format` | Item this issue enforces |
 
 ### DO's and DON'Ts
 
 **DO:**
-- ✅ Use `type:task` + `epic:auth` for tasks
-- ✅ Use `type:epic` + `epic:auth` + `milestone:v1.0` for epics
+- ✅ Use `--type task` + `--label epic:auth` for tasks
+- ✅ Use `--type epic` + `--label epic:auth` + `--label milestone:v1.0` for epics
 - ✅ Query by membership: `jit query all --label "epic:auth"`
 - ✅ Use lowercase for namespaces
 
 **DON'T:**
-- ❌ Skip the `type:` label
+- ❌ Add a second label in a unique namespace instead of swapping it
 - ❌ Use uppercase in namespaces (`Type:task`)
 - ❌ Use hyphens instead of colons (`epic-auth`)
 - ❌ Create freeform labels without namespaces
@@ -892,28 +771,26 @@ jit issue create \
 
 ### 1. Enforce Format
 - Regex validation: `namespace:value`
-- Clear error messages with suggestions
+- Rule violations block the write and name the offending label
 - No freeform labels accepted
 
 ### 2. Namespace Registry
-- Predefined standard namespaces
-- Properties: description, uniqueness, strategic flag
+- Namespaces declared in `.jit/config.toml`
+- Properties: description, uniqueness, examples
 - Extensible for custom namespaces
 
 ### 3. Agent-Friendly Tools
-- Discovery: `label namespaces`, `label values`
-- Validation: Clear errors before write
-- Suggestions: `label suggest`
-- JSON schema: Machine-readable rules
+- Discovery: `jit label namespaces`, `jit label values`
+- Validation: rule errors before write, `jit validate` for the whole repository
+- JSON envelopes on every listing, plus `jit --schema`
 
 ### 4. Atomic Operations
 - Idempotent add
-- Replace for unique namespaces
+- Paired `--remove-label` / `--label` to swap a unique namespace's value
 - Batch operations (all-or-nothing)
 
 ### 5. MCP Integration
-- Explicit tool schemas
-- Examples in tool definitions
+- Tools generated from the CLI schema
 - Prompt guidance on usage
 - Error feedback loop
 
