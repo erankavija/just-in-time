@@ -9,9 +9,16 @@
     "6ce0f14e-7768-45ea-ada7-c39b0cd2957e"
   ],
   "gates_required": [
-    "repo-validate"
+    "repo-validate",
+    "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T11:32:09.752185791Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -29,7 +36,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-06T15:39:58.875830140Z",
-  "updated_at": "2026-07-09T23:14:10.794038729Z",
+  "updated_at": "2026-07-10T11:32:09.752239061Z",
   "first_ready_at": "2026-07-06T15:39:58.875830550Z",
   "claimed_at": "2026-07-09T23:14:10.794038049Z"
 }

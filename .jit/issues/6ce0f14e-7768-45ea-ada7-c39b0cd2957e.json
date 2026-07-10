@@ -20,9 +20,16 @@
   ],
   "gates_required": [
     "jit-validate",
-    "code-review"
+    "code-review",
+    "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T11:32:09.744144235Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -32,7 +39,7 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-06T15:39:58.883953366Z",
-  "updated_at": "2026-07-10T11:26:54.096309174Z",
+  "updated_at": "2026-07-10T11:32:09.744211315Z",
   "first_ready_at": "2026-07-06T15:39:58.883953626Z",
   "claimed_at": "2026-07-10T11:26:54.096308974Z"
 }

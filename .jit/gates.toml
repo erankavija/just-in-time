@@ -124,6 +124,28 @@ pass_context = true
 
 [[gates]]
 version = 1
+key = "doc-review"
+title = "AI Documentation Review"
+description = "AI-powered review of the shipped documentation surface against the current source tree. Apply to any work that adds or changes adopter-facing documentation (the docs/ tree and the product-describing READMEs): it verifies that statements about CLI behavior, storage layout, and repository structure match crates/jit/src and .jit/ config, that repo-local dogfood configuration is signalled as this repository's own, that prose states current behavior with no legacy narration or hand-maintained counts that rot, that links and cited paths resolve, and that content conforms to docs/reference/jit-content-standards.md including Mermaid for all diagrams."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "exec"
+command = "./scripts/ai-review.sh"
+timeout_seconds = 1800
+pass_context = true
+prompt_file = "./scripts/doc-review-prompt.md"
+
+[gates.checker.env]
+REVIEWER_AGENT = "codex exec"
+
+[gates.reserved]
+
+[[gates]]
+version = 1
 key = "fmt"
 title = "Code Formatted"
 description = "Code must be formatted with cargo fmt"
