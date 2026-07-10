@@ -155,7 +155,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             GraphExportFormat::Json if full => {
                 // The full node shape carries the DAG-resolved parent + cluster;
                 // resolution reads the repo's configured type hierarchy.
-                let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+                let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
                 let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
                 crate::visualization::export_json_full(&graph, &resolution)
             }
@@ -211,7 +211,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
         let resolution = crate::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
         // When scoped to a root, keep the root plus its transitive dependency
@@ -291,7 +291,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let config = crate::hierarchy_templates::get_hierarchy_config(&self.storage)?;
+        let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
         let divergences =
             crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &config);
 

@@ -185,7 +185,7 @@ async fn get_graph<S: IssueStore>(
     // Resolve the hierarchy with the core resolver, over the repo's type levels.
     let issue_refs: Vec<&Issue> = issues.iter().collect();
     let config =
-        jit::hierarchy_templates::get_hierarchy_config(state.executor.storage()).map_err(|e| {
+        jit::config_manager::get_hierarchy_config(state.executor.storage()).map_err(|e| {
             tracing::error!("Failed to load hierarchy configuration: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;

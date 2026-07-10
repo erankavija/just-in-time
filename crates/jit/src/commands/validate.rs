@@ -98,7 +98,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)> {
-        use crate::hierarchy_templates::get_hierarchy_config;
+        use crate::config_manager::get_hierarchy_config;
 
         let config = get_hierarchy_config(&self.storage)?;
         let issues = self.storage.list_issues()?;

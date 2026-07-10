@@ -1,4 +1,8 @@
-//! Type hierarchy templates for different workflows
+//! Type hierarchy presets offered at `jit init`.
+//!
+//! Pure data: each preset names a level map and its label associations, and
+//! renders itself to a `config.toml` fragment. Loading a repository's configured
+//! taxonomy is [`crate::config_manager::get_hierarchy_config`].
 
 use std::collections::HashMap;
 
@@ -380,33 +384,6 @@ source-of-truth = "registry-first"
             hierarchy,
             label_associations,
         }
-    }
-}
-
-/// Load hierarchy configuration from storage.
-///
-/// Reads the type_hierarchy and label_associations from config.toml
-/// or returns the default config.
-pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
-    storage: &S,
-) -> anyhow::Result<crate::domain::type_taxonomy::HierarchyConfig> {
-    use crate::config_manager::ConfigManager;
-    let config_mgr = ConfigManager::new(storage.root());
-    let namespaces = config_mgr.get_namespaces()?;
-
-    if let Some(type_hierarchy) = namespaces.type_hierarchy {
-        // Load label_associations or use empty map
-        let label_associations = namespaces.label_associations.unwrap_or_default();
-
-        // Convert to HierarchyConfig
-        crate::domain::type_taxonomy::HierarchyConfig::new(type_hierarchy, label_associations)
-            .map_err(|e| {
-                crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}"))
-                    .into()
-            })
-    } else {
-        // Return default config
-        Ok(crate::domain::type_taxonomy::HierarchyConfig::default())
     }
 }
 

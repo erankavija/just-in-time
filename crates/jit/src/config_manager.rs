@@ -288,6 +288,45 @@ impl ConfigManager {
     }
 }
 
+/// Load the type taxonomy from the repository's `config.toml`.
+///
+/// Reads `[type_hierarchy]` and its label associations through a
+/// [`ConfigManager`] rooted at the store, and returns them as a
+/// [`HierarchyConfig`](crate::domain::type_taxonomy::HierarchyConfig). A
+/// repository that declares no `[type_hierarchy]` yields the default taxonomy.
+///
+/// # Examples
+///
+/// ```no_run
+/// use jit::config_manager::get_hierarchy_config;
+/// use jit::storage::JsonFileStorage;
+///
+/// let storage = JsonFileStorage::new(".jit");
+/// let config = get_hierarchy_config(&storage).unwrap();
+/// assert!(config.contains_type("task"));
+/// ```
+pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
+    storage: &S,
+) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
+    let config_mgr = ConfigManager::new(storage.root());
+    let namespaces = config_mgr.get_namespaces()?;
+
+    if let Some(type_hierarchy) = namespaces.type_hierarchy {
+        // Load label_associations or use empty map
+        let label_associations = namespaces.label_associations.unwrap_or_default();
+
+        // Convert to HierarchyConfig
+        crate::domain::type_taxonomy::HierarchyConfig::new(type_hierarchy, label_associations)
+            .map_err(|e| {
+                crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}"))
+                    .into()
+            })
+    } else {
+        // Return default config
+        Ok(crate::domain::type_taxonomy::HierarchyConfig::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
