@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "820f9036-7373-4385-aa6f-7cd8125631a7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d91ea408-3ed9-4021-9f9b-5ee736474c5f",
+  "commit": "f779734ba2a0642b8f9871149125afa3aeaa305c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T09:28:32.438581568Z",
+  "completed_at": "2026-07-10T09:29:21.008928087Z",
+  "duration_ms": 48570,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nAll success criteria are met:\n\n- REQ-1: The graph consumes server-provided hierarchy fields, and `hierarchyResolution.ts` is deleted.\n- REQ-2: Node type is read from `GraphNode.type`; no client parsing of `type:` labels remains.\n- REQ-3: The TypeScript vector test is removed. [hierarchy_vectors_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/hierarchy_vectors_test.rs:55) remains the fixture consumer.\n- REQ-4: The recorded `npm-ci` gate passed. Clustering and layout coverage includes hierarchy-only refreshes and repository graph behavior.\n\n## Architecture and separation of concerns\n\nNo boundary violations found. The changes are confined to web presentation, payload types, tests, and documentation.\n\n## Functional paradigm\n\nThe hierarchy migration uses data projections and collection operations appropriately. No blocking functional-style regression found.\n\n## Correctness and invariants\n\nThe prior cache defect is resolved at [GraphView.tsx](/home/vkaskivuo/Projects/just-in-time/web/src/components/Graph/GraphView.tsx:809): the layout fingerprint now covers server-provided `type`, `parent`, `children`, `cluster`, and `rank`, as well as visible nodes and edges.\n\nRegression coverage in [GraphView.layoutCache.test.tsx](/home/vkaskivuo/Projects/just-in-time/web/src/components/Graph/__tests__/GraphView.layoutCache.test.tsx:145) verifies that hierarchy-only changes trigger layout while presentation-only changes preserve positions.\n\nNo Rust persistence, event, gate, assignee, label, or PID behavior changed.\n\n## Safety\n\nNo unsafe Rust or PID-sensitive code was introduced.\n\n## Testing\n\nThe succeeded `npm-ci` gate is the primary evidence; I did not rerun the web tests. It confirms web lint, tests, and production build passed.\n\n`./scripts/jit-validate.sh` also passed. The working tree changes under `.jit/` are gate-run bookkeeping and were not treated as implementation changes.\n\n## Error handling\n\nNo new fallible Rust operations or error-handling regressions were introduced.\n\n## CLI contract\n\nNo CLI commands or JSON output contracts changed.\n\n## Documentation\n\nThe graph payload documentation and TypeScript model describe the authoritative served fields. No new Rust public API was introduced.\n\n## Prior review feedback\n\nThe previous high-severity finding is resolved by the expanded layout-input fingerprint and focused regression tests.\n\n## JIT issue management\n\nDependency `e486a854` is complete, and the issue reports no unmet dependencies. Repository validation passed.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met, the prior stale-layout cache defect is fixed with regression coverage, and recorded validation gates pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met, the prior stale-layout cache defect is fixed with regression coverage, and recorded validation gates pass.",
+    "findings": []
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "f1b1c7a8-a379-4a0e-9a33-4c394877f183",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d91ea408-3ed9-4021-9f9b-5ee736474c5f",
+  "commit": "5da1cf6e038d531e16ad2dca65c0a7cf0c30fc83",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T09:16:46.646296982Z",
+  "completed_at": "2026-07-10T09:18:09.058308200Z",
+  "duration_ms": 82412,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-2 and REQ-3 are met: node types come from `GraphNode.type`, and the TypeScript resolver and vector test were removed.\n\nREQ-1 is not fully met because hierarchy-only payload changes can leave the rendered graph stale. REQ-4 therefore cannot be accepted despite the successful web gate.\n\n## Architecture and separation of concerns\n\nNo blocking boundary violations found. The web layer consumes the server payload without introducing storage, command, or domain I/O concerns.\n\n## Functional paradigm\n\nThe new hierarchy projection is largely functional and data-driven. No blocking style issue found.\n\n## Correctness and invariants\n\nBlocking issue: the layout cache only fingerprints node IDs and edges. A server update that changes `type`, `parent`, `children`, or `cluster` without changing graph topology recomputes `clusterData`, but then enters the `topologyUnchanged` branch and merely patches existing node data/styles. Cluster membership, visibility, node renderer type, and positions remain stale.\n\nFor example, changing an issue from `type:task` to `type:story` can alter served hierarchy resolution while retaining identical node IDs and edges. The graph will not apply that new resolution until some unrelated topology or view-setting change forces a full layout.\n\n## Safety\n\nNo unsafe Rust or PID-sensitive changes were introduced.\n\n## Testing\n\nThe recorded `npm-ci` gate passed with exit code 0:\n\n- 23 test files and 204 tests passed.\n- ESLint passed.\n- Production TypeScript/Vite build passed.\n\nI did not rerun that suite. `./scripts/jit-validate.sh` passed. However, there is no test covering hierarchy-field changes with unchanged node/edge topology, which allowed the stale-layout defect through.\n\n## Error handling\n\nNo new blocking error-handling issue found.\n\n## CLI contract\n\nNo CLI surface changed.\n\n## Documentation\n\nThe payload types and migration documentation were updated appropriately. No new Rust public API was introduced.\n\n## Prior review feedback\n\n`run_history` is empty, so there is no earlier review finding to resolve.\n\n## JIT issue management\n\nThe prerequisite issue `e486a854` is done and `unmet_dependencies` is empty. Repository validation passed.\n\n## Findings\n\n1. **F1 — High:** Hierarchy-only server updates are ignored by the rendered-layout cache. The topology fingerprint at `web/src/components/Graph/GraphView.tsx:816` contains only node IDs and edges; the unchanged branch at line 826 does not apply the newly computed clustering, visibility, renderer types, or rank layout. This violates REQ-1’s requirement that the graph view derive its current clustering and parent structure from served resolution fields.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Hierarchy-only payload updates can leave graph clustering and layout stale despite the served resolution changing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The layout cache fingerprints only node IDs and edges, so changed served hierarchy fields do not update clustering or layout.\",\"file\":\"web/src/components/Graph/GraphView.tsx\",\"line\":816}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3461 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4b50-b023-7851-bd21-3d54fa20006c\n--------\nuser\n--- 3448 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Hierarchy-only payload updates can leave graph clustering and layout stale despite the served resolution changing.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The layout cache fingerprints only node IDs and edges, so changed served hierarchy fields do not update clustering or layout.",
+        "file": "web/src/components/Graph/GraphView.tsx",
+        "line": 816
+      }
+    ]
+  }
+}
