@@ -20,7 +20,7 @@ Dependencies in JIT represent "FROM depends on TO" relationships. If issue A dep
 JIT uses depth-first search (DFS) to detect potential cycles before adding any dependency:
 
 ```rust
-// Simplified algorithm from crates/jit/src/graph.rs
+// Simplified algorithm from crates/jit/src/graph/mod.rs
 fn would_create_cycle(from: &str, to: &str) -> bool {
     // Adding edge from → to creates a cycle if there's already a path to → from
     // In other words: if 'from' is reachable from 'to'
@@ -586,4 +586,4 @@ jit validate --fix
 - [Design Philosophy](design-philosophy.md) - Why these guarantees matter
 - [Troubleshooting Guide](../how-to/troubleshooting.md) - Practical recovery procedures
 - Implementation: `crates/jit/src/storage/` - Atomic operations and locking
-- Implementation: `crates/jit/src/graph.rs` - Cycle detection algorithm
+- Implementation: `crates/jit/src/graph/mod.rs` - Cycle detection algorithm

@@ -26,9 +26,9 @@
 #   function-typed bracket node types — `planning` (`P`) and `breakdown` (`B`) —
 #   each carrying its gate presets. (`planning`/`breakdown` are added to
 #   `config.toml`'s `[type_hierarchy]` so they are valid child types.) A breakable
-#   epic is bracketed by `jit apply plan <epic>` as the reduced spine
-#
-#     C(epic) ──dep→ {impl subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
+#   epic is bracketed by `jit apply plan <epic>` into a reduced spine: the
+#   container `C` (the epic) depends on the impl subgraph, which depends on `B`
+#   (`type:breakdown`), which depends on `P` (`type:planning`).
 #
 #   read as precedence `P > B > impl > C`: plan first, then breakdown, then the
 #   work, then the container closes. `P` carries the agent `plan-review` gate; `B`

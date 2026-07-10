@@ -1,7 +1,7 @@
 {
   "epic_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
   "epic_short_id": "287c4051",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -101,7 +101,7 @@
           "short_id": "6ce0f14e",
           "title": "Documentation review gate",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -141,6 +141,37 @@
       ]
     }
   ],
+  "wave_5": {
+    "wave_number": 5,
+    "rationale": "doc-review residuals. Round 2 of the gate (on the wave-4 merged tree) found 5 findings; after fixing them, round 3 found 9 more; round 4 passed with zero. The reviewer audits deeper each pass rather than re-checking closed ground. Small localized findings were lead edits on main; the one large finding (labels.md documents a nonexistent label CLI, 920 lines / 16 bogus command sites) was dispatched to an isolated worktree worker.",
+    "rounds": [
+      {
+        "round": 2,
+        "findings": 5,
+        "disposition": "lead edits on main (commit 0a91d5e4): control-plane layout in guarantees.md; removed-keys narration in example-config.toml; 'exactly as before' in custom-gates.md; in-flight markers in examples/research/rules.toml and examples/sdd/rules.toml. Docs-wide marker sweep also caught a sixth site the audit missed: configuration.md removed-keys narration."
+      },
+      {
+        "round": 3,
+        "findings": 9,
+        "disposition": "F1 (labels.md) dispatched to worker dr-labels (worktree, merged as c11a43dc, -340/+217). F2-F9 lead edits on main (commit 392312eb): storage migration claim, README roadmap promise, INSTALL npm path (registry 404s), guarantees undo/replay/time-travel, two templates.toml 'replacement for the old' headers, two 'legacy alias' framings. Sweep also caught three further 'Legacy alias:' sites in cli-commands.md the gate sampled but did not enumerate.",
+        "lead_review": "dr-labels PASS with one lead-applied correction (c5809a4c): the MCP tools table claimed a remove_label param; the generator uses properties[flag.name] verbatim from `jit --schema`, which emits remove-label. Only the command path is underscored into the tool name. Verified empirically in a scratch repo: paired --remove-label/--label swaps a unique label in either flag order; --type rejects an undeclared kind where --label type:x only warns; the namespace-unique-type error text matches real output verbatim; all 14 documented verbs exist in cli.rs."
+      },
+      {
+        "round": 4,
+        "findings": 0,
+        "disposition": "VERDICT: PASS at commit c5809a4c. REQ-03 green."
+      }
+    ],
+    "issues": [
+      {
+        "short_id": "dr-labels",
+        "files": "docs/reference/labels.md",
+        "findings": "R3-F1",
+        "status": "merged",
+        "commit": "69d3e781"
+      }
+    ]
+  },
   "lead_decisions": [
     {
       "id": "LD-1",
@@ -190,6 +221,21 @@
       "id": "LD-10",
       "decision": "User-approved (2026-07-10): the doc-review gate's 21 findings are fixed as wave 4 under this epic rather than deferred, including rewriting web/README.md for the jit web UI and removing two 'not yet implemented' roadmap lists. Framed as 6ce0f14e REQ-03 gate-driven rework (no new issues); re-run doc-review to green, then complete.",
       "for": "6ce0f14e"
+    },
+    {
+      "id": "LD-12",
+      "decision": "Wave 5 (doc-review residuals) ran as lead edits on main plus one dispatched worker. Rounds 2->3->4 of the gate surfaced 5 -> 9 -> 0 findings: the reviewer audits deeper each pass rather than re-checking closed ground, so each round's fix set must be swept for same-class siblings before re-running. Doing so caught 4 defects the gate sampled but never enumerated (configuration.md removed-keys narration; three further 'Legacy alias:' sites in cli-commands.md).",
+      "for": "6ce0f14e"
+    },
+    {
+      "id": "LD-13",
+      "decision": "User-approved (2026-07-10, escalation): attach a cargo-ci gate to 6ce0f14e. code-review round 1 failed on 7 test failures that do not reproduce (cargo test --workspace alone: 1545 passed / 0 failed; reviewer: 1538 passed / 7 failed) — bug 894337e2 (find_available_port race) plus claim-test contention on .git/jit while the reviewer runs its own jit commands. scripts/code-review-prompt.md:10 makes the reviewer skip cargo test when a succeeded cargo-ci gate exists. Strictly additive; no gate weakened. Lead invariant 4 required the escalation even though LD-7 had established the practice.",
+      "for": "6ce0f14e"
+    },
+    {
+      "id": "LD-14",
+      "decision": "Dropped `dangerouslyDisableSandbox: true` from the worktree dispatch prompt. The prior handoff lists it as a standing ground rule for worker git writes, but the auto-mode classifier correctly blocks it as an unauthorized sandbox bypass. Workers commit normally; instruct them to report a sandbox block rather than work around it.",
+      "for": "wave-5"
     },
     {
       "id": "LD-11",

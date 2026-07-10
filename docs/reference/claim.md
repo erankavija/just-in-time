@@ -241,9 +241,9 @@ jit claim heartbeat abc12345-6789-... --json
 
 Indefinite leases become **stale** when:
 
-```
-now - last_beat > stale_threshold_secs (default: 3600)
-```
+$$\mathrm{now} - \mathrm{last\_beat} > \mathrm{stale\_threshold\_secs}$$
+
+where `stale_threshold_secs` defaults to 3600.
 
 Stale leases are:
 - Highlighted in `jit claim status`

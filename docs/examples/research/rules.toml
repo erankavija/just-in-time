@@ -77,9 +77,9 @@
 #   `planning` (`P`) and `breakdown` (`B`) — each carrying its gate presets.
 #   (`planning`/`breakdown` are added to `config.toml`'s `[type_hierarchy]` so they
 #   are valid child types.) A breakable goal is bracketed by `jit apply plan <goal>`
-#   as the reduced spine
-#
-#     C(goal) ──dep→ {experiment subgraph} ──dep→ B(type:breakdown) ──dep→ P(type:planning)
+#   into a reduced spine: the container `C` (the goal) depends on the experiment
+#   subgraph, which depends on `B` (`type:breakdown`), which depends on `P`
+#   (`type:planning`).
 #
 #   read as precedence `P > B > experiments > C`: plan first, then breakdown, then
 #   the experiments, then the goal closes. `P` carries the agent `plan-review`

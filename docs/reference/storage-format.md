@@ -2,7 +2,10 @@
 
 > **Diátaxis Type:** Reference
 
-JIT stores all data in the `.jit/` directory at the repository root.
+JIT stores its issue and configuration data in the `.jit/` directory at the
+repository root. Machine-local runtime state lives there too, gitignored, and
+multi-agent lease coordination lives under `.git/jit/` (see
+[The `.git/jit/` Control Plane](#the-gitjit-control-plane)).
 
 ## Directory Structure
 

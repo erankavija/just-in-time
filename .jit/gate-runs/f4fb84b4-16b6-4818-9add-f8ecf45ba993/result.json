@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "run_id": "f4fb84b4-16b6-4818-9add-f8ecf45ba993",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+  "commit": "cd12c765255a28a6f77badac0bfbad9e5b74418a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T15:30:41.368595367Z",
+  "completed_at": "2026-07-10T15:33:32.172814792Z",
+  "duration_ms": 170804,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail.\n\n- `docs/concepts/overview.md:45` says atomic operations use “no locks.” The storage implementation uses per-file, registry, index, event-log, and claim-control-plane locks. Remediation: state that JIT combines atomic file replacement with advisory locking.\n- `docs/concepts/overview.md:57` says everything is version-controlled under `.jit/`. Machine-local files under `.jit/` are gitignored, while lease coordination lives under `.git/jit/`. Remediation: distinguish versioned repository data, machine-local runtime state, and the shared Git control plane.\n- `docs/reference/storage-format.md:5` similarly claims all data lives in `.jit/`, contradicting its own accurate control-plane description at lines 35–36 and 236 onward. Remediation: qualify the opening statement to cover repository issue/configuration data only.\n- The workspace description and component boundaries otherwise match `Cargo.toml`, `mcp-server/package.json`, `web/package.json`, and the current tree.\n- The documented CLI families, flags, JSON contracts, and exit-code taxonomy reviewed against `cli.rs` and `jit --schema` match the current surface.\n\n## 2. Adopter surface versus repo-local dogfood configuration\n\nPass.\n\nThe repository-specific projection in `docs/reference/rules-and-gates.md:17-21` is explicitly identified as this repository’s live configuration. Planning-bracket material is presented as optional configuration or worked examples, rather than as `jit init` defaults.\n\n## 3. Current behavior only\n\nPass.\n\nThe apparent matches are current-state terms, command names, status values, example comments, or descriptions of idempotent migrations. No adopter-facing prose narrates a superseded or promised JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass.\n\nThe earlier MCP tool totals have been removed. Remaining numeric statements describe stable workflow structure, configuration values, example output, or runtime quantities rather than volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nFail.\n\n- `docs/concepts/guarantees.md:23` and `docs/concepts/guarantees.md:589` cite the nonexistent `crates/jit/src/graph.rs`; graph code is now under `crates/jit/src/graph/`. Remediation: cite the actual module file responsible for cycle detection, such as `crates/jit/src/graph/mod.rs`, or cite the directory where appropriate.\n- `docs/concepts/design-philosophy.md:204` repeats the nonexistent `crates/jit/src/graph.rs` citation. Remediation: replace it with the concrete existing source file containing the illustrated behavior.\n- Markdown file links and anchors otherwise resolve. The `@/issue/REQ-01` occurrence is an explicitly documented invalid-input example, not a dangling citation. Other concrete addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nFail.\n\n- `docs/reference/claim.md:244-246` presents `now - last_beat > stale_threshold_secs` as a plain-text fenced equation. Remediation: express it in LaTeX, for example `$$\\mathrm{now}-\\mathrm{last\\_beat}>\\mathrm{stale\\_threshold\\_secs}$$`.\n- `docs/examples/research/config.toml:46` contains an arrow-art dependency diagram. Remediation: replace it with prose or refer to a Mermaid diagram in an accompanying Markdown document.\n- `docs/examples/research/rules.toml:82` contains another arrow-art dependency diagram. Remediation: replace it with prose or move the relationship into a Mermaid block in authored Markdown.\n- `docs/examples/sdd/config.toml:40` contains an arrow-art dependency diagram. Remediation: replace it with prose or refer to the canonical Mermaid bracket diagram.\n- `docs/examples/sdd/rules.toml:31` contains another arrow-art dependency diagram. Remediation: replace it with prose or move it into a Mermaid block in authored Markdown.\n\nDirectory trees and verbatim CLI tree output were correctly treated as listings rather than diagrams.\n\n## Findings\n\n1. **F1 — High:** `docs/concepts/overview.md:45` falsely claims JIT’s atomic file operations use no locks. State that atomic replacement is combined with advisory locking.\n2. **F2 — High:** `docs/concepts/overview.md:57` falsely says everything is version-controlled under `.jit/`. Distinguish versioned `.jit/` data, gitignored runtime files, and `.git/jit/` coordination state.\n3. **F3 — High:** `docs/reference/storage-format.md:5` falsely says all JIT data lives in `.jit/`. Qualify this as repository issue/configuration data and acknowledge `.git/jit/` in the opening description.\n4. **F4 — High:** `docs/concepts/guarantees.md:23` and line 589 cite nonexistent `crates/jit/src/graph.rs`. Replace both citations with the existing graph module path.\n5. **F5 — High:** `docs/concepts/design-philosophy.md:204` cites nonexistent `crates/jit/src/graph.rs`. Cite the concrete existing graph source file.\n6. **F6 — Medium:** `docs/reference/claim.md:245` renders an equation as plain text. Convert it to LaTeX math.\n7. **F7 — High:** `docs/examples/research/config.toml:46` uses arrow art as a diagram. Replace it with prose or reference a Mermaid diagram.\n8. **F8 — High:** `docs/examples/research/rules.toml:82` uses arrow art as a diagram. Replace it with prose or a Mermaid diagram in Markdown.\n9. **F9 — High:** `docs/examples/sdd/config.toml:40` uses arrow art as a diagram. Replace it with prose or reference the canonical Mermaid diagram.\n10. **F10 — High:** `docs/examples/sdd/rules.toml:31` uses arrow art as a diagram. Replace it with prose or a Mermaid diagram in Markdown.\n\nTotal findings: 10\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The documentation retains 10 blocking defects: three storage/locking claims, three stale source-path citations, one plain-text equation, and four non-Mermaid arrow diagrams.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Overview falsely claims atomic file operations use no locks\",\"file\":\"docs/concepts/overview.md\",\"line\":45},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Overview falsely says everything is version-controlled under .jit\",\"file\":\"docs/concepts/overview.md\",\"line\":57},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Storage reference falsely says all JIT data lives in .jit\",\"file\":\"docs/reference/storage-format.md\",\"line\":5},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Guarantees document cites nonexistent crates/jit/src/graph.rs\",\"file\":\"docs/concepts/guarantees.md\",\"line\":23},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Design philosophy cites nonexistent crates/jit/src/graph.rs\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":204},{\"id\":\"F6\",\"severity\":\"medium\",\"summary\":\"Lease staleness equation is plain text instead of LaTeX\",\"file\":\"docs/reference/claim.md\",\"line\":245},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Research config contains a non-Mermaid arrow-art diagram\",\"file\":\"docs/examples/research/config.toml\",\"line\":46},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Research rules contain a non-Mermaid arrow-art diagram\",\"file\":\"docs/examples/research/rules.toml\",\"line\":82},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"SDD config contains a non-Mermaid arrow-art diagram\",\"file\":\"docs/examples/sdd/config.toml\",\"line\":40},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"SDD rules contain a non-Mermaid arrow-art diagram\",\"file\":\"docs/examples/sdd/rules.toml\",\"line\":31}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5494 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4ca7-02fe-7962-9bc1-545855e23ab4\n--------\nuser\n--- 5481 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The documentation retains 10 blocking defects: three storage/locking claims, three stale source-path citations, one plain-text equation, and four non-Mermaid arrow diagrams.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Overview falsely claims atomic file operations use no locks",
+        "file": "docs/concepts/overview.md",
+        "line": 45
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Overview falsely says everything is version-controlled under .jit",
+        "file": "docs/concepts/overview.md",
+        "line": 57
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Storage reference falsely says all JIT data lives in .jit",
+        "file": "docs/reference/storage-format.md",
+        "line": 5
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Guarantees document cites nonexistent crates/jit/src/graph.rs",
+        "file": "docs/concepts/guarantees.md",
+        "line": 23
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "Design philosophy cites nonexistent crates/jit/src/graph.rs",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 204
+      },
+      {
+        "id": "F6",
+        "severity": "medium",
+        "summary": "Lease staleness equation is plain text instead of LaTeX",
+        "file": "docs/reference/claim.md",
+        "line": 245
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Research config contains a non-Mermaid arrow-art diagram",
+        "file": "docs/examples/research/config.toml",
+        "line": 46
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Research rules contain a non-Mermaid arrow-art diagram",
+        "file": "docs/examples/research/rules.toml",
+        "line": 82
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "SDD config contains a non-Mermaid arrow-art diagram",
+        "file": "docs/examples/sdd/config.toml",
+        "line": 40
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "SDD rules contain a non-Mermaid arrow-art diagram",
+        "file": "docs/examples/sdd/rules.toml",
+        "line": 31
+      }
+    ]
+  }
+}

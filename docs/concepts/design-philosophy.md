@@ -201,7 +201,7 @@ let high_priority_blocked = issues.iter()
 
 **Graph traversal (cycle detection):**
 ```rust
-// From crates/jit/src/graph.rs
+// From crates/jit/src/graph/mod.rs
 fn is_reachable(&self, start: &str, target: &str) -> bool {
     let mut visited = HashSet::new();
     let mut stack = vec![start];

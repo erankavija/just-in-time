@@ -42,7 +42,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 - Quiet mode for scripting (`--quiet` suppresses headers)
 
 **Agent-Friendly Architecture**
-- Atomic file operations (no database, no server, no locks)
+- Atomic file replacement guarded by advisory locks (no database, no server)
 - MCP tool integration for AI frameworks
 - Stateless coordination through shared file state
 - Event logs for observability and audit trail
@@ -54,7 +54,9 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 - **Assignee** (not owner) - Who's working on it (human or agent)
 
 **Repository-Local Storage**
-- Everything in `.jit/` directory (version controlled)
+- Issue and configuration data in `.jit/` (version controlled)
+- Machine-local runtime state also under `.jit/`, gitignored
+- Lease coordination in `.git/jit/`, shared across worktrees
 - Plain JSON files (no database, no server)
 - Git-optional (works standalone or with version control)
 - Easy backup, export, and migration
