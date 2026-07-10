@@ -2621,7 +2621,7 @@ pub fn commit_with_lease_context(
 ### Phase 2: CLI Integration (Week 1-2)
 1. **`jit claim` commands** (acquire, renew, release, status, list)
 2. **`jit worktree` commands** (info, list, init)
-3. **`jit validate --divergence`** command
+3. **`jit validate --branch-drift`** command
 4. **CLI-level lease enforcement in CommandExecutor**
 
 ### Phase 3: Enforcement and Recovery (Week 2)
