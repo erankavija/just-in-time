@@ -20,7 +20,7 @@
 - `7a9eb806` — authored `references/coherence-review.md` (tiers C1/C2/C3, PASS/FAIL verdict, stale-forward sweep, no-argue stop). code-review FAIL round 1: protocol existed but was not WIRED (REQ-01/03 unenforced). Lead reworked (rework-1): wired it into the dispatch flow at the container-dispatch.md step-8→9 seam + SKILL.md dispatch tail + softened the red flag; reconciled all 5 "separate story/concern" mentions. Re-run PASS → **done**.
 - `41aa1b75` — ran+graded 3rd scenario `plan-from-import` (PASS 8/8). All 3 planning-lead entry-path scenarios now recorded. **Discovered a real bug** (coverage-preview vacuity, see below) → **done**.
 - Filed bug `16402e14` (coverage-preview passes vacuously on checkbox-prefixed `[hard]` criteria; type:bug, priority high, component:validation, milestone:v1.0). Root cause: start-anchored `^\[hard\]` match at `crates/jit/src/validation/engine.rs:1317`. Wired to milestone `9db27a3a` (see Trap #7).
-- `c23dfe71` — verify-and-close rollup. Authored `docs/reference/lead-skills-eval-baseline.md`. code-review FAIL round 1: exec-lead `evals.json` had a **4th** scenario `parent-invoked-escalation` unrun. Ran+graded it PASS 6/6 (validates b46e13d9 escalation-to-parent), recorded, baseline → 4/4. Re-run PASS → **done**.
+- `c23dfe71` — verify-and-close rollup. Authored `dev/eval/lead-skills-eval-baseline.md`. code-review FAIL round 1: exec-lead `evals.json` had a **4th** scenario `parent-invoked-escalation` unrun. Ran+graded it PASS 6/6 (validates b46e13d9 escalation-to-parent), recorded, baseline → 4/4. Re-run PASS → **done**.
 - `e8b1cee3` — claimed; verified skeleton meets REQ-01..05 (all backed by prior work + 02a2bbb9 evals); reworded the one `epic-level target` domain-leak in `container-dispatch.md` for REQ-02. **Gates not yet run** (stopped here for handoff).
 - Every completed issue got `cargo-ci` added + passed BEFORE code-review (Trap #1, standing process). Leak checks clean after every worktree wave.
 
@@ -55,8 +55,8 @@ None. (Bug `16402e14` was filed at the user's explicit request this session and 
 - Plan (bracket): `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (D1–D9)
 - Progress + verdicts: `dev/active/f2532a2d-progress.json`
 - Prior handoff: `dev/active/f2532a2d-handoff.md` (Traps #1–#6)
-- Adjudication method: `docs/reference/skill-eval-adjudication.md`
-- Eval baseline rollup (c23dfe71): `docs/reference/lead-skills-eval-baseline.md`
+- Adjudication method: `dev/eval/skill-eval-adjudication.md`
+- Eval baseline rollup (c23dfe71): `dev/eval/lead-skills-eval-baseline.md`
 - Content standards: `docs/reference/jit-content-standards.md`
 - jit-project-lead skeleton + references: `.claude/skills/jit-project-lead/SKILL.md`, `references/{tier-derivation,wave-layering,container-dispatch,coherence-review,standards-scan,standards-fix}.md`
 - Filed bug: `jit issue show 16402e14`; parser site `crates/jit/src/validation/engine.rs:1317`

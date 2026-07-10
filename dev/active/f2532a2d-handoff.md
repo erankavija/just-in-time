@@ -29,7 +29,7 @@
 
 ## What to do next
 
-- [ ] **Finish 41aa1b75** (resume, don't restart). Worktree `worktree-agent-41aa1b75` @ `a4cf8dc7` already has `evals.json` + `setup-test-repo.sh`. Run its 3 scenarios (research-and-plan, plan-from-existing, plan-from-import) via the equivalent sub-agent runner, grade under `docs/reference/skill-eval-adjudication.md`, write `evals/results.md` with checklists + transcripts. Then: add cargo-ci gate, run cargo-ci, run code-review, merge, done. (Its scenario agents read jit-planning-lead from `~/.claude/skills` → main, which is stable — that's correct.)
+- [ ] **Finish 41aa1b75** (resume, don't restart). Worktree `worktree-agent-41aa1b75` @ `a4cf8dc7` already has `evals.json` + `setup-test-repo.sh`. Run its 3 scenarios (research-and-plan, plan-from-existing, plan-from-import) via the equivalent sub-agent runner, grade under `dev/eval/skill-eval-adjudication.md`, write `evals/results.md` with checklists + transcripts. Then: add cargo-ci gate, run cargo-ci, run code-review, merge, done. (Its scenario agents read jit-planning-lead from `~/.claude/skills` → main, which is stable — that's correct.)
 - [ ] **Rework-2 on 0b7e864d** (one attempt left; count=1, MAX=2). The ONLY remaining finding is the title scanner/fixer mismatch (Trap #4). Fix: anchor the scanner's position-code title pattern to `^` (matches the standards-doc "leading ordinal" definition and the fixer), so mid-title codes like `Build S0/W1: worker` are not flagged as mechanical. Add fixture tests for that case. Re-run both harnesses (test-standards-scan.sh, test-standards-fix.sh). Then cargo-ci + code-review, merge, done.
 - [ ] **7a9eb806 is READY now** (dep e7d41080 done): "Run cross-container coherence review before accepting a container as complete." Can dispatch immediately.
 - [ ] After 41aa1b75 done → **c23dfe71** ready (dep 41aa1b75 + 6662f738✓). After 0b7e864d done → **206bd960** ready (dep 0b7e864d).
@@ -55,7 +55,7 @@ None. The one escalation this session (flaky-test gate) was resolved by the invo
 - Epic: `jit issue show f2532a2d`
 - Plan (bracket): `dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md` (decisions D1–D9)
 - Progress + verdicts: `dev/active/f2532a2d-progress.json` (`waves`, `reviewed{}`, `rework_counts`, `notes[]`)
-- Adjudication method (used by all eval issues): `docs/reference/skill-eval-adjudication.md`
+- Adjudication method (used by all eval issues): `dev/eval/skill-eval-adjudication.md`
 - Content standards (scanner/fixer target): `docs/reference/jit-content-standards.md`
 - Scanner + fixer: `.claude/skills/jit-project-lead/scripts/standards-scan.sh`, `standards-fix.sh`, `references/standards-scan.md`, `references/standards-fix.md`
 - Dispatch prose (e7d41080): `.claude/skills/jit-project-lead/references/container-dispatch.md`
