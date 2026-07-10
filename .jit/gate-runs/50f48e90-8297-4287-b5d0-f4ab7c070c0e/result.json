@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "50f48e90-8297-4287-b5d0-f4ab7c070c0e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
+  "commit": "c5809a4c992ce504c547c39daf90ce42cd27c7f5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-10T15:29:19.417406344Z",
+  "completed_at": "2026-07-10T15:30:09.015447401Z",
+  "duration_ms": 49598,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nAll hard requirements are met:\n\n- REQ-01: `doc-review` is an automatic postcheck gate backed by `./scripts/ai-review.sh` and a documentation-specific prompt at [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:1).\n- REQ-02: The prompt mandates machine-readable findings at [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:81); the passing run contains successfully parsed structured findings.\n- REQ-03: The latest `doc-review` run passed with zero findings.\n- REQ-04: The registry describes both the review dimensions and when future documentation changes require the gate at [.jit/gates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/gates.toml:125).\n- REQ-05: The documentation-cleanup epic requires `doc-review` at [.jit/issues/287c4051-22f8-4e86-bf3a-5006907dcb85.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/287c4051-22f8-4e86-bf3a-5006907dcb85.json:11).\n\nAll declared prerequisite issues are complete.\n\n## Architecture and separation of concerns\n\nPass. The implementation is confined to gate configuration, review prompting, documentation, and repository-local issue records. It introduces no domain, storage, command, CLI, or output-layer coupling.\n\n## Functional paradigm\n\nPass. No Rust control flow or side-effecting application logic was introduced.\n\n## Correctness and invariants\n\nPass. The gate is registered with `mode = \"auto\"` and `auto = true` at [.jit/gates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/gates.toml:130). Gate registration and requirement changes have corresponding events. No atomic-write, transition-gate, assignee, label, or PID-safety invariant is compromised.\n\n## Safety\n\nPass. No unsafe Rust or changes affecting `#![deny(unsafe_code)]` were introduced.\n\n## Testing\n\nPass. Tests were not rerun because the issue has a newer succeeded `cargo-ci` gate, as instructed. Its evidence reports:\n\n- Formatting passed.\n- Clippy passed.\n- 3,545 tests passed, 0 failed, 12 ignored.\n\nThis resolves the prior review’s sole finding concerning seven failing tests.\n\n## Error handling\n\nPass. No new fallible Rust APIs, context-free errors, `unwrap()`, or `expect()` calls were introduced.\n\n## CLI contract\n\nPass. No CLI command or machine-readable output contract was changed. The review gate itself produces the required structured JSON findings.\n\n## Documentation\n\nPass. The prompt covers source accuracy, shipped versus repository-local configuration, current-state narration, volatile counts, links and paths, Mermaid diagrams, mathematical formatting, and addressable citations at [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:27). The latest documentation review passed with zero findings.\n\n## Jit issue management\n\nPass. `./scripts/jit-validate.sh` completed successfully. The issue’s dependencies are all done, and the documentation-cleanup epic explicitly requires this gate.\n\n## Technical debt\n\nNo technical debt found. The gate reuses the established AI-review mechanism, provides explicit future applicability guidance, and emits findings in the repository’s existing structured format.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; documentation review, cargo-ci, and repository validation pass with no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; documentation review, cargo-ci, and repository validation pass with no unresolved findings.",
+    "findings": []
+  }
+}
