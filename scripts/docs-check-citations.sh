@@ -6,12 +6,19 @@ set -euo pipefail
 #
 # Two comparisons, both derived live so the check encodes no product facts:
 #   1. File-path tokens inside backtick spans must exist on disk. A token is
-#      treated as a file citation only when (a) its first segment is a real
-#      tracked top-level repository entry (enumerated live), and (b) its last
-#      segment carries an extension (contains a dot) — a pattern class that
-#      admits files while skipping directory/conceptual references. This
+#      treated as a file citation — a pattern class, not an allowlist — when
+#      (a) it contains a `/`, (b) its final segment carries an extension
+#      (a `.<ext>` suffix), and (c) it is not placeholder/glob notation. Any
+#      such token that does not exist on disk is a MISSING finding, regardless
+#      of whether its leading segment names a tracked repo root: a citation
+#      under a misspelled/nonexistent root (e.g. `crate/jit/src/foo.rs`) is
+#      exactly the dangling reference REQ-01 requires us to surface. The
+#      extension requirement is deliberate — an extensionless token is a
+#      directory / conceptual reference, mechanically out of reach, so those
+#      are deferred to the doc-review reviewer rather than flagged here. This
 #      rejects prose, flags, and MIME types (`application/json`) without any
-#      hardcoded path or extension list.
+#      hardcoded path or extension list. Broad flagging that surfaces
+#      auditor-adjudicated lines is intended (plan §2 M3).
 #   2. `@/<kind>/<self-id>` addressable-item citations must resolve through
 #      `jit item show`, but only for a `<kind>` that is a live registered item
 #      kind or alias (derived from `item_kinds` config). This skips the
@@ -24,9 +31,11 @@ set -euo pipefail
 # A mis-cited real path that is NOT placeholder notation is reported.
 #
 # Usage:
-#   docs-check-citations.sh [PATH ...]
-# With no arguments it defaults to the full adopter-facing documentation
-# surface. Area audits pass their own space-separated file/dir footprint.
+#   docs-check-citations.sh PATH [PATH ...]
+# The footprint is a REQUIRED space-separated list of files/dirs — the checker
+# encodes no default path list (that would be a product fact, REQ-01). The gate
+# entrypoint (docs-mechanical.sh) derives the whole-surface footprint live and
+# passes it in; area audits pass their own.
 #
 # Exit codes:
 #   0 — no dangling items and no missing file citations
@@ -35,7 +44,8 @@ set -euo pipefail
 #   2 — usage/environment error
 
 if [ "$#" -eq 0 ]; then
-  set -- docs README.md INSTALL.md mcp-server/README.md web/README.md
+  echo "usage: docs-check-citations.sh PATH [PATH ...]" >&2
+  exit 2
 fi
 
 command -v jit >/dev/null 2>&1 || {
@@ -46,20 +56,6 @@ command -v jq >/dev/null 2>&1 || {
   echo "docs-check-citations: 'jq' not found on PATH (needed to enumerate item kinds)" >&2
   exit 2
 }
-
-# Live set of top-level repository roots a real path citation can begin with.
-# Prefer tracked entries (excludes VCS metadata and gitignored machine-local
-# files); fall back to the working-tree listing minus .git outside a repo.
-if tracked=$(git ls-files 2>/dev/null) && [ -n "$tracked" ]; then
-  top_entries=$(printf '%s\n' "$tracked" | sed 's#/.*##' | sort -u)
-else
-  top_entries=""
-  for e in * .[!.]* ..?*; do
-    { [ -e "$e" ] || [ -L "$e" ]; } || continue
-    [ "$e" = ".git" ] && continue
-    top_entries+="$e"$'\n'
-  done
-fi
 
 # Live set of addressable-item leaders (registered kind names + their aliases).
 # The reserved `issue` scope segment is absent by construction.
@@ -73,14 +69,16 @@ while IFS= read -r token; do
   [ -n "$token" ] || continue
   # Strip an optional `:line` / `:line-range` suffix before testing existence.
   path=${token%%:[0-9]*}
-  # Placeholder / glob notation is a pattern class, not a defect.
+  # Placeholder / glob notation is a pattern class, not a defect (REQ-01).
   case "$path" in
     *'<'* | *'{'* | *'}'* | *'*'*) continue ;;
   esac
-  # First segment must be a real tracked repo root.
-  first=${path%%/*}
-  printf '%s\n' "$top_entries" | grep -qxF "$first" || continue
-  # Last segment must carry an extension — a file citation, not a directory.
+  # Must look like a file path: contains a '/' (the feed already requires this)
+  # and the final segment carries an extension. No leading-segment / tracked-root
+  # filter — a citation under a misspelled or nonexistent root is a real dangling
+  # reference and must be surfaced. An extensionless token is a directory /
+  # conceptual reference, mechanically out of reach: deferred to doc-review.
+  case "$path" in */*) ;; *) continue ;; esac
   last=${path##*/}
   case "$last" in
     *.*) ;;

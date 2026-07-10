@@ -20,9 +20,11 @@ set -euo pipefail
 # anchors (e.g. `#L10`) into non-markdown source targets — those are skipped.
 #
 # Usage:
-#   docs-check-links.sh [PATH ...]
-# With no arguments it defaults to the full adopter-facing documentation
-# surface. Area audits pass their own space-separated file/dir footprint.
+#   docs-check-links.sh PATH [PATH ...]
+# The footprint is a REQUIRED space-separated list of files/dirs — the checker
+# encodes no default path list (that would be a product fact, REQ-01). The gate
+# entrypoint (docs-mechanical.sh) derives the whole-surface footprint live and
+# passes it in; area audits pass their own.
 #
 # Exit codes:
 #   0 — every link and anchor resolves  (prints "OK: all links and anchors resolve")
@@ -30,7 +32,8 @@ set -euo pipefail
 #   2 — usage/environment error
 
 if [ "$#" -eq 0 ]; then
-  set -- docs README.md INSTALL.md mcp-server/README.md web/README.md
+  echo "usage: docs-check-links.sh PATH [PATH ...]" >&2
+  exit 2
 fi
 
 exec python3 - "$@" <<'PY'
