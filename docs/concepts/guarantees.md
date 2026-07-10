@@ -222,6 +222,8 @@ jit claim acquire <task2> --agent-id agent:worker-1
 
 # git init alone is not enough - HEAD must resolve to a commit
 git init
+git config user.email "you@example.com"
+git config user.name "Your Name"
 jit claim acquire <task2> --agent-id agent:worker-1
 # ✗ Error: Claims and leases require a git repository (exit code 10) - no commits yet
 
@@ -229,6 +231,8 @@ git commit --allow-empty -m "Initial commit"
 jit claim acquire <task2> --agent-id agent:worker-1
 # ✓ Advisory lease acquired
 
+mkdir -p path/to
+echo "Initial design notes" > path/to/design.md
 jit doc add <task2> path/to/design.md
 git add -A && git commit -m "Add design doc"
 echo "Revised notes" >> path/to/design.md
