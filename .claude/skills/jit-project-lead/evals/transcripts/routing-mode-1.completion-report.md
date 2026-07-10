@@ -1,7 +1,7 @@
 # routing-mode-1 — Completion Report
 
 Runner: harness-governed fresh-context sub-agent given the scenario `prompt` verbatim
-(equivalent-runner path per `docs/reference/skill-eval-adjudication.md`). Repo:
+(equivalent-runner path per `dev/eval/skill-eval-adjudication.md`). Repo:
 `/tmp/jit-plead-evals/routing-mode-1` (setup scenario `routing`, seed milestone `03b5911f`
 "Demo release readiness"). Opening request: *"Drive milestone 03b5911f to done — steward it
 across its epics."* Date: 2026-07-03.
