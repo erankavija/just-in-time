@@ -5902,3 +5902,5 @@
 {"type":"gate_passed","id":"7b187923-ed5d-4bce-ae88-228d860d5c82","issue_id":"136268f8-5aed-4f36-9c10-46019c98ca76","timestamp":"2026-07-10T08:44:21.742738125Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"457fca55-0f9f-4efe-b717-f8e06423fd8c","issue_id":"136268f8-5aed-4f36-9c10-46019c98ca76","timestamp":"2026-07-10T08:44:42.129921040Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"537626fa-f45d-4c8e-ab59-6c511392415f","issue_id":"136268f8-5aed-4f36-9c10-46019c98ca76","timestamp":"2026-07-10T08:44:42.129951390Z"}
+{"type":"issue_state_changed","id":"d632c457-5673-40a8-a73d-fe69716ee3c6","issue_id":"d91ea408-3ed9-4021-9f9b-5ee736474c5f","timestamp":"2026-07-10T08:55:17.532591280Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"ef14d050-ece0-41ca-84f2-bf20f0385cb8","issue_id":"d91ea408-3ed9-4021-9f9b-5ee736474c5f","timestamp":"2026-07-10T08:55:17.532795640Z","assignee":"agent:claude"}

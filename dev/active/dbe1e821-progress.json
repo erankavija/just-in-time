@@ -1,7 +1,7 @@
 {
   "epic_id": "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
   "epic_short_id": "dbe1e821",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -68,14 +68,14 @@
           "short_id": "e486a854",
           "title": "Expose resolved hierarchy through the server API and output schemas",
           "classification": "implementation",
-          "status": "rework-1"
+          "status": "done"
         },
         {
           "id": "136268f8-5aed-4f36-9c10-46019c98ca76",
           "short_id": "136268f8",
           "title": "Config-declared template role and anchor bindings",
           "classification": "implementation",
-          "status": "rework-1"
+          "status": "done"
         }
       ]
     },
@@ -133,6 +133,12 @@
       "type": "bug",
       "epic": "6eb585bc",
       "reason": "Surfaced by a rework agent's flaky cargo test run. serve.rs:249 returns a port it no longer holds; the test flake is a symptom of a TOCTOU race in shipped code."
+    },
+    {
+      "short_id": "n/a",
+      "title": "Skill-tree corrections",
+      "type": "process",
+      "reason": "Fable analysis found `jit gate runs` (nonexistent) in rework-prompt-template.md and lead-review-protocol.md Tier 1.5, disabling the cumulative-findings audit all epic; jit-manage Workflow E prescribed the read-only `check-all` as an evaluating verb. All fixed and linted against the installed CLI. Analysis at dev/studies/multi-agent-parallelism-analysis.md."
     }
   ],
   "escalations": [
@@ -161,10 +167,11 @@
     "c291e95c": "R1 FAIL [high]: REQ-02 unevidenced because no gate ran the mcp-server suite. Resolved by defining the mcp-ci gate (invoker-approved). R2 PASS.",
     "a4e8d5ac": "R1 FAIL [high]: prerequisite c291e95c still in_progress. Sequencing artifact, not worker fault; not counted as rework. PASS after c291e95c closed.",
     "b6eb2585": "PASS on first review, zero findings. blocking_dependencies shared as pub(super); TransitionBlocker gained PartialEq so bulk-vs-single blockers compare as values.",
-    "e486a854": "R1 FAIL [high]: GET /graph omits the {\"count\": N, ...} list envelope required by the issue Notes and CLAUDE.md. Substantive work (core resolver called from server, one serialization path, graph_tree schema arm, scoped caveat on both surfaces) all verified met.",
-    "136268f8": "R1 FAIL: [high] REQ-2's end-to-end test rebuilds main.rs:2747's binding map by hand instead of driving the CLI, so a regression in the auto-bind would not be caught. [medium] configuration.md wrongly claims roles.planning controls the move-upstream-to-role target, which is named by the transform's own role field."
+    "e486a854": "R1 FAIL [high]: GET /graph omits the {\"count\": N, ...} list envelope required by the issue Notes and CLAUDE.md. Substantive work (core resolver called from server, one serialization path, graph_tree schema arm, scoped caveat on both surfaces) all verified met. R2 PASS, zero findings.",
+    "136268f8": "R1 FAIL: [high] REQ-2's end-to-end test rebuilds main.rs:2747's binding map by hand instead of driving the CLI, so a regression in the auto-bind would not be caught. [medium] configuration.md wrongly claims roles.planning controls the move-upstream-to-role target, which is named by the transform's own role field. R2 PASS, zero findings; the fix swept the doc error into commands/template.rs unprompted."
   },
   "started_at": "2026-07-09T00:00:00+00:00",
   "concurrency_note": "A second jit-execution-lead is driving epic:docs-accuracy in the same working tree and on main, concurrently. Invoker approved continuing with strict write discipline: stage only own paths (never `git add -A .jit`), never run `jit recover` (it deletes locks owned by the other lead). Their commits interleave with mine; all my work verified present in HEAD.",
-  "style_note": "Lead considered enforcing the no-em-dash writing rule on wave-2 output, then reversed: the repo already carries em-dashes in pre-existing code that passed review, the instances were appositives rather than the redundant paraphrase the rule targets, and selective enforcement would be churn. If wanted, it belongs in rules.toml or the review prompt as a declared standard."
+  "style_note": "Lead considered enforcing the no-em-dash writing rule on wave-2 output, then reversed: the repo already carries em-dashes in pre-existing code that passed review, the instances were appositives rather than the redundant paraphrase the rule targets, and selective enforcement would be churn. If wanted, it belongs in rules.toml or the review prompt as a declared standard.",
+  "adopted_behavior": "P1 from the analysis: an open escalation suspends only its dependency cone. In wave 1 the lead stalled four escalation-independent issues for 5h36m; waves 3-5 keep integrating independent work while an escalation is open."
 }
