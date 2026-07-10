@@ -9,11 +9,16 @@
 //!
 //! These drive `CommandExecutor` in-process against a real on-disk
 //! `templates.toml` (the bindings are read from the repository, so an in-test TOML
-//! string would not exercise them), covering:
+//! string would not exercise them), covering the library contract:
 //!
 //! - a repository that renames all three bindings: apply, bracket breakdown, and
 //!   `--force` refresh end to end;
 //! - a repository that declares NO bindings: the shipped names, unchanged.
+//!
+//! `bracket_breakdown` is reachable only here: it is a library API with no CLI
+//! surface. The container anchor's auto-binding is the CLI's own step — it fills
+//! the binding map these tests pass explicitly — and is covered against the real
+//! binary in `template_binding_cli_tests.rs`.
 
 use jit::commands::{BracketChild, CommandExecutor};
 use jit::domain::{GateStatus, Issue, Priority};
