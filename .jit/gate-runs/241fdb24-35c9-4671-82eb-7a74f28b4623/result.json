@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "241fdb24-35c9-4671-82eb-7a74f28b4623",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
+  "commit": "10afbb804d8d14afa1de09112387c5eb4263dc65",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T15:40:00.693960235Z",
+  "completed_at": "2026-07-10T15:41:43.418311294Z",
+  "duration_ms": 102724,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail.\n\n- `README.md:176` says “Markdown stays the source of truth” for addressable items. This contradicts the configured item model: invariants, rules, and gates are registry-first and sourced from `.jit/invariants.toml`, `.jit/rules.toml`, and `.jit/gates.toml`. Remediation: state that each item kind’s configured source is authoritative—Markdown for markdown-first kinds and TOML registries for registry-first kinds—while the item index remains a projection.\n\nThe documented CLI surface, JSON contracts, storage layout, workspace members, and component boundaries otherwise match the current source, schema, and manifests.\n\n## 2. Adopter surface versus repo-local dogfood configuration\n\nPass.\n\nRepository-specific types, namespaces, rules, gates, templates, and item kinds are presented as optional examples or explicitly identified as this repository’s configuration.\n\n## 3. Current behavior only\n\nPass.\n\nMatches for historical or future-looking terms occur in examples, status values, comments, or descriptions of present behavior. No adopter-facing prose narrates a superseded or promised JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass.\n\nRemaining numeric statements describe fixed document structure, configured limits, examples, or runtime output rather than volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nPass.\n\nMarkdown links, generated heading anchors, and concrete repository paths resolve. `jit validate --json` reports no dangling item links. The latest review’s two broken planning-bracket anchors are corrected.\n\n## 6. Content-standards conformance\n\nPass.\n\nAuthored diagrams use Mermaid. Non-Mermaid blocks containing tree characters are directory listings or CLI output and therefore exempt. No plain-text mathematical equation defect remains.\n\nAll three findings from the most recent review have been addressed.\n\n## Findings\n\n1. **F1 — High:** `README.md:176` incorrectly says Markdown is the source of truth for all addressable items. Replace this with the configured model: markdown-first kinds use their Markdown source, registry-first kinds use their TOML registry, and the item index is always a projection.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking documentation defect remains: the README incorrectly describes Markdown as the source of truth for registry-first addressable items.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README incorrectly says Markdown is the source of truth for all addressable items\",\"file\":\"README.md\",\"line\":176}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4324 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4caf-8bd8-7080-9458-5bdb4bfcb60f\n--------\nuser\n--- 4311 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking documentation defect remains: the README incorrectly describes Markdown as the source of truth for registry-first addressable items.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README incorrectly says Markdown is the source of truth for all addressable items",
+        "file": "README.md",
+        "line": 176
+      }
+    ]
+  }
+}

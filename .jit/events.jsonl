@@ -6021,3 +6021,4 @@
 {"type":"gate_passed","id":"8e6c0a45-d05f-4722-a671-5a3c491ba1ca","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-10T15:30:33.576633731Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"002dbd38-3f36-46ba-8c37-538449aedaf4","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-10T15:33:32.173312152Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"b101028c-afd5-4834-80d0-ca080af08f4a","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-10T15:38:53.504738577Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"95d19a1d-e4f0-4a27-a1bb-0da388fde9d8","issue_id":"287c4051-22f8-4e86-bf3a-5006907dcb85","timestamp":"2026-07-10T15:41:43.418843664Z","gate_key":"doc-review","updated_by":"auto:executor"}
