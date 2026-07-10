@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "run_id": "b2b85302-5083-436e-a0d1-6c8a8e3afa19",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "8e7a8ee587904918f5c871e5c72eab1506aa67d7",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T22:41:18.774436602Z",
+  "completed_at": "2026-07-10T22:42:14.776172895Z",
+  "duration_ms": 56001,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-03 is met: `.jit/gates.toml` registers `docs-mechanical` as an exec postcheck invoking `./scripts/docs-mechanical.sh`.\n\nREQ-01 and REQ-02 are not fully met. The citation checker excludes legitimate path classes, the link checker does not resolve every Markdown link form, and the supplied issue evidence contains no successful `docs-mechanical` or self-test execution.\n\n## Architecture and Separation of Concerns\n\nNo Rust architecture boundaries were changed. The implementation is confined to scripts and gate configuration.\n\n## Functional Paradigm\n\nThe embedded Python uses some imperative collection and iteration, which is reasonable for a small filesystem scanner and is not independently blocking.\n\n## Correctness and Invariants\n\nThe orchestrator now preserves finding versus environment-error semantics correctly.\n\nHowever, the citation checker only considers tokens containing `/` whose final component contains a dot. Consequently, non-placeholder citations such as `MISSING.md` and `crates/jit/NOTICE` are never tested.\n\nThe self-test is unsafe in a dirty worktree: it stages projection targets and unconditionally restores both targets and their index entries to `HEAD`, destroying any pre-existing user changes.\n\nNo issue-state, event-log, gate-transition, assignee, label, PID, or atomic-write implementation changed.\n\n## Safety\n\nNo Rust or unsafe code was introduced. The destructive self-test cleanup is nevertheless a blocking operational safety defect.\n\n## Testing\n\nThe supplied issue evidence records `repo-validate` passing. I also ran `./scripts/jit-validate.sh`; it passed.\n\nNo successful `docs-mechanical` or `docs-check-selftest.sh` run is recorded for this issue. Committing a test harness does not itself demonstrate that all six clean/seeded assertions executed successfully.\n\nThe link self-test covers only inline links, leaving reference-style Markdown links untested and unsupported.\n\n## Error Handling\n\nThe aggregate script now maps child exit code `1` to findings and environment or unexpected failures to exit code `2`, resolving prior F4.\n\nThe checker pipelines still do not independently classify unreadable or nonexistent footprint arguments as environment errors, but this is secondary to the blocking coverage findings below.\n\n## CLI Contract\n\nNo CLI command was added or changed. The `--json` requirement is not applicable to repository gate scripts.\n\n## Documentation\n\nThe scripts have useful usage and exit-code comments. Some claims are inaccurate:\n\n- `docs-check-links.sh` claims to resolve every Markdown link but only recognizes inline `[text](target)` syntax.\n- `docs-check-citations.sh` claims that any non-placeholder mis-cited real path is reported, while explicitly excluding root-level and extensionless paths.\n- `docs-check-selftest.sh` claims its cleanup is safe, although it discards pre-existing changes to both projection targets.\n\n## Prior Review Feedback\n\nPrior F1 is resolved: the individual checkers now require a footprint, and the orchestrator derives its default footprint live.\n\nPrior F2 is only partially resolved. The tracked-root filter was removed, but root-level and extensionless dangling paths remain false negatives.\n\nPrior F3 remains unresolved because no successful seeded-defect and clean-run result is present in the issue’s gate history.\n\nPrior F4 is resolved: exit code `2` now dominates aggregate findings.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is done and `unmet_dependencies` is empty. Repository validation passes.\n\n## Findings\n\n1. **F1 — High:** The citation checker still violates REQ-01 by silently skipping valid non-placeholder path citations. Its input pipeline requires `/`, and lines 81–86 require a dotted final component, so dangling citations such as `MISSING.md` and `crates/jit/NOTICE` exit successfully instead of producing `MISSING`.\n2. **F2 — High:** The link resolver does not cover every Markdown link as required. The sole link regex at line 60 recognizes only inline `[text](target)` links; reference-style links and their definitions are ignored, allowing seeded broken reference links to pass.\n3. **F3 — High:** The self-test can destroy unrelated user work. It stages the live projection targets at lines 90–92, then the exit trap restores their index and working-tree states to `HEAD` at line 56, erasing any changes that existed before the test began.\n4. **F4 — High:** Hard REQ-02 still lacks successful execution evidence. The supplied issue history records only `repo-validate` after the prior failed review; it contains no passed `docs-mechanical` gate or captured self-test result proving each checker’s seeded and clean cases ran successfully.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 and REQ-02 remain unmet because valid citation and Markdown-link classes are skipped, the self-test can erase user changes, and successful seeded-defect execution is not recorded.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The citation checker skips root-level and extensionless non-placeholder path citations.\",\"file\":\"scripts/docs-check-citations.sh\",\"line\":81},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The link resolver ignores reference-style Markdown links and therefore does not resolve every Markdown link.\",\"file\":\"scripts/docs-check-links.sh\",\"line\":60},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The self-test cleanup restores projection targets to HEAD and can erase pre-existing staged and working-tree changes.\",\"file\":\"scripts/docs-check-selftest.sh\",\"line\":56},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"No successful docs-mechanical or seeded-defect self-test execution is recorded for hard REQ-02.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1150 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e31-425d-7830-acb7-3962e2ae0876\n--------\nuser\n--- 1137 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-01 and REQ-02 remain unmet because valid citation and Markdown-link classes are skipped, the self-test can erase user changes, and successful seeded-defect execution is not recorded.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The citation checker skips root-level and extensionless non-placeholder path citations.",
+        "file": "scripts/docs-check-citations.sh",
+        "line": 81
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The link resolver ignores reference-style Markdown links and therefore does not resolve every Markdown link.",
+        "file": "scripts/docs-check-links.sh",
+        "line": 60
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "The self-test cleanup restores projection targets to HEAD and can erase pre-existing staged and working-tree changes.",
+        "file": "scripts/docs-check-selftest.sh",
+        "line": 56
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "No successful docs-mechanical or seeded-defect self-test execution is recorded for hard REQ-02."
+      }
+    ]
+  }
+}
