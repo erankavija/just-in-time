@@ -1,5 +1,5 @@
 {
-  "description": "Test vectors for canonical DAG-authoritative hierarchy resolution. Consumed by the Rust core test (crates/jit/src/graph/hierarchy.rs, via tests/hierarchy_vectors_test.rs), the sole implementation of the rule: it must produce `expected` from `nodes` under `hierarchy`. Every other consumer (CLI output, graph export, the web server's /graph payload) projects that result. See docs/concepts/hierarchy-resolution.md for the model.",
+  "description": "Test vectors for canonical DAG-authoritative hierarchy resolution. Consumed by the Rust core test (crates/jit/src/graph/hierarchy.rs, via tests/hierarchy_vectors_test.rs), the sole implementation of the rule: it must produce `expected` from `nodes` under `hierarchy`. Every other consumer (CLI output, graph export, the web server's /graph payload) projects that result. Resolution is defined on the transitive reduction of `dependencies`, so the `r-*` nodes, whose epic declares a redundant direct edge to `r-t1`, resolve as if that edge were absent. See docs/concepts/hierarchy-resolution.md for the model.",
   "hierarchy": { "milestone": 1, "epic": 2, "story": 3, "task": 4 },
   "nodes": [
     { "id": "m", "type": "milestone", "dependencies": ["e1", "tA"] },
@@ -14,7 +14,11 @@
     { "id": "cx", "type": "epic", "dependencies": ["tx"] },
     { "id": "sy", "type": "story", "dependencies": ["ty"] },
     { "id": "ty", "type": "task", "dependencies": ["tx"] },
-    { "id": "tx", "type": "task", "dependencies": [] }
+    { "id": "tx", "type": "task", "dependencies": [] },
+    { "id": "r-epic", "type": "epic", "dependencies": ["r-story", "r-t1"] },
+    { "id": "r-story", "type": "story", "dependencies": ["r-t2"] },
+    { "id": "r-t2", "type": "task", "dependencies": ["r-t1"] },
+    { "id": "r-t1", "type": "task", "dependencies": [] }
   ],
   "expected": {
     "m": { "parent": null, "children": ["e1"], "cluster": "m", "rank": 2 },
@@ -29,6 +33,10 @@
     "cx": { "parent": null, "children": ["tx"], "cluster": "cx", "rank": 1 },
     "sy": { "parent": null, "children": ["ty"], "cluster": "sy", "rank": 2 },
     "ty": { "parent": "sy", "children": [], "cluster": "sy", "rank": 1 },
-    "tx": { "parent": "cx", "children": [], "cluster": "cx", "rank": 0 }
+    "tx": { "parent": "cx", "children": [], "cluster": "cx", "rank": 0 },
+    "r-epic": { "parent": null, "children": ["r-story"], "cluster": "r-epic", "rank": 3 },
+    "r-story": { "parent": "r-epic", "children": ["r-t1", "r-t2"], "cluster": "r-epic", "rank": 2 },
+    "r-t2": { "parent": "r-story", "children": [], "cluster": "r-epic", "rank": 1 },
+    "r-t1": { "parent": "r-story", "children": [], "cluster": "r-epic", "rank": 0 }
   }
 }

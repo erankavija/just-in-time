@@ -5,7 +5,9 @@
 //! committed `expected` output. `resolve_hierarchy` is the sole implementation
 //! of the canonical DAG-authoritative resolution; every consumer (CLI output,
 //! graph export, the web server's `/graph` payload) projects its result, so
-//! this fixture pins the rule for all of them.
+//! this fixture pins the rule for all of them. Its `r-*` nodes pin the
+//! canonicalization: an epic's redundant direct edge to a task its story already
+//! reaches leaves the task under the story.
 
 use std::collections::HashMap;
 

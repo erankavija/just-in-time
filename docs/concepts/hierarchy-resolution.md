@@ -43,10 +43,23 @@ For every node the resolver produces four facts:
 
 | Fact | Definition |
 |------|------------|
-| **parent** | The *nearest dominating container*: among all containers whose dependency closure includes the node, the one that most directly contains it. A container linked by a **direct** dependency edge outranks one that reaches the node only transitively. Among equally-direct candidates the deepest level wins, then the fewest hops, then the lexicographically smallest container id. `null` for a root. |
+| **parent** | The *nearest dominating container*: among all containers whose dependency closure includes the node, the one that most directly contains it. A container linked by a **direct** edge of the reduced graph outranks one that reaches the node through intermediate nodes. Among equally-direct candidates the deepest level wins, then the fewest hops, then the lexicographically smallest container id. `null` for a root. |
 | **children** | The inverse of `parent`: the nodes whose resolved parent is this node, sorted by id. A node that is a direct dependency of a container but resolves to a nearer container is that nearer container's child, so `parent`/`children` form a consistent forest. |
 | **cluster** | The strategic root of the parent chain: follow `parent` pointers up to the topmost container. A leaf with no container ancestor has no cluster; a root container is its own cluster. |
 | **rank** | The longest dependency-path length from the node to a sink (a node with no in-set dependencies). Sinks have rank `0`. A stable layout depth. |
+
+### Resolution reads the reachability relation
+
+The resolver reduces the edge set transitively before deriving any fact, so an
+edge set and any redundant superset of it with the same reachability resolve
+identically. A container that declares a direct dependency on a node it already
+reaches through one of its own children states nothing new, and that redundant
+edge earns it no claim on the node: the child stays the parent.
+
+This decouples resolution from edge hygiene. `jit dep add` rejects a redundant
+edge, or reduces it away, according to its policy, and `jit validate --fix`
+removes any that reach storage. Whether either has run yet cannot move a node's
+parent.
 
 ### Defined edge cases
 
