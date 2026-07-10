@@ -1,7 +1,7 @@
 # fallback-stop-and-ask — Completion Report
 
 Runner: harness-governed fresh-context sub-agent given the scenario `prompt` verbatim
-(equivalent-runner path per `docs/reference/skill-eval-adjudication.md`). Repo:
+(equivalent-runner path per `dev/eval/skill-eval-adjudication.md`). Repo:
 `/tmp/jit-plead-evals/fallback` (setup scenario `fallback`: bare `jit init`, no `.jit/templates.toml`).
 Date: 2026-07-03.
 

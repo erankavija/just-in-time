@@ -1,7 +1,7 @@
 # routing-mode-2 — Completion Report
 
 Runner: harness-governed fresh-context sub-agent given the scenario `prompt` verbatim
-(equivalent-runner path per `docs/reference/skill-eval-adjudication.md`). Repo:
+(equivalent-runner path per `dev/eval/skill-eval-adjudication.md`). Repo:
 `/tmp/jit-plead-evals/routing-mode-2` (setup scenario `routing`). Opening request: *"Stand up
 multi-tenant support for the product — figure out what that means and get it delivered."*
 Date: 2026-07-03.

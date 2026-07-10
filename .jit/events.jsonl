@@ -5860,3 +5860,4 @@
 {"type":"gate_passed","id":"a8b5d6ac-ce92-40ee-9958-88c2ad5483aa","issue_id":"c29118f9-72e5-4d20-a20a-4de58cce4b33","timestamp":"2026-07-09T23:48:53.791332365Z","gate_key":"jit-validate","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"57a5b3cf-ec0d-48ea-92f3-64c864b01ef0","issue_id":"a6e1ae3d-169c-4959-b105-66a418ddc022","timestamp":"2026-07-09T23:48:54.103677412Z","gate_key":"jit-validate","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"bb8977c7-5c3e-4016-ac74-ee99e4d8e8d7","issue_id":"c7f0f690-d147-4a72-abf7-d93ea06ac8cd","timestamp":"2026-07-09T23:48:54.495696768Z","gate_key":"jit-validate","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"97f14cce-5d4b-4431-b63b-ab20f277c40e","issue_id":"a5b04c9f-dfae-42fc-a6d9-4a1a64cf5450","timestamp":"2026-07-10T00:03:52.454201492Z","updated_by":"issue-update","fields":["description"]}

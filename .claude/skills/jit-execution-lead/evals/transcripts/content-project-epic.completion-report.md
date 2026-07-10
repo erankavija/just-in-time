@@ -54,7 +54,7 @@ No additional issues were discovered.
 
 Recorded so the negative expected-output item "No software-specific commands attempted" is
 checkable against this run's action log, not just its final tree (per the equivalent-runner
-requirement in `docs/reference/skill-eval-adjudication.md` step 2). Every claim below is
+requirement in `dev/eval/skill-eval-adjudication.md` step 2). Every claim below is
 traceable to the run repo's own on-disk records under `.jit/`:
 
 - **Gates defined by the run:** exactly one, `content-review` (`.jit/gates.json`, `mode:

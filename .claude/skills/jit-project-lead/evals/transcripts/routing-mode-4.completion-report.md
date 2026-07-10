@@ -1,7 +1,7 @@
 # routing-mode-4 — Completion Report
 
 Runner: harness-governed fresh-context sub-agent given the scenario `prompt` verbatim
-(equivalent-runner path per `docs/reference/skill-eval-adjudication.md`). Repo:
+(equivalent-runner path per `dev/eval/skill-eval-adjudication.md`). Repo:
 `/tmp/jit-plead-evals/routing-mode-4` (setup scenario `routing`). Opening request: *"Sweep the whole
 project for content-standards violations, auto-fix the mechanical ones, and list what needs a
 decision."* Date: 2026-07-03.

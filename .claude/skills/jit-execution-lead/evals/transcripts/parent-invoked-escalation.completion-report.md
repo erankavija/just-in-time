@@ -82,7 +82,7 @@ am holding: no breakdown or dispatch against the truncate task, criteria unchang
 ## Run-Record Log (equivalent-runner path)
 
 The scenario carries a negative item ("No interactive question posed to the
-human"). Per `docs/reference/skill-eval-adjudication.md`, the equivalent runner's
+human"). Per `dev/eval/skill-eval-adjudication.md`, the equivalent runner's
 completion report records the run's action log so the negative item is checkable
 against the run-record, not repo-state alone.
 
