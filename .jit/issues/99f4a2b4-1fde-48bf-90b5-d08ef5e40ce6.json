@@ -2,9 +2,9 @@
   "id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
   "title": "Committed documentation mechanical-check gate",
   "description": "Land three low-self-rot mechanical checker scripts and register them as a new config-declared `docs-mechanical` entry in `.jit/gates.toml`, so link/anchor resolution, citation existence, and projection freshness are enforced by committed automation rather than one-off commands.\n\n## Background\n\nAn exhaustive documentation audit runs a mechanical verification bar over every area of the documentation surface. Three of the checks in that bar derive both comparison sides live from the repository at runtime and encode no product facts, so they carry low risk of going stale as the docs and code change; they are worth committing as durable scripts that keep running after the audit closes. The three checkers:\n\n1. **Markdown link and heading-anchor resolver.** Resolves every markdown link and intra-document anchor in an audited path list against the tree, reproducing GitHub-style anchoring (lowercase, punctuation stripped keeping word characters and hyphens, spaces mapped to hyphens one-to-one so em-dash gaps become double hyphens). It does not synthesize GitHub's numeric disambiguation suffixes for repeated headings, so an unresolved anchor against a duplicated heading is adjudicated by a person rather than auto-failed.\n2. **Source-path and addressable-item citation-existence check.** Extracts path-like tokens from backtick-quoted spans and tests existence on disk, and resolves addressable-item citations (the `@/<kind>/<self-id>` scheme) through the item-resolution machinery. Its placeholder filter is a pattern class — path notation containing angle-bracket, brace, or glob placeholders (e.g. `.jit/issues/{id}.json`, `.jit/schemas/*.json`) — never a hardcoded file allowlist, so it cannot go stale as paths move. A mis-cited real path that is not placeholder notation is always a finding.\n3. **Projection-freshness diff.** Re-runs the invariant and rules/gates projectors and diffs their configured target files (the `CLAUDE.md` invariant region and `docs/reference/rules-and-gates.md`), so a projected region that has drifted from its registry source fails the check.\n\nThis repository's gate registry already has a convention for exec-type entries backed by repo scripts; the new entry follows the same shape.\n\n## Success Criteria\n\n- [hard] REQ-01: Each checker derives both comparison sides live at runtime and encodes no product facts (no hardcoded path lists, counts, or enum values; the placeholder filter is a pattern class, never a file allowlist).\n- [hard] REQ-02: Each checker exits nonzero on a seeded defect and zero on the current tree.\n- [hard] REQ-03: A `docs-mechanical` entry exists in `.jit/gates.toml`, wired to the three checker scripts and following the repository's existing exec-gate conventions.\n\n## Notes\n\nThe linked plan document carries the exact check commands and expected outputs (§2). The plan's reference implementations are the starting point; harden them into the committed scripts.\n\nBefore landing, exercise each checker once against a seeded defect (a broken link, a dangling citation, a hand-edited projected region) to confirm the nonzero-exit requirement, then confirm a clean exit on the current tree.\n\nBlast radius: `scripts/` (three new scripts) plus `.jit/gates.toml` (one new entry).",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "c939d0b6-ad59-44ef-9ac1-63b7365f8521"
   ],
@@ -30,6 +30,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-10T20:21:17.655916429Z",
-  "updated_at": "2026-07-10T20:52:01.324552021Z",
-  "first_ready_at": "2026-07-10T20:21:17.655916689Z"
+  "updated_at": "2026-07-10T21:51:58.257049984Z",
+  "first_ready_at": "2026-07-10T20:21:17.655916689Z",
+  "claimed_at": "2026-07-10T21:51:58.257049744Z"
 }
