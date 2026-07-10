@@ -2,9 +2,9 @@
   "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
   "title": "Documentation review gate",
   "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve; content conforms to the jit content standards, including Mermaid for all diagrams (ASCII-art diagrams are forbidden in docs).\n\n## Success Criteria\n\n- [hard] REQ-01: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the review dimensions above\n- [hard] REQ-02: The gate produces structured findings\n- [hard] REQ-03: The gate passes on the repository's documentation tree at the time this issue completes\n- [hard] REQ-04: The gate registry description states when to apply the gate to future documentation work\n- [hard] REQ-05: The gate is required on the documentation-cleanup epic containing this work, so the epic completes only through it",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:claude",
   "dependencies": [
     "287f7bc9-c185-49a7-bc68-0102aaada58d",
     "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
@@ -32,6 +32,7 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-06T15:39:58.883953366Z",
-  "updated_at": "2026-07-10T11:25:56.896726260Z",
-  "first_ready_at": "2026-07-06T15:39:58.883953626Z"
+  "updated_at": "2026-07-10T11:26:54.096309174Z",
+  "first_ready_at": "2026-07-06T15:39:58.883953626Z",
+  "claimed_at": "2026-07-10T11:26:54.096308974Z"
 }
