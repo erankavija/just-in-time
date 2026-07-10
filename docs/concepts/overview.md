@@ -87,12 +87,18 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 **Mental Model:**
 ```
 .jit/                          # Like .git/ - repository-local
+├── index.json                 # Issue index for fast queries; carries the format version
+├── config.toml                # Configuration
+├── gates.toml                 # Gate registry definitions
+├── rules.toml                 # Validation rules
+├── events.jsonl               # Append-only event log
 ├── issues/                    # One JSON file per issue
-│   └── <uuid>.json           # Issue state, dependencies, gates
-├── gates.toml                 # Gate definitions (reusable)
-├── events.jsonl              # Audit log (append-only)
-└── config.toml               # Configuration
+│   └── <uuid>.json            # Issue state, dependencies, gates
+├── gate-runs/                 # Recorded gate runs
+└── schemas/                   # JSON Schema files referenced by rules.toml
 ```
+
+See [Storage Format](../reference/storage-format.md) for the authoritative layout, including per-project files.
 
 **Workflow:**
 1. **Create issues** with dependencies and gates

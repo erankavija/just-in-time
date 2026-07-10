@@ -568,7 +568,7 @@ flowchart LR
 - Run automatically: `jit gate evaluate $ISSUE tests`
 - Used for objective, repeatable verification
 - Require checker command and timeout configuration
-- All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS` env vars — see [Environment Variables](../how-to/custom-gates.md#environment-variables) for the full contract, including `JIT_ISSUE_DOCS`'s JSON schema
+- All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS` env vars; see [Environment Variables](../how-to/custom-gates.md#environment-variables) for the full contract, including `JIT_ISSUE_DOCS`'s JSON schema
 - **Context-aware mode** (`--pass-context`): checker also receives `JIT_CONTEXT_FILE` with issue data, gate definition, prompt, and run history as JSON
 
 ### Gate Status Tracking
@@ -691,23 +691,13 @@ stateDiagram-v2
 - Audit trail of who approved what (gate status history)
 - Programmatic queryability (find issues awaiting specific gates)
 
-### Current Limitations and Future Directions
+### Gate Behavior
 
-**Current capabilities:**
 - Gates apply uniformly at state transitions
 - Checker commands run in shell; the exit code decides pass/fail
 - Checkers can emit a machine-readable findings block (verdict, per-finding severity and file:line) that is parsed and stored with the run
 
-**Potential future enhancements** (not yet implemented):
-- **Conditional gates**: Apply gates based on issue properties (e.g., only require security-scan for epic:auth issues)
-- **Gate dependencies**: Gates that must pass in specific order
-- **Parallel gate execution**: Run multiple automated gates concurrently for speed
-- **Gate templates**: Pre-configured gate sets for common workflows
-- **Per-label gate policies**: Different gate requirements based on issue labels
-
-**Note:** Current design intentionally keeps gates simple and flexible. These extensions would be added based on real-world usage patterns, maintaining backward compatibility.
-
-For domain-specific gate examples beyond software development, see [Custom Gates - Beyond Software Development](../how-to/custom-gates.md#beyond-software-development).
+For domain-specific gate examples, see [Custom Gates - Adapting Gates to Your Domain](../how-to/custom-gates.md#adapting-gates-to-your-domain).
 
 ## States
 
@@ -744,7 +734,7 @@ stateDiagram-v2
 
 **Rejected**: Terminal state indicating the issue was closed without implementation. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
-**Archived**: Parked out of active views. Reachable from any state and not terminal — an archived issue can be revived by transitioning it back into the lifecycle. Archived issues are excluded from readiness queries but still count as open in container rollups.
+**Archived**: Parked out of active views. Reachable from any state and not terminal. An archived issue can be revived by transitioning it back into the lifecycle. Archived issues are excluded from readiness queries but still count as open in container rollups.
 
 ### Terminal States
 
@@ -1193,26 +1183,11 @@ timeout 300 work_on_issue "$ISSUE" || {
 }
 ```
 
-### Current Limitations and Future Directions
+### Coordination Model
 
-**Current capabilities:**
 - Atomic claiming via file operations
 - Decentralized polling (no coordinator daemon)
 - Simple assignee format with type prefix
 - Manual release on timeout/error
 
-**Potential future enhancements** (not yet implemented):
-- **Coordinator daemon** (`jit-dispatch`) - Central work distributor with:
-  - Active push to agents (no polling)
-  - Health monitoring and automatic reassignment
-  - Load balancing across agents
-  - Stalled work detection
-  - Agent capability matching
-- **Assignee priorities** - Preferred agent for issue types
-- **Work-in-progress limits** - Max concurrent issues per agent
-- **Agent heartbeats** - Detect crashed agents
-- **Automatic timeout** - Release after inactivity threshold
-
-**Note:** Current design works well for 1-10 agents polling every 10-30 seconds. Coordinator daemon would optimize for larger agent pools (10-100 agents) with lower latency requirements.
-
-For practical coordination examples, see [How-To: Software Development](../how-to/software-development.md#multi-agent-workflows).
+For practical coordination examples, see [How-To: Software Development](../how-to/software-development.md#coordinate-multiple-contributors).

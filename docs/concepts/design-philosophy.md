@@ -7,7 +7,7 @@ This document explains the fundamental design decisions behind JIT and why they 
 
 ## Domain Agnostic
 
-**Core Principle:** JIT works for any domain—software development, research, knowledge work, project management—without requiring domain-specific terminology or workflows.
+**Core Principle:** JIT works for any domain (software development, research, knowledge work, project management) without requiring domain-specific terminology or workflows.
 
 ### Why Domain Neutrality Matters
 
@@ -39,7 +39,7 @@ The same concepts adapt to different contexts:
 
 ### Configurable Workflows
 
-JIT provides **configuration over convention**—hierarchies and workflows adapt to your domain:
+JIT provides **configuration over convention**. Hierarchies and workflows adapt to your domain:
 
 ```toml
 # Software: milestone → epic → task
@@ -64,13 +64,13 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 
 ### Key Design Principles
 
-**JSON-First Output:** Every command supports `--json` for structured data—agents parse reliably, no regex scraping needed.
+**JSON-First Output:** Every command supports `--json` for structured data that agents parse reliably, with no regex scraping needed.
 
 **Atomic File Operations:** Write-temp-rename pattern prevents race conditions and partial writes. Multi-agent safe by design.
 
 **Clear Exit Codes:** UNIX-standard exit codes enable bash error handling: `jit ... || handle_error`
 
-**MCP Protocol:** AI assistants call JIT operations directly via Model Context Protocol—type-safe, structured tool use.
+**MCP Protocol:** AI assistants call JIT operations directly via Model Context Protocol, with type-safe, structured tool use.
 
 **Structured Errors:** JSON errors include error codes and context for programmatic error recovery.
 
@@ -89,7 +89,7 @@ File locking serializes claim operations, preventing concurrent modification con
 
 ## Functional Programming Principles
 
-**Core Principle:** Prefer functional patterns—immutability, pure functions, composition—over stateful object-oriented code.
+**Core Principle:** Prefer functional patterns (immutability, pure functions, composition) over stateful object-oriented code.
 
 ### Why Functional Programming?
 
@@ -478,7 +478,7 @@ flowchart TD
     S5 --> S1
 ```
 
-**Example:** The `--json` flag everywhere came from agents needing structured output while building JIT features. We felt the pain, added JSON output, and now all users benefit.
+**Example:** Every command's `--json` flag serves agent automation, emitting structured, machine-parseable output that agents consume directly and humans share.
 
 ## See Also
 
@@ -486,4 +486,4 @@ flowchart TD
 - [Core Model](core-model.md) - Domain-agnostic concepts (issues, gates, dependencies)
 - [Quickstart Tutorial](../tutorials/quickstart.md) - See principles in practice
 - [How-To: Multi-Agent Coordination](../how-to/multi-agent-coordination.md) - Agent-first design in action
-- [CONTRIBUTOR-QUICKSTART.md](../../CONTRIBUTOR-QUICKSTART.md) - FP guidelines for contributors
+- [CLAUDE.md](../../CLAUDE.md) - Functional-style coding conventions for contributors
