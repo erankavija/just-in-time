@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "ee43fa48-bf70-4bfd-8b4c-0e489e8377e3",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94",
+  "commit": "844e959f1bd82ccb82cebe9d7fdb701af38e247d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T19:53:50.226583828Z",
+  "completed_at": "2026-07-10T19:55:41.832130785Z",
+  "duration_ms": 111605,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nThe required plan exists at [dev/active/2d109173-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/2d109173-plan.md:1) and is linked as a `design` document in `issue.documents`. The linked investigation is also present and substantive. This area passes.\n\n## Completeness against the criteria\n\nThe plan maps all six hard requirements to concrete audit tasks and includes the entire `docs/` tree plus the named root/component documents. Assigning `docs/index.md` and `docs/README.md` to the root-document task at plan lines 271–278 closes the unowned-file gap identified by the investigation.\n\nHowever, REQ-06 has a decomposition gap. The plan says every area will identify volatile facts lacking projection surfaces and file follow-ups, but the area-task acceptance template at lines 214–223 does not require creating those follow-ups. The separate follow-up task at lines 280–294 is limited to three already-known engine gaps and has no dependency on the audits. A newly discovered missing projection surface can therefore be cited in documentation while never producing the follow-up required by the binding “cite source and file a follow-up” constraint.\n\n## Technical soundness and architectural fit\n\nThe plan correctly reuses `jit --schema`, direct Clap definitions, addressable-item resolution, existing renderers, and the existing review gate. Its stale-binary guard and special handling of the incorrect generated `State` enum are grounded in the codebase.\n\nThere is one blocking mismatch in the proposed review architecture. The container explicitly includes `TESTING.md`, and the root audit footprint includes it at plan lines 271–276. But the current review prompt’s adopter surface enumerates `README.md`, `INSTALL.md`, and component READMEs while omitting `TESTING.md` at [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:9). The proposed Group A amendment only restricts reviews to a declared scope and preserves the current full surface when unscoped (plan lines 201–210). It does not say that declared scope expands the reviewable surface or that the base inventory will be corrected. Consequently, the scoped root review may treat `TESTING.md` as out of scope, and the final unscoped review definitely retains that omission. This invalidates the claimed exhaustive backstop.\n\n## Decomposition and dependencies\n\nThe area footprints are otherwise coherent, with the large reference catalog reasonably isolated. All Group B audits correctly depend on the scope-aware prompt change.\n\nThe follow-up task’s lack of dependency on Group B is not sound. At plan lines 291–294 the plan deliberately makes it independent, yet its purpose is to capture missing projection surfaces “surfaced by this epic.” It can finish before the exhaustive audits discover additional cases. Either each audit must create its own required follow-ups, or a consolidation task must depend on all audit tasks and capture every discovered projection gap.\n\n## Risks and actionability\n\nThe plan identifies reviewer nondeterminism, stale binaries, cross-area contradictions, deletion collisions, and task sizing, with plausible mitigations.\n\nIt does not surface the `TESTING.md` scope mismatch, despite relying on the final full-surface review as the principal semantic completeness backstop. Nor does it mitigate the risk that independently scheduled follow-up filing completes before discovery. Both are load-bearing rather than advisory.\n\n## Prior review feedback\n\n`run_history` is empty, so there is no prior feedback to verify.\n\n## Findings\n\n1. **High — `TESTING.md` is not guaranteed to be reviewed.** The plan assigns it to the root audit and relies on scoped and final `doc-review` runs, but the existing prompt omits it from the adopter-facing surface. Group A only specifies restriction of the existing surface, not expansion or correction of that inventory. Amend the prompt task explicitly so a declared footprint is authoritative and add `TESTING.md` to the unscoped full surface.\n2. **High — REQ-06 follow-up creation has a coverage and ordering gap.** Group B can discover additional volatile facts with no projection surface, but its acceptance template does not require filing follow-ups. Group C names only three known gaps and intentionally runs independently. Require every area task to file follow-ups for newly found missing surfaces, or make a comprehensive follow-up-consolidation task depend on all audits.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan has blocking review-scope and REQ-06 follow-up ordering gaps.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"TESTING.md is omitted from the review prompt surface and is not guaranteed to receive scoped or final semantic review.\",\"file\":\"scripts/doc-review-prompt.md\",\"line\":9},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"REQ-06 follow-up filing is limited to known gaps and sequenced independently of audits that may discover additional missing projection surfaces.\",\"file\":\"dev/active/2d109173-plan.md\",\"line\":280}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1558 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4d97-ee32-7b71-be09-80bca9c034cf\n--------\nuser\n--- 1545 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan has blocking review-scope and REQ-06 follow-up ordering gaps.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "TESTING.md is omitted from the review prompt surface and is not guaranteed to receive scoped or final semantic review.",
+        "file": "scripts/doc-review-prompt.md",
+        "line": 9
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "REQ-06 follow-up filing is limited to known gaps and sequenced independently of audits that may discover additional missing projection surfaces.",
+        "file": "dev/active/2d109173-plan.md",
+        "line": 280
+      }
+    ]
+  }
+}
