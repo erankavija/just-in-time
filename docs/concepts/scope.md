@@ -189,7 +189,8 @@ jit gate add <run-migration> change-approval rollback-plan
 - Event log for observability
 
 **Local-first, git-friendly:**
-- All state in `.jit/` directory (JSON files)
+- Repository data in `.jit/` (JSON issues and events, TOML config and registries), version-controlled
+- Machine-local runtime state also under `.jit/`, gitignored; lease coordination under `.git/jit/`
 - Version, diff, merge with git
 - No external database or cloud service
 

@@ -52,7 +52,7 @@ jit dep add g7h8i9 a1b2c3  # ✗ ERROR: Cycle detected
 
 **Transitive reduction:**
 
-While JIT allows transitive dependencies (A→B→C and A→C simultaneously), minimal edges are preferred for clarity. The graph always represents the *minimal* set of relationships needed.
+JIT keeps the dependency graph transitively reduced. When `A→B→C` already holds, adding the redundant `A→C` is rejected by default, and `jit validate` enforces the reduced form. `jit dep add --reduce` instead accepts the new edge and drops whatever it makes redundant, in the same operation. Either way the graph represents the *minimal* set of relationships needed.
 
 ### Atomic Operations
 
