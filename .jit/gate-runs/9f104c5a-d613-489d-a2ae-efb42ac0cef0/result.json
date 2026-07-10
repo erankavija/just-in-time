@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "run_id": "9f104c5a-d613-489d-a2ae-efb42ac0cef0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6",
+  "commit": "001fb211d7e3718759b2dde777abce7f8a36c4d4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T22:16:33.012071961Z",
+  "completed_at": "2026-07-10T22:17:23.950442092Z",
+  "duration_ms": 50938,
+  "exit_code": 1,
+  "stdout": "## Acceptance Criteria\n\nREQ-03 is met: `.jit/gates.toml` registers an exec-type `docs-mechanical` postcheck invoking `./scripts/docs-mechanical.sh`.\n\nREQ-01 and REQ-02 are not met. The scripts embed product-specific documentation paths, the citation checker has broad false-negative classes, and no seeded-defect evidence was recorded.\n\n## Architecture and Separation of Concerns\n\nNo Rust domain/storage/commands/CLI boundary changes were introduced. The changes are confined to shell/Python checking scripts and gate configuration.\n\n## Functional Paradigm\n\nThe embedded Python is mostly expression-oriented, though file discovery uses imperative mutation. This is reasonable for a small filesystem scanner and is not independently blocking.\n\n## Correctness and Invariants\n\nThe projection checker invokes existing renderer commands rather than writing files itself. No issue-state, event-log, gate-transition, assignee, label, or PID-sensitive implementation was changed.\n\nThe aggregate script loses checker exit-code semantics: any child exit, including documented environment error `2`, becomes `1` at [scripts/docs-mechanical.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-mechanical.sh:33).\n\n## Safety\n\nNo Rust or unsafe code was added.\n\n## Testing\n\nThe issue has a passed `repo-validate` gate with exit code 0. There is no succeeded `cargo-ci` gate in the supplied issue context, but this scripts-only change does not modify Rust.\n\nHard REQ-02 specifically requires each checker to be exercised against a seeded defect and the clean tree. `run_history` is empty, and the recorded issue gates contain only `repo-validate`; no durable seeded-defect or clean `docs-mechanical` results were supplied.\n\n## Error Handling\n\nIndividual scripts distinguish findings (`1`) from environment errors (`2`), but the orchestrator collapses both into `1`. Consequently, callers cannot distinguish an actual documentation defect from a checker that never ran successfully.\n\n## CLI Contract\n\nNo user-facing CLI command was added or changed. The new gate is an exec gate, so the CLI-wide `--json` requirement is not applicable.\n\n## Documentation\n\nThe scripts contain useful usage and exit-code documentation. That documentation is inaccurate at the aggregate boundary because `docs-mechanical.sh` advertises exit code `2` but never returns it.\n\n## Prior Review Feedback\n\n`run_history` is empty, so there are no prior findings to reassess.\n\n## JIT Issue Management\n\nThe prerequisite `c939d0b6` is `done`, and `unmet_dependencies` is empty. The recorded `repo-validate` gate passed. The declared blast radius is respected.\n\n## Findings\n\n1. **F1 — High:** REQ-01 explicitly prohibits hardcoded path lists, but both default checkers encode `docs README.md INSTALL.md mcp-server/README.md web/README.md` at [scripts/docs-check-links.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-check-links.sh:32) and [scripts/docs-check-citations.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-check-citations.sh:37). The claimed full documentation surface is therefore a product fact that can silently become stale when documentation roots are added or moved.\n\n2. **F2 — High:** The citation checker does not guarantee that a mis-cited real path is reported. It only examines tokens containing `/`, requires the first segment to be an existing tracked top-level entry, and requires the final segment to contain a dot at [scripts/docs-check-citations.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-check-citations.sh:80). Thus dangling root citations such as `MISSING.md`, paths under a misspelled top-level directory, and extensionless file citations are silently skipped. This contradicts REQ-01’s requirement that every non-placeholder mis-cited real path be a finding.\n\n3. **F3 — High:** Hard REQ-02 lacks durable evidence. `run_history` is empty and the issue’s only recorded completed gate is `repo-validate`; there is no recorded clean `docs-mechanical` run or seeded broken-link, dangling-citation, and projection-drift run demonstrating nonzero exits.\n\n4. **F4 — Medium:** `docs-mechanical.sh` converts every failed child invocation to status `1` at [scripts/docs-mechanical.sh](/home/vkaskivuo/Projects/just-in-time/scripts/docs-mechanical.sh:33), despite documenting `2` for environment errors. A missing dependency or failed renderer is therefore misreported as a documentation finding, weakening gate diagnostics and violating the script’s stated contract.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 and REQ-02 fail because the checkers encode a hardcoded documentation footprint, miss valid dangling-path classes, and lack required seeded-defect evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The link and citation checkers hardcode the default documentation path list, violating REQ-01.\",\"file\":\"scripts/docs-check-links.sh\",\"line\":32},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The citation heuristic silently skips several classes of non-placeholder dangling file citations.\",\"file\":\"scripts/docs-check-citations.sh\",\"line\":80},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"No durable clean and seeded-defect execution evidence was supplied for hard REQ-02.\"},{\"id\":\"F4\",\"severity\":\"medium\",\"summary\":\"The orchestrator collapses documented environment-error exit code 2 into finding exit code 1.\",\"file\":\"scripts/docs-mechanical.sh\",\"line\":33}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1165 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e1a-9693-7be1-ba5a-caff5e0d4ae0\n--------\nuser\n--- 1152 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-01 and REQ-02 fail because the checkers encode a hardcoded documentation footprint, miss valid dangling-path classes, and lack required seeded-defect evidence.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The link and citation checkers hardcode the default documentation path list, violating REQ-01.",
+        "file": "scripts/docs-check-links.sh",
+        "line": 32
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The citation heuristic silently skips several classes of non-placeholder dangling file citations.",
+        "file": "scripts/docs-check-citations.sh",
+        "line": 80
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "No durable clean and seeded-defect execution evidence was supplied for hard REQ-02."
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "summary": "The orchestrator collapses documented environment-error exit code 2 into finding exit code 1.",
+        "file": "scripts/docs-mechanical.sh",
+        "line": 33
+      }
+    ]
+  }
+}

@@ -6153,3 +6153,7 @@
 {"type":"issue_claimed","id":"0008fe43-c2f4-47e3-a253-2bf72df902bf","issue_id":"99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6","timestamp":"2026-07-10T21:51:58.257340755Z","assignee":"agent:claude"}
 {"type":"issue_state_changed","id":"15cf11d3-b6c4-47f9-b43e-a787db2b9706","issue_id":"d24008f0-ecec-4f08-900b-9d686e9a5051","timestamp":"2026-07-10T21:51:58.273682427Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"a10043e7-446a-422d-b0a0-6de35be3eecf","issue_id":"d24008f0-ecec-4f08-900b-9d686e9a5051","timestamp":"2026-07-10T21:51:58.273874157Z","assignee":"agent:claude"}
+{"type":"gate_passed","id":"71d70e4f-c54b-46c7-9779-f98f070c86be","issue_id":"99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6","timestamp":"2026-07-10T22:14:03.344447176Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"184ac7a1-1050-4228-930a-c85d944ec30a","issue_id":"d24008f0-ecec-4f08-900b-9d686e9a5051","timestamp":"2026-07-10T22:14:03.655442343Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"57c197a7-f4db-482c-9a47-6a2e2a73f154","issue_id":"d24008f0-ecec-4f08-900b-9d686e9a5051","timestamp":"2026-07-10T22:15:07.042005216Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"46addb14-2500-439f-9159-d78dec60a4f2","issue_id":"99f4a2b4-1fde-48bf-90b5-d08ef5e40ce6","timestamp":"2026-07-10T22:17:23.950930483Z","gate_key":"code-review","updated_by":"auto:executor"}

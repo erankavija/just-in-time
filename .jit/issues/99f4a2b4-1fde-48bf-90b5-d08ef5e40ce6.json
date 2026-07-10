@@ -12,7 +12,18 @@
     "code-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T22:14:03.021283011Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T22:16:33.012071961Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -30,7 +41,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-10T20:21:17.655916429Z",
-  "updated_at": "2026-07-10T21:51:58.257049984Z",
+  "updated_at": "2026-07-10T22:17:23.950692443Z",
   "first_ready_at": "2026-07-10T20:21:17.655916689Z",
   "claimed_at": "2026-07-10T21:51:58.257049744Z"
 }
