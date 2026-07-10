@@ -2,7 +2,7 @@
   "id": "e486a854-1860-4d25-8cc5-c26715192088",
   "title": "Expose resolved hierarchy through the server API and output schemas",
   "description": "Serve core hierarchy resolution to external consumers: resolved fields on the HTTP graph endpoint, a published schema for the tree output, and one consistent field set across export surfaces.\n\n## Background\n\nCore resolves parent/children/cluster/rank in `graph/hierarchy.rs`, and `jit graph tree` emits the full `HierarchyNodeView` (`output.rs:848-866`). But `GET /graph` (`crates/server/src/routes.rs:124-163`) ships only raw edges plus labels, `export_json_full` (`visualization.rs:208-238`) emits only `resolved_parent` and `cluster` (no children/rank), and `get_output_schema_for_command` (`schema.rs:359-410`) has no `graph_tree` arm even though the types derive `JsonSchema`. External consumers therefore re-derive resolution and re-parse `type:` labels.\n\n## Success Criteria\n\n- [hard] REQ-1: Each node in the `GET /graph` response carries resolved parent, children, cluster, rank, and the resolved type value, all computed by core resolution in the server (no client-side derivation required).\n- [hard] REQ-2: The published output schema set includes the graph-tree response shape, retrievable through the schema command.\n- [hard] REQ-3: The full JSON export emits the same four resolution fields as the tree output; the parent-and-cluster-only partial shape no longer exists.\n- [hard] REQ-4: The scoped-export caveat (a scoped node's parent may lie outside the emitted subtree, `commands/graph.rs:246-252`) is documented in the CLI reference for both export and tree surfaces.\n\n## Notes\n\nKeep the response envelope conventions (`{\"count\": N, \"<collection>\": [...]}` for lists). The server links the jit library directly, so this is a matter of calling the existing resolver in the route handler, not new resolution code.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:claude",
   "dependencies": [],
@@ -11,10 +11,15 @@
     "cargo-ci"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T08:26:26.918368588Z"
+    },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-05T22:34:56.464717044Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-10T08:01:14.474273165Z"
     }
   },
   "context": {},
@@ -27,7 +32,8 @@
     "satisfies:REQ-2"
   ],
   "created_at": "2026-07-05T22:31:18.720853776Z",
-  "updated_at": "2026-07-09T22:56:14.801261083Z",
+  "updated_at": "2026-07-10T08:28:43.741381923Z",
   "first_ready_at": "2026-07-05T22:31:18.720854336Z",
-  "claimed_at": "2026-07-09T22:56:14.801260903Z"
+  "claimed_at": "2026-07-09T22:56:14.801260903Z",
+  "done_at": "2026-07-10T08:28:43.741381183Z"
 }
