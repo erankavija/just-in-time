@@ -67,6 +67,11 @@ sha256sum -c checksums.txt
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 
+# Initialize the shared data volume first — the API server refuses to start
+# against an uninitialized directory. The cli service mounts the same volume
+# and sets JIT_DATA_DIR=/data, so `jit init` targets it.
+docker-compose run --rm --entrypoint jit cli init
+
 # Start all services (API + Web UI)
 docker-compose up -d
 
@@ -251,9 +256,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Optional Dependencies
 
-- **Git**: For document version tracking (`apt install git`)
+- **Git**: Core issue tracking is Git-optional, but advisory leases (`jit claim`) and worktree coordination need a Git repository with a resolvable `HEAD` (`apt install git`)
 - **Docker**: For containerized deployment (`apt install docker.io docker-compose`)
-- **Node.js**: Only needed for MCP server (`apt install nodejs npm`)
+- **Node.js** (v18+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`)
 
 ---
 

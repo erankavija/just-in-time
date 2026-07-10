@@ -319,9 +319,9 @@ npm install
 
 ### Node version issues
 
-Requires Node.js v16+:
+Requires Node.js v18+ (the repository builds on Node.js 20):
 ```bash
-node --version  # Should be v16 or later
+node --version  # Should be v18 or later
 ```
 
 ## Architecture

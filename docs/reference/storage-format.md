@@ -21,8 +21,9 @@ multi-agent lease coordination lives under `.git/jit/` (see
 ├── issues/           # One JSON file per issue
 │   ├── <uuid>.json   # Issue data
 │   └── <uuid>.lock   # File lock for atomic operations
-├── gate-runs/        # Recorded gate runs
-│   └── <issue-id>/   # Per-issue gate run history
+├── gate-runs/        # Recorded gate runs, one directory per run
+│   └── <run-id>/
+│       └── result.json  # Run record; carries its issue id and gate key
 └── schemas/          # JSON Schema files referenced by rules.toml
 ```
 
@@ -80,10 +81,10 @@ Each issue is stored as `issues/<uuid>.json`:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | UUID | Unique identifier (ULID-based) |
+| `id` | UUID | Unique identifier (UUID v4) |
 | `title` | string | Short issue title |
 | `description` | string | Full description (markdown) |
-| `state` | enum | `backlog`, `ready`, `in_progress`, `done`, `rejected` |
+| `state` | enum | `backlog`, `ready`, `in_progress`, `gated`, `done`, `rejected`, `archived` |
 | `priority` | enum | `critical`, `high`, `normal`, `low` |
 | `assignee` | string? | Format: `type:identifier` (e.g., `agent:copilot-1`) |
 | `dependencies` | UUID[] | Issues that must reach a terminal state before this one |
@@ -148,20 +149,22 @@ See [Configuration Reference](configuration.md) for full options.
 
 `events.jsonl` is an append-only log (one JSON object per line):
 
-```json
-{"event_type":"IssueCreated","issue_id":"abc123","timestamp":"2026-01-15T10:00:00Z","data":{}}
-{"event_type":"StateChanged","issue_id":"abc123","timestamp":"2026-01-15T10:05:00Z","data":{"from":"backlog","to":"ready"}}
-{"event_type":"GatePassed","issue_id":"abc123","timestamp":"2026-01-15T10:10:00Z","data":{"gate":"tests","by":"auto:executor"}}
+Each event is a JSON object tagged by a snake-case `type` field, with the
+remaining fields flat on the object (not nested under a `data` key). Every event
+carries its own `id`, the `issue_id` it concerns, and a `timestamp`:
+
+```jsonl
+{"type":"issue_created","id":"e5095588-...","issue_id":"abc123","timestamp":"2026-01-15T10:00:00Z","title":"probe","priority":"normal"}
+{"type":"issue_state_changed","id":"758cfeb0-...","issue_id":"abc123","timestamp":"2026-01-15T10:05:00Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"0176a0ac-...","issue_id":"abc123","timestamp":"2026-01-15T10:10:00Z","assignee":"agent:worker-1"}
 ```
 
 ### Event Types
 
-- `IssueCreated`, `IssueUpdated`, `IssueDeleted`
-- `StateChanged` - State transitions
-- `DependencyAdded`, `DependencyRemoved`
-- `GatePassed`, `GateFailed`
-- `LeaseAcquired`, `LeaseReleased`, `LeaseExpired`
-- `AssigneeChanged`
+The `type` tag is one of: `issue_created`, `issue_claimed`, `issue_released`,
+`issue_state_changed`, `issue_completed`, `issue_deleted`, `gate_passed`,
+`gate_failed`, `gate_added`, `gate_removed`. Fields beyond `id`, `issue_id`, and
+`timestamp` vary by type.
 
 ## Gate Registry
 

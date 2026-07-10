@@ -16,7 +16,7 @@
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T15:42:26.355255697Z"
+      "updated_at": "2026-07-10T15:46:08.557504447Z"
     },
     "repo-validate": {
       "status": "passed",
@@ -41,7 +41,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-06T15:39:58.875830140Z",
-  "updated_at": "2026-07-10T15:45:05.736050685Z",
+  "updated_at": "2026-07-10T15:50:00.185310631Z",
   "first_ready_at": "2026-07-06T15:39:58.875830550Z",
   "claimed_at": "2026-07-09T23:14:10.794038049Z"
 }
