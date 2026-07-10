@@ -1,12 +1,18 @@
 # REQ-01 evidence — scope-aware doc-review prompt
 
-REQ-01: the review prompt restricts findings to a description-declared file scope
-when present, and reviews the full surface when absent; behavior demonstrated by
-one scoped and one unscoped run.
+REQ-01 (as amended, owner decision 2026-07-11): the review prompt restricts
+findings to a description-declared file scope when present, and reviews the full
+surface when absent. The prompt-level implementation is evidenced here by a
+mechanism trace plus one real scoped reviewer run; the full scoped-vs-unscoped
+behavioral comparison is deferred to the downstream area-audit tasks, each of
+which runs a scope-restricted `doc-review`.
 
-This document is the durable record of that demonstration. It has two parts: a
-deterministic mechanism trace (how the scope reaches the reviewer) and a real
-scoped reviewer run (that the reviewer honors it).
+This document is the durable record. It has two parts: a deterministic mechanism
+trace (how the scope reaches the reviewer, for both the scoped and unscoped
+context assemblies) and one real scoped reviewer run (showing the reviewer honors
+a declared footprint). The unscoped case is shown at the mechanism level only
+(`REVIEWER_AGENT=cat`), not as a live reviewer run — a live unscoped run at this
+prompt-amendment stage is premature; the audit tasks exercise it.
 
 The instruction that governs the behavior is the `### Scoped audits` paragraph in
 `scripts/doc-review-prompt.md:27-29`:
@@ -179,7 +185,10 @@ the declared footprint, which is exactly the REQ-01 scoped behavior.
   `codex exec` run; corroborated by the Part 1 trace showing the scope line
   reaching the reviewer).
 - Unscoped context → the same instruction paragraph governs with its full-surface
-  fallback, no footprint line injected (Part 1).
+  fallback, no footprint line injected — shown at the mechanism level (Part 1);
+  the live full-surface behavioral run is deferred to the audit tasks.
 
-Both branches of REQ-01 are demonstrated. `scripts/doc-review-prompt.md:27-29`
-is unchanged by this evidence work.
+The prompt-level implementation of both branches is evidenced (scoped: real run +
+trace; unscoped: mechanism trace), with the full behavioral comparison deferred
+downstream per the amended criterion. `scripts/doc-review-prompt.md:27-29` is
+unchanged by this evidence work.

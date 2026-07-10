@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "e38ce5e3-67e7-4dc0-b1b7-6bb570ac443e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d24008f0-ecec-4f08-900b-9d686e9a5051",
+  "commit": "1bac6a3cf49ae45c7e0c07a315cf56299cb7a5b8",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-10T22:59:09.540645288Z",
+  "completed_at": "2026-07-10T22:59:50.206575059Z",
+  "duration_ms": 40665,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01’s implementation is correct at `scripts/doc-review-prompt.md:27-29`: explicit description-declared file scopes constrain all findings, while absent scopes retain the enumerated full-surface review.\n\nThe committed mechanism trace and real scoped reviewer run satisfy the revised owner-approved criterion. The previously requested live unscoped run is now explicitly deferred to downstream audits.\n\n## Architecture and separation of concerns\n\nNo violations. The functional change is confined to a review prompt and introduces no runtime dependencies or I/O.\n\n## Functional paradigm\n\nNot applicable to this prompt-only change.\n\n## Correctness and invariants\n\nThe scoped-audit instruction is unambiguous and preserves the existing default surface. Runtime invariants, atomic writes, event logging, gates, labels, assignees, and PID handling are unaffected.\n\nThe issue-description update was accompanied by an `issue_updated` event in `.jit/events.jsonl`.\n\n## Safety\n\nNo Rust or unsafe code was introduced.\n\n## Testing\n\nThe recorded `repo-validate` gate passed with exit code 0. Tests were not rerun.\n\nThe scoped behavioral run in `dev/active/d24008f0-req01-evidence.md:90-174` demonstrates that all reported findings remained within `docs/tutorials/`.\n\n## Error handling\n\nNot applicable; no executable code changed.\n\n## CLI contract\n\nNot applicable; no CLI behavior changed.\n\n## Documentation\n\nThe original review-surface enumeration remains unchanged, including the intentional omission of root `TESTING.md`.\n\nThe evidence document was not updated after REQ-01 changed. It still says an unscoped run was performed and that both branches were demonstrated, although its unscoped exercise only used `REVIEWER_AGENT=cat`. This leaves contradictory durable documentation and technical debt.\n\n## Prior review feedback\n\nThe latest review’s demand for a live unscoped reviewer execution is resolved by the explicit owner decision deferring that demonstration.\n\nHowever, the evidence artifact still presents the old requirement and overstates what was executed, so the rework is incomplete as documentation maintenance.\n\n## Jit issue management\n\nDependency `c939d0b6` is done and `unmet_dependencies` is empty. Repository validation passed. Assignee and labels conform to their required formats.\n\n## Findings\n\n1. **F1 — Medium:** `dev/active/d24008f0-req01-evidence.md:3-9` still claims behavior was demonstrated by scoped and unscoped runs, and lines 181-184 claim both branches were demonstrated. The document itself shows that only the scoped case used a real reviewer; the unscoped case used `REVIEWER_AGENT=cat`. Update the evidence introduction, conclusion, and issue document label to reflect the revised criterion: mechanism trace plus one real scoped run, with full behavioral comparison deferred.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 is implemented and demonstrated as revised, but the durable evidence still falsely claims a real unscoped run and leaves contradictory documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"The evidence artifact still claims scoped and unscoped behavioral runs although only the scoped case used a real reviewer.\",\"file\":\"dev/active/d24008f0-req01-evidence.md\",\"line\":3}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 946 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f4e41-9a03-7360-b5e6-f0acd025958f\n--------\nuser\n--- 933 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-01 is implemented and demonstrated as revised, but the durable evidence still falsely claims a real unscoped run and leaves contradictory documentation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "The evidence artifact still claims scoped and unscoped behavioral runs although only the scoped case used a real reviewer.",
+        "file": "dev/active/d24008f0-req01-evidence.md",
+        "line": 3
+      }
+    ]
+  }
+}

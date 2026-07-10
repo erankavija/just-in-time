@@ -21,7 +21,7 @@
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T22:31:16.136611128Z"
+      "updated_at": "2026-07-10T22:59:09.540645288Z"
     }
   },
   "context": {},
@@ -36,7 +36,7 @@
     {
       "path": "dev/active/d24008f0-req01-evidence.md",
       "commit": null,
-      "label": "REQ-01 scoped/unscoped run evidence",
+      "label": "REQ-01 mechanism trace + real scoped run (unscoped deferred to audits)",
       "doc_type": "analysis",
       "format": "markdown"
     }
@@ -48,7 +48,7 @@
     "component:docs"
   ],
   "created_at": "2026-07-10T20:21:17.655376969Z",
-  "updated_at": "2026-07-10T22:59:00.844490314Z",
+  "updated_at": "2026-07-10T23:00:47.950063339Z",
   "first_ready_at": "2026-07-10T20:21:17.655377429Z",
   "claimed_at": "2026-07-10T21:51:58.273740217Z"
 }
