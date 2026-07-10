@@ -104,6 +104,37 @@
           "status": "dispatched"
         }
       ]
+    },
+    {
+      "wave_number": 4,
+      "rationale": "The doc-review gate (6ce0f14e REQ-03) found 21 real defects across the whole shipped doc surface, beyond the 11 planned tasks. User approved (2026-07-10) fixing all 21 under this epic. Gate-driven rework on the doc tree, grouped into 4 disjoint-file workers.",
+      "gate_findings": 21,
+      "issues": [
+        {
+          "short_id": "dw-a",
+          "files": "README.md, web/README.md, mcp-server/README.md",
+          "findings": "F1,F2,F4",
+          "status": "dispatched"
+        },
+        {
+          "short_id": "dw-b",
+          "files": "docs/concepts/{overview,design-philosophy,core-model}.md",
+          "findings": "F3,F5,F7,F8,F13,F15",
+          "status": "dispatched"
+        },
+        {
+          "short_id": "dw-c",
+          "files": "docs/reference/{cli-commands,item-addresses}.md",
+          "findings": "F6,F9,F16,F20",
+          "status": "dispatched"
+        },
+        {
+          "short_id": "dw-d",
+          "files": "planning-bracket, adopt-planning-bracket, custom-gates, validation-rules, validation-engine",
+          "findings": "F10,F11,F12,F14,F17,F18,F19,F21",
+          "status": "dispatched"
+        }
+      ]
     }
   ],
   "lead_decisions": [
@@ -150,6 +181,11 @@
       "id": "LD-9",
       "decision": "Reversed LD-6 for the two f2532a2d session handoffs: repointed their skill-eval paths to dev/eval/ after code-review flagged them. f2532a2d is Done and one line was a forward-looking 'grade under <path>' instruction that 404'd. dev/archive/** and the epic's own audit-findings doc (where the pre-move path IS the finding) stay verbatim.",
       "for": "c7f0f690"
+    },
+    {
+      "id": "LD-10",
+      "decision": "User-approved (2026-07-10): the doc-review gate's 21 findings are fixed as wave 4 under this epic rather than deferred, including rewriting web/README.md for the jit web UI and removing two 'not yet implemented' roadmap lists. Framed as 6ce0f14e REQ-03 gate-driven rework (no new issues); re-run doc-review to green, then complete.",
+      "for": "6ce0f14e"
     }
   ],
   "created_during_execution": [
