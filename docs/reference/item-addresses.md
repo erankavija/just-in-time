@@ -53,8 +53,12 @@ item show`.
 | Project | `@/invariant/dag-acyclic` | An item of a project-scoped kind |
 | Project, aliased kind | `@/inv/dag-acyclic` | The same item, via the kind's alias |
 | Project, named | `@acme/invariant/dag-acyclic` | The same item, when `acme` is this repository's declared project name |
-| Issue | `@/issue/56ab0224/requirement/REQ-01` | An item of an issue-scoped kind, inside issue `56ab0224` |
-| Sugar | `56ab0224/REQ-01` | The same item, kind inferred |
+| Issue | `@/issue/<short-id>/requirement/REQ-01` | An item of an issue-scoped kind, inside the issue named by `<short-id>` |
+| Sugar | `<short-id>/REQ-01` | The same item, kind inferred |
+
+The project rows resolve as written; `<short-id>` in the issue and sugar rows is
+a placeholder for a real issue's short id, and `REQ-01` for one of its
+requirement self-ids.
 
 ### The `@` sentinel and the reserved `issue` segment
 
@@ -123,16 +127,16 @@ repository whose `requirement` and `risk` patterns both match the string
 `RISK-01`, and an issue holding one `risk` item with that self-id:
 
 ```bash
-$ jit item show 56ab0224/RISK-01 --json | jq -r .item.qualified_id
-@/issue/56ab0224/risk/RISK-01
+$ jit item show <short-id>/RISK-01 --json | jq -r .item.qualified_id
+@/issue/<short-id>/risk/RISK-01
 ```
 
 An ambiguity is reported only when the issue really holds several items sharing
 the self-id under different kinds:
 
 ```bash
-$ jit item show 56ab0224/RISK-01
-Error: self-id 'RISK-01' in issue 56ab0224 is ambiguous across kinds (requirement, risk);
+$ jit item show <short-id>/RISK-01
+Error: self-id 'RISK-01' in issue <short-id> is ambiguous across kinds (requirement, risk);
 use the explicit '@/issue/<short-id>/<kind>/<self-id>' address
 ```
 
