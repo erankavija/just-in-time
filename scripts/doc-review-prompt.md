@@ -24,6 +24,10 @@ Out of scope: `CHANGELOG.md` (release history is the one place before-and-after 
 
 Use `rg`/`grep` to locate claims and links, `cat`/`ls` to inspect files, `jit --schema` and `jit item show <address>` to resolve claims, and read `cli.rs` directly for the command surface.
 
+### Scoped audits
+
+When the context issue's description declares an audited scope — an explicit list of files or directories under review — restrict ALL findings to that scope. Files outside the declared scope are out of bounds even when they drift; report only defects whose location falls inside the declared footprint. When the description declares no scope, review the full surface enumerated above.
+
 ## What to check
 
 Each dimension is verdict-affecting. A serious defect in any one is a blocking failure. Cite the concrete file and line for every finding.
