@@ -64,7 +64,7 @@ counterexample across generated inputs.
 | --- | --- |
 | `crates/jit/src/graph/mod.rs` | Unlimited traversal equals the transitive dependency set; cycle detection reports none for DAGs |
 | `crates/jit/src/graph/hierarchy.rs` | Resolution invariants hold on arbitrary DAGs; resolution is order-invariant |
-| `crates/jit/src/type_hierarchy.rs` | Type-name extraction normalizes consistently; invalid labels are rejected |
+| `crates/jit/src/domain/type_taxonomy.rs` | Type-name extraction normalizes consistently; invalid labels are rejected |
 | `crates/jit/src/storage/claim_coordinator_proptests.rs` | Index rebuild is idempotent and lossless; lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive |
 | `crates/jit/tests/template_apply_tests.rs` | Template application yields an acyclic, transitively reduced graph; force-refresh is idempotent over nodes and edges |
 | `crates/jit/tests/short_hash_tests.rs` | Any unique prefix resolves to its issue; shared prefixes are reported as ambiguous |
@@ -207,7 +207,7 @@ Run them with `cargo test --test integration_test` (or any other target name).
 Two environment behaviors matter when writing tests:
 
 - **`JIT_TEST_MODE=1`** disables the git guards that global operations enforce in a live
-  repository: the main-history divergence check (`enforce_main_only_operations`) and the
+  repository: the branch-drift check against main history (`enforce_main_only_operations`) and the
   claims-index validation inside `jit validate`. `TestHarness::new()` sets it. Integration
   tests that call these paths set it explicitly.
 - **Doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`. They are

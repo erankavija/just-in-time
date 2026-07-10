@@ -6,7 +6,7 @@ This document explains all clippy warning suppressions in the codebase.
 
 ### 1. `needless_range_loop` - Levenshtein Distance Algorithm
 
-**Location:** `crates/jit/src/type_hierarchy.rs:244`
+**Location:** `crates/jit/src/domain/type_taxonomy.rs:261`
 
 **Reason:** The Levenshtein distance algorithm requires indexed access to multiple matrix cells simultaneously:
 
@@ -56,7 +56,7 @@ Clippy suggests `.iter_mut().enumerate()`, but this only provides mutable access
 **Locations:**
 - `crates/jit/src/commands/document.rs`: `read_document_content`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`
 - `crates/jit/src/commands/labels.rs`: `get_issue`, `add_label`
-- `crates/jit/src/type_hierarchy.rs`: `ConfigError::DuplicateType`
+- `crates/jit/src/domain/type_taxonomy.rs`: `ConfigError::DuplicateType`
 
 **Reason:** These are public API methods that form part of the library interface but are not currently called by the CLI binary itself.
 

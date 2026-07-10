@@ -212,8 +212,9 @@ consumes both). The waves are coarse buckets; the per-task `→` edges are autho
 
 - **R1 (RESOLVED) Type-hierarchy edges at the spine front.** Confirmed during plan review:
   type-hierarchy validation is label-only and does **not** validate dependency edges
-  (`type_hierarchy.rs:368-382`; graph eval delegates to those label-only functions,
-  `validation/graph.rs:1144-1172`). So `P`'s edge to moved upstream deps of arbitrary type
+  (`domain/type_taxonomy.rs`: `detect_validation_issues` and `detect_membership_issues`;
+  graph eval delegates to those label-only functions, `validation/graph.rs:1144-1172`).
+  So `P`'s edge to moved upstream deps of arbitrary type
   raises no spurious findings. No action needed.
 - **R2 `validate --scope` boundary vs whole-repo rules.** Repo-wide kinds
   (`label-uniqueness`, `scope = "all"`) are excluded from `--scope` exactly as they are
