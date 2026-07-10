@@ -8,7 +8,7 @@
       "note": "Enablers. Both block all Wave 2 audits.",
       "issues": [
         {"id": "99f4a2b4", "short_id": "99f4a2b4", "title": "Committed documentation mechanical-check gate", "classification": "implementation", "status": "rework-1", "note": "merged to main; code-review FAIL F1-F4 (hardcoded footprint, citation false-negatives, no durable seeded evidence, exit-2 collapse); rework dispatched"},
-        {"id": "d24008f0", "short_id": "d24008f0", "title": "Documentation review prompt amendment", "classification": "implementation", "status": "rework-1", "note": "merged to main; code-review FAIL F1 (REQ-01 lacks durable scoped/unscoped run evidence); rework dispatched"}
+        {"id": "d24008f0", "short_id": "d24008f0", "title": "Documentation review prompt amendment", "classification": "implementation", "status": "done", "note": "DONE. REQ-01 amended (owner 2026-07-11: unscoped behavioral demo deferred to audit tasks). Evidence = mechanism trace + real scoped run. Both gates pass."}
       ]
     },
     {
