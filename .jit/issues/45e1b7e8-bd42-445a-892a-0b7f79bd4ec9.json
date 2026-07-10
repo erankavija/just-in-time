@@ -1,0 +1,23 @@
+{
+  "id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "title": "Gate results evidence the working tree, not the merged commit",
+  "description": "Gate checkers evaluate the working tree, so a merge can leave the mainline non-compiling while every gate on every issue reports passed. Nothing in the parallel-dispatch protocol verifies that the merged commit itself builds.\n\n## Background\n\nA worker branch anchored before a module is deleted still carries the parent module file that names it. Merging that branch after the deletion lands reintroduces the `pub mod` declaration. Git sees a file removed on one side and an untouched line on the other, finds no textual overlap, and merges without a conflict. The mainline then fails to build:\n\n```\nerror[E0583]: file not found for module `claims_log`\n  --> crates/jit/src/storage/mod.rs:14:1\n```\n\n```mermaid\ngitGraph\n    commit id: \"module exists\"\n    branch worker\n    commit id: \"edits elsewhere\"\n    checkout main\n    commit id: \"delete module + decl\"\n    checkout main\n    merge worker id: \"clean merge, broken build\"\n```\n\nObserved 2026-07-10: a merge resurrected `pub mod claims_log;` after `crates/jit/src/storage/claims_log.rs` had been deleted. The breakage survived several commits before being noticed and repaired in `0f01959d`.\n\nTwo existing safeguards are structurally blind to this class of failure:\n\n- The post-wave leak check compares the working tree against a pre-dispatch snapshot, so it detects files a worker wrote outside its worktree. Nothing leaked here; the merge was legitimate and the work was correct.\n- Compile-and-test checkers run in the working tree of whoever invokes them. When that tree carries a compensating uncommitted edit, the checker passes on a state that exists in no commit. During the incident above, a full suite reported 3,553 tests passing on a merged issue while the mainline would not compile. Both results were accurate; they describe different trees.\n\nThe consequence is that a passing gate result is evidence about a working tree, while the commit it records is a claim about the repository. Those diverge silently, and any clone or reset lands on the broken commit.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository script reports whether a named commit builds, resolving sources from that commit in isolation so an uncommitted working-tree edit cannot mask a broken one.\n- [hard] REQ-02: The worktree dispatch and parallelism references require that verification after each merge into the mainline and before any further commit lands on top of it.\n- [hard] REQ-03: A regression test constructs the resurrection case, a branch anchored before a module deletion and merged after it, and asserts the new check reports failure on a tree where the leak check reports success.\n- [aspirational] REQ-04: A recorded gate result distinguishes the tree its checker observed from the commit it names, so a pass produced against a modified working tree is not readable as evidence for that commit.\n\n## Notes\n\nREQ-04 is the general defect; REQ-01 through REQ-03 are cheap containment for the specific failure. Sizing REQ-04 may warrant splitting it into its own issue: recorded results already carry a commit field, which names whatever the repository pointed at when the checker ran, regardless of whether the tree matched it. Recording the tree's cleanliness alongside it would make the distinction machine-readable.\n\nThis needs neither concurrent leads nor a shared checkout. Any long-lived branch spanning a module deletion reproduces it, and both conditions merely raise the odds.\n\nResolving this by having a checker stash or clean the tree before running is a regression, not a fix. Agents and humans legitimately hold uncommitted state, and a checker that mutates the tree it is judging is worse than the gap it closes.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "epic:core-maintenance",
+    "component:gates"
+  ],
+  "created_at": "2026-07-10T11:01:51.147435115Z",
+  "updated_at": "2026-07-10T11:01:51.149864287Z",
+  "first_ready_at": "2026-07-10T11:01:51.147453635Z"
+}

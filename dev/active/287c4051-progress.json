@@ -1,7 +1,7 @@
 {
   "epic_id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
   "epic_short_id": "287c4051",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -12,56 +12,56 @@
           "short_id": "a6e1ae3d",
           "title": "Complete the CLI command reference",
           "classification": "documentation",
-          "status": "reviewed-pass"
+          "status": "done"
         },
         {
           "id": "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
           "short_id": "c7f0f690",
           "title": "Relocate self-documentation out of the adopter docs tree",
           "classification": "documentation",
-          "status": "rework"
+          "status": "done"
         },
         {
           "id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
           "short_id": "c29118f9",
           "title": "Rewrite TESTING.md for the current workspace layout",
           "classification": "documentation",
-          "status": "rework"
+          "status": "done"
         },
         {
           "id": "d48906de-133e-4676-98cc-0785349f947d",
           "short_id": "d48906de",
           "title": "Correct the storage-format reference layout",
           "classification": "documentation",
-          "status": "rework"
+          "status": "done"
         },
         {
           "id": "313a7f3a-c6db-4adc-8934-36a7874287ed",
           "short_id": "313a7f3a",
           "title": "Correct git-requirement claims in the guarantees doc",
           "classification": "documentation",
-          "status": "rework"
+          "status": "done"
         },
         {
           "id": "f5eb11a2-d368-4ede-aa9f-abdc1343236e",
           "short_id": "f5eb11a2",
           "title": "Convert ASCII diagrams in docs to Mermaid",
           "classification": "documentation",
-          "status": "rework"
+          "status": "done"
         },
         {
           "id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
           "short_id": "287f7bc9",
           "title": "Refresh mcp-server README tool statements",
           "classification": "documentation",
-          "status": "reviewed-pass"
+          "status": "done"
         },
         {
           "id": "f1aaaca7-84ad-4985-96f8-20b1cd94fadf",
           "short_id": "f1aaaca7",
           "title": "Fix stale storage comment and unignored jit tmp directory",
           "classification": "implementation",
-          "status": "in-progress"
+          "status": "done"
         }
       ]
     },
@@ -140,6 +140,16 @@
       "id": "LD-7",
       "decision": "Add a cargo-ci gate to a docs issue before re-running code-review. The reviewer skips cargo test when a succeeded cargo-ci gate exists; without it, concurrent gate runs trip the known find_available_port race (894337e2) and produce spurious test-failure findings.",
       "for": "all"
+    },
+    {
+      "id": "LD-8",
+      "decision": "User-approved (escalation): delete the dead storage::claims_log module. It had zero non-test consumers and serialized the claim-log sequence field as `sequence` while the live writer (claim_coordinator::ClaimLogEntry) uses `seq`; the duplicate made code-review read d48906de's correct storage-format doc as wrong. Deletion (cargo-ci green, 3545 tests) removed the contradiction without changing shipped docs.",
+      "for": "d48906de"
+    },
+    {
+      "id": "LD-9",
+      "decision": "Reversed LD-6 for the two f2532a2d session handoffs: repointed their skill-eval paths to dev/eval/ after code-review flagged them. f2532a2d is Done and one line was a forward-looking 'grade under <path>' instruction that 404'd. dev/archive/** and the epic's own audit-findings doc (where the pre-move path IS the finding) stay verbatim.",
+      "for": "c7f0f690"
     }
   ],
   "created_during_execution": [
@@ -153,11 +163,11 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "c7f0f690": 1,
+    "c7f0f690": 2,
     "c29118f9": 1,
     "d48906de": 1,
-    "313a7f3a": 1,
-    "f5eb11a2": 1
+    "313a7f3a": 2,
+    "f5eb11a2": 2
   },
   "started_at": "2026-07-10T00:00:00Z",
   "reviewed": {
@@ -216,6 +226,9 @@
         "design-philosophy.md layer diagram asserts Web UI --> CLI; crates/server embeds CommandExecutor in-process",
         "guarantees.md lock-sequence arrow art remains; REQ-03 is tree-wide"
       ]
+    },
+    "wave1_final": {
+      "note": "All 8 wave-1 issues done. Rework rounds: c7f0f690 x2 (sweep gap, then f2532a2d handoff dangling paths), 313a7f3a x2 (git-init HEAD, then missing-file example), f5eb11a2 x2 (false layer edge + guarantees arrow art, then cycle-graph arrow art), d48906de x1 (source line-range citations) + escalation-approved deletion of dead storage::claims_log module to resolve the seq/sequence gate finding, c29118f9 x1 (false filesystem claims). a6e1ae3d and 287f7bc9 passed first time."
     }
   }
 }

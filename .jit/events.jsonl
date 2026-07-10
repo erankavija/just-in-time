@@ -5956,3 +5956,10 @@
 {"type":"issue_completed","id":"99c63eda-a56c-4590-b46f-8c8faa17a4f1","issue_id":"313a7f3a-c6db-4adc-8934-36a7874287ed","timestamp":"2026-07-10T10:53:55.149317121Z"}
 {"type":"issue_state_changed","id":"b41015dc-fc37-458c-ab7c-009e78219f02","issue_id":"f5eb11a2-d368-4ede-aa9f-abdc1343236e","timestamp":"2026-07-10T10:53:55.256340119Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"72727d43-3ca7-410c-aca8-01fbb828294d","issue_id":"f5eb11a2-d368-4ede-aa9f-abdc1343236e","timestamp":"2026-07-10T10:53:55.256369849Z"}
+{"type":"issue_created","id":"125e0374-24de-4dc1-b90c-efa7e487014f","issue_id":"45e1b7e8-bd42-445a-892a-0b7f79bd4ec9","timestamp":"2026-07-10T11:01:51.183697472Z","title":"Gate results evidence the working tree, not the merged commit","priority":"high"}
+{"type":"issue_updated","id":"8920c060-cc63-43ed-83f2-92768cd15a2b","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-10T11:01:55.222777309Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_passed","id":"aa151085-c3b3-4c2f-99bb-580109a6b2f5","issue_id":"f1aaaca7-84ad-4985-96f8-20b1cd94fadf","timestamp":"2026-07-10T11:01:55.469374738Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6664b4c3-5e2d-4511-a99f-846e8afc5782","issue_id":"f1aaaca7-84ad-4985-96f8-20b1cd94fadf","timestamp":"2026-07-10T11:01:55.580494209Z","gate_key":"jit-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"567d49c6-3579-4f61-a408-e6e8b951a93b","issue_id":"f1aaaca7-84ad-4985-96f8-20b1cd94fadf","timestamp":"2026-07-10T11:02:31.649453117Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"d41d5b90-80f4-4cb9-bcd9-4cfe39e1d164","issue_id":"f1aaaca7-84ad-4985-96f8-20b1cd94fadf","timestamp":"2026-07-10T11:02:41.217748145Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"fe146902-7a46-4460-b6dd-0c8e0dabfb9e","issue_id":"f1aaaca7-84ad-4985-96f8-20b1cd94fadf","timestamp":"2026-07-10T11:02:41.217778275Z"}
