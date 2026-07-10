@@ -11,6 +11,9 @@
 # Jit worktree identity (machine-specific, regenerated on init — never commit)
 .jit/worktree.json
 
+# Jit scratch directory (ephemeral, machine-specific)
+.jit/tmp/
+
 # MCP Server (Node.js)
 mcp-server/node_modules/**
 mcp-server/jit-schema.json

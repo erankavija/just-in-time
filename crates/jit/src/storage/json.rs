@@ -535,7 +535,9 @@ impl IssueStore for JsonFileStorage {
             fs::File::create(&events_path).context("Failed to create events file")?;
         }
 
-        // Config.toml is managed by humans, not auto-created
+        // Config.toml scaffolding happens one layer up: the `jit init` command
+        // (main.rs) calls `CommandExecutor::seed_project_config`, which writes
+        // it via `storage::config_store::seed_repo_config`.
         // Use ConfigManager to access configuration
 
         Ok(())
