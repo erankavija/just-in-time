@@ -101,12 +101,9 @@ content_format = "markdown"
 
 # NOTE: ALL label/type ENFORCEMENT (format, namespace registry, allowed values,
 # patterns, uniqueness, required namespaces, and the orphan-leaf /
-# strategic-consistency warnings) is defined declaratively in `.jit/rules.toml`
-# — the single source of truth, scaffolded by `jit init`. The former
-# `require_type_label`, `label_regex`, `reject_malformed_labels`,
-# `enforce_namespace_registry`, `warn_orphaned_leaves`, and
-# `warn_strategic_consistency` keys were removed; this section now carries only
-# the behavioral keys above.
+# strategic-consistency warnings) is defined declaratively in `.jit/rules.toml`,
+# the single source of truth, scaffolded by `jit init`. This `[validation]`
+# section carries only the behavioral keys above.
 
 # =============================================================================
 # NAMESPACE REGISTRY

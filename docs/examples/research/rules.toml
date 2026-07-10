@@ -47,8 +47,8 @@
 #   3. Hypothesis coverage at done — when a goal reaches done, every hypothesis
 #      declared as `[hard]` in `## Hypotheses` must be tested by at least one
 #      done experiment that carries `tests:<id>` (label-coverage, enforce = true
-#      at state = "done"). An in-flight goal produces ZERO error findings from
-#      this rule; it only fires at the done transition.
+#      at state = "done"). A goal in any state other than done produces ZERO
+#      error findings from this rule; it only fires at the done transition.
 #   4. tests: reference integrity — every `tests:<id>` on an experiment resolves
 #      to a declared `hyp:<id>` on the linked goal (label-reference, warn). A
 #      typo'd hypothesis id surfaces without blocking.
@@ -62,8 +62,9 @@
 # LIFECYCLE NOTE:
 #   Rules (2) and (4) are always-on (no state predicate) because a stray or
 #   dangling label is wrong at any lifecycle phase. Rule (3) is scoped
-#   `state = "done"` with `enforce = true`: an in-flight goal is quiet, but the
-#   goal cannot complete until every [hard] hypothesis is covered. This mirrors
+#   `state = "done"` with `enforce = true`: a goal in backlog, ready, in_progress
+#   or gated is quiet, but the goal cannot complete until every [hard] hypothesis
+#   is covered. This mirrors
 #   the lifecycle-aware pattern from CC-8 / the SDD example.
 #
 # THE PLAN-BEFORE-FAN-OUT BRACKET (the `plan` template declares it; engine stays agnostic):
@@ -192,7 +193,7 @@ assert = { require-section = { heading = "Evidence" } }
 #   UNCOVERED (see below)   — "hypothesis 'H-01' in section 'Hypotheses' is not
 #                              covered by any done experiment that tests: it"
 #                              The hypothesis exists, but no experiment covers it
-#                              yet. This is expected during in-flight work.
+#                              yet. This is expected while the goal is still open.
 #
 # Exact string comparison: `H-1` in the body vs `hyp:H-01` on the label differ,
 # so `hyp:H-01` is a stray. No silent normalization.
@@ -204,7 +205,7 @@ assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypot
 
 # --- Graph: hypothesis coverage at done ------------------------------------
 # LIFECYCLE-SCOPED: this rule fires ONLY when the goal reaches the `done` state.
-# During in-flight work (backlog, ready, in_progress, gated) the goal produces
+# In backlog, ready, in_progress and gated the goal produces
 # ZERO error findings from this rule — a goal whose experiments are not yet done
 # is not a validation failure; it is work in progress.
 #
@@ -224,7 +225,8 @@ assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypot
 # goal it drops the bracket nodes `P`/`B` from coverage candidates and halts the
 # transitive walk at `B`, so closure tallies exactly the experiment interior
 # between `C` and `B`. In a plain (unbracketed) goal there are no such nodes, so
-# the exclusion is a no-op and the rule behaves exactly as before.
+# the exclusion is a no-op: coverage tallies every done experiment the goal
+# depends on.
 [[rules]]
 name = "research-hard-hypotheses-covered-at-done"
 when = { type = "goal", state = "done" }

@@ -348,16 +348,22 @@ jit issue claim abc123 agent:worker-1  # Fails if already assigned to someone el
 
 All coordination happens through filesystem operations:
 
+Two directories at the repository root carry coordination state. `.jit/` holds
+per-worktree issue data; `.git/jit/` is the control plane shared across every
+worktree of the repository.
+
 ```
 .jit/
 ├── issues/{id}.json          # Issue data (per-file locks)
 ├── index.json                # Issue index (exclusive lock)
 ├── gates.toml                # Gate registry (exclusive lock)
-├── events.jsonl              # Event log (append-only, locked)
-└── .git/jit/                 # Shared control plane
-    ├── claims.jsonl          # Claim log (append-only)
-    ├── claims.index.json     # Active claims (exclusive lock)
-    └── heartbeats/           # Lease keep-alive
+└── events.jsonl              # Event log (append-only, locked)
+
+.git/jit/
+├── claims.jsonl              # Claim log (append-only)
+├── claims.index.json         # Active claims (exclusive lock)
+├── heartbeat/                # Lease keep-alive, one file per agent
+└── locks/claims.lock         # Advisory lock guarding claim-log operations
 ```
 
 **Synchronization points:**

@@ -219,8 +219,8 @@ views (`gate status`, `gate status --all`, `gate status-all`, and the
 gate-blocked transition error), while keeping the raw stdout available
 alongside.
 
-This is an **opt-in contract**: a checker that emits no block keeps working
-exactly as before — the structured fields are simply absent.
+This is an **opt-in contract**: a checker that emits no block has its raw stdout
+recorded and exposes no structured finding fields.
 
 **The block.** Two line-exact fence markers wrap a single JSON object:
 

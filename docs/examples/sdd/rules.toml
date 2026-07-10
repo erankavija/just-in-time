@@ -44,8 +44,9 @@
 #     — Local rules (1) and (2) run on every write: structure errors block
 #       immediately. A stray `req:` label (5b) is caught immediately because
 #       `sdd-req-matches-a-criterion` is always-on. Coverage (3) and derivation
-#       (4) do NOT fire during planning; an in-flight epic with uncovered or
-#       unsatisfied requirements produces ZERO error-severity graph findings.
+#       (4) do NOT fire during planning; an epic in any state other than done,
+#       with uncovered or unsatisfied requirements, produces ZERO error-severity
+#       graph findings.
 #
 #   BREAKDOWN GATE (the bracket's plan-time check)
 #     — `sdd-coverage-preview` (3b) fires on the transient `B` node (keyed on
@@ -188,8 +189,8 @@ assert = { criteria-label-match = { namespace = "req", criteria-section = "succe
 # convention) carries `satisfies:<id>` and is in state `done`.
 #
 # `when = { type = "epic", state = "done" }` scopes this rule to the done
-# transition only. During planning (in_progress, ready, etc.) an in-flight epic
-# with incomplete children produces ZERO findings from this rule.
+# transition only. In backlog, ready, in_progress and gated, an epic with
+# incomplete children produces ZERO findings from this rule.
 #
 # `enforce = true` means the done transition is BLOCKED (exit 4,
 # TransitionBlockedError) if any [hard] criterion is uncovered. Graph rules run

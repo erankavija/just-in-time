@@ -90,11 +90,9 @@ content_format = "markdown"
 > **Validation enforcement lives in `.jit/rules.toml`.** Label/type format, the
 > namespace registry, allowed values, value patterns, uniqueness, required
 > namespaces, and the orphan-leaf / strategic-consistency warnings are all
-> defined declaratively as rules in `.jit/rules.toml` — the single source of
-> truth, scaffolded by `jit init`. The former `require_type_label`,
-> `label_regex`, `reject_malformed_labels`, `enforce_namespace_registry`,
-> `warn_orphaned_leaves`, and `warn_strategic_consistency` keys were removed; an
-> old `config.toml` that still carries them parses fine but they have no effect.
+> defined declaratively as rules in `.jit/rules.toml`, the single source of
+> truth, scaffolded by `jit init`. The `[validation]` section of `config.toml`
+> carries only the behavioral keys listed above.
 
 ### `[namespaces.*]`
 
