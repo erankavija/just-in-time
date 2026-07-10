@@ -5987,3 +5987,6 @@
 {"type":"gate_passed","id":"478a9837-d2e4-44f8-af03-b756c5f32b80","issue_id":"5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0","timestamp":"2026-07-10T11:18:12.134698296Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"e358a03b-e11a-483c-8476-1a2b3762bf33","issue_id":"5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0","timestamp":"2026-07-10T11:18:19.149698777Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"9c011a25-4086-4057-89b6-1e296e72e29b","issue_id":"5514e4f5-0bc4-42d0-9f19-115e1f0d1ac0","timestamp":"2026-07-10T11:18:19.149739617Z"}
+{"type":"gate_added","id":"a40c6378-72bc-4f01-9040-08d27c2a1f62","issue_id":"7eec3d59-60ab-448c-9334-50c5cb93d4bd","timestamp":"2026-07-10T11:18:38.161271562Z","gate_key":"cargo-ci"}
+{"type":"gate_passed","id":"5e7f128c-6892-405d-8be1-cf0286b38619","issue_id":"7eec3d59-60ab-448c-9334-50c5cb93d4bd","timestamp":"2026-07-10T11:22:09.676692021Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"03924e56-da61-415e-84bb-fd4f237215ea","issue_id":"7eec3d59-60ab-448c-9334-50c5cb93d4bd","timestamp":"2026-07-10T11:22:09.788174282Z","gate_key":"jit-validate","updated_by":"auto:executor"}
