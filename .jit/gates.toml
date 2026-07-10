@@ -146,6 +146,26 @@ REVIEWER_AGENT = "codex exec"
 
 [[gates]]
 version = 1
+key = "docs-mechanical"
+title = "Documentation Mechanical Checks"
+description = "Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit invariant render / jit reference render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). With no footprint it checks the full adopter doc surface; area audits invoke the individual checkers with their own footprint."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "exec"
+command = "./scripts/docs-mechanical.sh"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.reserved]
+
+[[gates]]
+version = 1
 key = "fmt"
 title = "Code Formatted"
 description = "Code must be formatted with cargo fmt"
