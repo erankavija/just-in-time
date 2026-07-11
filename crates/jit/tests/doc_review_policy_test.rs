@@ -55,10 +55,59 @@ fn test_doc_review_gate_description_matches_issue_scoped_policy() {
         "advisory",
         "concise",
         "fail",
+        "repository-configured hierarchy",
+        "DAG-resolved descendants",
+        "combined documentation contract",
     ] {
         assert!(
             description.contains(required),
             "doc-review description missing policy phrase: {required}"
+        );
+    }
+}
+
+#[test]
+fn test_doc_review_prompt_distinguishes_leaf_footprint_from_container_footprint() {
+    let prompt = repo_file("scripts/doc-review-prompt.md");
+    let leaf = prompt
+        .split("### Leaf review")
+        .nth(1)
+        .expect("leaf review section")
+        .split("### Container review")
+        .next()
+        .expect("bounded leaf section");
+    let container = prompt
+        .split("### Container review")
+        .nth(1)
+        .expect("container review section")
+        .split("## Derive the smallest documentation impact cone")
+        .next()
+        .expect("bounded container section");
+
+    assert!(leaf.contains("only commits tagged for the context leaf"));
+    assert!(leaf.contains("Do not include descendant"));
+    assert!(container.contains("container plus every delivered descendant"));
+    assert!(container.contains("DAG-authoritative resolved children"));
+    assert!(container.contains("unrelated sequencing dependencies"));
+}
+
+#[test]
+fn test_doc_review_prompt_defines_holistic_container_checks() {
+    let prompt = repo_file("scripts/doc-review-prompt.md");
+
+    for required in [
+        "combined current documentation contract",
+        "Do not replay leaf reviews",
+        "container-level workflow coverage",
+        "cross-child terminology and example consistency",
+        "canonical placement versus duplication",
+        "discoverability",
+        "aggregate concision",
+        "union of descendant impact cones",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing container policy phrase: {required}"
         );
     }
 }
