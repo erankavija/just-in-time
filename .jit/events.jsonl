@@ -6539,3 +6539,5 @@
 {"type":"gate_definition_updated","id":"1b1e0601-9489-437d-8374-8282211d2f33","timestamp":"2026-07-11T20:07:10.871272576Z","gate_key":"breakdown-review"}
 {"type":"gate_definition_updated","id":"e4c07c4f-a3dd-4a30-8f2c-a3294f627926","timestamp":"2026-07-11T20:07:10.879977402Z","gate_key":"doc-review"}
 {"type":"gate_definition_updated","id":"04c11e17-9b2a-44ce-a21c-453aa69c944c","timestamp":"2026-07-11T20:07:10.887913378Z","gate_key":"code-review"}
+{"type":"issue_created","id":"b8dbf1c3-8d17-4575-8426-f0453a691005","issue_id":"ebd3f8ff-3d04-480c-a95e-ca13145e50a8","timestamp":"2026-07-11T20:25:28.818372487Z","title":"Make documentation review issue-scoped and advisory on existing drift","priority":"normal"}
+{"type":"issue_updated","id":"5dd90f7b-0046-4b27-8a81-5017b073bbc4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-11T20:25:32.123777780Z","updated_by":"dependency-add","fields":["dependencies"]}
