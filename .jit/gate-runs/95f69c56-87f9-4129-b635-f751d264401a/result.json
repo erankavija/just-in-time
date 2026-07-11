@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "95f69c56-87f9-4129-b635-f751d264401a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57",
+  "commit": "c1e1246ebde1274b21c18547b784d4ec21af0656",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:31:44.797038010Z",
+  "completed_at": "2026-07-11T08:33:50.755325534Z",
+  "duration_ms": 125958,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nTwo blocking findings remain:\n\n- `docs/tutorials/first-workflow.md:327` describes `jit issue claim` as providing “no conflicts.” The command atomically rejects a competing assignment, but it is explicitly assignment bookkeeping rather than an exclusive work lease (`crates/jit/src/cli.rs:1082-1088`). It does not categorically prevent other mutations. Remediation: state that claiming prevents competing assignment, and direct readers to `jit claim acquire` plus lease enforcement when exclusive mutation coordination is required.\n- `docs/tutorials/parallel-work-worktrees.md:201` says visibility “spans all worktrees.” The implemented fallback is asymmetric: the current worktree reads its local `.jit/`, its own Git `HEAD`, and—when it is secondary—the main worktree’s `.jit/`. It does not read arbitrary sibling worktrees or expose a secondary worktree’s uncommitted changes to every other worktree. Remediation: replace the statement with the exact three-source, current-worktree-relative visibility guarantee.\n\nAll seven findings from the preceding review have otherwise been addressed:\n\n- The four-state lifecycle is identified as the happy path and links to the full state machine.\n- Automatic gates use runnable stand-in checker commands.\n- The persistent agent configuration includes `created_at`.\n- Cross-worktree visibility after merging requires updating the receiving branch.\n- The diagram uses a generic UUID-backed issue path.\n- Lease ownership is distinguished from default file locking.\n- `jq` appears in the applicable prerequisites.\n\nThe documented commands and flags were checked against a binary built from current HEAD and the clap definitions. No invented CLI surface was found.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. Repository-specific types, namespaces, rules, templates, item kinds, and checker scripts are not presented as shipped defaults in the scoped tutorials.\n\n## 3. Current behavior only\n\nNo findings. The scoped prose contains no legacy, migration, roadmap, or future-state narration about jit.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings. Numeric references describe tutorial-local examples, durations, or the explicitly implemented three-source fallback rather than volatile registry totals.\n\n## 5. Links and referenced paths resolve\n\nNo findings. The scoped mechanical checks report:\n\n- All Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- No addressable-item citations occur in the footprint.\n- Projected content is fresh.\n\n## 6. Content-standards conformance\n\nNo findings. The only authored diagram is Mermaid. No box-drawing diagrams, plain-text equations requiring LaTeX, or excessive heading depth were found.\n\n## Consolidated findings\n\n1. **F1 — Assignment claiming overstates conflict prevention:** `docs/tutorials/first-workflow.md:327` says agent claiming provides “no conflicts,” although `jit issue claim` is assignment bookkeeping, not an exclusive work lease. Remediation: limit the guarantee to competing assignment and reference leases plus enforcement for exclusive mutation coordination.\n2. **F2 — Worktree visibility is overstated:** `docs/tutorials/parallel-work-worktrees.md:201` says visibility spans all worktrees, but the fallback only consults the current worktree, its Git HEAD, and the main worktree when applicable. Remediation: describe that asymmetric three-source fallback and explicitly exclude arbitrary sibling worktrees.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two blocking behavioral overstatements remain concerning conflict prevention by issue assignment and visibility across worktrees.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"First Workflow incorrectly says issue assignment claiming prevents conflicts\",\"file\":\"docs/tutorials/first-workflow.md\",\"line\":327},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Parallel-work tutorial incorrectly says issue visibility spans all worktrees\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":201}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4773 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f504d-d141-7ec1-99f6-bd0f68c3af10\n--------\nuser\n--- 4760 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two blocking behavioral overstatements remain concerning conflict prevention by issue assignment and visibility across worktrees.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "First Workflow incorrectly says issue assignment claiming prevents conflicts",
+        "file": "docs/tutorials/first-workflow.md",
+        "line": 327
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Parallel-work tutorial incorrectly says issue visibility spans all worktrees",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 201
+      }
+    ]
+  }
+}

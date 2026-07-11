@@ -3,6 +3,49 @@
 Footprint: `docs/tutorials/` — `README.md`, `quickstart.md`, `first-workflow.md`,
 `parallel-work-worktrees.md`. Binary verified at HEAD (`jit 0.2.1`, commit `8e4acd98`).
 
+## Rework attempt 1 — 7 scoped `doc-review` findings (all fixed, verified vs HEAD)
+
+The first pass under-audited `parallel-work-worktrees.md` (I had wrongly listed several of
+its claims as "verified accurate"). Corrected below; each fix swept footprint-wide.
+
+- **F1 [medium] quickstart — only the 4-state happy path shown.** Kept the happy path but
+  added a pointer to the full state machine (`gated`/`rejected`/`archived`) at
+  [`../concepts/core-model.md#states`], at both the AI-orientation bullet and the
+  "Key Concepts Learned" recap. Before: "states: backlog → ready → in_progress → done".
+- **F2 [high] first-workflow — real checker execution mislabeled "simulating".** The auto
+  gates were defined `--checker-command "cargo test"` / `"cargo test --test integration"`,
+  which actually run and fail in the tutorial's non-Cargo project. Changed both to
+  self-contained always-pass stand-ins (`echo '… passed'`) with a comment to point
+  `--checker-command` at a real suite (pytest/cargo test) in a real project. Removed the
+  "(simulating CI and human review)" framing; auto gates now evaluate with no `--by` (the
+  checker runs), the manual `review` gate keeps `--by` attestation. Verified end-to-end.
+- **F3 [high] parallel-work — agent.toml example missing required `created_at`.** Verified
+  `AgentSection.created_at` is a required `String` (`agent_config.rs:35`, no serde default);
+  the `[agent] id + description`-only example would fail to parse. Added
+  `created_at = "2026-01-06T12:00:00Z"`. Only one agent.toml example in the footprint.
+- **F4 [high] parallel-work — false auto cross-worktree visibility.** Reworded: another
+  worktree sees merged issue updates only after it updates its own branch
+  (`git pull`/`merge`/`rebase`); worktrees on different branches don't share commits
+  automatically. Verified against git worktree behavior.
+- **F5 [medium] parallel-work — Mermaid diagram showed non-UUID `task-1.json`.** Changed the
+  node to `.jit/issues/{id}.json`, consistent with the `{id}.json` placeholder in
+  storage-format / CLAUDE.md.
+- **F6 [high] parallel-work — leases overstated as preventing conflicts.** Verified: lease
+  **acquisition** is exclusive (a second `claim acquire` fails — "already claimed by …"),
+  but the lease is **advisory** (CLAUDE.md "Advisory work leases"); an agent that skips
+  claiming can still mutate the issue, and write-enforcement is configurable via
+  `enforce_leases` (default `strict`, `config.rs:1723`). Reworded the intro, "What You'll
+  Learn", Step 4 lead-in, the lease bullet, and `README.md`'s index line to frame leases as
+  exclusive-hold coordination signals (not data-conflict prevention), with a pointer to
+  `configuration.md#enforce_leases`. Class swept across both files.
+- **F7 [high] quickstart — `jq` missing from prerequisites.** Added `jq` to quickstart
+  prerequisites. Swept: `first-workflow.md` also pipes `jq`, so added it there too;
+  `parallel-work-worktrees.md` uses no `jq`.
+
+Post-rework mechanical bar over `docs/tutorials/`: M2/M3/M5 clean (exit 0; new `#states`
+and `#enforce_leases` anchors resolve), M4 no box-drawing, M1 invented-flag residue now
+empty (the former `--test` residue was the `cargo test --test` checker, now removed).
+
 ## Mechanical bar (post-edit, over `docs/tutorials/`)
 
 - M2 links & anchors: `OK: all links and anchors resolve`
@@ -55,8 +98,10 @@ state, not product-legacy narration (excluded by the doc-review carve-out), but 
   `claim renew <lease-id> --extension`, `claim force-evict <lease-id> --reason` positionals correct.
 - Claim storage: `.git/jit/claims.jsonl` + `.git/jit/claims.index.json`
   (`claim_coordinator.rs:206,703`) — matches the Mermaid diagram.
-- Agent identity: `JIT_AGENT_ID` env var and `~/.config/jit/agent.toml` `[agent] id/description`
-  (`agent_config.rs:6,19,31-37`, `errors.rs:1029`).
+- Agent identity: `JIT_AGENT_ID` env var and `~/.config/jit/agent.toml` — `[agent]` section
+  with **required** fields `id`, `created_at` (ISO 8601), `description` and optional
+  `default_ttl_secs` (`agent_config.rs:31-41`; `created_at` has no serde default, so an
+  example omitting it fails to parse — see rework F3).
 - Short-hash minimum 4 chars (`storage/json.rs:643`, `storage/mod.rs:229`).
 - `graph deps --depth 0` = all transitive/unlimited (`cli.rs:2004,2018`).
 - 3-tier worktree visibility (local `.jit/`, git HEAD, main worktree) — confirmed

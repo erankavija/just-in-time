@@ -15,6 +15,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:31:44.797038010Z"
+    },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -23,12 +28,7 @@
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T07:57:59.849133057Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T07:58:03.594583670Z"
+      "updated_at": "2026-07-11T08:31:38.243938475Z"
     }
   },
   "context": {},
@@ -70,7 +70,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:45:11.255393099Z",
-  "updated_at": "2026-07-11T08:01:19.034255899Z",
+  "updated_at": "2026-07-11T08:33:50.755545384Z",
   "first_ready_at": "2026-07-10T20:45:11.255402299Z",
   "claimed_at": "2026-07-11T07:39:26.772484274Z"
 }

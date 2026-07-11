@@ -4,13 +4,13 @@
 > **Time to complete:** 15 minutes  
 > **Prerequisites:** Basic familiarity with jit ([Quickstart](./quickstart.md))
 
-This tutorial guides you through setting up parallel work using git worktrees. You'll learn how multiple agents can work on different issues simultaneously without conflicts.
+This tutorial guides you through setting up parallel work using git worktrees. You'll learn how multiple agents can work on different issues in parallel, using leases to coordinate who is working on what.
 
 ## What You'll Learn
 
 - Create a secondary worktree for parallel work
 - Configure agent identity for coordination
-- Claim issues to prevent conflicts
+- Claim issues with leases to coordinate parallel work
 - Work in isolation and merge back
 
 ## Before You Start
@@ -65,6 +65,7 @@ mkdir -p ~/.config/jit
 cat > ~/.config/jit/agent.toml << 'EOF'
 [agent]
 id = "agent:alice"
+created_at = "2026-01-06T12:00:00Z"
 description = "Alice's development session"
 EOF
 ```
@@ -95,7 +96,7 @@ The issue visibility works through a 3-tier fallback:
 
 ## Step 4: Claim an Issue
 
-Before working on an issue, claim it to prevent conflicts:
+Before working on an issue, acquire a lease on it to signal that you're working on it:
 
 ```bash
 # Find an available issue
@@ -114,9 +115,11 @@ You should see:
 ```
 
 The claim creates a **lease** that:
-- Prevents other agents from claiming the same issue
+- Is held exclusively — while your lease is active, another agent cannot acquire a lease on the same issue
 - Expires after TTL (default: 10 minutes)
 - Can be renewed if you need more time
+
+A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. Whether write operations require a lease is configurable — see `enforce_leases` in the [Configuration Reference](../reference/configuration.md#enforce_leases).
 
 View active claims:
 
@@ -161,7 +164,7 @@ Closes issue <issue-id>"
 git push origin feature/my-work
 ```
 
-After merging to main, other worktrees will see your issue updates via git.
+After merging to main, another worktree sees your issue updates once it updates its own branch (`git pull`, `merge`, or `rebase`) — worktrees on different branches do not share each other's commits automatically.
 
 ## Step 7: Clean Up
 
@@ -183,7 +186,7 @@ git worktree remove my-feature
 ```mermaid
 flowchart LR
     subgraph Main["Main worktree"]
-        MI[".jit/issues/task-1.json"]
+        MI[".jit/issues/{id}.json"]
     end
     subgraph Secondary["Secondary worktree"]
         SI[".jit/issues/ (reads from main)"]

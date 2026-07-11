@@ -19,6 +19,7 @@ This tutorial demonstrates the full power of JIT for multi-agent workflows.
 
 - Completed [Quickstart](quickstart.md)
 - JIT initialized in a project directory
+- `jq` (the examples parse `--json` output with it)
 - Understanding of short hashes and basic commands
 
 ## Setup: Define Quality Gates
@@ -26,12 +27,14 @@ This tutorial demonstrates the full power of JIT for multi-agent workflows.
 First, define the gates we'll use for quality control:
 
 ```bash
-# Automated gate - runs a checker script
+# Automated gate - runs a checker command when evaluated.
+# The stand-in command below always passes so this tutorial is self-contained;
+# in a real project, point --checker-command at your test suite (e.g. pytest, cargo test).
 jit gate define unit-tests \
   --title "Unit Tests" \
   --description "Run test suite" \
   --mode auto \
-  --checker-command "cargo test"
+  --checker-command "echo 'unit tests passed'"
 
 # Manual gate - requires human judgment
 jit gate define review \
@@ -39,12 +42,12 @@ jit gate define review \
   --description "Peer review required" \
   --mode manual
 
-# Automated integration tests
+# Automated integration tests (stand-in command, as above)
 jit gate define integration-tests \
   --title "Integration Tests" \
   --description "End-to-end test suite" \
   --mode auto \
-  --checker-command "cargo test --test integration"
+  --checker-command "echo 'integration tests passed'"
 
 # List defined gates
 jit gate list
@@ -238,20 +241,21 @@ echo "Added critical security task: $TASK4"
 As agents finish work, they pass each task's postcheck gates (unit tests, review), then mark it done. A task whose gates are not yet passed diverts to `gated` instead of `done`:
 
 ```bash
-# Pass each task's gates (simulating CI and human review), then complete it
-jit gate evaluate $TASK1 unit-tests --by "ci:github-actions"
+# Pass each task's gates, then complete it. The auto gate (unit-tests) runs its
+# checker command; the manual gate (review) records a human attestation via --by.
+jit gate evaluate $TASK1 unit-tests
 jit gate evaluate $TASK1 review --by "human:tech-lead"
 jit issue update $TASK1 --state done
 
-jit gate evaluate $TASK2 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK2 unit-tests
 jit gate evaluate $TASK2 review --by "human:tech-lead"
 jit issue update $TASK2 --state done
 
-jit gate evaluate $TASK3 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK3 unit-tests
 jit gate evaluate $TASK3 review --by "human:tech-lead"
 jit issue update $TASK3 --state done
 
-jit gate evaluate $TASK4 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK4 unit-tests
 jit gate evaluate $TASK4 review --by "human:security-team"
 jit issue update $TASK4 --state done
 
@@ -275,7 +279,7 @@ Final integration and epic completion:
 # The lead agent claims it, then passes the epic's own postcheck gates.
 jit issue claim $EPIC agent:lead
 jit gate evaluate $EPIC review --by "human:tech-lead"
-jit gate evaluate $EPIC integration-tests --by "ci:github-actions"
+jit gate evaluate $EPIC integration-tests
 
 # Complete the epic
 jit issue update $EPIC --state done

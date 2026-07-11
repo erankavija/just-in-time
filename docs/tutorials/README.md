@@ -44,7 +44,7 @@ Tutorials are designed to help you learn JIT through hands-on practice. Each tut
 - Work in isolation and merge back
 - Handle lease expiration and renewal
 
-**Start here if:** You need multiple agents working on different issues simultaneously without conflicts.
+**Start here if:** You need multiple agents working on different issues in parallel, coordinated with leases.
 
 ---
 

@@ -9,7 +9,7 @@
 **If you're an AI agent**, you want to get productive fast. Here's the 2-minute version:
 
 **Core Concepts:**
-- **Issues** = Units of work (states: backlog → ready → in_progress → done)
+- **Issues** = Units of work. This tutorial follows the happy path `backlog → ready → in_progress → done`; the full state machine (adding `gated`, `rejected`, `archived`) is in [Core Model → States](../concepts/core-model.md#states).
 - **Dependencies** = DAG controlling work order (FROM depends on TO)
 - **Gates** = Quality checkpoints that must pass
 - **Labels** = `namespace:value` format for organization
@@ -68,6 +68,7 @@ This tutorial shows the basics. For the full power of label hierarchies, see [Fi
 ## Prerequisites
 
 - JIT installed (see [INSTALL.md](../../INSTALL.md))
+- `jq` (the `--json` examples pipe through it)
 - Basic command line knowledge
 - A project directory (we'll create one)
 
@@ -164,7 +165,7 @@ You've learned the basics! Now explore:
 
 ## Key Concepts Learned
 
-- **Issues**: Units of work with states (backlog → ready → in_progress → done)
+- **Issues**: Units of work. This tutorial's happy path is `backlog → ready → in_progress → done`; see [Core Model → States](../concepts/core-model.md#states) for the full state machine
 - **Dependencies**: Express "A blocks B" relationships (directed acyclic graph)
 - **Short hashes**: 4-8 character prefixes for convenience (like git)
 - **Gates**: Quality checkpoints that must pass before completion
