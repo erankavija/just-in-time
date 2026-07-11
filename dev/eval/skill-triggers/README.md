@@ -16,7 +16,7 @@ That technique assumes the skill under test is *not* otherwise present in
 synthetic proxy when the real skill is right there with the same
 description. That assumption breaks for `jit-execution-lead` and
 `jit-planning-lead`: both are installed at the **user level**
-(`~/.claude/skills/jit-execution-lead`, `~/.claude/skills/jit-planning-lead`),
+(`~/.agents/skills/jit-execution-lead`, `~/.agents/skills/jit-planning-lead`),
 symlinked into this repo, so they're in `available_skills` for every
 `claude -p` invocation regardless of cwd. A smoke test confirmed this: for
 the query "Take charge of epic 6662f738 and drive it to completion with a
@@ -35,7 +35,7 @@ carry the identical live description, so either one firing is equally
 strong evidence the description works.
 
 It also runs `claude -p` from a fresh temp directory with no project-level
-`.claude/skills` of its own, so the only skill matching the target name is
+`.agents/skills` of its own, so the only skill matching the target name is
 the real user-level installation — the same set of skills any other project
 would see.
 
@@ -43,9 +43,9 @@ would see.
 
 ```bash
 python3 dev/eval/skill-triggers/run_trigger_eval.py \
-  --eval-set .claude/skills/jit-execution-lead/trigger_eval.json \
+  --eval-set .agents/skills/jit-execution-lead/trigger_eval.json \
   --skill-path <path-to-jit-execution-lead-skill-dir> \
-  --out .claude/skills/jit-execution-lead/trigger_eval_results.json \
+  --out .agents/skills/jit-execution-lead/trigger_eval_results.json \
   --model <model-id-powering-this-session> \
   --runs-per-query 3 \
   --verbose

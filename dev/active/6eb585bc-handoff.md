@@ -18,8 +18,8 @@
 - Filed 15 issues from a usability audit + 4-day session-transcript mining (report: dev/active/6eb585bc-usability-audit-2026-07-05.md); invoker pinned all open design decisions via interview before execution.
 - Executed 16 serial waves; every child passed cargo-ci + code-review gates. Rework rounds: 74fbdb69 ×1, a05b87ae ×1 (+1 lead-initiated pre-gate extension), c8518f2a ×2, 043ae624 ×1, cc42a69b ×1, 7fe5c743 ×2, 0ab468ba ×1 (+ lead-run backfill closing REQ-02), 31e12d2b ×2, 1a63ef75 ×2, b3a54e25 ×5 (lead-direct docs; single-contradiction-per-round chain); first-pass green: b1586c0d (after lead surgical fix), dc3bef62, 30a3b5c1, d0f88ee2, 27338abc, 62f3bebd.
 - Landed surfaces now dogfooded lead-side: {count,<collection>} envelope, gate key/status, repeatable AND --label, typed exit codes + startup JSON, issue status/children/progress, query count/divergence, config get, structured gate findings (+ ai-review.sh emits the block), graph export --full + lifecycle timestamps (backfill run: 435/464 issues), hierarchy in core (web UI consumes it), wrong-verb hints, help cross-refs, init/export --json.
-- Declared INV-DOMAIN-AGNOSTIC (advisory) in .jit/invariants.toml, rendered into CLAUDE.md.
-- CLAUDE.md refreshed (invoker-approved edits incl. Agent Workflow Quick Reference); README fully rewritten (b3a54e25); core-model.md lifecycle docs made archive/revive-accurate with Mermaid diagram.
+- Declared INV-DOMAIN-AGNOSTIC (advisory) in .jit/invariants.toml, rendered into AGENTS.md.
+- AGENTS.md refreshed (invoker-approved edits incl. Agent Workflow Quick Reference); README fully rewritten (b3a54e25); core-model.md lifecycle docs made archive/revive-accurate with Mermaid diagram.
 - Cleaned all 29 membership-label divergences (containment edges via --reduce, labels stripped from 2 rejected issues, WAVE-DEBUG probe deleted via JIT_ALLOW_DELETION=1). `jit validate` fully green, divergences 0.
 - Filed from dogfood friction (invoker-interviewed): c291e95c, 1d59070d, 0daba57d.
 
@@ -59,4 +59,4 @@
 - Audit report: dev/active/6eb585bc-usability-audit-2026-07-05.md (linked to epic)
 - Prior batch report: dev/active/6eb585bc-batch-report-2026-07-05.md (linked to epic)
 - Conventions decided this batch: memory notes jit-output-conventions, no-legacy-narration-in-docs, dogfood-new-jit-features, interview-before-filing-issues (lead memory directory)
-- Review protocol: ~/.claude/skills/jit-execution-lead/references/lead-review-protocol.md (six tiers + no-argue)
+- Review protocol: ~/.agents/skills/jit-execution-lead/references/lead-review-protocol.md (six tiers + no-argue)

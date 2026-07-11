@@ -58,7 +58,7 @@ None. (Bug `16402e14` was filed at the user's explicit request this session and 
 - Adjudication method: `dev/eval/skill-eval-adjudication.md`
 - Eval baseline rollup (c23dfe71): `dev/eval/lead-skills-eval-baseline.md`
 - Content standards: `docs/reference/jit-content-standards.md`
-- jit-project-lead skeleton + references: `.claude/skills/jit-project-lead/SKILL.md`, `references/{tier-derivation,wave-layering,container-dispatch,coherence-review,standards-scan,standards-fix}.md`
+- jit-project-lead skeleton + references: `.agents/skills/jit-project-lead/SKILL.md`, `references/{tier-derivation,wave-layering,container-dispatch,coherence-review,standards-scan,standards-fix}.md`
 - Filed bug: `jit issue show 16402e14`; parser site `crates/jit/src/validation/engine.rs:1317`
 - External dep for 6c5f70ad: `dev/active/eed6750c-handoff.md`
-- Dispatch scripts: `.claude/skills/jit-execution-lead/scripts/{dispatch-worker-worktree,check-leak-into-main}.sh`
+- Dispatch scripts: `.agents/skills/jit-execution-lead/scripts/{dispatch-worker-worktree,check-leak-into-main}.sh`

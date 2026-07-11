@@ -486,4 +486,4 @@ flowchart TD
 - [Core Model](core-model.md) - Domain-agnostic concepts (issues, gates, dependencies)
 - [Quickstart Tutorial](../tutorials/quickstart.md) - See principles in practice
 - [How-To: Multi-Agent Coordination](../how-to/multi-agent-coordination.md) - Agent-first design in action
-- [CLAUDE.md](../../CLAUDE.md) - Functional-style coding conventions for contributors
+- [AGENTS.md](../../AGENTS.md) - Functional-style coding conventions for contributors

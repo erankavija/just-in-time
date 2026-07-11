@@ -112,7 +112,7 @@ archive/        → After 1-2 releases
 ### Development Guides
 - See [docs/tutorials/quickstart.md](../docs/tutorials/quickstart.md) - Getting started (10 min)
 - See [docs/reference/cli-commands.md](../docs/reference/cli-commands.md#mcp-tools-reference) - MCP tools for agents
-- See [../CLAUDE.md](../CLAUDE.md) - Contributor and agent guidance for this repository
+- See [../AGENTS.md](../AGENTS.md) - Contributor and agent guidance for this repository
 
 ### Reference
 - [studies/architecture-pitfalls.md](studies/architecture-pitfalls.md) - Common pitfalls
@@ -127,7 +127,7 @@ archive/        → After 1-2 releases
 ## For Contributors
 
 **Getting Started:**
-1. Read [../CLAUDE.md](../CLAUDE.md)
+1. Read [../AGENTS.md](../AGENTS.md)
 2. Review [architecture/core-system-design.md](architecture/core-system-design.md)
 3. Use `jit query available` to find tasks
 

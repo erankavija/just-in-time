@@ -45,7 +45,7 @@ pub struct InMemoryStorage {
     ///
     /// Backs [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
     /// so command/domain tests can exercise project-scope sources (and any other
-    /// config-declared file) with NO real filesystem, per CLAUDE.md "testability".
+    /// config-declared file) with NO real filesystem, per AGENTS.md "testability".
     repo_files: Arc<Mutex<HashMap<String, String>>>,
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.

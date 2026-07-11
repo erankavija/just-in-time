@@ -53,7 +53,7 @@ cargo install --path crates/jit
 
 **Optional components:**
 - `jit-server`: Web UI server (visualization at http://localhost:3000)
-- **MCP Server**: Model Context Protocol server for AI agents like Claude (see [mcp-server/](mcp-server/))
+- **MCP Server**: Model Context Protocol server for AI agents (see [mcp-server/](mcp-server/))
 
 See [INSTALL.md](INSTALL.md) for all installation options.
 

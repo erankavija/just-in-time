@@ -111,18 +111,18 @@ adopter surface still resolves clean.
 ### 5. F3 — self-test never mutates the real repo (dummy-change survival)
 
 ```
-before self-test:  sha256(CLAUDE.md)=9bcc770ba2e1e0383d6c0e0d6530b64b81916d45e0f639fed2d9f5baac8c284e
- CLAUDE.md | 2 ++
+before self-test:  sha256(AGENTS.md)=9bcc770ba2e1e0383d6c0e0d6530b64b81916d45e0f639fed2d9f5baac8c284e
+ AGENTS.md | 2 ++
  1 file changed, 2 insertions(+)
 self-test exit=0
-after  self-test:  sha256(CLAUDE.md)=9bcc770ba2e1e0383d6c0e0d6530b64b81916d45e0f639fed2d9f5baac8c284e
+after  self-test:  sha256(AGENTS.md)=9bcc770ba2e1e0383d6c0e0d6530b64b81916d45e0f639fed2d9f5baac8c284e
 dummy markers still present: 2
- CLAUDE.md | 2 ++
+ AGENTS.md | 2 ++
  1 file changed, 2 insertions(+)
-(dummy cleaned up; CLAUDE.md restored)
+(dummy cleaned up; AGENTS.md restored)
 ```
 
-A pre-existing staged AND unstaged change to a tracked file (`CLAUDE.md`)
+A pre-existing staged AND unstaged change to a tracked file (`AGENTS.md`)
 survives a full self-test run byte-for-byte (identical sha256, both markers
 present, index entry intact). The M5 projection check runs inside a throwaway
 `git clone` under the scratch dir, so it never touches the real index/worktree.

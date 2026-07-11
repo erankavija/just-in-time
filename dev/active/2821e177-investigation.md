@@ -172,7 +172,7 @@ HEAD (`751da7f5`). No plan is written here; no code or `.jit/` state was changed
     scope, no `/`). Zero qualified-form `satisfies:<scope>/<self-id>` labels exist.
   - `per:`, `mitigates:`, `resolves:`, `enforces:` — **zero** occurrences anywhere in
     `.jit/issues/*.json`.
-  - CLAUDE.md's live projected invariants region (`CLAUDE.md:125-133`) uses the `id-anchor` render
+  - AGENTS.md's live projected invariants region (`AGENTS.md:125-133`) uses the `id-anchor` render
     style, which emits `- **{id}** — {statement}` with **no address prefix at all**
     (confirmed against `render_id_anchor`, `projection.rs:184-198`) — there is nothing to migrate
     there; it re-renders automatically from whatever the registry's ids become.
@@ -332,7 +332,7 @@ HEAD (`751da7f5`). No plan is written here; no code or `.jit/` state was changed
   atomic-write, same "sole source when present" idiom already used for `rules.toml`).
 - **Layer boundaries to respect:** the new address parser (kind-segmented, `@<project>`-aware)
   belongs in `domain/item.rs` alongside `Scope`/`split_qualified_id`, staying pure/I-O-free per
-  CLAUDE.md's domain-layer rule — consistent with how the existing parser is built. Storage access
+  AGENTS.md's domain-layer rule — consistent with how the existing parser is built. Storage access
   for a `gates.toml` store belongs behind the `IssueStore` trait exactly as `load_gate_registry`
   already is (`storage/mod.rs:188,195`) — the trait signature does not need to change, only the
   `JsonFileStorage` implementation (and, if kept, `InMemoryStorage`'s in-memory equivalent).
@@ -352,7 +352,7 @@ HEAD (`751da7f5`). No plan is written here; no code or `.jit/` state was changed
 
 ## 7. Architectural-invariant check
 
-- **INV-LABEL-FORMAT** (`CLAUDE.md`/`invariants.toml`, enforced by `default:label-format`) is the
+- **INV-LABEL-FORMAT** (`AGENTS.md`/`invariants.toml`, enforced by `default:label-format`) is the
   literal target of REQ-02's grammar change — the rule's backing JSON Schema
   (`.jit/schemas/default-label-format.json`, generated from `CANONICAL_LABEL_REGEX` in
   `validation/defaults.rs:55`) must be regenerated in lockstep with `labels.rs:24`'s regex, or the
@@ -389,4 +389,4 @@ HEAD (`751da7f5`). No plan is written here; no code or `.jit/` state was changed
 - Whether `TomlSourceDescriptor` gains a transform capability or `rules.toml`'s schema changes
   instead (§4/§2 REQ-03) — both are structurally possible; no code fact favors one over the other.
 - Exact target file/heading for the rules/gates reference doc (REQ-07) — no existing convention
-  beyond `CLAUDE.md`'s invariants region to draw an analogy from.
+  beyond `AGENTS.md`'s invariants region to draw an analogy from.

@@ -198,7 +198,7 @@ Gate-blocked example:
 ## MCP Tools Reference
 
 jit ships an MCP (Model Context Protocol) server under
-[`mcp-server/`](../../mcp-server/README.md) so MCP clients (Claude Desktop, VS
+[`mcp-server/`](../../mcp-server/README.md) so MCP clients (such as VS
 Code, and other agents) can drive jit through structured tool calls instead of
 shelling out to the CLI.
 

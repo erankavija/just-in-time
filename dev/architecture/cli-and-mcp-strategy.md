@@ -25,7 +25,7 @@
 **Why**: Direct, simple, works with any tool/agent, no additional server needed
 
 ### **Strategy 2: MCP Server (Priority 2)**  
-**Why**: Better for AI agents that support MCP (Claude, future agents), provides type-safe interface
+**Why**: Better for AI agents that support MCP, provides a type-safe interface
 
 **Approach**: Do **both**, with CLI as foundation and MCP as a thin wrapper.
 
@@ -320,7 +320,7 @@ $ jit --batch < operations.json
 
 ✅ **Type-safe**: Strongly typed tool definitions  
 ✅ **Discoverable**: Agents automatically understand capabilities  
-✅ **Composable**: Works with any MCP-compatible AI (Claude, future agents)  
+✅ **Composable**: Works with any MCP-compatible AI
 ✅ **Structured**: Native JSON request/response  
 ✅ **Real-time**: Can maintain state across operations  
 
@@ -329,7 +329,7 @@ $ jit --batch < operations.json
 ```
 ┌─────────────┐
 │ AI Agent    │
-│ (Claude,etc)│
+│ (MCP client)│
 └──────┬──────┘
        │ MCP Protocol (JSON-RPC)
        │
@@ -586,7 +586,7 @@ AI Agent thinks: "I need to create an issue and add a dependency"
 1. Benefits **all** users (humans + all agents)
 2. Required foundation for MCP server anyway
 3. Lower risk, faster ROI
-4. Works with **any** AI agent (Claude, GPT, local models)
+4. Works with **any** AI agent (hosted or local)
 
 ### ✅ Add MCP Server (Phase 2)
 **Why**:
@@ -621,7 +621,7 @@ AI Agent thinks: "I need to create an issue and add a dependency"
 
 ### Week 3-4:
 8. **Prototype MCP server** (TypeScript for speed)
-9. **Test with Claude** (has MCP support)
+9. **Test with an MCP client**
 10. **Document MCP usage**
 
 ---
@@ -672,7 +672,7 @@ AI Agent thinks: "I need to create an issue and add a dependency"
 ### Phase 2 (MCP Server)
 - [ ] MCP server running on stdio transport
 - [ ] 15-20 tools implemented
-- [ ] Works with Claude Desktop
+- [ ] Works with an MCP-compatible client
 - [ ] Integration tests with MCP protocol
 - [ ] Documentation: `docs/mcp-server.md`
 - [ ] Example agent workflows

@@ -9,7 +9,7 @@
 //! ALL rendering / drift logic to the pure engine
 //! ([`projection`](crate::validation::projection),
 //! [`drift`](crate::validation::drift)). They own no CLI parsing or output
-//! formatting (the layer boundary in CLAUDE.md "Separation of Concerns").
+//! formatting (the layer boundary in AGENTS.md "Separation of Concerns").
 
 use super::*;
 use crate::config::InvariantProjectionConfig;

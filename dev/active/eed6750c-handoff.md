@@ -30,7 +30,7 @@
 - The node's owner **runs its own gate** from within the task (supersedes the 2026-06-20
   design-doc §7 "leave PENDING for a standard runner").
 - Keep the skill **domain-agnostic and terse**. A verbose, jit-specific invariant-check
-  paragraph was rejected during fix C; phrase generically (no `graph.rs`/`CLAUDE.md`/`epic`
+  paragraph was rejected during fix C; phrase generically (no `graph.rs`/`AGENTS.md`/`epic`
   literals in skill prose).
 - `jit gate pass` exit codes are verdict-meaningful now (0=pass, 4=FAIL, 10=runner error);
   still prefer the recorded status over an outer wrapper's signal.
@@ -45,7 +45,7 @@
   slash command).
 
 ## Pointers
-- Skill: `.claude/skills/jit-planning-lead/`.
+- Skill: `.agents/skills/jit-planning-lead/`.
 - Authoring + dogfood record: `dev/sessions/session-20260625-planning-skill-authoring.md`.
 - Dogfood plan artifact: `dev/active/25064508-d563-4073-a970-296607a01adc-plan.md`.
 - Dogfood transcript: `~/.claude/projects/-home-vkaskivuo-Projects-just-in-time/a7c51c9d-*.jsonl`.

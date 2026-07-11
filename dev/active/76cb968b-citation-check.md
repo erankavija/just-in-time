@@ -7,7 +7,7 @@
 
 ## Citation surfaces
 
-1. **Authored markdown:** `.claude/skills/` (excluding `*/evals/` historical transcripts), `README.md`, `docs/`, `CLAUDE.md`.
+1. **Authored markdown:** `.agents/skills/` (excluding `*/evals/` historical transcripts), `README.md`, `docs/`, `AGENTS.md`.
 2. **Rust comments, all forms:** doc comments (`///`, `//!`, doctest bodies) and ordinary comments (`//`, including trailing comments after code) across every `.rs` file under `crates/` — test files included.
 
 ## Method
@@ -16,7 +16,7 @@
 
    ```
    # authored markdown
-   grep -rhoE "@/[a-z][a-z0-9-]*(/[A-Za-z0-9-]+)+" .claude/skills/ README.md docs/ CLAUDE.md | grep -v evals
+   grep -rhoE "@/[a-z][a-z0-9-]*(/[A-Za-z0-9-]+)+" .agents/skills/ README.md docs/ AGENTS.md | grep -v evals
    # the comment portion of every Rust line containing //
    grep -rh --include="*.rs" "//" crates/ | sed 's|^[^/]*//|//|' \
      | grep -oE "@/[a-z][a-z0-9-]*(/[A-Za-z0-9-]+)+"
@@ -36,7 +36,7 @@
 
 ### Resolved (31)
 
-- **invariant (7)** — assignee-format, atomic-writes, dag-acyclic, domain-agnostic, event-log, gate-semantics, label-format (cited as `@/inv/…` in skills, CLAUDE.md guidance, and Rust comments; canonical `@/invariant/…` in README/docs and Rust doc examples).
+- **invariant (7)** — assignee-format, atomic-writes, dag-acyclic, domain-agnostic, event-log, gate-semantics, label-format (cited as `@/inv/…` in skills, AGENTS.md guidance, and Rust comments; canonical `@/invariant/…` in README/docs and Rust doc examples).
 - **rule (9)** — coverage-preview, label-format, namespace-registry, namespace-unique-resolution, namespace-unique-team, namespace-unique-type, orphan-leaf, strategic-consistency, type-hierarchy-known.
 - **gate (13)** — breakdown-review, cargo-ci, cargo-ci-features, clippy, code-review, coverage-preview, fmt, jit-validate, npm-ci, plan-review, repo-validate, tdd-reminder, tests.
 - **definition (1)** — `@/definition/State`.

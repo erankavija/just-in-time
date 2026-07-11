@@ -23,4 +23,4 @@ coverage.json
 badges/
 
 # jit-execution-lead worktrees (transient, never tracked)
-.claude/worktrees/
+.agents/worktrees/

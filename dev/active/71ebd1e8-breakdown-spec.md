@@ -151,6 +151,6 @@ Resolves all 12 open points of brief §8. Provisional; premise-shaky ones marked
   internal groups, each independently landable).
 
 - **Assumptions:** the rules/gates reference doc's exact target file/heading (D8) has no existing
-  convention beyond CLAUDE.md's invariant region; it is config-declared so the target can be chosen
+  convention beyond AGENTS.md's invariant region; it is config-declared so the target can be chosen
   at the REQ-07 item without reopening the plan. Risk if wrong: cosmetic, contained to that item.
 

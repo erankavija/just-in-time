@@ -5,7 +5,7 @@
 //! every issue's description through the storage boundary, and return derived
 //! qualified ids. All projection logic lives in `domain/item.rs`; this module
 //! only orchestrates config + storage + the pure index (the layer boundary in
-//! CLAUDE.md "Separation of Concerns").
+//! AGENTS.md "Separation of Concerns").
 
 use super::*;
 use crate::config::SourceOfTruth;

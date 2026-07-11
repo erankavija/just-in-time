@@ -5,7 +5,7 @@ Adapts the skill-creator plugin's trigger-eval technique (temp command file +
 headless `claude -p` + stream-json tool-use detection; see the plugin's
 `scripts/run_eval.py`) for one confound specific to this repository:
 jit-execution-lead and jit-planning-lead are permanently installed as
-user-level skills (`~/.claude/skills/<name>`, symlinked into this repo), so
+user-level skills (`~/.agents/skills/<name>`, symlinked into this repo), so
 they are present in Claude's `available_skills` list for *every* `claude -p`
 invocation, independent of cwd. The plugin's stock runner only counts a
 "trigger" if the model invokes a synthetic proxy command carrying a unique

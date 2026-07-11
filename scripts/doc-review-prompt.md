@@ -44,7 +44,7 @@ Statements about CLI behavior, storage layout, and repository structure must mat
 
 Adopter-facing docs describe the **shipped surface** — what `jit init` produces plus the CLI the binary exposes. This repository dogfoods jit, so some docs legitimately show this repository's own registries and config as a live example (for instance `docs/reference/rules-and-gates.md` renders this repo's gates, and `docs/reference/example-config.toml` carries repo-local values). The standard is that such content is **signalled as this repository's configuration**, not that it is absent.
 
-Check for the signal, not for the content. Read the "Dogfooding Setup" section of `CLAUDE.md` to know which values are repo-local: the `planning`/`breakdown`/`bug`/`enhancement` types; the `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the gates wired to repo scripts. Where a doc presents one of these as a shipped default without framing it as this repository's own configuration, that missing signal is a blocking finding.
+Check for the signal, not for the content. Read the "Dogfooding Setup" section of `AGENTS.md` to know which values are repo-local: the `planning`/`breakdown`/`bug`/`enhancement` types; the `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the gates wired to repo scripts. Where a doc presents one of these as a shipped default without framing it as this repository's own configuration, that missing signal is a blocking finding.
 
 ### 3. Current behavior only
 

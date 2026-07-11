@@ -29,10 +29,10 @@ its claims as "verified accurate"). Corrected below; each fix swept footprint-wi
   automatically. Verified against git worktree behavior.
 - **F5 [medium] parallel-work — Mermaid diagram showed non-UUID `task-1.json`.** Changed the
   node to `.jit/issues/{id}.json`, consistent with the `{id}.json` placeholder in
-  storage-format / CLAUDE.md.
+  storage-format / AGENTS.md.
 - **F6 [high] parallel-work — leases overstated as preventing conflicts.** Verified: lease
   **acquisition** is exclusive (a second `claim acquire` fails — "already claimed by …"),
-  but the lease is **advisory** (CLAUDE.md "Advisory work leases"); an agent that skips
+  but the lease is **advisory** (AGENTS.md "Advisory work leases"); an agent that skips
   claiming can still mutate the issue, and write-enforcement is configurable via
   `enforce_leases` (default `strict`, `config.rs:1723`). Reworded the intro, "What You'll
   Learn", Step 4 lead-in, the lease bullet, and `README.md`'s index line to frame leases as

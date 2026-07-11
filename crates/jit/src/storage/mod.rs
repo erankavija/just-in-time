@@ -333,7 +333,7 @@ pub trait IssueStore: Clone {
     ///
     /// This is the storage-owned entry point for command/domain code that needs to
     /// read a config-declared file (e.g. a project-scope item source) WITHOUT
-    /// reaching into the filesystem directly — the layer boundary in CLAUDE.md
+    /// reaching into the filesystem directly — the layer boundary in AGENTS.md
     /// ("storage owns ALL persistence"). The path is enforced repository-local:
     /// an absolute path or any `..` traversal is rejected with the typed
     /// [`PathReadError::InvalidPath`] before any I/O.
@@ -372,7 +372,7 @@ pub trait IssueStore: Clone {
     /// The storage-owned write counterpart of [`read_repo_file`](Self::read_repo_file):
     /// command/domain code that needs to materialize a config-declared file (e.g.
     /// the invariant projection target) goes through this boundary rather than
-    /// touching the filesystem directly (the CLAUDE.md "storage owns ALL
+    /// touching the filesystem directly (the AGENTS.md "storage owns ALL
     /// persistence" boundary). The path is enforced repository-local so a
     /// configured target can never escape the repo, with the SAME two-layer check
     /// as [`read_repo_file`](Self::read_repo_file): a shape check (an absolute path

@@ -7,7 +7,7 @@ This document explains what JIT guarantees about data integrity, consistency, an
 
 ## Invariants
 
-JIT maintains four core invariants that are enforced at all times. Three of them are also registered project invariants, cited below by their address (`@/invariant/<id>`); run `jit item show <address>` for the registry's canonical statement. The invariant registry (`.jit/invariants.toml`) also renders into the invariant region of the project `CLAUDE.md` via `jit invariant render`.
+JIT maintains four core invariants that are enforced at all times. Three of them are also registered project invariants, cited below by their address (`@/invariant/<id>`); run `jit item show <address>` for the registry's canonical statement. The invariant registry (`.jit/invariants.toml`) also renders into the invariant region of the project `AGENTS.md` via `jit invariant render`.
 
 ### DAG Property
 

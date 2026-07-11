@@ -4,7 +4,7 @@
 //! create for the `.jit/events.jsonl` / `.jit/claims.jsonl` union-merge
 //! drivers, so the CLI layer (`main.rs`) only calls [`setup_gitattributes`]
 //! and reports its [`GitattributesOutcome`] — it never touches git or the
-//! filesystem itself (CLAUDE.md "Separation of Concerns"). Mirrors the
+//! filesystem itself (AGENTS.md "Separation of Concerns"). Mirrors the
 //! [`crate::storage::worktree_paths::WorktreePaths::detect`] precedent for
 //! git-subprocess-backed storage setup.
 

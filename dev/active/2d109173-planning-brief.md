@@ -31,7 +31,7 @@ Root cause: violations of `@/inv/single-source-prose` — volatile facts hand-co
 - **Deletion / merge:** a task may delete a wholly-obsolete or redundant doc, or merge it into another, repointing inbound links, with the rationale recorded on the task.
 - **Examples:** audit all seven rulesets, but triage reference-grade vs illustrative first; depth follows the triage; record it.
 - **Style:** factual accuracy only; punctuation/tone rewrites are not an acceptance criterion (287c4051 LD-11).
-- **Non-goals:** no changes to `dev/` contributor docs or `CLAUDE.md`.
+- **Non-goals:** no changes to `dev/` contributor docs or `AGENTS.md`.
 
 ## Notes for the planning agent
 

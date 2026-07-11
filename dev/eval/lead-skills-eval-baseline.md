@@ -15,8 +15,8 @@ run's self-report).
 
 | Skill | Evals | Runner + verdicts | Result |
 |---|---|---|---|
-| `jit-execution-lead` | [`evals/evals.json`](../../.claude/skills/jit-execution-lead/evals/evals.json) — `sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`, `parent-invoked-escalation` | [`evals/results.md`](../../.claude/skills/jit-execution-lead/evals/results.md) + transcripts | 4/4 PASS |
-| `jit-planning-lead` | [`evals/evals.json`](../../.claude/skills/jit-planning-lead/evals/evals.json) — `research-and-plan`, `plan-from-existing`, `plan-from-import` (one per entry path) | [`evals/results.md`](../../.claude/skills/jit-planning-lead/evals/results.md) + transcripts | 3/3 PASS |
+| `jit-execution-lead` | [`evals/evals.json`](../../.agents/skills/jit-execution-lead/evals/evals.json) — `sw-epic-with-children`, `sw-epic-needs-breakdown`, `content-project-epic`, `parent-invoked-escalation` | [`evals/results.md`](../../.agents/skills/jit-execution-lead/evals/results.md) + transcripts | 4/4 PASS |
+| `jit-planning-lead` | [`evals/evals.json`](../../.agents/skills/jit-planning-lead/evals/evals.json) — `research-and-plan`, `plan-from-existing`, `plan-from-import` (one per entry path) | [`evals/results.md`](../../.agents/skills/jit-planning-lead/evals/results.md) + transcripts | 3/3 PASS |
 
 `jit-planning-lead`'s `plan-from-import` verdict is PASS with a recorded finding:
 the run's coverage-preview gate passed vacuously on checkbox-prefixed criteria.
@@ -31,8 +31,8 @@ Method: the skill-creator plugin's trigger-eval runner over each skill's
 
 | Skill | `trigger_eval.json` | Results | Should-trigger | Should-not-trigger | Total |
 |---|---|---|---|---|---|
-| `jit-execution-lead` | [file](../../.claude/skills/jit-execution-lead/trigger_eval.json) | [results](../../.claude/skills/jit-execution-lead/trigger_eval_results.json) | 8/8 | 9/9 | 17/17, failed 0 |
-| `jit-planning-lead` | [file](../../.claude/skills/jit-planning-lead/trigger_eval.json) | [results](../../.claude/skills/jit-planning-lead/trigger_eval_results.json) | 8/8 | 9/9 | 17/17, failed 0 |
+| `jit-execution-lead` | [file](../../.agents/skills/jit-execution-lead/trigger_eval.json) | [results](../../.agents/skills/jit-execution-lead/trigger_eval_results.json) | 8/8 | 9/9 | 17/17, failed 0 |
+| `jit-planning-lead` | [file](../../.agents/skills/jit-planning-lead/trigger_eval.json) | [results](../../.agents/skills/jit-planning-lead/trigger_eval_results.json) | 8/8 | 9/9 | 17/17, failed 0 |
 
 ## Success-criteria map (issue `c23dfe71`)
 

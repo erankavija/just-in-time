@@ -6,7 +6,7 @@
 //! (projection target/mode/style), the effective ruleset, and the gate registry,
 //! then delegates ALL rendering / region-splicing / atomic-write logic to the pure
 //! engine ([`project_rules_and_gates`](crate::validation::rules_gates_projection::project_rules_and_gates)).
-//! It owns no CLI parsing or output formatting (the layer boundary in CLAUDE.md
+//! It owns no CLI parsing or output formatting (the layer boundary in AGENTS.md
 //! "Separation of Concerns").
 
 use super::*;

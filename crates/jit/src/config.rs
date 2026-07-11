@@ -2145,7 +2145,7 @@ impl EffectiveConfig {
     /// `~/.config/jit` existence checks, home-directory resolution, and each
     /// present source's [`JitConfig::load`] — so callers outside this module
     /// (notably the `commands` layer) never touch `std::fs` / `dirs` directly
-    /// (CLAUDE.md "Separation of Concerns": config IO stays in the config
+    /// (AGENTS.md "Separation of Concerns": config IO stays in the config
     /// layer). Mirrors the system (`/etc/jit`) > user (`~/.config/jit`) > repo
     /// priority `jit config show` has always used.
     ///

@@ -6,7 +6,7 @@
 //! [`ProjectName`], REQ-03 of the multi-jit story: an invalid identity must
 //! never reach the file). ALL config-file IO — reading the TOML document and
 //! the atomic write — is delegated to [`crate::storage::config_store`], so no
-//! persistence lives in this command module (the layer boundary in CLAUDE.md
+//! persistence lives in this command module (the layer boundary in AGENTS.md
 //! "Separation of Concerns").
 //!
 //! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key

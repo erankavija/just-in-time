@@ -3,7 +3,7 @@
 > **Diátaxis Type:** Reference
 
 How to turn a scenario-eval run into a reproducible pass/fail verdict. A scenario eval
-(e.g. `.claude/skills/jit-execution-lead/evals/evals.json`) ships a free-text
+(e.g. `.agents/skills/jit-execution-lead/evals/evals.json`) ships a free-text
 `expected_output` description. This document defines the method that converts that
 description into an itemized, independently checkable checklist and scores a run against
 it, so that anyone — not just the person who ran the eval — can reproduce the verdict.

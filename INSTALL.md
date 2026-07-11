@@ -222,9 +222,9 @@ cd mcp-server
 npm install -g .
 ```
 
-### Usage with Claude Desktop
+### MCP Client Configuration
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add this server definition to your MCP client's configuration:
 
 ```json
 {

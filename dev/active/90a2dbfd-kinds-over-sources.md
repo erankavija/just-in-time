@@ -165,8 +165,8 @@ The organizing moves, in order:
      `enforced-but-undeclared` direction can be dropped for rules too, collapsing
      drift to one direction.
 
-6. **Region-mode projection into `CLAUDE.md`.** `[invariant_projection]` (or the
-   generalized projection) targets a begin/end region inside `CLAUDE.md` so the
+6. **Region-mode projection into `AGENTS.md`.** `[invariant_projection]` (or the
+   generalized projection) targets a begin/end region inside `AGENTS.md` so the
    "## Domain Invariants" section becomes a projection of the registry, not a
    hand-maintained duplicate.
 
@@ -195,7 +195,7 @@ non-existent `dag-no-cycles` rule.
 5. Simplify `drift.rs`: drop gate (and rule, if addressable) `enforced-but-undeclared`;
    keep `declared-but-unenforced` as error. Update `commands/validate.rs`
    integration and `jit invariant check` exit semantics.
-6. Add region-mode projection target support for `CLAUDE.md`; re-point the
+6. Add region-mode projection target support for `AGENTS.md`; re-point the
    Domain Invariants section.
 7. (If pursuing rule/gate kinds) Resolve the `:`-in-self-id label grammar
    (`labels.rs:24`): either widen the value grammar or remap rule self-ids.
@@ -212,7 +212,7 @@ non-existent `dag-no-cycles` rule.
   golden test for the `[item_kinds]` table (REQ-04).
 - `drift.rs` unit tests updated: no gate `enforced-but-undeclared`; seed registry
   yields zero findings; a dangling `enforced-by` still errors (REQ-05).
-- Projection test: rendering into a `CLAUDE.md` region round-trips (REQ-06).
+- Projection test: rendering into a `AGENTS.md` region round-trips (REQ-06).
 - Existing `cargo-ci` + `code-review` gates.
 
 ## Risks and Open Questions

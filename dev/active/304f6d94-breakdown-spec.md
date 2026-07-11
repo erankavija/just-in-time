@@ -62,7 +62,7 @@ This item dispatches the existing `jit-execution-lead` unmodified aside from its
     `.jit/config.toml:24-31`. Divergent ruleset exercised: `docs/examples/research/config.toml:34`
     (`strategic_types = ["goal"]`) with `docs/examples/research/templates.toml:18`
     (`applies_to = ["goal"]`).
-  - Dispatch: `.claude/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and
+  - Dispatch: `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and
     `.../scripts/check-leak-into-main.sh`, documented canonical-copy-only in
     `references/worktree-dispatch-protocol.md` (subagent invokes them; no fork).
   - Waves: `jit graph deps <id>` hand-layered per jit-execution-lead `SKILL.md:146-172`.
@@ -79,14 +79,14 @@ This item dispatches the existing `jit-execution-lead` unmodified aside from its
     `architect-agent-prompt.md:37`, `jit-breakdown/references/analysis-prompt.md:106`;
     byte-identical duplicate at `jit-planning-lead/references/content-standards.md`.
     Canonical home after promotion: `docs/reference/jit-content-standards.md`.
-    Cross-project reachability: every jit entry in `~/.claude/skills` is a per-skill
-    symlink into this repo's `.claude/skills` (verified `ls -la ~/.claude/skills`), so a
+    Cross-project reachability: every jit entry in `~/.agents/skills` is a per-skill
+    symlink into this repo's `.agents/skills` (verified `ls -la ~/.agents/skills`), so a
     skill file's physical location after symlink resolution is
-    `<this-repo>/.claude/skills/<skill>/...`, and a skill-base-relative traversal
+    `<this-repo>/.agents/skills/<skill>/...`, and a skill-base-relative traversal
     (`../../../docs/reference/jit-content-standards.md` from the skill dir, one level
     deeper from `references/` files) resolves inside this repo even when the skill is
     entered from another project (verified:
-    `realpath ~/.claude/skills/jit-execution-lead/../../../docs/reference` →
+    `realpath ~/.agents/skills/jit-execution-lead/../../../docs/reference` →
     `/home/vkaskivuo/Projects/just-in-time/docs/reference`).
 
 - **Grounding (from investigation), classified:**
@@ -109,7 +109,7 @@ This item dispatches the existing `jit-execution-lead` unmodified aside from its
     derive. `../gf2` uses the same `milestone`/`epic` pair as this repo and adds no third
     shape.
   - Layer boundary: everything needed is CLI-exposed; skills-only change, consistent with
-    CLAUDE.md layering.
+    AGENTS.md layering.
 
 
 ## Parent-plan decisions
@@ -132,8 +132,8 @@ First-class log, consumed by review and breakdown. Provisional entries flagged.
   (`../../../docs/reference/jit-content-standards.md` from a skill dir, one level deeper from
   `references/` files); both existing copies are removed in the same change, direct
   references rather than pointer stubs (stubs recreate the multi-file indirection REQ-06
-  removes and can drift). Reachability holds cross-project because every `~/.claude/skills`
-  jit entry is a per-skill symlink into this repo's `.claude/skills`; verified resolution
+  removes and can drift). Reachability holds cross-project because every `~/.agents/skills`
+  jit entry is a per-skill symlink into this repo's `.agents/skills`; verified resolution
   argument in §2. Rejected: keep the canonical copy inside jit-manage's `references/`
   (couples the project-wide SSOT to one skill's directory and leaves the duplicate problem);
   synced copies (violates "single canonical doc"); leave the byte-identical duplicate (the

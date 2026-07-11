@@ -10,7 +10,7 @@ jit backs software projects (this repo, where the hierarchy is `milestone` > `ep
 
 ## Success Criteria
 
-- [hard] REQ-01: `.claude/skills/jit-project-lead/SKILL.md` exists as a thin orchestrator under 500 lines (roughly 5k tokens), with role prompts and detailed rules split into `references/` files read on demand.
+- [hard] REQ-01: `.agents/skills/jit-project-lead/SKILL.md` exists as a thin orchestrator under 500 lines (roughly 5k tokens), with role prompts and detailed rules split into `references/` files read on demand.
 - [hard] REQ-02: The skill derives its steward anchor and delegation boundary from `[type_hierarchy]`/`strategic_types` in `.jit/config.toml` and `applies_to` in `.jit/templates.toml`, with zero hardcoded domain type literals (no `milestone`, `epic`, or `goal` string anywhere in the skill's control-flow logic).
 - [hard] REQ-03: Given this repository's ruleset (two strategic tiers: `milestone` anchor, `epic` delegation boundary) the derivation yields the correct anchor and delegation boundary; given the research example ruleset (`docs/examples/research/config.toml`, `strategic_types = ["goal"]`, `goal` also the breakable type) it yields the collapsed case correctly — one strategic tier, the steward's scope is the portfolio of top-level `goal` containers.
 - [hard] REQ-04: When `templates.toml` is missing, `strategic_types` is empty, or the derivation would leave a genuine level tie among candidate anchors, the skill stops and asks rather than guessing.
@@ -39,7 +39,7 @@ The skeleton delivers the orchestrator shell (pre-flight, tier derivation, refer
   derivation yields correct anchor and delegation boundary on both observed rulesets, the
   two-tier .jit/config.toml and the collapsed single-tier docs/examples/research ruleset
   (strategic type equals the breakable type).`
-  Blast radius: new `.claude/skills/jit-project-lead/`, `~/.claude/skills` symlink.
+  Blast radius: new `.agents/skills/jit-project-lead/`, `~/.agents/skills` symlink.
 - **Four-mode front door with request routing**  `type: story`  `satisfies: REQ-02`  `depends-on: jit-project-lead skeleton with config-derived tiers`
   Outcome: an opening request routes to one of the four modes; mode 1 is fully functional;
   modes 2/3 delegate to jit-planning-lead; mode 4 delegates to the sweep path.
@@ -73,7 +73,7 @@ The skeleton delivers the orchestrator shell (pre-flight, tier derivation, refer
     `.jit/config.toml:24-31`. Divergent ruleset exercised: `docs/examples/research/config.toml:34`
     (`strategic_types = ["goal"]`) with `docs/examples/research/templates.toml:18`
     (`applies_to = ["goal"]`).
-  - Dispatch: `.claude/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and
+  - Dispatch: `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh` and
     `.../scripts/check-leak-into-main.sh`, documented canonical-copy-only in
     `references/worktree-dispatch-protocol.md` (subagent invokes them; no fork).
   - Waves: `jit graph deps <id>` hand-layered per jit-execution-lead `SKILL.md:146-172`.
@@ -90,14 +90,14 @@ The skeleton delivers the orchestrator shell (pre-flight, tier derivation, refer
     `architect-agent-prompt.md:37`, `jit-breakdown/references/analysis-prompt.md:106`;
     byte-identical duplicate at `jit-planning-lead/references/content-standards.md`.
     Canonical home after promotion: `docs/reference/jit-content-standards.md`.
-    Cross-project reachability: every jit entry in `~/.claude/skills` is a per-skill
-    symlink into this repo's `.claude/skills` (verified `ls -la ~/.claude/skills`), so a
+    Cross-project reachability: every jit entry in `~/.agents/skills` is a per-skill
+    symlink into this repo's `.agents/skills` (verified `ls -la ~/.agents/skills`), so a
     skill file's physical location after symlink resolution is
-    `<this-repo>/.claude/skills/<skill>/...`, and a skill-base-relative traversal
+    `<this-repo>/.agents/skills/<skill>/...`, and a skill-base-relative traversal
     (`../../../docs/reference/jit-content-standards.md` from the skill dir, one level
     deeper from `references/` files) resolves inside this repo even when the skill is
     entered from another project (verified:
-    `realpath ~/.claude/skills/jit-execution-lead/../../../docs/reference` →
+    `realpath ~/.agents/skills/jit-execution-lead/../../../docs/reference` →
     `/home/vkaskivuo/Projects/just-in-time/docs/reference`).
 
 - **Grounding (from investigation), classified:**
@@ -120,7 +120,7 @@ The skeleton delivers the orchestrator shell (pre-flight, tier derivation, refer
     derive. `../gf2` uses the same `milestone`/`epic` pair as this repo and adds no third
     shape.
   - Layer boundary: everything needed is CLI-exposed; skills-only change, consistent with
-    CLAUDE.md layering.
+    AGENTS.md layering.
 
 
 ## Parent-plan decisions
@@ -143,8 +143,8 @@ First-class log, consumed by review and breakdown. Provisional entries flagged.
   (`../../../docs/reference/jit-content-standards.md` from a skill dir, one level deeper from
   `references/` files); both existing copies are removed in the same change, direct
   references rather than pointer stubs (stubs recreate the multi-file indirection REQ-06
-  removes and can drift). Reachability holds cross-project because every `~/.claude/skills`
-  jit entry is a per-skill symlink into this repo's `.claude/skills`; verified resolution
+  removes and can drift). Reachability holds cross-project because every `~/.agents/skills`
+  jit entry is a per-skill symlink into this repo's `.agents/skills`; verified resolution
   argument in §2. Rejected: keep the canonical copy inside jit-manage's `references/`
   (couples the project-wide SSOT to one skill's directory and leaves the duplicate problem);
   synced copies (violates "single canonical doc"); leave the byte-identical duplicate (the

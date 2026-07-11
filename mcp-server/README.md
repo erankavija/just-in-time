@@ -4,7 +4,7 @@ Model Context Protocol server for the Just-In-Time issue tracker.
 
 ## Overview
 
-This MCP server wraps the `jit` CLI to provide MCP tools for AI agents like Claude. It dynamically generates tools from the JIT schema, ensuring the MCP interface stays synchronized with the CLI.
+This MCP server wraps the `jit` CLI to provide MCP tools for AI agents. It dynamically generates tools from the JIT schema, ensuring the MCP interface stays synchronized with the CLI.
 
 ## Features
 
@@ -80,9 +80,9 @@ node index.js
    gh copilot suggest "Use jit to create a new high-priority issue"
    ```
 
-### With Claude Desktop
+### MCP Client Configuration Example
 
-Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Add this server definition to your MCP client's configuration:
 
 ```json
 {
@@ -119,17 +119,17 @@ JIT_MCP_ALL_TOOLS=1 sh -c 'echo "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tool
 
 ## Example Usage (via MCP)
 
-When used with an MCP client like Claude:
+When used with an MCP client:
 
 ```
 User: Create a high-priority issue for implementing authentication
-Claude: [calls jit_issue_create with title="Implement authentication", priority="high"]
+Agent: [calls jit_issue_create with title="Implement authentication", priority="high"]
 
 User: Show me all ready issues
-Claude: [calls jit_query_available]
+Agent: [calls jit_query_available]
 
 User: Add a dependency - the auth issue depends on the database setup
-Claude: [calls jit_dep_add with from_id="AUTH_ID", to_ids=["DB_ID"]]
+Agent: [calls jit_dep_add with from_id="AUTH_ID", to_ids=["DB_ID"]]
 ```
 
 ## Implementation Details
@@ -328,7 +328,7 @@ node --version  # Should be v20 or later
 
 ```mermaid
 flowchart TD
-    Agent["AI Agent<br/>(Claude Desktop, GitHub Copilot, etc.)"]
+    Agent["AI Agent / MCP Client"]
     CLI["jit CLI (with --json flag)"]
 
     Agent -->|"MCP Protocol<br/>(JSON-RPC over stdio)"| Loader

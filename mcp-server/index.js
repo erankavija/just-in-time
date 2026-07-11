@@ -4,7 +4,7 @@
  * JIT MCP Server
  * 
  * Model Context Protocol server for the Just-In-Time issue tracker.
- * Wraps the jit CLI to provide MCP tools for AI agents like Claude.
+ * Wraps the jit CLI to provide MCP tools for AI agents.
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -27,7 +27,7 @@ const concurrencyLimiter = new ConcurrencyLimiter(10);
 
 // Response mode: controls how tool results are returned.
 //   "content"    — Summary + JSON in a single text content block (default).
-//                   Works with all MCP clients including Claude Code.
+//                   Works with MCP-compatible AI clients.
 //   "structured" — Summary in content, typed data in structuredContent with
 //                   outputSchema. Requires client support (MCP 2025-06-18+).
 //                   As of Feb 2026 most clients ignore content when

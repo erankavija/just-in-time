@@ -972,7 +972,7 @@ fn test_gate_define_with_env_vars() {
             "--env",
             "REVIEWER_AGENT=copilot -s",
             "--env",
-            "MODEL=claude-haiku-4.5",
+            "MODEL=test-review-model",
         ])
         .assert()
         .success()
@@ -992,7 +992,7 @@ fn test_gate_define_with_env_vars() {
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let checker = &json["checker"];
     assert_eq!(checker["env"]["REVIEWER_AGENT"], "copilot -s");
-    assert_eq!(checker["env"]["MODEL"], "claude-haiku-4.5");
+    assert_eq!(checker["env"]["MODEL"], "test-review-model");
 }
 
 #[test]

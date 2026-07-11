@@ -14,7 +14,7 @@ to the contributor-documentation home with history preserved:
 
 | File:line | Before | After |
 | --- | --- | --- |
-| `CLAUDE.md:124` | `(see TESTING.md for details)` | `(see dev/TESTING.md for details)` |
+| `AGENTS.md:124` | `(see TESTING.md for details)` | `(see dev/TESTING.md for details)` |
 | `dev/index.md:145` | `[TESTING.md](../TESTING.md)` | `[TESTING.md](TESTING.md)` |
 | `dev/architecture/core-system-design.md:402` | `` See `TESTING.md` `` | `` See `../TESTING.md` `` |
 
@@ -24,7 +24,7 @@ The moved file's own links were authored root-relative; moving it one level down
 into `dev/` required prefixing each intra-repo target with `../` so it still
 resolves:
 
-- `[CLAUDE.md](../CLAUDE.md)` (two occurrences, lines 4 and 332)
+- `[AGENTS.md](../AGENTS.md)` (two occurrences, lines 4 and 332)
 - `[.github/copilot-instructions.md](../.github/copilot-instructions.md)`
 - `[docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md)`
 - `[crates/jit/tests/harness.rs](../crates/jit/tests/harness.rs)`
@@ -72,7 +72,7 @@ is to keep it:
    and `docs/tutorials/quickstart.md` — both Wave-2-audited files (handoff
    serialization risk) — for no net gain.
 3. **Conventional-file class.** D8's stay-list (`README.md`, `CHANGELOG.md`,
-   `CLAUDE.md`) illustrates the conventional root files that remain; `INSTALL`
+   `AGENTS.md`) illustrates the conventional root files that remain; `INSTALL`
    belongs to the same long-established conventional class.
 
 The owner's durable lean-root preference (adopter content → `docs/`) is real, but
@@ -94,17 +94,17 @@ with the declining rationale recorded here.
 ## Tree-wide verification
 
 Checkers run over the adopter surface plus every file this change touched
-(`docs/ README.md CLAUDE.md mcp-server/README.md web/README.md INSTALL.md
+(`docs/ README.md AGENTS.md mcp-server/README.md web/README.md INSTALL.md
 dev/TESTING.md dev/index.md dev/architecture/core-system-design.md`):
 
 - **M2 links & anchors** — `OK: all links and anchors resolve` (exit 0).
 - **M3 citations** — `OK: all cited paths and @/ items resolve` over the adopter
-  surface (exit 0). Note: adding `CLAUDE.md` to the footprint surfaces a
-  pre-existing `DANGLING: @/charter/D-N` at `CLAUDE.md:94` — illustrative prose
+  surface (exit 0). Note: adding `AGENTS.md` to the footprint surfaces a
+  pre-existing `DANGLING: @/charter/D-N` at `AGENTS.md:94` — illustrative prose
   ("citable as `@/charter/D-N` via `per:` labels"), present in the base commit,
   untouched by this change, and outside the adopter citation footprint.
 - **M5 projections** — clean after commit. The transient `DRIFT` seen while the
-  change was uncommitted was this change's own `CLAUDE.md:124` edit (the projector
+  change was uncommitted was this change's own `AGENTS.md:124` edit (the projector
   wrote nothing to the invariant region; `git diff --stat` showed exactly the one
   line). The `## Domain Invariants` projected region was not touched.
 

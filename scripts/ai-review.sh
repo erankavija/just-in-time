@@ -19,8 +19,6 @@ set -euo pipefail
 #
 # Example REVIEWER_AGENT values:
 #   codex review -
-#   copilot -s --model claude-haiku-4.5
-#   claude --model haiku -p -
 #   cat                                    # dry-run (echoes the prompt)
 #
 # Setup:

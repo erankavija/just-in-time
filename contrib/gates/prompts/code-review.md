@@ -18,7 +18,7 @@ Review the implementation associated with this issue for:
 
 1. **Correctness** - Does the code do what the issue description asks? Are there logic errors, off-by-one mistakes, or unhandled edge cases?
 
-2. **Style & Consistency** - Does the code follow the repository's conventions? If a CLAUDE.md or style guide exists, check against it.
+2. **Style & Consistency** - Does the code follow the repository's conventions? If a AGENTS.md or style guide exists, check against it.
 
 3. **Error Handling** - Are errors handled gracefully? Are error messages descriptive? Are failure modes recoverable where appropriate?
 

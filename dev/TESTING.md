@@ -1,7 +1,7 @@
 # JIT Testing Strategy
 
 This document describes the testing approach for the Just-In-Time issue tracker. It is the
-detailed elaboration of the three-layer strategy summarized in [CLAUDE.md](../CLAUDE.md).
+detailed elaboration of the three-layer strategy summarized in [AGENTS.md](../AGENTS.md).
 
 ## Three Layers
 
@@ -329,7 +329,7 @@ fn test_cli_defer_issue() {
 
 ## See Also
 
-- [CLAUDE.md](../CLAUDE.md) - architecture, layer boundaries, coding conventions
+- [AGENTS.md](../AGENTS.md) - architecture, layer boundaries, coding conventions
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
 - [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
 - [crates/jit/tests/harness.rs](../crates/jit/tests/harness.rs) - the harness implementation
