@@ -50,6 +50,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2},
+  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1},
   "started_at": "2026-07-11T00:00:00Z"
 }
