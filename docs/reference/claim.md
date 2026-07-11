@@ -73,9 +73,9 @@ jit claim acquire abc123 --json
 |------|-------------|
 | 0 | Lease acquired successfully |
 | 1 | Issue already claimed by another agent |
-| 1 | Issue not found |
 | 1 | TTL=0 without required --reason |
 | 1 | Exceeded indefinite lease limits |
+| 3 | Issue not found |
 
 ### Policy Limits (TTL=0)
 
@@ -147,7 +147,8 @@ jit claim release abc123 --json
 | Code | Description |
 |------|-------------|
 | 0 | Lease released successfully |
-| 1 | Issue not found, issue has no active lease to release, or no acting identity available |
+| 1 | No acting identity available |
+| 3 | Issue not found, or issue has no active lease to release |
 
 ---
 
@@ -196,8 +197,8 @@ jit claim renew abc12345-6789-... --json
 | Code | Description |
 |------|-------------|
 | 0 | Lease renewed successfully |
-| 1 | Lease not found |
 | 1 | Not authorized (different owner) |
+| 3 | Lease not found |
 
 ---
 
@@ -262,8 +263,8 @@ stale_threshold_secs = 3600  # 1 hour
 | Code | Description |
 |------|-------------|
 | 0 | Heartbeat sent successfully |
-| 1 | Lease not found |
 | 1 | Not authorized (different owner) |
+| 3 | Lease not found |
 
 ---
 
@@ -437,8 +438,8 @@ Force-evictions are logged to the claims audit log with:
 | Code | Description |
 |------|-------------|
 | 0 | Lease evicted successfully |
-| 1 | Lease not found |
-| 1 | Missing required --reason |
+| 2 | Missing required --reason |
+| 3 | Lease not found |
 
 ---
 

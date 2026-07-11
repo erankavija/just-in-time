@@ -452,7 +452,7 @@ config show`); every other section reads the REPO's `config.toml` only, with
 no system/user merge and no built-in defaults layered in, so an absent
 section resolves to `{}` rather than a struct of defaults. `templates` and
 `invariants` are not part of this surface (they load from sibling files, not
-`config.toml`); see `jit config list-templates` / `jit invariant list`.
+`config.toml`); see `jit config list-templates` / `jit item list --kind invariant`.
 
 An unknown key exits `2` (`INVALID_ARGUMENT`): an unknown top-level key
 names the valid sections, an unknown nested key names the missing segment

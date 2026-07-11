@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "6342cbc4-151d-451e-9236-39b037e0449a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c",
+  "commit": "d24e32b09d8be1c4a877c72de757eb572060ec4c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:07:13.010584532Z",
+  "completed_at": "2026-07-11T08:12:02.539680981Z",
+  "duration_ms": 289529,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nBlocking findings:\n\n- `docs/reference/cli-command-grammar.md:23` presents an exhaustive command topology but omits the current `reference` and `migrate` command groups and the top-level `list` and `rdeps` convenience commands exposed by `cli.rs` and `jit --schema`. Remediation: update the noun/bare-command grammar to include every current top-level family, or explicitly label the inventory as non-exhaustive.\n\n- `docs/reference/storage-format.md:154` says every event carries `issue_id`, and line 164 gives an exhaustive event-type list containing only ten variants. The current `Event` enum also has repository/registry-scoped events without `issue_id` and additional variants such as `document_archived`, `issue_updated`, `dependency_reduced`, rule-bypass events, gate-definition events, and `lifecycle_timestamps_backfilled`. Remediation: document the complete current enum and state that only issue-scoped events carry `issue_id`, citing `crates/jit/src/domain/types.rs`.\n\nOther sampled CLI, storage, configuration, exit-code, and behavior claims matched the current source or current-HEAD binary.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local registries are explicitly framed where presented as this project’s configuration. Worked configuration examples do not claim their customizable values are `jit init` defaults, and `example-config.toml` separately identifies the shipped four-type default.\n\n## 3. Current behavior only\n\nPass. The sole marker hit, “parser used to extract” in `example-config.toml:95`, is ordinary present-tense wording rather than legacy narration. No past-state, migration-transition, or roadmap narration was found.\n\n## 4. Hardcoded counts\n\nPass. Numeric totals found in scope describe fixed contract structure, such as identifier forms and semantic groups, rather than volatile command, registry, crate, tool, or test totals.\n\n## 5. Links and referenced paths\n\nPass.\n\n- All scoped Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- Every registered `@/<kind>/<self-id>` citation resolves through the current binary.\n- `run_history` is empty, so there are no prior-review findings to reassess.\n\n## 6. Content-standards conformance\n\nPass.\n\n- The box-drawing blocks in `storage-format.md:14` and `storage-format.md:251` are directory trees, not diagrams.\n- The authored diagram in `labels.md` is Mermaid.\n- No non-Mermaid diagram-shaped blocks or non-LaTeX equations were found.\n- Projection rendering performed in an isolated copy produced no difference in `rules-and-gates.md`.\n- Heading depth and present-tense reference voice conform to the standards.\n\n## Findings\n\n1. **F1 — High:** `cli-command-grammar.md` claims a complete command topology but omits current top-level command families and convenience commands. Update the inventory or mark it non-exhaustive.\n2. **F2 — High:** `storage-format.md` incorrectly says every event has `issue_id` and gives an incomplete exhaustive event-type list. Document all current variants and distinguish issue-scoped from repository/registry-scoped events.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two blocking reference defects remain: the CLI topology is incomplete and the event-log contract contradicts the current Event enum.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"CLI command grammar omits current top-level command families and convenience commands while presenting its topology as exhaustive.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":23},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Storage reference incorrectly requires issue_id on every event and lists only a subset of current event variants.\",\"file\":\"docs/reference/storage-format.md\",\"line\":154}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4874 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5037-5c12-7eb1-ae07-b6450ef04fcf\n--------\nuser\n--- 4861 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two blocking reference defects remain: the CLI topology is incomplete and the event-log contract contradicts the current Event enum.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "CLI command grammar omits current top-level command families and convenience commands while presenting its topology as exhaustive.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 23
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Storage reference incorrectly requires issue_id on every event and lists only a subset of current event variants.",
+        "file": "docs/reference/storage-format.md",
+        "line": 154
+      }
+    ]
+  }
+}
