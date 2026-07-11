@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "d369cc1a-4b3e-4347-b706-b8b3d2159be5",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c",
+  "commit": "10c20876a1b1f72c9def0949bcde98cfa7370d8a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:35:15.266898699Z",
+  "completed_at": "2026-07-11T08:36:38.615598798Z",
+  "duration_ms": 83348,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nOne blocking finding:\n\n- `docs/reference/storage-format.md:120-127` claims that an older binary “neither drops nor misreads” unknown lifecycle timestamp fields. Although Serde ignores unknown fields while deserializing, issue writes serialize the older binary’s `Issue` structure back to disk, which cannot preserve fields unknown to that binary. Remediation: remove the unsupported preservation guarantee and describe only the current binary’s optional-field behavior and schema-version contract.\n\nThe two findings from the prior review are resolved:\n\n- `cli-command-grammar.md` now includes `reference`, `migrate`, `list`, and `rdeps`.\n- `storage-format.md` now distinguishes issue-scoped events and lists every current `Event` variant.\n\nOther checked CLI, configuration, storage, lifecycle, and event claims match the current source.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. The projected rules and gates are explicitly identified as this repository’s configuration. Custom values in worked configuration snippets are presented as configurable examples rather than shipped defaults.\n\n## 3. Current behavior only\n\nThe compatibility passage at `storage-format.md:120-127` also uses older/newer-version transition narration instead of stating the current storage contract directly. This is included in F1 because it is the same defective passage and remediation.\n\nNo other blocking past-state or roadmap narration was found.\n\n## 4. Hardcoded counts\n\nPass. No volatile hand-maintained product totals were found in scope.\n\n## 5. Links and referenced paths\n\nPass.\n\n- All scoped Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- All scoped `@/<kind>/<self-id>` citations resolve.\n- The repository’s scoped mechanical documentation checks passed.\n\n## 6. Content-standards conformance\n\nPass.\n\n- Projection regeneration reports `rules-and-gates.md` as fresh.\n- Diagram-shaped authored content uses Mermaid.\n- The box-drawing blocks in `storage-format.md` are permitted directory trees.\n- No non-LaTeX authored equations were found.\n\n## Findings\n\n1. **F1 — High:** `storage-format.md:120-127` incorrectly guarantees that stale binaries preserve unknown lifecycle fields and narrates compatibility through older/newer states. Remove that guarantee and state only the current optional-field and format-version behavior.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior findings are fixed, but the storage reference still makes an unsupported stale-binary field-preservation guarantee.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Storage reference incorrectly guarantees that stale binaries preserve unknown lifecycle timestamp fields.\",\"file\":\"docs/reference/storage-format.md\",\"line\":120}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3300 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5051-075e-7e60-91e4-09461766011b\n--------\nuser\n--- 3287 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior findings are fixed, but the storage reference still makes an unsupported stale-binary field-preservation guarantee.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Storage reference incorrectly guarantees that stale binaries preserve unknown lifecycle timestamp fields.",
+        "file": "docs/reference/storage-format.md",
+        "line": 120
+      }
+    ]
+  }
+}

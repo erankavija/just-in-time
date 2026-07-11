@@ -22,8 +22,9 @@ The command line is `jit <noun> <verb> [arguments] [flags]`.
 
 - A **noun** is a subcommand group naming a domain entity or subsystem: `issue`,
   `gate`, `gate preset`, `dep`, `doc`, `graph`, `query`, `claim`, `config`,
-  `label`, `events`, `snapshot`, `worktree`, `hooks`, `item`,
-  `invariant`, and `apply`'s target. Nouns are singular (`issue`, not `issues`).
+  `label`, `events`, `snapshot`, `worktree`, `hooks`, `item`, `invariant`,
+  `reference`, `migrate`, and `apply`'s target. Nouns are singular (`issue`, not
+  `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
   `add`, `remove`, `pass`, `define`, `acquire`. Verbs are imperative and shared
   across nouns where the action is the same (`list`, `show`, `add`, `remove`
@@ -39,6 +40,12 @@ behave identically. The canonical noun is the short form; the long form is the
 alias: `dep` is canonical with `dependency` as its visible alias, and `doc` is
 canonical with `document` as its alias. New nouns do not introduce aliases unless
 an established long form is already in agents' muscle memory.
+
+**Top-level convenience aliases.** A small set of top-level spellings flatten a
+common noun/verb into a single first-guess command and route to the canonical
+form: `jit list` routes to `jit issue list`, and `jit rdeps` to
+`jit graph rdeps`. Each behaves identically to the canonical noun/verb it
+forwards to, which remains the primary spelling.
 
 ---
 

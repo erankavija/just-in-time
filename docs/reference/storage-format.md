@@ -151,7 +151,11 @@ See [Configuration Reference](configuration.md) for full options.
 
 Each event is a JSON object tagged by a snake-case `type` field, with the
 remaining fields flat on the object (not nested under a `data` key). Every event
-carries its own `id`, the `issue_id` it concerns, and a `timestamp`:
+carries its own `id` and a `timestamp`. Issue-scoped events also carry the
+`issue_id` they concern; repository- and registry-scoped events (for example
+`document_archived`, the `gate_definition_*` registry edits, and
+`lifecycle_timestamps_backfilled`) carry no `issue_id`, because they record a
+change to shared state rather than to a single issue:
 
 ```jsonl
 {"type":"issue_created","id":"e5095588-...","issue_id":"abc123","timestamp":"2026-01-15T10:00:00Z","title":"probe","priority":"normal"}
@@ -161,10 +165,21 @@ carries its own `id`, the `issue_id` it concerns, and a `timestamp`:
 
 ### Event Types
 
-The `type` tag is one of: `issue_created`, `issue_claimed`, `issue_released`,
-`issue_state_changed`, `issue_completed`, `issue_deleted`, `gate_passed`,
-`gate_failed`, `gate_added`, `gate_removed`. Fields beyond `id`, `issue_id`, and
-`timestamp` vary by type.
+The authoritative set of event types is the `Event` enum in
+`crates/jit/src/domain/types.rs`; each variant serializes under
+`#[serde(tag = "type")]` with its snake-case name as the `type` value. The
+current tags are:
+
+- **Issue-scoped** (carry `issue_id`): `issue_created`, `issue_claimed`,
+  `issue_state_changed`, `issue_updated`, `issue_released`, `issue_completed`,
+  `issue_deleted`, `gate_passed`, `gate_failed`, `gate_added`, `gate_removed`,
+  `dependency_reduced`, `local_rule_bypassed`, `transition_blocked`,
+  `graph_rule_bypassed`.
+- **Repository- or registry-scoped** (no `issue_id`): `document_archived`,
+  `gate_definition_created`, `gate_definition_updated`, `gate_definition_removed`,
+  `lifecycle_timestamps_backfilled`.
+
+Fields beyond `id` and `timestamp` vary by type.
 
 ## Gate Registry
 

@@ -51,6 +51,34 @@ write-block exit 4 is correct (verified).
 items). Swept every `jit <cmd> <subcmd>` reference in the footprint against
 `--schema`: this was the only invented one.
 
+### 3. Incomplete command-topology enumeration in `cli-command-grammar.md` (REQ-01 — rework, attempt 1)
+
+The noun/bare-verb enumeration (`:23-35`) read as exhaustive but omitted four
+top-level families present in `jit --schema`. Reconciled against `cli.rs`:
+`reference` (`cli.rs:295`, `Reference(ReferenceCommands)`) and `migrate`
+(`cli.rs:409`, `Migrate(MigrateCommands)`) are subcommand groups → added to the
+nouns list. `list` (`cli.rs:61`) and `rdeps` (`cli.rs:177`) are top-level
+**convenience aliases** routing to `jit issue list` / `jit graph rdeps` → added a
+"Top-level convenience aliases" note rather than listing them as nouns. Bare-verb
+list (init/status/validate/search/version/recover/serve/apply) was already
+complete. Swept the footprint: this is the only command-topology enumeration.
+
+### 4. Event-log contract wrong in `storage-format.md` (REQ-01/REQ-06 — rework, attempt 1)
+
+Two gaps missed on the first pass (which checked only that the *listed* tags
+matched source, not completeness or the universal-field claim):
+- **(a) `issue_id` is not universal.** Verified against the full `Event` enum
+  (`crates/jit/src/domain/types.rs:1308-1581`, 20 variants): 5 are repo-/
+  registry-scoped and carry NO `issue_id` — `document_archived` (`:1426`),
+  `gate_definition_created`/`updated`/`removed` (`:1544`/`:1531`/`:1557`),
+  `lifecycle_timestamps_backfilled` (`:1573`). Reworded the "every event carries
+  `issue_id`" claim: `id`+`timestamp` universal, `issue_id` issue-scoped only.
+- **(b) event-type list was a 10-of-20 subset.** The authoritative `get_type`
+  match (`types.rs:2010-2029`) has exactly 20 arms (an exhaustive match — the
+  count is **20**, not 21). Replaced the subset with the source-of-truth citation
+  (`Event` enum in `types.rs`) plus all 20 tags, grouped issue-scoped (15) vs
+  repo/registry-scoped (5).
+
 ## Missing-projection-surface facts (REQ-06 — recorded for follow-up filing)
 
 - **Per-command exit-code mappings have no projection surface.** `jit --schema`
@@ -61,6 +89,11 @@ items). Swept every `jit <cmd> <subcmd>` reference in the footprint against
   These are cite-source-only today; a follow-up could project a
   command→exit-code map into `--schema` so the reference tables derive rather
   than hand-copy. (Group-C follow-up input.)
+- **The event-tag set has no projection surface.** `jit --schema` does not emit
+  the `Event` enum's tag set, so `storage-format.md`'s event-type list is
+  cite-source-only (`crates/jit/src/domain/types.rs`). It is now cited to source
+  rather than hand-copied, but a follow-up could project the tags (and their
+  scope: which carry `issue_id`) so the list derives. (Group-C follow-up input.)
 
 ## Judgment calls
 
@@ -78,3 +111,16 @@ items). Swept every `jit <cmd> <subcmd>` reference in the footprint against
 - **Doc-link deferred to lead:** did not run `jit doc add` (hard rule: never
   write under `.jit/`; the lead is the sole writer). The lead should link this
   file to 7c283e95.
+
+## Correction to first-pass "verified clean" claims (rework attempt 1)
+
+The first-pass report over-claimed on two counts, both corrected above:
+- "storage-format.md fully verified clean" held only for the tags that WERE
+  listed; it missed event-type-list completeness (10 of 20) and the false
+  universal-`issue_id` claim (findings §4). storage-format.md is now accurate for
+  the full 20-variant `Event` enum.
+- "all CLI claims verified" missed that cli-command-grammar.md's noun/bare-verb
+  enumeration was an incomplete subset of the top-level families (finding §3).
+The first pass verified that stated facts matched source but did not test
+enumerations for completeness against the full `--schema` / `Event`-enum sets;
+this pass does.
