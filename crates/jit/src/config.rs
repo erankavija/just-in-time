@@ -281,6 +281,26 @@ pub struct IconConfigToml {
     pub custom: Option<HashMap<String, String>>,
 }
 
+/// Deserialize and eagerly validate `[validation].strictness`.
+///
+/// Accepts an absent key (yielding `None`) or one of the three levels
+/// (`strict`/`loose`/`permissive`, case-insensitively); any other value is
+/// rejected at deserialize time via [`Strictness`](crate::validation::Strictness)
+/// so a `config.toml` carrying an unrecognized strictness fails to load instead
+/// of persisting a silently-inert value. The validated raw string is preserved
+/// so `jit config get`/`show` round-trips the author's spelling.
+fn deserialize_strictness<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<String>::deserialize(deserializer)?;
+    if let Some(raw) = value.as_deref() {
+        raw.parse::<crate::validation::Strictness>()
+            .map_err(serde::de::Error::custom)?;
+    }
+    Ok(value)
+}
+
 /// Validation behavior configuration.
 ///
 /// Per-rule enforcement lives in `.jit/rules.toml`, the sole rule source (DR
@@ -296,6 +316,12 @@ pub struct ValidationConfig {
     /// changing either. Absent means `"loose"` (only an enforced error blocks —
     /// the pre-strictness behavior). Resolved via
     /// [`ValidationConfig::strictness`].
+    ///
+    /// Validated at deserialize time (like [`ProjectName`]): loading a
+    /// `config.toml` whose `strictness` is not one of the three levels fails
+    /// eagerly rather than deferring the error to the next validation call, so an
+    /// unrecognized value can never persist and sit silently.
+    #[serde(default, deserialize_with = "deserialize_strictness")]
     pub strictness: Option<String>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
@@ -325,7 +351,27 @@ impl ValidationConfig {
     /// Resolve the repo-wide validation
     /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
     /// to [`Strictness::Loose`](crate::validation::Strictness::Loose) when unset.
-    /// An invalid value is surfaced as an error rather than silently defaulting.
+    ///
+    /// The value is already validated at deserialize time (see
+    /// [`deserialize_strictness`]), so a loaded config resolves infallibly; the
+    /// `Result` guards a `ValidationConfig` constructed by hand with an invalid
+    /// string, which is still surfaced as an error rather than silently
+    /// defaulting.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::config::ValidationConfig;
+    /// use jit::validation::Strictness;
+    ///
+    /// // An explicit level resolves to its variant.
+    /// let cfg: ValidationConfig = toml::from_str(r#"strictness = "strict""#).unwrap();
+    /// assert_eq!(cfg.strictness().unwrap(), Strictness::Strict);
+    ///
+    /// // An absent key defaults to loose (the pre-strictness behavior).
+    /// let bare: ValidationConfig = toml::from_str("").unwrap();
+    /// assert_eq!(bare.strictness().unwrap(), Strictness::Loose);
+    /// ```
     pub fn strictness(&self) -> Result<crate::validation::Strictness> {
         crate::validation::Strictness::from_config_value(self.strictness.as_deref())
     }
@@ -2826,6 +2872,52 @@ default_type = "task"
         let validation = config.validation.unwrap();
         assert_eq!(validation.strictness, Some("loose".to_string()));
         assert_eq!(validation.default_type, Some("task".to_string()));
+    }
+
+    #[test]
+    fn test_each_strictness_level_deserializes() {
+        for level in ["strict", "loose", "permissive", "STRICT"] {
+            let toml = format!("[validation]\nstrictness = \"{level}\"\n");
+            let config: JitConfig =
+                toml::from_str(&toml).unwrap_or_else(|e| panic!("'{level}' must deserialize: {e}"));
+            // The validated raw spelling is preserved for round-tripping.
+            assert_eq!(
+                config.validation.unwrap().strictness,
+                Some(level.to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn test_invalid_strictness_is_rejected_at_deserialize() {
+        // An unrecognized level must fail config load eagerly, not defer the
+        // error to a later validation call (F1). The message names the bad value.
+        let toml = "[validation]\nstrictness = \"banana\"\n";
+        let err = toml::from_str::<JitConfig>(toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("banana"), "names the bad value: {msg}");
+        assert!(
+            msg.contains("strict") && msg.contains("loose") && msg.contains("permissive"),
+            "lists the accepted values: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_invalid_strictness_fails_config_load_from_disk() {
+        // The eager rejection also fires through the on-disk load path, so a
+        // committed config.toml with a bad strictness never resolves silently.
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            "[validation]\nstrictness = \"banana\"\n",
+        )
+        .unwrap();
+        let err = JitConfig::load(temp_dir.path()).unwrap_err();
+        // The load path wraps the deserialize error with context, so inspect the
+        // full chain for the offending value.
+        let chain = format!("{err:#}");
+        assert!(chain.contains("banana"), "{chain}");
+        assert!(chain.contains("strictness"), "{chain}");
     }
 
     #[test]

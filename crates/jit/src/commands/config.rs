@@ -284,6 +284,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             let _validated: ProjectName = name.parse()?;
         }
 
+        // Reject an unrecognized `[validation].strictness` eagerly, on the SAME
+        // post-mutation document, so an invalid level never persists. This mirrors
+        // the load-time `deserialize_strictness` guard: `config set
+        // validation.strictness <valid>` is the repair path for a file that
+        // already holds a bad value, while any set over a document carrying an
+        // invalid strictness is rejected. Nothing is written before this check.
+        if let Some(strictness) = doc
+            .get("validation")
+            .and_then(|validation| validation.get("strictness"))
+            .and_then(|value| value.as_str())
+        {
+            let _validated: crate::validation::Strictness = strictness.parse()?;
+        }
+
         // Persist through storage (atomic write, parent dir ensured for the
         // user-global first-write case).
         config_store::save_config_document(&config_path, &doc)?;
@@ -585,6 +599,35 @@ schema = 1
         assert_eq!(
             executor.get_config("version.schema").unwrap().value,
             serde_json::json!(1)
+        );
+    }
+
+    #[test]
+    fn test_set_config_rejects_invalid_strictness() {
+        // F1: `jit config set validation.strictness <invalid>` must be rejected
+        // eagerly, and must not overwrite a previously-valid persisted value.
+        let dir = tempfile::TempDir::new().unwrap();
+        let executor = CommandExecutor::new(crate::storage::JsonFileStorage::new(dir.path()));
+
+        // A recognized level is accepted and persisted.
+        executor
+            .set_config("validation.strictness", "strict", false)
+            .unwrap();
+        assert_eq!(
+            executor.get_config("validation.strictness").unwrap().value,
+            serde_json::json!("strict")
+        );
+
+        // An unrecognized level is rejected with a message naming the bad value.
+        let err = executor
+            .set_config("validation.strictness", "banana", false)
+            .unwrap_err();
+        assert!(err.to_string().contains("banana"), "{err}");
+
+        // The rejected set persisted nothing: the good value survives on disk.
+        assert_eq!(
+            executor.get_config("validation.strictness").unwrap().value,
+            serde_json::json!("strict")
         );
     }
 

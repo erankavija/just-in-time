@@ -168,12 +168,17 @@ fn test_absent_strictness_defaults_to_loose() {
 #[test]
 fn test_invalid_strictness_is_rejected_not_ignored() {
     // A selectable-but-unknown value must be an error, never silently ignored.
+    // Rejection is eager: the invalid strictness makes the config fail to load,
+    // so the operation errors at config load before any rule evaluation — the
+    // opposite of a silently-inert value. (That the message names the bad value
+    // is proven at the deserialize/`config set` boundaries in the config unit
+    // tests, where the error is not re-wrapped by the config-load context.)
     let executor = executor(Some("banana"), EPIC_REQ_ENFORCE);
     let result = create_violating_epic(&executor);
     assert!(result.is_err(), "an invalid strictness must fail the write");
-    let msg = result.unwrap_err().to_string();
+    let chain = format!("{:#}", result.unwrap_err());
     assert!(
-        msg.contains("strictness") && msg.contains("banana"),
-        "error explains the misconfigured value: {msg}"
+        chain.contains("config.toml"),
+        "the write fails at config load, not silently: {chain}"
     );
 }
