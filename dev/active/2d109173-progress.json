@@ -50,6 +50,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "8682e95a": 1, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
+  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "8682e95a": 2, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
   "started_at": "2026-07-11T00:00:00Z"
 }
