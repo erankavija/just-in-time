@@ -23,6 +23,9 @@ pub struct CommandSchema {
     pub types: HashMap<String, Value>,
     /// Exit code documentation
     pub exit_codes: Vec<ExitCodeDoc>,
+    /// Per-command-family exit-code mappings, including exceptions to the global
+    /// taxonomy in `exit_codes`.
+    pub command_exit_codes: Vec<CommandExitCode>,
 }
 
 /// Command definition
@@ -140,6 +143,54 @@ pub struct ExitCodeDoc {
     pub description: String,
 }
 
+/// Exit code a command family emits under a named condition.
+///
+/// The global taxonomy in [`ExitCodeDoc`] states what each code means in
+/// general; this maps the codes back to the command families and conditions
+/// that produce them. `exception` flags a row where the code's meaning here
+/// departs from the global entry — a completed run signalling findings with a
+/// non-zero code, or a pass-through of a subprocess's own code — rather than the
+/// ordinary error classification.
+///
+/// The classification rows derive from the typed-error classifier
+/// (`error_to_exit_code` in `crates/jit/src/main.rs`); the exception rows derive
+/// from the direct-exit sites in the same dispatch. A test in `main.rs` verifies
+/// the classification rows against `error_to_exit_code`, and
+/// [`CommandExitCode::code`] is verified against the global taxonomy in
+/// `schema.rs` tests, so this projection cannot silently drift from runtime
+/// behavior (@/inv/single-source-prose).
+///
+/// # Examples
+///
+/// ```
+/// use jit::schema::CommandSchema;
+///
+/// let schema = CommandSchema::generate();
+/// // `jit gate status-all` exits 4 while any required gate is unpassed — a
+/// // completed status report, so it is flagged as an exception.
+/// let row = schema
+///     .command_exit_codes
+///     .iter()
+///     .find(|c| c.command == "gate status-all" && c.code == 4)
+///     .expect("gate status-all exit-4 row");
+/// assert!(row.exception);
+/// ```
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommandExitCode {
+    /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
+    /// every command.
+    pub command: String,
+    /// Exit code emitted. Always a member of the global taxonomy in
+    /// [`CommandSchema::exit_codes`].
+    pub code: i32,
+    /// Condition that produces the code.
+    pub condition: String,
+    /// True when the code's meaning here departs from the global taxonomy entry
+    /// for `code`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub exception: bool,
+}
+
 impl CommandSchema {
     /// Generate schema automatically from clap definitions
     pub fn generate() -> Self {
@@ -180,6 +231,7 @@ impl CommandSchema {
             commands,
             types: Self::generate_types(),
             exit_codes: Self::generate_exit_codes(),
+            command_exit_codes: Self::generate_command_exit_codes(),
         }
     }
 
@@ -643,6 +695,259 @@ impl CommandSchema {
             },
         ]
     }
+
+    /// Project the per-command-family exit-code mappings.
+    ///
+    /// The rows are grouped as: universal codes every command can emit, codes
+    /// specific to a command family, and exceptions — codes a completed run
+    /// emits to signal findings, or codes whose meaning departs from the global
+    /// taxonomy. Classification rows mirror the typed-error classifier
+    /// (`error_to_exit_code`, `crates/jit/src/main.rs`); exception rows mirror
+    /// the direct process-exit sites in the same dispatch. Both are verified by
+    /// test rather than hand-copied (@/inv/single-source-prose).
+    fn generate_command_exit_codes() -> Vec<CommandExitCode> {
+        let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
+            command: command.to_string(),
+            code,
+            condition: condition.to_string(),
+            exception,
+        };
+        vec![
+            // Universal: any command reaches these through the shared classifier.
+            row("*", 0, "Command completed successfully.", false),
+            row(
+                "*",
+                1,
+                "No typed classifier matched the failure (generic error).",
+                false,
+            ),
+            row(
+                "*",
+                2,
+                "Invalid arguments or usage error, including an unresolvable, \
+                 ambiguous, or too-short id prefix.",
+                false,
+            ),
+            row(
+                "*",
+                3,
+                "A referenced issue, gate, gate-run, preset, lease, repository, \
+                 or file path was not found.",
+                false,
+            ),
+            row("*", 5, "A filesystem operation was denied.", false),
+            row(
+                "*",
+                10,
+                "The repository's on-disk format is newer than this binary, or a \
+                 filesystem/subprocess I/O operation failed.",
+                false,
+            ),
+            // Command-family classification (standard taxonomy meaning).
+            row(
+                "dep add",
+                4,
+                "The edge would create a cycle, or a redundant \
+                 (transitively-implied) edge was rejected.",
+                false,
+            ),
+            row(
+                "issue update, issue claim, issue claim-next",
+                4,
+                "A state transition is blocked by unmet dependencies or unpassed \
+                 gates.",
+                false,
+            ),
+            row(
+                "gate define",
+                6,
+                "The gate key is already registered.",
+                false,
+            ),
+            row(
+                "issue batch-create",
+                2,
+                "The batch file failed pre-validation; no issues were created.",
+                false,
+            ),
+            row(
+                "issue batch-create",
+                10,
+                "A write failed after some issues were already created.",
+                false,
+            ),
+            row(
+                "apply",
+                4,
+                "The template's internal depends-on edges form a cycle.",
+                false,
+            ),
+            row(
+                "doc archive",
+                3,
+                "The source document to archive does not exist.",
+                false,
+            ),
+            row(
+                "doc archive",
+                6,
+                "The archive destination path is already occupied.",
+                false,
+            ),
+            row(
+                "claim",
+                10,
+                "A lease subcommand was run outside a git repository (leases \
+                 require git for worktree identity).",
+                false,
+            ),
+            // Gate evaluation: the code carries the checker's verdict.
+            row(
+                "gate evaluate, gate evaluate-all",
+                4,
+                "A checker ran and its verdict was fail.",
+                true,
+            ),
+            row(
+                "gate evaluate, gate evaluate-all",
+                10,
+                "A checker could not run to a verdict (timeout, crash, or \
+                 command not found).",
+                true,
+            ),
+            // Findings signalled by a completed run via a non-zero exit code.
+            row(
+                "validate",
+                4,
+                "Repository-integrity, scope, or drift validation found \
+                 error-severity findings.",
+                true,
+            ),
+            row(
+                "validate",
+                1,
+                "Rule evaluation reported error-severity findings.",
+                true,
+            ),
+            row(
+                "gate status-all",
+                4,
+                "One or more required gates have not passed.",
+                true,
+            ),
+            row(
+                "invariant check",
+                4,
+                "Enforcement drift was found (declared enforcement not backed by \
+                 an enforcing rule).",
+                true,
+            ),
+            row(
+                "config validate",
+                1,
+                "The configuration has error-severity problems.",
+                true,
+            ),
+            row(
+                "config validate",
+                2,
+                "The configuration is valid but has warnings; here 2 means \
+                 warnings, not a usage error.",
+                true,
+            ),
+            row(
+                "doc validate, doc check-links",
+                1,
+                "Document validation found errors.",
+                true,
+            ),
+            row(
+                "doc validate, doc check-links",
+                2,
+                "Document validation found only warnings; here 2 means warnings, \
+                 not a usage error.",
+                true,
+            ),
+            row(
+                "gate preset apply",
+                1,
+                "One or more issues failed to apply the preset (partial batch).",
+                true,
+            ),
+            // Pass-through of a spawned process's own code.
+            row(
+                "serve",
+                10,
+                "The bundled dev-server child exited non-zero; the child's own \
+                 exit code is passed through.",
+                true,
+            ),
+        ]
+    }
+}
+
+/// Render the exit-code reference page (`docs/reference/exit-codes.md`).
+///
+/// The page projects the global taxonomy ([`CommandSchema::exit_codes`]) and the
+/// per-command mappings ([`CommandSchema::command_exit_codes`]) into markdown, so
+/// the committed doc is generated rather than hand-copied. A test asserts the
+/// committed file equals this output (@/inv/single-source-prose).
+///
+/// # Examples
+///
+/// ```
+/// let page = jit::schema::render_exit_code_reference();
+/// assert!(page.starts_with("# Exit Codes"));
+/// assert!(page.contains("| Command | Code | Condition | Exception |"));
+/// ```
+pub fn render_exit_code_reference() -> String {
+    let mut out = String::new();
+    out.push_str("# Exit Codes\n\n");
+    out.push_str(
+        "<!-- GENERATED by `jit::schema::render_exit_code_reference` \
+         (`crates/jit/src/schema.rs`). Do not edit by hand; regenerate instead. -->\n\n",
+    );
+    out.push_str(
+        "`jit` returns a small, stable set of process exit codes so scripts and \
+         agents can branch on outcomes without parsing output. This page is \
+         projected from the exit-code taxonomy and the command classifier \
+         (`error_to_exit_code` in `crates/jit/src/main.rs`).\n\n",
+    );
+
+    out.push_str("## Global taxonomy\n\n");
+    out.push_str("| Code | Meaning |\n|------|---------|\n");
+    for doc in CommandSchema::generate_exit_codes() {
+        out.push_str(&format!("| `{}` | {} |\n", doc.code, doc.description));
+    }
+    out.push('\n');
+
+    out.push_str("## Command-specific mappings\n\n");
+    out.push_str(
+        "Most commands draw only from the global taxonomy above. The rows below \
+         identify the codes a specific command family emits. An **exception** is \
+         a code a completed run emits to signal findings, or a code whose meaning \
+         departs from the global entry (for example, `2` meaning \"valid with \
+         warnings\" for the validation commands). `*` marks a code every command \
+         can reach through the shared classifier.\n\n",
+    );
+    out.push_str("| Command | Code | Condition | Exception |\n");
+    out.push_str("|---------|------|-----------|-----------|\n");
+    for entry in CommandSchema::generate_command_exit_codes() {
+        out.push_str(&format!(
+            "| `{}` | `{}` | {} | {} |\n",
+            entry.command,
+            entry.code,
+            entry.condition,
+            if entry.exception { "yes" } else { "" }
+        ));
+    }
+    out.push('\n');
+
+    out.push_str(
+        "For the full `jit gate evaluate` verdict taxonomy and the `--json` \
+         `verdict` field, see [the gate command reference](cli-commands.md).\n",
+    );
+    out
 }
 
 #[cfg(test)]
@@ -959,6 +1264,67 @@ mod tests {
         assert!(
             props.get("dependencies").is_none(),
             "schema must not contain 'dependencies' property (that belongs to the removed GraphDepsResponse)"
+        );
+    }
+
+    #[test]
+    fn test_command_exit_codes_present_in_schema() {
+        let schema = CommandSchema::generate();
+        assert!(
+            !schema.command_exit_codes.is_empty(),
+            "command_exit_codes projection must be populated"
+        );
+        // A few representative families must surface so the projection stays
+        // discoverable.
+        for command in ["*", "gate evaluate, gate evaluate-all", "validate"] {
+            assert!(
+                schema
+                    .command_exit_codes
+                    .iter()
+                    .any(|c| c.command == command),
+                "command_exit_codes must document `{command}`"
+            );
+        }
+    }
+
+    #[test]
+    fn test_command_exit_codes_within_global_taxonomy() {
+        // Every projected code must be a defined member of the global taxonomy,
+        // so the per-command surface can never introduce a code the taxonomy
+        // does not explain.
+        let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
+            .iter()
+            .map(|d| d.code)
+            .collect();
+        for entry in CommandSchema::generate_command_exit_codes() {
+            assert!(
+                taxonomy.contains(&entry.code),
+                "command `{}` documents code {}, which is absent from the global taxonomy",
+                entry.command,
+                entry.code
+            );
+        }
+    }
+
+    /// The committed reference page is a projection: it must equal the rendered
+    /// output exactly. Regenerate with `UPDATE_EXIT_CODE_DOC=1` when the
+    /// projection changes.
+    #[test]
+    fn test_exit_code_reference_doc_is_current() {
+        let rendered = render_exit_code_reference();
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/reference/exit-codes.md"
+        );
+        if std::env::var_os("UPDATE_EXIT_CODE_DOC").is_some() {
+            std::fs::write(path, &rendered).expect("write exit-codes.md");
+            return;
+        }
+        let committed = std::fs::read_to_string(path).expect("read docs/reference/exit-codes.md");
+        assert_eq!(
+            committed, rendered,
+            "docs/reference/exit-codes.md is stale; regenerate with \
+             UPDATE_EXIT_CODE_DOC=1 cargo test test_exit_code_reference_doc_is_current"
         );
     }
 }

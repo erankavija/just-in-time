@@ -1364,21 +1364,14 @@ jit gate evaluate abc123 --gate tests --force
 - On a normal run (manual attestation, or a freshly executed checker), `--json`
   reports `already_passed: false`.
 
-**Exit-code taxonomy** (auto and manual gates):
-
-| Code | Meaning |
-|------|---------|
-| `0`  | pass — checker passed, or manual attestation recorded |
-| `2`  | bad arguments — the gate is not required for this issue |
-| `3`  | issue not found |
-| `4`  | checker failure — the checker ran and the verdict was `fail` |
-| `10` | runner error — timeout, command-not-found, or crash (infrastructure failure) |
-
-The codes `4` and `10` are split by the carried checker status: a clean non-zero
-verdict (e.g. tests failed) is `4`; a checker that could not produce a verdict
-(killed by timeout/signal, no exit code) is `10`. Pre-verdict argument (`2`) and
-lookup (`3`) errors are classified before the run path and are never reported as
-a runner error.
+**Exit-code taxonomy** (auto and manual gates): the
+[exit-code reference](exit-codes.md#command-specific-mappings) is the authority
+for every code `jit gate evaluate` returns. The command-specific split it
+records: a checker that ran and returned verdict `fail` exits `4`; a checker that
+could not produce a verdict (timeout, command-not-found, or crash) exits `10`.
+Pre-verdict argument errors (e.g. the gate is not required for the issue) and
+lookup errors (issue not found) are classified before the run path and are never
+reported as a runner error.
 
 **`--json` verdict field:**
 
@@ -1536,16 +1529,11 @@ jit graph export --format json --full | jq '.nodes[] | select(.gates_status.test
 
 ### Exit Codes
 
-All gate commands use standard exit codes:
-
-- `0` - Success
-- `2` - Invalid argument (e.g. gate not required for the issue, duplicate gate)
-- `3` - Resource not found (issue or gate)
-- `4` - Validation/checker failure (e.g. `jit gate evaluate` checker verdict `fail`)
-- `10` - Runner/external error (e.g. `jit gate evaluate` checker timeout or crash)
-
-See [`jit gate evaluate`](#jit-gate-evaluate) above for the full pass-specific taxonomy
-and the `--json` `verdict` field.
+Gate commands follow the standard [exit-code reference](exit-codes.md); its
+[command-specific mappings](exit-codes.md#command-specific-mappings) list the
+`jit gate evaluate` and `jit gate status-all` rows, including the checker-verdict
+exceptions. See [`jit gate evaluate`](#jit-gate-evaluate) above for the
+pass-specific `verdict` field.
 
 ## Gate Preset Commands
 

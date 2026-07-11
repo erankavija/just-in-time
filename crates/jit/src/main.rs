@@ -7178,3 +7178,102 @@ fn run() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod exit_code_projection_tests {
+    //! REQ-02: verify the projected command exit-code mappings against the
+    //! runtime classifier they document. Each representative typed error is run
+    //! through [`error_to_exit_code`] (the exact classifier the CLI dispatch
+    //! uses) and the resulting code is confirmed to (a) equal the expected code
+    //! and (b) be a code the schema's `command_exit_codes` projection documents.
+    //! If the classifier ever reclassifies one of these conditions, or the
+    //! projection stops documenting a code the classifier still emits, this test
+    //! fails — so the projection cannot silently drift from runtime behavior.
+
+    use super::error_to_exit_code;
+    use jit::schema::CommandSchema;
+
+    /// Representative typed errors paired with the exit code the classifier must
+    /// produce for them. Only errors constructible through the public library API
+    /// appear here; the crate-private conditions (blocked transitions, checker
+    /// failures, batch writes) are pinned end-to-end by the subprocess tests in
+    /// `tests/exit_code_tests.rs`.
+    fn classifier_cases() -> Vec<(anyhow::Error, i32)> {
+        use std::io::{Error as IoError, ErrorKind};
+        vec![
+            (jit::errors::InvalidArgumentError::new("bad arg").into(), 2),
+            (
+                jit::storage::AmbiguousIdError::issue(
+                    "aaaa",
+                    ["aaaa1111".to_string(), "aaaa2222".to_string()],
+                )
+                .into(),
+                2,
+            ),
+            (jit::storage::InvalidIdPrefixError::new("ab").into(), 2),
+            (
+                jit::commands::GateNotRequiredError {
+                    issue_id: "abc123".to_string(),
+                    gate_key: "tests".to_string(),
+                }
+                .into(),
+                2,
+            ),
+            (jit::storage::IssueNotFoundError::new("abc123").into(), 3),
+            (IoError::new(ErrorKind::NotFound, "missing").into(), 3),
+            (jit::errors::ValidationFailedError::new("bad").into(), 4),
+            (jit::GraphError::CycleDetected.into(), 4),
+            (
+                jit::errors::RedundantDependencyError::new(
+                    ("aaaa1111".to_string(), "bbbb2222".to_string()),
+                    vec![("aaaa1111".to_string(), "cccc3333".to_string())],
+                )
+                .into(),
+                4,
+            ),
+            (
+                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
+                5,
+            ),
+            (jit::storage::GateAlreadyExistsError::new("tests").into(), 6),
+            (jit::errors::AlreadyExistsError::new("occupied").into(), 6),
+            (
+                jit::errors::ClaimRequiresGitError::new(
+                    jit::errors::GitRequirementGap::NoRepository,
+                )
+                .into(),
+                10,
+            ),
+            (
+                jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                10,
+            ),
+        ]
+    }
+
+    #[test]
+    fn classifier_produces_expected_codes() {
+        for (error, expected) in classifier_cases() {
+            assert_eq!(
+                error_to_exit_code(&error).code(),
+                expected,
+                "classifier produced the wrong code for `{error}`"
+            );
+        }
+    }
+
+    #[test]
+    fn projection_documents_every_classified_code() {
+        let schema = CommandSchema::generate();
+        let documented: std::collections::HashSet<i32> =
+            schema.command_exit_codes.iter().map(|c| c.code).collect();
+        for (error, _expected) in classifier_cases() {
+            let actual = error_to_exit_code(&error).code();
+            assert!(
+                documented.contains(&actual),
+                "classifier emits code {actual} (for `{error}`) but the \
+                 command_exit_codes projection documents no row for it"
+            );
+        }
+    }
+}
