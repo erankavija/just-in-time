@@ -221,7 +221,8 @@ When `jit validate` reports an unregistered namespace, the `namespace-registry` 
 
 ### Type Labels
 
-**CRITICAL: Every issue carries exactly ONE `type:*` label.**
+The configured `type` namespace permits **at most one** `type:*` label per
+issue. A type label is not universally required.
 
 The `type:*` namespace defines the kind of work an issue represents. The set of
 valid type values is not built in: it is whatever `[type_hierarchy].types`
@@ -239,7 +240,8 @@ jit issue update <id> --type story
 ```
 
 `jit issue create` without `--type` (and without a `type:*` label) applies
-`[validation].default_type`.
+`[validation].default_type` only when that project configures it. A project can
+also add a rule that requires a type; neither behavior is universal.
 
 **Note on "research" vs "spike":** both name a time-boxed investigation
 ("spike" is the Agile term used in Jira, Rally, and similar tools). Pick one as
@@ -671,14 +673,17 @@ release = "milestone" # Map release type to milestone namespace
 
 ### The Golden Rules
 
-**Rule 1: Every Issue Carries Exactly One Type**
+**Rule 1: Keep Type Labels Singular**
 ```bash
 # Explicit — validated against [type_hierarchy].types
 jit issue create --title "Login API" --type task --label "epic:auth"
 
-# Implicit — [validation].default_type is applied
+# Implicit only when this project configures [validation].default_type
 jit issue create --title "Login API" --label "epic:auth"
 ```
+
+The type namespace prevents more than one `type:*` value. A project rule or
+configured default can require or supply one when that is part of its workflow.
 
 **Rule 2: Type vs Membership Labels**
 

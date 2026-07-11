@@ -7,7 +7,10 @@ This document explains what JIT guarantees about data integrity, consistency, an
 
 ## Invariants
 
-JIT maintains four core invariants that are enforced at all times. Three of them are also registered project invariants, cited below by their address (`@/invariant/<id>`); run `jit item show <address>` for the registry's canonical statement. The invariant registry (`.jit/invariants.toml`) also renders into the invariant region of the project `AGENTS.md` via `jit invariant render`.
+JIT's project invariants are cited below by their address (`@/invariant/<id>`);
+run `jit item show <address>` for the registry's canonical statement. The
+invariant registry (`.jit/invariants.toml`) renders into the invariant region of
+the project `AGENTS.md` via `jit invariant render`.
 
 ### DAG Property
 
@@ -56,36 +59,32 @@ JIT keeps the dependency graph transitively reduced. When `A→B→C` already ho
 
 ### Atomic Operations
 
-**Guarantee:** All file writes are atomic - either the entire write succeeds or nothing changes. (`@/invariant/atomic-writes`)
+**Guarantee:** Replacement writes are published atomically through the storage
+layer's temp-file-and-rename path. (`@/invariant/atomic-writes`)
 
-JIT uses the write-temp-rename pattern for all file operations. This leverages the POSIX guarantee that `rename()` is atomic at the filesystem level.
+The storage layer writes a unique temporary file in the target's directory and
+renames it onto the target. Keeping both paths in one directory makes the rename
+a same-filesystem operation, so readers do not observe a partially written
+replacement (`crates/jit/src/storage/atomic_write.rs`).
 
 **How it works:**
 
-```rust
-// From crates/jit/src/storage/json.rs
-fn write_json<T>(path: &Path, data: &T) -> Result<()> {
-    let json = serialize(data)?;
-    
-    // Write to temporary file
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, json)?;
-    
-    // Atomic rename (POSIX guarantee)
-    fs::rename(&temp_path, path)?;
-    
-    Ok(())
-}
-```
+The atomic-write primitive gives each temporary file a process-and-call-specific
+name, avoiding collisions between writers before rename. It is an atomic file
+replacement mechanism, not a multi-file transaction.
+
+`events.jsonl` follows a different persistence path: JIT opens it in append mode
+and serializes each append with the repository write lock and `.events.lock`
+(`crates/jit/src/storage/json.rs`). It is a locked append, not a replacement-file
+rename.
 
 **Multi-agent safety:**
 
-File locking prevents race conditions during concurrent updates:
-
-- **Index updates:** Exclusive lock on `.index.lock`
-- **Issue updates:** Per-issue lock on `issues/{id}.lock`
-- **Claim operations:** Exclusive lock on `locks/claims.lock` (under `.git/jit/`)
-- **Event log:** Exclusive lock on `.events.lock`
+JIT also uses advisory file locks to coordinate operations that share mutable
+state. The locks are released with their guards and work only among cooperating
+processes; they complement, rather than extend, an atomic rename into a global
+transaction. Advisory work-lease coordination uses `.git/jit/locks/claims.lock`
+(`crates/jit/src/storage/lock.rs`).
 
 **Example - Two agents claiming simultaneously:**
 
@@ -110,34 +109,25 @@ sequenceDiagram
 
 **Benefits:**
 
-- **No partial writes:** Crashes never leave corrupted JSON files
-- **No lost updates:** File locks serialize concurrent modifications
-- **Crash safety:** Temp files cleaned up automatically on next operation
+- **No partial replacement:** Readers do not observe a partially written target file.
+- **Coordinated operations:** Cooperating JIT processes use advisory locks where shared access must be serialized.
 
 ### Event Logging
 
-**Guarantee:** All state changes are logged to `.jit/events.jsonl` as an append-only audit trail. (`@/invariant/event-log`)
+**Guarantee:** Every issue state change appends an event to `.jit/events.jsonl`.
+(`@/invariant/event-log`)
 
-Every operation that modifies issue state, dependencies, or gates emits an event. The event log provides complete observability over how the repository reached its current state.
+This guarantee is about lifecycle state changes. Other operations may emit their
+own event variants, but the event log is not a promise that every repository
+mutation is recorded or that it reconstructs complete repository history.
 
 **Event types:**
 
-Each event is internally tagged by a snake_case `type` field. The core event
-types (full set in `crates/jit/src/domain/types.rs`):
-
-```
-issue_created         - New issue created
-issue_claimed         - Agent claimed an issue
-issue_released        - Assignment cleared from an assignee
-issue_state_changed   - Lifecycle state transitioned (from → to)
-issue_updated         - Labels, priority, assignee, or other fields changed
-issue_completed       - Issue reached the Done state
-gate_added            - Quality gate attached to an issue
-gate_removed          - Quality gate detached from an issue
-gate_passed           - Quality gate marked passed
-gate_failed           - Quality gate marked failed
-dependency_reduced    - Redundant dependencies removed by transitive reduction
-```
+Each event is tagged by a snake-case `type` field. The authoritative and
+evolving set of event variants is the `Event` enum in
+`crates/jit/src/domain/types.rs`, including the `issue_state_changed` variant
+used for lifecycle transitions. Consult that enum rather than relying on a
+hand-maintained list in prose.
 
 **Log format:**
 
@@ -151,16 +141,15 @@ Events are stored as newline-delimited JSON (JSONL):
 
 **Properties:**
 
-- **Append-only:** Events are never modified or deleted
-- **Ordered:** Timestamp establishes causal ordering
-- **Complete:** Every mutation is logged
-- **Durable:** Atomic append with file locking
+- **Append-only:** Events are appended to the log.
+- **State-transition evidence:** The state-change invariant is recorded as
+  `issue_state_changed` events.
 
 **Benefits:**
 
-- **Observability:** Debug workflows by examining event history
-- **Audit trail:** Compliance requirements satisfied
-- **Reconstruction:** Derived state is rebuilt from the log (`jit migrate lifecycle-timestamps` backfills lifecycle timestamps from it)
+- **Observability:** Inspect recorded lifecycle transitions for an issue.
+- **Lifecycle timestamps:** `jit migrate lifecycle-timestamps` can backfill
+  selected timestamps from recorded `issue_state_changed` events.
 
 **Query examples:**
 
@@ -189,6 +178,7 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 ✅ Dependency management  
 ✅ Quality gates (automated and manual)  
 ✅ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`)  
+✅ `jit doc archive` (subject to the repository's documentation configuration and archive checks)<br>
 ✅ Event logging and queries  
 ✅ Status and visualization  
 
@@ -196,7 +186,6 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 
 ❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`ClaimRequiresGitError`, exit code 10)  
 ❌ `jit doc show --at <commit>` - View document at specific git revision  
-❌ `jit doc archive` - Track document history across moves  
 ❌ `jit snapshot export --at <tag>` - Export from specific git revision  
 ❌ Document asset validation from git history  
 
@@ -205,6 +194,9 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 When git is unavailable:
 
 - **Document operations:** Fall back to working tree only
+- **Filesystem-backed documents:** `jit doc add`, `jit doc list`, `jit doc archive`,
+  and `jit doc show` without a commit reference remain available; history, diff,
+  and commit-specific reads require git
 - **Snapshot export:** Export from current working tree
 - **History commands:** Return error with helpful message
 - **Advisory leases:** Fail outright with `ClaimRequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative
@@ -271,15 +263,16 @@ jit issue show abc123
 # ✓ Shows in_progress immediately
 ```
 
-**2. Atomic operations**
+**2. Scoped atomic operations**
 
-Individual operations are isolated and atomic:
+Replacement-file writes, locked event appends, and lease acquisition each have
+their own scope; none makes unrelated repository updates one transaction:
 
 ```bash
-# Agent 1 claims atomically
+# Agent 1 acquires an advisory lease atomically (in a Git worktree).
 jit claim acquire abc123
 # Agent 2's simultaneous claim will either succeed or fail cleanly
-# No partial state, no corruption
+# The lease operation does not make ordinary issue claims atomic.
 ```
 
 **3. Eventually consistent across processes**
@@ -310,7 +303,7 @@ Understanding limitations prevents incorrect assumptions:
 ❌ **Snapshot isolation**  
 - Long-running operations may see intermediate state
 - Use claims to establish boundaries
-- Event log provides ordering guarantees
+- The event log records state-transition events; it is not a cross-operation ordering guarantee
 
 ❌ **Automatic conflict resolution**  
 - First-writer-wins for non-conflicting fields
@@ -322,7 +315,7 @@ Understanding limitations prevents incorrect assumptions:
 **✓ Safe patterns:**
 
 ```bash
-# Claim-based coordination (atomic, works without git)
+# Issue assignment works without git, but it is not atomic coordination.
 jit issue claim <issue> agent:worker-1
 # Work on issue
 jit issue update <issue> --state done
@@ -362,10 +355,10 @@ worktree of the repository.
 
 ```
 .jit/
-├── issues/{id}.json          # Issue data (per-file locks)
-├── index.json                # Issue index (exclusive lock)
-├── gates.toml                # Gate registry (exclusive lock)
-└── events.jsonl              # Event log (append-only, locked)
+├── issues/{id}.json          # Issue data
+├── index.json                # Issue index
+├── gates.toml                # Gate registry
+└── events.jsonl              # Append-only event log
 
 .git/jit/
 ├── claims.jsonl              # Claim log (append-only)
@@ -376,10 +369,10 @@ worktree of the repository.
 
 **Synchronization points:**
 
-1. **File locks** - Serialize updates to shared state
+1. **Advisory file locks** - Coordinate operations that acquire the same lock
 2. **Atomic renames** - Publish updates atomically
 3. **Claims** - Establish exclusive access boundaries
-4. **Event log** - Establish causal ordering
+4. **Event log** - Record state-transition events
 
 ## Failure Modes
 
@@ -391,17 +384,15 @@ JIT is designed to handle failures gracefully without data loss or corruption.
 
 **Recovery:**
 
-Atomic operations (write-temp-rename) prevent partial writes:
+Atomic replacement writes use a same-directory temporary file and rename:
 
 ```bash
-# During write crash:
-.jit/issues/abc123.json.tmp  # Incomplete temp file
-.jit/issues/abc123.json      # Previous version intact
+# During an interrupted replacement:
+.jit/issues/.abc123.json.<pid>.<sequence>.tmp  # Incomplete temporary file
+.jit/issues/abc123.json                        # Previous version intact
 
-# On the next operation:
-# Read operations only consider .json files, so the previous version is served
-# and the orphaned .tmp is never read. The recovery pass that runs during
-# jit claim operations sweeps orphaned .tmp files older than one hour.
+# Run recovery to clean provably stale temporary files and locks.
+jit recover
 ```
 
 **Result:** No corruption, no data loss, previous state preserved.
@@ -469,14 +460,21 @@ jit claim list
 Lease: lease-001
   Issue: abc123
   Agent: agent:worker-1
-  Expires: 2026-02-02T19:00:00Z (10 minutes ago) ⚠️ STALE
+  Expires: <timestamp in the past> ⚠️ STALE
 ```
 
 **Recovery:**
 
 ```bash
-# Automatic recovery - expired leases are ignored
-jit query available  # Shows issue as available
+# An expired lease is evicted during a later lease acquisition, so another agent
+# can acquire a new lease. The issue assignee is stored separately: a Ready issue
+# with any assignee is still excluded from `jit query available`.
+jit claim acquire abc123 --agent-id agent:worker-2
+
+# Clear the current assignee before looking for unassigned ready work.
+jit issue release abc123 "return to the available pool"
+# Or: jit issue unassign abc123
+jit query available
 
 # Manual eviction if needed
 jit claim force-evict lease-001 --reason "agent crashed"
@@ -552,8 +550,11 @@ JIT is designed with isolation and fault tolerance:
 **✓ Isolated failures:**
 
 - Corrupted issue → Only that issue affected, others work normally (`list_issues` skips an unreadable file)
-- Missing git → Core features still work, document features disabled
-- Stale lease → Automatically expired, issue becomes available
+- Missing git → Core issue operations and filesystem-backed document operations
+  still work; leases, document history/diff, and commit-specific document reads
+  are unavailable
+- Stale lease → A later lease acquisition can evict it, but the issue remains
+  assigned until `jit issue release` or `jit issue unassign` clears its assignee
 - Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which append rather than re-read the log, keep working
 
 **✓ No cascading failures:**

@@ -183,32 +183,31 @@ TASK=$(jit issue create \
 **Step 3: Follow TDD workflow**
 
 ```bash
-# 1. Claim the issue
-jit issue claim $TASK agent:developer-1
-
-# 2. Write tests FIRST (precheck reminder)
-# ... write failing tests ...
+# 1. Satisfy the precheck before claiming (claim runs prechecks on Ready → InProgress)
 jit gate evaluate $TASK tdd-reminder --by agent:developer-1
 
-# 3. Implement code to make tests pass
-# ... write implementation ...
+# 2. Claim the issue after the precheck passes
+jit issue claim $TASK agent:developer-1
+
+# 3. Write tests first, then implement code to make them pass
+# ... write failing tests and implementation ...
 
 # 4. Run tests (manual verification before marking done)
 cargo test --lib
 # If pass, continue. If fail, fix and repeat.
 
-# 5. Mark as done - triggers automated postchecks
-jit issue update $TASK --state done
+# 5. Evaluate required automated gates
+jit gate evaluate $TASK tests
+jit gate evaluate $TASK fmt
+jit gate evaluate $TASK clippy
 
-# Gates auto-run:
-# - tests: cargo test --lib
-# - fmt: cargo fmt -- --check
-# - clippy: cargo clippy -- -D warnings
-
-# 6. Manual code review
+# 6. Record manual code review
 jit gate evaluate $TASK code-review --by agent:reviewer
 
-# Check final status
+# 7. Inspect gate status, then request completion explicitly
+jit gate status-all $TASK
+jit issue update $TASK --state done
+# Check final state
 jit issue show $TASK
 ```
 
@@ -243,8 +242,8 @@ jit issue create \
 # 2. Pass tdd-reminder gate
 # 3. Implement minimum code to pass
 # 4. Refactor if needed
-# 5. Mark done (auto-runs tests, clippy, fmt)
-# 6. Get code review, pass code-review gate
+# 5. Evaluate tests, clippy, and fmt; then inspect their statuses
+# 6. Record code review and request completion explicitly
 ```
 
 ### Reusable Gate Templates
@@ -450,7 +449,8 @@ jit issue update $BUG_ID --state in_progress
 # After fix, pass regression gate
 jit gate evaluate $BUG_ID regression-test --by agent:frontend-dev
 
-# Mark done (auto-runs tests)
+# Evaluate the regression gate, inspect status, then request completion
+jit gate status-all $BUG_ID
 jit issue update $BUG_ID --state done
 ```
 

@@ -7,7 +7,11 @@ Complete CLI reference for `jit claim` subcommands used in lease-based claim coo
 
 ## Overview
 
-The `jit claim` command family manages exclusive leases on issues for parallel work coordination. Leases prevent conflicting edits when multiple agents work simultaneously.
+The `jit claim` command family manages exclusive advisory leases on issues for
+parallel work coordination. Lease acquisition is serialized by the claims
+coordinator, but a lease does not itself prevent writes: whether selected write
+commands require one is controlled by `[worktree].enforce_leases` (and `off`
+does not block writes).
 
 ```bash
 jit claim <COMMAND> [OPTIONS]
@@ -34,7 +38,16 @@ jit claim acquire [OPTIONS] <ISSUE_ID>
 
 ### Description
 
-Acquires an exclusive lease to work on an issue. Only one agent can hold a lease on an issue at a time, preventing conflicting edits. The lease automatically expires after the TTL unless renewed.
+Acquires an exclusive advisory lease to work on an issue. Only one agent can
+hold that lease at a time; a finite lease expires unless renewed. On success,
+the command also records the resolved agent as the issue assignee, but it does
+not change the issue lifecycle state.
+
+To begin lifecycle work on a ready issue, run `jit issue claim <issue-id>
+<same-agent>` after acquisition. That same-assignee command runs prechecks and
+promotes `ready` to `in_progress`; it is not a second lease acquisition. Ordinary
+`jit issue claim` is assignee bookkeeping and lifecycle promotion, not atomic
+multi-agent coordination.
 
 ### Arguments
 
@@ -66,6 +79,29 @@ jit claim acquire abc123 --ttl 0 --reason "Manual review required"
 # JSON output for scripting
 jit claim acquire abc123 --json
 ```
+
+### Expiry, assignment, and availability
+
+When a later `jit claim acquire` finds an expired finite lease, the coordinator
+evicts it before deciding whether a new lease can be acquired. Lease expiry does
+not clear the issue's assignee, however. `jit query available` selects only
+ready, unassigned issues, so release or unassign the issue separately before
+expecting it in that query:
+
+```bash
+jit claim acquire abc123 --agent-id agent:worker-2
+jit issue release abc123 "return to the available pool"
+# Or: jit issue unassign abc123
+jit query available
+```
+
+### Git requirement
+
+Lease commands need a Git repository with a resolvable `HEAD` for worktree
+identity and branch tracking. This does not disable filesystem-backed document
+operations: `jit doc add`, `jit doc list`, `jit doc archive`, and working-tree
+document reads work without Git. Document history, diffs, and commit-specific
+reads require Git.
 
 ### Exit Codes
 
@@ -107,7 +143,9 @@ jit claim release [OPTIONS] <ISSUE_ID>
 ### Description
 
 Resolves the issue's active lease and releases it **without** requiring the lease
-UUID, making the issue immediately available for other agents to claim.
+UUID, making that lease immediately acquirable by another agent. It does not
+clear the issue assignee; use `jit issue release` or `jit issue unassign` when
+the issue should again qualify as unassigned work.
 
 Release succeeds **regardless of which agent owns the lease** (it reuses the
 force-evict path). The release requires an acting identity: it is resolved from

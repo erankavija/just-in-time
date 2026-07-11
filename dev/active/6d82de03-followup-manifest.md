@@ -4,16 +4,17 @@
 
 This manifest is the deliverable for `6d82de03`. It records future, separately
 owned work only: it makes no engine, product, configuration, documentation, or
-projection change itself. The filing lead should create each listed leaf issue
-with its stated labels and wire **each new issue to depend on `6d82de03`**.
-That keeps the filing operation downstream of the audit without making the
-current epic wait for the subsequently owned work.
+projection change itself. Each listed leaf issue depends on `6d82de03` and is a
+direct dependency of the separately owned `004d10b7` follow-up epic. That epic
+is a direct dependency of the v1.0 milestone (`9db27a3a`). This keeps the filing
+operation downstream of the audit without making the completed audit epic wait
+for the subsequently owned work.
 
 The type hierarchy in `.jit/config.toml:24-37` permits `task` and `bug` at
 level 4; its namespaces include `type`, `epic`, `milestone`, and `component`.
 Every proposed issue below therefore carries the required labels
-`epic:docs-exhaustive-audit` and `milestone:v1.0`, along with one `type:*` and
-one source-supported `component:*` label.
+`epic:documentation-contract-followups` and `milestone:v1.0`, along with one
+`type:*` and one source-supported `component:*` label.
 
 ## Summary
 
@@ -36,7 +37,7 @@ and has no proposed issue.
 ## 1. Complete the generated CLI schema contract
 
 - **Recommended filing:** `type:bug`, priority `high`
-- **Labels:** `type:bug`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:cli`
+- **Labels:** `type:bug`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:cli`
 - **Verified source citations:**
   - `crates/jit/src/schema.rs:103-141` builds the generated schema, while
     `:459-469` hard-codes a six-value `State` list without `rejected`.
@@ -81,7 +82,7 @@ Source: `crates/jit/src/schema.rs:103-141,235-249,286-315,459-469`;
 ## 2. Correct `jit issue create --description` help text
 
 - **Recommended filing:** `type:bug`, priority `normal`
-- **Labels:** `type:bug`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:cli`
+- **Labels:** `type:bug`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:cli`
 - **Verified source citations:** `crates/jit/src/cli.rs:612-669` defines
   `IssueCommands::Create`; unlike the neighboring title, type, gate, label,
   and content-format arguments, its `description` argument at `:640-641` has
@@ -114,7 +115,7 @@ Source: `crates/jit/src/cli.rs:612-669`.
 ## 3. Project command-specific exit-code mappings
 
 - **Recommended filing:** `type:task`, priority `normal`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:cli`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:cli`
 - **Verified source citations:** `crates/jit/src/schema.rs:520-556` supplies
   only a global exit-code taxonomy. `crates/jit/src/main.rs:33-247` maps typed
   failures to codes at runtime, and command dispatch uses direct
@@ -156,7 +157,7 @@ Source: `crates/jit/src/schema.rs:520-556`; `crates/jit/src/main.rs:33-247`;
 ## 4. Project the event-tag catalog and issue association semantics
 
 - **Recommended filing:** `type:task`, priority `normal`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:core`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:core`
 - **Verified source citations:**
   - `crates/jit/src/domain/types.rs:1305-1581` declares the serialized event
     variants and makes clear that `DocumentArchived`, gate-definition events,
@@ -199,7 +200,7 @@ Source: `crates/jit/src/domain/types.rs:1305-1581,1981-2031` and
 ## 5. Project authoritative storage-layout specifics
 
 - **Recommended filing:** `type:task`, priority `normal`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:storage`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:storage`
 - **Verified source citations:**
   - `crates/jit/src/domain/types.rs:16-17,547-579` establishes UUID issue IDs
     and eight-character human short IDs.
@@ -243,7 +244,7 @@ Source: `crates/jit/src/domain/types.rs:16-17,547-579` and
 ## 6. Remove the stale `.jit/claims.jsonl` merge-driver entry
 
 - **Recommended filing:** `type:bug`, priority `normal`
-- **Labels:** `type:bug`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:storage`
+- **Labels:** `type:bug`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:storage`
 - **Verified source citations:**
   - `crates/jit/src/storage/gitattributes.rs:1-8,57-62` writes a union merge
     driver for `.jit/claims.jsonl`.
@@ -285,7 +286,7 @@ Source: `crates/jit/src/storage/gitattributes.rs:1-8,57-62`,
 ## 7. Resolve the inert `validation.strictness` contract
 
 - **Recommended filing:** `type:bug`, priority `high`
-- **Labels:** `type:bug`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:validation`
+- **Labels:** `type:bug`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:validation`
 - **Verified source citations:**
   - `.jit/config.toml:42-47` still declares `validation.strictness = "loose"`.
   - `crates/jit/src/config.rs:284-305` explicitly calls `strictness` an inert
@@ -326,7 +327,7 @@ Source: `.jit/config.toml:42-47`; `crates/jit/src/config.rs:284-305`; and
 ## 8. Declare and enforce the supported Rust MSRV
 
 - **Recommended filing:** `type:task`, priority `high`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:core`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:core`
 - **Verified source citations:**
   - `Cargo.toml:1-25` declares workspace metadata and dependencies but no
     `rust-version`; `crates/jit/Cargo.toml:1-59` inherits edition/license but
@@ -365,7 +366,7 @@ Source: `Cargo.toml:1-25`, `crates/jit/Cargo.toml:1-59`, and
 ## 9. Add a projector for built-in gate presets
 
 - **Recommended filing:** `type:task`, priority `normal`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:gates`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:gates`
 - **Verified source citations:**
   - `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-348,351-372`
     constructs and lists the binary-bundled preset definitions.
@@ -407,7 +408,7 @@ Source: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372` and
 ## 10. Project runtime coordination and recovery defaults
 
 - **Recommended filing:** `type:task`, priority `normal`
-- **Labels:** `type:task`, `epic:docs-exhaustive-audit`, `milestone:v1.0`, `component:core`
+- **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:core`
 - **Verified source citations:**
   - `crates/jit/src/agent_config.rs:43-65` sets the default heartbeat interval
     to 30 seconds.

@@ -149,15 +149,17 @@ state-change event — cannot be recovered and stays unset (as above).
 schema = 2
 
 [type_hierarchy]
-types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
 strategic_types = ["milestone", "epic"]
 
 [validation]
-strictness = "loose"  # "strict", "loose", or "permissive"
 default_type = "task"
 ```
 
-See [Configuration Reference](configuration.md) for full options.
+The hierarchy's type names are repository-defined; `bug` and `enhancement` in
+this repository's dogfood configuration are not `jit init` defaults. Validation
+enforcement belongs in `rules.toml`; a legacy `strictness` key is parsed but has
+no effect. See [Configuration Reference](configuration.md) for active options.
 
 ## Event Log Format
 
@@ -179,19 +181,10 @@ change to shared state rather than to a single issue:
 
 ### Event Types
 
-The authoritative set of event types is the `Event` enum in
-`crates/jit/src/domain/types.rs`; each variant serializes under
-`#[serde(tag = "type")]` with its snake-case name as the `type` value. The
-current tags are:
-
-- **Issue-scoped** (carry `issue_id`): `issue_created`, `issue_claimed`,
-  `issue_state_changed`, `issue_updated`, `issue_released`, `issue_completed`,
-  `issue_deleted`, `gate_passed`, `gate_failed`, `gate_added`, `gate_removed`,
-  `dependency_reduced`, `local_rule_bypassed`, `transition_blocked`,
-  `graph_rule_bypassed`.
-- **Repository- or registry-scoped** (no `issue_id`): `document_archived`,
-  `gate_definition_created`, `gate_definition_updated`, `gate_definition_removed`,
-  `lifecycle_timestamps_backfilled`.
+The event vocabulary is defined by the
+[`Event` enum](../../crates/jit/src/domain/types.rs), whose serde declaration
+uses a snake-case `type` tag. Consult that source for the current variants;
+this reference intentionally does not duplicate the list.
 
 Fields beyond `id` and `timestamp` vary by type.
 
@@ -267,20 +260,19 @@ example projection target).
 
 ## The `.git/jit/` Control Plane
 
-Multi-agent coordination state (claim leases, heartbeats, locks) lives under
-`.git/jit/`, the **shared control plane**, not `.jit/`. `.jit/` is per-worktree
-data; `.git/jit/` is shared across every worktree of the same repository (via
-git's common directory), because a lease must be visible to every worktree
-racing to claim the same issue. `jit claim` requires a git repository for this
-reason: outside one, it fails with a typed `ClaimRequiresGitError` (exit code
-10) rather than falling back to a per-worktree lease store.
+Multi-agent coordination state (claim leases and locks) lives under `.git/jit/`,
+the **shared control plane**, not `.jit/`. `.jit/` is per-worktree data;
+`.git/jit/` is shared across every worktree of the same repository (via git's
+common directory), because a lease must be visible to every worktree racing to
+claim the same issue. `jit claim` requires a git repository for this reason:
+outside one, it fails with a typed `ClaimRequiresGitError` (exit code 10) rather
+than falling back to a per-worktree lease store.
 
 ```
 .git/jit/
 ├── claims.jsonl         # Append-only audit log of claim operations
 ├── claims.index.json    # Derived cache of currently active leases
-├── heartbeat/           # One file per agent, tracking liveness
-│   └── <agent-id>.json
+├── heartbeat/           # Initialized control-plane directory
 └── locks/               # Advisory lock files guarding claim-log operations
     └── claims.lock
 ```
@@ -289,14 +281,12 @@ reason: outside one, it fails with a typed `ClaimRequiresGitError` (exit code
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
   `ForceEvict`), each entry carrying a monotonic `seq` for total ordering.
 - **`claims.index.json`**: a cache of active leases derived from
-  `claims.jsonl`, rebuilt (not hand-edited) as operations are appended. Each
-  lease record carries `lease_id`, `issue_id`, `agent_id`, `worktree_id`,
-  `branch`, `ttl_secs`, `acquired_at`, `expires_at`, `last_beat`, and `stale`.
-  A `ttl_secs` of `0` marks an indefinite lease, kept alive by heartbeats
-  instead of expiry.
-- **`heartbeat/<agent-id>.json`** (colons in the agent id replaced with
-  hyphens): process-liveness records (`pid`, `last_beat`, `interval_secs`)
-  for agents holding indefinite leases.
+  `claims.jsonl`, atomically updated from claim operations rather than
+  hand-edited. Each lease record carries `lease_id`, `issue_id`, `agent_id`,
+  `worktree_id`, `branch`, `ttl_secs`, `acquired_at`, `expires_at`,
+  `last_beat`, and `stale`. A `ttl_secs` of `0` marks an indefinite lease,
+  kept alive by a `Heartbeat` log operation that updates `last_beat` in this
+  index; `jit claim heartbeat` does not write a per-agent heartbeat file.
 - **`locks/claims.lock`**: an advisory file lock guarding atomic reads and
   appends against `claims.jsonl` and `claims.index.json`.
 

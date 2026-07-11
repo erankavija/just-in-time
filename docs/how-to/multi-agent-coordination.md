@@ -12,11 +12,12 @@ JIT provides two ways to claim work:
 | Command | Use Case | TTL | Lease Management |
 |---------|----------|-----|------------------|
 | `jit issue claim <id> <assignee>` | Single developer, simple workflows | None | No |
-| `jit claim acquire <id>` | Multi-agent coordination | Default 10min | Yes (renew/release) |
+| `jit claim acquire <id> --ttl <seconds>` | Multi-agent coordination | Explicit; CLI default is 600 seconds | Yes (renew/release) |
 
 **Use `jit issue claim`** for simple, single-developer workflows where you don't need automatic expiry.
 
-**Use `jit claim acquire`** when running multiple agents in parallel—the TTL prevents stale claims if an agent crashes.
+**Use `jit claim acquire --ttl <seconds>`** when running multiple agents in
+parallel. Finite leases expire at their requested TTL if an agent crashes.
 
 ## Quick Reference
 
@@ -44,8 +45,8 @@ jit init
 ### Claim and Work
 
 ```bash
-# Claim an issue
-jit claim acquire <issue-id>
+# Claim an issue for ten minutes
+jit claim acquire <issue-id> --ttl 600
 
 # Work on it...
 jit issue update <issue-id> --state done
@@ -133,7 +134,9 @@ jit claim status
 - Max 2 indefinite leases per agent (configurable)
 - Max 10 indefinite leases per repository (configurable)
 
-Leases become **stale** after 1 hour without heartbeat. Stale leases are rejected by pre-commit hooks.
+Indefinite leases are marked **stale** after a hardcoded hour without a
+heartbeat. The claim control plane excludes stale leases; this is not a
+pre-commit-hook setting and `stale_threshold_secs` does not configure it.
 
 ## Handling Conflicts
 
@@ -171,10 +174,10 @@ git commit
 
 ### How Issue Resolution Works
 
-```
-1. Local .jit/      → Issues modified in THIS worktree
-2. Git HEAD         → Committed issues (canonical)
-3. Main .jit/       → Uncommitted issues from main worktree
+```mermaid
+flowchart TD
+    local["1. Local .jit/<br/>Issues modified in this worktree"] --> head["2. Git HEAD<br/>Committed issues (canonical)"]
+    head --> main["3. Main .jit/<br/>Uncommitted issues from the main worktree"]
 ```
 
 ### Reading Issues
@@ -203,14 +206,24 @@ git push
 
 ```toml
 [worktree]
-mode = "auto"           # "auto" | "on" | "off"
 enforce_leases = "strict"  # "strict" | "warn" | "off"
 
 [coordination]
-default_ttl_secs = 600  # 10 minutes
-heartbeat_interval_secs = 30
-stale_threshold_secs = 3600
+max_indefinite_leases_per_agent = 2
+max_indefinite_leases_per_repo = 10
 ```
+
+`enforce_leases` is the active repository policy for structural issue writes.
+The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
+finite lease duration on each claim with `--ttl`; for an indefinite lease, run
+`jit claim heartbeat <lease-id>` explicitly while it is active. The current
+CLI default for an omitted `--ttl` is 600 seconds.
+
+`worktree.mode`, `default_ttl_secs`, `heartbeat_interval_secs`,
+`stale_threshold_secs`, and automatic-renewal settings are parsed and shown by
+configuration commands but do not control the current claim runtime. Indefinite
+leases are currently marked stale after a hardcoded hour without an explicit
+heartbeat; changing `stale_threshold_secs` does not alter that behavior.
 
 ### Agent Config (`~/.config/jit/agent.toml`)
 
@@ -218,15 +231,16 @@ stale_threshold_secs = 3600
 [agent]
 id = "agent:my-agent"
 description = "My development agent"
-default_ttl_secs = 900  # Override default for this agent
 ```
+
+`[agent].id` is the active persistent identity source. Agent TTL and behavior
+fields are parsed metadata; they do not override `jit claim acquire --ttl` or
+start a heartbeat runner.
 
 ### Environment Overrides
 
 ```bash
 export JIT_AGENT_ID=agent:session-123
-export JIT_WORKTREE_MODE=on
-export JIT_ENFORCE_LEASES=strict
 ```
 
 ## Monitoring Active Work

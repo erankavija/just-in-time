@@ -95,7 +95,7 @@ subject. The forms are fixed per identifier kind:
 | **Issue reference** | full UUID, 8-char `short_id`, or any unique prefix | The canonical form. Every command taking an issue subject resolves all three; none may demand the full UUID. |
 | **Gate key** | exact registry key | No prefix or fuzzy match. A gate key is an exact string from the registry. |
 | **Lease id** | full lease UUID | `claim renew`, `claim heartbeat`, and `claim force-evict` take the lease's own UUID, distinct from the issue id. |
-| **Qualified item id** | `<scope>/<self-id>` | `scope` is `@` for project scope or an issue reference (and so accepts the same three issue forms); `self-id` is exact. |
+| **Qualified item id** | `@/<kind>/<self-id>` (project) or `@/issue/<issue-ref>/<kind>/<self-id>` (issue) | Every explicit address includes its kind segment. `<issue-ref>/<self-id>` is accepted as input sugar only when the configured item kinds can infer the kind unambiguously. |
 
 **Consistency rule.** Every positional that names an issue (`issue show`,
 `issue update`, `gate add`, `gate evaluate`, `dep add`, `doc add`, `claim acquire`,

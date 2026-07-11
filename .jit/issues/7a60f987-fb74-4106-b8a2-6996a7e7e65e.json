@@ -2,7 +2,7 @@
   "id": "7a60f987-fb74-4106-b8a2-6996a7e7e65e",
   "title": "Remove the stale claims merge-driver entry",
   "description": "`jit init` writes a union-merge entry for `.jit/claims.jsonl`, but claim coordination writes its append-only log under the shared `.git/jit/` control plane.\n\nSource: `crates/jit/src/storage/gitattributes.rs:1-8,57-62`; `crates/jit/src/storage/worktree_paths.rs:8-22,93-103`; `crates/jit/src/storage/claim_coordinator.rs:701-724`.\n\n## Success Criteria\n\n- [hard] REQ-01: A newly initialized git repository has no merge-driver entry for `.jit/claims.jsonl` unless that path becomes a supported persisted file.\n- [hard] REQ-02: Any remaining JIT merge-driver entries correspond to files written in their documented storage plane.\n- [hard] REQ-03: Focused initialization coverage verifies `.gitattributes` and the real claim-log location.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -16,11 +16,11 @@
   "documents": [],
   "labels": [
     "type:bug",
-    "epic:docs-exhaustive-audit",
     "milestone:v1.0",
-    "component:storage"
+    "component:storage",
+    "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.554035392Z",
-  "updated_at": "2026-07-11T13:36:02.157099657Z",
+  "updated_at": "2026-07-11T13:41:02.445366099Z",
   "first_ready_at": "2026-07-11T13:35:35.554035642Z"
 }

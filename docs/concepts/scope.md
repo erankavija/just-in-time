@@ -207,7 +207,8 @@ jit gate add <run-migration> change-approval rollback-plan
 - No @mentions
 
 **Not a CI/CD system:**
-- Gates can trigger CI, but JIT doesn't run builds
+- Automated gates run their configured local checker commands (for example,
+  build or test tools), but JIT is not a CI scheduler or worker system
 - No artifact storage or deployment
 - Integrates with CI/CD, doesn't replace it
 

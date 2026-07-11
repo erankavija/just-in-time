@@ -356,9 +356,9 @@ flowchart LR
 An edge reads "FROM depends on TO": FROM is blocked until TO reaches a terminal state.
 
 **Graph reading tips:**
-- **No incoming edges** = Root issue (can start immediately)
+- **No outgoing edges** = Root issue (has no dependencies; it can become ready without dependency blockers)
 - **Many incoming edges** = Bottleneck (blocks lots of work)
-- **No outgoing edges** = Leaf issue (no dependencies)
+- **No incoming edges** = Leaf issue (nothing else depends on it)
 - **Long chains** = Critical path (sequential work)
 - **Wide graphs** = Parallelizable work
 
@@ -452,7 +452,7 @@ jit graph downstream <critical-issue>
 # Find issues with no dependencies
 jit graph roots
 
-# These can start immediately
+# Inspect each root's state and gates before assigning it
 # Example output:
 # Root issues (3):
 #   - abc123 [ready] - Database setup
@@ -482,7 +482,7 @@ jit graph export --format dot --output deps.dot
 
 **Manual analysis:**
 ```bash
-# Start from leaf (no dependencies)
+# Start from a leaf (no dependents) and follow its prerequisite chain
 # Walk backwards counting depth
 jit graph deps <leaf-id> --depth 0 | wc -l
 ```
@@ -614,7 +614,7 @@ jit graph export --format dot > backup.dot
 
 # Remove all dependencies for an issue
 jit issue show $ISSUE --json | \
-  jq -r '.dependencies[].id' | \
+  jq -r '.dependencies[]' | \
   while read dep; do
     jit dep rm $ISSUE $dep
   done

@@ -1,7 +1,7 @@
 {
   "epic_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
   "epic_short_id": "2d109173",
-  "current_wave": 5,
+  "current_wave": 7,
   "wave_2_ready": true,
   "docs_mechanical_scoping": "Evaluate docs-mechanical on each task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` \u2014 VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). The .jit/claims.jsonl miscite is FIXED (2b9a80fb), so whole-surface should be clean now. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75,adc4c6ef,8682e95a + container 2d109173. docs-mechanical now attached to 36d5451e too (all tasks covered). Re-eval gate: use `--force` since the gate caches a pass per HEAD and content changes between checkpoints. Integration: bring worker files via `git checkout <branch> -- <paths>` (NEVER git-merge \u2014 stale-base shows other workers' committed files as spurious deletions). Lead-direct fixes stay on main; do NOT re-checkout that file from the branch (would revert the lead fix).",
   "waves": [
@@ -126,12 +126,80 @@
           "short_id": "6d82de03",
           "title": "File follow-ups for engine gaps and missing projection surfaces",
           "classification": "documentation",
-          "status": "in_progress"
+          "status": "done",
+          "note": "DONE. Filed ten owner-approved follow-ups and, at owner direction, created follow-up epic 004d10b7 as a v1.0 milestone dependency. Zero label/DAG divergences; jit validate passes."
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "note": "Final container doc-review rework: 28 blocking source-contradicting findings partitioned by disjoint file footprint and corrected without deferral.",
+      "issues": [
+        {
+          "id": "2c990aa0",
+          "short_id": "2c990aa0",
+          "title": "Correct lifecycle, gate, and coordination documentation semantics",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F1-F10 and F26-F28 corrected; repo-validate and scoped docs-mechanical pass."
+        },
+        {
+          "id": "b35c267a",
+          "short_id": "b35c267a",
+          "title": "Correct core guarantees, item grammar, and graph documentation semantics",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F11-F18 corrected; repo-validate and scoped docs-mechanical pass."
+        },
+        {
+          "id": "47aaad9d",
+          "short_id": "47aaad9d",
+          "title": "Correct configuration, release, and deployment documentation semantics",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F19-F25 corrected; repo-validate and scoped docs-mechanical pass."
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "note": "Second allowed container rework after doc-review run 4fca2c67 found 13 residual defects in previously unreviewed files.",
+      "issues": [
+        {
+          "id": "33b2c714",
+          "short_id": "33b2c714",
+          "title": "Correct remaining lifecycle, lease, and durability documentation semantics",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F1,F2,F4,F5,F6,F7 corrected and verified against source; repo-validate + whole-surface docs-mechanical pass. Lead review: dev/active/2d109173-wave7-review.md."
+        },
+        {
+          "id": "85aae6d2",
+          "short_id": "85aae6d2",
+          "title": "Correct remaining coordination and deployment documentation mechanics",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F3,F8,F9,F13 corrected and verified against source; repo-validate + whole-surface docs-mechanical pass. Lead review: dev/active/2d109173-wave7-review.md."
+        },
+        {
+          "id": "58bc3826",
+          "short_id": "58bc3826",
+          "title": "Correct remaining storage and dependency reference drift",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. F10,F11,F12 corrected and verified against source; repo-validate + whole-surface docs-mechanical pass. Lead review: dev/active/2d109173-wave7-review.md."
         }
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "004d10b7",
+      "short_id": "004d10b7",
+      "title": "Documentation contract follow-ups",
+      "reason": "Owner-directed container for the ten filed issues; direct dependency of v1.0 milestone 9db27a3a."
+    }
+  ],
   "escalations": [
     {
       "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
@@ -146,6 +214,14 @@
       "status": "resolved",
       "opened_at": "2026-07-11T00:00:00Z",
       "summary": "Invoker directed manual lead takeover on 2026-07-11."
+    },
+    {
+      "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+      "category": "External reviewer-service usage limit",
+      "status": "resolved",
+      "opened_at": "2026-07-11T17:42:14+03:00",
+      "resolved_at": "2026-07-11T17:53:00+03:00",
+      "summary": "Wave 7 child gates (repo-validate, docs-mechanical) are local, not reviewer-service; they were run and passed on resume. The three children are done. The final epic doc-review remains to be run against the integrated surface."
     }
   ],
   "rework_counts": {
@@ -158,10 +234,11 @@
     "736a069e": 1,
     "b8924a6d": 1,
     "2b9a80fb": 2,
-    "36d5451e": 2
+    "36d5451e": 2,
+    "2d109173": 2
   },
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "Wave 5 scope is authorized: mandatory slate plus optional candidates 1-5, excluding the component-image :latest release-policy candidate. File separately owned leaf follow-ups that depend on 6d82de03, then pass repo-validate, close 6d82de03, and complete the epic.",
+  "resume_pointer": "Wave 7 local rework is complete but awaiting gates because the reviewer service reported a usage limit. Resume after service availability: run the three child gates, close them, run final epic gates including doc-review, and escalate if that review fails because MAX_REWORK_ATTEMPTS=2.",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."

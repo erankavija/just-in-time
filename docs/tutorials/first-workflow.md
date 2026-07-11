@@ -198,7 +198,7 @@ jit query all --assignee "agent:worker-2"
 ```
 
 **What we did:**
-- Multiple agents claimed tasks atomically
+- Multiple agents recorded task assignments; advisory leases provide exclusivity when needed
 - Tasks transitioned to in_progress
 - One task still ready for another agent
 
@@ -324,7 +324,7 @@ jit status
 
 ### Workflow Patterns
 - **Quality Gates**: Enforce process (tests, review)
-- **Agent Claiming**: Atomic, exclusive assignment that coordinates who works on each issue
+- **Agent Claiming**: Records assignment and lifecycle work; use advisory leases for exclusive coordination
 - **Dynamic Discovery**: Add work as you learn
 - **Parallel Execution**: Multiple agents work simultaneously
 
@@ -332,7 +332,7 @@ jit status
 - `jit gate define` - Create quality gates
 - `jit issue create` with labels and gates
 - `jit dep add` - Build dependency graph
-- `jit issue claim` - Atomic agent assignment
+- `jit issue claim` - Agent assignment and ready-work promotion (not an exclusive lease)
 - `jit gate evaluate` - Produce a gate verdict: run the checker (auto) or record attestation (manual)
 - `jit query available/blocked` - Find available work
 - `jit graph deps` - Visualize dependency trees

@@ -66,7 +66,10 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 
 **JSON-First Output:** Commands that emit data support `--json` for structured output agents parse reliably, with no regex scraping; list-emitting commands wrap results in a `{count, <collection>}` envelope.
 
-**Atomic File Operations:** Write-temp-rename pattern prevents race conditions and partial writes. Multi-agent safe by design.
+**Atomic File Operations:** Persistent-file replacements use a temporary file in
+the target directory followed by a rename, so readers do not observe a partially
+written replacement. Advisory locks coordinate the operations that need shared
+access; an atomic rename alone does not serialize competing writers.
 
 **Clear Exit Codes:** UNIX-standard exit codes enable bash error handling: `jit ... || handle_error`
 
@@ -261,7 +264,7 @@ Most modern tools start with a web UI and add CLI later. JIT inverts this:
 ```bash
 # Agents and scripts compose commands
 jit query available --json | \
-  jq -r 'issues[0].id' | \
+  jq -r '.issues[0].id' | \
   xargs -I {} jit claim acquire {} --agent-id agent:worker-1
 ```
 
@@ -356,116 +359,50 @@ Suggestions:
 
 ### Why Dogfooding Matters
 
-**1. Real-world validation:** If JIT can't track its own development, how can it track yours?
+**1. Real-world validation:** The project uses the same issue, dependency, and gate workflows it documents.
 
-**2. Continuous feedback:** We experience pain points before users do.
+**2. Continuous feedback:** Day-to-day use can reveal workflow friction for maintainers to investigate.
 
-**3. Credibility:** Claims about agent orchestration and workflow management are proven, not theoretical.
+**3. Credibility:** The repository provides a concrete environment for examining agent orchestration and workflow management.
 
 ### JIT Tracking JIT
 
-**This very repository uses JIT:**
+This repository uses JIT to track its own work. The current issue set, states,
+assignments, and gate registry are repository-local data, so inspect them in the
+checkout rather than relying on a prose snapshot:
 
 ```bash
-# View JIT's own issues
-$ jit query all
-Found 87 issues:
-  epic:docs - User Documentation (19 issues)
-  epic:multi-agent - Parallel Work Support (12 issues)
-  epic:gate-system - Quality Gates (8 issues)
-  ...
+# Inspect the local repository's live project state.
+jit query count --by state
+jit graph tree
+jit gate list
 
-# The documentation you're reading was tracked as issues
-$ jit query all --label "epic:docs"
-  84c358ec - Story: Tutorial Documentation [done]
-  d820155f - Write guarantees.md (System Guarantees) [done]
-  b66d2338 - Complete Issues section in core-model.md [done]
-  c8355d70 - Write design-philosophy.md [in_progress]
-  ...
-```
-
-**Gates tested on our workflow:**
-```bash
-# We use the same gates we recommend
-$ jit gate list
-code-review    - Manual review required
-tests          - Cargo test suite must pass
-clippy         - Rust linter must pass
-fmt            - Code formatting check
-```
-
-**Multi-agent coordination proven:**
-```bash
-# Multiple agents work on documentation simultaneously
-# (Yes, the agent writing this doc claimed it via jit!)
-$ jit claim status
-Agent: agent:docs-worker
-  Lease: fd33891c
-  Issue: c8355d70 (Write design-philosophy.md)
-  Expires: 2026-02-02T21:42:00Z
-```
-
-### Specific Examples
-
-**1. Dependency graphs in practice**
-
-Our milestones depend on epics, epics depend on tasks:
-```bash
-$ jit graph deps cfb3ba94  # User Documentation epic
-Epic cfb3ba94 depends on:
-  → 84c358ec Tutorial Documentation [done]
-  → 5bad7437 Reference Documentation [ready]
-  → c8254dbf Core Concepts Documentation [backlog]
-```
-
-**2. Gate system validation**
-
-Documentation quality enforced via gates:
-```bash
-$ jit gate status c8355d70 code-review
-Gate 'code-review' status: pending
-(Will pass when agent:docs-worker completes task)
-```
-
-**3. Label hierarchies in use**
-
-We use `epic:*` labels to organize work:
-```bash
-$ jit query all --label "epic:docs"
-# Returns all documentation issues (this proves label filtering works)
-```
-
-**4. Document lifecycle tested**
-
-Development documents are linked to issues:
-```bash
-$ jit doc list d820155f
-Documents for issue d820155f:
-  dev/design/guarantees-design.md (design)
-  # (if we had linked design docs - example of the feature)
+# Inspect an issue and the durable artifacts linked to it.
+jit issue status <issue-id>
+jit doc list <issue-id>
 ```
 
 ### Benefits of Dogfooding
 
 **1. Catches usability issues early**
-- If we struggle with a command, so will users
-- Awkward workflows get fixed before release
+- Normal project use exposes workflow friction to maintainers
+- Those observations inform improvement work
 
 **2. Validates agent orchestration claims**
-- "Multi-agent safe" is proven, not theoretical
-- Race conditions would break our own workflow
+- It exercises the same coordination surface used by adopters
+- It keeps concurrency assumptions visible in everyday work
 
-**3. Ensures production readiness**
-- We won't ship features we wouldn't use ourselves
-- Quality bar is high (we live with the consequences)
+**3. Grounds maintenance decisions**
+- Maintainers can evaluate a workflow in the repository that uses it
+- Trade-offs are considered against observed project use
 
-**4. Documentation stays accurate**
-- Examples come from real usage, not imagination
-- Screenshots and workflows are up-to-date
+**4. Grounds documentation**
+- Examples can be checked against the same commands and configuration
+- Live repository state remains discoverable through the commands above
 
 **5. Motivation and accountability**
-- If JIT can't track JIT, we failed
-- Success means our tool is genuinely useful
+- The project team shares the consequences of its workflow choices
+- Feedback has a direct path into tracked work
 
 ### Continuous Improvement Loop
 

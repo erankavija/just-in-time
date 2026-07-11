@@ -6,19 +6,22 @@ JIT is CLI-first—most users just run `jit` commands in their repository. This 
 
 ## Local Development (Most Common)
 
-Run the API server and web UI separately:
+Build the web UI, then let `jit-server` serve the files and API from the same
+origin:
 
 ```bash
-# Terminal 1: Start API server (points to your repo)
-cd /path/to/your/repo
-jit-server --data-dir .jit --bind 127.0.0.1:3000
-
-# Terminal 2: Start web UI dev server
 cd /path/to/just-in-time/web
-npm run dev
+npm install
+npm run build
+
+cd /path/to/your/repo
+jit-server --data-dir .jit --web-dir /path/to/just-in-time/web/dist --bind 127.0.0.1:3000
 ```
 
-The web UI runs on `http://localhost:5173` and connects to the API at `localhost:3000`.
+Open `http://localhost:3000`. The current Vite configuration has no `/api`
+proxy, so `npm run dev` alone cannot serve this UI against a separate
+`jit-server`; use the same-origin setup above or configure a reverse proxy that
+serves the built assets and proxies `/api`.
 
 ### Building the Web UI
 
@@ -28,7 +31,9 @@ npm install
 npm run build   # Creates dist/ with static files
 ```
 
-Serve `dist/` with any static file server (nginx, caddy, python -m http.server).
+Serve `dist/` with a static server that also proxies `/api` to `jit-server`, or
+pass it to `jit-server --web-dir` as shown above. The UI uses same-origin
+`/api` requests.
 
 ## Running as Background Services
 
@@ -81,9 +86,15 @@ server {
 For shared/team deployments with everything containerized:
 
 ```bash
-# Clone and start
+# Clone and initialize the named data volume before starting the API service.
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
+
+# `jit-server` requires an initialized JIT data directory. The Compose CLI
+# service shares the named `jit-data` volume with the API service.
+docker compose run --rm --entrypoint jit cli init
+
+# Start the API and reverse-proxied Web UI.
 docker compose up -d
 
 # API: http://localhost:3000
@@ -93,10 +104,11 @@ docker compose up -d
 ### Custom Data Directory
 
 ```bash
-# Mount your existing repo
+# Mount the existing JIT data directory itself, not its repository parent.
+# `/data` is the Docker configuration; native jit-server defaults to `./.jit`.
 docker compose run --rm \
-  -v /path/to/your/repo:/data \
-  api jit-server
+  -v /path/to/your/repo/.jit:/data \
+  api
 ```
 
 ## Backup and Recovery
@@ -109,7 +121,7 @@ docker run --rm -v jit-data:/data -v $(pwd):/backup alpine \
   tar czf /backup/jit-backup-$(date +%Y%m%d).tar.gz -C /data .
 
 # Native
-tar czf jit-backup-$(date +%Y%m%d).tar.gz -C /var/lib/jit .
+tar czf jit-backup-$(date +%Y%m%d).tar.gz -C .jit .
 ```
 
 ### Restore
@@ -130,9 +142,9 @@ docker compose up -d
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JIT_DATA_DIR` | `/data` | Data directory path |
+| `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; Docker and Compose explicitly set it to `/data` |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
-| `JIT_LOCK_TIMEOUT` | `30` | Lock timeout in seconds |
+| `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds |
 
 ## Troubleshooting
 
@@ -144,7 +156,7 @@ docker compose logs api
 journalctl -u jit-api -f
 
 # Verify permissions
-ls -la /var/lib/jit
+ls -la .jit
 ```
 
 ### Health check failing

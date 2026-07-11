@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "run_id": "6b765cc6-c0a2-4491-8608-6c5f2e4f3a7c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "befd35d04eb48aa8135fd035f46959a97a86cb83",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T13:41:32.120105988Z",
+  "completed_at": "2026-07-11T14:05:51.140423743Z",
+  "duration_ms": 1459020,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. Lifecycle, gate execution, claim behavior, configuration, storage guarantees, and deployment instructions contain source-contradicting claims (F1–F20, F22–F28).\n\n## 2. Adopter surface vs repo-local configuration\n\nFail. Repo-local `bug`/`enhancement` types are presented as generic shipped configuration without signalling (F20).\n\n## 3. Current behavior only\n\nFail. A dogfooding transcript presents obsolete issue counts, historical statuses, and future-state narration as current (F21).\n\n## 4. No rotting counts\n\nFail. The guarantees page hardcodes an obsolete invariant count, and the dogfooding transcript hardcodes live issue totals (F14, F21).\n\n## 5. Links and referenced paths\n\nPass. The full scoped link, anchor, repo-path, and addressable-item checks resolve successfully.\n\n## 6. Content standards\n\nPass. No non-Mermaid diagrams or plain-text mathematics requiring LaTex were found; allowed file trees and CLI output remain plain text.\n\n## Findings\n\n1. **F1 — Creation and readiness are described incorrectly.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:225) says new issues start `backlog` and that prechecks gate `ready`; `issue create` creates dependency-free issues as `Ready`, and gates do not block `Ready`. Remediate the diagrams and prose to describe the actual initial `Ready` state and prechecks at `Ready → InProgress`.\n\n2. **F2 — Gate status calls the actual `pending` state “required.”** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:523) and [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:578) document `required/passed/failed`; the serialized enum is `pending/passed/failed`. Remediate the state diagram and status text to use `pending`.\n\n3. **F3 — Documentation says automatic gate evaluation completes an issue, but it does not.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1366), [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:549), [software-development.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/software-development.md:200), [overview.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/overview.md:134), and [troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:54) claim postchecks run on `issue update --state done` and/or the last automated gate auto-transitions `gated → done`. That command only checks statuses and diverts to `Gated`; automatic `gate evaluate` returns after recording its run. Remediate with the actual explicit evaluation/retry workflow and distinguish manual-gate auto-transition behavior.\n\n4. **F4 — Failed prechecks are said to move an issue to `gated`.** [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:517) says a failed precheck gates the issue; the handler returns a transition-blocked error and leaves it `Ready`. Remediate the failure-path explanation.\n\n5. **F5 — Type labels are falsely documented as universally required.** [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:224), [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:834), [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:119), and [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:904) say every issue has exactly one `type:*` label or emits a missing-type warning. A type is only defaulted when `[validation].default_type` is configured; the rules enforce at most one, not requiredness. Remediate all such claims, including the incorrect `--orphan` exception.\n\n6. **F6 — `issue assign` is documented as a lifecycle transition.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:728) and [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:763) say `Ready` is necessarily unassigned and `issue assign` moves it to `InProgress`. Assignment only changes the assignee; `issue claim` is the command that promotes a ready issue. Remediate the state and command descriptions.\n\n7. **F7 — `issue claim` and `claim-next` are falsely described as atomic exclusive coordination.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1074), [quickstart.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/quickstart.md:23), and [first-workflow.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/first-workflow.md:327) describe them as race-safe. They read candidates/assignment before separate writes; only `jit claim acquire` holds the exclusive claims lock. Remediate multi-agent guidance to use advisory leases for exclusivity.\n\n8. **F8 — `issue claim-next --filter` is advertised as functional but its handler ignores the filter.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:949) and [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1105) promise filtered selection. Remediate by removing filter-based examples until that behavior exists.\n\n9. **F9 — The documented restricted, terminal state machine is not enforced.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:734), [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:754), and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:966) say Done/Rejected cannot return to active states or transition to each other. Non-`Done` target states are accepted by the update/reject paths. Remediate the diagrams and terminal-state claims to match actual guards.\n\n10. **F10 — A documented bulk-update command is invalid.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:957) combines an issue ID with `--filter`, but clap marks them mutually exclusive. Remediate by removing `abc123` or replacing `--filter` with a single-issue update.\n\n11. **F11 — Two `jq` examples omit the required leading dot.** [design-philosophy.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:264) and [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1158) use `issues[0].id` and `id`. Remediate to `.issues[0].id` and `.id`.\n\n12. **F12 — Atomic-write guarantees over-credit rename and misstate the implementation.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:59) and [design-philosophy.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:69) say all writes use the shown temp-file/rename pattern and that rename prevents races. Event writes are locked append operations, and locks—not rename—serialize read/modify/write coordination. Remediate the guarantee and remove the stale pseudo-implementation.\n\n13. **F13 — Event-log guarantees are overstated and the declared “full” event list is stale.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:121) says every mutation is logged, [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:125) omits current event variants, and [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:155) says timestamps establish causal ordering. Remediate to the actual state-change invariant, cite the event enum for the current set, and remove the causal-ordering claim.\n\n14. **F14 — The invariant count is obsolete.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:10) claims four invariants and three registered ones; `.jit/invariants.toml` currently registers nine. Remediate by citing the registry without maintaining a count.\n\n15. **F15 — `jit doc archive` is incorrectly listed as requiring Git.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:199) contradicts the filesystem-based archive handler. Remediate by removing it from the Git-required list.\n\n16. **F16 — Qualified item-ID grammar is incomplete.** [cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:98) gives `<scope>/<self-id>`, omitting the required kind segment. Remediate with `@/<kind>/<self-id>`, `@/issue/<issue-ref>/<kind>/<self-id>`, and the documented issue sugar form.\n\n17. **F17 — A dependency-removal script treats dependency IDs as objects.** [dependency-management.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/dependency-management.md:617) uses `.dependencies[].id`, but dependencies serialize as UUID strings. Remediate to `.dependencies[]`.\n\n18. **F18 — Graph root/leaf direction is reversed.** [dependency-management.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/dependency-management.md:359) says no incoming edges means a root that can start, and no outgoing edges means a leaf with no dependencies. `graph roots` selects issues whose dependency lists are empty. Remediate the graph-reading guidance to match the documented `FROM depends on TO` edge direction.\n\n19. **F19 — Runtime configuration documentation advertises inactive controls.** [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:229), [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:274), [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:302), and [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:338) present worktree mode, lease timing/renewal, global-operation, lock, and event fields as runtime controls. Current handlers only consume the indefinite-lease limits; worktree mode and the listed timing/event controls are parsed/displayed but not applied. Agent `auto_heartbeat` is also documented as default-true despite defaulting false and having no runner. Remediate the reference and related coordination examples to document only active behavior.\n\n20. **F20 — Repo-local type values are presented as generic shipped configuration.** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:229), [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:60), [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:152), and [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:44) add `bug`/`enhancement` without saying these are this repository’s dogfood choices. Remediate by using only shipped defaults or clearly framing the snippets as this repository’s configuration.\n\n21. **F21 — The dogfooding transcript is stale current-state narration with rotting counts.** [design-philosophy.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:367) through [line 445](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:445) presents historical issue totals, IDs, statuses, gates, and “Will pass” output as current. Remediate by replacing it with timeless examples or live commands without captured project-state assertions.\n\n22. **F22 — Scope documentation falsely says JIT does not run builds.** [scope.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/scope.md:210) contradicts automated gate checkers, which execute configured commands such as build/test tools. Remediate to say JIT is not a CI system while acknowledging that gate checkers run local commands.\n\n23. **F23 — The development Web UI setup cannot reach the API as described.** [deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:21) says Vite connects to `jit-server`; this repository’s Vite configuration has no `/api` proxy. Remediate to use `jit-server --web-dir web/dist` or a configured reverse proxy.\n\n24. **F24 — The Docker Compose quick start omits required initialization.** [deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:83) starts services against a new volume, but `jit-server` refuses an uninitialized data directory. Remediate by initializing the shared volume with the CLI before `docker compose up`.\n\n25. **F25 — The server data-directory default is incorrect.** [deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:133) says `JIT_DATA_DIR` defaults to `/data`; `jit-server` defaults to `./.jit`, while Docker sets `/data` explicitly. Remediate the table to distinguish native default from Docker configuration.\n\n26. **F26 — Troubleshooting says `jit status` regenerates worktree identity.** [troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:341) is false; status only reads issue storage. Remediate by using an identity-creating claim or worktree command.\n\n27. **F27 — Troubleshooting attributes secondary-worktree visibility to `worktree.mode`.** [troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:347) through [line 369](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:369) instructs users to toggle a mode that current reads do not consult. Remediate with the actual Git/index/main-worktree fallback prerequisites.\n\n28. **F28 — Troubleshooting directs claims-index and stale-lock repair to `jit validate --fix`.** [troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:213) through [line 230](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:230) conflicts with the documented and implemented separation: `jit recover` repairs coordination state. Remediate the recovery sequence to use `jit recover`.\n\nTotal findings: 28\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"28 blocking documentation defects drift from current lifecycle, coordination, configuration, deployment, and repository behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Creation and readiness behavior is documented incorrectly.\",\"file\":\"docs/concepts/core-model.md\",\"line\":225},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Gate status is documented as required instead of pending.\",\"file\":\"docs/concepts/core-model.md\",\"line\":523},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Docs falsely claim automatic gate evaluation completes gated issues.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1366},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Failed prechecks are falsely said to move issues to gated.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":517},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Docs falsely require exactly one type label on every issue.\",\"file\":\"docs/reference/labels.md\",\"line\":224},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"Docs falsely say issue assign transitions Ready work to InProgress.\",\"file\":\"docs/concepts/core-model.md\",\"line\":763},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Docs falsely describe issue claim and claim-next as atomic exclusive coordination.\",\"file\":\"docs/concepts/core-model.md\",\"line\":1074},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Docs advertise claim-next filtering although the handler ignores the filter.\",\"file\":\"docs/concepts/core-model.md\",\"line\":949},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"Docs falsely describe terminal states and the state graph as restricted.\",\"file\":\"docs/concepts/core-model.md\",\"line\":734},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"A documented issue update command combines mutually exclusive ID and filter inputs.\",\"file\":\"docs/concepts/core-model.md\",\"line\":957},{\"id\":\"F11\",\"severity\":\"high\",\"summary\":\"Two jq examples omit required leading dots in their filters.\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":264},{\"id\":\"F12\",\"severity\":\"high\",\"summary\":\"Atomic-write claims over-credit rename and show stale implementation behavior.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":59},{\"id\":\"F13\",\"severity\":\"high\",\"summary\":\"Event-log completeness, event list, and timestamp-ordering claims are inaccurate.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":121},{\"id\":\"F14\",\"severity\":\"high\",\"summary\":\"The hardcoded invariant count is obsolete.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":10},{\"id\":\"F15\",\"severity\":\"high\",\"summary\":\"Doc archive is incorrectly documented as requiring Git.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":199},{\"id\":\"F16\",\"severity\":\"high\",\"summary\":\"Qualified item-ID grammar omits the required kind segment.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":98},{\"id\":\"F17\",\"severity\":\"high\",\"summary\":\"Dependency-removal jq treats string dependency IDs as objects.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":617},{\"id\":\"F18\",\"severity\":\"high\",\"summary\":\"Graph root and leaf direction guidance is reversed.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":359},{\"id\":\"F19\",\"severity\":\"high\",\"summary\":\"Configuration reference presents inactive settings as runtime controls.\",\"file\":\"docs/reference/configuration.md\",\"line\":229},{\"id\":\"F20\",\"severity\":\"high\",\"summary\":\"Repo-local type values are presented as generic shipped configuration.\",\"file\":\"README.md\",\"line\":229},{\"id\":\"F21\",\"severity\":\"high\",\"summary\":\"Dogfooding transcript contains stale counts, statuses, and future narration.\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":367},{\"id\":\"F22\",\"severity\":\"high\",\"summary\":\"Scope docs falsely say JIT does not run build commands.\",\"file\":\"docs/concepts/scope.md\",\"line\":210},{\"id\":\"F23\",\"severity\":\"high\",\"summary\":\"Deployment guide falsely says Vite development connects to jit-server.\",\"file\":\"docs/how-to/deployment.md\",\"line\":21},{\"id\":\"F24\",\"severity\":\"high\",\"summary\":\"Docker Compose startup omits required JIT data initialization.\",\"file\":\"docs/how-to/deployment.md\",\"line\":87},{\"id\":\"F25\",\"severity\":\"high\",\"summary\":\"Deployment guide gives the wrong native JIT_DATA_DIR default.\",\"file\":\"docs/how-to/deployment.md\",\"line\":133},{\"id\":\"F26\",\"severity\":\"high\",\"summary\":\"Troubleshooting falsely says jit status regenerates worktree identity.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":341},{\"id\":\"F27\",\"severity\":\"high\",\"summary\":\"Troubleshooting falsely treats worktree.mode as controlling visibility fallbacks.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":347},{\"id\":\"F28\",\"severity\":\"high\",\"summary\":\"Troubleshooting wrongly sends coordination-state repairs to validate --fix.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":223}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 46077 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f5169-701d-7153-84d4-84e8e95a0ef6\n--------\nuser\n--- 46064 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "28 blocking documentation defects drift from current lifecycle, coordination, configuration, deployment, and repository behavior.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Creation and readiness behavior is documented incorrectly.",
+        "file": "docs/concepts/core-model.md",
+        "line": 225
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Gate status is documented as required instead of pending.",
+        "file": "docs/concepts/core-model.md",
+        "line": 523
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Docs falsely claim automatic gate evaluation completes gated issues.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1366
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Failed prechecks are falsely said to move issues to gated.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 517
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "Docs falsely require exactly one type label on every issue.",
+        "file": "docs/reference/labels.md",
+        "line": 224
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "Docs falsely say issue assign transitions Ready work to InProgress.",
+        "file": "docs/concepts/core-model.md",
+        "line": 763
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Docs falsely describe issue claim and claim-next as atomic exclusive coordination.",
+        "file": "docs/concepts/core-model.md",
+        "line": 1074
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Docs advertise claim-next filtering although the handler ignores the filter.",
+        "file": "docs/concepts/core-model.md",
+        "line": 949
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "Docs falsely describe terminal states and the state graph as restricted.",
+        "file": "docs/concepts/core-model.md",
+        "line": 734
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "A documented issue update command combines mutually exclusive ID and filter inputs.",
+        "file": "docs/concepts/core-model.md",
+        "line": 957
+      },
+      {
+        "id": "F11",
+        "severity": "high",
+        "summary": "Two jq examples omit required leading dots in their filters.",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 264
+      },
+      {
+        "id": "F12",
+        "severity": "high",
+        "summary": "Atomic-write claims over-credit rename and show stale implementation behavior.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 59
+      },
+      {
+        "id": "F13",
+        "severity": "high",
+        "summary": "Event-log completeness, event list, and timestamp-ordering claims are inaccurate.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 121
+      },
+      {
+        "id": "F14",
+        "severity": "high",
+        "summary": "The hardcoded invariant count is obsolete.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 10
+      },
+      {
+        "id": "F15",
+        "severity": "high",
+        "summary": "Doc archive is incorrectly documented as requiring Git.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 199
+      },
+      {
+        "id": "F16",
+        "severity": "high",
+        "summary": "Qualified item-ID grammar omits the required kind segment.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 98
+      },
+      {
+        "id": "F17",
+        "severity": "high",
+        "summary": "Dependency-removal jq treats string dependency IDs as objects.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 617
+      },
+      {
+        "id": "F18",
+        "severity": "high",
+        "summary": "Graph root and leaf direction guidance is reversed.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 359
+      },
+      {
+        "id": "F19",
+        "severity": "high",
+        "summary": "Configuration reference presents inactive settings as runtime controls.",
+        "file": "docs/reference/configuration.md",
+        "line": 229
+      },
+      {
+        "id": "F20",
+        "severity": "high",
+        "summary": "Repo-local type values are presented as generic shipped configuration.",
+        "file": "README.md",
+        "line": 229
+      },
+      {
+        "id": "F21",
+        "severity": "high",
+        "summary": "Dogfooding transcript contains stale counts, statuses, and future narration.",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 367
+      },
+      {
+        "id": "F22",
+        "severity": "high",
+        "summary": "Scope docs falsely say JIT does not run build commands.",
+        "file": "docs/concepts/scope.md",
+        "line": 210
+      },
+      {
+        "id": "F23",
+        "severity": "high",
+        "summary": "Deployment guide falsely says Vite development connects to jit-server.",
+        "file": "docs/how-to/deployment.md",
+        "line": 21
+      },
+      {
+        "id": "F24",
+        "severity": "high",
+        "summary": "Docker Compose startup omits required JIT data initialization.",
+        "file": "docs/how-to/deployment.md",
+        "line": 87
+      },
+      {
+        "id": "F25",
+        "severity": "high",
+        "summary": "Deployment guide gives the wrong native JIT_DATA_DIR default.",
+        "file": "docs/how-to/deployment.md",
+        "line": 133
+      },
+      {
+        "id": "F26",
+        "severity": "high",
+        "summary": "Troubleshooting falsely says jit status regenerates worktree identity.",
+        "file": "docs/how-to/troubleshooting.md",
+        "line": 341
+      },
+      {
+        "id": "F27",
+        "severity": "high",
+        "summary": "Troubleshooting falsely treats worktree.mode as controlling visibility fallbacks.",
+        "file": "docs/how-to/troubleshooting.md",
+        "line": 347
+      },
+      {
+        "id": "F28",
+        "severity": "high",
+        "summary": "Troubleshooting wrongly sends coordination-state repairs to validate --fix.",
+        "file": "docs/how-to/troubleshooting.md",
+        "line": 223
+      }
+    ]
+  }
+}

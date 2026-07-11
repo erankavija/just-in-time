@@ -515,13 +515,13 @@ jit gate define tdd-precheck \
 jit issue claim $ISSUE agent:me
 
 # Precheck runs automatically
-# If fails: Issue transitions to gated (must pass before starting)
+# If it fails: claim returns a blocker and the issue remains ready
 # If passes: Issue transitions to in_progress
 ```
 
 ### Postchecks (After Work Completes)
 
-Run when issue transitions **to** `done` state.
+Must pass before an issue can complete as `done`.
 
 **Purpose:** Verify work quality before completion.
 
@@ -543,12 +543,15 @@ jit gate define tests \
 
 **Workflow:**
 ```bash
-# Complete work, attempt to finish
+# Attempt to finish; unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
 
-# Postcheck runs automatically
-# If fails: Issue transitions to gated (fix and retry)
-# If passes: Issue transitions to done
+# Run the required automated postcheck and inspect the result
+jit gate evaluate $ISSUE tests
+jit gate status-all $ISSUE
+
+# Once all required statuses pass, request completion again
+jit issue update $ISSUE --state done
 ```
 
 ### Choosing Stage
@@ -846,11 +849,14 @@ jit gate define tests --mode auto --stage postcheck --checker-command "cargo tes
 # Apply to all issues in epic (batch mode still uses --add-gate)
 jit issue update --filter "label:epic:auth" --add-gate fmt --add-gate clippy --add-gate tests
 
-# Developer completes work
+# Developer evaluates the required automated gates
+jit gate evaluate $ISSUE fmt
+jit gate evaluate $ISSUE clippy
+jit gate evaluate $ISSUE tests
+
+# Inspect gate status, then complete only after every required status passes
+jit gate status-all $ISSUE
 jit issue update $ISSUE --state done
-# All three gates run automatically
-# Issue transitions to gated if any fail
-# Auto-transitions to done when all pass
 ```
 
 ### Workflow 3: Manual + Automated Review
@@ -862,14 +868,18 @@ jit gate add $ISSUE tests clippy
 # Manual review
 jit gate add $ISSUE code-review
 
-# Complete work
+# Attempt completion; the unpassed gates move the issue to gated
 jit issue update $ISSUE --state done
-# Automated gates run, manual gate remains unpassed
-# Issue in gated state
 
-# Reviewer approves
+# Run automated gates and record manual review
+jit gate evaluate $ISSUE tests
+jit gate evaluate $ISSUE clippy
 jit gate evaluate $ISSUE code-review --by "human:alice"
-# Issue auto-transitions to done
+
+# Manual approval may complete a gated issue; otherwise retry explicitly after
+# status-all reports every required gate as passed.
+jit gate status-all $ISSUE
+jit issue update $ISSUE --state done
 ```
 
 ## Troubleshooting Gate Failures
@@ -901,13 +911,11 @@ Expected format: 'namespace:value'
 
 **Solution:** Use colon separator: `--label "milestone:v1.0"`
 
-#### "Missing type label"
+#### Optional type labels
 
-```bash
-Warning: Issue created without type label
-```
-
-**Solution:** Add type label: `jit issue update $ISSUE --label "type:task"`
+A project may use `--type task` or configure `[validation].default_type` to add a
+type label. The type namespace permits at most one value; a missing type is only
+a problem when that project configures a default or a rule requiring it.
 
 #### "Orphaned task"
 

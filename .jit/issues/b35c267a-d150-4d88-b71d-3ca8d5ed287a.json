@@ -1,0 +1,46 @@
+{
+  "id": "b35c267a-d150-4d88-b71d-3ca8d5ed287a",
+  "title": "Correct core guarantees, item grammar, and graph documentation semantics",
+  "description": "Resolve the final documentation review findings concerning durability guarantees, event-log claims, addressable-item grammar, graph direction, and stale dogfooding narration.\n\n## Success Criteria\n\n- [hard] REQ-01: Atomic-write, event-log, Git-requirement, and invariant documentation states only source-backed guarantees without rotting enumerations or causal-order claims.\n- [hard] REQ-02: Item-address grammar, dependency data examples, graph root/leaf guidance, and jq snippets match the current data model and CLI behavior.\n- [hard] REQ-03: Dogfooding examples are timeless or clearly historical, with no current-state claims that can rot.\n- [hard] REQ-04: Scoped mechanical documentation checks and repository validation pass.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:final-docs-rework",
+  "dependencies": [],
+  "gates_required": [
+    "repo-validate",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:19:45.720076859Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:19:45.409148353Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/2d109173-final-rework-review.md",
+      "commit": null,
+      "label": "Final rework lead review",
+      "doc_type": "review",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ],
+  "created_at": "2026-07-11T14:06:54.574283841Z",
+  "updated_at": "2026-07-11T14:20:38.698970374Z",
+  "first_ready_at": "2026-07-11T14:06:54.574289851Z",
+  "claimed_at": "2026-07-11T14:07:12.323573587Z",
+  "done_at": "2026-07-11T14:20:38.698969854Z"
+}

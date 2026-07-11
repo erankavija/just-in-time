@@ -20,15 +20,16 @@
 # Find ready work
 jit query available --json
 
-# Claim atomically (race-safe)
+# Claim records assignment; acquire a lease first when exclusivity matters
 jit issue claim <short-hash> agent:your-id
 
 # Check status
 jit issue show <short-hash> --json
 
-# Evaluate gates
+# Evaluate gates, inspect their statuses, then complete explicitly
 jit gate evaluate <short-hash> tests
 jit gate evaluate <short-hash> code-review
+jit gate status-all <short-hash>
 
 # Complete
 jit issue update <short-hash> --state done
@@ -147,10 +148,11 @@ jit gate add $TASK3 code-review
 jit issue update $TASK3 --state done
 # Transitions to 'gated' instead
 
-# Pass the gate
+# Record manual approval. A manual pass may complete an already gated issue.
 jit gate evaluate $TASK3 code-review
 
-# Now mark done (succeeds)
+# Inspect status; if it is still gated, retry explicit completion.
+jit gate status-all $TASK3
 jit issue update $TASK3 --state done
 ```
 

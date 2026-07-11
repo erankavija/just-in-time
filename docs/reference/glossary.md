@@ -5,7 +5,7 @@
 ## Core Concepts
 
 - **Issue**: A unit of work tracked by JIT
-- **Dependency**: A relationship where one issue blocks another
+- **Dependency**: A prerequisite relationship: “A depends on B” means B blocks A
 - **Gate**: A quality checkpoint that must pass before completion
 - **State**: Current lifecycle stage of an issue
 - **Label**: A namespace:value tag for categorization
@@ -51,11 +51,13 @@ Format: `resolution:reason` (e.g., `resolution:duplicate`, `resolution:wont-fix`
 
 ## Dependency Relationships
 
-**Blocks**: A → B means A blocks B
+**Depends On / Blocks**: “A depends on B” means B blocks A. B must reach a
+terminal state before A can become ready.
 
-**Blocked By**: B is blocked by A
+**Blocked By**: A is blocked by B when A depends on B
 
-**Transitive**: A blocks B, B blocks C implies A transitively blocks C
+**Transitive**: If A depends on B and B depends on C, A is transitively blocked
+by C
 
 **Transitive Reduction**: Minimal set of dependencies
 

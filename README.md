@@ -97,7 +97,8 @@ JIT's workflow revolves around **issues** (units of work) that progress through 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> backlog
+    [*] --> ready: dependency-free creation
+    [*] --> backlog: creation with unmet dependencies
     backlog --> ready: dependencies terminal
     ready --> in_progress: claim (prechecks pass)
     in_progress --> gated: work submitted
@@ -226,7 +227,7 @@ JIT is configurable via `.jit/config.toml`:
 schema = 2
 
 [type_hierarchy]
-types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
 strategic_types = ["milestone", "epic"]
 
 ```

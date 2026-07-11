@@ -1,0 +1,46 @@
+{
+  "id": "85aae6d2-f32a-4ea6-a1bd-a8a1c5a730cd",
+  "title": "Correct remaining coordination and deployment documentation mechanics",
+  "description": "Resolve the remaining final-review findings on multi-agent configuration, source-precedence diagrams, and server lock-timeout deployment documentation.\n\n## Success Criteria\n\n- [hard] REQ-01: Coordination documentation distinguishes active enforcement and command behavior from inert compatibility fields.\n- [hard] REQ-02: Every relationship diagram uses Mermaid and deployment defaults match source.\n- [hard] REQ-03: Scoped mechanical documentation checks and repository validation pass.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:config-deploy-rework",
+  "dependencies": [],
+  "gates_required": [
+    "repo-validate",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:53:49.168109046Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:53:48.856813140Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/2d109173-wave7-review.md",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ],
+  "created_at": "2026-07-11T14:36:53.783393252Z",
+  "updated_at": "2026-07-11T14:55:04.476317528Z",
+  "first_ready_at": "2026-07-11T14:36:53.783397602Z",
+  "claimed_at": "2026-07-11T14:37:04.832907537Z",
+  "done_at": "2026-07-11T14:55:04.476316808Z"
+}

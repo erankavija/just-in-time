@@ -51,7 +51,8 @@ To fix:
   - jit gate status-all def67890
   - jit gate evaluate def67890 code-review
 
-Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
+Issue transitioned to `gated`. Evaluate or attest the listed gates, inspect
+`jit gate status-all`, then retry `jit issue update <issue-id> --state done`.
 ```
 
 **Cause:** JIT enforces dependency and gate blockers before state transitions.
@@ -74,6 +75,8 @@ become ready or complete. Required gates must pass before an issue can become
    gates:
    ```bash
    jit gate evaluate <issue-id> <gate-key>
+   jit gate status-all <issue-id>
+   jit issue update <issue-id> --state done
    ```
 
 For scripts and MCP clients, use `--json` on `issue update`, `issue claim`, or
@@ -210,23 +213,16 @@ jit recover
 
 The claims index can always be rebuilt from the append-only `claims.jsonl` log.
 
-### Validation Errors
+### Coordination-State Repair
 
-**Symptom:**
+`jit validate` reports repository validation findings. Stale locks, expired
+leases, orphaned temporary files, and a corrupted claims index are coordination
+state for `jit recover` to repair.
+
 ```bash
-$ jit validate
-✗ Validation failed with 2 issues:
-  - Orphaned lock file: .git/jit/locks/claims.lock
-  - Index sequence gap at position 42
-```
-
-**Solution:**
-```bash
-# Dry run to see what would be fixed
-jit validate --fix --dry-run
-
-# Apply fixes
-jit validate --fix
+# Repair only provably stale coordination data, then validate the repository.
+jit recover
+jit validate
 ```
 
 ---
@@ -338,35 +334,36 @@ Error: Failed to detect worktree paths
 # Remove old identity
 rm .jit/worktree.json
 
-# Any jit command will regenerate it
-jit status
+# This worktree command loads or creates its identity.
+jit worktree info
 ```
 
 ### Secondary Worktree Can't See Issues
 
 **Symptom:** `jit query all` returns nothing in secondary worktree.
 
-**Cause:** Worktree mode disabled or path detection failed.
+**Cause:** The aggregated read path could not find the issue in this worktree,
+Git `HEAD`, or the recognized main worktree. Visibility does not depend on a
+`worktree.mode` runtime switch.
 
 **Solutions:**
 
-1. **Check worktree mode:**
+1. **Confirm this is a linked Git worktree:**
    ```bash
-   jit config get worktree.mode
-   ```
-   Should be `"auto"` or `"on"`.
-
-2. **Verify shared jit directory:**
-   ```bash
-   ls -la .git  # Should show "gitdir: /path/to/main/.git/worktrees/..."
-   ls -la $(cat .git)/jit  # Should exist
+   git worktree list
+   git rev-parse --git-common-dir
    ```
 
-3. **Enable worktree mode:**
+2. **Verify the repository data is available from an aggregation source:**
    ```bash
-   # In main worktree:
-   jit config set worktree.mode on
+   git show HEAD:.jit/index.json
+   git worktree list
    ```
+
+3. **If the issue exists only as an uncommitted change,** keep the main
+   worktree available at the path Git reports. Secondary-worktree reads fall
+   back to that main worktree automatically when the standard Git layout can be
+   resolved.
 
 ---
 

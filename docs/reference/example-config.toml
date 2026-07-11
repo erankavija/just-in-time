@@ -41,7 +41,7 @@ study = "studies"
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower numbers = more strategic)
 # Default: { milestone = 1, epic = 2, story = 3, task = 4 }
-types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4, enhancement = 4 }
+types = { milestone = 1, epic = 2, story = 3, task = 4 }
 
 # Types shown in 'jit query strategic' (high-level planning view)
 strategic_types = ["milestone", "epic"]
@@ -59,12 +59,6 @@ story = "story"
 # Choose a preset: simple, navigation, minimal, construction
 preset = "simple"  # Optional, defaults to "simple"
 
-# Custom icon overrides (optional)
-# These override the preset for specific types
-# Use this for domain-specific icons or to customize selected types
-[type_hierarchy.icons.custom]
-bug = "🐛"  # Override bug icon, other types use preset
-
 # Available presets:
 # - simple:       ⭐ (1) → 📦 (2) → 📝 (3) → ☑️ (4+)
 # - navigation:   🏔️ (1) → 🗺️ (2) → 🧭 (3) → 📍 (4+)
@@ -77,17 +71,13 @@ bug = "🐛"  # Override bug icon, other types use preset
 # epic = "📚"
 # story = "📄"
 # task = "✓"
-# bug = "🐛"
 
 # =============================================================================
 # VALIDATION
 # =============================================================================
-# Control how strictly JIT validates issues and labels
+# Active issue-creation defaults; rules.toml defines validation enforcement
 
 [validation]
-# Strictness level: "strict", "loose", or "permissive" (currently inert).
-strictness = "loose"
-
 # Auto-assign this type when creating issues without a type:* label
 default_type = "task"
 
@@ -103,7 +93,8 @@ content_format = "markdown"
 # patterns, uniqueness, required namespaces, and the orphan-leaf /
 # strategic-consistency warnings) is defined declaratively in `.jit/rules.toml`,
 # the single source of truth, scaffolded by `jit init`. This `[validation]`
-# section carries only the behavioral keys above.
+# section carries only the behavioral keys above. A legacy `strictness` key is
+# parsed for compatibility, but does not affect validation.
 
 # =============================================================================
 # NAMESPACE REGISTRY
@@ -116,7 +107,7 @@ content_format = "markdown"
 # author them as rules in `.jit/rules.toml` (the single source of truth).
 
 [namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
+description = "Issue type taxonomy (hierarchical)"
 unique = true
 examples = ["type:task", "type:story", "type:epic", "type:milestone"]
 

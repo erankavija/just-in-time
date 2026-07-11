@@ -18,7 +18,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 **AI Agents** - Primary audience
 - Coordinate multi-agent work distribution
 - Query available work programmatically
-- Claim tasks atomically (no race conditions)
+- Use advisory leases when an agent needs exclusive work ownership
 - Enforce quality through automated gates
 - Access via MCP (Model Context Protocol) tools
 
@@ -66,13 +66,13 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 **Problem: Traditional issue trackers don't support AI agents**
 - Web-first UIs require browser automation (slow, brittle)
 - GraphQL/REST APIs are paginated and rate-limited
-- No atomic claim operations (race conditions)
+- No repository-local advisory lease coordination
 - No explicit dependency graphs (only implicit parent/child)
 - Quality checks happen externally (CI/CD separate from tracking)
 
 **Solution: JIT integrates coordination and quality**
 - CLI-first with JSON output (fast, reliable)
-- Atomic file operations (no race conditions)
+- Atomic file writes plus advisory leases for exclusive coordination
 - Explicit dependency DAG (clear work order)
 - Gates integrate quality into workflow (not external)
 - MCP tools for agent frameworks (standardized interface)
@@ -105,7 +105,7 @@ See [Storage Format](../reference/storage-format.md) for the authoritative layou
 **Workflow:**
 1. **Create issues** with dependencies and gates
 2. **Query for ready work** (unblocked, unassigned)
-3. **Claim atomically** (file rename = atomic operation)
+3. **Acquire a lease when exclusivity matters, then claim**
 4. **Do work** with quality gates guiding process
 5. **Validate and complete** when gates pass
 6. **Repeat** - next agent/human picks up ready work
@@ -114,7 +114,7 @@ See [Storage Format](../reference/storage-format.md) for the authoritative layou
 - Issues move through states: `backlog → ready → in_progress → gated → done`
 - Dependencies block issues until prerequisites reach a terminal state
 - Gates block completion until quality standards met
-- Assignees prevent duplicate work (one issue, one worker)
+- Assignees record ownership; advisory leases provide exclusive coordination
 - Events log all changes for observability
 
 **Example:**
@@ -122,7 +122,7 @@ See [Storage Format](../reference/storage-format.md) for the authoritative layou
 # Agent queries ready work
 jit query available --json
 
-# Agent claims task atomically
+# Record workflow ownership (acquire a lease first when exclusivity matters)
 jit issue claim abc123 agent:worker-1
 
 # Agent does work...
@@ -131,10 +131,14 @@ jit issue claim abc123 agent:worker-1
 jit gate evaluate abc123 tests
 jit gate evaluate abc123 code-review
 
-# Issue auto-transitions to done when gates pass
+# Inspect gate statuses, then explicitly request completion
+jit gate status-all abc123
+jit issue update abc123 --state done
 ```
 
-**Key Insight:** JIT doesn't coordinate agents with a central server. Instead, agents coordinate through **shared file state** and **atomic operations**. This is simpler, more reliable, and easier to reason about than distributed locking or message queues.
+**Key Insight:** JIT has no central coordination server. Agents share repository
+state; atomic writes keep files whole, and `jit claim acquire` provides advisory
+leases when exclusive coordination is needed.
 
 ## Domain Examples
 

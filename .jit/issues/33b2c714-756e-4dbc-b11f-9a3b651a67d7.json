@@ -1,0 +1,46 @@
+{
+  "id": "33b2c714-756e-4dbc-b11f-9a3b651a67d7",
+  "title": "Correct remaining lifecycle, lease, and durability documentation semantics",
+  "description": "Resolve the remaining final-review findings on creation state, claim-acquire assignment behavior, lease semantics, atomic replacement versus append logging, expired lease effects, and Gitless document capabilities.\n\n## Success Criteria\n\n- [hard] REQ-01: Lifecycle, claiming, lease, and atomic-write descriptions match current command and storage behavior without extending guarantees beyond source.\n- [hard] REQ-02: Git requirements distinguish commit/history operations from filesystem-backed document operations.\n- [hard] REQ-03: Scoped mechanical documentation checks and repository validation pass.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:final-docs-rework",
+  "dependencies": [],
+  "gates_required": [
+    "repo-validate",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:53:38.542868060Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:53:42.305969296Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/2d109173-wave7-review.md",
+      "commit": null,
+      "label": null,
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ],
+  "created_at": "2026-07-11T14:36:53.758533844Z",
+  "updated_at": "2026-07-11T14:55:04.355562881Z",
+  "first_ready_at": "2026-07-11T14:36:53.758540514Z",
+  "claimed_at": "2026-07-11T14:37:04.823188050Z",
+  "done_at": "2026-07-11T14:55:04.355562371Z"
+}

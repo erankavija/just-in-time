@@ -541,7 +541,7 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 - **Clear reporting:** Shows modified/skipped/error counts
 
 **When to use bulk vs single-issue update:**
-- **Single-issue:** Smart orchestration with prechecks, postchecks, auto-transitions
+- **Single-issue:** Enforces prechecks on `ready → in_progress` and checks gate statuses on an explicit `done` request
 - **Bulk:** Explicit, predictable batch changes across many issues
 
 ### Batch-Create with Dependency Wiring (`jit issue batch-create`)
@@ -926,7 +926,8 @@ jit issue reject $ISSUE --reason "wont-fix" --quiet
 
 **Key behaviors:**
 - **Bypasses gates:** Can reject from any state, even with failing gates
-- **Terminal state:** Cannot transition out of Rejected
+- **Closure outcome:** Records rejection without dependency or gate checks; do not
+  treat it as an enforced no-return source state for later `issue update` calls
 - **Optional reason:** `--reason` flag adds `resolution:*` label
 - **Immediate:** No validation or gate checks
 
@@ -963,9 +964,9 @@ jit issue reject $WIP_ISSUE --reason "duplicate"
 jit issue reject $GATED_ISSUE --reason "wont-fix"
 # Note: This bypasses gates, unlike transitioning to Done
 
-# Cannot transition from Done → Rejected (terminal states are final)
-jit issue reject $DONE_ISSUE
-# Error: Cannot transition from terminal state
+# Rejection bypasses dependency and gate checks; choose the closure action that
+# matches the project's process rather than relying on a source-state restriction.
+jit issue reject $ISSUE --reason "out-of-scope"
 ```
 
 ## Gate Commands
@@ -1361,9 +1362,9 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: updates gate status to `passed`, records who passed it and timestamp.
-- For an automated (auto) gate: runs the checker and only marks the gate passed if the checker passes.
-- If this was the last blocking gate, issue auto-transitions from `gated → done`.
+- For a manual gate: updates gate status to `passed`, records who passed it and timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes. This evaluation records a run; it does not itself complete the issue.
+- After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
 
 **Skip when already passed at HEAD:**
 - If the gate's latest run already passed at the current `HEAD` commit, `jit gate

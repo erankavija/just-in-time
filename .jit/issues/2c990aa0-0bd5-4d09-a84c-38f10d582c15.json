@@ -1,0 +1,46 @@
+{
+  "id": "2c990aa0-0bd5-4d09-a84c-38f10d582c15",
+  "title": "Correct lifecycle, gate, and coordination documentation semantics",
+  "description": "Resolve the final documentation review findings concerning lifecycle transitions, gate execution and statuses, assignment and claim behavior, type-label requirements, and invalid command examples.\n\n## Success Criteria\n\n- [hard] REQ-01: The assigned lifecycle and gate documentation precisely matches the current CLI and command handlers, including initial state, precheck failure, Gated completion, and the pending/passed/failed gate statuses.\n- [hard] REQ-02: Assignment, issue-claim, claim-next, and advisory-lease coordination claims state only behavior implemented by the current code.\n- [hard] REQ-03: All changed CLI and jq examples are syntactically valid and match their actual command contracts.\n- [hard] REQ-04: Scoped mechanical documentation checks and repository validation pass.",
+  "state": "done",
+  "priority": "high",
+  "assignee": "agent:cumulative-docs-rework",
+  "dependencies": [],
+  "gates_required": [
+    "repo-validate",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:19:44.886576613Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T14:19:45.198141650Z"
+    }
+  },
+  "context": {},
+  "documents": [
+    {
+      "path": "dev/active/2d109173-final-rework-review.md",
+      "commit": null,
+      "label": "Final rework lead review",
+      "doc_type": "review",
+      "format": "markdown"
+    }
+  ],
+  "labels": [
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:docs",
+    "type:task"
+  ],
+  "created_at": "2026-07-11T14:06:54.548117321Z",
+  "updated_at": "2026-07-11T14:20:38.579132917Z",
+  "first_ready_at": "2026-07-11T14:06:54.548125111Z",
+  "claimed_at": "2026-07-11T14:07:12.314483561Z",
+  "done_at": "2026-07-11T14:20:38.579132597Z"
+}

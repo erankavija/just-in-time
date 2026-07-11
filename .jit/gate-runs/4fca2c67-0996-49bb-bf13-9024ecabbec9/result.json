@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "run_id": "4fca2c67-0996-49bb-bf13-9024ecabbec9",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "befd35d04eb48aa8135fd035f46959a97a86cb83",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T14:21:12.009589727Z",
+  "completed_at": "2026-07-11T14:35:48.188774984Z",
+  "duration_ms": 876179,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. Lifecycle, claim/lease behavior, storage guarantees, configuration, and dependency direction drift in F1–F11.\n\nThe prior findings were substantially addressed, but residual and newly reached defects remain.\n\n## 2. Adopter surface vs repo-local configuration\n\nPass. Repo-local configuration shown in the reviewed surface is appropriately framed.\n\n## 3. Current behavior only\n\nPass. Legacy-marker matches are illustrative or generic rather than product-history claims.\n\n## 4. No rotting counts\n\nFail. No volatile totals remain, but the hand-maintained Event-tag enumeration violates the same single-source requirement (F12).\n\n## 5. Links and referenced paths\n\nPass. Full-scope link/anchor and addressable-item resolution checks pass.\n\n## 6. Content standards\n\nFail. One relationship diagram is non-Mermaid arrow art (F13).\n\n## Findings\n\n1. **F1 — Lifecycle diagram gives the wrong initial state.** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:100) starts every issue in `backlog`, but dependency-free `jit issue create` issues are persisted as `ready`. Remediate the diagram to show the actual creation state and present `backlog` as the blocked state.\n\n2. **F2 — Lease acquisition’s assignment side effect is omitted and contradicted.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1076) says `jit issue claim` records the assignee after `jit claim acquire`; acquisition already assigns the issue. Remediate to say `issue claim` is only needed afterward to promote ready work to `in_progress`.\n\n3. **F3 — Ordinary issue claiming is falsely called atomic coordination.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:308) labels `jit issue claim` “atomic,” although candidate selection and assignment are separate operations. Remediate to describe it as lifecycle assignment and direct exclusive coordination to `jit claim acquire`.\n\n4. **F4 — Lease reference overstates advisory leases as preventing edits.** [claim.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/claim.md:10) says leases prevent conflicting edits, but they only prevent duplicate lease acquisition; writes remain possible without a lease when enforcement is off. Remediate with the advisory/enforcement distinction.\n\n5. **F5 — Atomic-write guarantee includes append-only event writes.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:62) says all file writes are all-or-nothing replacements. `events.jsonl` is lock-serialized append I/O, not temp-file-and-rename replacement. Remediate the guarantee to distinguish atomic replacement writes from locked append logs.\n\n6. **F6 — Expired leases are falsely said to appear in `query available`.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:460) claims expiry makes an issue available to that query. Lease acquisition assigns the issue, while `query available` requires it to be unassigned. Remediate to distinguish lease availability from queue availability and prescribe release/unassign when appropriate.\n\n7. **F7 — Gitless operation is said to disable all document features.** [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:536) contradicts filesystem-backed document archive and current-content operations. Remediate to limit the Git requirement to commit-pinned/history operations.\n\n8. **F8 — Multi-agent configuration presents inert controls as operational.** [multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:204) presents `worktree.mode`, TTL, heartbeat, and staleness settings as active coordination controls, although only lease enforcement and indefinite-lease limits are consumed. Remediate to use `--ttl` and explicit heartbeats, and label the other fields as compatibility/display-only.\n\n9. **F9 — Lock-timeout default is incorrect.** [deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:147) lists `JIT_LOCK_TIMEOUT` as `30`; storage defaults it to five seconds. Remediate the table to `5`.\n\n10. **F10 — Dependency direction is reversed in the glossary.** [glossary.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/glossary.md:54) says `A → B` means A blocks B. `jit dep add A B` means A depends on B, so B blocks A. Remediate the blocks/blocked-by/transitive definitions.\n\n11. **F11 — Storage layout invents per-agent heartbeat files.** [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:284) describes `heartbeat/<agent-id>.json` liveness records. Heartbeats update `claims.jsonl` and the claims index; no per-agent files are written. Remediate the layout and record description.\n\n12. **F12 — Event tags are hand-copied volatile data.** [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:187) enumerates the current serialized Event variants despite identifying the Rust enum as authoritative. Remediate by replacing the list with the source citation or a derived projection.\n\n13. **F13 — Source-precedence diagram is not Mermaid.** [multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:175) uses a multi-line arrow-art flow in an untyped fence. Remediate it as a Mermaid diagram.\n\nTotal findings: 13\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"13 blocking documentation defects remain in lifecycle, coordination, storage, and standards documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Lifecycle diagram gives the wrong initial state.\",\"file\":\"README.md\",\"line\":100},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Lease acquisition assignment side effect is omitted and contradicted.\",\"file\":\"docs/concepts/core-model.md\",\"line\":1076},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Ordinary issue claiming is falsely called atomic coordination.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":308},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Lease reference overstates advisory leases as preventing edits.\",\"file\":\"docs/reference/claim.md\",\"line\":10},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Atomic-write guarantee incorrectly includes append-only event writes.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":62},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"Expired leases are falsely said to appear in query available.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":460},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Gitless operation is said to disable all document features.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":536},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Multi-agent configuration presents inert controls as operational.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":204},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"JIT_LOCK_TIMEOUT default is incorrect.\",\"file\":\"docs/how-to/deployment.md\",\"line\":147},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"Glossary reverses dependency direction.\",\"file\":\"docs/reference/glossary.md\",\"line\":54},{\"id\":\"F11\",\"severity\":\"high\",\"summary\":\"Storage layout invents per-agent heartbeat files.\",\"file\":\"docs/reference/storage-format.md\",\"line\":284},{\"id\":\"F12\",\"severity\":\"high\",\"summary\":\"Event tags are hand-copied volatile data.\",\"file\":\"docs/reference/storage-format.md\",\"line\":187},{\"id\":\"F13\",\"severity\":\"high\",\"summary\":\"Source-precedence diagram is non-Mermaid arrow art.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":175}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 60786 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f518d-c06e-7ba2-b703-8c3c3574828b\n--------\nuser\n--- 60773 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "13 blocking documentation defects remain in lifecycle, coordination, storage, and standards documentation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Lifecycle diagram gives the wrong initial state.",
+        "file": "README.md",
+        "line": 100
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Lease acquisition assignment side effect is omitted and contradicted.",
+        "file": "docs/concepts/core-model.md",
+        "line": 1076
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Ordinary issue claiming is falsely called atomic coordination.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 308
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Lease reference overstates advisory leases as preventing edits.",
+        "file": "docs/reference/claim.md",
+        "line": 10
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "Atomic-write guarantee incorrectly includes append-only event writes.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 62
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "Expired leases are falsely said to appear in query available.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 460
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Gitless operation is said to disable all document features.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 536
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Multi-agent configuration presents inert controls as operational.",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "line": 204
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "JIT_LOCK_TIMEOUT default is incorrect.",
+        "file": "docs/how-to/deployment.md",
+        "line": 147
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "Glossary reverses dependency direction.",
+        "file": "docs/reference/glossary.md",
+        "line": 54
+      },
+      {
+        "id": "F11",
+        "severity": "high",
+        "summary": "Storage layout invents per-agent heartbeat files.",
+        "file": "docs/reference/storage-format.md",
+        "line": 284
+      },
+      {
+        "id": "F12",
+        "severity": "high",
+        "summary": "Event tags are hand-copied volatile data.",
+        "file": "docs/reference/storage-format.md",
+        "line": 187
+      },
+      {
+        "id": "F13",
+        "severity": "high",
+        "summary": "Source-precedence diagram is non-Mermaid arrow art.",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "line": 175
+      }
+    ]
+  }
+}

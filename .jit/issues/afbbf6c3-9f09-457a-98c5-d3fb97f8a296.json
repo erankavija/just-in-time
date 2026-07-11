@@ -2,7 +2,7 @@
   "id": "afbbf6c3-9f09-457a-98c5-d3fb97f8a296",
   "title": "Resolve the inert validation strictness contract",
   "description": "`[validation].strictness` is configurable but has no validation behavior. Resolve the false contract by removing/migrating the key or by defining and implementing its behavior; do not leave selectable ignored values.\n\nSource: `.jit/config.toml:42-47`; `crates/jit/src/config.rs:284-305`; `docs/reference/configuration.md:75-91`; `dev/active/36d5451e-audit-notes.md:75-83,126-134`.\n\n## Success Criteria\n\n- [hard] REQ-01: One coherent outcome is selected: remove/migrate the key or give every documented value observable tested behavior.\n- [hard] REQ-02: Templates, parsing, examples, and reference documentation agree with that outcome.\n- [hard] REQ-03: Regression tests prove no accepted strictness setting is silently inert.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -16,11 +16,11 @@
   "documents": [],
   "labels": [
     "type:bug",
-    "epic:docs-exhaustive-audit",
     "milestone:v1.0",
-    "component:validation"
+    "component:validation",
+    "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.554707732Z",
-  "updated_at": "2026-07-11T13:36:02.475789369Z",
+  "updated_at": "2026-07-11T13:41:02.515358120Z",
   "first_ready_at": "2026-07-11T13:35:35.554707972Z"
 }

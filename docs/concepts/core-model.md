@@ -127,8 +127,8 @@ See [Assignees](#assignees) for complete specification.
 List of issue IDs that must reach a terminal state before this issue can proceed.
 
 **Semantics:** "This issue depends on those issues"
+- Blocks readiness and claiming until dependencies reach a terminal state
 - Blocks completion (state transition to `done`)
-- Does not block starting work (can `in_progress` while dependencies pending)
 - Enforces DAG structure (no cycles)
 
 See [Dependencies](#dependencies-vs-labels-understanding-the-difference) for complete explanation.
@@ -204,13 +204,12 @@ Issues progress through states as work advances:
 
 ```mermaid
 flowchart LR
-    C[Creation] --> B[Backlog]
-    B --> R[Ready]
-    R --> P[In Progress]
-    P --> D[Done]
-    R --> G[Gated]
-    P --> G
-    G --> D
+    C[Creation] --> R[Ready]
+    B[Backlog: unmet dependencies] --> R
+    R --> P[In Progress: prechecks pass]
+    P --> G[Gated: completion blocked]
+    P --> D[Done: gates already passed]
+    G --> D[Done: retry after gates pass]
 ```
 
 **1. Creation**
@@ -222,32 +221,36 @@ jit issue create \
   --label "type:task"
 ```
 
-New issues start in `backlog` state.
+New dependency-free issues are created in `ready`. Gates do not block `ready`;
+they are checked when work starts or completes.
 
 **2. Transition to Ready**
 
-Issues become `ready` when:
-- ✓ All dependencies in terminal state (`done` or `rejected`)
-- ✓ All precheck gates passed
+An issue in `backlog` becomes `ready` when all dependencies are terminal (`done`
+or `rejected`). Prechecks are not a readiness condition: they run when a ready
+issue is claimed or explicitly moved to `in_progress`.
 
 **3. Work Begins**
 
 ```bash
 jit issue claim $ISSUE agent:worker-1
-# Automatically transitions to in_progress
+# Transitions to in_progress if its prechecks pass
 ```
 
 **4. Completion**
 
 ```bash
-# Inspect latest postcheck runs
+# Inspect and evaluate required gates
 jit gate status-all $ISSUE
+jit gate evaluate $ISSUE tests
 
-# Mark complete
+# Once every required gate is passed, request completion again
 jit issue update $ISSUE --state done
 ```
 
-Issue moves to `gated` if postchecks unpassed, otherwise to `done`.
+An explicit `done` request moves an issue with unpassed gates to `gated`; it does
+not run those checkers. Evaluate the gates, inspect their statuses, then retry
+the `done` request.
 
 See [States](#states) for complete state machine details.
 
@@ -332,11 +335,11 @@ Issue has label "epic:auth"
   → Provides hierarchy and context
 ```
 
-**Assignees** prevent conflicts:
+**Assignees** record ownership:
 ```
 Issue assigned to "agent:worker-1"
   → Indicates ownership
-  → Combined with claims for atomicity
+  → An advisory lease provides exclusive coordination when needed
   → Enables coordination across agents
 ```
 
@@ -344,7 +347,7 @@ Issue assigned to "agent:worker-1"
 ```
 Issue state: in_progress
   → Shows current workflow position
-  → Determines valid transitions
+  → Is checked by the workflow's dependency and gate guards
   → Affects query results (available, blocked, done)
 ```
 
@@ -520,7 +523,7 @@ Quality gates are checkpoints that enforce process requirements before issues ca
 
 Gates exist in three states:
 
-1. **Required** - Gate is attached to an issue but not yet checked
+1. **Pending** - Gate is attached to an issue but not yet checked
 2. **Passed** - Gate check succeeded (automated) or approved (manual)
 3. **Failed** - Gate check failed (automated only)
 
@@ -528,8 +531,8 @@ Gates exist in three states:
 
 ```mermaid
 stateDiagram-v2
-    Required --> Passed: check succeeds or manual approval
-    Required --> Failed: automated check fails
+    Pending --> Passed: check succeeds or manual approval
+    Pending --> Failed: automated check fails
     Failed --> Passed: fix issue, re-run check
 ```
 
@@ -537,12 +540,12 @@ stateDiagram-v2
 
 Gates run at two stages in the issue lifecycle:
 
-**Prechecks** - Run before work begins (`backlog/ready → in_progress`)
+**Prechecks** - Run before work begins (`ready → in_progress`)
 - Verify prerequisites met
 - Remind about process (e.g., TDD: write tests first)
 - Validate approach before implementation
 
-**Postchecks** - Run before completion (`in_progress → done`)
+**Postchecks** - Required before completion (`in_progress/gated → done`)
 - Verify quality standards (tests pass, linting clean)
 - Require reviews or approvals
 - Validate deliverables complete
@@ -575,7 +578,7 @@ flowchart LR
 ### Gate Status Tracking
 
 Each gate on an issue tracks:
-- **Status**: required, passed, or failed
+- **Status**: pending, passed, or failed
 - **Updated by**: Who/what passed the gate (e.g., `human:alice`, `ci:github-actions`)
 - **Updated at**: Timestamp of last status change
 
@@ -599,7 +602,8 @@ jit issue update $ISSUE --state done
 **If any gates not passed:**
 - Issue transitions to `gated` (waiting for gate approval)
 - Clear error message shows which gates are blocking
-- Auto-transitions to `done` when last gate passes
+- Evaluate the listed gates, inspect `jit gate status-all`, then retry the
+  explicit `done` request
 
 **Example:**
 ```bash
@@ -613,8 +617,16 @@ $ jit gate evaluate abc123 tests
 
 $ jit gate evaluate abc123 code-review --by human:alice
 ✓ code-review passed
-→ Issue automatically transitioned to 'done' (all gates passed)
+
+# Once every required status is green, retry completion.
+$ jit issue update abc123 --state done
+✓ Issue transitioned to 'done'
 ```
+
+Passing a manual gate may auto-transition an already `gated` issue when it
+clears the final blocker. Automated `jit gate evaluate` runs and records its
+checker result; use the explicit retry above for a workflow that works for both
+gate modes.
 
 ### Gate Bypass for Terminal States
 
@@ -660,10 +672,10 @@ Gates influence state transitions:
 
 ```mermaid
 stateDiagram-v2
-    Backlog --> Ready: prechecks
-    Ready --> InProgress
-    InProgress --> Gated: postchecks
-    Gated --> Done: all gates pass
+    Backlog --> Ready: dependencies terminal
+    Ready --> InProgress: prechecks pass
+    InProgress --> Gated: done requested with unpassed gates
+    Gated --> Done: done retried after gate statuses pass
     note right of Gated
         Waiting for gates
     end note
@@ -673,7 +685,8 @@ stateDiagram-v2
 - **Prechecks** gate entry to `in_progress`
 - **Postchecks** gate entry to `done`
 - **Gated state** exists specifically for gate waiting
-- **Auto-transition** from `gated → done` when gates pass
+- **Automated evaluation** records a gate run; completion is retried explicitly
+  after required statuses pass (manual approval may complete a gated issue)
 
 ### Design Philosophy
 
@@ -708,16 +721,15 @@ Issues progress through a lifecycle with the following states:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Backlog: created
+    [*] --> Ready: dependency-free creation
     Backlog --> Ready: dependencies satisfied
-    Ready --> InProgress: claimed
+    Ready --> InProgress: claim / prechecks pass
     InProgress --> Gated: completion attempted
-    Gated --> Done: all gates pass
-    Done --> [*]
+    Gated --> Done: done retried after gates pass
     note right of Gated
-        Rejected (terminal, won't implement) and
-        Archived (parked, out of active views)
-        are reachable from any state
+        This diagram shows the ordinary workflow.
+        The update handler does not enforce it as
+        an exhaustive source-to-target transition graph.
     end note
 ```
 
@@ -725,21 +737,25 @@ stateDiagram-v2
 
 **Backlog**: Issue is not yet ready to work on. Dependencies have not all reached a terminal state, or the issue is explicitly marked as future work.
 
-**Ready**: Issue is unblocked (all dependencies satisfied), has no assignee, and is available to claim. This is the state agents query to find work.
+**Ready**: Issue is unblocked (all dependencies satisfied). It may be assigned;
+`jit query available` selects ready, unassigned work.
 
 **In Progress**: Issue is actively being worked on by an assignee.
 
-**Gated**: Issue has attempted to transition to Done, but quality gates have not all passed. Issue auto-transitions to Done when all required gates pass.
+**Gated**: Issue has attempted to transition to Done, but quality gates have not
+all passed. Evaluate or attest the gates, then retry `jit issue update --state done`.
 
-**Done**: Terminal state indicating successful completion. Done issues do not transition to active states; archiving remains available for parking them out of views.
+**Done**: Completion outcome. A `done` request checks dependencies and required
+gate statuses before entering this state.
 
-**Rejected**: Terminal state indicating the issue was closed without implementation. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
+**Rejected**: Closure outcome for work not implemented. It bypasses dependency
+and gate checks. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
 **Archived**: Parked out of active views. Reachable from any state and not terminal. An archived issue can be revived by transitioning it back into the lifecycle. Archived issues are excluded from readiness queries but still count as open in container rollups.
 
-### Terminal States
+### Completion and Rejection Outcomes
 
-JIT has two terminal states that represent different outcomes:
+`Done` and `Rejected` represent different closure outcomes:
 
 **Done** - Work was successfully completed
 - All gates passed
@@ -751,21 +767,22 @@ JIT has two terminal states that represent different outcomes:
 - Common reasons: duplicate, won't-fix, invalid, out-of-scope
 - Optional `resolution:*` label provides closure reason
 
-Done and Rejected do not transition directly to active states. Archiving is available from every state, and an archived issue revives into an active state via `jit issue update --state <state>`.
+The current update and reject handlers do not enforce a closed, source-to-target
+state graph for non-`done` targets. Treat the diagram as the ordinary workflow;
+do not rely on it to prohibit a later explicit state update.
 
 ### State Transitions
 
 **Auto-transitions:**
 - `Backlog → Ready`: When all dependencies reach a terminal state (done or rejected)
-- `Gated → Done`: When all required gates pass
 
-**Manual transitions:**
-- `Ready → In Progress`: Via `jit issue claim` or `jit issue assign`
-- `In Progress → Done`: Via `jit issue update --state done` (if gates allow)
-- `In Progress → Gated`: Automatic when transitioning to Done with unmet gates
+**Guarded workflow operations:**
+- `Ready → In Progress`: `jit issue claim` attempts this transition and runs prechecks
+- `jit issue assign`: Changes only the assignee; it does not change state
+- `→ Done`: `jit issue update --state done` checks dependencies and gate statuses
+- `→ Gated`: A `done` request with unpassed gates is diverted here
 - `Any State → Rejected`: Via `jit issue reject` (bypasses gates)
 - `Any State → Archived`: Via `jit issue update --state archived` (parks the issue; bypasses gates)
-- `Archived → any active state`: Via `jit issue update --state <state>` (revives the issue into the lifecycle)
 
 ### Gate Bypass for Rejected
 
@@ -829,12 +846,15 @@ Labels provide organizational membership using `namespace:value` format for filt
 - Separator: exactly one colon (`:`)
 - No leading/trailing whitespace
 
-### Required Labels
+### Type Labels and Defaults
 
-**Every issue carries exactly one `type:` label.** The type vocabulary is project
-configuration, not fixed by the engine (`@/inv/domain-agnostic`): `jit init` ships
-the `milestone → epic → story → task` hierarchy, and a project declares its own
-type names and levels under `[type_hierarchy]`.
+A configured `type` namespace can enforce **at most one** `type:*` label. The
+type vocabulary is project configuration, not fixed by the engine
+(`@/inv/domain-agnostic`): `jit init` ships the `milestone → epic → story → task`
+hierarchy, and a project declares its own type names and levels under
+`[type_hierarchy]`. A project may use `[validation].default_type` to add a type
+when one is absent; without that default or a project rule, a type label is not
+universally required.
 
 ```mermaid
 flowchart LR
@@ -849,7 +869,8 @@ Projects add their own types alongside these. This repository, for example,
 declares `bug`, `enhancement`, `planning`, and `breakdown`; the research example
 under `docs/examples/research/` uses `goal` and `experiment` instead.
 
-**Exception:** Use `--orphan` flag to explicitly allow issues without type label.
+`--orphan` concerns missing parent membership labels for leaf issues; it is not a
+type-label exception.
 
 ### Common Label Namespaces
 
@@ -946,15 +967,13 @@ jit query all --label "component:*"
 
 `jit query all --label` ANDs repeated flags. The full boolean filter language
 (`AND` / `OR` / `NOT` over `state`, `label`, `priority`, and `assignee` fields)
-is available on the `--filter` flag of `jit issue claim-next` and
-`jit issue update`:
+is available on batch `jit issue update --filter`:
 ```bash
 # query all ANDs repeated --label flags
 jit query all --label "epic:auth" --label "component:backend"
 
-# Boolean filter language on --filter (claim-next / update)
-jit issue claim-next agent:worker-1 --filter "label:milestone:v1.0 OR label:milestone:v1.1"
-jit issue update abc123 --filter "label:type:task AND NOT label:epic:*" --add-gate tests
+# Boolean filter language on batch update (no issue ID with --filter)
+jit issue update --filter "label:type:task AND NOT label:epic:*" --add-gate tests
 ```
 
 ### Label vs Dependency Semantics
@@ -1011,7 +1030,8 @@ These commands help discover existing labels without manual inspection.
 
 ## Assignees
 
-Assignees indicate who (human or agent) is actively working on an issue. JIT supports atomic claiming to prevent race conditions in multi-agent scenarios.
+Assignees record who is intended to work on an issue. They are workflow metadata;
+for exclusive multi-agent coordination, use an advisory lease.
 
 ### Assignee Format
 
@@ -1034,11 +1054,13 @@ jit issue claim abc123 agent:worker-1
 jit issue assign abc123 bot:ci-automation
 ```
 
-### Claim Semantics (Atomic Operations)
+### Claiming and Lease Coordination
 
-**Why atomic claiming matters:**
+`jit issue claim` records an assignee and, for a ready issue, attempts the
+`in_progress` transition. It is not an exclusive coordination primitive: separate
+agents can read a candidate and write an assignment in separate operations.
 
-In multi-agent scenarios, multiple agents may query for ready work simultaneously. Without atomic operations, race conditions occur:
+In multi-agent scenarios, two agents can therefore select the same ready issue:
 
 ```mermaid
 sequenceDiagram
@@ -1051,42 +1073,45 @@ sequenceDiagram
     Note over A1,A2: Duplicate work
 ```
 
-**JIT's solution: File-based atomic claiming**
-
-Advisory locks serialize the writes; the POSIX `rename()` makes each write
-atomic. A claim takes the repository, index, and issue locks, then:
-1. Read issue file
-2. Verify the issue is unassigned, or already assigned to the same claimant
-3. Write temp file with new assignee
-4. **Atomic rename** (the file is replaced whole, never partially)
-
-Because the locks serialize step 2 against step 4, the second agent reads the
-issue only after the first agent's claim has landed, and its verification fails.
+Use `jit claim acquire` when one agent must hold an exclusive advisory lease. It
+uses the claims coordinator's exclusive lease lock and records the resolved agent
+as the issue assignee, but it does not change the lifecycle state. Then use
+`jit issue claim` with that same assignee to promote a ready issue into
+`in_progress` through its prechecks.
 
 ```bash
-# Both agents try simultaneously, for two DIFFERENT assignees
-Agent 1: jit issue claim abc123 agent:worker-1  # ✓ Succeeds
-Agent 2: jit issue claim abc123 agent:worker-2  # ✗ Fails: already claimed by agent:worker-1
+# Acquire an exclusive advisory lease and record the assignee.
+jit claim acquire abc123 --ttl 600 --agent-id agent:worker-1
+
+# The same-assignee issue claim promotes a ready issue; it does not acquire a
+# second lease or change a still-blocked issue into ready.
+jit issue claim abc123 agent:worker-1
 ```
+
+Leases are advisory. They coordinate cooperating agents, while
+`[worktree].enforce_leases` controls whether selected write commands require an
+active lease; with enforcement `off`, those write guards do not block writes.
+`jit issue claim` separately rejects a conflicting live lease as part of its
+claiming behavior.
 
 ### Claim vs Assign
 
-**`jit issue claim`** - Atomic operation (race-safe)
+**`jit issue claim`** - Lifecycle-oriented assignment
 - Verifies the issue is unassigned, or already assigned to the same claimant
-- Claims for specified assignee
-- Returns an error only when the issue is already assigned to a *different* assignee; re-claiming as the current assignee is idempotent (it promotes the assignment, e.g. into an `in_progress` transition once dependencies reach a terminal state)
-- Use for multi-agent coordination
+- For a ready issue, runs prechecks and promotes it to `in_progress`
+- Returns an error only when the issue is already assigned to a *different* assignee; re-claiming as the current assignee is idempotent
+- Does not itself provide a lease or a compare-and-set claim across competing commands
 
-**`jit issue assign`** - Force assignment (overwrites)
+**`jit issue assign`** - Assignee bookkeeping (overwrites)
 - Assigns regardless of current state
 - Can reassign from one agent to another
+- Does not change lifecycle state
 - Use for manual intervention
 
 **Examples:**
 ```bash
-# Agent claims (atomic, safe)
+# Claim records workflow ownership; acquire a lease first when exclusivity matters.
 jit issue claim abc123 agent:worker-1
-# Error if claimed by a DIFFERENT assignee; re-claiming as agent:worker-1 itself succeeds
 
 # Human reassigns (force, override)
 jit issue assign abc123 human:alice
@@ -1101,20 +1126,22 @@ For agents that just want "next available work":
 # Claim next ready issue by priority
 jit issue claim-next agent:worker-1
 
-# With filter
-jit issue claim-next agent:worker-1 --filter "label:epic:auth"
 ```
 
 **Behavior:**
 1. Queries ready issues (unassigned, state=ready, unblocked)
 2. Sorts by priority (critical → high → normal → low)
-3. Atomically claims first available issue
+3. Attempts to claim the first selected issue
 4. Returns claimed issue ID
 
+`claim-next --filter` is accepted by the CLI but its current handler does not
+apply it. Do not use it for targeted work. Query ready work with labels or a
+separate query first, and acquire a lease if the selection must be exclusive.
+
 **Race handling:**
-- If multiple agents claim-next simultaneously, each gets different issue
-- Atomic file operations ensure no duplicates
-- If no ready issues, returns error
+- Concurrent `claim-next` calls can choose the same candidate
+- Use `jit claim acquire <issue-id>` for an exclusive lease before work starts
+- If no ready issues, `claim-next` returns an error
 
 ### Release Semantics
 
@@ -1126,10 +1153,13 @@ jit issue release abc123 "timeout"
 ```
 
 **Behavior:**
-- Clears assignee
+- Clears assignee; it does not release an advisory lease
 - Adds event to audit log
-- Issue becomes available for other agents
+- A ready, unblocked issue becomes eligible for `jit query available` after its
+  assignee is cleared
 - Reason recorded for observability
+
+Use `jit claim release` separately when an advisory lease must be released.
 
 **Common reasons:**
 - `timeout` - Exceeded time budget
@@ -1154,8 +1184,8 @@ Equivalent to `assign` with no assignee value.
 ```bash
 # Each agent independently polls and claims
 while true; do
-  # Claim next ready work atomically
-  ISSUE=$(jit issue claim-next agent:worker-$ID --json | jq -r 'id')
+  # Convenience selection; this does not acquire an exclusive lease.
+  ISSUE=$(jit issue claim-next agent:worker-$ID --json | jq -r '.id')
   
   if [ -n "$ISSUE" ]; then
     # Do work...
@@ -1170,28 +1200,19 @@ while true; do
 done
 ```
 
-**Pattern 2: Filtered Work Distribution**
+**Pattern 2: Targeted Work Distribution**
 ```bash
-# Agent 1: Backend specialist
-jit issue claim-next agent:backend-specialist --filter "label:component:backend"
-
-# Agent 2: Frontend specialist
-jit issue claim-next agent:frontend-specialist --filter "label:component:frontend"
-
-# Agent 3: Generalist
-jit issue claim-next agent:generalist
+# Discover a component-specific ready issue, then coordinate it exclusively.
+jit query available --label component:backend
+jit claim acquire <selected-issue-id> --ttl 600 --agent-id agent:backend-specialist
+jit issue claim <selected-issue-id> agent:backend-specialist
 ```
 
-**Pattern 3: Priority-Based Assignment**
-```bash
-# High-priority agent gets critical work
-jit issue claim-next agent:priority-worker --filter "priority:critical OR priority:high"
+`claim-next` already orders its unfiltered candidates by priority. For component
+or priority targeting, use a separate query because its current `--filter`
+handler does not apply that argument.
 
-# Low-priority agent gets normal work
-jit issue claim-next agent:background-worker --filter "priority:normal OR priority:low"
-```
-
-**Pattern 4: Timeout and Recovery**
+**Pattern 3: Timeout and Recovery**
 ```bash
 # Work on issue with timeout
 ISSUE=$(jit issue claim-next agent:worker-1)
@@ -1203,7 +1224,8 @@ timeout 300 work_on_issue "$ISSUE" || {
 
 ### Coordination Model
 
-- Atomic claiming via file operations
+- Atomic file writes, not an atomic `issue claim` or `claim-next` selection
+- Exclusive advisory leases via `jit claim acquire`; enforcement remains configuration-controlled
 - Decentralized polling (no coordinator daemon)
 - Simple assignee format with type prefix
 - Manual release on timeout/error
