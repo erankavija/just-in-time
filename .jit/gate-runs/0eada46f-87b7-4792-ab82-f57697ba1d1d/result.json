@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "0eada46f-87b7-4792-ab82-f57697ba1d1d",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2b9a80fb-5d06-40e8-b3a0-ef23534cd89a",
+  "commit": "15357fbb3b813e1f9742a6a2569b8bbd0b7bf8c5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:13:58.711440498Z",
+  "completed_at": "2026-07-11T08:17:11.257090443Z",
+  "duration_ms": 192545,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nThe documented command names, flags, aliases, JSON examples, storage claims, and exit-code taxonomy checked against the HEAD-built binary, `cli.rs`, and handlers match the current implementation.\n\n## 2. Adopter surface versus dogfood configuration\n\nBlocking finding: [docs/reference/cli-commands.md:428](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:428) uses `--type bug` as an unqualified adopter example. `bug` is this repository’s local type; a freshly initialized repository provides `milestone`, `epic`, `story`, and `task`.\n\nRemediation: either use a shipped type such as `task`, or explicitly state that `bug` requires a repository-local `[type_hierarchy]` declaration.\n\n## 3. Current behavior only\n\nBlocking finding: [docs/reference/cli-commands.md:2807](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2807) describes an “already-migrated repository,” while line 2809 explains missing data as “predating event coverage.” This is migration/history narration about earlier jit behavior.\n\nRemediation: state only the current conditions: rerunning when all lifecycle fields are populated makes no changes, and fields remain unset when the current event log contains no applicable event.\n\n## 4. No hardcoded counts that silently rot\n\nBlocking finding: [docs/reference/cli-commands.md:1578](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1578) hand-copies gate totals from the builtin preset registry (`5 gates`, `1 gate`, `3 gates`), and line 1826 repeats “all 5 quality gates.” These totals change when preset definitions change.\n\nRemediation: omit the numerical totals from authored examples, or generate/project the sample from `jit gate preset list` and `jit gate preset show`.\n\n## 5. Links and referenced paths resolve\n\nAll Markdown targets and anchors in the scoped file resolve. All cited repository paths exist. Every addressable-item citation resolves through the HEAD-built `jit item show`.\n\n## 6. Content-standards conformance\n\nNo non-Mermaid diagram was found. Table separators and fenced CLI examples are not diagrams. No plain-text mathematical equations requiring LaTeX were found. The historical narration identified above violates the present-behavior requirement.\n\n## Findings\n\n1. **F1 — High:** The `--type bug` example presents this repository’s local type as generally available without dogfood framing. Replace it with a shipped type or identify the required local configuration. Location: `docs/reference/cli-commands.md:428`.\n2. **F2 — High:** Lifecycle backfill documentation narrates historical migration states through “already-migrated” and “predating event coverage.” Rewrite it solely in terms of current stored fields and available events. Location: `docs/reference/cli-commands.md:2807`.\n3. **F3 — High:** Builtin/custom preset examples hardcode volatile gate totals at lines 1578–1580 and 1826. Remove the totals or derive the displayed output from the preset registry. Location: `docs/reference/cli-commands.md:1578`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking defects remain: an unsignalled repo-local type, historical migration narration, and volatile preset gate counts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The --type bug example presents a repository-local type as generally available without dogfood framing.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":428},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Lifecycle backfill documentation narrates historical migration states instead of current behavior only.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2807},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Preset examples hardcode volatile gate totals maintained separately from the builtin preset registry.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1578}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3113 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f503d-8ce4-71d1-8d8f-a69845d07c60\n--------\nuser\n--- 3100 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking defects remain: an unsignalled repo-local type, historical migration narration, and volatile preset gate counts.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The --type bug example presents a repository-local type as generally available without dogfood framing.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 428
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Lifecycle backfill documentation narrates historical migration states instead of current behavior only.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2807
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Preset examples hardcode volatile gate totals maintained separately from the builtin preset registry.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1578
+      }
+    ]
+  }
+}

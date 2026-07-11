@@ -15,10 +15,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:13:55.377437464Z"
+    },
     "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:13:55.266514573Z"
+    },
+    "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T23:31:26.421939482Z"
+      "updated_at": "2026-07-11T08:13:58.711440498Z"
     }
   },
   "context": {},
@@ -29,6 +39,31 @@
       "label": null,
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/2b9a80fb-audit-notes.md",
+      "commit": null,
+      "label": "Audit notes",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../../mcp-server/README.md",
+          "resolved_path": "mcp-server/README.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "4271140bb3dabcb8c4f03f4308ea23cac8a6007441e8973eb4cb82147202d48f",
+          "is_shared": false
+        },
+        {
+          "original_path": "../../mcp-server/curated-tools.json",
+          "resolved_path": "mcp-server/curated-tools.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "9c6b145c963f6e1186b550f97074d3abe13390d672489b18dba5ecde5e4f4014",
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -43,7 +78,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.660179582Z",
-  "updated_at": "2026-07-11T07:39:26.702719353Z",
+  "updated_at": "2026-07-11T08:17:11.257428943Z",
   "first_ready_at": "2026-07-10T20:21:17.660179842Z",
   "claimed_at": "2026-07-11T07:39:26.702719143Z"
 }
