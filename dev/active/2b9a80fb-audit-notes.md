@@ -44,9 +44,9 @@ Source-verified against HEAD `8e4acd98`. Binary `jit 0.2.1 (commit 8e4acd98)` pr
 - Command aliases used in examples all real: `query ready`→available, `gate eval`→evaluate, `graph downstream`→rdeps, `graph dependencies`→deps, `dependency`/`document` family aliases, `config show`.
 - `State` enum (7 variants) and the exit-code taxonomy table (`3769-3778`) match `types.rs:28-42` and `--schema.exit_codes`. `is_terminal = Done|Rejected` (so "archived, which is not terminal" at `1488` is correct).
 
-## REQ-06 — volatile facts with no markdown-projection surface (cited-to-source; recorded for follow-up)
+## REQ-06 — builtin gate-preset facts (RESOLVED in doc-review rework; supersedes the earlier "acceptable as-is" judgment)
 
-- **Builtin gate-preset catalog** (`2359-2405`): presets live in code (`crates/jit/src/gate_presets/builtin.rs`), not a config registry that renders to markdown. The doc already names the authoritative live surface (`2361-2364`: "the builtin preset registry is authoritative … `jit gate preset list`/`show`"), so the hand-enumeration is backed by a cited surface and is currently accurate. No markdown projector exists → left in place with the existing citation. Candidate follow-up: a `jit gate preset` projection akin to `jit reference render`, or trimming the enumeration to the live surface.
+Presets live in code (`crates/jit/src/gate_presets/builtin.rs`) with no markdown projector. My first pass judged the hand-enumeration acceptable because it was currently accurate and cited the live surface; **doc-review F3 correctly rejected that** — `@/inv/single-source-prose` makes a hand-maintained copy a staleness defect *even when currently accurate*. All hand-copied builtin-preset counts/contents have now been de-hardcoded and re-pointed at the live source of truth (`jit gate preset list`/`show`); see the doc-review-rework section below.
 
 ## RESOLVED — MCP Tools Reference collapsed (lead-approved)
 
@@ -64,3 +64,14 @@ The former **MCP Tools Reference** (`192-865`) hand-copied a whole MCP tool cata
    - Minor follow-up (out of footprint, not fixed): `docs/tutorials/quickstart.md:45` describes the link as "complete tool catalog" — the catalog now lives in `mcp-server/README.md`; that inbound link still resolves but its wording could point there directly.
 
 **Pre-existing tree-wide dangling links (NOT mine, out of scope):** a whole-tree M2 run surfaces dangling targets only in `dev/` (contributor notes/archives and `dev/authoring-conventions.md`, which contains *intentional* broken-link examples) and `web/TESTING.md`. None reference `cli-commands.md` or the collapse; all predate this change and lie outside the single-file footprint.
+
+## Doc-review rework (round 1 — 3 findings, all fixed)
+
+- **F1 [high] repo-local `--type bug` unframed.** `jit issue create "Fix login bug" --type bug --priority high` (create example) used `bug`, a repo-local dogfood type; `jit init` ships only `milestone/epic/story/task`. Fixed to `--type task` (shipped default). File-wide sweep: `bug`/`enhancement`/`planning`/`breakdown` as an issue TYPE appears nowhere else; no `brackets:`/`satisfies:`/`per:` repo-local label namespaces anywhere. Remaining `planning`/`breakdown` tokens are the shipped planning-bracket presets' P/B node roles (concept-doc–framed, not repo-local types); `grep "bug"` lines are title searches.
+- **F2 [high] `jit migrate lifecycle-timestamps` read as historical migration.** Command kept documented; reframed to present-tense current behavior — dropped "One-time", "a second run over an already-migrated repository", and "predating event coverage". Kept every accurate fact: idempotent (writes nothing / appends no event / `issues_updated: 0` when nothing is missing), derives from `.jit/events.jsonl`, fills only absent fields, emits `lifecycle_timestamps_backfilled`, `--json` shape. Also reworded an innocent "commands used to …" in the collapsed MCP section to avoid the reviewer's `used to` grep. No other historical/migration narration remains file-wide.
+- **F3 [high] hand-copied builtin-preset counts/enumerations (`@/inv/single-source-prose`).** Three instances, all de-hardcoded and re-pointed at the live source of truth (`jit gate preset list` / `show`) rather than re-copying corrected numbers:
+  1. `preset list` sample output — `(5 gates)`/`(1 gate)`/`(3 gates)` → `(<N> gates)` placeholders + an annotation that the builtin registry is authoritative.
+  2. `preset show rust-tdd` sample output — annotated as an illustrative layout; the concrete per-gate `Command:`/`Timeout:` values genericized to `<command>`/`<N>s` so it no longer asserts rust-tdd's authoritative contents.
+  3. `### Builtin Presets` prose — replaced the per-preset hand-enumerated gate lists/timeouts/stages with names grouped by purpose (language TDD starters, `security-audit`, `minimal`, planning-bracket trio) plus the directive to introspect contents via `jit gate preset show <name>`. Preset behavior (planning-bracket attach-on-bracketing, custom-preset override) preserved.
+
+Post-rework mechanical bar: M2/M3/M5 clean, M4 no box-drawing, M1 residue only adjudicated non-defects (cargo/global flags, `--add-label` alias, `--clear-` grep fragment).

@@ -215,8 +215,8 @@ generation model in brief:
   arrays. Each tool's response carries the same JSON payload the command prints
   with `--json`.
 - **Curated default listing.** `tools/list` advertises an agent-facing subset —
-  the commands used to find, claim, inspect, and transition work, check gates,
-  and read repository structure. The include/exclude decisions and their
+  the commands for finding, claiming, inspecting, and transitioning work,
+  checking gates, and reading repository structure. The include/exclude decisions and their
   rationale live in
   [`mcp-server/curated-tools.json`](../../mcp-server/curated-tools.json).
 - **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` exposes every generated
@@ -425,7 +425,7 @@ jit issue create --title <TITLE> [OPTIONS]
 
 ```bash
 jit issue create "Fix login bug"
-jit issue create "Fix login bug" --type bug --priority high
+jit issue create "Fix login bug" --type task --priority high
 jit issue create --title "Fix login bug" --gate tests --label epic:auth
 jit issue create "Wire up parser" --json
 ```
@@ -1573,11 +1573,13 @@ List all available gate presets (builtin and custom).
 jit gate preset list [--json]
 ```
 
-**Output:**
+**Output** (line format only — run `jit gate preset list` for the live set, and
+`jit gate preset show <name>` for a preset's actual gate list and count; the
+builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] rust-tdd - Test-driven development workflow for Rust projects (5 gates)
-[builtin] minimal - Minimal workflow with just code review (1 gate)
-[custom] my-workflow - Custom preset created from issue abc123 (3 gates)
+[builtin] rust-tdd - Test-driven development workflow for Rust projects (<N> gates)
+[builtin] minimal - Minimal workflow with just code review (<N> gates)
+[custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```
 
 **Example:**
@@ -1601,7 +1603,8 @@ jit gate preset show <NAME> [--json]
 **Arguments:**
 - `NAME` - Preset name (e.g., `rust-tdd`, `minimal`)
 
-**Output:**
+**Output** (illustrative layout — the builtin registry is authoritative, so run
+the command for a preset's actual gates, commands, and timeouts):
 ```
 Preset: rust-tdd
 Description: Test-driven development workflow for Rust projects
@@ -1609,14 +1612,9 @@ Description: Test-driven development workflow for Rust projects
 Gates:
   tdd-reminder - Write tests first (TDD) (precheck:manual)
   tests - All tests pass (postcheck:auto)
-    Command: cargo test
-    Timeout: 300s
-  clippy - Clippy lints pass (postcheck:auto)
-    Command: cargo clippy --all-targets -- -D warnings
-    Timeout: 120s
-  fmt - Code formatted (postcheck:auto)
-    Command: cargo fmt --check
-    Timeout: 30s
+    Command: <command>
+    Timeout: <N>s
+  ...
   code-review - Code review completed (postcheck:manual)
 ```
 
@@ -1736,49 +1734,22 @@ Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are auto
 
 ### Builtin Presets
 
-JIT embeds a set of builtin presets in the binary. `jit gate preset list`
-enumerates them with a one-line summary each, `jit gate preset show <name>`
-prints a preset's full gate list, and the builtin preset registry is
-authoritative for their names and contents.
+JIT embeds a set of builtin presets in the binary. The builtin registry is the
+source of truth for their names and contents, so introspect them with the live
+commands rather than a hand-maintained copy: `jit gate preset list` prints every
+preset with a one-line summary, and `jit gate preset show <name>` prints a
+preset's full gate list (keys, stages, commands, timeouts). The bundles shipped:
 
-**`rust-tdd`** - Test-driven development workflow for Rust
-- `tdd-reminder` - Manual reminder to write tests first (precheck)
-- `tests` - Automated test suite check (postcheck, 300s timeout)
-- `clippy` - Automated linter check (postcheck, 120s timeout)
-- `fmt` - Automated formatter check (postcheck, 30s timeout)
-- `code-review` - Manual code review requirement (postcheck)
-
-**`python-tdd`** - Test-driven development workflow for Python
-- `tdd-reminder` - Manual reminder to write tests first (precheck)
-- `pytest` - Automated test suite check (postcheck, 300s timeout)
-- `black` - Automated formatter check (postcheck, 30s timeout)
-- `mypy` - Automated type checking (postcheck, 120s timeout)
-- `code-review` - Manual code review requirement (postcheck)
-
-**`js-tdd`** - Test-driven development workflow for JavaScript/TypeScript
-- `tdd-reminder` - Manual reminder to write tests first (precheck)
-- `jest` - Automated test suite check (postcheck, 300s timeout)
-- `eslint` - Automated linter check (postcheck, 120s timeout)
-- `code-review` - Manual code review requirement (postcheck)
-
-**`security-audit`** - Security review workflow
-- `security-review` - Manual security vulnerability review (precheck)
-- `secret-detection` - Automated secret detection via gitleaks (postcheck, 20s timeout)
-- `dependency-audit` - Automated dependency vulnerability audit (postcheck, 60s timeout)
-
-**`minimal`** - Minimal workflow with just code review
-- `code-review` - Manual code review requirement (postcheck)
-
-The [planning-bracket](../concepts/planning-bracket.md) presets attach automatically when a breakable container is bracketed:
-
-**`plan-review`** - Agent plan-quality review on the planning node `P`
-- `plan-review` - AI review of the plan/design before fan-out (postcheck, auto)
-
-**`coverage-preview`** - Deterministic coverage check on the breakdown node `B`
-- `coverage-preview` - Scoped `jit validate` over the drafted decomposition; blocks when a `[hard]` criterion is uncovered (postcheck, auto)
-
-**`breakdown-review`** - Agent decomposition-quality review on the breakdown node `B`
-- `breakdown-review` - AI review of the breakdown against the design and content standards: per-child content standards, dependency-DAG coherence, right-sized depth (postcheck, auto)
+- **Language TDD starters** — `rust-tdd`, `python-tdd`, `js-tdd`: a tests-first
+  reminder plus that ecosystem's test/lint/format gates and a code review.
+- **`security-audit`** — a security review plus automated secret- and
+  dependency-scanning gates.
+- **`minimal`** — a single code-review gate.
+- **Planning-bracket trio** — `plan-review`, `coverage-preview`,
+  `breakdown-review`: attach automatically to the planning (`P`) and breakdown
+  (`B`) nodes when a breakable container is
+  [bracketed](../concepts/planning-bracket.md), reviewing the plan and the
+  decomposition before fan-out.
 
 **Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
 
@@ -2788,7 +2759,7 @@ enforce_leases = "strict"
 
 ### `jit migrate lifecycle-timestamps`
 
-One-time backfill of the issue [lifecycle
+Backfills the issue [lifecycle
 timestamps](storage-format.md#lifecycle-timestamps) (`first_ready_at`,
 `claimed_at`, `done_at`) for issues whose stored records are missing one or more
 of these fields.
@@ -2804,11 +2775,11 @@ Only still-absent fields are filled — an existing timestamp is never overwritt
 preserving first-occurrence semantics. Updated issues are written atomically and
 a single `lifecycle_timestamps_backfilled` event records the count.
 
-The migration is **idempotent**: a second run over an already-migrated
-repository writes nothing, appends no event, and reports `issues_updated: 0`.
-Issues whose event log carries no relevant transition (predating event coverage,
-or auto-promoted straight to `ready` at creation, which logs no transition) keep
-their fields unset — the timestamps are unrecoverable, not defaulted.
+The command is **idempotent**: when no issue is missing a timestamp it writes
+nothing, appends no event, and reports `issues_updated: 0`. An issue whose event
+log carries no matching transition — for example one auto-promoted straight to
+`ready` at creation, which logs no transition — keeps those fields unset; such a
+timestamp is unrecoverable, not defaulted.
 
 `--json` prints `{ "issues_scanned": N, "issues_updated": M }`.
 

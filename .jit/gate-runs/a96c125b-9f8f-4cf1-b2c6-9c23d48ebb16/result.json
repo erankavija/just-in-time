@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "a96c125b-9f8f-4cf1-b2c6-9c23d48ebb16",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2b9a80fb-5d06-40e8-b3a0-ef23534cd89a",
+  "commit": "00545cbac92147273b1a997a3fd2c6f4cb6e057a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:27:49.867201415Z",
+  "completed_at": "2026-07-11T08:29:12.791376375Z",
+  "duration_ms": 82924,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nOne blocking mismatch remains in [docs/reference/cli-commands.md:3107](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3107). The “daily status report” assigns `DONE_TODAY` by counting `issue_state_changed` events whose destination is `done`, but it applies no date filter. It merely examines up to the latest 100 matching events. Consequently, the displayed “Completed Today” value can include older completions and omit today’s completions beyond that limit.\n\nRemediation: filter events by their timestamp against the current date, and avoid a fixed limit that can truncate today’s results—or rename the metric to accurately describe the bounded, undated count.\n\nThe previously reported event example now correctly uses `issue_state_changed` and `.to`.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. The prior unqualified `--type bug` example now uses the shipped `task` type. The `plan` template examples explicitly identify it as this repository’s configuration.\n\n## 3. Current behavior only\n\nNo findings. The lifecycle-timestamp command is now described solely through its current behavior, without historical migration narration.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings. The prior builtin-preset totals were replaced with placeholders and live introspection instructions. Remaining numeric values are response examples or operational parameters, not volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nNo findings. The scoped link and anchor checker passed, cited repository paths exist, and all addressable-item citations resolve using the HEAD-built binary.\n\n## 6. Content-standards conformance\n\nNo findings. The file contains no box-drawing or ASCII flow diagrams requiring Mermaid conversion and no plain-text mathematics requiring LaTeX.\n\n## Findings\n\n1. **F1 — High:** The “daily status report” labels a bounded, undated event count as “Completed Today.” Add timestamp-based filtering and remove the truncating fixed limit, or relabel the metric to match its actual semantics. Location: `docs/reference/cli-commands.md:3107`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking behavioral mismatch remains: the example's Completed Today metric does not filter events by date and is capped at 100 events.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The daily status example reports an undated, 100-event-bounded completion count as Completed Today.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3107}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1349 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f504a-3b93-74b3-988c-5606c8812b35\n--------\nuser\n--- 1336 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking behavioral mismatch remains: the example's Completed Today metric does not filter events by date and is capped at 100 events.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The daily status example reports an undated, 100-event-bounded completion count as Completed Today.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3107
+      }
+    ]
+  }
+}
