@@ -2,9 +2,9 @@
   "id": "004d10b7-13d7-4a35-9467-f9572a373b27",
   "title": "Documentation contract follow-ups",
   "description": "Own the implementation work filed by the exhaustive documentation audit where a volatile fact lacks an authoritative projection or the documented contract conflicts with the product. This is follow-up delivery, deliberately separate from the completed documentation-audit epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the ten filed follow-up issues is a direct dependency of this epic and retains an independently verifiable completion gate.\n- [hard] REQ-02: The work resolves the audit-recorded documentation contract gaps across CLI schema, event and storage semantics, validation, toolchain policy, gates, and runtime defaults.\n- [hard] REQ-03: This epic is a direct dependency of the v1.0 milestone, so release readiness reflects the outstanding follow-up work.\n\n## Scope\n\nThe child issues are authoritative for implementation detail. The original audit filing record is 6d82de03; the completed audit epic is 2d109173.",
-  "state": "backlog",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [
     "623f3163-776e-4e1c-8d98-a8c8f13d2566",
     "3ac07340-8901-404a-ac66-a98658bf95c4",
@@ -23,15 +23,15 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.425951474Z"
-    },
     "doc-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.425906804Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.425951474Z"
     }
   },
   "context": {},
@@ -42,6 +42,7 @@
     "type:epic"
   ],
   "created_at": "2026-07-11T13:38:53.076392475Z",
-  "updated_at": "2026-07-11T19:47:55.425974394Z",
-  "first_ready_at": "2026-07-11T13:38:53.076398555Z"
+  "updated_at": "2026-07-11T21:17:08.385831858Z",
+  "first_ready_at": "2026-07-11T13:38:53.076398555Z",
+  "claimed_at": "2026-07-11T21:17:08.385831388Z"
 }
