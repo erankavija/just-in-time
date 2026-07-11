@@ -222,6 +222,13 @@
       "opened_at": "2026-07-11T17:42:14+03:00",
       "resolved_at": "2026-07-11T17:53:00+03:00",
       "summary": "Wave 7 child gates (repo-validate, docs-mechanical) are local, not reviewer-service; they were run and passed on resume. The three children are done. The final epic doc-review remains to be run against the integrated surface."
+    },
+    {
+      "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+      "category": "External reviewer-service quota exhausted (final epic doc-review)",
+      "status": "open",
+      "opened_at": "2026-07-11T17:57:00+03:00",
+      "summary": "All 18 children done; epic repo-validate + docs-mechanical pass; corrected surface committed at eb80d3cd. Final epic doc-review (gate run 9e685d2d) failed in 3.5s with 'Agent produced no output'; codex session 019f51ae recorded credits balance 0 / has_credits false. Reset reported for 19:52. doc-review is the only outstanding gate for epic completion; workaround forbidden per handoff trap. Awaiting invoker direction: wait-and-resume after reset, or provide alternate authorised reviewer."
     }
   ],
   "rework_counts": {
