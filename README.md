@@ -135,7 +135,7 @@ Cycles are rejected up front, redundant edges are refused (or reduced with `--re
 
 ### Quality Gates Enforce Standards
 
-Gates are checkpoints that must pass before an issue can start, progress, or complete.
+Gates are checkpoints that govern issue work and completion.
 
 ```bash
 # Register an automated gate in this repository's gate registry
@@ -157,7 +157,7 @@ jit gate status <issue> unit-tests --findings   # structured findings view
 - **Manual**: Passed explicitly by a human or agent, like a checklist item.
 
 **Gate stages:**
-- **Precheck**: Must pass before work starts (e.g. "acknowledge TDD")
+- **Precheck**: `jit issue claim` runs these when it moves a Ready issue into InProgress (e.g. "acknowledge TDD")
 - **Postcheck**: Must pass before completion (tests, linting, reviews)
 
 ### Built for Orchestration

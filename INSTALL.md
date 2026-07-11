@@ -89,10 +89,8 @@ docker-compose down
 ### Pre-built Images (GitHub Container Registry)
 
 ```bash
-# The all-in-one image publishes :latest; the component images (-api/-web/-cli)
-# do not — pull them by the rolling :main branch tag, or by a release-version
-# (e.g. :0.2.1) or commit-sha tag.
-docker pull ghcr.io/erankavija/just-in-time:latest         # All-in-one
+# Pull component images by the rolling :main branch tag, a release-version,
+# or a commit-sha tag.
 docker pull ghcr.io/erankavija/just-in-time-api:main       # API server only
 docker pull ghcr.io/erankavija/just-in-time-web:main       # Web UI only
 docker pull ghcr.io/erankavija/just-in-time-cli:main       # CLI only
@@ -107,6 +105,12 @@ user-defined network and give the API container that network alias before starti
 
 ```bash
 docker network create jit-network
+
+# Initialize the named volume once before starting the API server.
+docker run --rm \
+  --workdir /data \
+  -v jit-data:/data \
+  ghcr.io/erankavija/just-in-time-cli:main init
 
 docker run -d \
   --name jit-api \
@@ -145,25 +149,6 @@ docker run --rm -it \
   -e JIT_DATA_DIR=/data \
   ghcr.io/erankavija/just-in-time-cli:main
 ```
-
-### All-in-One Container
-
-```bash
-# Run API + Web UI in single container
-docker run -d \
-  --name jit-all \
-  --add-host=api=127.0.0.1 \
-  -p 3000:3000 \
-  -p 8080:80 \
-  -v jit-data:/data \
-  ghcr.io/erankavija/just-in-time:latest
-```
-
-`--add-host=api=127.0.0.1` maps the Web UI image's nginx `api` upstream to the
-local `jit-server` in this container; [`docker run --add-host`](https://docs.docker.com/reference/cli/docker/container/run/#add-entries-to-container-hosts-file---add-host)
-adds the required custom host mapping.
-
----
 
 ## From Source
 

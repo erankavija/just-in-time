@@ -169,3 +169,16 @@ below remain individual resolution rows so both reviews are accounted for.
   valid missing-projection/source-of-truth follow-ups; they do not block these documentation
   corrections. The removed system-resource figures remain deliberately removed rather than
   deferred.
+
+## Manual takeover — final round-five corrections
+
+- **Named-volume initialization.** The individual API-container recipe now initializes
+  `jit-data` through the CLI image with `/data` as its working directory before the API server
+  mounts it. `jit init` initializes its current directory, and `jit-server` requires the mounted
+  data directory to contain an initialized repository.
+- **All-in-one UI claim.** Removed the all-in-one pull and run recipe rather than documenting an
+  API-and-UI workflow that its Dockerfile and nginx root do not deliver. The Compose and individual
+  component workflows remain the source-backed container paths.
+- **Gate stages.** The README now names `jit issue claim` as the Ready-to-InProgress precheck
+  path and retains postchecks as the completion requirement; it no longer overstates prechecks as
+  a prerequisite of every way work may begin.
