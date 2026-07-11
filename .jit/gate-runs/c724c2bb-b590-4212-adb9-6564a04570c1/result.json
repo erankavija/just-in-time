@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "c724c2bb-b590-4212-adb9-6564a04570c1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "4ad290747b1ef78a4d9c86533b7be4d6f1be6fd1",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T18:52:14.988142377Z",
+  "completed_at": "2026-07-11T18:54:24.201028367Z",
+  "duration_ms": 129212,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. The latest run’s automatic readiness promotion and terminal-outcome findings are addressed, but its quickstart lifecycle finding remains unresolved.\n\nThe quickstart states a fixed `ready → in_progress → gated → done` path at lines 12 and 170. Its commands instead take `TASK1` directly from `ready` to `done` and `TASK3` from `ready` to `gated`, then potentially automatically to `done`. The handlers also permit direct completion when gates have already passed, so `gated` is not universally traversed.\n\n## 2. Adopter surface versus repo-local configuration\n\nPass. Repository-specific types, namespaces, templates, rules, and gates are framed as examples, opt-in configuration, or this repository’s dogfood configuration.\n\n## 3. Current behavior only\n\nPass. Historical-marker matches are ordinary grammar or illustrative descriptions, not narration of past or future JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No unsupported volatile product totals were found. Numeric matches are command output, error examples, or structurally bounded examples.\n\n## 5. Links and referenced paths resolve\n\nPass. The full mechanical audit confirms that Markdown links, heading anchors, repository paths, addressable-item citations, and projections resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid. Remaining box-drawing blocks are permitted directory trees or CLI output. No heading-depth or relevant plain-text mathematics defect was found.\n\n## Findings\n\n1. **F1 — The quickstart still documents a fixed lifecycle path that its commands and the handlers do not follow.** [docs/tutorials/quickstart.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/quickstart.md:12) and line 170 say work runs `ready → in_progress → gated → done`. The walkthrough never moves an issue to `in_progress`; moreover, an issue with already-passed or no gates can move directly to `done`, while an unpassed gate diverts completion to `gated`. Remediate by either adding claim/start-work commands so the walkthrough exercises `in_progress` and qualifying `gated` as conditional, or describing the actual paths exercised instead of presenting one fixed sequence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking quickstart lifecycle defect remains: it presents a fixed state path that neither its commands nor the handlers require.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The quickstart documents a fixed lifecycle path that its commands and the handlers do not follow.\",\"file\":\"docs/tutorials/quickstart.md\",\"line\":12}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2418 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5285-e7ad-7e70-b733-a18be17650d5\n--------\nuser\n--- 2405 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking quickstart lifecycle defect remains: it presents a fixed state path that neither its commands nor the handlers require.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The quickstart documents a fixed lifecycle path that its commands and the handlers do not follow.",
+        "file": "docs/tutorials/quickstart.md",
+        "line": 12
+      }
+    ]
+  }
+}

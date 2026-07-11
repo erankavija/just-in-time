@@ -9,7 +9,7 @@
 **If you're an AI agent**, you want to get productive fast. Here's the 2-minute version:
 
 **Core Concepts:**
-- **Issues** = Units of work. A dependency-free issue starts at `ready`; `backlog` holds issues with unmet dependencies, and work runs `ready → in_progress → gated → done`. The full state machine (also `rejected`, `archived`) is in [Core Model → States](../concepts/core-model.md#states).
+- **Issues** = Units of work. A dependency-free issue starts at `ready`; `backlog` holds issues with unmet dependencies. Claiming a ready issue moves it to `in_progress`; completing it lands in `done`, or diverts to `gated` when a required gate has not passed. The full state machine (also `rejected`, `archived`) is in [Core Model → States](../concepts/core-model.md#states).
 - **Dependencies** = DAG controlling work order (FROM depends on TO)
 - **Gates** = Quality checkpoints that must pass
 - **Labels** = `namespace:value` format for organization
@@ -167,7 +167,7 @@ You've learned the basics! Now explore:
 
 ## Key Concepts Learned
 
-- **Issues**: Units of work. A dependency-free issue starts at `ready`; work runs `ready → in_progress → gated → done`. See [Core Model → States](../concepts/core-model.md#states) for the full state machine (incl. `backlog`, `rejected`, `archived`)
+- **Issues**: Units of work. A dependency-free issue starts at `ready`; claiming moves it to `in_progress`, and completing lands in `done` (or `gated` if a required gate has not passed). See [Core Model → States](../concepts/core-model.md#states) for the full state machine (incl. `backlog`, `rejected`, `archived`)
 - **Dependencies**: Express "A blocks B" relationships (directed acyclic graph)
 - **Short hashes**: 4-8 character prefixes for convenience (like git)
 - **Gates**: Quality checkpoints that must pass before completion
