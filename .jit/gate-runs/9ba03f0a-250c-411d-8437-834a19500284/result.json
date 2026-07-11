@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "9ba03f0a-250c-411d-8437-834a19500284",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c",
+  "commit": "70289a03abb7527dc4ddd7a7fc432ef7066461d3",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T09:01:47.584527664Z",
+  "completed_at": "2026-07-11T09:02:36.468312932Z",
+  "duration_ms": 48883,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nPass.\n\nThe latest prior-review findings are resolved:\n\n- `docs/reference/worktree-validate.md:59-80` now matches the current human and JSON output for `jit worktree info`.\n- `docs/reference/worktree-validate.md:168-206` now documents the positional issue ID, `--explain`, `--scope`, and their constraints.\n- `docs/reference/worktree-validate.md:251-258` includes scoped validation’s exit code 4.\n\nThe earlier command-topology, event-log, compatibility, and lifecycle-recovery findings also remain resolved.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-specific rules, gates, types, namespaces, and templates are identified as configurable examples or this repository’s projected configuration rather than shipped defaults.\n\n## 3. Current behavior only\n\nPass. No legacy, migration-transition, or future-roadmap narration describing jit’s behavior remains in scope.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile hand-maintained product totals were found.\n\n## 5. Links and referenced paths\n\nPass.\n\n- All scoped Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- All scoped addressable-item citations resolve.\n- Registry projections are fresh.\n\n## 6. Content-standards conformance\n\nPass.\n\n- Authored diagrams use Mermaid.\n- The box-drawing blocks in `storage-format.md` are directory-tree listings.\n- No non-LaTeX authored equations were found.\n- Heading structure and reference voice conform to the standards.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped reference documentation matches the current source, and all prior-review findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped reference documentation matches the current source, and all prior-review findings are resolved.",
+    "findings": []
+  }
+}

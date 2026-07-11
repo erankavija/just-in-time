@@ -58,21 +58,25 @@ jit worktree info --json
 
 ```
 Worktree Information:
-  ID:       wt:a1b2c3d4
-  Branch:   feature/my-work
-  Root:     /home/user/project-wt
-  Type:     secondary
-  Main:     /home/user/project
+  ID:         wt:a1b2c3d4
+  Branch:     feature/my-work
+  Root:       /home/user/project-wt
+  Type:       secondary worktree
+  Common dir: /home/user/project/.git
 ```
 
-For JSON output:
+`Type:` prints `main worktree` or `secondary worktree`. `Common dir:` is the
+shared git directory (the repository's `.git`) common to every worktree — not
+the main worktree's path.
+
+For JSON output (the response envelope also carries `message` and `warnings`):
 ```json
 {
   "worktree_id": "wt:a1b2c3d4",
   "branch": "feature/my-work",
-  "worktree_root": "/home/user/project-wt",
-  "is_main": false,
-  "main_worktree": "/home/user/project"
+  "root_path": "/home/user/project-wt",
+  "is_main_worktree": false,
+  "common_dir": "/home/user/project/.git"
 }
 ```
 
@@ -118,23 +122,31 @@ jit worktree list --json
 
 #### Output
 
+A table with one row per worktree — columns `WORKTREE ID`, `BRANCH`, `PATH`,
+`CLAIMS` (the count of active claims held from that worktree):
+
 ```
-Git Worktrees (3):
+WORKTREE ID      BRANCH                    PATH                                                 CLAIMS
+----------------------------------------------------------------------------------------------------
+wt:main          main                      /home/user/project                                        0
+wt:a1b2c3d4      feature/auth              /home/user/project-feature                                2
+wt:e5f6g7h8      bugfix/login              /home/user/project-bugfix                                 1
+```
 
-  /home/user/project (main)
-    ID:      wt:main
-    Branch:  main
-    Claims:  0
-
-  /home/user/project-feature
-    ID:      wt:a1b2c3d4
-    Branch:  feature/auth
-    Claims:  2
-
-  /home/user/project-bugfix
-    ID:      wt:e5f6g7h8
-    Branch:  bugfix/login
-    Claims:  1
+For JSON output (envelope also carries `message` and `warnings`):
+```json
+{
+  "count": 3,
+  "worktrees": [
+    {
+      "worktree_id": "wt:main",
+      "branch": "main",
+      "path": "/home/user/project",
+      "is_main": true,
+      "active_claims": 0
+    }
+  ]
+}
 ```
 
 #### Exit Codes
@@ -154,43 +166,65 @@ Validate repository integrity and consistency.
 ### Synopsis
 
 ```bash
-jit validate [OPTIONS]
+jit validate [ID] [OPTIONS]
 ```
 
 ### Description
 
-Checks the JIT repository for consistency issues including:
-- Orphaned lock files
-- Corrupted or inconsistent claims index
-- Sequence gaps in audit logs
-- Stale leases (with `--leases`)
-- Branch drift from `origin/main` (with `--branch-drift`)
+`jit validate` runs the repository's declarative rules and integrity checks; its
+behavior depends on the arguments.
 
-Can optionally fix detected issues with `--fix`.
+- **Whole-repository** (`jit validate`, no id): evaluates every issue against the
+  declarative ruleset in `.jit/rules.toml` (label format, namespace registry,
+  uniqueness, type-hierarchy, and any project graph rules) and the built-in
+  integrity checks — broken dependency references, gate references absent from
+  the registry, DAG cycles, issues isolated from the dependency graph, redundant
+  (transitively-reducible) edges, and claims-index consistency. Advisory
+  membership-vs-DAG divergences are reported but do not fail the run.
+- **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
+  issue. The id accepts a full UUID, 8-char short id, or unique prefix.
+
+`--fix` additionally repairs the auto-fixable findings (type-hierarchy label
+fixes, transitive-reduction violations, pending state transitions). Coordination
+state — stale locks, the claims index, expired leases — is repaired by
+[`jit recover`](#jit-recover), not by `jit validate`.
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `--fix` | Attempt to automatically fix validation issues |
-| `--dry-run` | Show what would be fixed without applying (requires `--fix`) |
-| `--branch-drift` | Validate `origin/main` is an ancestor of the current branch |
-| `--leases` | Validate active leases are consistent and not stale |
+| `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
+| `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
+| `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, and `--explain` |
+| `--fix` | Auto-fix the repairable findings (type-hierarchy, transitive reduction, pending transitions) |
+| `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
+| `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
+| `--leases` | Report active leases that are inconsistent or stale |
 | `--json` | Output as JSON |
+
+`--fix`, `--branch-drift`, and `--leases` are repo-wide and cannot be combined
+with a positional `[ID]`.
 
 ### Examples
 
 ```bash
-# Basic validation
+# Whole-repository validation
 jit validate
 
-# Check everything including leases and branch drift
+# Validate a single issue's rules
+jit validate a1b2c3d4
+
+# Explain which rules apply to an issue
+jit validate a1b2c3d4 --explain
+
+# Validate a container's bracket subtree as a gate check
+jit validate --scope <container-id>
+
+# Check git branch drift and lease health
 jit validate --branch-drift --leases
 
-# See what would be fixed
+# Preview, then apply, the auto-fixes
 jit validate --fix --dry-run
-
-# Actually fix issues
 jit validate --fix
 
 # JSON output for CI
@@ -199,63 +233,31 @@ jit validate --json
 
 ### Output
 
-Success:
+Whole-repository, clean:
 ```
 ✓ Repository validation passed
-  - Claims log: OK (42 entries)
-  - Claims index: OK (5 active leases)
-  - Locks: OK (no stale locks)
 ```
 
-With issues:
+Whole-repository, with an integrity error and a warning-severity finding:
 ```
-✗ Validation failed with 2 issues:
-  - Orphaned lock file: .git/jit/locks/claims.lock
-  - Index sequence gap at position 42
+❌ Repository integrity error: Invalid dependency: issue 'a1b2c3d4' depends on 'deadbeef' which does not exist
+⚠ [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no parent association label
 
-Run 'jit validate --fix' to attempt automatic repair.
-```
-
-With `--fix`:
-```
-✓ Fixed 2 issues:
-  - Removed orphaned lock: .git/jit/locks/claims.lock
-  - Rebuilt claims index from log
+Warnings: 1
 ```
 
-### Validation Checks
-
-#### Default Checks
-
-| Check | Description | Auto-Fix |
-|-------|-------------|----------|
-| Lock files | Detects orphaned locks from crashed processes | ✓ Removes stale locks |
-| Claims index | Verifies index matches audit log | ✓ Rebuilds from log |
-| Sequence gaps | Detects missing entries in logs | Reports only |
-| Schema version | Verifies compatible data format | Reports only |
-
-#### With `--leases`
-
-| Check | Description | Auto-Fix |
-|-------|-------------|----------|
-| Expired leases | Finds leases past expiration | ✓ Evicts expired |
-| Stale indefinite | Finds TTL=0 leases without recent heartbeat | Reports only |
-| Ownership | Verifies lease metadata consistency | Reports only |
-
-#### With `--branch-drift`
-
-| Check | Description | Auto-Fix |
-|-------|-------------|----------|
-| Main history | Verifies branch includes origin/main | Reports only |
-| Global config | Warns if editing global config while diverged | Reports only |
+Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
+`⚠ [<rule>]`.
 
 ### Exit Codes
 
 | Code | Description |
 |------|-------------|
-| 0 | Validation passed (or all issues fixed) |
-| 1 | Validation failed with issues |
-| 1 | --dry-run showed issues that would be fixed |
+| 0 | Validation passed (or `--fix` completed its repairs) |
+| 1 | A declarative-rule error (whole-repo or per-issue), an `--explain` / `--branch-drift` / `--leases` failure, or `--dry-run` given without `--fix` |
+| 2 | Usage error — includes the hidden `--divergence` stub, which errors and redirects to `--branch-drift` or `jit query divergence` |
+| 3 | The positional issue id, or the `--scope` container, was not found |
+| 4 | A repository-integrity failure (broken dependency, DAG cycle, isolated issue, redundant edge, unknown gate reference, or bad claims index), or a `--scope` error finding |
 
 ### Integration with Hooks
 
@@ -280,12 +282,15 @@ jit recover [OPTIONS]
 
 ### Description
 
-Runs all automatic recovery routines in sequence:
-1. Clean up stale lock files
-2. Rebuild corrupted indexes
+Runs the coordination-recovery routines under `.git/jit/` in sequence:
+1. Clean up stale lock files (those owned by dead processes)
+2. Rebuild the claims index from the append-only claims log
 3. Evict expired leases
+4. Remove leftover temporary files
 
-This is equivalent to `jit validate --fix` but with less verbose output.
+This repairs multi-agent coordination state. It is a different repair set from
+`jit validate --fix`, which fixes rule/graph findings (type-hierarchy labels,
+transitive-reduction violations, pending state transitions).
 
 ### Options
 
@@ -306,10 +311,11 @@ jit recover --json
 ### Output
 
 ```
-✓ Recovery complete
-  - Cleaned 1 stale lock
-  - Rebuilt claims index
-  - Evicted 2 expired leases
+Recovery complete:
+  • Stale locks cleaned: 1
+  • Index rebuilt: true
+  • Expired leases evicted: 2
+  • Temp files removed: 0
 ```
 
 ### Exit Codes

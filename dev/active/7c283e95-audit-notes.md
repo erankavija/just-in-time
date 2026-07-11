@@ -98,6 +98,44 @@ the footprint (configuration.md:457 unknown-key exit, rules-and-gates.md:14
 projection byte-preservation, item-addresses.md:48 address round-trip are all
 unrelated and correct).
 
+### 6. `worktree-validate.md` was under-audited; full re-audit (rework, attempt 3 — FINAL)
+
+The first pass marked worktree-validate.md "codes correct" but did not deeply
+verify output samples, JSON field names, or the validate flag/arg surface. Full
+end-to-end re-audit against `jit --schema`, `cli.rs`, the source structs, and
+`main.rs` exit paths (all verified empirically in a temp repo) found the file
+substantially inaccurate:
+
+- **`jit worktree info` output** — human sample showed `Main: <path>` and
+  `Type: secondary`; actual is `Common dir: <.git dir>` and `Type: main
+  worktree|secondary worktree` (`main.rs:7015-7027`). JSON claimed
+  `{worktree_root, is_main, main_worktree}`; actual `WorktreeInfo`
+  (`commands/worktree.rs:16`) is `{worktree_id, branch, root_path,
+  is_main_worktree, common_dir}` + envelope `message`/`warnings`. Fixed both.
+- **`jit worktree list` output** — showed a nested per-worktree block; actual is
+  a `WORKTREE ID | BRANCH | PATH | CLAIMS` table (`main.rs:7070-7084`). Added the
+  real table + JSON shape (`{count, worktrees:[{worktree_id, branch, path,
+  is_main, active_claims}], message, warnings}`).
+- **`jit validate`** — synopsis was `[OPTIONS]`; actual takes optional positional
+  `[ID]` plus `--explain/--scope/--fix/--dry-run/--branch-drift/--leases/--json`
+  (`cli.rs:343-387`; `--divergence` is `hide=true`, a stub that errors→redirects).
+  The old Description/Output/"Validation Checks" tables described validate as a
+  coordination checker (locks/sequence-gaps/schema) — but `validate_integrity_silent`
+  (`commands/validate.rs:587`) checks broken deps, unknown gate refs, DAG cycles,
+  isolated nodes, transitive reduction, and claims index, plus `run_rules` over the
+  declarative ruleset. Rewrote Description/Options/Examples/Output and replaced the
+  fabricated exit-code table with the real mode-specific codes (verified): whole-repo
+  integrity fail→4, rule error→1, per-issue→1 (nonexistent id→3), `--explain`→1,
+  `--scope` finding→4 (container not found→3), `--branch-drift`/`--leases`→1,
+  `--divergence`→2, `--dry-run` w/o `--fix`→1, clean/`--fix`→0.
+- **`jit recover`** — claimed "equivalent to `jit validate --fix`" (FALSE:
+  `validate_with_fix` fixes hierarchy/transitive-reduction/pending-transitions,
+  `commands/validate.rs:49-93`, while recover repairs coordination:
+  locks/index/leases/temp-files, `commands/claim.rs:764-842`). Fixed the false
+  equivalence, added the 4th step (temp files), and corrected the output sample.
+
+worktree info/list no-git→exit 1 rows were the only parts already correct.
+
 ## Missing-projection-surface facts (REQ-06 — recorded for follow-up filing)
 
 - **Per-command exit-code mappings have no projection surface.** `jit --schema`
