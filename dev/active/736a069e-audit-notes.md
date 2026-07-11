@@ -74,3 +74,44 @@ Footprint: `docs/concepts/` (9 files, ~3,339 lines). Binary verified at HEAD
 - **`jit-server`** (`scope.md`, `design-philosophy.md`): valid — `crates/server`
   ships a `jit-server` binary (`crates/server/Cargo.toml`), distinct from the
   `jit serve` subcommand. Not drift.
+
+## Round 2 — full 9-file sweep (scoped `doc-review` findings)
+
+Round 1 under-audited 4 of 9 files (design-philosophy.md, scope.md). This round
+re-audited **all 9** concepts files end-to-end and swept the interface-overclaim,
+config-taxonomy-as-fixed, and over-credited-guarantee classes footprint-wide.
+
+- **F1 — universal `--json` overclaim (design-philosophy.md:67 and :481).** "Every
+  command supports `--json`" is false — many leaf/mutation commands have no `--json`
+  flag. Reworded to the accurate convention (data-emitting commands support `--json`;
+  list-emitters use the `{count, <collection>}` envelope). Both occurrences fixed.
+- **F2 — MCP/web parity overclaim (design-philosophy.md:297).** "MCP exposes exactly
+  the capabilities the CLI exposes / behavior stays identical" is false. Per
+  `mcp-server/README.md`, tools are schema-generated (every command callable) but the
+  default `tools/list` is a **curated subset** (`curated-tools.json`; full set only via
+  `JIT_MCP_ALL_TOOLS=1`), with name/param transforms. Reworded to the curated-generation
+  model; dropped the identical-behavior claim.
+- **F3 — type taxonomy shown as fixed/universal (core-model.md Required Labels).** The
+  mermaid presented `type:research`/`type:bug` as universal. Per `@/inv/domain-agnostic`
+  the type vocabulary is project config; `jit init` ships milestone/epic/story/task.
+  Reframed the mermaid to the shipped default and named repo-local (`bug`, `enhancement`,
+  `planning`, `breakdown`) and research-example (`goal`, `experiment`) types explicitly.
+- **F4 — strategic set shown as engine-fixed (core-model.md).** "JIT defines certain
+  namespaces as strategic: milestone/epic/goal/theme" is wrong. `query_strategic`
+  (`domain/queries.rs:336`) filters by **type** against `strategic_types` config, default
+  `["milestone", "epic"]` (`config_manager.rs:402`). Reworded to config-derived strategic
+  **types**, default milestone/epic, with goal/theme as other-config illustrations.
+- **F5 — invented type in example (scope.md:34).** `type:feature` is in no configured
+  hierarchy (not `jit init` defaults, not this repo's types). Changed to `type:epic`
+  (default hierarchy). Footprint-wide type sweep afterward: only default/repo/example-
+  framed type values remain (no `type:feature`/`type:research` anywhere).
+- **F6 — false event-integrity guarantee (guarantees.md:557).** "Invalid event → Logged
+  but doesn't block operations" is false: `read_events` (`storage/json.rs:770`) does
+  `serde_json::from_str(&line)?`, so a malformed line makes event **reads** fail fast.
+  Reworded to real behavior (reads fail with a parse error, never silently skipped; issue
+  operations that only append keep working). Verified the sibling "Isolated failures"
+  bullets against source: "Corrupted issue → only that issue affected" is **true**
+  (`list_issues` filter_maps with `.ok()`, skipping unreadable files); annotated it.
+
+Sweep result: no further interface-overclaim, config-taxonomy-as-fixed, or
+over-credited-guarantee instances found across the 9 files after these fixes.

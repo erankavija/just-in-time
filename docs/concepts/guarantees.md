@@ -551,10 +551,10 @@ JIT is designed with isolation and fault tolerance:
 
 **✓ Isolated failures:**
 
-- Corrupted issue → Only that issue affected, others work normally
+- Corrupted issue → Only that issue affected, others work normally (`list_issues` skips an unreadable file)
 - Missing git → Core features still work, document features disabled
 - Stale lease → Automatically expired, issue becomes available
-- Invalid event → Logged but doesn't block operations
+- Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which append rather than re-read the log, keep working
 
 **✓ No cascading failures:**
 

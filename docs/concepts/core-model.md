@@ -830,16 +830,23 @@ Labels provide organizational membership using `namespace:value` format for filt
 
 ### Required Labels
 
-**Every issue must have exactly ONE**:
+**Every issue carries exactly one `type:` label.** The type vocabulary is project
+configuration, not fixed by the engine (`@/inv/domain-agnostic`): `jit init` ships
+the `milestone → epic → story → task` hierarchy, and a project declares its own
+type names and levels under `[type_hierarchy]`.
+
 ```mermaid
 flowchart LR
     T["type:*"]
-    T --> M["type:milestone<br/>release goal"]
-    T --> E["type:epic<br/>large feature"]
-    T --> K["type:task<br/>concrete work item"]
-    T --> R["type:research<br/>time-boxed investigation"]
-    T --> B["type:bug<br/>defect to fix"]
+    T --> M["type:milestone<br/>level 1"]
+    T --> E["type:epic<br/>level 2"]
+    T --> S["type:story<br/>level 3"]
+    T --> K["type:task<br/>level 4 (leaf)"]
 ```
+
+Projects add their own types alongside these. This repository, for example,
+declares `bug`, `enhancement`, `planning`, and `breakdown`; the research example
+under `docs/examples/research/` uses `goal` and `experiment` instead.
 
 **Exception:** Use `--orphan` flag to explicitly allow issues without type label.
 
@@ -860,15 +867,14 @@ blocked-by:external    External dependency
 resolution:duplicate   Why rejected
 ```
 
-**Strategic labels** (high-level organization):
+**Strategic types** (high-level organization):
 
-JIT defines certain namespaces as "strategic" in configuration:
-- `milestone:*` - Release grouping
-- `epic:*` - Feature grouping
-- `goal:*` - Objective grouping
-- `theme:*` - Initiative grouping
+Which types count as "strategic" is project configuration (`strategic_types` under
+`[type_hierarchy]`), not an engine-fixed set. The shipped default is `milestone`
+and `epic`; another project might configure `goal` or `theme` instead.
 
-Strategic issues (those with strategic labels) appear in special queries:
+Strategic issues (those whose `type:` label is a configured strategic type) appear
+in a dedicated query:
 ```bash
 # Find all strategic issues
 jit query strategic

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "202e62e6-585a-4dbe-9d9c-f3da209386df",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "736a069e-0f58-48ec-bdc4-7a8eb2500afd",
+  "commit": "c2e23a6a274be4de7ffd815abc530709c32d85d2",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:37:50.906848107Z",
+  "completed_at": "2026-07-11T08:38:39.889177445Z",
+  "duration_ms": 48982,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nOne blocking semantic mismatch remains.\n\nThe six findings from the previous review have otherwise been addressed: JSON coverage is qualified, MCP’s curated listing is disclosed, configurable types are framed correctly, `scope.md` uses a shipped type, and malformed event reads are described accurately.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local types and planning-bracket configuration are explicitly identified as this repository’s configuration or as opt-in examples.\n\n## 3. Current behavior only\n\nPass. No legacy or roadmap narration about JIT’s behavior was found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims were found.\n\n## 5. Links and referenced paths resolve\n\nPass. Scoped mechanical checks confirmed:\n\n- All Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- Every addressable-item citation resolves.\n- Projected documentation regions are current.\n\n## 6. Content-standards conformance\n\nPass. Diagram-shaped authored content uses Mermaid. Box-drawing characters occur only in the permitted directory-tree listings in `overview.md` and `guarantees.md`.\n\n## Findings\n\n1. **F1 — High:** [`docs/concepts/containment-and-completion.md:31`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/containment-and-completion.md:31) says that following dependency edges “from a leaf upward” yields its containers. Stored edges point from a dependent container to its contained dependency, so a leaf does not reach its containers by following outgoing edges; containers are found by traversing incoming/reverse dependency relationships. Remediation: state that following outgoing edges from a container yields its contents, while following the edges in reverse from a leaf yields its containing ancestors.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking hierarchy-semantics defect remains: the documentation gives the wrong traversal direction from leaves to containers.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The documentation incorrectly says following dependency edges from a leaf upward yields its containers.\",\"file\":\"docs/concepts/containment-and-completion.md\",\"line\":31}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1725 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5053-675d-7bd2-8679-9cbe63b9ed07\n--------\nuser\n--- 1712 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking hierarchy-semantics defect remains: the documentation gives the wrong traversal direction from leaves to containers.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The documentation incorrectly says following dependency edges from a leaf upward yields its containers.",
+        "file": "docs/concepts/containment-and-completion.md",
+        "line": 31
+      }
+    ]
+  }
+}

@@ -64,7 +64,7 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 
 ### Key Design Principles
 
-**JSON-First Output:** Every command supports `--json` for structured data that agents parse reliably, with no regex scraping needed.
+**JSON-First Output:** Commands that emit data support `--json` for structured output agents parse reliably, with no regex scraping; list-emitting commands wrap results in a `{count, <collection>}` envelope.
 
 **Atomic File Operations:** Write-temp-rename pattern prevents race conditions and partial writes. Multi-agent safe by design.
 
@@ -294,8 +294,8 @@ flowchart TD
 
 **Benefits:**
 - Single source of truth (core library)
-- MCP exposes exactly the capabilities the CLI exposes
-- Behavior stays identical whichever surface a user or agent reaches for
+- MCP tools are generated from `jit --schema`, so every CLI command is callable; the default `tools/list` advertises a curated agent-facing subset (see `mcp-server/README.md`)
+- Each surface reaches the same core code, so results stay consistent across the CLI, MCP, and web UI
 
 **Example:**
 ```bash
@@ -478,7 +478,7 @@ flowchart TD
     S5 --> S1
 ```
 
-**Example:** Every command's `--json` flag serves agent automation, emitting structured, machine-parseable output that agents consume directly and humans share.
+**Example:** The `--json` flag on data-emitting commands serves agent automation, emitting structured, machine-parseable output that agents consume directly and humans share.
 
 ## See Also
 

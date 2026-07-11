@@ -32,7 +32,7 @@ jit gate define code-review --title "Code Review" --mode manual \
 
 # Create feature with dependencies
 jit issue create --title "Add user authentication" \
-  --label type:feature --label component:auth
+  --label type:epic --label component:auth
 
 jit issue create --title "Add password hashing" \
   --label type:task --label component:auth

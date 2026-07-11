@@ -18,17 +18,17 @@
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T08:19:57.856726950Z"
+      "updated_at": "2026-07-11T08:37:47.885959820Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:37:50.906848107Z"
     },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-11T08:19:58.068098054Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T08:20:01.472865630Z"
     }
   },
   "context": {},
@@ -60,7 +60,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.658986271Z",
-  "updated_at": "2026-07-11T08:22:39.152079010Z",
+  "updated_at": "2026-07-11T08:38:39.889389706Z",
   "first_ready_at": "2026-07-10T20:21:17.658986861Z",
   "claimed_at": "2026-07-11T07:39:26.722581738Z"
 }
