@@ -216,28 +216,18 @@ const result = await concurrencyLimiter.run(async () => {
 });
 ```
 
-### Structured Error Responses
+### Tool Result Responses
 
-All responses follow a consistent envelope format:
+Successful tool calls return an MCP `CallToolResult`. The default `content`
+mode returns one text content block containing a short summary followed by JSON
+for the compacted command result. Set `JIT_MCP_RESPONSE_MODE=structured` to
+return the summary in `content` and the compacted command result in
+`structuredContent`.
 
-```javascript
-// Success
-{
-  "success": true,
-  "data": { /* command output */ }
-}
-
-// Error
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Validation failed: id: Required"
-  }
-}
-```
-
-MCP responses mark errors with `isError: true` for proper client handling.
+Error results set `isError: true`. Handler-generated errors use a text content
+block containing JSON with `success: false` and an `error` object (including a
+code and message); callers should use `isError` to identify the result as an
+error.
 
 ## Development
 

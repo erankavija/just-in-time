@@ -4,7 +4,7 @@ Footprint: `README.md`, `INSTALL.md`, `mcp-server/README.md`, `web/README.md`,
 `docs/index.md`, `docs/README.md`. Verified against HEAD `acc3162d` (binary `jit 0.2.1`,
 commit `acc3162d`, matches `git rev-parse HEAD`).
 
-## Mechanical bar (self-verified, all clean)
+## Mechanical bar (initial audit, all clean)
 
 - **M2 links/anchors** — `OK: all links and anchors resolve`.
 - **M3 citations** — `OK: all cited paths and @/ items resolve` (incl. the new
@@ -61,9 +61,8 @@ Every Node-floor statement now reads 20 and cites `.github/workflows/ci.yml`.
   `jit version` (`Version: 0.2.1`), `jit-server --version` (clap `version`, `main.rs:28`),
   `node --version`, `rg --version` all work.
 - **F3 [high] `validation.strictness` shown as active (REQ-05/behavior).** The field is inert —
-  parsed but no behavioral effect (`crates/jit/src/config.rs:290,296`). `README.md:232` comment
-  now reads `# "strict", "loose", or "permissive" (currently inert)`, matching
-  `docs/reference/configuration.md:86`. No roadmap narration added.
+  parsed but no behavioral effect (`crates/jit/src/config.rs:290-298`). It is no longer shown in
+  the root README's adopter configuration example. No roadmap narration added.
 - **F4 [medium] unsourced `Rust 1.80+` MSRV (REQ-06).** No `rust-version` in any manifest; CI uses
   `dtolnay/rust-toolchain@stable` (`.github/workflows/ci.yml:44`). `INSTALL.md:159` now states a
   recent stable toolchain with the CI cite and notes the workspace declares no minimum, instead of
@@ -79,9 +78,9 @@ No projection surface exists for these; each is stated near its source and cited
   toolchain" with the CI cite (F4). Follow-up candidate: decide whether `Cargo.toml` should declare
   a `rust-version` (MSRV) so the install floor has an authoritative source.
 - **`validation.strictness` parsed-but-unused (engine gap).** The `[validation] strictness` config
-  key is deserialized but has no behavioral effect (`crates/jit/src/config.rs:290,296` — "inert").
-  Docs (README + `configuration.md`) now annotate it "(currently inert)". Follow-up candidate:
-  either wire strictness to real behavior or remove the config key.
+  key is deserialized but has no behavioral effect (`crates/jit/src/config.rs:290-298` — "inert").
+  The root README does not advertise it as an adopter setting. Follow-up candidate: either wire
+  strictness to real behavior or remove the compatibility key.
 - **jit-server / jit serve default ports.** `README.md:55` (3000) and the `3000–3099` auto-select
   range (`crates/jit/src/commands/serve.rs:5`, `cli.rs:418`) are hand-copied from
   `crates/server/src/main.rs:38` and `serve.rs`. No projection surface for default ports.
@@ -99,3 +98,37 @@ No projection surface exists for these; each is stated near its source and cited
   not as a `jit init` shipped default (the canonical `milestone → epic → story → task` is named
   at `README.md:219`). Signal present; left as-is.
 - No deletion/merge performed; no inbound-link repointing needed. Footprint self-contained.
+
+## Authorized final rework — 3 remaining doc-review findings fixed
+
+The final rework's scoped M2 and M3 checks pass. The required M5 check initially
+revealed a stale configured `CLAUDE.md` projection outside this task's footprint;
+the lead corrected the projection target and the final M5 rerun passes. The
+check's temporary in-place `CLAUDE.md` change was restored and is not part of
+this task's diff.
+
+- **F1 [high] inert `validation.strictness` choice list.** Removed the entire `[validation]`
+  stanza from the root README's configuration example. A scoped sweep found no other
+  `strictness`, `strict`, `loose`, or `permissive` configuration-choice wording in the footprint.
+- **F2 [high] MCP success-response envelope.** `mcp-server/README.md` now describes the two
+  `formatSuccessResult` modes in `mcp-server/index.js:139-158`: the default single text
+  `content` block containing summary plus compacted JSON, and structured mode's summary
+  `content` plus `structuredContent`. It reserves the `success: false` JSON object for the
+  handler-generated error text and identifies `isError: true` as the MCP error signal
+  (`index.js:221-322`). No success-envelope claim remains in the scoped MCP README.
+- **F3 [medium] unsupported platform and resource requirements.** Removed the distribution
+  floors, architecture assertion, RAM/disk figures, storage density, and SSD recommendation from
+  `INSTALL.md`. The former system-requirements table of contents entry is now Optional
+  Dependencies; the remaining dependency statements are tied to their documented functions, and
+  the Node floor cites CI. No unsupported hardware, storage, or OS requirement remains in the
+  footprint.
+
+### Deferred-item categorization for Group C (REQ-06 handoff)
+
+| Item | Classification | Action |
+|---|---|---|
+| No declared Rust MSRV | Valid missing-projection/source-of-truth gap | File a Group-C follow-up to decide and declare the supported Rust version. |
+| Inert `validation.strictness` compatibility key | Valid engine/documentation-source gap | File a Group-C follow-up to remove it or give it behavior; it is not an adopter configuration setting. |
+| `jit-server` / `jit serve` default ports | Valid missing-projection fact | File a Group-C follow-up only if the project wants a projection; current docs cite source. |
+| MCP default timeout and concurrency limit | Valid missing-projection fact | File a Group-C follow-up only if the project wants a projection; current docs cite source. |
+| Former system-resource figures | Not a deferred factual gap | Removed as unsupported; do not file a follow-up unless a reproducible benchmark is deliberately added. |

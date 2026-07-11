@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all methods to install JIT Issue Tracker on Linux systems.
+This guide covers the installation methods provided in this repository.
 
 ## Table of Contents
 
@@ -8,7 +8,7 @@ This guide covers all methods to install JIT Issue Tracker on Linux systems.
 - [Docker](#docker)
 - [From Source](#from-source)
 - [NPM (MCP Server)](#npm-mcp-server)
-- [System Requirements](#system-requirements)
+- [Optional Dependencies](#optional-dependencies)
 
 ---
 
@@ -241,26 +241,12 @@ Add this server definition to your MCP client's configuration:
 
 ---
 
-## System Requirements
-
-### Minimum
-
-- **OS**: Linux (Ubuntu 20.04+, Debian 11+, RHEL 8+, or equivalent)
-- **Architecture**: x86_64 (amd64)
-- **RAM**: 256 MB
-- **Disk**: 50 MB for binaries, ~10 MB per 1000 issues
-
-### Recommended
-
-- **RAM**: 512 MB+ (for API server with multiple concurrent clients)
-- **Disk**: SSD for better I/O performance
-- **ripgrep**: For full-text search (`apt install ripgrep` or `yum install ripgrep`)
-
-### Optional Dependencies
+## Optional Dependencies
 
 - **Git**: Core issue tracking is Git-optional, but advisory leases (`jit claim`) and worktree coordination need a Git repository with a resolvable `HEAD` (`apt install git`)
 - **Docker**: For containerized deployment (`apt install docker.io docker-compose`)
 - **Node.js** (20+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`); the CI floor is Node 20 (`.github/workflows/ci.yml`)
+- **ripgrep**: For full-text search (`apt install ripgrep` or `yum install ripgrep`)
 
 ---
 

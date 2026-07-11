@@ -229,8 +229,6 @@ schema = 2
 types = { milestone = 1, epic = 2, story = 3, task = 4, bug = 4 }
 strategic_types = ["milestone", "epic"]
 
-[validation]
-strictness = "loose"  # "strict", "loose", or "permissive" (currently inert)
 ```
 
 See the [Configuration Reference](docs/reference/configuration.md) and [Example Config](docs/reference/example-config.toml).
