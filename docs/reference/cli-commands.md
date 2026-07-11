@@ -2815,7 +2815,7 @@ jit serve [OPTIONS]
 | `--stop` | Stop the running server for this repository. |
 | `--status` | Report whether a server is running and exit. |
 | `--fg` | Run in the foreground instead of daemonizing (useful for debugging; Ctrl+C stops it). |
-| `--log <FILE>` | Write server output to this file. A relative path resolves under `.jit/` (default `server.log` there); an absolute path is used as given. |
+| `--log <FILE>` | Where the daemonized server writes its output. A relative path resolves under `.jit/` (default `server.log` there); an absolute path is used as given. It governs daemon mode only — under `--fg` the server's output stays attached to the terminal and `--log` is not used. |
 | `--web-dir <DIR>` | Directory of built web UI static files (auto-detected when omitted). |
 | `--json` | Emit machine-readable output. |
 
@@ -2845,11 +2845,12 @@ reports the launched process:
 }
 ```
 
-`status` is `started`, `running` (already up, or the `--status` view), `stopped`,
-`not_running`, `exited` (a foreground run that ended), or `error` (a
-`--stop`/`--status` operation that failed, carrying an accompanying `error`
-message field). `web_ui_source` is `embedded` or `filesystem`, per where the UI
-assets were served from.
+`status` is `started` (a new background daemon launched), `running` (already up,
+or the `--status` view), `stopped`, `not_running`, `exited` (a foreground `--fg`
+run that ended, carrying its `exit_code`), or `error` (a start, stop, or status
+operation that failed, carrying an accompanying `error` message field).
+`web_ui_source` is `embedded` or `filesystem`, per where the UI assets were
+served from.
 
 ## Git Hook Commands
 

@@ -2,7 +2,7 @@
   "id": "8682e95a-bb8a-4c73-8a48-ed712e8b08b0",
   "title": "Command-family reference gap-fill",
   "description": "Add adopter-facing reference documentation for the two CLI command families that lack a documentation home: `serve` and `events`.\n\n## Background\n\nEvery top-level CLI command family needs an adopter-facing documentation home, and the CLI command catalog (`docs/reference/cli-commands.md`) is the reference home for command families. A documentation-surface investigation found two families without one: `serve` is absent from the docs entirely, and `events` has concept-level coverage of the event log but no CLI reference entry — coverage of the log's format is not a home for the command family itself.\n\n## Success Criteria\n\n- [hard] REQ-01: `docs/reference/cli-commands.md` carries a `serve` reference section documenting the family and its flags (`--port`, `--stop`, `--status`, `--fg`, `--log`, `--web-dir`, `--json`), each matching the current generated CLI schema or the current clap definitions.\n- [hard] REQ-02: `docs/reference/cli-commands.md` carries an `events` reference entry documenting its `query` and `tail` subcommands and their flags, each matching the current generated CLI schema or the current clap definitions.\n\n## Notes\n\n- Both additions follow the catalog's existing per-family entry conventions (structure, heading style, example shape), so the new sections read as native parts of the reference.\n- The generated CLI schema under-reports the real flag surface (clap `visible_alias` flag forms and the global flags are absent from it); the clap definitions in `crates/jit/src/cli.rs` are the fallback oracle for any flag the schema omits.\n- Blast radius: single file, additive sections.",
-  "state": "ready",
+  "state": "done",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -14,20 +14,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "failed",
+    "docs-mechanical": {
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T09:21:19.398993230Z"
+      "updated_at": "2026-07-11T09:26:28.723969414Z"
     },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T09:14:33.061800571Z"
+      "updated_at": "2026-07-11T09:27:21.054636397Z"
     },
-    "docs-mechanical": {
+    "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T09:21:19.267588714Z"
+      "updated_at": "2026-07-11T09:26:28.854324528Z"
     }
   },
   "context": {},
@@ -55,6 +55,7 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-07-10T20:45:11.226049547Z",
-  "updated_at": "2026-07-11T09:23:20.813332720Z",
-  "first_ready_at": "2026-07-10T20:45:11.226057147Z"
+  "updated_at": "2026-07-11T09:27:21.428209509Z",
+  "first_ready_at": "2026-07-10T20:45:11.226057147Z",
+  "done_at": "2026-07-11T09:27:21.428208859Z"
 }

@@ -98,3 +98,39 @@ prints; web_ui_source); `--stop`/`--status`/`--fg` mutual exclusion (clap
 conflicts_with_all); `--web-dir` auto-detect (find_web_dir); `--json` started
 shape `{status,pid,port,url,log_file,web_ui,web_ui_source}` (main.rs:6542-6564,
 web_ui hardcoded true on start). All match source.
+
+## Rework attempt 2 (doc-review: 2 mode-conditional edge cases)
+
+Both verified against source (`main.rs` serve handler 6345-6607, `commands/serve.rs`).
+
+- F1 [medium] `--log` is daemon-only — the top-level `log_file = log.map(|l|
+  jit_dir.join(l))` (main.rs:6360) is passed ONLY to `ServeOptions` in the
+  daemonize branch (6534-6540). The `--fg` branch runs `cmd.status()` (main.rs
+  ~6511) and inherits the terminal's stdio; it never uses `log_file` and prints
+  "foreground, Ctrl+C to stop". Flag row now scopes `--log` to daemon mode and
+  states `--fg` output stays on the terminal.
+- F2 [medium] `error` status covers START failures too — the daemonize branch's
+  `Err(e)` arm (main.rs:6592-6604) emits `{"status":"error","error":...}`,
+  identical to the stop-failure (6388) and status-failure (6436) arms. Taxonomy
+  broadened from "`--stop`/`--status`" to "start, stop, or status".
+
+### Complete status-emission map (every `"status"` the serve handler can emit)
+
+| status        | branch / trigger (main.rs)                                              | payload                                    |
+|---------------|------------------------------------------------------------------------|--------------------------------------------|
+| `stopped`     | `--stop`, StopOutcome::Stopped (6364)                                   | `pid`, `port`                              |
+| `not_running` | `--stop` NotRunning (6378) / `--status` None (6426)                     | —                                          |
+| `error`       | `--stop` Err (6388) / `--status` Err (6436) / daemon-start Err (6592)   | `error` (message)                          |
+| `running`     | `--status` Some (6410) / fg already-running (6463) / daemon AlreadyRunning (6578) | `pid`, `port`, `url` (+ `log_file`,`started_at` in the `--status` view) |
+| `exited`      | `--fg`, after `cmd.status()` returns (6512)                             | `port`, `exit_code`                        |
+| `started`     | daemonize, ServeOutcome::Started (6542)                                 | `pid`,`port`,`url`,`log_file`,`web_ui`,`web_ui_source` |
+
+Set is complete — the six documented values match the six the handler emits, no more.
+
+### Mode-conditional behavior (daemon vs `--fg`), re-confirmed
+
+- **Logging:** daemon → `--log` file (default `.jit/server.log`); `--fg` → terminal stdio, `--log` unused. (F1)
+- **Blocking / Ctrl+C:** daemon returns immediately after launch; `--fg` blocks inline until Ctrl+C or the server exits (`cmd.status()`).
+- **Status emitted on a fresh run:** daemon → `started`; `--fg` → `exited` (only after the run ends). An already-running server short-circuits to `running` in both modes.
+- **PID file:** written/tracked by the daemon path (`start_server`); the `--fg` path reads it for the already-running check but the inline run is not a tracked daemon.
+- **Unconditional (same in both modes), re-confirmed against source:** port scan (`start..=start+99`, serve.rs:238-258), `--web-dir` resolution + auto-detect (`find_web_dir`), `/api` + `/` endpoints, filesystem-vs-embedded UI selection. Nothing else is stated unconditionally that is actually mode-conditional.

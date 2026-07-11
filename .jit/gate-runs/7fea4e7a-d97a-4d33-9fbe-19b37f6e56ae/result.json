@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "7fea4e7a-d97a-4d33-9fbe-19b37f6e56ae",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "8682e95a-bb8a-4c73-8a48-ed712e8b08b0",
+  "commit": "883832712ca41ded6b8f475fb6115b5f5a33e64b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T09:26:28.854324528Z",
+  "completed_at": "2026-07-11T09:27:12.426711183Z",
+  "duration_ms": 43572,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nNo findings. The `serve` and `events` command sections match the clap definitions and handlers. The two findings from the latest review are resolved:\n\n- `--log` is correctly documented as daemon-only and unused with `--fg`.\n- The `error` status correctly covers start, stop, and status failures.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. The scoped additions do not present repository-local configuration as shipped defaults.\n\n## 3. Current behavior only\n\nNo findings. The scoped content contains no historical or future-state narration about jit behavior.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings. Numeric values describe command defaults, bounded port searches, examples, or response data—not volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nNo findings. All links, anchors, cited paths, and concrete addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nNo findings. The scoped additions follow the established heading structure and contain no non-Mermaid diagrams or improperly formatted mathematics.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped command-family reference accurately documents serve and events, and all prior findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped command-family reference accurately documents serve and events, and all prior findings are resolved.",
+    "findings": []
+  }
+}
