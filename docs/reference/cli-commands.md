@@ -2057,6 +2057,65 @@ jit query divergence --json
 `membership_divergences` array (the same entries); the count is **advisory** and
 never changes the validate exit status.
 
+## Event Log Commands
+
+`events.jsonl` is the repository's append-only history: every issue creation,
+state transition, claim, gate result, and registry edit appends one line.
+`jit events` reads that log — it never writes to it. Both subcommands emit events
+in the log's stored (append) order. The event object shape and the full set of
+event `type` tags are documented under
+[Event Log Format](storage-format.md#event-log-format).
+
+Human output prints one JSON event object per line (JSONL, the same encoding the
+log stores); `--json` wraps the same events in the list envelope
+`{"count": N, "events": [...]}` with a `message` field.
+
+### `jit events tail`
+
+Print the most recent events.
+
+```bash
+jit events tail [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-n <N>` | Number of most recent events to print (default `10`). |
+| `--json` | Emit the list envelope `{"count": N, "events": [...]}`. |
+
+```bash
+jit events tail
+jit events tail -n 50
+jit events tail --json
+```
+
+### `jit events query`
+
+Filter the log by event type and/or issue, capped at `--limit` results.
+
+```bash
+jit events query [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-e`, `--event-type <TYPE>` | Keep only events whose `type` tag equals `<TYPE>` (e.g. `issue_state_changed`). |
+| `-i`, `--issue-id <ID>` | Keep only events carrying this `issue_id`. |
+| `-l`, `--limit <N>` | Return at most `N` events (default `50`). |
+| `--json` | Emit the list envelope `{"count": N, "events": [...]}`. |
+
+```bash
+# Every state change recorded for one issue
+jit events query --issue-id abc123 --event-type issue_state_changed
+
+# The 20 most recent gate passes across the repository
+jit events query --event-type gate_passed --limit 20 --json
+```
+
+Type filters match the snake-case `type` tag exactly; repository- and
+registry-scoped events carry no `issue_id`, so an `--issue-id` filter never
+returns them.
+
 ## Document Commands
 
 A document reference links a repository file to an issue, so an agent reading the
@@ -2730,6 +2789,63 @@ jit snapshot export --working-tree
 
 JSON returns `{path, issue_count, document_count, format, size_bytes, message}`;
 `size_bytes` is `null` for a directory export.
+
+## Server Commands
+
+### `jit serve`
+
+Start the JIT API and web UI server for the current repository as a background
+daemon, or inspect or stop a running one. jit runs one server process per
+repository, tracked by a PID file (`server.pid.json` under `.jit/`); a second
+`jit serve` reports the already-running server rather than starting a duplicate. When the
+preferred port is taken, jit auto-selects a free port in the range 3000–3099. The
+server exposes the HTTP API under `/api` and the web UI at `/` — from built
+static files when a web directory is found, otherwise from assets embedded in the
+binary.
+
+```bash
+jit serve [OPTIONS]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--port <PORT>` | Preferred port to listen on (default `3000`); auto-selects from 3000–3099 when it is taken. |
+| `--stop` | Stop the running server for this repository. |
+| `--status` | Report whether a server is running and exit. |
+| `--fg` | Run in the foreground instead of daemonizing (useful for debugging; Ctrl+C stops it). |
+| `--log <FILE>` | Write server output to this file, resolved under `.jit/` (default `server.log` there). |
+| `--web-dir <DIR>` | Directory of built web UI static files (auto-detected when omitted). |
+| `--json` | Emit machine-readable output. |
+
+`--stop`, `--status`, and `--fg` are mutually exclusive.
+
+```bash
+jit serve                 # Start (or report an already-running server)
+jit serve --port 3010     # Prefer a specific port
+jit serve --status        # Check whether a server is running
+jit serve --stop          # Stop the running server
+jit serve --fg            # Run in the foreground for debugging
+jit serve --json          # Machine-readable output
+```
+
+`--json` prints a bespoke status object rather than an issue envelope. A start
+reports the launched process:
+
+```json
+{
+  "status": "started",
+  "pid": 12345,
+  "port": 3000,
+  "url": "http://localhost:3000",
+  "log_file": "/repo/.jit/server.log",
+  "web_ui": true,
+  "web_ui_source": "embedded"
+}
+```
+
+`status` is `started`, `running` (already up, or the `--status` view), `stopped`,
+`not_running`, or `exited` (a foreground run that ended). `web_ui_source` is
+`embedded` or `filesystem`, per where the UI assets were served from.
 
 ## Git Hook Commands
 
