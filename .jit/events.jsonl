@@ -6541,3 +6541,5 @@
 {"type":"gate_definition_updated","id":"04c11e17-9b2a-44ce-a21c-453aa69c944c","timestamp":"2026-07-11T20:07:10.887913378Z","gate_key":"code-review"}
 {"type":"issue_created","id":"b8dbf1c3-8d17-4575-8426-f0453a691005","issue_id":"ebd3f8ff-3d04-480c-a95e-ca13145e50a8","timestamp":"2026-07-11T20:25:28.818372487Z","title":"Make documentation review issue-scoped and advisory on existing drift","priority":"normal"}
 {"type":"issue_updated","id":"5dd90f7b-0046-4b27-8a81-5017b073bbc4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-11T20:25:32.123777780Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"a939ae0a-5d1d-4668-a575-3153a7ed22e2","issue_id":"ebd3f8ff-3d04-480c-a95e-ca13145e50a8","timestamp":"2026-07-11T20:27:31.673513234Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"f3163b7b-1ea7-446d-9923-5749b5c7c0da","issue_id":"ebd3f8ff-3d04-480c-a95e-ca13145e50a8","timestamp":"2026-07-11T20:27:31.673718974Z","assignee":"agent:terra"}
