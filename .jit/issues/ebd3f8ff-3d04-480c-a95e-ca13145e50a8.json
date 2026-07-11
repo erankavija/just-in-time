@@ -2,7 +2,7 @@
   "id": "ebd3f8ff-3d04-480c-a95e-ca13145e50a8",
   "title": "Make documentation review issue-scoped and advisory on existing drift",
   "description": "Change the AI documentation review gate from a default full-surface audit into an issue-scoped documentation-impact review. The reviewer reconstructs the implementation footprint from commits tagged for the context issue, checks the smallest documentation impact cone—including required but untouched docs—and enforces concise user-facing prose without allowing unrelated existing drift to block delivery.\n\n## Background\n\nThe adopter-facing documentation surface has completed a comprehensive audit. Repeating that audit whenever `doc-review` runs creates noise and makes unrelated drift gate-blocking. Commit messages already carry `jit:<short-id>` tags, which give the reviewer an attributable implementation footprint even when issue commits are interleaved with unrelated work.\n\nThe issue-scoped review must still catch omitted documentation: touched documentation files alone are not a sufficient scope. Existing drift encountered during review remains useful signal, but it is advisory and does not affect the verdict.\n\n## Success Criteria\n\n- [hard] REQ-01: The documentation reviewer discovers commits on the current branch whose messages contain the context issue tag `jit:<short-id>` and constructs the implementation footprint from the union of those individual commit patches, including renames and deletions, rather than from one broad earliest-commit-to-HEAD range that can absorb unrelated commits.\n- [hard] REQ-02: When no tagged commit is available, the review falls back to the issue description, success criteria, and linked documents, and states that commit-based attribution was unavailable; uncommitted changes are not automatically attributed to the issue.\n- [hard] REQ-03: The reviewer derives the smallest documentation impact cone from the attributable implementation footprint and issue intent. It reviews documentation changed by the issue, documentation that must change because of the issue even when untouched, and links or neighboring text directly affected by those changes.\n- [hard] REQ-04: A finding blocks only when it has a direct causal relationship to the issue work, including a missing required documentation update, an inaccurate issue-authored update, or an issue-introduced link, citation, example, placement, discoverability, or material concision defect.\n- [hard] REQ-05: Existing unrelated drift encountered during the review is explicitly classified as pre-existing advisory feedback, is recommended to be surfaced without requiring an exhaustive search, and never changes a passing verdict to failure.\n- [hard] REQ-06: The review rubric requires concise documentation: direct present-tense statements, focused examples, links to canonical reference material instead of duplication, and omission of implementation history or internal mechanics that users do not need. Material duplication or obscured instructions in issue-authored prose is blocking; sentence-level style preferences are advisory.\n- [hard] REQ-07: Structured gate findings preserve whether each finding is blocking or advisory and whether it is issue-impact or pre-existing; a passing structured result may contain advisory findings, and parser/serialization tests cover the new fields and compatibility with findings that omit them.\n- [hard] REQ-08: The `doc-review` gate description and reviewer prompt state the issue-scoped policy, commit-tag footprint construction, advisory existing-drift policy, verdict rule, and concise-style rubric consistently; regression coverage verifies the policy-defining prompt content.\n\n- [hard] REQ-09: The reviewer distinguishes a leaf from a container through the repository-configured hierarchy and DAG-authoritative resolved children. A leaf footprint contains only commits tagged for that leaf; a container footprint contains commits tagged for the container plus every delivered descendant, without treating unrelated sequencing dependencies as contained work.\n- [hard] REQ-10: A container review evaluates the combined current documentation contract rather than replaying each leaf review. It checks container-level workflow coverage, cross-child terminology and example consistency, canonical placement versus duplication, discoverability, and aggregate concision across the union of descendant impact cones; regression coverage distinguishes this behavior from leaf review while retaining the same non-blocking treatment of unrelated existing drift.\n\n## Notes\n\nThe verdict rule is: fail if and only if at least one unresolved issue-impact blocking finding exists. Existing-drift findings never fail the gate.\n\nThe likely implementation footprint includes `scripts/doc-review-prompt.md`, `.jit/gates.toml`, structured gate-finding domain/output types, and their tests. The implementation may choose stable field names for the two classifications, provided both survive parsing, storage, and JSON output.\n",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:terra",
   "dependencies": [],
@@ -10,7 +10,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T20:49:40.504019098Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T20:55:05.461974700Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -20,7 +31,8 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-11T20:25:28.814873364Z",
-  "updated_at": "2026-07-11T20:37:31.445501754Z",
+  "updated_at": "2026-07-11T20:59:23.306570338Z",
   "first_ready_at": "2026-07-11T20:25:28.814882604Z",
-  "claimed_at": "2026-07-11T20:27:31.673572774Z"
+  "claimed_at": "2026-07-11T20:27:31.673572774Z",
+  "done_at": "2026-07-11T20:59:23.306569528Z"
 }

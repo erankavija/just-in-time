@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "270e5368-f05d-4319-9507-9c012540e22f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ebd3f8ff-3d04-480c-a95e-ca13145e50a8",
+  "commit": "af77bb9a69cd7aa884d5b6cc41fc237fe7703523",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T20:55:05.461974700Z",
+  "completed_at": "2026-07-11T20:57:17.154971114Z",
+  "duration_ms": 131692,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nAll REQ-01–REQ-10 are met. The prompt defines tagged, individual-patch attribution; fallback behavior; impact cones; blocking/advisory verdict rules; concise style; and distinct leaf/container review behavior in [scripts/doc-review-prompt.md](/home/vkaskivuo/Projects/just-in-time/scripts/doc-review-prompt.md:11). The configured gate consistently uses that prompt in [.jit/gates.toml](/home/vkaskivuo/Projects/just-in-time/.jit/gates.toml:127).\n\n## Architecture and correctness\n\nThe classification fields are pure domain data with backwards-compatible deserialization in [gate_findings.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/gate_findings.rs:44), storage round-trips them in [gate_runs.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/gate_runs.rs:39), and CLI rendering remains in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:793). No layer-boundary, atomic-write, event-log, PID-safety, or unsafe-code regression found.\n\n## Testing\n\nRecorded cargo-ci passed: fmt and clippy clean; 3,551 tests passed, 0 failed. The earlier cargo-ci attempt failed before tests ran because its temporary directory was read-only; the later successful run resolved that environment issue. I did not rerun cargo tests. `./scripts/jit-validate.sh` passed.\n\nRegression coverage verifies prompt policy and container semantics in [doc_review_policy_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/doc_review_policy_test.rs:12), plus parsing, JSON output, advisory passing results, and compatibility in [gate_findings_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/gate_findings_test.rs:107).\n\n## Error handling, CLI, and documentation\n\nNo new fallible paths were added. Existing `--json` gate output preserves both classifications. Public domain APIs retain doc comments and examples. No prior review findings were supplied, and the issue has no dependencies.\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; validation and recorded cargo-ci passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; validation and recorded cargo-ci passed.",
+    "findings": []
+  }
+}
