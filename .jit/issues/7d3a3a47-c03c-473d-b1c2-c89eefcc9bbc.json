@@ -9,7 +9,22 @@
   "gates_required": [],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/7d3a3a47-investigation.md",
+      "commit": null,
+      "label": "Current archival mechanism audit",
+      "doc_type": "study",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/7d3a3a47-planning-brief.md",
+      "commit": null,
+      "label": "Owner-approved planning brief",
+      "doc_type": "planning",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:artifact-archival",
     "component:docs",
@@ -17,6 +32,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-11T19:05:24.051555195Z",
-  "updated_at": "2026-07-11T19:06:10.742607288Z",
+  "updated_at": "2026-07-11T19:41:33.518539110Z",
   "first_ready_at": "2026-07-11T19:05:24.051567025Z"
 }
