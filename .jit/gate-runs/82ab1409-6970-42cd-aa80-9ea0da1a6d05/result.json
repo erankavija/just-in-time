@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "82ab1409-6970-42cd-aa80-9ea0da1a6d05",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "dadea23243f27154d2588f4b6fb64d447942d385",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T18:38:32.904602017Z",
+  "completed_at": "2026-07-11T18:43:49.433760180Z",
+  "duration_ms": 316529,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. The latest run’s 16 findings are corrected, but three lifecycle defects remain.\n\n## 2. Adopter surface versus repo-local configuration\n\nPass. Repository-specific types, namespaces, gates, templates, and rules are appropriately framed as examples or dogfood configuration.\n\n## 3. Current behavior only\n\nPass. Matches for historical wording describe evidence aging or ordinary grammar, not past or future JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No unsupported volatile product totals remain.\n\n## 5. Links and referenced paths resolve\n\nPass. The full mechanical audit reports that links, anchors, repository paths, addressable-item citations, and projections resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams are Mermaid; remaining box-drawing blocks are permitted directory trees or CLI output. No relevant mathematics or heading-depth defect was found.\n\n## Findings\n\n1. **F1 — Dependency completion is falsely documented as automatically promoting dependents to `ready`.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:229) and [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:776) call `Backlog → Ready` an automatic transition. [quickstart.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/quickstart.md:124), [first-workflow.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/first-workflow.md:177), and [adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:314) rely on the same behavior. In current source, completing or rejecting a dependency does not scan and promote its dependents: `query available` still excludes the persisted `backlog` issue. Promotion occurs through an explicit ready update, `jit validate --fix`, or the dependency-removal path. Remediate the lifecycle reference and walkthroughs with one of those actual promotion operations.\n\n2. **F2 — The quickstart claims a lifecycle path its commands do not follow.** [quickstart.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/quickstart.md:12) and [quickstart.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/quickstart.md:170) say the tutorial follows `backlog → ready → in_progress → done`. Dependency-free issues are created in `ready`, and the tutorial completes or gates them without entering `in_progress`; only one issue temporarily enters `backlog` after adding a dependency. Remediate these summaries to describe the states the walkthrough actually exercises, or add the missing explicit transitions.\n\n3. **F3 — Dependency examples incorrectly require `done` rather than either terminal outcome.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:435), [first-workflow.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/first-workflow.md:143), and [research-projects.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/research-projects.md:121) say dependencies wait for work to be done. `State::is_terminal` treats both `done` and `rejected` as satisfying dependencies. Remediate the examples to say “reaches a terminal state (`done` or `rejected`)”; use a validation rule or gate if the workflow specifically requires successful completion.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking lifecycle defects remain: automatic readiness promotion, an inaccurate quickstart path, and done-only dependency semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Docs falsely claim terminal dependencies automatically promote backlog dependents to ready.\",\"file\":\"docs/concepts/core-model.md\",\"line\":229},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The quickstart claims a lifecycle path that its commands do not follow.\",\"file\":\"docs/tutorials/quickstart.md\",\"line\":12},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Dependency examples incorrectly require done although rejected also satisfies dependencies.\",\"file\":\"docs/concepts/core-model.md\",\"line\":435}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8449 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5279-5c72-7cf2-8974-4f6ea42218be\n--------\nuser\n--- 8436 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking lifecycle defects remain: automatic readiness promotion, an inaccurate quickstart path, and done-only dependency semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Docs falsely claim terminal dependencies automatically promote backlog dependents to ready.",
+        "file": "docs/concepts/core-model.md",
+        "line": 229
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The quickstart claims a lifecycle path that its commands do not follow.",
+        "file": "docs/tutorials/quickstart.md",
+        "line": 12
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Dependency examples incorrectly require done although rejected also satisfies dependencies.",
+        "file": "docs/concepts/core-model.md",
+        "line": 435
+      }
+    ]
+  }
+}

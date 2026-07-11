@@ -432,7 +432,7 @@ Dependencies create **execution order** in a directed acyclic graph (DAG):
 ```
 Epic: Auth System
   depends on: [Login Task, Password Task, Session Task]
-  → Epic cannot complete until all tasks are done
+  → Epic cannot complete until all tasks reach a terminal state (done or rejected)
 ```
 
 **Key properties:**

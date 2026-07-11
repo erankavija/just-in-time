@@ -118,7 +118,7 @@ jit issue create --title "Write: Methods" \
 jit issue create --title "Write: Results" \
   --label "type:task" --label "paper:main-paper"
 
-# Results depends on experiments being done
+# Results depends on experiments reaching a terminal state (done or rejected)
 jit dep add <results-id> <experiment-id>
 
 # Co-author review gates
