@@ -13,9 +13,10 @@
   "labels": [
     "epic:artifact-archival",
     "component:docs",
-    "type:epic"
+    "type:epic",
+    "milestone:v1.0"
   ],
   "created_at": "2026-07-11T19:05:24.051555195Z",
-  "updated_at": "2026-07-11T19:05:24.053056156Z",
+  "updated_at": "2026-07-11T19:06:10.742607288Z",
   "first_ready_at": "2026-07-11T19:05:24.051567025Z"
 }
