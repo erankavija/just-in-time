@@ -403,7 +403,7 @@ Issues work for any domain:
 
 ## Dependencies vs Labels: Understanding the Difference
 
-Dependencies and labels both organize work, but serve fundamentally different purposes. They often flow in the same direction (task → epic → milestone) but have distinct semantics.
+Dependencies and labels both organize work, but serve fundamentally different purposes. They connect the same task/epic/milestone hierarchy but point in opposite directions: a membership label points from a leaf up to its container (task → epic → milestone), while a dependency points from a container down to the work it contains (milestone → epic → task).
 
 ### Labels: What Belongs Where (Grouping)
 
@@ -438,7 +438,7 @@ Epic: Auth System
 - Dynamic relationship (affects state transitions)
 - Transitive reduction (minimal edges preferred)
 
-### Same Direction, Different Meanings
+### Same Pairs, Opposite Directions
 
 ```mermaid
 flowchart TD
@@ -446,14 +446,15 @@ flowchart TD
     E["Epic: Auth System"]
     M["Milestone: v1.0"]
     T -->|"label epic:auth (membership)"| E
-    T -->|"dependency (order)"| E
+    E -->|"dependency (order)"| T
     E -->|"label milestone:v1.0 (membership)"| M
-    E -->|"dependency (order)"| M
+    M -->|"dependency (order)"| E
 ```
 
-The label says "this task belongs to the auth epic". The dependency says "the epic
-requires this task to reach a terminal state". Both flow the same way, but labels
-organize while dependencies control workflow.
+The label says "this task belongs to the auth epic" (task → epic). The dependency
+says "the epic requires this task to reach a terminal state" (epic → task). They
+connect the same pair of issues but point opposite ways: membership points a leaf
+up to its container, while a dependency points a container down to its contents.
 
 ### Asymmetry: Dependencies Are More Flexible
 
@@ -963,7 +964,7 @@ See [Dependencies vs Labels](#dependencies-vs-labels-understanding-the-differenc
 **Summary:**
 - **Labels** = Organizational membership (grouping)
 - **Dependencies** = Execution order (workflow)
-- Both often flow same direction, but different purposes
+- Opposite directions: membership points leaf → container, dependency points container → leaf
 - Use both for maximum clarity
 
 **Example:**

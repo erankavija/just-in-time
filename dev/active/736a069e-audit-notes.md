@@ -115,3 +115,32 @@ config-taxonomy-as-fixed, and over-credited-guarantee classes footprint-wide.
 
 Sweep result: no further interface-overclaim, config-taxonomy-as-fixed, or
 over-credited-guarantee instances found across the 9 files after these fixes.
+
+## Round 3 — DAG traversal-direction sweep (scoped `doc-review` finding)
+
+Direction of truth (`crates/jit/src/graph/hierarchy.rs:7-9,52-53`): a **container
+depends on the work it contains** (`A --depends on--> B` = container → contained
+node); the containers that hold a leaf are those "whose dependency closure includes
+the node" — reached by traversing edges in **reverse** (a leaf's incoming edges).
+
+- **F1 (flagged) — containment-and-completion.md:34-35.** "following them from a leaf
+  upward yields the containers that hold it" inverted the direction: a leaf's *own*
+  outgoing edges point to its prerequisites, not up to its containers. Reworded: "the
+  containers that hold a leaf are found by following the edges in reverse — every
+  container whose outgoing-dependency closure reaches it."
+- **Swept + found — core-model.md "Dependencies vs Labels".** The section claimed
+  dependencies and labels "flow the same direction (task → epic → milestone)" and its
+  mermaid drew the dependency edge `Task --> Epic`, contradicting the adjacent prose
+  ("the epic requires this task") and `hierarchy.rs`. Corrected in four places:
+  the intro (:406), the mermaid (dependency arrows flipped to `Epic → Task`,
+  `Milestone → Epic`), the section heading + explanation (`Same Direction, Different
+  Meanings` → `Same Pairs, Opposite Directions`; :455), and the Labels summary (:966).
+  Membership points leaf → container; dependency points container → leaf.
+- **Verified correct, unchanged:** hierarchy-resolution.md:17-18 (contents via a
+  container's outgoing edges), :46 (parent = "containers whose dependency closure
+  includes the node" — reverse), :48-49 (cluster follows resolved `parent` pointers;
+  rank = longest path to a sink). containment-and-completion.md:22-24, :74, :83
+  (container depends on contents; blocking follows edges transitively). core-model.md
+  Asymmetry mermaid (`v1.0 --blocks--> v2.0`) uses the `blocks` relation correctly.
+
+Sweep result: no remaining container/leaf traversal-direction inversions across the 9 files.

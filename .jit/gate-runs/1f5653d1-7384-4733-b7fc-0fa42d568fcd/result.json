@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "1f5653d1-7384-4733-b7fc-0fa42d568fcd",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "736a069e-0f58-48ec-bdc4-7a8eb2500afd",
+  "commit": "f196427d7c82248b1fc2ab3d203cda2f5de0ce3c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T08:52:04.619841676Z",
+  "completed_at": "2026-07-11T08:53:03.609765822Z",
+  "duration_ms": 58989,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nPass. CLI, storage, hierarchy, lifecycle, validation, and persistence claims in `docs/concepts/` match the current source.\n\nThe prior finding at `docs/concepts/containment-and-completion.md:33-36` is resolved: outgoing edges lead from containers to contents, while reverse traversal finds a leaf’s containers. The related direction claims in `docs/concepts/core-model.md:406-457` are also consistent.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local types, namespaces, planning-bracket rules, templates, and gates are explicitly framed as this repository’s configuration or as opt-in examples. Shipped defaults are distinguished from custom vocabularies.\n\n## 3. Current behavior only\n\nPass. No legacy, migration, or roadmap narration describing JIT’s behavior remains in the scoped documentation.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product totals are hardcoded in `docs/concepts/`.\n\n## 5. Links and referenced paths resolve\n\nPass.\n\n- All scoped Markdown links and anchors resolve.\n- All cited repository paths resolve.\n- Every `@/<kind>/<self-id>` citation resolves through `jit item show`.\n- The documented CLI flags are present in the schema or clap definitions.\n\n## 6. Content-standards conformance\n\nPass. Authored diagrams use Mermaid. The box-drawing blocks in `overview.md` and `guarantees.md` are permitted directory-tree listings. No non-LaTeX equations or blocking heading-depth defects were found.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped concepts documentation matches the current shipped behavior, configuration boundaries, links, citations, and content standards; the prior traversal-direction defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped concepts documentation matches the current shipped behavior, configuration boundaries, links, citations, and content standards; the prior traversal-direction defect is resolved.",
+    "findings": []
+  }
+}

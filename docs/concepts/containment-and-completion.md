@@ -31,8 +31,9 @@ graph LR
 ```
 
 Each arrow reads "depends on". Following a container's outgoing edges into
-more-tactical nodes yields its contents; following them from a leaf upward yields
-the containers that hold it.
+more-tactical nodes yields its contents; the containers that hold a leaf are found
+by following the edges in reverse — every container whose outgoing-dependency
+closure reaches it.
 
 The same edge also expresses plain ordering between peers: a task may depend on
 another task with no containment intended. The resolver separates the two cases
