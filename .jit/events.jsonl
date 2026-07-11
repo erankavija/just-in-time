@@ -6319,3 +6319,4 @@
 {"type":"gate_passed","id":"c8707e74-1daa-40d0-a5a2-7a52dbd4d171","issue_id":"36d5451e-05d1-41d7-baf5-208eba97c4a2","timestamp":"2026-07-11T12:42:46.407515784Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"bf6a3b90-1c67-4e2e-88c6-80b087f41f69","issue_id":"36d5451e-05d1-41d7-baf5-208eba97c4a2","timestamp":"2026-07-11T12:50:26.742217009Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"issue_updated","id":"864be4f5-5902-4106-b8b6-376410cec402","issue_id":"36d5451e-05d1-41d7-baf5-208eba97c4a2","timestamp":"2026-07-11T12:51:14.356465872Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_claimed","id":"50c827c3-debe-4f1b-ba27-65e8c7ad4921","issue_id":"36d5451e-05d1-41d7-baf5-208eba97c4a2","timestamp":"2026-07-11T12:53:46.921368634Z","assignee":"agent:jit-execution-lead"}

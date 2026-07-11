@@ -4,7 +4,7 @@
   "description": "Verify every CLI/storage/structure/semantics claim in the root and component READMEs, the installation documentation, and the docs landing pages against current source, and fix all drift class-wide.\n\n## Background\n\nThe footprint is `README.md`, the installation documentation at its current home (`INSTALL.md` at planning time; the audit covers that content wherever it now lives), `mcp-server/README.md`, `web/README.md`, plus the two landing/stub pages `docs/index.md` and `docs/README.md` — ~1,017 lines plus the two landing pages. It is one of the disjoint-footprint areas in an exhaustive, source-verified documentation audit of the adopter-facing documentation surface. Root `TESTING.md` is contributor documentation and is not part of this footprint. `docs/README.md` is a 4-line stub pointing at `docs/index.md`; keep it unless the audit finds it wholly obsolete. The audit verifies the final file locations and link topology of the root documentation as it stands. Recurring drift classes to sweep for include invented CLI surface, stale storage-format specifics, over-credited guarantees, legacy or future narration, and prerequisite/environment drift.\n\nA known drift instance must be fixed: a Node.js version floor inconsistency in the installation documentation (as of planning, `INSTALL.md:160` states 20+ while `INSTALL.md:261` states v18+) and at `mcp-server/README.md:324` (states v18+). CI's actual floor is Node 20 (`.github/workflows/ci.yml:204,240`).\n\n## Success Criteria\n\n- [hard] REQ-01: Every documented command and flag in the footprint exists in the current generated CLI schema or the current clap definitions.\n- [hard] REQ-02: Every repository-relative link, heading anchor, source citation, and addressable-item citation in the footprint resolves.\n- [hard] REQ-03: Every diagram-shaped block in the footprint is Mermaid; directory trees and verbatim command output are not diagrams.\n- [hard] REQ-04: Every factual claim in the footprint about CLI behavior, storage layout, repository structure, or engine semantics matches the current source tree; where a drift instance is found, its whole class is swept across the footprint, not patched line-by-line.\n- [hard] REQ-05: Prose in the footprint states current behavior only — no legacy or future/roadmap narration remains.\n- [hard] REQ-06: Every volatile fact in the footprint with an existing projection or citation surface is projected or cited rather than hand-copied; each volatile fact with no such surface is cited to its source file and recorded for follow-up filing.\n- [hard] REQ-07: The Node.js version floor reads Node 20 in every statement across the installation documentation (at its current home) and `mcp-server/README.md`, matching the CI floor and citing its source (`.github/workflows/ci.yml:204,240`).\n\n## Notes\n\nThe linked plan document carries the exact check commands and expected outputs (§2).\n\nCLI-surface verification must use a binary built from the current HEAD; a stale installed binary has previously produced false verification results. The generated CLI schema under-reports the real flag surface (clap `visible_alias` flag forms and the global flags are absent from it), so a documented flag absent from the schema is checked against the clap definitions in `crates/jit/src/cli.rs` before being declared invented; only a flag absent from both is a defect.\n\nKnown-benign box-drawing content in this footprint: `mcp-server/README.md:143-150` is a directory-tree/verbatim-output listing, not a diagram.\n\nA doc in this footprint found wholly obsolete or redundant may be deleted or merged into another, with the rationale recorded on this task. Every inbound link tree-wide is repointed in the same change — links are uniformly relative markdown, so inbound references are findable by filename in both bare-name and relative-path forms — and no doc is removed before its inbound links are repointed. After any deletion or merge, every link and anchor tree-wide still resolves.\n\nBlast radius: self-contained to the footprint above.",
   "state": "in_progress",
   "priority": "normal",
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [
     "adc4c6ef-04a4-4993-afb0-5ca12cf9061e"
   ],
@@ -14,11 +14,6 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T12:42:46.203710876Z"
-    },
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
@@ -28,6 +23,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-11T12:42:38.172759596Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T12:42:46.203710876Z"
     }
   },
   "context": {},
@@ -73,7 +73,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.661717023Z",
-  "updated_at": "2026-07-11T12:51:14.356211662Z",
+  "updated_at": "2026-07-11T12:53:46.921119194Z",
   "first_ready_at": "2026-07-10T20:21:17.661717253Z",
   "claimed_at": "2026-07-11T12:13:18.649711373Z"
 }

@@ -112,8 +112,8 @@
           "short_id": "36d5451e",
           "title": "Root and component documentation audit",
           "classification": "documentation",
-          "status": "escalated",
-          "note": "MAX_REWORK_ATTEMPTS exhausted: final-cycle attempt 2 fixed the cumulative 17 findings, but doc-review run 5f5c4d9b surfaced three new in-scope defects (named-volume initialization, all-in-one UI claim, and gate-stage enforcement). Await invoker direction before another dispatch."
+          "status": "manual_takeover",
+          "note": "Invoker directed lead manual takeover on 2026-07-11. Resolve the final three doc-review findings (named-volume initialization, all-in-one UI claim, gate-stage enforcement), then run the full lead review and gates."
         }
       ]
     },
@@ -143,9 +143,9 @@
     {
       "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
       "category": "Rework exceeded MAX_REWORK_ATTEMPTS",
-      "status": "awaiting_invoker",
+      "status": "resolved",
       "opened_at": "2026-07-11T00:00:00Z",
-      "summary": "The reset counter reached two attempts. The latest doc-review run 5f5c4d9b-57cd-4e97-bbb1-5ac949a87f35 contains three new in-scope documentation defects."
+      "summary": "Invoker directed manual lead takeover on 2026-07-11."
     }
   ],
   "rework_counts": {
@@ -161,7 +161,7 @@
     "36d5451e": 2
   },
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "BLOCKED in Wave 4: 36d5451e has exhausted its reset rework budget. Await invoker choice to authorize/reset another rework, take over manually, or reject. The latest review is dev/active/36d5451e-review-round-5.md. After Wave 4, interview the owner before Wave 5 on candidate engine follow-ups.",
+  "resume_pointer": "Wave 4 is in manual lead takeover for the three findings in dev/active/36d5451e-review-round-5.md. After Wave 4 passes and closes, interview the owner before Wave 5 on candidate engine follow-ups.",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
