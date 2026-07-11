@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "90faf611-b921-4105-b554-6baa4ce5f0fa",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "afbbf6c3-9f09-457a-98c5-d3fb97f8a296",
+  "commit": "386f41b717fca4a549130490bf371bc2bcfa34a5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T22:12:06.112896567Z",
+  "completed_at": "2026-07-11T22:15:15.305448993Z",
+  "duration_ms": 189192,
+  "exit_code": 0,
+  "stdout": "Attribution: `afbbf6c3` is a leaf (`bug`, level 4) with no resolved children. I reviewed its sole reachable tagged commit, `229685af`, individually; no fallback was needed.\n\nThe commit documents the new strictness behavior accurately in the canonical configuration reference, annotated example config, and storage-format cross-reference. It matches the current template and enforcement predicate. No issue-impact documentation gaps found.\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's strictness behavior is accurately and discoverably documented.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's strictness behavior is accurately and discoverably documented.",
+    "findings": []
+  }
+}

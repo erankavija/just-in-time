@@ -2,7 +2,7 @@
   "id": "e86b32d4-860f-42b0-991d-4e944ce62f1f",
   "title": "Declare and enforce the supported Rust MSRV",
   "description": "The workspace has no declared or tested Rust support policy: manifests omit `rust-version` and CI follows moving `stable`.\n\nSource: `Cargo.toml:1-25`; `crates/jit/Cargo.toml:1-59`; `.github/workflows/ci.yml:43-46`; `dev/active/36d5451e-audit-notes.md:66-79,126-134`.\n\n## Success Criteria\n\n- [hard] REQ-01: The project declares one authoritative Rust support policy: a numeric MSRV or an explicitly enforced stable-only policy.\n- [hard] REQ-02: Cargo metadata and CI enforce the selected policy.\n- [hard] REQ-03: Installation and development documentation derives its Rust requirement from that policy.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:worker",
   "dependencies": [
@@ -14,20 +14,20 @@
     "doc-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.396193332Z"
-    },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.396138082Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:05:27.775872416Z"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.396220442Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:15:38.190312104Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:09:31.244961750Z"
     }
   },
   "context": {},
@@ -39,7 +39,8 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.555196423Z",
-  "updated_at": "2026-07-11T21:18:09.133422492Z",
+  "updated_at": "2026-07-11T22:18:30.914561885Z",
   "first_ready_at": "2026-07-11T13:35:35.555196673Z",
-  "claimed_at": "2026-07-11T21:18:09.133422322Z"
+  "claimed_at": "2026-07-11T21:18:09.133422322Z",
+  "done_at": "2026-07-11T22:18:30.914560785Z"
 }

@@ -15,19 +15,19 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.385781544Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:07:51.504323431Z"
     },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.385730154Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:03:59.877275278Z"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.385809634Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T22:12:06.112896567Z"
     }
   },
   "context": {},
@@ -39,7 +39,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.554707732Z",
-  "updated_at": "2026-07-11T21:18:09.116116800Z",
+  "updated_at": "2026-07-11T22:15:15.316920181Z",
   "first_ready_at": "2026-07-11T13:35:35.554707972Z",
   "claimed_at": "2026-07-11T21:18:09.116116670Z"
 }

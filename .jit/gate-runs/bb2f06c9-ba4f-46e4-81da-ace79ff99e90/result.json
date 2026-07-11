@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "bb2f06c9-ba4f-46e4-81da-ace79ff99e90",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "afbbf6c3-9f09-457a-98c5-d3fb97f8a296",
+  "commit": "386f41b717fca4a549130490bf371bc2bcfa34a5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T22:07:51.504323431Z",
+  "completed_at": "2026-07-11T22:09:31.209063974Z",
+  "duration_ms": 99704,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-02 is not met: invalid strictness values are documented as rejected but are accepted during config parsing and `jit config set`.\n\n## Architecture and separation of concerns\n\nNo boundary violation found in the changed production paths.\n\n## Functional paradigm\n\nNo blocking functional-style concern found.\n\n## Correctness and invariants\n\nStrictness is applied at the write and transition enforcement points. No atomic-write, event-log, PID-safety, label, assignee, gate, or unsafe-code regression found in the reviewed change.\n\n## Safety\n\nNo unsafe code introduced.\n\n## Testing\n\nThe matching succeeded `cargo-ci` record reports format and Clippy clean, with 3,586 tests passed and none failed. I did not rerun Cargo tests. `./scripts/jit-validate.sh` passed (label warnings allowed).\n\nThe added tests cover configured write/transition behavior, but do not cover rejection at config-load or `config set` time.\n\n## Error handling\n\nInvalid strictness errors are contextual when validation happens, but configuration admission is delayed and inconsistent.\n\n## CLI contract\n\nNo new CLI surface was added.\n\n## Documentation\n\nThe new public `ValidationConfig::strictness` API lacks the required `# Examples` section.\n\n## Prior review feedback\n\n`run_history` is empty; there is no prior review finding to verify.\n\n## Jit issue management\n\nThe sole prerequisite is done, and repository validation passed.\n\n1. **High — invalid strictness values are accepted by configuration parsing and `jit config set`, contradicting the documented rejection behavior.** [`ValidationConfig.strictness`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:299) is `Option<String>`, so TOML deserialization accepts arbitrary values; the config loader does not resolve it, and [`set_config`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/config.rs:253) writes arbitrary strings. Thus `strictness = \"banana\"` persists successfully and only fails later on selected write/transition paths, violating REQ-02’s parsing agreement and the reference claim that unrecognized values are rejected.\n\n2. **Medium — new public API documentation lacks an example.** [`ValidationConfig::strictness`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:329) is public and documented, but has no `# Examples` section, violating the required public-API documentation standard.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Strictness values are not rejected at configuration admission, and a new public API lacks its required example.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Unsupported strictness values are accepted by TOML parsing and jit config set despite documentation stating they are rejected.\",\"file\":\"crates/jit/src/config.rs\",\"line\":299},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"Public ValidationConfig::strictness lacks the required # Examples documentation section.\",\"file\":\"crates/jit/src/config.rs\",\"line\":329}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8842 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5338-ff69-7b02-a402-d81328258679\n--------\nuser\n--- 8829 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Strictness values are not rejected at configuration admission, and a new public API lacks its required example.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Unsupported strictness values are accepted by TOML parsing and jit config set despite documentation stating they are rejected.",
+        "file": "crates/jit/src/config.rs",
+        "line": 299
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "Public ValidationConfig::strictness lacks the required # Examples documentation section.",
+        "file": "crates/jit/src/config.rs",
+        "line": 329
+      }
+    ]
+  }
+}

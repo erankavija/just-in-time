@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "34a08b47-921e-44b0-9028-d60f8d487019",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "e86b32d4-860f-42b0-991d-4e944ce62f1f",
+  "commit": "386f41b717fca4a549130490bf371bc2bcfa34a5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T22:09:31.244961750Z",
+  "completed_at": "2026-07-11T22:10:50.897629322Z",
+  "duration_ms": 79652,
+  "exit_code": 0,
+  "stdout": "## Acceptance Criteria\n\nREQ-01–03 are met. The numeric MSRV is authoritative at [`Cargo.toml:7`](/home/vkaskivuo/Projects/just-in-time/Cargo.toml:7), inherited by both workspace packages, enforced by the pinned-toolchain CI build at [`.github/workflows/ci.yml:106`](/home/vkaskivuo/Projects/just-in-time/.github/workflows/ci.yml:106) and documented for source/development users at [`INSTALL.md:159`](/home/vkaskivuo/Projects/just-in-time/INSTALL.md:159).\n\n## Architecture and Separation of Concerns\n\nNo Rust production-layer changes were introduced. The added guard is an integration test only.\n\n## Functional Paradigm\n\nNo production imperative or side-effect-heavy code was added.\n\n## Correctness and Invariants\n\nThe MSRV CI job reads the sole manifest value and builds the entire workspace, all targets, and all features with that exact toolchain at [`.github/workflows/ci.yml:133`](/home/vkaskivuo/Projects/just-in-time/.github/workflows/ci.yml:133). No affected invariant violations found.\n\n## Safety\n\nNo unsafe code or PID-related code was introduced.\n\n## Testing\n\nThe succeeded `cargo-ci` gate for this issue records `fmt: ok`, `clippy: ok`, and `3586 passed, 0 failed, 12 ignored` in [result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/5ebb2a01-0462-4eb2-852f-032a5b5dd883/result.json). I did not rerun Cargo tests. The new regression guard at [`version_cli_tests.rs:161`](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/version_cli_tests.rs:161) checks numeric workspace policy and member inheritance.\n\n## Error Handling\n\nNo new production fallible paths were added.\n\n## CLI Contract\n\nNo CLI surface changed.\n\n## Documentation\n\n`INSTALL.md` accurately derives the Rust prerequisite from the manifest policy and names its CI enforcement.\n\n## Prior Review Feedback\n\n`run_history` is empty; no prior findings require follow-up.\n\n## Jit Issue Management\n\nThe listed prerequisite is done. `./scripts/jit-validate.sh` passed; no disallowed validation failures.\n\n## Findings\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The numeric MSRV is declared, enforced in Cargo and CI, documented, and covered by passing gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The numeric MSRV is declared, enforced in Cargo and CI, documented, and covered by passing gate evidence.",
+    "findings": []
+  }
+}
