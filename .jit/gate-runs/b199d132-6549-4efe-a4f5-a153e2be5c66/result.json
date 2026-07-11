@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "run_id": "b199d132-6549-4efe-a4f5-a153e2be5c66",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "736a069e-0f58-48ec-bdc4-7a8eb2500afd",
+  "commit": "62d9e555b6f856e7d00e3866c05aa397191dc220",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:20:01.472865630Z",
+  "completed_at": "2026-07-11T08:22:39.151853100Z",
+  "duration_ms": 157678,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nBlocking drift remains:\n\n- `design-philosophy.md` overstates both JSON coverage and parity between the CLI, MCP server, and web UI.\n- `core-model.md` presents configured type and strategic-label vocabularies as universal requirements.\n- `scope.md` uses a type absent from the configuration produced by default initialization.\n- `guarantees.md` incorrectly describes malformed event handling.\n\nThe known claim-lock filename and event-tag defects have been corrected: the documentation now uses `locks/claims.lock` and real snake-case event tags such as `issue_state_changed`.\n\n## 2. Adopter surface versus dogfood configuration\n\nThe planning-bracket material clearly identifies `planning`, `breakdown`, `coverage-preview`, `brackets:`, and the `plan` template as opt-in configuration.\n\nHowever, `core-model.md` still presents `type:bug` as part of the required general taxonomy without configuration framing. The initialized default hierarchy contains `milestone`, `epic`, `story`, and `task`; `bug` is repository-local configuration.\n\n## 3. Current behavior only\n\nNo blocking legacy or roadmap narration was found. The “No longer relevant” wording at `core-model.md:798` describes the meaning of an `obsolete` resolution, not an earlier product state. Future-tense text inside illustrative CLI output is likewise not product roadmap narration.\n\n## 4. No hardcoded counts that silently rot\n\nNo blocking volatile product-total claim was found. Counts such as the three explicitly enumerated planning-bracket gates and two terminal lifecycle states describe bounded structures rather than hand-maintained registry totals.\n\n## 5. Links and referenced paths resolve\n\nThe scoped mechanical checks report:\n\n- All Markdown links and heading anchors resolve.\n- All cited repository paths resolve.\n- Every `@/<kind>/<self-id>` citation resolves through `jit item show`.\n- Projected documentation regions are current.\n\n## 6. Content-standards conformance\n\nAll diagram-shaped authored content uses Mermaid. The box-drawing blocks in `overview.md` and `guarantees.md` are permitted directory-tree listings. No blocking plain-text mathematical notation or heading-depth defect was found.\n\n## Findings\n\n1. **F1 — High:** [`docs/concepts/design-philosophy.md:67`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:67) claims every command supports `--json`, repeated at line 481. The CLI defines JSON flags per command; it is not a global flag and not every command has one. Remediation: replace both universal claims with a qualified statement that commands offering structured output expose `--json`, or enumerate the supported surface from `jit --schema`.\n\n2. **F2 — High:** [`docs/concepts/design-philosophy.md:297`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/design-philosophy.md:297) says MCP exposes exactly the CLI’s capabilities and line 298 says behavior is identical across all surfaces. The default MCP surface is explicitly curated and excludes numerous CLI commands; the web server also exposes its own API surface. Remediation: state that the surfaces reuse the same underlying CLI/core behavior where exposed, while MCP advertises a curated subset and the web server provides its own API.\n\n3. **F3 — High:** [`docs/concepts/core-model.md:833`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:833) presents a universal required type taxonomy containing `research` and repository-local `bug`, with an executable `type:bug` example at line 882. `jit init` defaults to `milestone`, `epic`, `story`, and `task`; `bug` is this repository’s local configuration. Remediation: describe type values as project-configured, show the initialized default taxonomy, and explicitly signal any `bug` or `research` examples as custom configuration.\n\n4. **F4 — High:** [`docs/concepts/core-model.md:865`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:865) says JIT defines `milestone`, `epic`, `goal`, and `theme` as strategic namespaces. Strategic types are read from project configuration, and the initialized default declares only `milestone` and `epic`. Remediation: explain that `[type_hierarchy].strategic_types` controls the query, give the shipped defaults, and frame `goal`/`theme` as possible custom values.\n\n5. **F5 — High:** [`docs/concepts/scope.md:34`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/scope.md:34) uses `type:feature` in an adopter example without declaring custom configuration. `feature` is absent from the initialized default hierarchy and fails the scaffolded type-hierarchy validation. Remediation: change it to a shipped type such as `type:story` or precede the example with configuration that declares `feature`.\n\n6. **F6 — High:** [`docs/concepts/guarantees.md:557`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:557) says an invalid event is logged and does not block operations. Event reads deserialize every nonblank JSONL record and return an error on a malformed or unknown event, so event queries and other event-reading operations fail. Remediation: state that malformed event records make event-reading commands fail while issue operations that only append or do not read the log may remain usable; remove the claim that invalid events are merely logged.\n\nTotal findings: 6\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Six blocking documentation defects remain in the scoped concepts surface: two interface overclaims, three configuration/default-taxonomy mismatches, and one incorrect event-corruption guarantee.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The documentation falsely claims every CLI command supports --json.\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":67},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The documentation falsely claims MCP and web expose exactly the CLI capabilities with identical behavior.\",\"file\":\"docs/concepts/design-philosophy.md\",\"line\":297},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"A configurable type taxonomy containing repository-local type:bug is presented as universally required.\",\"file\":\"docs/concepts/core-model.md\",\"line\":833},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Project-configured strategic types are presented as a fixed JIT-defined milestone/epic/goal/theme list.\",\"file\":\"docs/concepts/core-model.md\",\"line\":865},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"An adopter example uses type:feature even though the initialized default hierarchy does not declare it.\",\"file\":\"docs/concepts/scope.md\",\"line\":34},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"The documentation incorrectly says invalid events are merely logged and do not block operations.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":557}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5249 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5043-15ea-7281-b39c-3865c726480b\n--------\nuser\n--- 5236 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Six blocking documentation defects remain in the scoped concepts surface: two interface overclaims, three configuration/default-taxonomy mismatches, and one incorrect event-corruption guarantee.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The documentation falsely claims every CLI command supports --json.",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 67
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The documentation falsely claims MCP and web expose exactly the CLI capabilities with identical behavior.",
+        "file": "docs/concepts/design-philosophy.md",
+        "line": 297
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "A configurable type taxonomy containing repository-local type:bug is presented as universally required.",
+        "file": "docs/concepts/core-model.md",
+        "line": 833
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Project-configured strategic types are presented as a fixed JIT-defined milestone/epic/goal/theme list.",
+        "file": "docs/concepts/core-model.md",
+        "line": 865
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "An adopter example uses type:feature even though the initialized default hierarchy does not declare it.",
+        "file": "docs/concepts/scope.md",
+        "line": 34
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "The documentation incorrectly says invalid events are merely logged and do not block operations.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 557
+      }
+    ]
+  }
+}

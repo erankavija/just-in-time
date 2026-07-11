@@ -16,9 +16,19 @@
   ],
   "gates_status": {
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-10T23:29:24.136728509Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:19:57.856726950Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:19:58.068098054Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T08:20:01.472865630Z"
     }
   },
   "context": {},
@@ -28,6 +38,13 @@
       "commit": null,
       "label": null,
       "doc_type": "design",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/736a069e-audit-notes.md",
+      "commit": null,
+      "label": "Audit notes",
+      "doc_type": "documentation",
       "format": "markdown"
     }
   ],
@@ -43,7 +60,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.658986271Z",
-  "updated_at": "2026-07-11T07:39:26.722581928Z",
+  "updated_at": "2026-07-11T08:22:39.152079010Z",
   "first_ready_at": "2026-07-10T20:21:17.658986861Z",
   "claimed_at": "2026-07-11T07:39:26.722581738Z"
 }

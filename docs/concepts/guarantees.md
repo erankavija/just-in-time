@@ -83,8 +83,8 @@ fn write_json<T>(path: &Path, data: &T) -> Result<()> {
 File locking prevents race conditions during concurrent updates:
 
 - **Index updates:** Exclusive lock on `.index.lock`
-- **Issue updates:** Per-issue lock on `.issues/{id}.lock`
-- **Claim operations:** Exclusive lock on `claims.index.lock`
+- **Issue updates:** Per-issue lock on `issues/{id}.lock`
+- **Claim operations:** Exclusive lock on `locks/claims.lock` (under `.git/jit/`)
 - **Event log:** Exclusive lock on `.events.lock`
 
 **Example - Two agents claiming simultaneously:**
@@ -92,7 +92,7 @@ File locking prevents race conditions during concurrent updates:
 ```mermaid
 sequenceDiagram
     participant A1 as Agent 1
-    participant L as claims.index.lock
+    participant L as locks/claims.lock
     participant A2 as Agent 2
     A1->>L: jit claim acquire abc123
     A2->>L: jit claim acquire abc123
@@ -122,16 +122,21 @@ Every operation that modifies issue state, dependencies, or gates emits an event
 
 **Event types:**
 
+Each event is internally tagged by a snake_case `type` field. The core event
+types (full set in `crates/jit/src/domain/types.rs`):
+
 ```
-IssueCreated          - New issue created
-IssueClaimed          - Agent claimed issue
-IssueUnclaimed        - Issue released
-IssueUpdated          - State, priority, or assignee changed
-DependencyAdded       - Dependency relationship added
-DependencyRemoved     - Dependency relationship removed
-GatePassed            - Quality gate marked passed
-GateFailed            - Quality gate marked failed
-GateChecked           - Automated gate execution completed
+issue_created         - New issue created
+issue_claimed         - Agent claimed an issue
+issue_released        - Assignment cleared from an assignee
+issue_state_changed   - Lifecycle state transitioned (from → to)
+issue_updated         - Labels, priority, assignee, or other fields changed
+issue_completed       - Issue reached the Done state
+gate_added            - Quality gate attached to an issue
+gate_removed          - Quality gate detached from an issue
+gate_passed           - Quality gate marked passed
+gate_failed           - Quality gate marked failed
+dependency_reduced    - Redundant dependencies removed by transitive reduction
 ```
 
 **Log format:**
@@ -139,9 +144,9 @@ GateChecked           - Automated gate execution completed
 Events are stored as newline-delimited JSON (JSONL):
 
 ```jsonl
-{"IssueCreated":{"id":"evt-001","issue_id":"abc123","timestamp":"2026-02-02T20:00:00Z","title":"Fix bug","priority":"high"}}
-{"IssueClaimed":{"id":"evt-002","issue_id":"abc123","timestamp":"2026-02-02T20:01:00Z","assignee":"agent:worker-1"}}
-{"IssueUpdated":{"id":"evt-003","issue_id":"abc123","timestamp":"2026-02-02T20:05:00Z","field":"state","old_value":"ready","new_value":"in_progress"}}
+{"type":"issue_created","id":"evt-001","issue_id":"abc123","timestamp":"2026-02-02T20:00:00Z","title":"Fix bug","priority":"high"}
+{"type":"issue_claimed","id":"evt-002","issue_id":"abc123","timestamp":"2026-02-02T20:01:00Z","assignee":"agent:worker-1"}
+{"type":"issue_state_changed","id":"evt-003","issue_id":"abc123","timestamp":"2026-02-02T20:05:00Z","from":"ready","to":"in_progress"}
 ```
 
 **Properties:**
@@ -167,7 +172,7 @@ jit events tail -n 20
 jit events query --issue-id abc123
 
 # Track state transitions
-jit events query --event-type IssueUpdated
+jit events query --event-type issue_state_changed
 ```
 
 ### Git Optional
@@ -328,8 +333,11 @@ while true; do
   sleep 5
 done
 
-# Event-driven workflows
-jit events tail -n 1 --follow | react_to_events
+# Event-driven workflows (poll the event tail for new events)
+while true; do
+  jit events tail -n 10 --json | react_to_events
+  sleep 5
+done
 ```
 
 **✗ Unsafe patterns:**
@@ -390,10 +398,10 @@ Atomic operations (write-temp-rename) prevent partial writes:
 .jit/issues/abc123.json.tmp  # Incomplete temp file
 .jit/issues/abc123.json      # Previous version intact
 
-# On next operation:
-jit validate  # Cleans up .tmp files older than 5 minutes
-# OR
-# Temp files ignored by read operations (only .json files read)
+# On the next operation:
+# Read operations only consider .json files, so the previous version is served
+# and the orphaned .tmp is never read. The recovery pass that runs during
+# jit claim operations sweeps orphaned .tmp files older than one hour.
 ```
 
 **Result:** No corruption, no data loss, previous state preserved.
@@ -437,25 +445,18 @@ Error: Failed to deserialize data: expected value at line 15 column 3
 
 **Scenario:** Crash leaves `.tmp` files behind.
 
-**Detection:**
+**Impact:** Harmless. Read operations only consider `.json` files, so an orphaned
+`.tmp` sibling is never served and never corrupts state.
+
+**Cleanup:**
 
 ```bash
-jit validate
-Warning: Found stale temporary files (will be cleaned):
-  .jit/issues/abc123.json.tmp (age: 2 hours)
+# Automatic: the recovery pass during jit claim operations removes orphaned
+# .tmp files older than one hour.
+
+# Manual cleanup at any time
+find .jit -name '*.tmp' -mmin +60 -delete
 ```
-
-**Recovery:**
-
-```bash
-# Automatic cleanup (removes files older than 5 minutes)
-jit validate --fix
-
-# Manual cleanup
-find .jit -name '*.tmp' -mmin +5 -delete
-```
-
-**Impact:** Stale temp files are harmless - ignored by read operations, cleaned automatically.
 
 ### Stale Claim Leases
 
@@ -567,17 +568,16 @@ JIT is designed with isolation and fault tolerance:
 ```bash
 # Comprehensive health check
 jit validate
-# Issues:
-#   - 3 stale temp files (will clean)
-#   - 1 expired lease (will evict)
-# 
-# Run with --fix to repair
+# Reports validation findings (hierarchy, dependency, and format issues).
 
-# Automatic repair
+# Include lease consistency
+jit validate --leases
+# Lists expired or dangling leases, each with the exact fix command
+# (jit claim release / jit claim force-evict).
+
+# Auto-fix what is mechanically fixable
 jit validate --fix
-# ✓ Cleaned 3 temp files
-# ✓ Evicted 1 stale lease
-# ✓ Rebuilt index
+# ✓ Applies type-hierarchy, transitive-reduction, and pending-state-transition fixes
 ```
 
 ## See Also

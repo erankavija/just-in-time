@@ -580,7 +580,7 @@ Each gate on an issue tracks:
 
 **Query gate status:**
 ```bash
-jit issue show $ISSUE --json | jq 'gates_status'
+jit issue show $ISSUE --json | jq '.gates'
 ```
 
 ### Gate Enforcement and Auto-Transitions
@@ -650,7 +650,7 @@ Gates are defined globally in the **gate registry** (`.jit/gates.toml`):
 jit gate define tests --title "Tests Pass" --mode auto --checker-command "cargo test"
 
 # Apply to multiple issues
-jit issue update --filter "epic:auth" --add-gate tests
+jit issue update --filter "label:epic:auth" --add-gate tests
 ```
 
 ### Relationship to State Machine
@@ -936,11 +936,18 @@ jit query all --label "component:*"
 ```
 
 **Boolean queries:**
+
+`jit query all --label` ANDs repeated flags. The full boolean filter language
+(`AND` / `OR` / `NOT` over `state`, `label`, `priority`, and `assignee` fields)
+is available on the `--filter` flag of `jit issue claim-next` and
+`jit issue update`:
 ```bash
-# Complex filters
-jit query all --filter "label:epic:auth AND label:component:backend"
-jit query all --filter "label:milestone:v1.0 OR label:milestone:v1.1"
-jit query all --filter "label:type:task AND NOT label:epic:*"
+# query all ANDs repeated --label flags
+jit query all --label "epic:auth" --label "component:backend"
+
+# Boolean filter language on --filter (claim-next / update)
+jit issue claim-next agent:worker-1 --filter "label:milestone:v1.0 OR label:milestone:v1.1"
+jit issue update abc123 --filter "label:type:task AND NOT label:epic:*" --add-gate tests
 ```
 
 ### Label vs Dependency Semantics
@@ -1107,8 +1114,8 @@ jit issue claim-next agent:worker-1 --filter "label:epic:auth"
 Agents can release issues they cannot complete:
 
 ```bash
-# Release an issue
-jit issue release abc123 --reason "timeout"
+# Release an issue (reason is a positional argument)
+jit issue release abc123 "timeout"
 ```
 
 **Behavior:**
@@ -1183,7 +1190,7 @@ jit issue claim-next agent:background-worker --filter "priority:normal OR priori
 ISSUE=$(jit issue claim-next agent:worker-1)
 timeout 300 work_on_issue "$ISSUE" || {
   # Timeout exceeded, release for others
-  jit issue release "$ISSUE" --reason "timeout"
+  jit issue release "$ISSUE" "timeout"
 }
 ```
 
