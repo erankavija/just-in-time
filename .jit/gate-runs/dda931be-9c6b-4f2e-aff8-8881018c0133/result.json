@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "dda931be-9c6b-4f2e-aff8-8881018c0133",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "cd5dc58e707c5a4419901175fa297111add70677",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T23:38:39.881876002Z",
+  "completed_at": "2026-07-11T23:40:06.254468830Z",
+  "duration_ms": 86372,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 is substantially implemented through generated `command_exit_codes` and [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:1). REQ-02 and REQ-03 are not met; see findings.\n\n## Architecture and separation of concerns\n\nNo new domain/storage boundary violations found. The schema renderer is appropriately isolated in [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:889).\n\n## Functional paradigm\n\nNo blocking functional-style concerns in the reviewed change.\n\n## Correctness and invariants\n\nThe projection contains an inaccurate `serve` mapping and is not comprehensively bound to runtime direct exits.\n\n## Safety\n\nNo unsafe code introduced. PID safety is not relevant to this change.\n\n## Testing\n\nThe succeeded `cargo-ci` gate records `fmt`, `clippy`, and `3606 passed, 0 failed, 13 ignored`; I did not rerun tests. `./scripts/jit-validate.sh` passed. The new tests cover only two of the many exception rows, leaving the claimed runtime verification incomplete.\n\n## Error handling\n\nNo new blocking error-handling concern beyond the undocumented/pass-through exit-code mismatch.\n\n## CLI contract\n\nNo new command was added; JSON support is unaffected.\n\n## Documentation\n\nThe generated reference is discoverable, but [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1800) and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2994) retain hand-maintained command-specific exit-code descriptions.\n\n## JIT issue management\n\nThe prerequisite `6d82de03` is done. There is no prior run history to remediate. Repository validation passed.\n\n1. **F1 — `serve` is documented as exit code 10 despite passing through arbitrary child exit codes.** [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:879) emits only a `serve`/`10` row, while runtime directly exits with `status.code().unwrap_or(1)` in [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:6529). A child exit of 1, 42, or another value is neither represented by the generated taxonomy nor accurately described as code 10. This fails REQ-01’s command-specific mapping requirement.\n\n2. **F2 — The claimed mechanical verification does not verify the projection against all runtime dispatch outcomes.** [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:704) says every direct-exit exception is verified, but the new integration test exercises only `validate`/4 and `gate status-all`/4 at [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_exit_code_projection_tests.rs:61) and [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_exit_code_projection_tests.rs:90). The other hand-authored exception rows—including `serve`, gate evaluation, config validation, document validation, invariant check, and preset application—can drift without a test failure. This fails hard REQ-02.\n\n3. **F3 — Command documentation still hand-copies command-specific exit-code mappings instead of consuming the generated surface.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1800) manually specifies `gate preset apply` outcomes, [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2198) manually specifies `doc check-links`, and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2994) manually specifies `config validate`. These duplicate rows represented by the new projection and violate hard REQ-03.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated exit-code projection is inaccurate for serve, incompletely verified against dispatch, and still duplicated in command documentation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The serve mapping documents only exit 10 even though runtime passes through arbitrary child exit codes.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":879},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Only two exception paths are tested, so the projection is not mechanically verified against all direct runtime exits.\",\"file\":\"crates/jit/tests/command_exit_code_projection_tests.rs\",\"line\":61},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"CLI reference still hand-copies command-specific exit-code mappings for preset, document, and config commands.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1800}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8295 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f538c-2198-7aa3-938c-ca60421e3d1d\n--------\nuser\n--- 8282 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated exit-code projection is inaccurate for serve, incompletely verified against dispatch, and still duplicated in command documentation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The serve mapping documents only exit 10 even though runtime passes through arbitrary child exit codes.",
+        "file": "crates/jit/src/schema.rs",
+        "line": 879
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Only two exception paths are tested, so the projection is not mechanically verified against all direct runtime exits.",
+        "file": "crates/jit/tests/command_exit_code_projection_tests.rs",
+        "line": 61
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "CLI reference still hand-copies command-specific exit-code mappings for preset, document, and config commands.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1800
+      }
+    ]
+  }
+}

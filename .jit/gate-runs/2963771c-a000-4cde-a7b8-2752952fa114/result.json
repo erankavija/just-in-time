@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "2963771c-a000-4cde-a7b8-2752952fa114",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "cd5dc58e707c5a4419901175fa297111add70677",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T23:40:06.284218591Z",
+  "completed_at": "2026-07-11T23:42:07.326780681Z",
+  "duration_ms": 121042,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a configured leaf (level 4) with no resolved children. I reviewed the four reachable `jit:3ac07340` commits individually with rename detection; their union is the footprint. Current uncommitted `.jit` changes were excluded. No prior doc-review run exists.\n\nThe generated reference is mechanically checked against its renderer, but it is not sufficiently discoverable and contains one inaccurate `serve` mapping.\n\n1. **F1 — blocking, issue-impact, high:** The new exit-code reference is absent from the Reference landing page, and the general CLI “Exit Codes” entry does not direct readers to its command-specific mappings. The only inbound docs links are gate-specific, so adopters seeking exit codes for other commands cannot discover the required generated surface. Add an “Exit Codes” entry to [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:46) and link the general section in [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3214) to the generated reference.\n\n2. **F2 — blocking, issue-impact, high:** [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:52) states that `serve` exits `10`, while also saying it passes through the child’s exit code. Current dispatch does exactly that (`std::process::exit(status.code().unwrap_or(1))`), so any nonzero child code can be returned. Revise the projection/schema contract to represent `serve` as a child-exit-code passthrough rather than an exit-10 mapping, and add verification for that behavior.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated exit-code reference is undiscoverable from the general reference and inaccurately maps serve passthrough exits to code 10.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The generated exit-code reference is not linked from the reference landing page or the general CLI exit-code section, leaving command-specific mappings undiscoverable outside gate documentation.\",\"file\":\"docs/index.md\",\"line\":46},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The serve row documents code 10 even though current dispatch passes through the dev-server child's actual nonzero exit code.\",\"file\":\"docs/reference/exit-codes.md\",\"line\":52}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9591 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f538d-71ca-79a3-880a-82d2cb2329cf\n--------\nuser\n--- 9578 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated exit-code reference is undiscoverable from the general reference and inaccurately maps serve passthrough exits to code 10.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The generated exit-code reference is not linked from the reference landing page or the general CLI exit-code section, leaving command-specific mappings undiscoverable outside gate documentation.",
+        "file": "docs/index.md",
+        "line": 46
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The serve row documents code 10 even though current dispatch passes through the dev-server child's actual nonzero exit code.",
+        "file": "docs/reference/exit-codes.md",
+        "line": 52
+      }
+    ]
+  }
+}
