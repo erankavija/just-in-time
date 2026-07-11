@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "8de7c241-4006-44d5-a16e-f638a9989ad3",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "afbbf6c3-9f09-457a-98c5-d3fb97f8a296",
+  "commit": "2584c8fab9641ed32588a0a1610e29fed155021d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T22:47:52.826459016Z",
+  "completed_at": "2026-07-11T22:48:55.967965711Z",
+  "duration_ms": 63141,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf at configured maximum level 4 and has no resolved children. I inspected the two current-branch tagged commits individually (`229685af`, `2584c8fa`) with rename/copy detection; neither required fallback attribution.\n\nThe combined footprint implements and documents all strictness modes. The canonical configuration reference, generated example, and storage cross-reference accurately match current behavior, including invalid-value rejection. The later eager-validation fix leaves that contract accurate. Prior review had no blocking findings to resolve.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's strictness behavior and eager invalid-value rejection are accurately documented.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's strictness behavior and eager invalid-value rejection are accurately documented.",
+    "findings": []
+  }
+}
