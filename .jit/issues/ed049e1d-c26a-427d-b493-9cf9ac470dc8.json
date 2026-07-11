@@ -1,0 +1,26 @@
+{
+  "id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "title": "Project runtime coordination and recovery defaults",
+  "description": "Operational defaults for heartbeat cadence, lock timeout/polling, temporary-file cleanup, and claim TTL are source-defined but lack one maintained complete projection.\n\nSource: `crates/jit/src/agent_config.rs:43-65`; `crates/jit/src/storage/json.rs:107-123`; `crates/jit/src/storage/lock.rs:118-155`; `crates/jit/src/commands/claim.rs:830-848`; `crates/jit/src/cli.rs:2551-2572`; `docs/reference/configuration.md:261-280`.\n\n## Success Criteria\n\n- [hard] REQ-01: One source-derived surface presents the default heartbeat interval, lock timeout/polling, temporary-file cleanup threshold, and claim TTL with units and operational scope.\n- [hard] REQ-02: Existing coordination documentation consumes or is mechanically checked against that surface.\n- [hard] REQ-03: Conformance coverage fails when a listed default changes without projection refresh.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "6d82de03-1018-47bc-ae0b-659366ad3f44"
+  ],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "created_at": "2026-07-11T13:35:35.556182403Z",
+  "updated_at": "2026-07-11T13:36:02.332076904Z",
+  "first_ready_at": "2026-07-11T13:35:35.556182633Z"
+}

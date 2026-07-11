@@ -26,6 +26,13 @@
       "label": null,
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/6d82de03-followup-manifest.md",
+      "commit": null,
+      "label": "Authorized follow-up filing manifest",
+      "doc_type": "analysis",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -36,7 +43,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.662218874Z",
-  "updated_at": "2026-07-11T13:28:33.930206077Z",
+  "updated_at": "2026-07-11T13:36:17.356157119Z",
   "first_ready_at": "2026-07-10T20:21:17.662219284Z",
   "claimed_at": "2026-07-11T13:28:33.930205807Z"
 }

@@ -1,0 +1,26 @@
+{
+  "id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
+  "title": "Add a projector for built-in gate presets",
+  "description": "Built-in gate presets are defined in Rust and can change without a maintained documentation surface. Add a deterministic projection that distinguishes shipped presets from project-local registries.\n\nSource: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372`; `crates/jit/src/gate_presets/manager.rs:27-44,111-137`; `crates/jit/src/commands/invariant.rs:1-23`; `crates/jit/src/commands/reference.rs:1-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: A deterministic discoverable projection renders every built-in preset with gate keys, stages, modes, descriptions, and relevant checker metadata.\n- [hard] REQ-02: The rendered surface distinguishes shipped presets from project-local/custom configuration.\n- [hard] REQ-03: Freshness coverage fails when a built-in preset or gate definition changes without regeneration.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "6d82de03-1018-47bc-ae0b-659366ad3f44"
+  ],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:docs-exhaustive-audit",
+    "milestone:v1.0",
+    "component:gates"
+  ],
+  "created_at": "2026-07-11T13:35:35.555687123Z",
+  "updated_at": "2026-07-11T13:36:02.296599248Z",
+  "first_ready_at": "2026-07-11T13:35:35.555687363Z"
+}
