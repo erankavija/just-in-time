@@ -196,16 +196,16 @@ flowchart LR
     SI -->|shared| CP
 ```
 
-- **Issue data** is per-worktree (isolated)
-- **Claims** are shared (via `.git/jit/`)
-- **Visibility** spans all worktrees
+- **Issue data** is per-worktree, carried on each worktree's branch
+- **Claims** are shared across all worktrees (via `.git/jit/`)
+- **Issue changes** sync between worktrees through git — another worktree sees them once its branch is updated (a secondary worktree can additionally read the main worktree's issues directly, as in Step 3)
 
 ## Try It Yourself
 
 1. Create two worktrees
 2. Set different `JIT_AGENT_ID` in each
 3. Try claiming the same issue from both — the second should fail
-4. Complete an issue in one worktree, commit, and see it update in the other
+4. Complete an issue in one worktree and commit it, then update the other worktree's branch (merge/pull) to see the change there
 
 ## Common Scenarios
 
@@ -231,7 +231,7 @@ jit claim renew <lease-id> --extension 600
 
 ### Scenario: Check Dependencies
 
-Dependencies work across worktrees:
+You can query an issue's dependencies from any worktree:
 
 ```bash
 # See what blocks an issue (immediate deps)

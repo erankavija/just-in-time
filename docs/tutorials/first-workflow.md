@@ -324,7 +324,7 @@ jit status
 
 ### Workflow Patterns
 - **Quality Gates**: Enforce process (tests, review)
-- **Agent Claiming**: Atomic assignment, no conflicts
+- **Agent Claiming**: Atomic, exclusive assignment that coordinates who works on each issue
 - **Dynamic Discovery**: Add work as you learn
 - **Parallel Execution**: Multiple agents work simultaneously
 

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "9bab552e-a71d-4422-867e-be104a9d1bf9",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57",
+  "commit": "32876ff748c64169419b202047e2a718a28d64a5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T08:43:55.704649959Z",
+  "completed_at": "2026-07-11T08:45:05.724379356Z",
+  "duration_ms": 70019,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nNo findings.\n\nAll documented tutorial commands and flags exist in the current clap surface. Behavioral and storage claims match the handlers, domain model, and worktree fallback implementation.\n\nBoth findings from the most recent review are resolved:\n\n- `docs/tutorials/first-workflow.md:327` now describes `jit issue claim` as atomic assignment coordination without claiming it prevents all mutations.\n- `docs/tutorials/parallel-work-worktrees.md:201` now accurately describes branch-based synchronization and the secondary-to-main worktree fallback.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings.\n\nRepository-specific types, namespaces, rules, templates, item kinds, and checker scripts are not presented as shipped defaults.\n\n## 3. Current behavior only\n\nNo findings.\n\nNo legacy, migration, roadmap, or future-state narration about jit appears in the scoped tutorials.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings.\n\nNumeric claims concern tutorial-local examples and lesson durations, not volatile product or registry totals.\n\n## 5. Links and referenced paths resolve\n\nNo findings.\n\nAll Markdown links, anchors, and cited repository paths resolve. No addressable-item citations occur in the scoped footprint.\n\n## 6. Content-standards conformance\n\nNo findings.\n\nThe authored diagram uses Mermaid. Other fenced blocks are commands or verbatim output. No non-LaTeX mathematical notation or excessive heading depth was found.\n\n## Consolidated findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped tutorials accurately describe the current shipped surface, and all prior findings have been resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped tutorials accurately describe the current shipped surface, and all prior findings have been resolved.",
+    "findings": []
+  }
+}

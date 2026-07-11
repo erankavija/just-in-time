@@ -46,6 +46,42 @@ Post-rework mechanical bar over `docs/tutorials/`: M2/M3/M5 clean (exit 0; new `
 and `#enforce_leases` anchors resolve), M4 no box-drawing, M1 invented-flag residue now
 empty (the former `--test` residue was the `cargo test --test` checker, now removed).
 
+## Rework attempt 2 — incomplete class sweep from attempt 1
+
+Attempt 1 fixed the CITED F4/F6 lines but missed sibling instances of the same two classes —
+the "fix the line, miss the class" trap. Attempt 2 ran an EXHAUSTIVE class sweep (the two
+mandated greps plus a broader propagation grep) across all four files and fixed every hit:
+
+- **first-workflow.md:327 (F6 class — lease/claim conflict overstatement).**
+  before: "**Agent Claiming**: Atomic assignment, no conflicts".
+  after: "**Agent Claiming**: Atomic, exclusive assignment that coordinates who works on each
+  issue". (`jit issue claim` acquisition is atomic/exclusive — a second claim on a claimed
+  issue fails — but "no conflicts" overstated data-conflict prevention.)
+- **parallel-work-worktrees.md:201 (F4 class — cross-worktree visibility).**
+  before: "**Visibility** spans all worktrees" — false, and it contradicted line 199
+  ("Issue data is per-worktree (isolated)") and the corrected line 167.
+  after: the summary block now reads consistently — issue data per-worktree/branch; claims
+  shared via `.git/jit/`; issue changes sync via git and are seen only after a branch update
+  (with the Step-3 main-read fallback noted).
+- **parallel-work-worktrees.md:208 (F4 class — same, not matched by the mandated grep but
+  the same class).** before: "Complete an issue in one worktree, commit, and see it update in
+  the other". after: "…commit it, then update the other worktree's branch (merge/pull) to see
+  the change there".
+
+**Line 234 verdict (`Dependencies work across worktrees:`) — reworded, accurate as a read.**
+Verified empirically: from a secondary worktree, `jit graph deps <main-issue>` correctly
+reads main's committed dependencies via the read fallback, but main does NOT see a secondary
+worktree's uncommitted new dependency (no auto-propagation across branches). The scenario's
+commands are read-only (`jit graph deps`), so the capability is real; tightened the header to
+"You can query an issue's dependencies from any worktree:" to remove any auto-propagation
+ambiguity.
+
+Remaining worktree-mentioning lines are accurate, not overstatements: line 167 (corrected
+F4), line 200 ("Claims are shared across all worktrees via `.git/jit/`" — verified true),
+line 201 (corrected summary). Post-sweep: mandated GREP A empty; GREP B and the broad
+propagation grep return only accurate statements. Mechanical bar clean (M2/M3/M5 exit 0, M4
+none, M1 empty).
+
 ## Mechanical bar (post-edit, over `docs/tutorials/`)
 
 - M2 links & anchors: `OK: all links and anchors resolve`
