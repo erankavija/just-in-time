@@ -126,7 +126,7 @@
           "short_id": "6d82de03",
           "title": "File follow-ups for engine gaps and missing projection surfaces",
           "classification": "documentation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     }
@@ -161,13 +161,15 @@
     "36d5451e": 2
   },
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "Wave 4 is complete. Do not start Wave 5 (6d82de03) until the owner answers the required engine-followup scope interview: the mandatory slate plus optional candidates 1–6 were presented in the session. Then file only the authorized follow-ups, pass repo-validate, close 6d82de03, and complete the epic.",
+  "resume_pointer": "Wave 5 scope is authorized: mandatory slate plus optional candidates 1-5, excluding the component-image :latest release-policy candidate. File separately owned leaf follow-ups that depend on 6d82de03, then pass repo-validate, close 6d82de03, and complete the epic.",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
   ],
   "owner_interview": {
-    "status": "awaiting_response",
+    "status": "resolved",
+    "resolved_at": "2026-07-11T00:00:00Z",
+    "decision": "Include optional candidates 1-5; exclude the component-image :latest release-policy candidate.",
     "mandatory_scope": [
       "CLI schema State enum and flag/global-flag completeness",
       "issue-create --description help text",
