@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e6f56c2e-3283-4fb5-a7ed-93609679a763",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "f26a1dd5a6d09402b3ad43a1764b0f3422b6c183",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T13:05:26.231607706Z",
+  "completed_at": "2026-07-11T13:10:59.513029800Z",
+  "duration_ms": 333281,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match current source tree\n\nPass. Command snippets match the current CLI schema and Clap definitions; storage and server claims align with source. Prior mismatches are resolved at [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:29) and [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:59).\n\n## 2. Adopter surface vs. dogfood configuration\n\nPass. Repository-local configuration is framed as repository-specific or as customization.\n\n## 3. Current behavior only\n\nPass. No applicable legacy, migration, or future-state narration found.\n\n## 4. No rotting hardcoded counts\n\nPass. No volatile product-total counts found.\n\n## 5. Links and referenced paths resolve\n\nPass. All scoped Markdown links, anchors, cited paths, and addressable-item citations resolve.\n\n## 6. Content standards conformance\n\nPass. Diagrams are Mermaid; the MCP directory tree is a permitted file listing. No applicable heading, prose-voice, or mathematics defects found.\n\n## Findings\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Scoped root, installation, component, and landing documentation matches current source; no blocking drift found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Scoped root, installation, component, and landing documentation matches current source; no blocking drift found.",
+    "findings": []
+  }
+}

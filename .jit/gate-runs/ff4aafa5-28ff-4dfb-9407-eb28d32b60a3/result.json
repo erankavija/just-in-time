@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "ff4aafa5-28ff-4dfb-9407-eb28d32b60a3",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "5611b8bc9f87fb8d3addf1cf6c2b1aeb66d10e24",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T12:56:24.177010577Z",
+  "completed_at": "2026-07-11T13:03:57.780145406Z",
+  "duration_ms": 453603,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail.\n\n- `docs/index.md:60` incorrectly calls every example directory a runnable `.jit/` configuration. Five entries are ruleset fragments without `config.toml`; the adoption guide instead identifies them as ready-to-copy examples requiring installation into an initialized project.\n- `README.md:29` incorrectly says all issue data is in versioned `.jit/`. Advisory lease control-plane state is stored under `.git/jit/`.\n\nThe latest review’s Docker initialization, all-in-one removal, and precheck wording are addressed.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repo-local gate content is explicitly framed as this repository’s registry, and the hierarchy snippet is a customization example.\n\n## 3. Current behavior only\n\nPass. No unsupported legacy, migration, or future-state narration found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims found.\n\n## 5. Links and referenced paths resolve\n\nPass. Scoped link, anchor, path-citation, and addressable-item checks resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams are Mermaid; the MCP file tree is a permitted plain-text directory listing. No applicable math or heading-depth defect found.\n\n## Findings\n\n1. **F1 — The landing page overstates example fragments as runnable configurations.** `docs/index.md:60` labels all seven example directories “Runnable `.jit/` configurations,” but `bug-repro`, `release-checklist`, `fresh-evidence`, `nyquist`, and `cross-epic` contain rulesets rather than complete configurations. The adoption guide at `docs/how-to/validation-rules.md:16-28` instructs users to copy `rules.toml` and schemas into an initialized project. Remediation: describe these as copyable example rulesets/configuration fragments, or make every listed directory self-contained and runnable.\n\n2. **F2 — The README incorrectly states that all issue data is versioned under `.jit/`.** `README.md:29` omits advisory lease state, which the worktree storage layer places in the shared `.git/jit/` control plane (`crates/jit/src/storage/worktree_paths.rs:8-21`). Remediation: qualify `.jit/` as the canonical Git-versionable repository data and state that advisory lease coordination metadata is machine-local under `.git/jit/`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two documentation claims drift: examples are not all runnable configurations, and lease state is not stored in versioned .jit data.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"docs/index.md calls partial example rulesets runnable .jit configurations.\",\"file\":\"docs/index.md\",\"line\":60},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"README.md says all issue data is versioned in .jit despite lease control-plane state living in .git/jit.\",\"file\":\"README.md\",\"line\":29}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 16102 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f5140-1e12-7b22-9481-cbdfbd49d61b\n--------\nuser\n--- 16089 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two documentation claims drift: examples are not all runnable configurations, and lease state is not stored in versioned .jit data.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "docs/index.md calls partial example rulesets runnable .jit configurations.",
+        "file": "docs/index.md",
+        "line": 60
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "README.md says all issue data is versioned in .jit despite lease control-plane state living in .git/jit.",
+        "file": "README.md",
+        "line": 29
+      }
+    ]
+  }
+}
