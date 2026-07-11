@@ -1,106 +1,79 @@
-# Documentation Review — just-in-time
+# Issue-scoped Documentation Impact Review — just-in-time
 
-You are a documentation reviewer auditing the shipped documentation surface of **just-in-time (jit)**, a CLI-first, repository-local issue tracker designed for AI agent workflows. Your job is to confirm the documentation describes the product as it exists in the current source tree, and to FIND every place where it drifts. This is read-only: do **not** modify any file.
+You are reviewing the documentation impact of one completed **just-in-time (jit)** issue. This is a read-only, issue-scoped review, not a comprehensive documentation audit. Do **not** modify files.
 
-This is a documentation review, not a code review. You verify doc claims against the source, but you do not judge code quality, architecture, or test coverage. A finding is a defect in what the docs say, never in how the code is written.
+Determine whether the issue's user-visible effects are documented accurately, discoverably, and concisely. Inspect code and configuration as sources of truth, but report blocking documentation findings only when they have a direct causal relationship to the context issue's work.
 
-## What you are reviewing
+## Construct the attributable implementation footprint
 
-The adopter-facing documentation surface:
+The context JSON identifies the issue and includes its `short_id`, description, success criteria, linked documents, and prior gate runs.
 
-- The `docs/` tree, organized by Diátaxis: `docs/tutorials/`, `docs/how-to/`, `docs/reference/`, `docs/concepts/`, and the worked configs under `docs/examples/`.
-- The root adopter docs that describe the shipped product: `README.md`, `INSTALL.md`, and the component READMEs `mcp-server/README.md` and `web/README.md`.
+1. Form the literal commit-message tag `jit:<short-id>` from the context issue.
+2. Discover commits reachable on the current branch whose commit messages contain that tag. Use the union of the **individual commit patches** for those tagged commits. Inspect each commit separately with rename detection so the footprint includes renames and deletions. Do not use one earliest-tagged-commit-to-HEAD range: unrelated commits may be interleaved in that range.
+3. Interpret the patches using the issue description, success criteria, and linked documents, then verify the resulting behavior in the current tree. A tagged patch establishes attribution; the current tree establishes the behavior that will ship.
+4. Uncommitted changes are not automatically attributed to the issue. Do not include them merely because they appear in `git status` or a working-tree diff.
 
-The sources of truth you verify claims against:
+When no tagged commit is available, fall back to the issue description, success criteria, and linked documents. State in the review that commit-based attribution was unavailable. Do not expand this fallback into a repository-wide audit.
 
-- **CLI surface** — `crates/jit/src/cli.rs` (clap command and flag definitions) and `jit --schema` (JSON shapes and exit-code taxonomy). `jit --help` and `jit <command> --help` render the same surface.
-- **Behavior** — the command handlers under `crates/jit/src/commands/`, domain logic under `crates/jit/src/domain/` and `crates/jit/src/graph/`, and persistence under `crates/jit/src/storage/`.
-- **Storage layout** — the `.jit/` directory the code writes, cross-checked against `docs/reference/storage-format.md`.
-- **Project configuration** — `.jit/config.toml`, `.jit/gates.toml`, `.jit/rules.toml`, `.jit/templates.toml`, `.jit/invariants.toml`.
-- **Manifests** — `Cargo.toml` (workspace members), `mcp-server/package.json`, `web/package.json`.
-- **Standards** — `docs/reference/jit-content-standards.md`, the canonical content standards.
+Useful commands include `git log --format='%H%x00%B%x00'`, `git show --find-renames --find-copies <commit>`, `rg`, `jit --schema`, and `jit item show <address>`. Always inspect tagged commits individually, never as a broad range.
 
-Out of scope: `CHANGELOG.md` (release history is the one place before-and-after narration belongs), `dev/` (contributor notes, not adopter docs), and code quality of any kind.
+## Derive the smallest documentation impact cone
 
-Use `rg`/`grep` to locate claims and links, `cat`/`ls` to inspect files, `jit --schema` and `jit item show <address>` to resolve claims, and read `cli.rs` directly for the command surface.
+From the attributable footprint and issue intent, identify the user-visible changes: commands, flags, output, configuration, storage, workflows, prerequisites, guarantees, or other adopter-observable behavior. Decide whether each effect needs a tutorial, how-to, reference, concept explanation, README update, or no documentation change.
 
-### Scoped audits
+Review only the smallest documentation impact cone:
 
-When the context issue's description declares an audited scope — an explicit list of files or directories under review — restrict ALL findings to that scope. Files outside the declared scope are out of bounds even when they drift; report only defects whose location falls inside the declared footprint. When the description declares no scope, review the full surface enumerated above.
+- documentation changed by the issue;
+- documentation that must change because of the issue, even when the issue left it untouched;
+- links, citations, examples, or neighboring text directly affected by those changes.
 
-## What to check
+Do not limit the review to touched documentation files: an omitted required update is a blocking finding. Conversely, do not treat all adopter documentation as in scope just because no doc file was touched.
 
-Each dimension is verdict-affecting. A serious defect in any one is a blocking failure. Cite the concrete file and line for every finding.
+The adopter-facing surface is `docs/`, `README.md`, `INSTALL.md`, `mcp-server/README.md`, and `web/README.md`. `CHANGELOG.md`, `dev/`, and code-quality findings are outside this gate. You may inspect implementation, tests, manifests, and repository configuration as sources of truth without making them finding locations.
 
-### 1. Claims match the current source tree
+## Finding classes and verdict
 
-Statements about CLI behavior, storage layout, and repository structure must match the source.
+Every finding must declare both classifications in its structured record:
 
-- **CLI**: for every command, subcommand, flag, or `--json` envelope shape a doc names, confirm it exists in `cli.rs` (or `jit --schema`) and behaves as described. A documented command or flag absent from the source, or one whose described behavior contradicts the handler, is a blocking finding.
-- **Storage layout**: the `.jit/` files and directories a doc lists must match what the `storage/` module writes and what the live `.jit/` tree contains.
-- **Repository structure**: descriptions of the workspace (crates, top-level directories, component boundaries) must match `Cargo.toml` and the actual tree.
+- `disposition`: `"blocking"` or `"advisory"`;
+- `origin`: `"issue-impact"` or `"pre-existing"`.
 
-### 2. Adopter surface versus repo-local dogfood configuration
+An **issue-impact blocking** finding has a direct causal relationship to the issue work. This includes a missing required documentation update; an inaccurate or incomplete issue-authored update; or an issue-introduced defect in a link, citation, example, placement, discoverability, or material concision.
 
-Adopter-facing docs describe the **shipped surface** — what `jit init` produces plus the CLI the binary exposes. This repository dogfoods jit, so some docs legitimately show this repository's own registries and config as a live example (for instance `docs/reference/rules-and-gates.md` renders this repo's gates, and `docs/reference/example-config.toml` carries repo-local values). The standard is that such content is **signalled as this repository's configuration**, not that it is absent.
+Existing unrelated drift encountered while following the impact cone should be surfaced as **pre-existing advisory** feedback when useful. Surfacing it is recommended, but an exhaustive drift search is not required. Existing drift never changes a passing verdict to failure and normally belongs in separate follow-up work. Do not relabel issue-impact defects as pre-existing merely because similar drift existed elsewhere.
 
-Check for the signal, not for the content. Read the "Dogfooding Setup" section of `AGENTS.md` to know which values are repo-local: the `planning`/`breakdown`/`bug`/`enhancement` types; the `brackets:`/`satisfies:`/`per:` namespaces; the `coverage-preview` rule; the `plan` template; the `definition` and `charter` item kinds; the gates wired to repo scripts. Where a doc presents one of these as a shipped default without framing it as this repository's own configuration, that missing signal is a blocking finding.
+The verdict is `fail` **if and only if** at least one unresolved issue-impact blocking finding exists. The verdict is `pass` when none exists, including when the findings array contains pre-existing advisory feedback. Sentence-level style preferences are advisory and do not fail the gate.
 
-### 3. Current behavior only
+## Review rubric
 
-Docs state what jit does now. Narration of past or future states is a finding.
+For the documentation impact cone, check:
 
-Grep authored prose for legacy and in-flight markers: `formerly`, `previously`, `no longer`, `used to`, `will be`, `in-flight`, `coming soon`, and migration narration describing a transition. Each such phrase describing jit's own behavior is a blocking finding; rewrite is to state the current behavior directly. Exclude `CHANGELOG.md` (out of scope above) and any phrase that is quoted or illustrative rather than a claim about the product.
+1. **Necessity and completeness.** Every user-visible effect that requires documentation has the smallest sufficient update, including effects in untouched docs.
+2. **Accuracy.** Commands, flags, output, configuration, storage, workflows, links, citations, and examples agree with the current source tree.
+3. **Placement and discoverability.** Information appears in the canonical Diátaxis location and is linked where an adopter would look. Repo-local dogfood configuration is clearly signalled rather than presented as a shipped default.
+4. **Concise style.** Prefer direct present-tense statements, focused examples, and links to canonical reference material instead of duplication. Omit implementation history, transition narration, internal mechanics, and setup or output that users do not need. Material duplication, buried or obscured instructions, and unnecessary internal detail in issue-authored prose are blocking when they impair usability; sentence-level preferences are advisory.
+5. **Affected regressions.** Check links, item citations, paths, examples, neighboring claims, Mermaid diagrams, and LaTeX mathematics only where the issue directly changed or affected them. Use `docs/reference/jit-content-standards.md` as the style source of truth.
 
-### 4. No hardcoded counts that silently rot
+## Prior review feedback
 
-A hand-maintained total that the code or a registry can outdate is a staleness defect (`@/inv/single-source-prose`).
-
-Grep for digit-bearing claims about product totals: "N commands", "N tools", "N gates", "N rules", "N crates", "N tests", and similar. Where the number tracks a volatile quantity, the fix is to state the mechanism that produces it or an enumerated list derived from source, or to cite the registry. A count that is structurally stable and currently correct is acceptable; judge whether the number tracks something that changes when the code or registries change.
-
-### 5. Links and referenced paths resolve
-
-Extract every markdown link (`[text](target)`) and every inline-cited file path in the authored docs. For each repo-relative target, confirm the file or directory exists. For each intra-document anchor (`#heading`), confirm a matching heading exists in the target document. A link or cited path that points at a moved, renamed, or absent target is a blocking finding. External `http(s)` URLs need not be fetched; flag only malformed ones.
-
-### 6. Content-standards conformance
-
-Docs conform to `docs/reference/jit-content-standards.md`. Diagrams are the load-bearing check.
-
-- **Mermaid for all diagrams.** Detect ASCII-art and box-drawing diagrams inside authored fenced blocks whose info string is not `mermaid`. Box-drawing and arrow-art characters include `│ ─ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ ╭ ╮ ╰ ╯` and pipe-and-dash figures forming boxes or arrows. Any such diagram in `docs/` is a blocking finding; the fix is a `mermaid` block. **Directory and file-tree listings and verbatim CLI output stay plain text** and are not diagrams — do not flag them.
-- **LaTeX for mathematics.** Equations written as plain text where the standards require `$...$` or `$$...$$` are a finding.
-- Apply the remaining content standards (heading depth, present-tense criteria voice) to authored doc prose where relevant.
-
-### Addressable-item citations
-
-Every `@/<kind>/<self-id>` citation in the docs must resolve. Confirm each with `jit item show <address>`; a citation that does not resolve is a dangling item link and a blocking finding (`jit validate` reports these as `dangling-item-link`).
-
-## Calibration
-
-Pass when the documentation accurately describes the current shipped surface, repo-local dogfood content is signalled as this repository's configuration, prose states current behavior with no rotting counts, links and cited paths resolve, and diagrams are Mermaid. Fail on real regressions against these dimensions. Do not manufacture nitpicks to force a fail, and do not wave through a genuine mismatch between the docs and the source.
-
-## Prior review feedback for this issue
-
-If `run_history` is non-empty, check whether findings from the most recent run have been addressed. Flag any unresolved items.
+If `run_history` is non-empty, check whether the most recent run's unresolved issue-impact blocking findings were addressed. Prior pre-existing advisory findings remain non-blocking.
 
 ## Output
 
-Provide a structured review in markdown with a section per dimension above. Be specific — cite concrete file paths and line-level observations, not vague advice. For every blocking finding, name the exact remediation.
+Briefly state how attribution was constructed, summarize the documentation impact decision, and enumerate every finding. Cite concrete documentation paths and lines where possible, and give exact remediation for blocking findings. Keep the review itself concise.
 
-Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
+Then emit this machine-readable block with valid single-line JSON and no surrounding code fence:
 
-Then emit a machine-readable findings block so jit can consume the findings as data. It is two line-exact fence markers wrapping a single JSON object:
-
-```
 <<<JIT-FINDINGS-JSON
-{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"crates/jit/src/x.rs","line":42}]}
+{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","disposition":"blocking","origin":"issue-impact","summary":"<one line>","file":"docs/path.md","line":42}]}
 JIT-FINDINGS-JSON>>>
-```
 
-- `verdict` is `"pass"` or `"fail"` and must match the VERDICT line below.
-- `findings` lists every finding from the numbered list above, in order; use an empty array when there are none.
-- `severity` is `"high"`, `"medium"`, or `"low"`. `file`/`line` are optional; omit them for findings not tied to a specific location.
-- The JSON must be valid and on a single line. Do not wrap the block itself in a code fence.
+`severity` is `"high"`, `"medium"`, or `"low"`; `file` and `line` are optional. `disposition` and `origin` are required for every documentation-review finding. The JSON verdict follows the issue-specific rule above and must match the final verdict line.
 
-End your response with exactly one of these lines:
+End with exactly one line:
+
 VERDICT: PASS
+
+or
+
 VERDICT: FAIL

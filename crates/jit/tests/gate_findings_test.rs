@@ -95,7 +95,7 @@ fn findings_checker() -> &'static str {
     concat!(
         "printf '%s\\n' ",
         "'<<<JIT-FINDINGS-JSON' ",
-        r#"'{"verdict":"fail","summary":"1 issue found","findings":[{"id":"F1","severity":"high","summary":"missing error context","file":"src/x.rs","line":42}]}' "#,
+        r#"'{"verdict":"fail","summary":"1 issue found","findings":[{"id":"F1","severity":"high","disposition":"blocking","origin":"issue-impact","summary":"missing error context","file":"src/x.rs","line":42}]}' "#,
         "'JIT-FINDINGS-JSON>>>'; exit 1"
     )
 }
@@ -127,6 +127,8 @@ fn test_findings_surface_in_latest_run_json() {
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["id"], "F1");
     assert_eq!(arr[0]["severity"], "high");
+    assert_eq!(arr[0]["disposition"], "blocking");
+    assert_eq!(arr[0]["origin"], "issue-impact");
     assert_eq!(arr[0]["summary"], "missing error context");
     assert_eq!(arr[0]["file"], "src/x.rs");
     assert_eq!(arr[0]["line"], 42);
@@ -135,6 +137,33 @@ fn test_findings_surface_in_latest_run_json() {
         .as_str()
         .unwrap()
         .contains("JIT-FINDINGS-JSON"));
+}
+
+#[test]
+fn test_passing_structured_result_preserves_advisory_pre_existing_finding() {
+    let temp = setup_repo();
+    let checker = concat!(
+        "printf '%s\\n' ",
+        "'<<<JIT-FINDINGS-JSON' ",
+        r#"'{"verdict":"pass","summary":"issue docs are complete; 1 advisory","findings":[{"id":"A1","severity":"low","disposition":"advisory","origin":"pre-existing","summary":"unrelated stale example","file":"docs/old.md","line":9}]}' "#,
+        "'JIT-FINDINGS-JSON>>>'; exit 0"
+    );
+    define_auto_gate(&temp, "doc-review", checker);
+    let id = create_issue(&temp, &["doc-review"]);
+    run_gate(&temp, &id, "doc-review");
+
+    let out = jit()
+        .current_dir(temp.path())
+        .args(["gate", "status", &id, "doc-review", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["findings"]["verdict"], "pass");
+    assert_eq!(json["findings"]["findings"][0]["disposition"], "advisory");
+    assert_eq!(json["findings"]["findings"][0]["origin"], "pre-existing");
 }
 
 // ---------------------------------------------------------------------------
@@ -224,9 +253,9 @@ fn test_findings_text_view() {
     // Header line carries verdict + count; no run metadata decoration.
     assert!(s.contains("verdict: fail"), "verdict in header: {s}");
     assert!(s.contains("findings: 1"), "count in header: {s}");
-    // One finding per line, greppable by [severity].
+    // One finding per line, greppable by severity and classifications.
     assert!(
-        s.contains("F1 [high] missing error context"),
+        s.contains("F1 [high] [blocking] [issue-impact] missing error context"),
         "finding line: {s}"
     );
     assert!(s.contains("(src/x.rs:42)"), "locator on finding: {s}");

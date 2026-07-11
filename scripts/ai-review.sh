@@ -87,7 +87,7 @@ JIT-FINDINGS-JSON>>>
 
 Rules for the block:
 - \`verdict\` is "pass" or "fail" and MUST match the VERDICT line below.
-- \`findings\` lists every finding from the numbered list above, in order. Use "pass" with an empty findings array when there are none.
+- \`findings\` lists every finding from the numbered list above, in order. Use an empty array when there are none; when the checker-specific policy distinguishes blocking from advisory feedback, a passing verdict may include advisory findings.
 - \`severity\` is one of "high", "medium", "low". \`file\` and \`line\` are optional; omit them when a finding is not tied to a specific location.
 - Emit valid JSON on a single line. Do not wrap the block in a code fence.
 

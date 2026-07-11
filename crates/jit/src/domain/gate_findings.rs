@@ -43,10 +43,11 @@ const FINDINGS_END: &str = "JIT-FINDINGS-JSON>>>";
 
 /// One structured finding emitted by a gate checker.
 ///
-/// `id`, `severity`, and `summary` are the minimum a finding carries; `file`
-/// and `line` are optional locators. All fields default (to empty / `None`)
-/// when absent from the checker's JSON, so a partial finding degrades instead
-/// of rejecting the enclosing block.
+/// `id`, `severity`, and `summary` are the minimum a finding carries;
+/// `disposition` and `origin` are optional checker-defined classifications,
+/// while `file` and `line` are optional locators. All fields default (to empty
+/// / `None`) when absent from the checker's JSON, so older checkers and stored
+/// findings remain compatible.
 ///
 /// # Examples
 ///
@@ -67,6 +68,12 @@ pub struct GateFinding {
     /// Checker-defined severity label (e.g. `"high"`, `"medium"`, `"low"`).
     #[serde(default)]
     pub severity: String,
+    /// Whether the finding affects the verdict (e.g. `"blocking"`, `"advisory"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<String>,
+    /// How the finding relates to the reviewed work (e.g. `"issue-impact"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
     /// One-line human-readable description of the finding.
     #[serde(default)]
     pub summary: String,
@@ -189,7 +196,7 @@ mod tests {
     fn test_parse_gate_findings_extracts_verdict_summary_and_findings() {
         let stdout = block(
             r#"{"verdict":"fail","summary":"2 problems","findings":[
-                {"id":"F1","severity":"high","summary":"missing guard","file":"src/x.rs","line":42},
+                {"id":"F1","severity":"high","disposition":"blocking","origin":"issue-impact","summary":"missing guard","file":"src/x.rs","line":42},
                 {"id":"F2","severity":"low","summary":"nit"}
             ]}"#,
         );
@@ -199,11 +206,15 @@ mod tests {
         assert_eq!(parsed.findings.len(), 2);
         assert_eq!(parsed.findings[0].id, "F1");
         assert_eq!(parsed.findings[0].severity, "high");
+        assert_eq!(parsed.findings[0].disposition.as_deref(), Some("blocking"));
+        assert_eq!(parsed.findings[0].origin.as_deref(), Some("issue-impact"));
         assert_eq!(parsed.findings[0].file.as_deref(), Some("src/x.rs"));
         assert_eq!(parsed.findings[0].line, Some(42));
         // Optional locators absent on the second finding.
         assert!(parsed.findings[1].file.is_none());
         assert!(parsed.findings[1].line.is_none());
+        assert!(parsed.findings[1].disposition.is_none());
+        assert!(parsed.findings[1].origin.is_none());
     }
 
     #[test]
@@ -275,6 +286,8 @@ mod tests {
             findings: vec![GateFinding {
                 id: "F1".to_string(),
                 severity: "high".to_string(),
+                disposition: Some("blocking".to_string()),
+                origin: Some("issue-impact".to_string()),
                 summary: "bug".to_string(),
                 file: Some("a.rs".to_string()),
                 line: Some(3),

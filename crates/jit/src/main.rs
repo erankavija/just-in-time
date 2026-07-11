@@ -781,8 +781,9 @@ fn render_report_stream(text: &str, tail: Option<usize>) -> String {
 /// --findings`).
 ///
 /// One header line carries the gate key, verdict, one-line summary, and finding
-/// count; each finding follows on its own line as `<id> [<severity>] <summary>`
-/// with an optional ` (<file>:<line>)` locator. The format is stable and
+/// count; each finding follows on its own line as `<id> [<severity>]` plus any
+/// `[<disposition>] [<origin>]` classifications, then `<summary>` and an
+/// optional ` (<file>:<line>)` locator. The format is stable and
 /// greppable (severity via `[high]`, verdict via the header), mirroring the
 /// `issue status` one-line convention. A run with no machine-readable block
 /// renders a single header line with `verdict: n/a` and `findings: 0`, so a
@@ -818,14 +819,19 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
                 } else {
                     &finding.severity
                 };
+                let classifications = [finding.disposition.as_deref(), finding.origin.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .map(|value| format!(" [{}]", value))
+                    .collect::<String>();
                 let locator = match (&finding.file, finding.line) {
                     (Some(file), Some(line)) => format!(" ({}:{})", file, line),
                     (Some(file), None) => format!(" ({})", file),
                     _ => String::new(),
                 };
                 out.push_str(&format!(
-                    "{} [{}] {}{}\n",
-                    id, severity, finding.summary, locator
+                    "{} [{}]{} {}{}\n",
+                    id, severity, classifications, finding.summary, locator
                 ));
             }
             out

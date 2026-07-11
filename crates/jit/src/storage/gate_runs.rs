@@ -42,6 +42,8 @@ mod tests {
                 findings: vec![GateFinding {
                     id: "F1".to_string(),
                     severity: "low".to_string(),
+                    disposition: Some("advisory".to_string()),
+                    origin: Some("pre-existing".to_string()),
                     summary: "nit".to_string(),
                     file: Some("src/x.rs".to_string()),
                     line: Some(7),
@@ -63,6 +65,11 @@ mod tests {
         assert_eq!(findings.verdict, "pass");
         assert_eq!(findings.findings.len(), 1);
         assert_eq!(findings.findings[0].id, "F1");
+        assert_eq!(
+            findings.findings[0].disposition.as_deref(),
+            Some("advisory")
+        );
+        assert_eq!(findings.findings[0].origin.as_deref(), Some("pre-existing"));
         assert_eq!(findings.findings[0].line, Some(7));
     }
 
