@@ -77,6 +77,9 @@ pub struct Flag {
     pub required: bool,
     /// Description
     pub description: String,
+    /// Alternate accepted long spellings (visible aliases, without `--`)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 /// Output schema - contains actual JSON Schema for structured responses
@@ -105,17 +108,19 @@ impl CommandSchema {
     pub fn generate() -> Self {
         let cli = crate::cli::Cli::command();
 
-        // Extract global options (flags that apply to all commands)
-        let global_options: Vec<Flag> = cli
+        // Extract global options: every non-positional flag accepted at the
+        // top level, including `--schema` and `--quiet`.
+        let mut global_options: Vec<Flag> = cli
             .get_arguments()
-            .filter(|arg| {
-                !arg.is_positional()
-                    && arg.is_global_set()
-                    && arg.get_id() != "help"
-                    && arg.get_id() != "version"
-            })
+            .filter(|arg| !arg.is_positional())
             .map(Self::extract_flag)
             .collect();
+
+        // clap synthesizes `--help`/`--version` at parse time, so they are
+        // absent from `get_arguments()`. Surface them explicitly so the schema
+        // documents every globally accepted spelling (@/inv/single-source-prose:
+        // these are clap's fixed spellings, not project-owned facts).
+        global_options.extend(Self::builtin_global_flags());
 
         let mut commands = HashMap::new();
 
@@ -139,6 +144,26 @@ impl CommandSchema {
             types: Self::generate_types(),
             exit_codes: Self::generate_exit_codes(),
         }
+    }
+
+    /// The `--help` and `--version` flags clap generates automatically.
+    ///
+    /// clap injects these during parsing rather than storing them as `Arg`
+    /// entries, so they must be described here to appear in the schema.
+    fn builtin_global_flags() -> Vec<Flag> {
+        ["help", "version"]
+            .into_iter()
+            .map(|name| Flag {
+                name: name.to_string(),
+                flag_type: "boolean".to_string(),
+                required: false,
+                description: match name {
+                    "help" => "Print help".to_string(),
+                    _ => "Print version".to_string(),
+                },
+                aliases: Vec::new(),
+            })
+            .collect()
     }
 
     /// Commands hidden from the default MCP tool listing.
@@ -294,6 +319,14 @@ impl CommandSchema {
         let flag_type = Self::infer_flag_type(arg);
         let required = arg.is_required_set();
 
+        // Visible long aliases are additional accepted spellings for this flag
+        // (e.g. `--add-label` for `--label`). Hidden aliases stay out of the
+        // contract, matching what `--help` advertises.
+        let aliases = arg
+            .get_visible_aliases()
+            .map(|names| names.into_iter().map(|s| s.to_string()).collect())
+            .unwrap_or_default();
+
         // Get description, with fallback for common flags
         let description = arg
             .get_help()
@@ -312,6 +345,7 @@ impl CommandSchema {
             flag_type,
             required,
             description,
+            aliases,
         }
     }
 
@@ -457,13 +491,22 @@ impl CommandSchema {
     }
 
     fn generate_types() -> HashMap<String, Value> {
+        use crate::domain::State;
+
         let mut types = HashMap::new();
 
+        // Derive the enum from the authoritative `State` enumeration so every
+        // real variant (including `rejected`) surfaces and future variants
+        // cannot silently drift out of the contract (@/inv/single-source-prose).
+        let state_values: Vec<Value> = State::all()
+            .iter()
+            .map(|state| Value::String(state.as_str().to_string()))
+            .collect();
         types.insert(
             "State".to_string(),
             json!({
                 "type": "enum",
-                "enum": ["backlog", "ready", "in_progress", "gated", "done", "archived"],
+                "enum": state_values,
                 "description": "Issue lifecycle state"
             }),
         );
@@ -685,6 +728,102 @@ mod tests {
                 "node schema should describe the {field} field"
             );
         }
+    }
+
+    /// REQ-01: the schema's `State` enum must list every real `State` variant,
+    /// derived from the authoritative `State::all()` enumeration. A hand-copied
+    /// list that drops `rejected` (or any future variant) must fail this test.
+    #[test]
+    fn test_schema_state_enum_covers_every_state() {
+        use crate::domain::State;
+
+        let schema = CommandSchema::generate();
+        let state_type = schema.types.get("State").expect("State type in schema");
+        let enum_vals: Vec<String> = state_type
+            .get("enum")
+            .and_then(|v| v.as_array())
+            .expect("State type has an enum array")
+            .iter()
+            .map(|v| v.as_str().expect("enum entries are strings").to_string())
+            .collect();
+
+        // `rejected` is the state historically dropped from the hand-maintained list.
+        assert!(
+            enum_vals.iter().any(|s| s == "rejected"),
+            "schema State enum must include `rejected`; found {enum_vals:?}"
+        );
+
+        // Guard against drift in either direction: the schema enum must equal
+        // the authoritative `State::all()` enumeration exactly.
+        let expected: Vec<String> = State::all()
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect();
+        assert_eq!(
+            enum_vals, expected,
+            "schema State enum must match State::all() exactly (single source of truth)"
+        );
+    }
+
+    /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,
+    /// `schema`, `help`, `version` — must be documented in `global_options`.
+    /// Dropping any one fails this test.
+    #[test]
+    fn test_schema_exposes_global_flags() {
+        let schema = CommandSchema::generate();
+        let names: HashSet<&str> = schema
+            .global_options
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect();
+        for expected in ["quiet", "schema", "help", "version"] {
+            assert!(
+                names.contains(expected),
+                "global flag `{expected}` must appear in schema global_options; found {names:?}"
+            );
+        }
+    }
+
+    /// REQ-02/REQ-03: a command flag's visible aliases (alternate accepted
+    /// spellings) must be exposed alongside its primary name. Dropping either
+    /// the primary flag or an alias fails this test.
+    #[test]
+    fn test_schema_exposes_visible_flag_aliases() {
+        let schema = CommandSchema::generate();
+
+        // `issue update --label` accepts the visible alias `--add-label`.
+        let update_label = schema
+            .commands
+            .get("issue")
+            .and_then(|c| c.subcommands.as_ref())
+            .and_then(|s| s.get("update"))
+            .expect("issue update command")
+            .flags
+            .iter()
+            .find(|f| f.name == "label")
+            .expect("issue update has a --label flag");
+        assert!(
+            update_label.aliases.iter().any(|a| a == "add-label"),
+            "issue update --label must expose its `add-label` alias; found {:?}",
+            update_label.aliases
+        );
+
+        // `doc add --label` accepts the visible alias `--title`.
+        let doc_add_label = schema
+            .commands
+            .get("doc")
+            .and_then(|c| c.subcommands.as_ref())
+            .and_then(|s| s.get("add"))
+            .expect("doc add command")
+            .flags
+            .iter()
+            .find(|f| f.name == "label")
+            .expect("doc add has a --label flag");
+        assert!(
+            doc_add_label.aliases.iter().any(|a| a == "title"),
+            "doc add --label must expose its `title` alias; found {:?}",
+            doc_add_label.aliases
+        );
     }
 
     #[test]
