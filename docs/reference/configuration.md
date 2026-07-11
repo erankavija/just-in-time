@@ -81,22 +81,37 @@ repository's dogfood configuration additionally declares `bug` and
 
 ```toml
 [validation]
+strictness = "loose"
 default_type = "task"
 content_format = "markdown"
 ```
 
 | Field | Description |
 |-------|-------------|
-| `strictness` | Parsed compatibility field; it does not alter validation. Define enforcement in `rules.toml`. |
+| `strictness` | Repo-wide enforcement modulator: `"strict"`, `"loose"` (default), `"permissive"` |
 | `default_type` | Auto-assign when no type:* label |
 | `content_format` | Default body parser: `"markdown"` (default), `"html"`, `"xml"` |
+
+**Strictness** globally modulates which rule violations block a write or state
+transition, layered on top of each rule's per-rule `enforce` flag and `severity`
+(defined in `rules.toml`). It never changes a rule's severity or `enforce` flag —
+only the block/allow decision:
+
+- `strict` — any violation blocks, whether a warning or an error, enforced or not.
+- `loose` (default) — only an enforced error blocks; every other finding is an
+  advisory warning.
+- `permissive` — nothing blocks; every violation is reported as an advisory
+  warning.
+
+An unrecognized value is rejected. Under `--force`, a blocked write or transition
+proceeds and the bypass is logged, at every level.
 
 > **Validation enforcement lives in `.jit/rules.toml`.** Label/type format, the
 > namespace registry, allowed values, value patterns, uniqueness, required
 > namespaces, and the orphan-leaf / strategic-consistency warnings are all
 > defined declaratively as rules in `.jit/rules.toml`, the single source of
-> truth, scaffolded by `jit init`. The `[validation]` section of `config.toml`
-> carries only the behavioral keys listed above.
+> truth, scaffolded by `jit init`. `strictness` tunes how those rules gate
+> operations globally; the rules themselves stay in `rules.toml`.
 
 ### `[namespaces.*]`
 

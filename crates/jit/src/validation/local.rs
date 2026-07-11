@@ -38,6 +38,7 @@ use crate::validation::engine::{
     render_finding_message, Finding, SchemaCompileError, SchemaEngine,
 };
 use crate::validation::rules::{Assertion, Rule, RuleScope, RuleSet, Severity};
+use crate::validation::strictness::Strictness;
 
 /// Error raised while evaluating local rules against an issue.
 ///
@@ -79,7 +80,10 @@ pub enum LocalEvalError {
 ///
 /// Carries every [`Finding`] produced (across all matching local rules) plus the
 /// `enforce` flag of each rule, so the command layer can decide which findings
-/// block a write. Construct via [`evaluate_local`].
+/// block a write. The block/allow decision is modulated by the evaluation's
+/// [`Strictness`] level (defaulting to [`Strictness::Loose`], the pre-strictness
+/// behavior); set the repository's level with [`LocalEvaluation::with_strictness`].
+/// Construct via [`evaluate_local`].
 ///
 /// # Examples
 ///
@@ -110,6 +114,10 @@ pub enum LocalEvalError {
 pub struct LocalEvaluation {
     /// All findings produced by matching local rules, with their severities.
     findings: Vec<EnforcedFinding>,
+    /// Repo-wide enforcement modulator applied to the block/allow decision.
+    /// Defaults to [`Strictness::Loose`], so an evaluation built without a level
+    /// keeps the pre-strictness behavior.
+    strictness: Strictness,
 }
 
 /// A [`Finding`] paired with whether its rule blocks writes (`enforce`).
@@ -120,6 +128,42 @@ struct EnforcedFinding {
 }
 
 impl LocalEvaluation {
+    /// Apply the repository's [`Strictness`] level to this evaluation, returning
+    /// it for chaining.
+    ///
+    /// Strictness modulates ONLY the block/allow decision ([`blocking_rules`],
+    /// [`is_blocking`], [`warnings`], [`rejection_message`]); it never alters the
+    /// findings themselves. [`Strictness::Loose`] (the default) leaves the
+    /// pre-strictness behavior unchanged.
+    ///
+    /// [`blocking_rules`]: LocalEvaluation::blocking_rules
+    /// [`is_blocking`]: LocalEvaluation::is_blocking
+    /// [`warnings`]: LocalEvaluation::warnings
+    /// [`rejection_message`]: LocalEvaluation::rejection_message
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::validation::local::LocalEvaluation;
+    /// use jit::validation::strictness::Strictness;
+    ///
+    /// let evaluation = LocalEvaluation::default().with_strictness(Strictness::Strict);
+    /// // An empty evaluation still never blocks, whatever the level.
+    /// assert!(!evaluation.is_blocking());
+    /// ```
+    #[must_use]
+    pub fn with_strictness(mut self, strictness: Strictness) -> Self {
+        self.strictness = strictness;
+        self
+    }
+
+    /// Whether the given finding blocks a non-forced write under this
+    /// evaluation's strictness level.
+    fn finding_blocks(&self, finding: &EnforcedFinding) -> bool {
+        self.strictness
+            .blocks(finding.enforce, finding.finding.severity)
+    }
+
     /// Every finding produced, in rule order.
     ///
     /// # Examples
@@ -135,8 +179,9 @@ impl LocalEvaluation {
         self.findings.iter().map(|f| &f.finding).collect()
     }
 
-    /// Returns whether any finding blocks a non-forced write: an `error`-severity
-    /// finding from a rule with `enforce = true`.
+    /// Returns whether any finding blocks a non-forced write under this
+    /// evaluation's [`Strictness`] level (loose: an enforced error; strict: any
+    /// violation; permissive: none).
     ///
     /// # Examples
     ///
@@ -150,8 +195,13 @@ impl LocalEvaluation {
         !self.blocking_rules().is_empty()
     }
 
-    /// The distinct names of `enforce` rules whose `error` findings block a write,
-    /// in first-seen order. Empty when nothing blocks.
+    /// The distinct names of rules whose findings block a write under this
+    /// evaluation's [`Strictness`] level, in first-seen order. Empty when nothing
+    /// blocks.
+    ///
+    /// Under [`Strictness::Loose`] (the default) this is exactly the `enforce`
+    /// rules with `error` findings; [`Strictness::Strict`] widens it to every
+    /// violating rule, and [`Strictness::Permissive`] empties it.
     ///
     /// This drives both the rejection message (which rules failed) and, on a
     /// `--force` write, the per-rule bypass events to log.
@@ -166,7 +216,7 @@ impl LocalEvaluation {
     pub fn blocking_rules(&self) -> Vec<String> {
         self.findings
             .iter()
-            .filter(|f| f.enforce && f.finding.severity == Severity::Error)
+            .filter(|f| self.finding_blocks(f))
             .fold(Vec::new(), |mut acc, f| {
                 if !acc.contains(&f.finding.rule) {
                     acc.push(f.finding.rule.clone());
@@ -175,9 +225,13 @@ impl LocalEvaluation {
             })
     }
 
-    /// Human-readable messages for findings that do NOT block the write
-    /// (warnings, and `error` findings from non-`enforce` rules), so callers can
-    /// surface them without rejecting.
+    /// Human-readable messages for findings that do NOT block the write under
+    /// this evaluation's [`Strictness`] level, so callers can surface them
+    /// without rejecting.
+    ///
+    /// The partition tracks strictness: under [`Strictness::Permissive`] every
+    /// violation is a warning; under [`Strictness::Strict`] a blocking finding is
+    /// not also surfaced here.
     ///
     /// # Examples
     ///
@@ -189,7 +243,7 @@ impl LocalEvaluation {
     pub fn warnings(&self) -> Vec<String> {
         self.findings
             .iter()
-            .filter(|f| !(f.enforce && f.finding.severity == Severity::Error))
+            .filter(|f| !self.finding_blocks(f))
             .filter(|f| f.finding.severity != Severity::Off)
             .map(|f| format!("[{}] {}", f.finding.rule, f.finding.message))
             .collect()
@@ -212,7 +266,7 @@ impl LocalEvaluation {
         let blocking: Vec<&EnforcedFinding> = self
             .findings
             .iter()
-            .filter(|f| f.enforce && f.finding.severity == Severity::Error)
+            .filter(|f| self.finding_blocks(f))
             .collect();
         if blocking.is_empty() {
             return None;
@@ -346,7 +400,13 @@ pub fn evaluate_local(
         }
     }
 
-    Ok(LocalEvaluation { findings })
+    // The repo-wide strictness modulator is applied by the caller via
+    // `LocalEvaluation::with_strictness`; default to loose so a bare evaluation
+    // keeps the pre-strictness block/allow behavior.
+    Ok(LocalEvaluation {
+        findings,
+        strictness: Strictness::default(),
+    })
 }
 
 /// Project an issue, populating `sections` only when `with_body` is set.
@@ -432,6 +492,111 @@ mod tests {
         let mut issue = Issue::new("An epic".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string()];
         issue
+    }
+
+    /// A `warn` rule (never enforces): epics should carry a `req:*` label.
+    const EPIC_REQ_WARN: &str = r#"
+[[rules]]
+name = "epic-req-warn"
+when = { type = "epic" }
+severity = "warn"
+assert = { require-label = { label = "req:*", min = 1 } }
+"#;
+
+    /// An `enforce` error rule: epics MUST carry a `req:*` label.
+    const EPIC_REQ_ENFORCE: &str = r#"
+[[rules]]
+name = "epic-req-enforce"
+when = { type = "epic" }
+severity = "error"
+enforce = true
+assert = { require-label = { label = "req:*", min = 1 } }
+"#;
+
+    #[test]
+    fn test_strictness_warn_only_violation_is_distinct_per_level() {
+        // The SAME warning-only violation must produce a DIFFERENT block/allow
+        // outcome at each level — otherwise a level would be silently inert.
+        let rules = rules_from(EPIC_REQ_WARN);
+        let issue = epic_without_req();
+
+        // Loose (default): a warning never blocks; it is surfaced as a warning.
+        let loose = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Loose);
+        assert!(!loose.is_blocking(), "loose must not block a warning");
+        assert_eq!(loose.warnings().len(), 1);
+
+        // Strict: the same warning now BLOCKS and is no longer a warning.
+        let strict = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Strict);
+        assert!(strict.is_blocking(), "strict must block a warning");
+        assert_eq!(strict.blocking_rules(), vec!["epic-req-warn"]);
+        assert!(strict.warnings().is_empty());
+        assert!(strict.rejection_message().is_some());
+
+        // Permissive: the same warning is advisory again (identical to loose here,
+        // but see the enforced-error test where permissive diverges from loose).
+        let permissive = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Permissive);
+        assert!(!permissive.is_blocking(), "permissive must not block");
+        assert_eq!(permissive.warnings().len(), 1);
+    }
+
+    #[test]
+    fn test_strictness_enforced_error_is_distinct_per_level() {
+        // The SAME enforced-error violation separates loose from permissive: loose
+        // blocks it, permissive downgrades it to advisory.
+        let rules = rules_from(EPIC_REQ_ENFORCE);
+        let issue = epic_without_req();
+
+        let loose = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Loose);
+        assert!(loose.is_blocking(), "loose must block an enforced error");
+        assert_eq!(loose.blocking_rules(), vec!["epic-req-enforce"]);
+
+        let permissive = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Permissive);
+        assert!(
+            !permissive.is_blocking(),
+            "permissive must NOT block even an enforced error"
+        );
+        assert_eq!(
+            permissive.warnings().len(),
+            1,
+            "the bypassed error is surfaced as an advisory warning"
+        );
+
+        let strict = evaluate_local(&issue, &rules, ContentFormat::Markdown)
+            .unwrap()
+            .with_strictness(Strictness::Strict);
+        assert!(strict.is_blocking(), "strict blocks an enforced error too");
+    }
+
+    #[test]
+    fn test_default_strictness_is_loose() {
+        // An evaluation built without `with_strictness` behaves as loose, so no
+        // existing repo changes meaning: an enforced error blocks, a warning does
+        // not.
+        let enforce = evaluate_local(
+            &epic_without_req(),
+            &rules_from(EPIC_REQ_ENFORCE),
+            ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(enforce.is_blocking());
+
+        let warn = evaluate_local(
+            &epic_without_req(),
+            &rules_from(EPIC_REQ_WARN),
+            ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(!warn.is_blocking());
     }
 
     #[test]

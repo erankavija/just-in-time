@@ -40,7 +40,8 @@ story = "story"
 # sibling `.jit/templates.toml`, applied via `jit apply plan <container>`.
 
 [validation]
-# Strictness level: "strict", "loose", or "permissive"
+# Repo-wide enforcement modulator over rules.toml: "strict" blocks any violation,
+# "loose" blocks only enforced errors (default), "permissive" blocks nothing.
 strictness = "loose"
 
 # Default type when none specified

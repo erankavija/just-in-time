@@ -283,18 +283,19 @@ pub struct IconConfigToml {
 
 /// Validation behavior configuration.
 ///
-/// The former enforcement keys (`require_type_label`, `label_regex`,
-/// `reject_malformed_labels`, `enforce_namespace_registry`, `warn_orphaned_leaves`,
-/// `warn_strategic_consistency`) were removed when `.jit/rules.toml` became the
-/// sole validation source (DR §8.2/§8.4). Only the BEHAVIORAL keys survive:
-/// `default_type`, `content_format`, and the inert `strictness`. serde ignores
-/// any stale enforcement keys still present in an old `config.toml` (no
-/// `deny_unknown_fields`), so such a file still parses; the keys simply have no
-/// effect — the operative rules live in `rules.toml`.
+/// Per-rule enforcement lives in `.jit/rules.toml`, the sole rule source (DR
+/// §8.2/§8.4); serde ignores any stale enforcement keys still present in an old
+/// `config.toml` (no `deny_unknown_fields`), so such a file still parses. The
+/// operative keys here are `strictness` (the repo-wide enforcement modulator),
+/// `default_type`, and `content_format`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ValidationConfig {
-    /// Strictness level: "strict", "loose", or "permissive". Retained as an inert
-    /// forward-compat key; it no longer drives validation behavior.
+    /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
+    /// `"permissive"`. It modulates which rule violations block a write or
+    /// transition, layered on top of each rule's `enforce`/severity, without
+    /// changing either. Absent means `"loose"` (only an enforced error blocks —
+    /// the pre-strictness behavior). Resolved via
+    /// [`ValidationConfig::strictness`].
     pub strictness: Option<String>,
     /// Default type when none specified (optional).
     pub default_type: Option<String>,
@@ -319,6 +320,14 @@ impl ValidationConfig {
                 format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
             }),
         }
+    }
+
+    /// Resolve the repo-wide validation
+    /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
+    /// to [`Strictness::Loose`](crate::validation::Strictness::Loose) when unset.
+    /// An invalid value is surfaced as an error rather than silently defaulting.
+    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
+        crate::validation::Strictness::from_config_value(self.strictness.as_deref())
     }
 }
 

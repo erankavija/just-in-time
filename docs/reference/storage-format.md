@@ -158,9 +158,10 @@ default_type = "task"
 ```
 
 The hierarchy's type names are repository-defined; `bug` and `enhancement` in
-this repository's dogfood configuration are not `jit init` defaults. Validation
-enforcement belongs in `rules.toml`; a legacy `strictness` key is parsed but has
-no effect. See [Configuration Reference](configuration.md) for active options.
+this repository's dogfood configuration are not `jit init` defaults. Individual
+rules live in `rules.toml`; the `[validation].strictness` key globally modulates
+which of their violations block operations. See
+[Configuration Reference](configuration.md) for active options.
 
 ## Event Log Format
 

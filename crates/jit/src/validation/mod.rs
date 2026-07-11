@@ -15,6 +15,8 @@
 //!   [`engine::Finding`]s;
 //! - [`local`] — write-path local-rule evaluation ([`evaluate_local`]);
 //! - [`graph`] — cross-issue graph-rule evaluation (validate / gate checkers);
+//! - [`strictness`] — the repo-wide [`Strictness`] enforcement modulator that
+//!   globally widens or narrows which violations block a write or transition;
 //! - [`invariants`] — the project-invariant registry and `.jit/invariants.toml`
 //!   loader (registry-first, project-scoped);
 //! - [`drift`] — the enforcement-drift check (declaration consistency between
@@ -37,7 +39,9 @@ pub mod report;
 pub mod rules;
 pub mod rules_gates_projection;
 pub mod serialize;
+pub mod strictness;
 
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};
+pub use strictness::Strictness;

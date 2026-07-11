@@ -559,6 +559,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
+    /// Resolve the repository-wide validation strictness from
+    /// `[validation].strictness`, defaulting to [`Strictness::Loose`] when the
+    /// key (or the whole `[validation]` section) is absent. A malformed value is
+    /// surfaced as an error rather than silently defaulting, so a misconfigured
+    /// `config.toml` cannot quietly disable or widen enforcement.
+    ///
+    /// [`Strictness::Loose`]: crate::validation::Strictness::Loose
+    fn validation_strictness(&self) -> Result<crate::validation::Strictness> {
+        match self.cached_config()?.validation.as_ref() {
+            Some(validation) => validation.strictness(),
+            None => Ok(crate::validation::Strictness::Loose),
+        }
+    }
+
     /// The single write-time validation entry point shared by issue create,
     /// update, and the batch path (DR §7.5).
     ///
@@ -569,8 +583,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// It evaluates the EFFECTIVE local rules (built-in defaults + user
     /// `.jit/rules.toml`) via
-    /// [`evaluate_local`](crate::validation::evaluate_local), with blocking
-    /// semantics:
+    /// [`evaluate_local`](crate::validation::evaluate_local), then applies the
+    /// repository's `[validation].strictness`
+    /// ([`Strictness`](crate::validation::Strictness)) to the block/allow
+    /// decision. Under the default [`Loose`](crate::validation::Strictness::Loose)
+    /// level the blocking semantics are:
     ///
     /// - An `error` finding from an `enforce = true` rule REJECTS the write
     ///   unless `force` is set (DR §7.2).
@@ -581,6 +598,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// - `warn`/non-`enforce` findings never block; their messages are
     ///   returned as warnings.
     ///
+    /// [`Strict`](crate::validation::Strictness::Strict) widens the block set to
+    /// EVERY violation (any warning or error blocks);
+    /// [`Permissive`](crate::validation::Strictness::Permissive) empties it (no
+    /// violation blocks — all findings become warnings). Strictness modulates only
+    /// this decision; it never changes a rule's severity or `enforce` flag.
+    ///
     /// The former hard-coded `IssueValidator` checks are now default rules inside
     /// the effective rule set, so they run through this same path. A genuinely
     /// misconfigured `.jit/rules.toml` or `config.toml` (parse/load error) is
@@ -588,8 +611,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn validate_for_write(&self, issue: &Issue, force: bool) -> Result<WriteValidation> {
         let rules = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
+        let strictness = self.validation_strictness()?;
         let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)
-            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?;
+            .map_err(|err| anyhow!("rule evaluation failed: {err}"))?
+            .with_strictness(strictness);
 
         let blocking = evaluation.blocking_rules();
         if !blocking.is_empty() && !force {
@@ -810,21 +835,27 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// - Evaluates the selected rules over the issue's dependency NEIGHBORHOOD
     ///   (the issue plus its transitive dependencies and dependents), not
     ///   `list_issues()` wholesale, via [`DependencyGraph`] reachability.
-    /// - A finding from an `enforce = true` rule with `error` severity ATTRIBUTED
-    ///   to this issue BLOCKS the transition: a [`Event::TransitionBlocked`] is
-    ///   appended per blocking rule (the attempted transition is the auditable
-    ///   act) and a [`TransitionBlockedError`](crate::errors::TransitionBlockedError)
-    ///   is returned (exit 4), unless `force` is set.
+    /// - Whether a finding ATTRIBUTED to this issue BLOCKS the transition is the
+    ///   repo-wide [`Strictness`](crate::validation::Strictness) decision applied
+    ///   to the finding's rule `enforce` flag and severity — the SAME modulator as
+    ///   the write path. Under the default
+    ///   [`Loose`](crate::validation::Strictness::Loose) level that is an
+    ///   `enforce = true` / `error` finding; [`Strict`](crate::validation::Strictness::Strict)
+    ///   widens it to any violation and [`Permissive`](crate::validation::Strictness::Permissive)
+    ///   blocks nothing. A blocking finding appends one
+    ///   [`Event::TransitionBlocked`] per rule (the attempted transition is the
+    ///   auditable act) and returns a
+    ///   [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
+    ///   4), unless `force` is set.
     /// - With `force`, blocking findings do NOT block; one
     ///   [`Event::GraphRuleBypassed`] is appended per overridden rule.
-    /// - A `config-error` finding (a malformed rule: bad regex, missing key) from
-    ///   an `enforce = true` / `error` rule whose selector applies to this issue
-    ///   also BLOCKS — a broken guard must not silently pass. The blocker message
-    ///   makes clear the rule itself is misconfigured. A config error from a
-    ///   non-enforcing rule stays a warning.
-    /// - Non-enforcing or non-`error` findings (and findings attributed to OTHER
-    ///   issues in the slice) never block; their `[rule] message` strings are
-    ///   returned as warnings for the caller to surface.
+    /// - A `config-error` finding (a malformed rule: bad regex, missing key) whose
+    ///   selector applies to this issue BLOCKS whenever the strictness/enforce
+    ///   decision blocks it — a broken guard must not silently pass. The blocker
+    ///   message makes clear the rule itself is misconfigured.
+    /// - Findings the strictness decision does not block (and findings attributed
+    ///   to OTHER issues in the slice) never block; their `[rule] message` strings
+    ///   are returned as warnings for the caller to surface.
     fn enforce_transition_graph_rules(
         &self,
         issue: &Issue,
@@ -874,29 +905,35 @@ impl<S: IssueStore> CommandExecutor<S> {
             &plan_content,
         );
 
-        // Which selected rules enforce (block on an attributed error finding).
+        // Per-rule `enforce` flag, looked up by rule name so the strictness
+        // modulator can read it per finding. A finding whose rule is not in the
+        // selected set (should not happen) is treated as non-enforcing.
         let enforcing: std::collections::HashSet<&str> = rules
             .iter()
             .filter(|r| r.enforce)
             .map(|r| r.name.as_str())
             .collect();
 
+        // Repo-wide strictness modulates which violations block this transition,
+        // exactly as on the write path: loose blocks only an enforced error,
+        // strict blocks any violation, permissive blocks nothing.
+        let strictness = self.validation_strictness()?;
+
         let mut blocking: Vec<(String, String)> = Vec::new();
         let mut warnings: Vec<String> = Vec::new();
         for gf in &findings {
             // A config-error finding (issue_id = None, e.g. a bad id-pattern regex
             // or a missing key) carries no issue attribution, but it means the
-            // rule itself is broken. If that rule enforces (and is error-severity),
+            // rule itself is broken. If the strictness/enforce decision blocks it,
             // the broken guard must BLOCK the transition rather than degrade to a
-            // warning — a typo in an `enforce = true` rule must not silently
-            // disable the guard. (The rule is already known to apply to this issue:
-            // `rules` was filtered by `when.matches(issue)`.)
+            // warning — a typo in an enforcing rule must not silently disable the
+            // guard. (The rule is already known to apply to this issue: `rules`
+            // was filtered by `when.matches(issue)`.)
             let is_config_error = gf.is_config_error();
             let attributed_to_self = gf.issue_id.as_deref() == Some(issue.id.as_str());
             let pertains = attributed_to_self || is_config_error;
-            let is_blocker = pertains
-                && gf.finding.severity == Severity::Error
-                && enforcing.contains(gf.finding.rule.as_str());
+            let rule_enforces = enforcing.contains(gf.finding.rule.as_str());
+            let is_blocker = pertains && strictness.blocks(rule_enforces, gf.finding.severity);
             if is_blocker {
                 let message = if is_config_error {
                     // Make clear the rule itself is misconfigured, not the issue.

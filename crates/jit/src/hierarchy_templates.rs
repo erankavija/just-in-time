@@ -106,10 +106,11 @@ strategic_types = [{strategic_array}]
 # custom = {{ bug = "🐛" }}   # per-type overrides (merged with preset)
 
 [validation]
-# How strictly JIT enforces rules:
-#   strict      — fail on any violation; suitable for CI and automated pipelines.
-#   loose       — warn but allow operations; good for everyday development (default).
-#   permissive  — minimal checks; useful during imports or migrations.
+# Repo-wide enforcement strictness. Modulates which rule violations block a write
+# or transition, on top of each rule's per-rule enforce/severity (in rules.toml):
+#   strict      — any violation blocks (warning or error); suits CI/automation.
+#   loose       — only an enforced error blocks; warnings are advisory (default).
+#   permissive  — nothing blocks; every violation is report-only (imports/migrations).
 strictness = "loose"
 
 # Auto-assign this type when creating issues without a type:* label.

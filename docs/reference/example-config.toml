@@ -76,9 +76,18 @@ preset = "simple"  # Optional, defaults to "simple"
 # =============================================================================
 # VALIDATION
 # =============================================================================
-# Active issue-creation defaults; rules.toml defines validation enforcement
+# Issue-creation defaults plus the repo-wide enforcement modulator; rules.toml
+# defines the individual rules.
 
 [validation]
+# Repo-wide enforcement strictness, layered on top of each rule's enforce/severity
+# (it never changes them — only the block/allow decision):
+#   strict      — any violation blocks (warning or error, enforced or not)
+#   loose       — only an enforced error blocks; warnings are advisory (default)
+#   permissive  — nothing blocks; every violation is report-only
+# An unrecognized value is rejected. Absent means "loose".
+strictness = "loose"
+
 # Auto-assign this type when creating issues without a type:* label
 default_type = "task"
 
@@ -90,12 +99,12 @@ default_type = "task"
 # Markdown fallback.
 content_format = "markdown"
 
-# NOTE: ALL label/type ENFORCEMENT (format, namespace registry, allowed values,
+# NOTE: individual label/type rules (format, namespace registry, allowed values,
 # patterns, uniqueness, required namespaces, and the orphan-leaf /
-# strategic-consistency warnings) is defined declaratively in `.jit/rules.toml`,
-# the single source of truth, scaffolded by `jit init`. This `[validation]`
-# section carries only the behavioral keys above. A legacy `strictness` key is
-# parsed for compatibility, but does not affect validation.
+# strategic-consistency warnings) are defined declaratively in `.jit/rules.toml`,
+# the single source of truth, scaffolded by `jit init`. `strictness` above tunes
+# how those rules gate operations globally; the rules themselves stay in
+# `rules.toml`.
 
 # =============================================================================
 # NAMESPACE REGISTRY
