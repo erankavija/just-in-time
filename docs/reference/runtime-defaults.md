@@ -3,13 +3,12 @@
 # Runtime Coordination Defaults
 
 Built-in defaults for multi-agent coordination and startup recovery. Each
-value is what jit uses when nothing overrides it; the source of truth is
-the `crates/jit/src/runtime_defaults.rs` module, which every production
-call site reads.
+value is defined once in the `crates/jit/src/runtime_defaults.rs` module,
+and this reference is generated from it.
 
 | Default | Value | Scope |
 | --- | --- | --- |
-| Heartbeat interval | 30 seconds | Cadence at which the optional auto-heartbeat daemon renews an indefinite (TTL=0) lease. |
+| Heartbeat interval | 30 seconds | Default interval between lease heartbeat updates; a lease heartbeat is treated as stale after twice this interval. |
 | Lock acquisition timeout | 5 seconds | Maximum time a writer waits for a `.jit` file lock or the repository write lock before failing. Override with the `JIT_LOCK_TIMEOUT` environment variable. |
 | Lock poll interval | 10 milliseconds | Wait between successive attempts while blocking on a contended file lock. |
 | Temp-file cleanup threshold | 3600 seconds | Age at which orphaned `*.tmp` files are swept during startup recovery. |

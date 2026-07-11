@@ -1,39 +1,98 @@
 //! Built-in runtime coordination and recovery defaults.
 //!
 //! These constants are the single source of truth for the operational defaults
-//! that govern multi-agent coordination and startup recovery: the auto-heartbeat
-//! cadence, the file-lock acquisition timeout and poll interval, the orphaned
-//! temp-file cleanup threshold, and the default claim lease TTL. Each production
-//! call site references the constant here instead of an inline literal, so the
-//! value lives in exactly one place.
+//! that govern multi-agent coordination and startup recovery: the lease
+//! heartbeat cadence, the file-lock acquisition timeout and poll interval, the
+//! orphaned temp-file cleanup threshold, and the default claim lease TTL. The
+//! default-resolution paths reference the constants here instead of inline
+//! literals, so each default is defined in exactly one place.
 //!
 //! [`render_reference_markdown`] projects these constants into the committed
 //! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
 //! committed copy matches the projection, so changing a default without
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
 
-/// Cadence, in seconds, at which the optional auto-heartbeat daemon renews an
-/// indefinite (TTL=0) lease.
+/// Default interval, in seconds, between lease heartbeat updates. A lease
+/// heartbeat is treated as stale once more than twice this interval has elapsed
+/// since its last beat.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+/// use jit::runtime_defaults::HEARTBEAT_INTERVAL_SECS;
+///
+/// let cadence = Duration::from_secs(HEARTBEAT_INTERVAL_SECS);
+/// assert_eq!(cadence.as_secs(), HEARTBEAT_INTERVAL_SECS);
+/// ```
 pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 /// Maximum time, in seconds, a writer waits for a `.jit` file lock or the
 /// repository write lock before failing. The `JIT_LOCK_TIMEOUT` environment
 /// variable overrides this default (whole seconds).
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+/// use jit::runtime_defaults::LOCK_TIMEOUT_SECS;
+///
+/// let timeout = Duration::from_secs(LOCK_TIMEOUT_SECS);
+/// assert_eq!(timeout.as_secs(), LOCK_TIMEOUT_SECS);
+/// ```
 pub const LOCK_TIMEOUT_SECS: u64 = 5;
 
 /// Interval, in milliseconds, between successive attempts while blocking on a
 /// contended file lock.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+/// use jit::runtime_defaults::LOCK_POLL_INTERVAL_MS;
+///
+/// let poll = Duration::from_millis(LOCK_POLL_INTERVAL_MS);
+/// assert_eq!(poll.as_millis() as u64, LOCK_POLL_INTERVAL_MS);
+/// ```
 pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 
 /// Age, in seconds, at which orphaned `*.tmp` files are swept during startup
 /// recovery (1 hour).
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+/// use jit::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS;
+///
+/// let threshold = Duration::from_secs(TEMP_CLEANUP_THRESHOLD_SECS);
+/// assert_eq!(threshold.as_secs(), TEMP_CLEANUP_THRESHOLD_SECS);
+/// ```
 pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 
 /// Default time-to-live, in seconds, for a lease created by `jit claim acquire`,
 /// and the default extension applied by `jit claim renew` (10 minutes).
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+/// use jit::runtime_defaults::CLAIM_TTL_SECS;
+///
+/// let ttl = Duration::from_secs(CLAIM_TTL_SECS);
+/// assert_eq!(ttl.as_secs(), CLAIM_TTL_SECS);
+/// ```
 pub const CLAIM_TTL_SECS: u64 = 600;
 
 /// Repo-relative path of the committed reference that projects these defaults.
+///
+/// # Examples
+///
+/// ```
+/// use jit::runtime_defaults::REFERENCE_PATH;
+///
+/// assert!(REFERENCE_PATH.ends_with("runtime-defaults.md"));
+/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
 
 /// Render the runtime coordination defaults as the committed markdown reference.
@@ -61,7 +120,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Heartbeat interval",
             format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
-            "Cadence at which the optional auto-heartbeat daemon renews an indefinite (TTL=0) lease.",
+            "Default interval between lease heartbeat updates; a lease heartbeat is treated as stale after twice this interval.",
         ),
         (
             "Lock acquisition timeout",
@@ -97,9 +156,8 @@ pub fn render_reference_markdown() -> String {
          # Runtime Coordination Defaults\n\
          \n\
          Built-in defaults for multi-agent coordination and startup recovery. Each\n\
-         value is what jit uses when nothing overrides it; the source of truth is\n\
-         the `crates/jit/src/runtime_defaults.rs` module, which every production\n\
-         call site reads.\n\
+         value is defined once in the `crates/jit/src/runtime_defaults.rs` module,\n\
+         and this reference is generated from it.\n\
          \n\
          | Default | Value | Scope |\n\
          | --- | --- | --- |\n\
@@ -138,11 +196,17 @@ mod tests {
     /// Regenerate the committed reference from the constants. Ignored by default;
     /// run explicitly after changing a default:
     ///   cargo test -p jit runtime_defaults -- --ignored regenerate
+    ///
+    /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
     #[test]
     #[ignore = "writes the committed reference; run explicitly to regenerate"]
     fn regenerate_reference() {
-        std::fs::write(reference_path(), render_reference_markdown())
-            .expect("should write the runtime-defaults reference");
+        let path = reference_path();
+        let tmp = path.with_extension("md.tmp");
+        std::fs::write(&tmp, render_reference_markdown())
+            .expect("should write the runtime-defaults temp file");
+        std::fs::rename(&tmp, &path)
+            .expect("should atomically replace the runtime-defaults reference");
     }
 
     #[test]

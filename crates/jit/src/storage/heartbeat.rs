@@ -50,8 +50,11 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-/// Default heartbeat interval in seconds
-pub const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+/// Default heartbeat interval in seconds.
+///
+/// Alias of [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`], the single
+/// source of truth for this default.
+pub const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS;
 
 /// Heartbeat metadata for an agent process.
 ///

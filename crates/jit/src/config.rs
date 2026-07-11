@@ -1782,9 +1782,11 @@ impl WorktreeConfig {
 /// Coordination settings for leases and multi-agent work.
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct CoordinationConfig {
-    /// Default TTL for new leases in seconds (default: 600).
+    /// Default TTL for new leases in seconds (default:
+    /// [`crate::runtime_defaults::CLAIM_TTL_SECS`]).
     pub default_ttl_secs: Option<u64>,
-    /// Heartbeat interval for automatic lease renewal in seconds (default: 30).
+    /// Heartbeat interval for automatic lease renewal in seconds (default:
+    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`]).
     pub heartbeat_interval_secs: Option<u64>,
     /// Warn when lease has less than this percentage of TTL remaining (default: 10).
     pub lease_renewal_threshold_pct: Option<u8>,
@@ -1800,11 +1802,13 @@ pub struct CoordinationConfig {
 
 impl CoordinationConfig {
     pub fn default_ttl_secs(&self) -> u64 {
-        self.default_ttl_secs.unwrap_or(600)
+        self.default_ttl_secs
+            .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
     }
 
     pub fn heartbeat_interval_secs(&self) -> u64 {
-        self.heartbeat_interval_secs.unwrap_or(30)
+        self.heartbeat_interval_secs
+            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 
     pub fn lease_renewal_threshold_pct(&self) -> u8 {
@@ -1914,9 +1918,11 @@ pub struct AgentIdentity {
 }
 
 impl AgentIdentity {
-    /// Get the default TTL, falling back to coordination default (600s).
+    /// Get the default TTL, falling back to the coordination default
+    /// ([`crate::runtime_defaults::CLAIM_TTL_SECS`]).
     pub fn default_ttl_secs(&self) -> u64 {
-        self.default_ttl_secs.unwrap_or(600)
+        self.default_ttl_secs
+            .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
     }
 }
 
@@ -1925,7 +1931,8 @@ impl AgentIdentity {
 pub struct AgentBehavior {
     /// Auto-start heartbeat daemon for lease renewal (default: false).
     pub auto_heartbeat: Option<bool>,
-    /// Heartbeat interval in seconds (default: 30).
+    /// Heartbeat interval in seconds (default:
+    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`]).
     pub heartbeat_interval: Option<u64>,
 }
 
@@ -1935,7 +1942,8 @@ impl AgentBehavior {
     }
 
     pub fn heartbeat_interval(&self) -> u64 {
-        self.heartbeat_interval.unwrap_or(30)
+        self.heartbeat_interval
+            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 }
 
@@ -2527,7 +2535,7 @@ impl MergedCoordinationConfig {
             .and_then(|c| c.default_ttl_secs)
             .or_else(|| self.user.as_ref().and_then(|c| c.default_ttl_secs))
             .or_else(|| self.system.as_ref().and_then(|c| c.default_ttl_secs))
-            .unwrap_or(600)
+            .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
     }
 
     pub fn heartbeat_interval_secs(&self) -> u64 {
@@ -2536,7 +2544,7 @@ impl MergedCoordinationConfig {
             .and_then(|c| c.heartbeat_interval_secs)
             .or_else(|| self.user.as_ref().and_then(|c| c.heartbeat_interval_secs))
             .or_else(|| self.system.as_ref().and_then(|c| c.heartbeat_interval_secs))
-            .unwrap_or(30)
+            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 
     pub fn lease_renewal_threshold_pct(&self) -> u8 {

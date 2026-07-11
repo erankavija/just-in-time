@@ -12,7 +12,7 @@ JIT provides two ways to claim work:
 | Command | Use Case | TTL | Lease Management |
 |---------|----------|-----|------------------|
 | `jit issue claim <id> <assignee>` | Single developer, simple workflows | None | No |
-| `jit claim acquire <id> --ttl <seconds>` | Multi-agent coordination | Explicit; CLI default is 600 seconds | Yes (renew/release) |
+| `jit claim acquire <id> --ttl <seconds>` | Multi-agent coordination | Explicit; omitted `--ttl` uses the [default claim lease TTL](../reference/runtime-defaults.md) | Yes (renew/release) |
 
 **Use `jit issue claim`** for simple, single-developer workflows where you don't need automatic expiry.
 
@@ -218,8 +218,9 @@ max_indefinite_leases_per_repo = 10
 `enforce_leases` is the active repository policy for structural issue writes.
 The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
 finite lease duration on each claim with `--ttl`; for an indefinite lease, run
-`jit claim heartbeat <lease-id>` explicitly while it is active. The current
-CLI default for an omitted `--ttl` is 600 seconds.
+`jit claim heartbeat <lease-id>` explicitly while it is active. An omitted
+`--ttl` falls back to the built-in claim lease TTL listed in
+[Runtime Coordination Defaults](../reference/runtime-defaults.md).
 
 `worktree.mode`, `default_ttl_secs`, `heartbeat_interval_secs`,
 `stale_threshold_secs`, and automatic-renewal settings are parsed and shown by

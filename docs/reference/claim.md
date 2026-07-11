@@ -59,7 +59,7 @@ multi-agent coordination.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--ttl <SECONDS>` | `600` | Time-to-live in seconds. Use `0` for indefinite lease (requires `--reason`) |
+| `--ttl <SECONDS>` | See [runtime defaults](runtime-defaults.md) | Time-to-live in seconds. Use `0` for indefinite lease (requires `--reason`) |
 | `--agent-id <ID>` | From config | Override agent identifier |
 | `--reason <TEXT>` | None | Reason for claim (required for TTL=0) |
 | `--json` | false | Output as JSON |
@@ -214,7 +214,7 @@ Extends the expiry time of an existing lease. For finite leases, adds time to th
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--extension <SECONDS>` | `600` | Seconds to extend the lease |
+| `--extension <SECONDS>` | See [runtime defaults](runtime-defaults.md) | Seconds to extend the lease |
 | `--json` | false | Output as JSON |
 
 ### Examples

@@ -564,7 +564,7 @@ JIT is designed with isolation and fault tolerance:
 
 - Storage errors don't crash the CLI (return error codes)
 - Validation errors suggest recovery steps
-- Lock timeouts prevent indefinite hangs (default 5 seconds)
+- Lock timeouts prevent indefinite hangs (see the [default lock acquisition timeout](../reference/runtime-defaults.md))
 - Event log corruption doesn't prevent issue operations
 
 **✓ Recovery-oriented design:**
