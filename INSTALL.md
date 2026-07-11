@@ -156,7 +156,7 @@ docker run --rm -it \
 
 ### Prerequisites
 
-- A recent stable Rust toolchain — CI builds on `stable` (`.github/workflows/ci.yml`); the workspace declares no minimum version (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Rust 1.97 or newer — the workspace minimum supported version (`rust-version` in `Cargo.toml`), which CI's MSRV job builds against so a change requiring a newer compiler fails the pipeline (`.github/workflows/ci.yml`). Install via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - Node.js 20+ (for MCP server and Web UI; the CI floor, `.github/workflows/ci.yml`)
 - ripgrep (optional, for search: `sudo apt install ripgrep`)
 

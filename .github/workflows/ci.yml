@@ -79,6 +79,60 @@ jobs:
           cd crates/jit
           cargo test --test '*' --verbose
 
+  # Enforce the declared MSRV. The authoritative policy is the single
+  # `rust-version` under `[workspace.package]` in Cargo.toml; this job reads it
+  # from the manifest (no hand-duplicated version literal) and builds the whole
+  # workspace on exactly that pinned toolchain. A change that requires a newer
+  # compiler than the declared minimum fails here, keeping the manifest claim
+  # honest. `cargo` itself also refuses to build the crates on an older
+  # toolchain because of the same `rust-version` field.
+  msrv:
+    name: MSRV (build on declared rust-version)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Read MSRV from Cargo.toml
+        id: msrv
+        run: |
+          version=$(grep -m1 -E '^rust-version' Cargo.toml | sed -E 's/.*"([0-9.]+)".*/\1/')
+          if [ -z "$version" ]; then
+            echo "Could not read rust-version from Cargo.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Declared MSRV: $version"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-msrv-
+
+      - name: Build workspace on MSRV toolchain
+        run: cargo +${{ steps.msrv.outputs.version }} build --workspace --all-targets --all-features --verbose
+
   # The html/xml content parsers and their production-dispatch tests are behind
   # optional cargo features that the default `cargo test` build never compiles.
   # The cross-format equality test is `#![cfg(all(feature="html",feature="xml"))]`
