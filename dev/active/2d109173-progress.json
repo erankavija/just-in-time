@@ -112,8 +112,8 @@
           "short_id": "36d5451e",
           "title": "Root and component documentation audit",
           "classification": "documentation",
-          "status": "rework",
-          "note": "IN REWORK round 2 of 3 (attempt 2). First pass fixed Node floor (REQ-07, 4 instances unified on 20 + ci.yml cite) + jit-server port (README 8080->3000). R1 rework (branch commit b41faf3c, INTEGRATED+checkpointed on main): 4 findings closed - component-image :latest->:main (6 refs), jit-mcp-server --version->which, strictness->'(currently inert)', Rust 1.80->recent stable+CI cite. R2 DISPATCHED (worker branch still at b41faf3c, round-2 fix NOT yet committed): 3 new findings - (F1) mcp-server/README.md:221 fabricated {success,data} envelope: real MCP success = {content:[{type:text,...}]} (index.js:141-155), error path embeds {success:false,error,exit_code,stderr}+isError:true (index.js:222-235); (F2) README.md:233 drop inert strictness choices entirely; (F3) INSTALL.md:248 unsourced system reqs (RAM/disk/OS) - de-fabricate. Mandated exhaustive unsourced-claims sweep. RESUME: nudge/await worker round-2 commit, then bring README.md INSTALL.md mcp-server/README.md + notes via git checkout, eval docs-mechanical --force + doc-review, finalize."
+          "status": "escalated",
+          "note": "LIVE STATE CORRECTION (2026-07-11): worker worktree is gone and b41faf3c is NOT integrated into main (git log main..worktree-agent-36d5451e shows it). Main's latest doc-review failed with F1 README strictness choices, F2 fabricated MCP success envelope, F3 unsupported INSTALL system/resource requirements. Two rework cycles are already recorded, so escalation-policy MAX_REWORK_ATTEMPTS requires owner direction before another dispatch."
         }
       ]
     },
@@ -132,7 +132,15 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+      "category": "Rework exceeded MAX_REWORK_ATTEMPTS",
+      "status": "awaiting_invoker",
+      "opened_at": "2026-07-11T00:00:00Z",
+      "summary": "Two rework cycles are recorded; the previous worker worktree is absent and its b41faf3c fixes were never integrated. The current doc-review still has three findings."
+    }
+  ],
   "rework_counts": {
     "99f4a2b4": 2,
     "d24008f0": 2,
@@ -146,7 +154,7 @@
     "36d5451e": 2
   },
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "Wave 4 in progress: 36d5451e on rework round 2/3. Worker (audit-root-36d5451e, worktree .agents/worktrees/agent-36d5451e) branch at b41faf3c; round-2 fix for 3 findings not yet committed. On resume: verify round-2 commit landed (git -C .agents/worktrees/agent-36d5451e log), re-eval docs-mechanical(--force, footprint='README.md INSTALL.md mcp-server/README.md web/README.md docs/index.md docs/README.md') + doc-review, close prior-findings regression check, finalize 36d5451e -> Wave 4 done. THEN: run the engine-issue interview (below) BEFORE Wave 5, then write the session handoff (owner instruction: handoff after wave 4 completes).",
+  "resume_pointer": "BLOCKED in Wave 4: 36d5451e has reached the two-rework limit. Await owner choice: reset/authorize one additional rework cycle, take over manually, or reject. If resumed with authorization, first integrate only b41faf3c's intended README.md, INSTALL.md, mcp-server/README.md, and audit-notes changes after reviewing against main; then resolve the current three doc-review findings and run full review. After Wave 4, interview the owner before Wave 5 on candidate engine follow-ups.",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
