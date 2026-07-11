@@ -2,7 +2,7 @@
   "id": "623f3163-776e-4e1c-8d98-a8c8f13d2566",
   "title": "Complete the generated CLI schema contract",
   "description": "`jit --schema` omits the real `rejected` lifecycle state and does not expose all accepted CLI spellings: visible aliases and global help/schema/version flags are absent. That makes the schema unsafe as a sole machine-readable CLI contract.\n\nSource: `crates/jit/src/schema.rs:103-141,235-249,286-315,459-469`; `crates/jit/src/domain/types.rs:19-42,75-101`; `crates/jit/src/cli.rs:20-36,978-987,1822-1828`.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema represents every real `State` value, including `rejected`, from one authoritative enumeration.\n- [hard] REQ-02: The schema exposes accepted visible aliases and all global help/schema/version flags in documented machine-readable form.\n- [hard] REQ-03: Focused tests fail when a state, primary flag, alias, or global flag is omitted.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:worker",
   "dependencies": [
@@ -17,17 +17,17 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T21:58:33.956416496Z"
+      "updated_at": "2026-07-11T22:29:18.993738473Z"
     },
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T22:05:29.839841636Z"
+      "updated_at": "2026-07-11T22:38:22.201818381Z"
     },
     "mcp-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T22:04:09.059626925Z"
+      "updated_at": "2026-07-11T22:38:21.063334123Z"
     }
   },
   "context": {},
@@ -39,7 +39,8 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.548692888Z",
-  "updated_at": "2026-07-11T22:07:51.442705017Z",
+  "updated_at": "2026-07-11T22:40:25.787392889Z",
   "first_ready_at": "2026-07-11T13:35:35.548693328Z",
-  "claimed_at": "2026-07-11T21:18:09.099252708Z"
+  "claimed_at": "2026-07-11T21:18:09.099252708Z",
+  "done_at": "2026-07-11T22:40:25.787392039Z"
 }

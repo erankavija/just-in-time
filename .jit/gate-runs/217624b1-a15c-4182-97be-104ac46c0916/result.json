@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "217624b1-a15c-4182-97be-104ac46c0916",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "623f3163-776e-4e1c-8d98-a8c8f13d2566",
+  "commit": "1b256d7c32ae04a5fbd6100edcae984a178b26dc",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T22:38:22.201818381Z",
+  "completed_at": "2026-07-11T22:40:00.562350566Z",
+  "duration_ms": 98360,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01–03 are met. `State` is generated from `State::all()` at `crates/jit/src/schema.rs:547`; global flags and visible flag aliases are represented; visible command aliases are extracted via Clap at `crates/jit/src/schema.rs:274`. Focused regression tests cover each class.\n\n## Architecture and separation of concerns\n\nNo boundary violations. The change remains within schema generation and Clap introspection.\n\n## Functional paradigm\n\nNo technical debt or non-idiomatic blocking pattern found.\n\n## Correctness and invariants\n\nNo regression found. This is read-only schema generation; no persistence, lifecycle, PID, or unsafe-code concerns are introduced.\n\n## Safety\n\nNo unsafe code introduced.\n\n## Testing\n\nThe current-commit cargo-ci gate passed (commit `1b256d7c`); mcp-ci also passed. Per instruction, I did not rerun tests. `./scripts/jit-validate.sh` passed.\n\n## Error handling\n\nNo error-handling regression found.\n\n## CLI contract\n\nThe schema now exposes documented visible command aliases, including `dependency` for `dep` and `pass`/`eval` for `gate evaluate`, at `crates/jit/src/schema.rs:274`.\n\n## Documentation\n\nThe new public `Command::aliases` and `Flag::aliases` fields include `# Examples` documentation at `crates/jit/src/schema.rs:36` and `crates/jit/src/schema.rs:98`.\n\n## Prior review feedback and issue management\n\nPrior findings F1 and F2 are resolved. The sole dependency is done.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; prior review findings are resolved and recorded validation passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; prior review findings are resolved and recorded validation passes.",
+    "findings": []
+  }
+}
