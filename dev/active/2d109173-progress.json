@@ -1,55 +1,147 @@
 {
   "epic_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
   "epic_short_id": "2d109173",
-  "current_wave": 3,
+  "current_wave": 4,
   "wave_2_ready": true,
-  "docs_mechanical_scoping": "Evaluate docs-mechanical on each task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` — VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). The .jit/claims.jsonl miscite is FIXED (2b9a80fb), so whole-surface should be clean now. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75,adc4c6ef,8682e95a + container 2d109173. STILL NEED to attach it to 36d5451e (Wave 4). Re-eval gate: use `--force` since the gate caches a pass per HEAD and content changes between checkpoints. Integration: bring worker files via `git checkout <branch> -- <paths>` (NEVER git-merge — stale-base shows other workers' committed files as spurious deletions). Lead-direct fixes stay on main; do NOT re-checkout that file from the branch (would revert the lead fix).",
+  "docs_mechanical_scoping": "Evaluate docs-mechanical on each task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` \u2014 VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). The .jit/claims.jsonl miscite is FIXED (2b9a80fb), so whole-surface should be clean now. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75,adc4c6ef,8682e95a + container 2d109173. docs-mechanical now attached to 36d5451e too (all tasks covered). Re-eval gate: use `--force` since the gate caches a pass per HEAD and content changes between checkpoints. Integration: bring worker files via `git checkout <branch> -- <paths>` (NEVER git-merge \u2014 stale-base shows other workers' committed files as spurious deletions). Lead-direct fixes stay on main; do NOT re-checkout that file from the branch (would revert the lead fix).",
   "waves": [
     {
       "wave_number": 1,
       "note": "Enablers. Both block all Wave 2 audits.",
       "issues": [
-        {"id": "99f4a2b4", "short_id": "99f4a2b4", "title": "Committed documentation mechanical-check gate", "classification": "implementation", "status": "done", "note": "DONE after 8 code-review rounds. REQ-01/REQ-02 amended (owner) to codify plan M3 repo-rooted auditor-adjudicated citation design + clean-footprint zero-exit. Checkers: scripts/docs-check-{links,citations,projections}.sh + docs-mechanical.sh orchestrator + docs-check-selftest.sh (12 assertions). FP-free: adopter surface flags only real .jit/claims.jsonl."},
-        {"id": "d24008f0", "short_id": "d24008f0", "title": "Documentation review prompt amendment", "classification": "implementation", "status": "done", "note": "DONE. REQ-01 amended (owner 2026-07-11: unscoped behavioral demo deferred to audit tasks). Evidence = mechanism trace + real scoped run. Both gates pass."}
+        {
+          "id": "99f4a2b4",
+          "short_id": "99f4a2b4",
+          "title": "Committed documentation mechanical-check gate",
+          "classification": "implementation",
+          "status": "done",
+          "note": "DONE after 8 code-review rounds. REQ-01/REQ-02 amended (owner) to codify plan M3 repo-rooted auditor-adjudicated citation design + clean-footprint zero-exit. Checkers: scripts/docs-check-{links,citations,projections}.sh + docs-mechanical.sh orchestrator + docs-check-selftest.sh (12 assertions). FP-free: adopter surface flags only real .jit/claims.jsonl."
+        },
+        {
+          "id": "d24008f0",
+          "short_id": "d24008f0",
+          "title": "Documentation review prompt amendment",
+          "classification": "implementation",
+          "status": "done",
+          "note": "DONE. REQ-01 amended (owner 2026-07-11: unscoped behavioral demo deferred to audit tasks). Evidence = mechanism trace + real scoped run. Both gates pass."
+        }
       ]
     },
     {
       "wave_number": 2,
       "note": "6 disjoint-footprint content audits, parallel via worktrees.",
       "issues": [
-        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "done", "note": "DONE. 3 review rounds: R1 fixed 3 (repo-local type, migration narration, hardcoded preset counts) + MCP catalog collapse (668->40 lines cited pointer) + JSON-shape drift; R2 fixed undated 'Completed Today' metric; R3 lead-direct one-line fix of the last missed preset-count instance (cli-commands.md:1797). All gates pass."},
-        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "done", "note": "DONE after 2 rework rounds. R1: 6 findings (interface overclaims x2, config-taxonomy-as-fixed x3, event-integrity guarantee); re-audited all 9 files. R2: 1 (container/leaf DAG traversal direction). All gates pass."},
-        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "rework", "note": "attempt 3 (FINAL): R1 grammar topology + event-log contract (20 variants, issue_id not universal); R2 stale-binary compat (lead refined compat/migration text); R3 worktree-validate.md full re-audit (obsolete worktree info fields + incomplete validate surface) dispatched."},
-        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "done", "note": "DONE after 1 rework round: 5 findings (ID-capture from msg not id x2, validate --fix over-credit, repo-local bug/ns unframed, label-as-hierarchy). All gates pass."},
-        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "done", "note": "DONE after 2 rework rounds. R1: 7 findings; R2: 2 missed-sweep instances (lease/visibility class) + worker caught a 3rd. All gates pass."},
-        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "done", "note": "DONE after rework 1: 2 release-checklist prose defects (over-credited enforcement, error-finding mislabeled 'warning'). All 3 gates pass."}
+        {
+          "id": "2b9a80fb",
+          "short_id": "2b9a80fb",
+          "title": "CLI command catalog audit",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE. 3 review rounds: R1 fixed 3 (repo-local type, migration narration, hardcoded preset counts) + MCP catalog collapse (668->40 lines cited pointer) + JSON-shape drift; R2 fixed undated 'Completed Today' metric; R3 lead-direct one-line fix of the last missed preset-count instance (cli-commands.md:1797). All gates pass."
+        },
+        {
+          "id": "736a069e",
+          "short_id": "736a069e",
+          "title": "Concepts documentation audit",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE after 2 rework rounds. R1: 6 findings (interface overclaims x2, config-taxonomy-as-fixed x3, event-integrity guarantee); re-audited all 9 files. R2: 1 (container/leaf DAG traversal direction). All gates pass."
+        },
+        {
+          "id": "7c283e95",
+          "short_id": "7c283e95",
+          "title": "Reference documentation audit (excluding the CLI command catalog)",
+          "classification": "documentation",
+          "status": "rework",
+          "note": "attempt 3 (FINAL): R1 grammar topology + event-log contract (20 variants, issue_id not universal); R2 stale-binary compat (lead refined compat/migration text); R3 worktree-validate.md full re-audit (obsolete worktree info fields + incomplete validate surface) dispatched."
+        },
+        {
+          "id": "b8924a6d",
+          "short_id": "b8924a6d",
+          "title": "How-to guides audit",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE after 1 rework round: 5 findings (ID-capture from msg not id x2, validate --fix over-credit, repo-local bug/ns unframed, label-as-hierarchy). All gates pass."
+        },
+        {
+          "id": "4c33d0e5",
+          "short_id": "4c33d0e5",
+          "title": "Tutorials audit",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE after 2 rework rounds. R1: 7 findings; R2: 2 missed-sweep instances (lease/visibility class) + worker caught a 3rd. All gates pass."
+        },
+        {
+          "id": "a70bac75",
+          "short_id": "a70bac75",
+          "title": "Example rulesets audit",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE after rework 1: 2 release-checklist prose defects (over-credited enforcement, error-finding mislabeled 'warning'). All 3 gates pass."
+        }
       ]
     },
     {
       "wave_number": 3,
       "note": "Relocations serialized after content audits (overlaps deployment.md/quickstart.md/README.md); gap-fill after CLI catalog. Disjoint from each other.",
       "issues": [
-        {"id": "adc4c6ef", "short_id": "adc4c6ef", "title": "Root documentation relocations", "classification": "documentation", "status": "done", "note": "DONE first pass. TESTING.md->dev/TESTING.md (3 inbound repoints + 5 outbound ../ fixes in moved file). INSTALL.md move DECLINED (packaging-doc convention + link topology; verdict recorded per REQ-02). All gates pass. INSTALL.md Node-floor inconsistency left as 36d5451e's seed."},
-        {"id": "8682e95a", "short_id": "8682e95a", "title": "Command-family reference gap-fill", "classification": "documentation", "status": "rework", "note": "attempt 1: events section clean; 3 serve behavioral findings (port range is requested..+99 not fixed 3000-3099; --log absolute stays absolute; status taxonomy omits 'error'). Verified vs serve.rs/main.rs. Dispatched."}
+        {
+          "id": "adc4c6ef",
+          "short_id": "adc4c6ef",
+          "title": "Root documentation relocations",
+          "classification": "documentation",
+          "status": "done",
+          "note": "DONE first pass. TESTING.md->dev/TESTING.md (3 inbound repoints + 5 outbound ../ fixes in moved file). INSTALL.md move DECLINED (packaging-doc convention + link topology; verdict recorded per REQ-02). All gates pass. INSTALL.md Node-floor inconsistency left as 36d5451e's seed."
+        },
+        {
+          "id": "8682e95a",
+          "short_id": "8682e95a",
+          "title": "Command-family reference gap-fill",
+          "classification": "documentation",
+          "status": "rework",
+          "note": "attempt 1: events section clean; 3 serve behavioral findings (port range is requested..+99 not fixed 3000-3099; --log absolute stays absolute; status taxonomy omits 'error'). Verified vs serve.rs/main.rs. Dispatched."
+        }
       ]
     },
     {
       "wave_number": 4,
       "note": "Root+component audit; verifies final file locations after relocations.",
       "issues": [
-        {"id": "36d5451e", "short_id": "36d5451e", "title": "Root and component documentation audit", "classification": "documentation", "status": "pending"}
+        {
+          "id": "36d5451e",
+          "short_id": "36d5451e",
+          "title": "Root and component documentation audit",
+          "classification": "documentation",
+          "status": "dispatched"
+        }
       ]
     },
     {
       "wave_number": 5,
       "note": "Group-C follow-up filing; downstream of all audits + gap-fill.",
       "issues": [
-        {"id": "6d82de03", "short_id": "6d82de03", "title": "File follow-ups for engine gaps and missing projection surfaces", "classification": "documentation", "status": "pending"}
+        {
+          "id": "6d82de03",
+          "short_id": "6d82de03",
+          "title": "File follow-ups for engine gaps and missing projection surfaces",
+          "classification": "documentation",
+          "status": "pending"
+        }
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "8682e95a": 2, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
+  "rework_counts": {
+    "99f4a2b4": 2,
+    "d24008f0": 2,
+    "a70bac75": 1,
+    "4c33d0e5": 1,
+    "8682e95a": 2,
+    "7c283e95": 1,
+    "736a069e": 1,
+    "b8924a6d": 1,
+    "2b9a80fb": 2
+  },
   "started_at": "2026-07-11T00:00:00Z"
 }
