@@ -227,8 +227,11 @@ they are checked when work starts or completes.
 **2. Transition to Ready**
 
 An issue in `backlog` becomes `ready` when all dependencies are terminal (`done`
-or `rejected`). Prechecks are not a readiness condition: they run when a ready
-issue is claimed or explicitly moved to `in_progress`.
+or `rejected`). This promotion is automatic: completing or rejecting a dependency
+re-scans its dependents and moves each newly-unblocked issue to `ready` in the
+same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`).
+Prechecks are not a readiness condition: they run when a ready issue is claimed or
+explicitly moved to `in_progress`.
 
 **3. Work Begins**
 
@@ -774,7 +777,7 @@ do not rely on it to prohibit a later explicit state update.
 ### State Transitions
 
 **Auto-transitions:**
-- `Backlog → Ready`: When all dependencies reach a terminal state (done or rejected)
+- `Backlog → Ready`: Automatic. When a dependency reaches a terminal state (done or rejected), the completing/rejecting command re-scans dependents and promotes each newly-unblocked issue in the same operation (`check_auto_transitions`, `crates/jit/src/commands/issue.rs`)
 
 **Guarded workflow operations:**
 - `Ready → In Progress`: `jit issue claim` attempts this transition and runs prechecks
