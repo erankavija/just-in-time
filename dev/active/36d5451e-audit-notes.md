@@ -42,15 +42,46 @@ Every Node-floor statement now reads 20 and cites `.github/workflows/ci.yml`.
   `http://localhost:3000`. Class sweep of every port/URL claim in the footprint found this as the
   sole defect; the Docker `8080`/API `3000` and Vite `5173` references are all correct.
 
+## Rework (attempt 1) — 4 doc-review findings fixed
+
+- **F1 [high] component-image `:latest` tags (REQ-04).** `.github/workflows/docker.yml:72-79`
+  publishes the `-api`/`-web`/`-cli` component images only under `type=ref` (branch tags `main`,
+  `develop`), `type=semver`, and `type=sha` — never `latest`. Only the all-in-one image gets
+  `type=raw,value=latest` (`docker.yml:138`). Class sweep found **6** component `:latest` refs, all
+  in `INSTALL.md`, all fixed to `:main` (the rolling default-branch tag, always published, copy-
+  pasteable): the pull block (`:94,95,96`) plus the `docker run` examples for API (`:109`), Web
+  (`:118`), and CLI (`:128,135`). The pull-block comment now states the tag policy. The all-in-one
+  `:latest` refs (`INSTALL.md:93,148,337`) are valid and unchanged.
+- **F2 [high] `jit-mcp-server --version` is not a real command (REQ-01).** `mcp-server/index.js`
+  parses no argv/`--version`; the bin runs `main()`, which starts the MCP stdio server and prints a
+  `Version: …` banner to stderr (`index.js:332`) — so `jit-mcp-server --version` launches the
+  blocking server, it does not print-and-exit. `INSTALL.md:192` fixed to
+  `which jit-mcp-server   # confirm the linked bin is on PATH` (works after `npm link`). Class
+  sweep for non-working verification commands: this was the only one — `jit --version`,
+  `jit version` (`Version: 0.2.1`), `jit-server --version` (clap `version`, `main.rs:28`),
+  `node --version`, `rg --version` all work.
+- **F3 [high] `validation.strictness` shown as active (REQ-05/behavior).** The field is inert —
+  parsed but no behavioral effect (`crates/jit/src/config.rs:290,296`). `README.md:232` comment
+  now reads `# "strict", "loose", or "permissive" (currently inert)`, matching
+  `docs/reference/configuration.md:86`. No roadmap narration added.
+- **F4 [medium] unsourced `Rust 1.80+` MSRV (REQ-06).** No `rust-version` in any manifest; CI uses
+  `dtolnay/rust-toolchain@stable` (`.github/workflows/ci.yml:44`). `INSTALL.md:159` now states a
+  recent stable toolchain with the CI cite and notes the workspace declares no minimum, instead of
+  asserting `1.80`.
+
 ## Missing-projection-surface facts (REQ-06) — cited to source, recorded for Group-C follow-up
 
 No projection surface exists for these; each is stated near its source and cited here.
 
-- **Rust version floor.** `INSTALL.md:159` states `Rust 1.80+`. No MSRV is declared anywhere:
-  no `rust-version` in `Cargo.toml`/crate manifests, and CI installs `dtolnay/rust-toolchain@stable`
-  (`.github/workflows/ci.yml:44`). The `1.80+` figure is unsourced and unverifiable against the
-  tree (edition is `2021`, needs ≥1.56 only). Left as-is (no authoritative target to change it to);
-  recorded for follow-up (declare an MSRV, or drop the specific figure).
+- **No declared MSRV (engine/packaging gap).** No `rust-version` in `Cargo.toml`/crate manifests;
+  CI installs `dtolnay/rust-toolchain@stable` (`.github/workflows/ci.yml:44`). The former
+  `INSTALL.md:159` `Rust 1.80+` figure was unsourced; the doc now states "a recent stable
+  toolchain" with the CI cite (F4). Follow-up candidate: decide whether `Cargo.toml` should declare
+  a `rust-version` (MSRV) so the install floor has an authoritative source.
+- **`validation.strictness` parsed-but-unused (engine gap).** The `[validation] strictness` config
+  key is deserialized but has no behavioral effect (`crates/jit/src/config.rs:290,296` — "inert").
+  Docs (README + `configuration.md`) now annotate it "(currently inert)". Follow-up candidate:
+  either wire strictness to real behavior or remove the config key.
 - **jit-server / jit serve default ports.** `README.md:55` (3000) and the `3000–3099` auto-select
   range (`crates/jit/src/commands/serve.rs:5`, `cli.rs:418`) are hand-copied from
   `crates/server/src/main.rs:38` and `serve.rs`. No projection surface for default ports.

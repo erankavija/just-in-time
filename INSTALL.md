@@ -89,11 +89,13 @@ docker-compose down
 ### Pre-built Images (GitHub Container Registry)
 
 ```bash
-# Pull latest images
+# The all-in-one image publishes :latest; the component images (-api/-web/-cli)
+# do not — pull them by the rolling :main branch tag, or by a release-version
+# (e.g. :0.2.1) or commit-sha tag.
 docker pull ghcr.io/erankavija/just-in-time:latest         # All-in-one
-docker pull ghcr.io/erankavija/just-in-time-api:latest     # API server only
-docker pull ghcr.io/erankavija/just-in-time-web:latest     # Web UI only
-docker pull ghcr.io/erankavija/just-in-time-cli:latest     # CLI only
+docker pull ghcr.io/erankavija/just-in-time-api:main       # API server only
+docker pull ghcr.io/erankavija/just-in-time-web:main       # Web UI only
+docker pull ghcr.io/erankavija/just-in-time-cli:main       # CLI only
 ```
 
 ### Run Individual Containers
@@ -106,7 +108,7 @@ docker run -d \
   -p 3000:3000 \
   -v jit-data:/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-api:latest
+  ghcr.io/erankavija/just-in-time-api:main
 ```
 
 #### Web UI
@@ -115,7 +117,7 @@ docker run -d \
 docker run -d \
   --name jit-web \
   -p 8080:80 \
-  ghcr.io/erankavija/just-in-time-web:latest
+  ghcr.io/erankavija/just-in-time-web:main
 ```
 
 #### CLI (Interactive)
@@ -125,14 +127,14 @@ docker run -d \
 docker run --rm \
   -v jit-data:/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-cli:latest \
+  ghcr.io/erankavija/just-in-time-cli:main \
   issue list
 
 # Interactive shell
 docker run --rm -it \
   -v $(pwd):/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-cli:latest \
+  ghcr.io/erankavija/just-in-time-cli:main \
   sh
 ```
 
@@ -156,7 +158,7 @@ docker run -d \
 
 ### Prerequisites
 
-- Rust 1.80+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- A recent stable Rust toolchain — CI builds on `stable` (`.github/workflows/ci.yml`); the workspace declares no minimum version (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
 - Node.js 20+ (for MCP server and Web UI; the CI floor, `.github/workflows/ci.yml`)
 - ripgrep (optional, for search: `sudo apt install ripgrep`)
 
@@ -189,7 +191,7 @@ npm test
 
 # Link globally (optional)
 npm link
-jit-mcp-server --version
+which jit-mcp-server   # confirm the linked bin is on PATH
 ```
 
 ### Build Web UI

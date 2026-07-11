@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "1148911a-6b07-4385-ad94-fb756b1c00a1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "2ff2ffa9356adff61b446453112e44a34097a8cc",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T09:43:15.857444297Z",
+  "completed_at": "2026-07-11T09:45:10.539065611Z",
+  "duration_ms": 114681,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nThree blocking documentation defects remain:\n\n- `README.md:233` still presents three apparent `validation.strictness` choices. The source models this as an unvalidated, inert compatibility field.\n- `mcp-server/README.md:221-240` describes every MCP response as a `success`/`data` JSON envelope. Successful calls actually return a text content block containing a summary and compacted data, or `structuredContent` when configured.\n- `INSTALL.md:248-256` states minimum and recommended RAM, disk, distribution-version, and storage-density requirements that have no corresponding declaration or benchmark in the source tree.\n\nThe documented CLI commands and flags checked against the freshly built `target/debug/jit`, `jit --schema`, and `cli.rs` exist. The earlier component-image tag and unsupported MCP version-command defects are fixed.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local types and registries in the scoped documentation are either signalled as this repository’s configuration or clearly presented as customization examples.\n\n## 3. Current behavior only\n\nPass. No authored legacy, migration, or future-state narration describing jit behavior was found in the scoped footprint.\n\n## 4. No hardcoded counts that silently rot\n\nBlocking drift remains at `INSTALL.md:250-255`: the RAM and disk totals, including “~10 MB per 1000 issues,” are hand-maintained operational figures without a benchmark or source-of-truth declaration.\n\nThe MCP concurrency and timeout values are traceable to the implementation and are not volatile product-total counts.\n\n## 5. Links and referenced paths resolve\n\nPass. The scoped link and citation checks report:\n\n- `OK: all links and anchors resolve`\n- `OK: all cited paths and @/ items resolve`\n\nThe concrete README citations `@/invariant/event-log`, `@/rule/label-format`, and `@/gate/code-review` also resolve individually with the freshly built binary.\n\n## 6. Content-standards conformance\n\nPass. The authored diagrams use Mermaid. The box-drawing block in `mcp-server/README.md:141-151` is a permitted directory tree. No applicable plain-text mathematics or heading-depth defect was found.\n\n## Findings\n\n1. **F1 — The inert `validation.strictness` field still appears to have three supported behavioral choices.** `README.md:233` says `\"strict\", \"loose\", or \"permissive\"` even though `crates/jit/src/config.rs:295-298` stores an arbitrary optional string and does not use it to control validation. Remediation: remove the field from the adopter example, or describe it solely as a compatibility field that accepts legacy data, has no behavioral effect, and is superseded by `.jit/rules.toml`; remove the purported choice list.\n\n2. **F2 — The MCP README documents the wrong successful-response shape.** `mcp-server/README.md:221-240` says all responses use `{\"success\":true,\"data\":...}`, but `mcp-server/index.js:274-278` passes successful results to `formatSuccessResult`, which returns summary-plus-data text by default or `structuredContent` in structured mode. Remediation: document the actual MCP `CallToolResult` shapes for both response modes; retain the `success:false` envelope only for error content.\n\n3. **F3 — The installation guide states unsupported system and resource requirements.** `INSTALL.md:248-256` gives distribution floors, minimum/recommended RAM, binary and per-issue disk estimates, and an SSD recommendation without a manifest, CI declaration, benchmark, or other source of truth. Remediation: remove these unsupported numeric requirements and recommendations, or cite a reproducible benchmark/source that establishes each value and identify their tested scope.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking documentation defects remain: misleading strictness choices, an incorrect MCP success-response envelope, and unsupported system-resource requirements.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README.md presents three choices for the inert, unvalidated validation.strictness compatibility field.\",\"file\":\"README.md\",\"line\":233},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The MCP README documents a success/data envelope that successful MCP calls do not return.\",\"file\":\"mcp-server/README.md\",\"line\":221},{\"id\":\"F3\",\"severity\":\"medium\",\"summary\":\"INSTALL.md states system and resource requirements without a source-of-truth declaration or benchmark.\",\"file\":\"INSTALL.md\",\"line\":248}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4749 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f508f-4c0b-76f2-ab43-678140099985\n--------\nuser\n--- 4736 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking documentation defects remain: misleading strictness choices, an incorrect MCP success-response envelope, and unsupported system-resource requirements.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README.md presents three choices for the inert, unvalidated validation.strictness compatibility field.",
+        "file": "README.md",
+        "line": 233
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The MCP README documents a success/data envelope that successful MCP calls do not return.",
+        "file": "mcp-server/README.md",
+        "line": 221
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "summary": "INSTALL.md states system and resource requirements without a source-of-truth declaration or benchmark.",
+        "file": "INSTALL.md",
+        "line": 248
+      }
+    ]
+  }
+}
