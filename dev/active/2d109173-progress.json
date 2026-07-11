@@ -52,8 +52,8 @@
           "short_id": "7c283e95",
           "title": "Reference documentation audit (excluding the CLI command catalog)",
           "classification": "documentation",
-          "status": "rework",
-          "note": "attempt 3 (FINAL): R1 grammar topology + event-log contract (20 variants, issue_id not universal); R2 stale-binary compat (lead refined compat/migration text); R3 worktree-validate.md full re-audit (obsolete worktree info fields + incomplete validate surface) dispatched."
+          "status": "done",
+          "note": "DONE after 3 rework rounds (final attempt). R1: grammar topology incomplete + event-log contract (20 event variants, issue_id NOT universal - document_archived/gate_definition_*/lifecycle_timestamps_backfilled carry none). R2: stale-binary compat overclaim (lead-direct refined compat/migration text on main - do NOT re-checkout storage-format.md from branch). R3: full re-audit of worktree-validate.md (obsolete worktree info fields worktree_root->root_path/is_main->is_main_worktree/main_worktree->common_dir; incomplete validate flag/exit surface; also fixed validate description, worktree list output, recover-vs-validate--fix). All gates pass."
         },
         {
           "id": "b8924a6d",
@@ -98,8 +98,8 @@
           "short_id": "8682e95a",
           "title": "Command-family reference gap-fill",
           "classification": "documentation",
-          "status": "rework",
-          "note": "attempt 1: events section clean; 3 serve behavioral findings (port range is requested..+99 not fixed 3000-3099; --log absolute stays absolute; status taxonomy omits 'error'). Verified vs serve.rs/main.rs. Dispatched."
+          "status": "done",
+          "note": "DONE after 2 rework rounds. Added serve + events reference sections. R1: 3 serve findings (port range requested..+99 not fixed 3000-3099; --log absolute stays absolute; status taxonomy omits 'error'). R2: 2 edge cases (--log daemon-only, --fg leaves output on terminal; error status also covers start failures) + full 6-value status-emission map verified. All gates pass."
         }
       ]
     },
@@ -113,7 +113,7 @@
           "title": "Root and component documentation audit",
           "classification": "documentation",
           "status": "rework",
-          "note": "attempt 1: Node floor (REQ-07) + jit-server port fixed first pass; 4 doc-review findings (component-image :latest not published, jit-mcp-server --version not a real command, validation.strictness inert presented active, unsourced Rust 1.80 MSRV). Verified vs docker.yml/index.js/config.rs/Cargo.toml. Dispatched."
+          "note": "IN REWORK round 2 of 3 (attempt 2). First pass fixed Node floor (REQ-07, 4 instances unified on 20 + ci.yml cite) + jit-server port (README 8080->3000). R1 rework (branch commit b41faf3c, INTEGRATED+checkpointed on main): 4 findings closed - component-image :latest->:main (6 refs), jit-mcp-server --version->which, strictness->'(currently inert)', Rust 1.80->recent stable+CI cite. R2 DISPATCHED (worker branch still at b41faf3c, round-2 fix NOT yet committed): 3 new findings - (F1) mcp-server/README.md:221 fabricated {success,data} envelope: real MCP success = {content:[{type:text,...}]} (index.js:141-155), error path embeds {success:false,error,exit_code,stderr}+isError:true (index.js:222-235); (F2) README.md:233 drop inert strictness choices entirely; (F3) INSTALL.md:248 unsourced system reqs (RAM/disk/OS) - de-fabricate. Mandated exhaustive unsourced-claims sweep. RESUME: nudge/await worker round-2 commit, then bring README.md INSTALL.md mcp-server/README.md + notes via git checkout, eval docs-mechanical --force + doc-review, finalize."
         }
       ]
     },
@@ -145,5 +145,51 @@
     "2b9a80fb": 2,
     "36d5451e": 2
   },
-  "started_at": "2026-07-11T00:00:00Z"
+  "started_at": "2026-07-11T00:00:00Z",
+  "resume_pointer": "Wave 4 in progress: 36d5451e on rework round 2/3. Worker (audit-root-36d5451e, worktree .claude/worktrees/agent-36d5451e) branch at b41faf3c; round-2 fix for 3 findings not yet committed. On resume: verify round-2 commit landed (git -C .claude/worktrees/agent-36d5451e log), re-eval docs-mechanical(--force, footprint='README.md INSTALL.md mcp-server/README.md web/README.md docs/index.md docs/README.md') + doc-review, close prior-findings regression check, finalize 36d5451e -> Wave 4 done. THEN: run the engine-issue interview (below) BEFORE Wave 5, then write the session handoff (owner instruction: handoff after wave 4 completes).",
+  "owner_instructions_this_session": [
+    "Do the session handoff AFTER wave 4 (36d5451e) completes.",
+    "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
+  ],
+  "engine_followup_slate": {
+    "note": "Compiled from all Wave 2-4 audit-notes. 'auto_included' are already within 6d82de03's REQ-01/REQ-02 criteria (file regardless). 'interview_candidates' are NEW engine defects/gaps not clearly in 6d82de03's known list - put these to the owner before filing.",
+    "auto_included_in_6d82de03": [
+      "jit --schema State enum omits 'rejected' (crates/jit/src/schema.rs:463-469 hardcodes 6, real enum has 7 incl Rejected - crates/jit/src/domain/types.rs:28-42).",
+      "jit --schema .flags[].name omits clap visible_alias flag forms (e.g. --add-label cli.rs:986, --title cli.rs:1827) and global --help/--schema/--version.",
+      "jit issue create --description help string describes content-format rather than the description (crates/jit/src/cli.rs).",
+      "Missing projection surfaces recorded by audits: per-command exit-code mappings (only global taxonomy in --schema; codes live in main.rs error_to_exit_code + per-command process::exit); the event-tag catalog + which carry issue_id (no --schema surface; cite types.rs Event enum, 20 variants); storage specifics (ID scheme, event shape, gate-runs layout)."
+    ],
+    "interview_candidates": [
+      {
+        "id": "vestigial-gitattributes",
+        "desc": "gitattributes.rs:60 writes a '.jit/claims.jsonl merge=union' line, but jit never creates .jit/claims.jsonl (claims live at .git/jit/claims.jsonl - claim_coordinator.rs:703 shared_jit=.git/jit). Dead/misplaced merge driver.",
+        "type": "code defect"
+      },
+      {
+        "id": "validation-strictness-inert",
+        "desc": "config validation.strictness is parsed but has no behavioral effect (config.rs:290,296). Surfaced as a doc defect in 3 files. Engine choice: wire it up or remove the key.",
+        "type": "latent/incomplete feature"
+      },
+      {
+        "id": "no-declared-msrv",
+        "desc": "No rust-version in Cargo.toml; CI uses dtolnay/rust-toolchain@stable. Docs asserted an unsourced 'Rust 1.80+'. Decision: declare an MSRV or keep 'stable-only'.",
+        "type": "packaging gap"
+      },
+      {
+        "id": "no-preset-projector",
+        "desc": "Builtin gate presets live in gate_presets/builtin.rs with no markdown projector; directly caused the hardcoded preset-count doc defects. A projector would let docs derive counts/contents.",
+        "type": "missing projection surface"
+      },
+      {
+        "id": "unprojected-config-defaults",
+        "desc": "Various runtime defaults have no projection surface: heartbeat interval, lock-retry timing (json.rs:115 ~5s), temp-cleanup threshold (~1h), claim TTL (600s is already in configuration.md).",
+        "type": "missing projection surface"
+      },
+      {
+        "id": "component-images-no-latest",
+        "desc": "Docker component images (-api/-web/-cli) publish no :latest tag (only the all-in-one does - docker.yml). Docs referenced -api:latest etc (fixed to :main). Whether components SHOULD publish :latest is a release-policy decision - possibly intentional; marginal.",
+        "type": "release-config (possibly intentional)"
+      }
+    ]
+  }
 }
