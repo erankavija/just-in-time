@@ -242,9 +242,10 @@
     {
       "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
       "category": "Non-converging adversarial doc-review (fresh-surface each pass)",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-11T21:00:00+03:00",
-      "summary": "doc-review run ecd0068a (commit 2d053fc5) FAILED with 16 NEW findings, none regressions of the prior 10. Trajectory 28->13->10->16 (count rose). Reviewer samples a different subset of a large surface each 15-26min pass; real drift in core-model/storage-format/custom-gates/cli-commands/software-development/README. Reactive batch-fixing is not converging. rework_counts[2d109173]=1 (one cycle left before MAX). Escalated to invoker to choose comprehensive proactive audit vs continued batch fixing."
+      "resolved_at": "2026-07-11T21:40:00+03:00",
+      "summary": "Invoker chose comprehensive parallel audit. 8 disjoint-footprint agents audited the entire ~15k-line adopter surface against crates/jit/src (using the reviewer to confirm, not discover). All 16 seeds + many beyond-seed defects fixed; committed dadea232. Owner interviewed on 2 flagged items: recipe example namespaces left as-is; internal design-doc provenance stripped from example configs/rulesets. repo-validate + whole-surface docs-mechanical pass. Final confirming doc-review in progress."
     }
   ],
   "rework_counts": {
