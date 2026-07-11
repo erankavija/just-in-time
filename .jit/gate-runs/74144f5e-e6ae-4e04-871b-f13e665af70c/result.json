@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "74144f5e-e6ae-4e04-871b-f13e665af70c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "a70bac75-7669-4b60-a2a3-24efb33ad704",
+  "commit": "d3f1695ad9ca64fadf9f85401eb022ca5a524715",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T07:52:44.481263149Z",
+  "completed_at": "2026-07-11T07:54:57.051401590Z",
+  "duration_ms": 132570,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nBlocking findings:\n\n- `docs/examples/release-checklist/rules.toml:6` says all three conditions “must” hold before a release is done. In the supplied ruleset, only the document rule is enforced. The checklist rule is warn-only, while the QA dependency rule has `enforce = false`; neither blocks completion. Remediation: describe these as reported requirements and explicitly distinguish the enforced document condition, or change the claim to say enforcement requires enabling `enforce = true`.\n\n- `docs/examples/release-checklist/rules.toml:34` calls the dependency rule’s transition result a “non-blocking warning,” but the rule declares `severity = \"error\"` at line 40. The engine preserves that severity even when `enforce = false`; it is a non-blocking error finding. Remediation: replace “non-blocking warning” with “non-blocking error finding,” or change the configured severity to `warn`.\n\nAll documented commands and flags otherwise exist in the current source-built CLI surface. The example-ruleset test suite passes all 60 tests.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. The SDD and research examples identify themselves as example configurations and instruct adopters what to copy. Their `planning`, `breakdown`, `brackets:`, `coverage-preview`, and `plan` values are not presented as defaults emitted by `jit init`.\n\nThe audit notes record the required classification:\n\n- Reference-grade: `sdd`, `research`\n- Illustrative: `bug-repro`, `cross-epic`, `fresh-evidence`, `nyquist`, `release-checklist`\n\n## 3. Current behavior only\n\nPass. The sole legacy-marker match, “no longer trustworthy” in `docs/examples/fresh-evidence/rules.toml:5`, describes evidence aging over time, not a former jit behavior or migration.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims occur in the scoped files. Numbers used for example identifiers, lifecycle explanations, rule ordering, and durations are intrinsic to the examples rather than hand-maintained product totals.\n\n## 5. Links and referenced paths resolve\n\nPass. The scoped mechanical checker reports all links, anchors, cited paths, and item citations resolved. The `bc86f54c` issue reference in the fresh-evidence example also resolves.\n\n## 6. Content-standards conformance\n\nPass. No diagram-shaped ASCII or box-drawing blocks occur. Inline arrows and prose mappings are not diagrams. No plain-text mathematical equations requiring LaTeX were found.\n\n## Findings\n\n1. **F1 — High:** `docs/examples/release-checklist/rules.toml:6` overstates all three methodology conditions as mandatory before completion even though only the document condition is enforced. Rewrite the passage to distinguish reported conditions from blocking enforcement, or direct users to enable enforcement.\n2. **F2 — High:** `docs/examples/release-checklist/rules.toml:34` describes a `severity = \"error\"` result as a warning. Change it to “non-blocking error finding,” or configure the rule with `severity = \"warn\"`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The release-checklist example overstates completion enforcement and mislabels an error-severity finding as a warning.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Release checklist prose says all three conditions must hold before done, but only the document condition is enforced.\",\"file\":\"docs/examples/release-checklist/rules.toml\",\"line\":6},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The dependency rule's error-severity finding is incorrectly described as a warning.\",\"file\":\"docs/examples/release-checklist/rules.toml\",\"line\":34}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2813 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f502a-1f28-7711-aaa8-91c67abc4ba6\n--------\nuser\n--- 2800 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The release-checklist example overstates completion enforcement and mislabels an error-severity finding as a warning.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Release checklist prose says all three conditions must hold before done, but only the document condition is enforced.",
+        "file": "docs/examples/release-checklist/rules.toml",
+        "line": 6
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The dependency rule's error-severity finding is incorrectly described as a warning.",
+        "file": "docs/examples/release-checklist/rules.toml",
+        "line": 34
+      }
+    ]
+  }
+}

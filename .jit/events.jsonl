@@ -6215,3 +6215,7 @@
 {"type":"issue_claimed","id":"37576814-afbb-4dc5-ab07-e1f395c1bf15","issue_id":"4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57","timestamp":"2026-07-11T07:39:26.772625954Z","assignee":"agent:claude"}
 {"type":"issue_state_changed","id":"da5f60aa-ba76-45c3-984b-b0f233719fd1","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:39:26.788671546Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"95691a2a-55a9-4058-ac52-2816a712a952","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:39:26.788915116Z","assignee":"agent:claude"}
+{"type":"issue_updated","id":"4db4fdf2-3a4b-4ec9-a734-c1627034b4d0","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:52:39.912373816Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_passed","id":"59452575-2a80-4347-87c8-a5fbc513d191","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:52:40.023274107Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b01bbb0a-1f1c-441b-a12d-ec450dd54053","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:52:40.334417003Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"ed2fea89-f7c1-46e1-92b0-b9eed34b0f2d","issue_id":"a70bac75-7669-4b60-a2a3-24efb33ad704","timestamp":"2026-07-11T07:54:57.051831841Z","gate_key":"doc-review","updated_by":"auto:executor"}
