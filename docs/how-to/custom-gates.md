@@ -676,7 +676,7 @@ jit gate preset apply minimal abc123 def456 ghi789
 **From query results:**
 ```bash
 # Apply to all issues in an epic
-jit query all --filter "label:epic:auth" | xargs jit gate preset apply rust-tdd
+jit query all --label "epic:auth" | xargs jit gate preset apply rust-tdd
 
 # Apply to all ready issues
 jit query available | xargs jit gate preset apply minimal

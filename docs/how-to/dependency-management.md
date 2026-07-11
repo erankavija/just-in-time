@@ -373,8 +373,8 @@ jit query all --label "epic:auth" --json | process_graph
 **Simplify visualization:**
 ```bash
 # Hide done issues in exports
-jit query all --state backlog,ready,in_progress --json | \
-  jq '.issues[] | .id' | \
+jit query all --json | \
+  jq -r '.issues[] | select(.state == "backlog" or .state == "ready" or .state == "in_progress") | .id' | \
   # Filter graph export to these IDs only
 ```
 
@@ -460,7 +460,7 @@ jit graph roots
 **Use case: Work distribution**
 ```bash
 # Assign root issues to agents first
-jit graph roots --json | jq -r '.[] | .id' | \
+jit graph roots --json | jq -r '.roots[] | .id' | \
   while read issue_id; do
     jit claim acquire $issue_id --agent-id agent:worker-$RANDOM
   done
@@ -493,7 +493,7 @@ jit query blocked --json | jq -r '.issues[].id' > blocked.txt
 
 # 2. For each blocker, count downstream
 for blocker in $(cat blocked.txt); do
-  count=$(jit graph downstream $blocker --json | jq 'length')
+  count=$(jit graph downstream $blocker --json | jq '.dependents | length')
   echo "$count $blocker"
 done | sort -rn
 
@@ -611,7 +611,7 @@ jit graph export --format dot > backup.dot
 
 # Remove all dependencies for an issue
 jit issue show $ISSUE --json | \
-  jq -r '.dependencies[]' | \
+  jq -r '.dependencies[].id' | \
   while read dep; do
     jit dep rm $ISSUE $dep
   done

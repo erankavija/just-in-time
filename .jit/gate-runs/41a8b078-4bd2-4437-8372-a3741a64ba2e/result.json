@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "run_id": "41a8b078-4bd2-4437-8372-a3741a64ba2e",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "b8924a6d-a15a-4880-b5c0-bc0ad4563da4",
+  "commit": "9d6f7300f8cc4108bd63c0e81b205bf70078d088",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:24:34.672685284Z",
+  "completed_at": "2026-07-11T08:26:27.986959824Z",
+  "duration_ms": 113314,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFour residual behavior mismatches remain:\n\n- Shell substitutions capture human-readable creation messages instead of issue IDs.\n- Query output is piped directly into commands requiring IDs.\n- `jit validate --fix` is credited with unsupported repairs.\n- Labels are described as inherently forming a strict hierarchy.\n\n## 2. Adopter surface versus dogfood configuration\n\nThe bug workflow uses the repository-local `type:bug` value as though it ships with `jit init`. It also assumes undeclared `component:` and `severity:` namespaces. The section does not signal or establish the required project configuration.\n\n## 3. Current behavior only\n\nPass. No authored claims using legacy or future-state narration were found in the scoped files.\n\n## 4. No hardcoded counts that silently rot\n\nPass. The digit-bearing occurrences are example output, configurable values, or nonvolatile workflow quantities rather than hand-maintained product totals.\n\n## 5. Links and referenced paths resolve\n\nPass. `./scripts/docs-mechanical.sh docs/how-to/` reports all links, anchors, source paths, and addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nPass. The only box-drawing characters are the declared verbatim CLI-output carve-out in `dependency-management.md`; diagram blocks are Mermaid. No non-LaTeX authored equations were found.\n\n## Findings\n\n1. **F1 — Command substitutions do not capture issue IDs.** At `docs/how-to/dependency-management.md:46-47` and `:161-163`, `$(jit issue create …)` returns `Created issue: <id>` in normal human mode. The resulting variables are passed to `jit dep add`, so the recipes fail. Remediation: add `--quiet` to each creation command, or use `--json | jq -r '.id'`.\n\n2. **F2 — Batch preset pipelines pass human-formatted query output to `xargs`.** At `docs/how-to/custom-gates.md:679` and `:682`, normal query output includes headings, titles, states, priorities, and totals rather than an ID-only stream. Remediation: request JSON and extract IDs, for example `jit query … --json | jq -r '.issues[].id' | xargs jit gate preset apply …`.\n\n3. **F3 — Unsupported `jit validate --fix` repairs are documented.** `docs/how-to/dependency-management.md:227-229` says the command removes references to deleted issues, cleans stale temporary files, and rebuilds a corrupt index. The handler fixes type-hierarchy findings, redundant dependency edges, and pending transitions; it does not perform the three listed operations. Remediation: replace the list with the actual supported fix classes.\n\n4. **F4 — The bug workflow presents custom project configuration as immediately available.** Beginning at `docs/how-to/software-development.md:376`, the recipes use `type:bug` plus `component:` and `severity:` labels without explaining that `bug` is not a shipped type and that the namespaces must be configured. The repository’s `bug` type is explicitly dogfood-local. Remediation: add a prerequisite configuration section defining the type and namespaces, explicitly frame them as example project configuration, or rewrite the recipe using shipped defaults.\n\n5. **F5 — Labels are incorrectly described as having a strict-hierarchy structure.** `docs/how-to/dependency-management.md:40` states that labels have a “Strict hierarchy.” Labels are general metadata; only specifically configured type and label-association rules impose hierarchy-related constraints. Remediation: describe labels as flat/configurable metadata and separately explain optional configured hierarchy associations.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Five documentation defects remain: two broken output-handling recipes, one overstated validate repair claim, one unframed custom configuration workflow, and one incorrect label-structure claim.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Issue-create command substitutions capture human-readable messages instead of IDs.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":46},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Batch preset pipelines pass human-formatted query output to commands requiring issue IDs.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":679},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The guide attributes three unsupported repair operations to jit validate --fix.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":227},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"The bug workflow presents the repo-local bug type and undeclared label namespaces without configuration framing.\",\"file\":\"docs/how-to/software-development.md\",\"line\":376},{\"id\":\"F5\",\"severity\":\"medium\",\"summary\":\"The dependency guide incorrectly describes labels as having a strict-hierarchy structure.\",\"file\":\"docs/how-to/dependency-management.md\",\"line\":40}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4126 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5047-4106-7fc1-ab84-226673a1cabb\n--------\nuser\n--- 4113 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Five documentation defects remain: two broken output-handling recipes, one overstated validate repair claim, one unframed custom configuration workflow, and one incorrect label-structure claim.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Issue-create command substitutions capture human-readable messages instead of IDs.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 46
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Batch preset pipelines pass human-formatted query output to commands requiring issue IDs.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 679
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "The guide attributes three unsupported repair operations to jit validate --fix.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 227
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "The bug workflow presents the repo-local bug type and undeclared label namespaces without configuration framing.",
+        "file": "docs/how-to/software-development.md",
+        "line": 376
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "summary": "The dependency guide incorrectly describes labels as having a strict-hierarchy structure.",
+        "file": "docs/how-to/dependency-management.md",
+        "line": 40
+      }
+    ]
+  }
+}

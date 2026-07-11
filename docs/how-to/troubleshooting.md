@@ -352,7 +352,7 @@ jit status
 
 1. **Check worktree mode:**
    ```bash
-   jit config show worktree.mode
+   jit config get worktree.mode
    ```
    Should be `"auto"` or `"on"`.
 

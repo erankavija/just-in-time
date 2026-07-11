@@ -75,7 +75,7 @@ jit dep add $TASK2 $TASK1
 jit dep add $TASK3 $TASK2
 
 # Check what's ready to start
-jit query available --filter "labels.epic:auth"
+jit query available --label "epic:auth"
 # Only TASK1 shows (others blocked)
 ```
 
@@ -86,10 +86,10 @@ jit query available --filter "labels.epic:auth"
 jit graph deps $EPIC_ID --depth 0
 
 # Check overall epic progress
-jit query all --filter "labels.epic:auth" | grep -E "(ready|in_progress|done)"
+jit query all --label "epic:auth" | grep -E "(ready|in_progress|done)"
 
 # Find what's blocking
-jit query blocked --filter "labels.epic:auth"
+jit query blocked --label "epic:auth"
 ```
 
 ### When to Use Epics vs Standalone Tasks
@@ -109,13 +109,13 @@ jit query blocked --filter "labels.epic:auth"
 
 ```bash
 # All work for auth epic
-jit query all --filter "labels.epic:auth"
+jit query all --label "epic:auth"
 
 # Ready work in auth epic
-jit query available --filter "labels.epic:auth"
+jit query available --label "epic:auth"
 
 # Completed auth tasks
-jit query all --state done --filter "labels.epic:auth"
+jit query all --state done --label "epic:auth"
 ```
 
 ## Implement TDD Workflow with Gates
@@ -293,15 +293,15 @@ jit issue create \
 
 ```bash
 # All v1.0 work
-jit query all --filter "labels.milestone:v1.0"
+jit query all --label "milestone:v1.0"
 
 # v1.0 work by state
-jit query all --state done --filter "labels.milestone:v1.0"
-jit query all --state in_progress --filter "labels.milestone:v1.0"
-jit query available --filter "labels.milestone:v1.0"
+jit query all --state done --label "milestone:v1.0"
+jit query all --state in_progress --label "milestone:v1.0"
+jit query available --label "milestone:v1.0"
 
 # Find blockers
-jit query blocked --filter "labels.milestone:v1.0"
+jit query blocked --label "milestone:v1.0"
 ```
 
 **Step 3: Track release readiness**
@@ -311,7 +311,7 @@ jit query blocked --filter "labels.milestone:v1.0"
 jit status
 
 # Milestone-specific status
-jit query all --filter "labels.milestone:v1.0" --json | \
+jit query all --label "milestone:v1.0" --json | \
   jq '[.issues[] | .state] | group_by(.) | map({state: .[0], count: length})'
 
 # Output:
@@ -329,7 +329,7 @@ jit query all --filter "labels.milestone:v1.0" --json | \
 jit graph export --format mermaid > v1-deps.mmd
 
 # Find issues blocking multiple others
-jit query all --filter "labels.milestone:v1.0" --json | \
+jit query all --label "milestone:v1.0" --full --json | \
   jq -r '.issues[] | select(.dependencies | length > 0) | .id' | \
   while read issue; do
     COUNT=$(jit graph downstream $issue --json | jq '.dependents | length')
@@ -346,8 +346,8 @@ jit issue create --title "Beta Features" --label "milestone:v1.1"
 jit issue create --title "Performance" --label "milestone:v2.0"
 
 # Query by milestone
-jit query all --filter "labels.milestone:v1.0"
-jit query all --filter "labels.milestone:v1.1"
+jit query all --label "milestone:v1.0"
+jit query all --label "milestone:v1.1"
 
 # Cross-milestone dependencies
 jit dep add $V2_ISSUE $V1_ISSUE  # v2.0 depends on v1.0 work
@@ -370,7 +370,7 @@ jit issue create --title "Changelog written" --label "epic:release"
 jit issue create --title "Version bumped" --label "epic:release"
 
 # Track completion
-jit query all --filter "labels.epic:release"
+jit query all --label "epic:release"
 ```
 
 ## Track Bug Fixes
@@ -402,8 +402,8 @@ Actual: Token validation error" \
 
 ```bash
 # Query all bugs by severity
-jit query all --filter "labels.type:bug AND labels.severity:critical"
-jit query all --filter "labels.type:bug AND labels.severity:high"
+jit query all --label "type:bug" --label "severity:critical"
+jit query all --label "type:bug" --label "severity:high"
 
 # Assign to developer
 jit issue assign $BUG_ID agent:frontend-dev
@@ -416,7 +416,7 @@ jit issue assign $BUG_ID agent:frontend-dev
 jit issue update $BUG_ID --label "epic:auth"
 
 # Query all auth-related bugs
-jit query all --filter "labels.type:bug AND labels.epic:auth"
+jit query all --label "type:bug" --label "epic:auth"
 ```
 
 **Step 4: Add regression test gate**
@@ -470,15 +470,15 @@ jit issue create --title "Typo in error message" \
 
 ```bash
 # Unassigned critical bugs
-jit query available --filter "labels.type:bug AND labels.severity:critical"
+jit query available --label "type:bug" --label "severity:critical"
 
 # Stale bugs (in backlog > 7 days)
-jit query all --state backlog --filter "labels.type:bug" --json | \
+jit query all --state backlog --label "type:bug" --full --json | \
   jq -r '.issues[] | select(.created_at < (now - 604800)) | "\(.id) - \(.title)"'
 
 # Bugs by component
-jit query all --filter "labels.type:bug AND labels.component:backend"
-jit query all --filter "labels.type:bug AND labels.component:frontend"
+jit query all --label "type:bug" --label "component:backend"
+jit query all --label "type:bug" --label "component:frontend"
 ```
 
 ## Coordinate Multiple Contributors
