@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "5f5c4d9b-57cd-4e97-bbb1-5ac949a87f35",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "1fad04ab35baae6b2fed1d80e21f04d986e20723",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T12:42:54.156539399Z",
+  "completed_at": "2026-07-11T12:50:26.741798938Z",
+  "duration_ms": 452585,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. Three behavioral claims drift from current implementation. The prior review’s MCP, Node 20, CLI, and routing findings are addressed.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local configuration is framed as an example or explicitly identified as this repository’s registry.\n\n## 3. Current behavior only\n\nPass. No legacy, migration, or future-facing product narration found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims found.\n\n## 5. Links and referenced paths resolve\n\nPass. Scoped repository-relative links, anchors, cited paths, and all three `@/` citations resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams are Mermaid; the MCP box-drawing block is a directory tree. No applicable heading or mathematics defect found.\n\n## Findings\n\n1. **F1 — The individual API-container instructions omit mandatory repository initialization.** [INSTALL.md:111](/home/vkaskivuo/Projects/just-in-time/INSTALL.md:111) mounts a new `jit-data` volume and starts `jit-server`, but the API server rejects an uninitialized data directory. Add a preceding CLI-container `jit init` command for `jit-data`, or require mounting an existing initialized repository.\n\n2. **F2 — The all-in-one container is documented as serving the Web UI, but its image copies assets to nginx’s wrong directory.** [INSTALL.md:152](/home/vkaskivuo/Projects/just-in-time/INSTALL.md:152) promises API and UI together, while `Dockerfile:65` copies `dist` to `/var/www/html` and `docker/nginx.conf:36` serves `/usr/share/nginx/html`. Replace this with the working Compose/separate-container flow, or describe the image as API-only until its image layout is corrected.\n\n3. **F3 — The README overstates gate-stage enforcement.** [README.md:138](/home/vkaskivuo/Projects/just-in-time/README.md:138) and [README.md:160](/home/vkaskivuo/Projects/just-in-time/README.md:160) say gates/prechecks must pass before work starts, but `jit issue update --state in_progress` does not run prechecks; transition guards enforce gates only on `done`. State that prechecks run through `jit issue claim`, and retain the unconditional completion requirement.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking documentation defects remain in Docker startup, all-in-one UI serving, and gate-stage enforcement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"INSTALL.md starts an individual API container on an uninitialized named volume.\",\"file\":\"INSTALL.md\",\"line\":111},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"INSTALL.md claims the all-in-one image serves the Web UI although its nginx root differs from the Dockerfile asset destination.\",\"file\":\"INSTALL.md\",\"line\":152},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"README.md claims prechecks must pass before work starts although direct state updates into in_progress do not run them.\",\"file\":\"README.md\",\"line\":138}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12886 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f5133-c1e7-7221-9dde-7a33c5401b03\n--------\nuser\n--- 12873 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking documentation defects remain in Docker startup, all-in-one UI serving, and gate-stage enforcement.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "INSTALL.md starts an individual API container on an uninitialized named volume.",
+        "file": "INSTALL.md",
+        "line": 111
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "INSTALL.md claims the all-in-one image serves the Web UI although its nginx root differs from the Dockerfile asset destination.",
+        "file": "INSTALL.md",
+        "line": 152
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "README.md claims prechecks must pass before work starts although direct state updates into in_progress do not run them.",
+        "file": "README.md",
+        "line": 138
+      }
+    ]
+  }
+}

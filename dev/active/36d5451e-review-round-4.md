@@ -6,7 +6,7 @@
 
 - `repo-validate`: passed (`1c62b901-66af-4035-9223-140af073d879`).
 - `docs-mechanical`: passed with the declared root/component footprint (`b45ee673-7b03-4029-bdb9-0e6dc65a2107`).
-- `doc-review`: failed in two overlapping recorded runs: `97b1a203-c4be-401b-a755-7e403b6d23c0` (seven findings) and `d525b0c2-75f4-4088-890e-02862407b372` (ten findings).
+- `doc-review`: failed in two overlapping recorded runs: `97b1a203-c4be-401a-b755-7e403b6d23c0` (seven findings) and `d525b0c2-75f4-4088-890e-02862407b372` (ten findings).
 
 ## Prior-findings regression table (Tier 1.5)
 

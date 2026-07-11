@@ -14,20 +14,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T12:21:30.627087697Z"
-    },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T12:21:41.887668955Z"
+      "updated_at": "2026-07-11T12:42:46.203710876Z"
     },
     "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T12:22:52.527811783Z"
+      "updated_at": "2026-07-11T12:42:54.156539399Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T12:42:38.172759596Z"
     }
   },
   "context": {},
@@ -52,6 +52,13 @@
       "label": "Lead review — round 4",
       "doc_type": "analysis",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/36d5451e-review-round-5.md",
+      "commit": null,
+      "label": "Lead review — round 5",
+      "doc_type": "analysis",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -66,7 +73,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:21:17.661717023Z",
-  "updated_at": "2026-07-11T12:34:01.127581163Z",
+  "updated_at": "2026-07-11T12:51:14.356211662Z",
   "first_ready_at": "2026-07-10T20:21:17.661717253Z",
   "claimed_at": "2026-07-11T12:13:18.649711373Z"
 }
