@@ -9,9 +9,33 @@
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
   "gates_required": [
-    "repo-validate"
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373733096Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373813626Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373786686Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373839796Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,6 +45,6 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.555687123Z",
-  "updated_at": "2026-07-11T13:41:02.488553871Z",
+  "updated_at": "2026-07-11T19:47:55.374105706Z",
   "first_ready_at": "2026-07-11T13:35:35.555687363Z"
 }

@@ -16,7 +16,7 @@ pass_context = true
 prompt_file = "./scripts/breakdown-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = "codex exec"
+REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
 
 [gates.reserved]
 
@@ -98,7 +98,7 @@ pass_context = true
 prompt_file = "./scripts/code-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = "codex exec"
+REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
 
 [gates.reserved]
 
@@ -140,7 +140,7 @@ pass_context = true
 prompt_file = "./scripts/doc-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = "codex exec"
+REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
 
 [gates.reserved]
 
@@ -262,7 +262,7 @@ pass_context = true
 prompt_file = "./scripts/plan-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = "codex exec"
+REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
 
 [gates.reserved]
 

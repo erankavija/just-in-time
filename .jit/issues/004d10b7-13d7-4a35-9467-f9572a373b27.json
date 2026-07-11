@@ -18,9 +18,22 @@
     "6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45"
   ],
   "gates_required": [
-    "repo-validate"
+    "repo-validate",
+    "doc-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.425951474Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.425906804Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -29,6 +42,6 @@
     "type:epic"
   ],
   "created_at": "2026-07-11T13:38:53.076392475Z",
-  "updated_at": "2026-07-11T13:39:19.353655654Z",
+  "updated_at": "2026-07-11T19:47:55.425974394Z",
   "first_ready_at": "2026-07-11T13:38:53.076398555Z"
 }
