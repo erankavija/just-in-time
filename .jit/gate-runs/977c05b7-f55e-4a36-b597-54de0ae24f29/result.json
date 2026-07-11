@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "977c05b7-f55e-4a36-b597-54de0ae24f29",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7c283e95-0fe9-4c3c-8e4e-aa9be88fda7c",
+  "commit": "8e12e4121eeb78767a8bd0ba47e864964ad499be",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:48:40.301989371Z",
+  "completed_at": "2026-07-11T08:50:19.477224449Z",
+  "duration_ms": 99175,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nTwo blocking findings remain:\n\n- `docs/reference/worktree-validate.md:59-76` documents obsolete `jit worktree info` output. The current human output uses `Common dir`, not `Main`; JSON emits `root_path`, `is_main_worktree`, and `common_dir`, not `worktree_root`, `is_main`, and `main_worktree`. Remediation: replace both examples with the fields rendered by `Commands::Worktree` in `crates/jit/src/main.rs`.\n\n- `docs/reference/worktree-validate.md:156-179` presents the `jit validate` reference as `jit validate [OPTIONS]` and omits the positional issue ID plus the current `--explain` and `--scope <ID>` modes. Its exit-code table also omits scoped validation’s exit code 4. Remediation: change the synopsis to `jit validate [OPTIONS] [ID]`, document both flags and their incompatibilities, and add exit code 4 for enforcing-rule failures under `--scope`.\n\nThe latest prior-review findings are resolved: lifecycle recovery is conditional on a corresponding event, the creation-time auto-promotion exception is explicit, and compatibility is now expressed as present storage rules.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-specific types, namespaces, rules, gates, templates, and item kinds are identified as configurable examples or this repository’s projected configuration.\n\n## 3. Current behavior only\n\nPass. No remaining legacy, migration-transition, or roadmap narration describes jit’s behavior. The lifecycle compatibility section directly states the current serialization contract.\n\n## 4. No hardcoded counts that silently rot\n\nPass. Numeric values in scope are configuration defaults, structural examples, or illustrative output rather than hand-maintained volatile product totals.\n\n## 5. Links and referenced paths\n\nPass. The scoped mechanical checker confirms that all Markdown links, heading anchors, repository paths, and addressable-item citations resolve. Registry projections are fresh.\n\n## 6. Content-standards conformance\n\nPass. Authored diagrams use Mermaid. The box-drawing blocks in `storage-format.md` are permitted directory trees, and mathematical notation uses LaTeX.\n\n## Findings\n\n1. **F1 — High:** `worktree-validate.md` documents obsolete human and JSON fields for `jit worktree info`. Replace the examples with the current `root_path`, `is_main_worktree`, and `common_dir` surface.\n2. **F2 — High:** `worktree-validate.md` omits the positional issue ID, `--explain`, `--scope`, their constraints, and scoped validation’s exit code 4. Update the synopsis, options, mode descriptions, and exit taxonomy.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior storage findings are resolved, but the worktree/validate reference still contains obsolete worktree output fields and an incomplete validate surface.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Worktree info examples use obsolete human and JSON field names.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":59},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Validate reference omits the positional issue ID, --explain, --scope, mode constraints, and scoped exit code 4.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":156}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5544 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f505d-500f-7ca3-ae0c-6386a27880c3\n--------\nuser\n--- 5531 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior storage findings are resolved, but the worktree/validate reference still contains obsolete worktree output fields and an incomplete validate surface.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Worktree info examples use obsolete human and JSON field names.",
+        "file": "docs/reference/worktree-validate.md",
+        "line": 59
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Validate reference omits the positional issue ID, --explain, --scope, mode constraints, and scoped exit code 4.",
+        "file": "docs/reference/worktree-validate.md",
+        "line": 156
+      }
+    ]
+  }
+}

@@ -79,6 +79,25 @@ matched source, not completeness or the universal-field claim):
   (`Event` enum in `types.rs`) plus all 20 tags, grouped issue-scoped (15) vs
   repo/registry-scoped (5).
 
+### 5. Overstated stale-binary field preservation in `storage-format.md` (REQ-01 — rework, attempt 2)
+
+The "Compatibility" paragraph (`:120`) claimed a stale binary "neither drops nor
+misreads" the additive lifecycle-timestamp fields — the "neither drops" half is
+false. Verified: the `Issue` struct (`crates/jit/src/domain/types.rs:482`) has an
+explicit field per key with `#[serde(default, skip_serializing_if=...)]` and NO
+unknown-field capture (no `#[serde(flatten)]` catch-all, no `deny_unknown_fields`
+anywhere in the file). Without `deny_unknown_fields` an old binary READS a newer
+file without error (unknown keys ignored) and does not misread existing data —
+which is the real reason `schema_version` stays `2` — but unknown keys are not
+captured, so a stale-binary rewrite (any mutation → full save) DROPS them.
+Reworded to: read-safe (justifies no schema bump) but not write-preserving (stale
+rewrite drops unknown keys); a current binary round-trips them and the
+`jit migrate lifecycle-timestamps` backfill can reconstruct them from the event
+log. Sweep: this was the only stale-binary/round-trip field-preservation claim in
+the footprint (configuration.md:457 unknown-key exit, rules-and-gates.md:14
+projection byte-preservation, item-addresses.md:48 address round-trip are all
+unrelated and correct).
+
 ## Missing-projection-surface facts (REQ-06 — recorded for follow-up filing)
 
 - **Per-command exit-code mappings have no projection surface.** `jit --schema`

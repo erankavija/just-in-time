@@ -118,13 +118,27 @@ for pre-existing issues from the event log with
 issues whose event log carries no relevant transition stay unset.
 
 **Compatibility.** These three fields (like `content_format` before them) are
-**additive and optional**: the issue record does not use serde
-`deny_unknown_fields`, so an older `jit` binary reading a newer repository
-ignores keys it does not know, and a newer binary reads an older issue file by
-defaulting the missing fields to unset. Because a stale binary neither drops nor
-misreads them, adding these fields does **not** bump the repository
-`schema_version` (still `2`); the [format-version guard](#versioning) is
-reserved for changes that would make a stale binary misinterpret existing data.
+**additive and optional**, and adding them keeps the repository at
+`schema_version` 2. Two properties of the storage contract govern this:
+
+- **Unknown keys are ignored on read.** The issue record does not use serde
+  `deny_unknown_fields`, so a reader that lacks these fields parses the record
+  without error, and a reader that has them treats a record omitting them as
+  unset. No reader misinterprets the data it parses, so additive optional fields
+  do not bump `schema_version`; the [format-version guard](#versioning) is
+  reserved for changes that would make a reader misread existing data.
+- **Unknown keys are not preserved on write.** The record captures no unknown
+  keys — the struct declares an explicit field per key with no catch-all map — so
+  a writer that lacks these fields does not round-trip them: any mutation triggers
+  a full save that drops the keys it never parsed. A writer that has the fields
+  always round-trips them.
+
+If a writer lacking these fields drops a lifecycle timestamp,
+[`jit migrate lifecycle-timestamps`](cli-commands.md#jit-migrate-lifecycle-timestamps)
+can reconstruct it **only when the event log records the corresponding
+transition**. A timestamp with no logged transition — notably `first_ready_at`
+for a dependency-free issue auto-promoted to `ready` at creation, which emits no
+state-change event — cannot be recovered and stays unset (as above).
 
 ## Configuration File
 
