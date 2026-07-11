@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "5cbd5523-0e1b-4323-963a-02e7fae1853e",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "b8924a6d-a15a-4880-b5c0-bc0ad4563da4",
+  "commit": "267f62dbbaa54427805f72fb226e738c7531dd2c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T08:53:22.393971272Z",
+  "completed_at": "2026-07-11T08:53:57.258126254Z",
+  "duration_ms": 34864,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nPass. The scoped CLI, JSON-envelope, validation, dependency, configuration, and workflow claims match the current source. All five findings from the previous review have been resolved.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. The bug workflow now clearly identifies `bug` and `severity:` as project-defined configuration rather than shipped defaults.\n\n## 3. Current behavior only\n\nPass. No legacy, migration, or future-state narration about jit remains in `docs/how-to/`.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile hand-maintained product totals were found.\n\n## 5. Links and referenced paths resolve\n\nPass. `./scripts/docs-mechanical.sh docs/how-to/` confirms all links, anchors, cited paths, projections, and addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid. The box-drawing characters in `dependency-management.md` are verbatim CLI output and fall under the stated carve-out. No plain-text mathematics or other blocking standards violations were found.\n\n## Findings\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped docs/how-to documentation matches the current shipped surface, and all five findings from the previous review are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped docs/how-to documentation matches the current shipped surface, and all five findings from the previous review are resolved.",
+    "findings": []
+  }
+}

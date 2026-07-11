@@ -375,6 +375,14 @@ jit query all --label "epic:release"
 
 ## Track Bug Fixes
 
+> This recipe uses a `bug` issue type and a `severity:` label namespace. Neither is
+> a shipped default — `jit init` scaffolds the `milestone`/`epic`/`story`/`task`
+> hierarchy and a base namespace registry (`type`, `component`, `priority`, `team`,
+> `milestone`, `resolution`, `enforces`). To use them, declare the `bug` type in
+> `[type_hierarchy]` and the `severity` namespace in the namespace registry of your
+> `.jit/config.toml` first. `component:` and `epic:`/`milestone:` below are shipped
+> defaults.
+
 ### Recipe: Bug Workflow
 
 **Step 1: Report the bug**

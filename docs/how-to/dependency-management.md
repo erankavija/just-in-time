@@ -37,14 +37,14 @@ Both can flow in the same direction, but serve different purposes:
 | **Semantics** | "Blocks until terminal" | "Belongs to group" |
 | **Enforces** | Work order (workflow) | Organization (categorization) |
 | **Dynamic** | Affects state transitions | Static metadata |
-| **Structure** | Arbitrary DAG | Strict hierarchy |
+| **Structure** | Arbitrary DAG | Flat `namespace:value` pairs |
 | **Query use** | Find blocked/ready work | Filter by scope |
 
 **Example - Same direction, different meanings:**
 ```bash
 # Create tasks and epic
-TASK=$(jit issue create --title "Implement login" --label "epic:auth")
-EPIC=$(jit issue create --title "Auth system" --label "milestone:v1.0")
+TASK=$(jit issue create --title "Implement login" --label "epic:auth" --json | jq -r '.id')
+EPIC=$(jit issue create --title "Auth system" --label "milestone:v1.0" --json | jq -r '.id')
 
 # Label: Task belongs to auth epic
 #   → Used for grouping and reporting
@@ -66,7 +66,7 @@ jit dep add $EPIC $TASK
 - Organizing related work into groups (epic, milestone, component)
 - Filtering issues by category or domain
 - Reporting progress within a scope
-- Creating hierarchical structure for navigation
+- Navigating work by group and scope (the type hierarchy and DAG define hierarchy, not the labels)
 
 ### Universal Dependency Examples
 
@@ -158,9 +158,9 @@ JIT validates dependencies on every add operation:
 
 ```bash
 # Create tasks
-TASK_A=$(jit issue create --title "Task A")
-TASK_B=$(jit issue create --title "Task B")
-TASK_C=$(jit issue create --title "Task C")
+TASK_A=$(jit issue create --title "Task A" --json | jq -r '.id')
+TASK_B=$(jit issue create --title "Task B" --json | jq -r '.id')
+TASK_C=$(jit issue create --title "Task C" --json | jq -r '.id')
 
 # Build chain: A → B → C
 jit dep add $TASK_A $TASK_B  # ✓ OK
@@ -223,10 +223,13 @@ jit validate
 # Some validators can auto-fix
 jit validate --fix
 
-# Example fixes:
-# - Remove references to deleted issues
-# - Clean up stale temporary files
-# - Rebuild index if corrupted
+# What --fix applies:
+# - Replaces an unknown/deprecated type label with its suggested valid type
+# - Drops redundant (transitively-implied) dependency edges
+# - Advances a pending state transition that is now unblocked
+#
+# Stale temp files, lock files, and a rebuildable index are NOT --fix's job;
+# run `jit recover` for those.
 ```
 
 ### Common Cycle Patterns and Solutions

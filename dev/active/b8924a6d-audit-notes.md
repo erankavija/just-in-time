@@ -89,6 +89,55 @@ cite their mechanism. Recorded judgment calls:
   troubleshooting.md:155,174) — defaults 2/agent, 10/repo, marked "(configurable)",
   match `hierarchy_templates.rs:269-270`. Stable defaults; no config-default projector.
 
+## Rework — doc-review attempt 1 (5 findings, all fixed)
+
+Mechanical checks don't reach these; the scoped `doc-review` gate found them. Each
+class swept footprint-wide.
+
+- **F1 (high) — ID capture from command substitution without `--json`.**
+  `X=$(jit issue create …)` captures the human "Created issue: …" line, not the UUID.
+  `jit issue create --json` puts the id at top-level `.id` (verified). Fixed
+  `dependency-management.md:46-47,161-163` → `… --json | jq -r '.id'`. Sweep: the
+  `software-development.md` captures (`:17,33,45,57,172,383`) already used
+  `--json | jq -r '.id'`; `graph`/`status` captures already `--json`. jq is already
+  used throughout both edited guides, so no new prerequisite is introduced.
+
+- **F2 (high) — human query output piped into ID-consuming commands.**
+  `custom-gates.md:679,682` piped `jit query …` (human format) into
+  `xargs jit gate preset apply`. Fixed to `--json | jq -r '.issues[].id' | xargs …`.
+  Sweep: these were the only two `query|xargs` pipelines; the `graph roots`/`query`
+  pipelines in `dependency-management.md`/`software-development.md` already use
+  `--json`+jq over the correct collection key.
+
+- **F3 (high) — `validate --fix` over-credited.** Verified against
+  `commands/validate.rs:57-92` + `domain/type_taxonomy.rs:664` (`generate_fixes`):
+  `--fix` applies exactly (1) type-label replacement (`ReplaceType`), (2) transitive
+  dependency-edge reduction, (3) pending-state-transition advancement. The doc's
+  "remove refs to deleted issues / clean temp files / rebuild index" are NOT `--fix`
+  — temp/lock/index recovery is `jit recover`. Rewrote `dependency-management.md:226`
+  list to the real behavior and attributed cleanup to `recover`. Sweep:
+  `troubleshooting.md` and `custom-gates.md` `--fix` mentions don't enumerate false
+  fixes (they show `--fix` / `--fix --dry-run` without an inflated capability list).
+
+- **F4 (high) — repo-local `bug` type + `severity:` namespace unframed.**
+  `jit init` ships `milestone/epic/story/task` types and a base namespace registry
+  (`type,component,priority,team,milestone,resolution,enforces` —
+  `hierarchy_templates.rs:136-166`); `bug` is a repo-local dogfood type and
+  `severity:` is non-default. Added a framing admonition to
+  `software-development.md` "Track Bug Fixes" signalling them as project-declared
+  config (and noting `component:`/`epic:`/`milestone:` ARE shipped). Sweep:
+  `adopt-planning-bracket.md` (planning/breakdown/brackets:) is the adoption guide
+  that explicitly declares them — framed; `validation-rules.md` `type:bug`/`satisfies:`
+  are inside `docs/examples/` content explicitly marked "EXAMPLES, not active" —
+  framed. No other unframed repo-local type/namespace.
+
+- **F5 (medium) — labels mischaracterized as a hierarchy.**
+  `dependency-management.md:40` "Structure … Strict hierarchy" → "Flat
+  `namespace:value` pairs" (`@/inv/label-format`). Also softened the adjacent
+  "Creating hierarchical structure for navigation" bullet (:69) to state the type
+  hierarchy and DAG define hierarchy, not the labels. Sweep: no other
+  label-as-hierarchy prose in the footprint.
+
 ## Mechanical bar — clean
 
 `./scripts/docs-mechanical.sh docs/how-to/` → M2/M3/M5 all OK, exit 0.
