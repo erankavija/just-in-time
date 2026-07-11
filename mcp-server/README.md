@@ -319,9 +319,9 @@ npm install
 
 ### Node version issues
 
-Requires Node.js v18+ (the repository builds on Node.js 20):
+Requires Node.js 20+, matching the CI floor (`.github/workflows/ci.yml`):
 ```bash
-node --version  # Should be v18 or later
+node --version  # Should be v20 or later
 ```
 
 ## Architecture

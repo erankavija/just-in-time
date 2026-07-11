@@ -157,7 +157,7 @@ docker run -d \
 ### Prerequisites
 
 - Rust 1.80+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-- Node.js 20+ (for MCP server and Web UI)
+- Node.js 20+ (for MCP server and Web UI; the CI floor, `.github/workflows/ci.yml`)
 - ripgrep (optional, for search: `sudo apt install ripgrep`)
 
 ### Build Rust Components
@@ -258,7 +258,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 - **Git**: Core issue tracking is Git-optional, but advisory leases (`jit claim`) and worktree coordination need a Git repository with a resolvable `HEAD` (`apt install git`)
 - **Docker**: For containerized deployment (`apt install docker.io docker-compose`)
-- **Node.js** (v18+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`)
+- **Node.js** (20+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`); the CI floor is Node 20 (`.github/workflows/ci.yml`)
 
 ---
 
