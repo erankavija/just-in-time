@@ -1,0 +1,49 @@
+{
+  "epic_id": "004d10b7-13d7-4a35-9467-f9572a373b27",
+  "epic_short_id": "004d10b7",
+  "epic_title": "Documentation contract follow-ups",
+  "current_wave": 1,
+  "wave_rationale": "All 10 children depend only on the done audit record 6d82de03 (no inter-sibling deps). Waves are conflict-serialization sub-waves: within each wave, no two issues touch the same source file, so parallel worktrees integrate cleanly.",
+  "decisions": {
+    "afbbf6c3": "Human chose: IMPLEMENT strictness behavior as an ENFORCEMENT MODULATOR. strict = any violation (warning or error) blocks transitions; loose = current behavior unchanged (only enforced/error rules block); permissive = nothing blocks, all violations report-only. Severity + enforce flags unchanged; strictness is a global gate multiplier.",
+    "e86b32d4": "MSRV numeric value 1.97 already set in workspace Cargo.toml (commit 04668aa8). Remaining: CI enforcement (still @stable) + docs derivation. No open decision."
+  },
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "623f3163-776e-4e1c-8d98-a8c8f13d2566", "short_id": "623f3163", "title": "Complete the generated CLI schema contract", "classification": "implementation", "status": "dispatched", "files": ["schema.rs", "domain/types.rs", "cli.rs"], "gates": ["cargo-ci", "code-review", "mcp-ci"]},
+        {"id": "afbbf6c3-9f09-457a-98c5-d3fb97f8a296", "short_id": "afbbf6c3", "title": "Resolve the inert validation strictness contract", "classification": "implementation", "status": "dispatched", "files": ["config.rs", ".jit/config.toml", "validation/", "docs/reference/configuration.md"], "gates": ["cargo-ci", "code-review", "doc-review"]},
+        {"id": "e86b32d4-860f-42b0-991d-4e944ce62f1f", "short_id": "e86b32d4", "title": "Declare and enforce the supported Rust MSRV", "classification": "implementation", "status": "dispatched", "files": ["Cargo.toml", ".github/workflows/ci.yml", "docs"], "gates": ["cargo-ci", "code-review", "doc-review"]},
+        {"id": "7a60f987-fb74-4106-b8a2-6996a7e7e65e", "short_id": "7a60f987", "title": "Remove the stale claims merge-driver entry", "classification": "implementation", "status": "dispatched", "files": ["storage/gitattributes.rs", "storage/worktree_paths.rs", "storage/claim_coordinator.rs"], "gates": ["cargo-ci", "code-review"]}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8", "short_id": "ed049e1d", "title": "Project runtime coordination and recovery defaults", "classification": "implementation", "status": "pending", "files": ["agent_config.rs", "storage/json.rs", "storage/lock.rs", "commands/claim.rs", "cli.rs", "docs/reference/configuration.md"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"]},
+        {"id": "3ac07340-8901-404a-ac66-a98658bf95c4", "short_id": "3ac07340", "title": "Project command-specific exit-code mappings", "classification": "implementation", "status": "pending", "files": ["schema.rs", "main.rs", "output_macros.rs", "docs"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"]}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a", "short_id": "2c66e9f7", "title": "Project event tags and issue association semantics", "classification": "implementation", "status": "pending", "files": ["domain/types.rs", "storage/json.rs", "docs"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"]},
+        {"id": "6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45", "short_id": "6ad894cb", "title": "Correct issue-create description help text", "classification": "implementation", "status": "pending", "files": ["cli.rs"], "gates": ["cargo-ci", "code-review"]}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "562e977c-98d1-457b-a59c-4a4e7323e762", "short_id": "562e977c", "title": "Project authoritative storage-layout specifics", "classification": "implementation", "status": "pending", "files": ["domain/types.rs", "storage/json.rs", "docs"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"], "note": "REQ-02 links to event contract from 2c66e9f7 (wave 3) rather than copying tag catalog — natural ordering satisfied."},
+        {"id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752", "short_id": "9e0abec5", "title": "Add a projector for built-in gate presets", "classification": "implementation", "status": "pending", "files": ["gate_presets/builtin.rs", "gate_presets/manager.rs", "commands/invariant.rs", "commands/reference.rs", "cli.rs", "docs"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"]}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [
+    {"issue": "afbbf6c3", "category": "architectural-decision", "resolved": true, "resolution": "human selected implement-strictness with enforcement-modulator semantics (see decisions)"}
+  ],
+  "rework_counts": {},
+  "started_at": "2026-07-12T00:00:00Z"
+}

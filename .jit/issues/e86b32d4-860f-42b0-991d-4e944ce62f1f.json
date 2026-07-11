@@ -2,9 +2,9 @@
   "id": "e86b32d4-860f-42b0-991d-4e944ce62f1f",
   "title": "Declare and enforce the supported Rust MSRV",
   "description": "The workspace has no declared or tested Rust support policy: manifests omit `rust-version` and CI follows moving `stable`.\n\nSource: `Cargo.toml:1-25`; `crates/jit/Cargo.toml:1-59`; `.github/workflows/ci.yml:43-46`; `dev/active/36d5451e-audit-notes.md:66-79,126-134`.\n\n## Success Criteria\n\n- [hard] REQ-01: The project declares one authoritative Rust support policy: a numeric MSRV or an explicitly enforced stable-only policy.\n- [hard] REQ-02: Cargo metadata and CI enforce the selected policy.\n- [hard] REQ-03: Installation and development documentation derives its Rust requirement from that policy.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
@@ -19,15 +19,15 @@
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.396193332Z"
     },
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.396220442Z"
-    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.396138082Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.396220442Z"
     }
   },
   "context": {},
@@ -39,6 +39,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.555196423Z",
-  "updated_at": "2026-07-11T19:47:55.396570482Z",
-  "first_ready_at": "2026-07-11T13:35:35.555196673Z"
+  "updated_at": "2026-07-11T21:18:09.133422492Z",
+  "first_ready_at": "2026-07-11T13:35:35.555196673Z",
+  "claimed_at": "2026-07-11T21:18:09.133422322Z"
 }
