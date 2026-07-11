@@ -44,10 +44,16 @@ npm run test:watch   # Run Vitest in watch mode
 
 ```bash
 npm install
-npm run dev
+npm run build
+cd ..
+jit-server --data-dir .jit --web-dir web/dist
 ```
 
-Run `jit-server` against the repository you want to inspect so the UI has an API to call. For a full walkthrough, including building `dist/` and serving it behind a static file server or `jit-server`, see the [deployment how-to guide](../docs/how-to/deployment.md).
+Open `http://localhost:3000`. This makes the UI and its `/api` requests same-origin.
+
+`npm run dev` remains useful for frontend asset work, but it starts Vite on a separate origin
+and this repository's Vite configuration has no `/api` proxy. It therefore does not connect to a
+separately started `jit-server`; configure a reverse proxy for `/api` if you need that workflow.
 
 ## License
 

@@ -52,7 +52,7 @@ cargo install --path crates/jit
 ```
 
 **Optional components:**
-- `jit-server`: Web UI server (visualization at http://localhost:3000)
+- `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; see [Web UI installation](INSTALL.md#build-web-ui).
 - **MCP Server**: Model Context Protocol server for AI agents (see [mcp-server/](mcp-server/))
 
 See [INSTALL.md](INSTALL.md) for all installation options.
@@ -185,7 +185,7 @@ Preserve context and decisions alongside issues.
 jit doc add <issue> design.md --label "Design Document"
 jit doc list <issue>                          # discover linked context
 jit doc check-links --scope issue:<issue>     # validate references
-jit doc archive design.md --type features     # safe archival with assets
+jit doc archive <managed-document> --type <configured-category>  # safe archival with assets
 ```
 
 Agents discover context from previous work, understand design decisions, and maintain institutional knowledge without external systems. See the [Document Commands Reference](docs/reference/cli-commands.md#document-commands).
@@ -233,9 +233,9 @@ strategic_types = ["milestone", "epic"]
 
 See the [Configuration Reference](docs/reference/configuration.md) and [Example Config](docs/reference/example-config.toml).
 
-## Project Status
+## Compatibility
 
-JIT is pre-1.0 (`0.2.x`) and under active development. The core concepts and architecture are stable; the CLI surface and on-disk format may change between releases. The repository format carries a version marker, and `jit` refuses to operate on a repository written by a newer binary rather than misreading it.
+Each repository records its format version in `.jit/index.json`; `jit` refuses an index written with a newer format version rather than misreading it ([storage source](crates/jit/src/storage/json.rs)). Run `jit version` to report the installed CLI version.
 
 ## License
 

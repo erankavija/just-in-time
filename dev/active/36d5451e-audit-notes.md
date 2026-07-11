@@ -132,3 +132,40 @@ this task's diff.
 | `jit-server` / `jit serve` default ports | Valid missing-projection fact | File a Group-C follow-up only if the project wants a projection; current docs cite source. |
 | MCP default timeout and concurrency limit | Valid missing-projection fact | File a Group-C follow-up only if the project wants a projection; current docs cite source. |
 | Former system-resource figures | Not a deferred factual gap | Removed as unsupported; do not file a follow-up unless a reproducible benchmark is deliberately added. |
+
+## Post-round-4 resolution — both recorded doc-review runs
+
+The first requested result path has a transposed UUID segment; the retained record is
+`.jit/gate-runs/97b1a203-c4be-401a-b755-7e403b6d23c0/result.json`. The second record is
+`.jit/gate-runs/d525b0c2-75f4-4088-890e-02862407b372/result.json`. The duplicate findings
+below remain individual resolution rows so both reviews are accounted for.
+
+| Review finding | Resolution | Source-backed evidence |
+|---|---|---|
+| `97…/F1` — root `jit-server` overstatement | `README.md` now calls it the REST API server and limits UI serving to embedded assets or `--web-dir`. | `crates/server/src/main.rs` chooses `--web-dir`, then embedded assets, then API-only. |
+| `97…/F2` — invalid archive example | Replaced the unmanaged path and output-directory value with generic `<managed-document>` and `<configured-category>` placeholders. | `jit doc archive --help` requires `PATH` and a configured `--type`; `.jit/config.toml` maps category keys such as `design`. |
+| `97…/F3` — future-facing status prose | Replaced the release-series/status paragraph with present format-compatibility behavior and `jit version`. | `crates/jit/src/storage/json.rs` stores `index.json` format versions and rejects newer ones. |
+| `97…/F4` — every-command MCP claim | States schema leaf-command generation and that the advertised list is a subset of generated tools. | `mcp-server/lib/tool-generator.js` recurses through `subcommands` and creates tools only in the leaf branch. |
+| `97…/F5` — permanent synchronization claim | States schema loading happens once at startup and requires restart after a CLI update. | `mcp-server/lib/schema-loader.js` invokes `jit --schema`; `mcp-server/index.js` caches generated tools. |
+| `97…/F6` — shell execution claim | States direct Node `execFile` launch and inherited MCP-host environment. | `mcp-server/lib/schema-loader.js` and `lib/cli-executor.js` use `execFileAsync('jit', ...)`. |
+| `97…/F7` — wrong MCP version source | Documents the version loaded from `jit --schema`, not `package.json`. | `mcp-server/index.js` constructs and logs with `jitSchema.version`. |
+| `d525…/F1` — MCP test PATH | The source-build recipe exports `target/release` before `npm test`. | `mcp-server/test-unit.js` invokes `jit --schema`. |
+| `d525…/F2` — MCP startup prerequisite | Installation now requires built or installed `jit` on `PATH` before `node index.js`. | `mcp-server/lib/schema-loader.js` fails when `jit --schema` cannot be run. |
+| `d525…/F3` — obsolete Copilot configuration | Uses `copilot mcp add`, `copilot mcp list`, and names `~/.copilot/mcp-config.json` with an official GitHub Docs link. | GitHub’s current Copilot CLI MCP guide (checked 2026-07-11) documents that command workflow and path. |
+| `d525…/F4` — wrong MCP version source | Same resolved version statement as `97…/F7`. | `mcp-server/index.js` uses `jitSchema.version`. |
+| `d525…/F5` — static/Vite web serving | Replaces arbitrary static/Vite serving advice with `jit-server --web-dir web/dist`; Vite is explicitly API-unproxied. | `web/src/api/client.ts` calls same-origin `/api`; `web/vite.config.ts` has no proxy; `crates/server/src/main.rs` serves `--web-dir`. |
+| `d525…/F6` — Web README local workflow | Uses the same-origin built-assets workflow and says a reverse proxy is needed for separate Vite/API origins. | `web/src/api/client.ts`, `web/vite.config.ts`, and `crates/server/src/main.rs`. |
+| `d525…/F7` — root `jit-server` overstatement | Same resolved qualification as `97…/F1`. | `crates/server/src/main.rs`. |
+| `d525…/F8` — Web container API hostname | Individual-container instructions create a user-defined network and give the API the `api` alias. | `docker/nginx.conf` proxies `/api/` to `api:3000`; Docker’s network alias supplies that name. |
+| `d525…/F9` — CLI interactive shell | Adds `--entrypoint sh` before the CLI image name. | `docker/Dockerfile.cli` sets `ENTRYPOINT ["jit"]`. |
+| `d525…/F10` — all-in-one API hostname | Adds `--add-host=api=127.0.0.1` and explains the mapping. | `docker/nginx.conf` uses `api:3000`; `docker/entrypoint.sh` starts local `jit-server`; Docker documents `--add-host` as a custom host-to-IP mapping. |
+
+### Deferred-item recheck
+
+- `dev/active/2d109173-plan.md` delegates engine and missing-projection gaps to its Group-C
+  follow-up task. Those are legitimate project-plan non-goals for this root/component
+  documentation footprint.
+- The MSRV, inert `validation.strictness`, default-port, and MCP-limit entries above remain
+  valid missing-projection/source-of-truth follow-ups; they do not block these documentation
+  corrections. The removed system-resource figures remain deliberately removed rather than
+  deferred.

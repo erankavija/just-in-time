@@ -4,22 +4,28 @@ Model Context Protocol server for the Just-In-Time issue tracker.
 
 ## Overview
 
-This MCP server wraps the `jit` CLI to provide MCP tools for AI agents. It dynamically generates tools from the JIT schema, ensuring the MCP interface stays synchronized with the CLI.
+This MCP server wraps the `jit` CLI to provide MCP tools for AI agents. At startup it loads
+the JIT schema and generates tools from its leaf commands.
 
 ## Features
 
-- **Schema-generated tools** - every CLI command becomes a callable MCP tool
-- **Curated default listing** - `tools/list` advertises an agent-facing subset; every command is callable
+- **Schema-generated tools** - every schema leaf command becomes a callable MCP tool
+- **Curated default listing** - `tools/list` advertises an agent-facing subset of the generated tools
 - **Nested subcommand support** - handles multi-level commands like `doc.assets.list`
 - **Type-safe** input validation using Zod
-- **Runtime schema loading** - the live schema from `jit --schema` is the single source of truth
+- **Runtime schema loading** - the live schema from `jit --schema` defines the server's startup surface
 - **Structured error responses** - consistent JSON envelope with error codes
 - **Operational hardening** - timeouts (30s) and concurrency limits (10 concurrent commands)
 - **Modular architecture** - clean separation of concerns for maintainability
 
 ## Installation
 
+`jit` must already be installed or built and available on `PATH`: the server loads
+`jit --schema` before it starts. For a source checkout:
+
 ```bash
+cargo build --release
+export PATH="$(pwd)/target/release:$PATH"
 cd mcp-server
 npm install
 ```
@@ -36,7 +42,7 @@ node index.js
 
 ### With GitHub Copilot CLI
 
-**Note**: MCP support in GitHub Copilot CLI requires the `jit` binary in your PATH.
+**Note**: GitHub Copilot CLI and the MCP server both need `jit` on `PATH`.
 
 1. Build the CLI and add to PATH:
    ```bash
@@ -45,40 +51,13 @@ node index.js
    export PATH="$(pwd)/target/release:$PATH"
    ```
 
-2. Configure the MCP server (location depends on your Copilot version):
-
-   **Option A**: Create `~/.config/github-copilot/mcp-servers.json`:
-   ```json
-   {
-     "mcpServers": {
-       "jit": {
-         "command": "node",
-         "args": ["/path/to/just-in-time/mcp-server/index.js"]
-       }
-     }
-   }
-   ```
-
-   **Option B**: Or use `~/.config/github-copilot/agents.json`:
-   ```json
-   {
-     "agents": {
-       "jit": {
-         "name": "JIT Issue Tracker",
-         "description": "Just-In-Time issue tracker with dependency graphs",
-         "mcp": {
-           "command": "node",
-           "args": ["/path/to/just-in-time/mcp-server/index.js"]
-         }
-       }
-     }
-   }
-   ```
-
-3. Verify configuration:
+2. Add and verify the local stdio server:
    ```bash
-   gh copilot suggest "Use jit to create a new high-priority issue"
+   copilot mcp add jit -- node /path/to/just-in-time/mcp-server/index.js
+   copilot mcp list
    ```
+
+   The [GitHub Copilot CLI MCP guide](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers) documents this workflow and the user configuration file at `~/.copilot/mcp-config.json`.
 
 ### MCP Client Configuration Example
 
@@ -114,7 +93,7 @@ To enumerate the listing, or the full generated set:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
-JIT_MCP_ALL_TOOLS=1 sh -c 'echo "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}" | node index.js'
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | JIT_MCP_ALL_TOOLS=1 node index.js
 ```
 
 ## Example Usage (via MCP)
@@ -152,9 +131,9 @@ mcp-server/
 
 ### Schema Loading
 
-The CLI is the single source of truth for the command schema. The server shells out to
-`jit --schema` at startup and fails fast when the binary is absent from PATH, so the MCP surface
-and the installed CLI can never disagree.
+The CLI is the source of truth for the command schema. The server invokes `jit --schema` once at
+startup and fails fast when the binary is absent from `PATH`. Its MCP surface matches that loaded
+schema; after rebuilding or replacing `jit`, restart the MCP server to load the changed schema.
 
 ### Dynamic Tool Generation with Nested Subcommands
 
@@ -280,7 +259,8 @@ Test with isolated directory:
 
 ### "jit: command not found"
 
-The MCP server executes `jit` commands via shell. Ensure it's in your PATH:
+The MCP server launches `jit` directly with Node's `execFile`, not through a shell. It inherits
+the MCP host process environment, including `PATH`; ensure that environment can find `jit`:
 
 ```bash
 # Check if jit is accessible
@@ -342,9 +322,9 @@ flowchart TD
 
 ## Version
 
-MCP server version tracks `mcp-server/package.json`. The server logs the JIT CLI version
-it loaded (from `jit --schema`) to stderr at startup; run `jit --version` to check the
-installed CLI directly.
+At startup the server advertises and logs the version loaded from `jit --schema`; it does not use
+the version in `mcp-server/package.json` for that MCP version. Run `jit --version` to inspect the
+CLI executable on `PATH` directly.
 
 ## License
 

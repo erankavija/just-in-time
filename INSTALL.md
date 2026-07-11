@@ -100,11 +100,18 @@ docker pull ghcr.io/erankavija/just-in-time-cli:main       # CLI only
 
 ### Run Individual Containers
 
+The Web UI image proxies `/api/` to the hostname `api` on its Docker network. Create a
+user-defined network and give the API container that network alias before starting the Web UI.
+
 #### API Server
 
 ```bash
+docker network create jit-network
+
 docker run -d \
   --name jit-api \
+  --network jit-network \
+  --network-alias api \
   -p 3000:3000 \
   -v jit-data:/data \
   -e JIT_DATA_DIR=/data \
@@ -116,6 +123,7 @@ docker run -d \
 ```bash
 docker run -d \
   --name jit-web \
+  --network jit-network \
   -p 8080:80 \
   ghcr.io/erankavija/just-in-time-web:main
 ```
@@ -132,10 +140,10 @@ docker run --rm \
 
 # Interactive shell
 docker run --rm -it \
+  --entrypoint sh \
   -v $(pwd):/data \
   -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-cli:main \
-  sh
+  ghcr.io/erankavija/just-in-time-cli:main
 ```
 
 ### All-in-One Container
@@ -144,11 +152,16 @@ docker run --rm -it \
 # Run API + Web UI in single container
 docker run -d \
   --name jit-all \
+  --add-host=api=127.0.0.1 \
   -p 3000:3000 \
   -p 8080:80 \
   -v jit-data:/data \
   ghcr.io/erankavija/just-in-time:latest
 ```
+
+`--add-host=api=127.0.0.1` maps the Web UI image's nginx `api` upstream to the
+local `jit-server` in this container; [`docker run --add-host`](https://docs.docker.com/reference/cli/docker/container/run/#add-entries-to-container-hosts-file---add-host)
+adds the required custom host mapping.
 
 ---
 
@@ -185,6 +198,8 @@ sudo cp target/release/jit-server /usr/local/bin/
 ### Build MCP Server
 
 ```bash
+# `npm test` runs `jit --schema`; use the release binary built above.
+export PATH="$(pwd)/target/release:$PATH"
 cd mcp-server
 npm install
 npm test
@@ -201,19 +216,25 @@ cd web
 npm install
 npm run build
 
-# Development server
-npm run dev
-# Access at http://localhost:5173
-
-# Production build is in dist/
-# Serve with any static file server
+# Serve the built UI and its same-origin /api endpoint from the repository root.
+cd ..
+jit-server --data-dir .jit --web-dir web/dist
+# Open http://localhost:3000
 ```
+
+`npm run dev` starts Vite for frontend asset work, but Vite has no API proxy in this
+repository. Because the UI calls `/api` on its own origin, use the same-origin command
+above to exercise the UI against JIT, or configure a reverse proxy that sends `/api` to
+`jit-server`.
 
 ---
 
 ## NPM (MCP Server)
 
 **For AI agent integration via Model Context Protocol.**
+
+The MCP server loads `jit --schema` at startup, so keep a built or installed `jit` executable
+on `PATH` when launching `jit-mcp-server` from this package.
 
 ### Install from Source
 
