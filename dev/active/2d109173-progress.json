@@ -166,6 +166,22 @@
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
   ],
+  "owner_interview": {
+    "status": "awaiting_response",
+    "mandatory_scope": [
+      "CLI schema State enum and flag/global-flag completeness",
+      "issue-create --description help text",
+      "projection gaps for exit codes, event catalog/issue-id semantics, and storage facts"
+    ],
+    "optional_candidates": [
+      "vestigial .jit/claims.jsonl merge-driver entry",
+      "inert validation.strictness key",
+      "undeclared Rust MSRV",
+      "built-in gate-preset projector",
+      "runtime-default projections",
+      "component-image :latest release policy"
+    ]
+  },
   "engine_followup_slate": {
     "note": "Compiled from all Wave 2-4 audit-notes. 'auto_included' are already within 6d82de03's REQ-01/REQ-02 criteria (file regardless). 'interview_candidates' are NEW engine defects/gaps not clearly in 6d82de03's known list - put these to the owner before filing.",
     "auto_included_in_6d82de03": [
