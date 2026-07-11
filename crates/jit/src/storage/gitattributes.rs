@@ -1,12 +1,19 @@
 //! `.gitattributes` merge-driver setup for `jit init`.
 //!
 //! Owns the git-repository detection and the `.gitattributes` read/append/
-//! create for the `.jit/events.jsonl` / `.jit/claims.jsonl` union-merge
-//! drivers, so the CLI layer (`main.rs`) only calls [`setup_gitattributes`]
-//! and reports its [`GitattributesOutcome`] — it never touches git or the
-//! filesystem itself (AGENTS.md "Separation of Concerns"). Mirrors the
+//! create for the `.jit/events.jsonl` union-merge driver, so the CLI layer
+//! (`main.rs`) only calls [`setup_gitattributes`] and reports its
+//! [`GitattributesOutcome`] — it never touches git or the filesystem itself
+//! (AGENTS.md "Separation of Concerns"). Mirrors the
 //! [`crate::storage::worktree_paths::WorktreePaths::detect`] precedent for
 //! git-subprocess-backed storage setup.
+//!
+//! Only `.jit/events.jsonl` gets an entry here: it's the one append-only log
+//! actually persisted in the per-worktree data plane (`.jit/`, tracked by
+//! git). The claim-coordination log lives under the shared control plane
+//! (`.git/jit/claims.jsonl`, see
+//! [`crate::storage::claim_coordinator::ClaimCoordinator`]), which is never
+//! git-tracked, so it has no merge driver to declare here.
 
 use anyhow::Result;
 use std::fs;
@@ -56,10 +63,7 @@ pub fn setup_gitattributes() -> Result<GitattributesOutcome> {
 
     let gitattributes_path = Path::new(&repo_root).join(".gitattributes");
     let jit_marker = "# JIT merge drivers";
-    let jit_config = format!(
-        "{}\n.jit/events.jsonl merge=union\n.jit/claims.jsonl merge=union\n",
-        jit_marker
-    );
+    let jit_config = format!("{}\n.jit/events.jsonl merge=union\n", jit_marker);
 
     if gitattributes_path.exists() {
         let content = fs::read_to_string(&gitattributes_path)?;

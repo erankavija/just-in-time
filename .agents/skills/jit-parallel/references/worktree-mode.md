@@ -57,9 +57,11 @@ After each agent commits to its branch, merge sequentially into `main`:
 git merge --no-ff worktree-agent-<short-id>
 ```
 
-`.jit/events.jsonl` and `.jit/claims.jsonl` are declared `merge=union` in
-`.gitattributes`, so git concatenates both sides of an append-only log without a
-conflict. Code conflicts require manual resolution.
+`.jit/events.jsonl` is declared `merge=union` in `.gitattributes`, so git concatenates
+both sides of that per-worktree append-only log without a conflict. The claim log
+(`.git/jit/claims.jsonl`) needs no merge driver: it lives in the shared control plane
+outside the versioned `.jit/` tree, so every worktree already reads and writes the same
+physical file. Code conflicts require manual resolution.
 
 After the wave completes, run the leak check before committing anything on `main`:
 

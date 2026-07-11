@@ -1313,6 +1313,21 @@ mod tests {
     }
 
     #[test]
+    fn test_acquire_claim_writes_log_under_shared_jit_not_local_jit() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+
+        coordinator.acquire_claim("issue-004", 600).unwrap();
+
+        // The append-only claim log lives in the shared control plane
+        // (.git/jit/claims.jsonl), never in the per-worktree data plane
+        // (.jit/claims.jsonl) — `.gitattributes` carries no merge-driver
+        // entry for the latter because jit never writes it there.
+        assert!(temp_dir.path().join(".git/jit/claims.jsonl").exists());
+        assert!(!temp_dir.path().join(".jit/claims.jsonl").exists());
+    }
+
+    #[test]
     fn test_acquire_claim_indefinite_lease() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = setup_coordinator(&temp_dir);

@@ -379,6 +379,38 @@ fn test_init_json_inside_git_reports_gitattributes_created() {
     assert!(content.contains("# JIT merge drivers"));
 }
 
+// Regression (jit:7a60f987): `.jit/claims.jsonl` never gets a merge-driver
+// entry. The claim log actually lives under the shared `.git/jit/` control
+// plane (see storage/claim_coordinator.rs), never under the versioned
+// `.jit/` data plane that `.gitattributes` covers.
+#[test]
+fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
+    let temp = TempDir::new().unwrap();
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .arg("-q")
+        .current_dir(temp.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let out = jit_init(temp.path(), &["--json"]);
+    assert!(out.status.success(), "jit init --json failed: {:?}", out);
+
+    let content = fs::read_to_string(temp.path().join(".gitattributes")).unwrap();
+    assert!(
+        !content.contains("claims.jsonl"),
+        "claim coordination writes its log under .git/jit/, not .jit/, so \
+         .gitattributes should have no merge-driver entry for claims.jsonl, got: {content:?}"
+    );
+    // Positive control: the events.jsonl entry stays — events.jsonl is
+    // actually persisted under the versioned .jit/ data plane.
+    assert!(
+        content.contains(".jit/events.jsonl merge=union"),
+        "the events.jsonl merge-driver entry should still be present, got: {content:?}"
+    );
+}
+
 #[test]
 fn test_init_json_reinit_reports_gitattributes_absent_from_created_paths() {
     let temp = TempDir::new().unwrap();
