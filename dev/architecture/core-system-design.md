@@ -399,7 +399,7 @@ Open questions for later phases:
 **Test Coverage:**
 - 132 total tests (78 unit + 8 harness + 16 integration + 7 query + 8 CLI consistency + 6 refactor + 9 orchestrator)
 - TestHarness provides 10-100x faster testing vs process-based tests
-- See `TESTING.md` for detailed test strategy
+- See `../TESTING.md` for detailed test strategy
 
 ---
 

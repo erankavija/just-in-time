@@ -121,7 +121,7 @@ All commands support `--json` (envelope spec under Coding Conventions).
 
 ## Testing Strategy
 
-Three-layer approach (see TESTING.md for details):
+Three-layer approach (see dev/TESTING.md for details):
 
 - **Unit tests** — In-source `#[cfg(test)]` modules. Fast, test individual functions.
 - **Harness tests** (`tests/harness_demo.rs`) — Use `TestHarness` for isolated in-process tests with `CommandExecutor` directly. Fast and reliable.

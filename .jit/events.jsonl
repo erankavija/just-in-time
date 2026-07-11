@@ -6287,3 +6287,10 @@
 {"type":"gate_passed","id":"672fd10f-4b05-4e52-94ba-c3eb43a8e2a5","issue_id":"8682e95a-bb8a-4c73-8a48-ed712e8b08b0","timestamp":"2026-07-11T09:14:33.053550455Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"8a70ee41-8a3f-49a5-aae9-cb145d5ec1f8","issue_id":"8682e95a-bb8a-4c73-8a48-ed712e8b08b0","timestamp":"2026-07-11T09:14:33.364694981Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"89acd3f1-328f-4862-bcae-d33cd9293834","issue_id":"8682e95a-bb8a-4c73-8a48-ed712e8b08b0","timestamp":"2026-07-11T09:16:02.583491459Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"b2a99c97-dcc2-4dfc-8dbd-d3096c5f24a2","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:19:06.975867275Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_passed","id":"8d75c2f8-e8e8-401b-ab69-1f9b7b77ef4c","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:19:07.287025301Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"39a5b6ff-3d8b-4351-8000-889647411938","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:19:07.598013897Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8bc5023c-65de-49b3-93b1-4863cf5934a9","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:20:11.917668319Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"177705ff-dd68-4076-bcd7-27be12e9931d","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:20:27.617911606Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"acad36ee-8557-4890-b21a-31f9e05fd95f","issue_id":"adc4c6ef-04a4-4993-afb0-5ca12cf9061e","timestamp":"2026-07-11T09:20:27.617943326Z"}
+{"type":"issue_state_changed","id":"da804159-f8f7-4b08-b9eb-4981dce4ee1b","issue_id":"36d5451e-05d1-41d7-baf5-208eba97c4a2","timestamp":"2026-07-11T09:20:27.688742387Z","from":"backlog","to":"ready"}

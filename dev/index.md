@@ -142,7 +142,7 @@ archive/        → After 1-2 releases
 
 **See also:**
 - [docs/index.md](../docs/index.md) - Product documentation
-- [TESTING.md](../TESTING.md) - Testing strategy
+- [TESTING.md](TESTING.md) - Testing strategy
 
 ---
 
