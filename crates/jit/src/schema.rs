@@ -33,6 +33,24 @@ pub struct Command {
     /// Whether this command is hidden from default MCP tool listing
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hidden: bool,
+    /// Alternate accepted invocations (visible command aliases, without a
+    /// leading path; e.g. `dependency` for `dep`, `pass`/`eval` for
+    /// `gate evaluate`).
+    ///
+    /// Empty for commands with no visible alias, and then skipped in the
+    /// serialized schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::schema::CommandSchema;
+    ///
+    /// let schema = CommandSchema::generate();
+    /// // `jit dep` is also reachable as `jit dependency`.
+    /// assert!(schema.commands["dep"].aliases.contains(&"dependency".to_string()));
+    /// ```
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
     /// Subcommands (for issue, dep, gate, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subcommands: Option<HashMap<String, Command>>,
@@ -77,7 +95,26 @@ pub struct Flag {
     pub required: bool,
     /// Description
     pub description: String,
-    /// Alternate accepted long spellings (visible aliases, without `--`)
+    /// Alternate accepted long spellings (visible aliases, without `--`).
+    ///
+    /// Empty for flags with no visible alias, and then skipped in the
+    /// serialized schema.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::schema::Flag;
+    ///
+    /// // `--label` also accepts `--add-label`.
+    /// let flag = Flag {
+    ///     name: "label".to_string(),
+    ///     flag_type: "array<string>".to_string(),
+    ///     required: false,
+    ///     description: "Add label(s)".to_string(),
+    ///     aliases: vec!["add-label".to_string()],
+    /// };
+    /// assert_eq!(flag.aliases, ["add-label"]);
+    /// ```
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
 }
@@ -231,6 +268,14 @@ impl CommandSchema {
 
         let hidden = parent_hidden || hidden_commands.contains(cmd_path);
 
+        // Visible command aliases are additional accepted invocations (e.g.
+        // `dependency` for `dep`). Hidden aliases stay out of the contract,
+        // matching what `--help` advertises.
+        let aliases: Vec<String> = clap_cmd
+            .get_visible_aliases()
+            .map(|s| s.to_string())
+            .collect();
+
         // Check if this has subcommands
         let subcommands_vec: Vec<_> = clap_cmd.get_subcommands().collect();
 
@@ -277,6 +322,7 @@ impl CommandSchema {
         Command {
             description,
             hidden,
+            aliases,
             subcommands,
             args,
             flags,
@@ -654,6 +700,7 @@ mod tests {
         let cmd = Command {
             description: "test".to_string(),
             hidden: false,
+            aliases: vec![],
             subcommands: None,
             args: vec![],
             flags: vec![],
@@ -671,6 +718,7 @@ mod tests {
         let cmd = Command {
             description: "test".to_string(),
             hidden: true,
+            aliases: vec![],
             subcommands: None,
             args: vec![],
             flags: vec![],
@@ -824,6 +872,38 @@ mod tests {
             "doc add --label must expose its `title` alias; found {:?}",
             doc_add_label.aliases
         );
+    }
+
+    /// REQ-02/REQ-03: command and subcommand visible aliases (alternate
+    /// accepted invocations) must be exposed in the schema. Dropping a command
+    /// alias fails this test.
+    #[test]
+    fn test_schema_exposes_command_visible_aliases() {
+        let schema = CommandSchema::generate();
+
+        // The top-level `dep` command accepts the visible alias `dependency`.
+        let dep = schema.commands.get("dep").expect("dep command");
+        assert!(
+            dep.aliases.iter().any(|a| a == "dependency"),
+            "dep command must expose its `dependency` alias; found {:?}",
+            dep.aliases
+        );
+
+        // The `gate evaluate` subcommand accepts the visible aliases `pass`
+        // and `eval`.
+        let evaluate = schema
+            .commands
+            .get("gate")
+            .and_then(|c| c.subcommands.as_ref())
+            .and_then(|s| s.get("evaluate"))
+            .expect("gate evaluate subcommand");
+        for alias in ["pass", "eval"] {
+            assert!(
+                evaluate.aliases.iter().any(|a| a == alias),
+                "gate evaluate must expose its `{alias}` alias; found {:?}",
+                evaluate.aliases
+            );
+        }
     }
 
     #[test]
