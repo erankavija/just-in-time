@@ -29,8 +29,8 @@
       "wave_number": 3,
       "note": "Relocations serialized after content audits (overlaps deployment.md/quickstart.md/README.md); gap-fill after CLI catalog. Disjoint from each other.",
       "issues": [
-        {"id": "adc4c6ef", "short_id": "adc4c6ef", "title": "Root documentation relocations", "classification": "documentation", "status": "pending"},
-        {"id": "8682e95a", "short_id": "8682e95a", "title": "Command-family reference gap-fill", "classification": "documentation", "status": "pending"}
+        {"id": "adc4c6ef", "short_id": "adc4c6ef", "title": "Root documentation relocations", "classification": "documentation", "status": "done", "note": "DONE first pass. TESTING.md->dev/TESTING.md (3 inbound repoints + 5 outbound ../ fixes in moved file). INSTALL.md move DECLINED (packaging-doc convention + link topology; verdict recorded per REQ-02). All gates pass. INSTALL.md Node-floor inconsistency left as 36d5451e's seed."},
+        {"id": "8682e95a", "short_id": "8682e95a", "title": "Command-family reference gap-fill", "classification": "documentation", "status": "rework", "note": "attempt 1: events section clean; 3 serve behavioral findings (port range is requested..+99 not fixed 3000-3099; --log absolute stays absolute; status taxonomy omits 'error'). Verified vs serve.rs/main.rs. Dispatched."}
       ]
     },
     {
@@ -50,6 +50,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
+  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "8682e95a": 1, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
   "started_at": "2026-07-11T00:00:00Z"
 }
