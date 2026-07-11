@@ -1,9 +1,9 @@
 {
   "epic_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
   "epic_short_id": "2d109173",
-  "current_wave": 2,
+  "current_wave": 3,
   "wave_2_ready": true,
-  "docs_mechanical_scoping": "Evaluate docs-mechanical on each audit task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` — VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). Whole-surface (no env) fails on the real .jit/claims.jsonl defect until 2b9a80fb fixes it. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75 + container 2d109173. STILL NEED to attach it to adc4c6ef, 8682e95a, 36d5451e when their waves come up (per plan they carry it too).",
+  "docs_mechanical_scoping": "Evaluate docs-mechanical on each task with DOCS_FOOTPRINT=<that task's footprint> (env forwards through `jit gate evaluate` — VERIFIED). Precedence: positional args > DOCS_FOOTPRINT env > derived default (permanent_paths=docs/). The .jit/claims.jsonl miscite is FIXED (2b9a80fb), so whole-surface should be clean now. docs-mechanical attached to: 2b9a80fb,736a069e,7c283e95,b8924a6d,4c33d0e5,a70bac75,adc4c6ef,8682e95a + container 2d109173. STILL NEED to attach it to 36d5451e (Wave 4). Re-eval gate: use `--force` since the gate caches a pass per HEAD and content changes between checkpoints. Integration: bring worker files via `git checkout <branch> -- <paths>` (NEVER git-merge — stale-base shows other workers' committed files as spurious deletions). Lead-direct fixes stay on main; do NOT re-checkout that file from the branch (would revert the lead fix).",
   "waves": [
     {
       "wave_number": 1,
