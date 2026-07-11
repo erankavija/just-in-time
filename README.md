@@ -104,9 +104,11 @@ stateDiagram-v2
     in_progress --> gated: work submitted
     gated --> done: postchecks pass
     done --> [*]
+    done --> in_progress: reopened
     note right of gated
-        rejected (terminal) and archived (parked)
-        are reachable from any state
+        rejected and archived are reachable from any
+        state; done and rejected can be reopened to an
+        active state (guards check only the target state)
     end note
 ```
 
@@ -115,8 +117,8 @@ stateDiagram-v2
 - **ready**: Every dependency is terminal (done or rejected), available to claim
 - **in_progress**: Work actively happening
 - **gated**: Work complete, awaiting quality gate approval
-- **done**: All gates passed, complete (terminal)
-- **rejected**: Closed without implementation (terminal, bypasses gates)
+- **done**: All gates passed, work complete; satisfies dependents. Can be reopened to an active state
+- **rejected**: Closed without implementation; bypasses gates; satisfies dependents. Can be reopened
 - **archived**: Parked out of active views; reachable from any state
 
 Issues record lifecycle timestamps (first ready, claimed, done) as they transition. See [Core Model: States](docs/concepts/core-model.md#states) for transition rules.

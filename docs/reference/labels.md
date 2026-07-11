@@ -50,7 +50,7 @@ flowchart LR
 ```
 
 The label makes the task a member of the Auth epic. The dependency stops the task from
-starting until "Setup DB" is ready.
+starting until "Setup DB" reaches a terminal state (done or rejected).
 
 Both can flow the same direction (task → epic → milestone) but serve different purposes and can be used independently.
 
@@ -125,11 +125,11 @@ Namespaces are declared in `.jit/config.toml` under `[namespaces.<name>]` tables
 `jit init` seeds a starter registry directly in the generated `config.toml`, ready
 to customize. To see what the current repository declares, run `jit label namespaces`.
 
-An excerpt of the generated registry:
+For example, the built-in `type` and `priority` namespaces both set `unique`:
 
 ```toml
 [namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
+description = "Issue type (hierarchical). At most one per issue."
 unique = true
 examples = ["type:task", "type:story", "type:epic"]
 
@@ -334,7 +334,7 @@ jit label namespaces
 # Label Namespaces:
 #
 #   type
-#     Description: Issue type (hierarchical). Exactly one per issue.
+#     Description: Issue type (hierarchical). At most one per issue.
 #     Unique: true
 #
 #   milestone

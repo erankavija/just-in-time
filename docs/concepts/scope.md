@@ -184,7 +184,7 @@ jit gate add <run-migration> change-approval rollback-plan
 - Block completion until gates pass
 
 **Multi-agent orchestration:**
-- Atomic claiming prevents conflicts
+- Exclusive lease acquisition (`jit claim acquire`) serializes conflicting claims; ordinary `jit issue claim`/`claim-next` assign work but do not lock
 - Lease-based coordination with TTL
 - Event log for observability
 

@@ -134,7 +134,7 @@ default_type = "task"
 # of truth (scaffolded by `jit init`).
 
 [namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
+description = "Issue type (hierarchical). At most one per issue."
 unique = true
 examples = ["type:task", "type:story", "type:epic"]
 
@@ -487,7 +487,7 @@ mod tests {
         // The registry carries only taxonomy (description/unique/examples).
         assert_eq!(
             type_ns.description,
-            "Issue type (hierarchical). Exactly one per issue."
+            "Issue type (hierarchical). At most one per issue."
         );
         assert!(type_ns.unique);
     }

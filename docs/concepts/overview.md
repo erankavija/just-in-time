@@ -115,7 +115,7 @@ See [Storage Format](../reference/storage-format.md) for the authoritative layou
 - Dependencies block issues until prerequisites reach a terminal state
 - Gates block completion until quality standards met
 - Assignees record ownership; advisory leases provide exclusive coordination
-- Events log all changes for observability
+- The event log records issue lifecycle changes (state transitions and a defined event set), not every repository mutation
 
 **Example:**
 ```bash

@@ -226,9 +226,17 @@
     {
       "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
       "category": "External reviewer-service quota exhausted (final epic doc-review)",
-      "status": "open",
+      "status": "resolved",
       "opened_at": "2026-07-11T17:57:00+03:00",
-      "summary": "All 18 children done; epic repo-validate + docs-mechanical pass; corrected surface committed at eb80d3cd. Final epic doc-review (gate run 9e685d2d) failed in 3.5s with 'Agent produced no output'; codex session 019f51ae recorded credits balance 0 / has_credits false. Reset reported for 19:52. doc-review is the only outstanding gate for epic completion; workaround forbidden per handoff trap. Awaiting invoker direction: wait-and-resume after reset, or provide alternate authorised reviewer."
+      "resolved_at": "2026-07-11T20:05:38+03:00",
+      "summary": "Credits reset ~19:52; poller re-ran doc-review at 19:53 and recorded a real 12-min review (run 5f09939f). Quota blocker cleared."
+    },
+    {
+      "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+      "category": "Rework exceeding MAX_REWORK_ATTEMPTS (final epic doc-review)",
+      "status": "open",
+      "opened_at": "2026-07-11T20:06:00+03:00",
+      "summary": "Real epic doc-review (run 5f09939f, commit 1356e88e) FAILED with 10 high-severity findings in previously-unreviewed prose (README:118, labels.md:53/132, claim.md:255, multi-agent-coordination.md:137, guarantees.md:366/445, scope.md:187, overview.md:118, troubleshooting.md:441). Adversarial-reviewer trajectory 28->13->10, fresh surface each pass. rework_counts[2d109173]=2=MAX; auto-rework not permitted. Escalated to invoker for direction."
     }
   ],
   "rework_counts": {
@@ -242,8 +250,9 @@
     "b8924a6d": 1,
     "2b9a80fb": 2,
     "36d5451e": 2,
-    "2d109173": 2
+    "2d109173": 0
   },
+  "rework_counter_note_2d109173": "Reset to 0 on 2026-07-11T20:07 by invoker authorization (answered escalation for doc-review run 5f09939f: 'authorize rework, be rigorous'). This cycle: fix all 10 findings AND sweep each defect class across the whole surface.",
   "started_at": "2026-07-11T00:00:00Z",
   "resume_pointer": "Wave 7 local rework is complete but awaiting gates because the reviewer service reported a usage limit. Resume after service availability: run the three child gates, close them, run final epic gates including doc-review, and escalate if that review fails because MAX_REWORK_ATTEMPTS=2.",
   "owner_instructions_this_session": [

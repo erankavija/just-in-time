@@ -363,7 +363,7 @@ worktree of the repository.
 .git/jit/
 ├── claims.jsonl              # Claim log (append-only)
 ├── claims.index.json         # Active claims (exclusive lock)
-├── heartbeat/                # Lease keep-alive, one file per agent
+├── heartbeat/                # Initialized but empty; heartbeats append to claims.jsonl and update the index
 └── locks/claims.lock         # Advisory lock guarding claim-log operations
 ```
 
@@ -442,8 +442,8 @@ Error: Failed to deserialize data: expected value at line 15 column 3
 **Cleanup:**
 
 ```bash
-# Automatic: the recovery pass during jit claim operations removes orphaned
-# .tmp files older than one hour.
+# jit recover removes orphaned .tmp files older than one hour (ordinary claim
+# commands do not run temp-file cleanup).
 
 # Manual cleanup at any time
 find .jit -name '*.tmp' -mmin +60 -delete
@@ -553,7 +553,9 @@ JIT is designed with isolation and fault tolerance:
 - Missing git → Core issue operations and filesystem-backed document operations
   still work; leases, document history/diff, and commit-specific document reads
   are unavailable
-- Stale lease → A later lease acquisition can evict it, but the issue remains
+- Expired finite lease → evicted during a later lease acquisition; a stale
+  indefinite lease is not auto-evicted and remains until a heartbeat,
+  `jit claim release`, or `jit claim force-evict`. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
 - Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which append rather than re-read the log, keep working
 

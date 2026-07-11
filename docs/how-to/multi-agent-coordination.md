@@ -135,8 +135,10 @@ jit claim status
 - Max 10 indefinite leases per repository (configurable)
 
 Indefinite leases are marked **stale** after a hardcoded hour without a
-heartbeat. The claim control plane excludes stale leases; this is not a
-pre-commit-hook setting and `stale_threshold_secs` does not configure it.
+heartbeat. Staleness is only a marker: a stale indefinite lease is not evicted
+automatically — it remains until a heartbeat, a `jit claim release`, or a
+`jit claim force-evict`. The threshold is not a pre-commit-hook setting and
+`stale_threshold_secs` does not configure it.
 
 ## Handling Conflicts
 
@@ -148,7 +150,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Solutions:**
 
-1. **Wait for expiration** — Leases expire automatically
+1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease does not expire; use Force evict)
 2. **Coordinate** — Contact the other agent to release
 3. **Force evict** — Admin operation for crashed agents:
    ```bash
@@ -305,7 +307,9 @@ jit validate
 # Clean up abandoned worktree
 git worktree remove ../old-worktree
 
-# Claims from that worktree will expire naturally
+# Finite leases from that worktree expire at their TTL and are evicted on the
+# next claim acquisition; an indefinite lease left behind needs an explicit
+# `jit claim force-evict` (or `jit recover`).
 ```
 
 ## Launching Parallel Copilot CLI Agents
@@ -424,7 +428,7 @@ git worktree remove ../jit-docs
 ### Do
 
 - ✅ **Set unique agent IDs** — Each agent needs distinct identity
-- ✅ **Claim before editing** — Prevents conflicts
+- ✅ **Acquire a lease before editing** — `jit claim acquire` serializes exclusive access
 - ✅ **Commit frequently** — Makes work visible to others
 - ✅ **Use dependencies** — Model work relationships explicitly
 - ✅ **Clean up worktrees** — Remove when done

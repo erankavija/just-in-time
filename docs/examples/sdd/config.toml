@@ -48,7 +48,7 @@ strictness = "loose"
 default_type = "task"
 
 [namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
+description = "Issue type (hierarchical). At most one per issue."
 unique = true
 examples = ["type:task", "type:story", "type:epic", "type:planning", "type:breakdown"]
 

@@ -6457,3 +6457,4 @@
 {"type":"gate_passed","id":"3d534394-61ac-4d87-858d-17a11433fcde","issue_id":"2d109173-91b2-49b1-9ef6-7d5a0f5a4b22","timestamp":"2026-07-11T14:56:35.712401023Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"f61ce718-a75c-417b-96de-93f9ac1aa25c","issue_id":"2d109173-91b2-49b1-9ef6-7d5a0f5a4b22","timestamp":"2026-07-11T14:56:36.123667072Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"2a4a193c-d8d3-4b9e-b900-5e764dc1665f","issue_id":"2d109173-91b2-49b1-9ef6-7d5a0f5a4b22","timestamp":"2026-07-11T14:56:51.956861146Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"ab6aa8cc-064f-4200-9bd0-74d40feca219","issue_id":"2d109173-91b2-49b1-9ef6-7d5a0f5a4b22","timestamp":"2026-07-11T17:05:38.468344810Z","gate_key":"doc-review","updated_by":"auto:executor"}

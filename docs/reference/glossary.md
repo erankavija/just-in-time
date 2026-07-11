@@ -69,4 +69,4 @@ by C
 
 **Assignee Type**: Format prefix (agent:, human:, ci:)
 
-**Event Log**: Audit trail of all state changes
+**Event Log**: Append-only audit trail of issue state changes and related lifecycle events (not every repository mutation)

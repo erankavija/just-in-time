@@ -94,7 +94,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 
 **Solutions:**
 
-1. **Wait for expiration** — Leases expire automatically after TTL
+1. **Wait for expiration** — A finite lease expires at its TTL and is evicted on the next claim acquisition (an indefinite lease never expires; force-evict it)
 2. **Check who has it:**
    ```bash
    jit claim status --issue abc123
@@ -133,7 +133,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
 
-**Cause:** Indefinite lease (TTL=0) hasn't received heartbeat within threshold (default 1 hour).
+**Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the hardcoded 1-hour threshold.
 
 **Solutions:**
 
@@ -436,9 +436,9 @@ If automatic recovery fails:
 
 ```bash
 # The claims index is derived from claims.jsonl
-# You can manually rebuild by:
+# Remove the index and let recovery rebuild it from the log:
 rm .git/jit/claims.index.json
-jit claim list  # Triggers rebuild
+jit recover  # Rebuilds the claims index from claims.jsonl
 ```
 
 ### Emergency: Clear All Leases
@@ -455,7 +455,7 @@ rm .git/jit/claims.jsonl
 rm .git/jit/claims.index.json
 
 # Reinitialize
-jit claim list  # Creates empty index
+jit recover  # Rebuilds an empty index from the cleared log
 ```
 
 ---
