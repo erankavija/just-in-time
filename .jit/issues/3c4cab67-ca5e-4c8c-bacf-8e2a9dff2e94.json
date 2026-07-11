@@ -1,7 +1,7 @@
 {
   "id": "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94",
   "title": "planning: Exhaustive documentation audit and drift removal",
-  "description": "Planning node for Exhaustive documentation audit and drift removal (2d109173). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/2d109173-plan.md and link it to this node once written.",
+  "description": "Planning node for Exhaustive documentation audit and drift removal (2d109173). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/2d109173-plan.md and link it to this node once written.",
   "state": "done",
   "priority": "high",
   "assignee": null,
@@ -19,14 +19,14 @@
   "context": {},
   "documents": [
     {
-      "path": "dev/active/2d109173-investigation.md",
+      "path": "dev/archive/2d109173-investigation.md",
       "commit": null,
       "label": null,
       "doc_type": "study",
       "format": "markdown"
     },
     {
-      "path": "dev/active/2d109173-plan.md",
+      "path": "dev/archive/2d109173-plan.md",
       "commit": null,
       "label": null,
       "doc_type": "design",
