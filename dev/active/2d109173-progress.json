@@ -113,7 +113,7 @@
           "title": "Root and component documentation audit",
           "classification": "documentation",
           "status": "rework",
-          "note": "Owner authorized one final scoped rework cycle on 2026-07-11. First selectively integrate b41faf3c's intended documentation changes, then resolve the three current doc-review findings and run the full review protocol."
+          "note": "Final-cycle attempt 1 resolved the original three findings, but two overlapping doc-review runs surfaced 17 further in-scope defects (run 97b1a203: 7; d525b0c2: 10). Rework attempt 2 must resolve the cumulative 17-finding set and every earlier finding; full verdict is dev/active/36d5451e-review-round-4.md."
         }
       ]
     },
@@ -151,10 +151,10 @@
     "736a069e": 1,
     "b8924a6d": 1,
     "2b9a80fb": 2,
-    "36d5451e": 0
+    "36d5451e": 1
   },
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "Wave 4 final rework authorized: claim 36d5451e; selectively integrate only b41faf3c's intended README.md, INSTALL.md, mcp-server/README.md, and audit-notes changes after reviewing against main; then resolve the current three doc-review findings and run full review. After Wave 4, interview the owner before Wave 5 on candidate engine follow-ups.",
+  "resume_pointer": "Wave 4 final rework attempt 2: resolve the cumulative 17 findings from doc-review runs 97b1a203-c4be-401b-a755-7e403b6d23c0 and d525b0c2-75f4-4088-890e-02862407b372. Do not omit any finding because the adversarial reviewer samples different subsets. After Wave 4, interview the owner before Wave 5 on candidate engine follow-ups.",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."

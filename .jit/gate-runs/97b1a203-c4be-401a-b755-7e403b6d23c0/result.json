@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "run_id": "97b1a203-c4be-401a-b755-7e403b6d23c0",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "49335633b7e12e03297001504d28ac87fcc53e5f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T12:21:49.092644345Z",
+  "completed_at": "2026-07-11T12:29:01.395391245Z",
+  "duration_ms": 432302,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. Prior findings are addressed, but seven new mismatches remain: the root README overstates `jit-server`’s bundled UI behavior and shows an invalid archive command; the MCP README overstates tool coverage and synchronization, misstates execution method, and reports the wrong server-version source.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. The scoped hierarchy example is presented as customization rather than an initializer default.\n\n## 3. Current behavior only\n\nFail. `README.md` retains future-facing project-status narration.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile command, tool, gate, rule, crate, or test totals were found.\n\n## 5. Links and referenced paths resolve\n\nPass. Scoped Markdown links, anchors, cited paths, and the concrete `@/` citations resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid; the MCP box-drawing block is a directory tree. No applicable math or heading-depth defect was found.\n\n1. **F1 — The README says `jit-server` provides a Web UI at port 3000, but released binaries do not embed the Web UI.** [README.md:55](/home/vkaskivuo/Projects/just-in-time/README.md:55) describes `jit-server` as a “Web UI server.” Assets are embedded only when `web/dist/` exists while compiling; the release workflow builds the server separately from the web bundle. Remediation: describe it as the API server, and state that it serves the UI only with embedded assets or `--web-dir`.\n\n2. **F2 — The documented document-archive command cannot run.** [README.md:188](/home/vkaskivuo/Projects/just-in-time/README.md:188) uses `--type features`, but archive types must be configured category keys; this repository configures `design = \"features\"`, so the command errors. The root-level `design.md` also is not a default managed path. Remediation: use `<managed-document>` and `<configured-category>`, or show matching configuration and a valid command.\n\n3. **F3 — The project-status prose describes possible future behavior rather than current behavior.** [README.md:238](/home/vkaskivuo/Projects/just-in-time/README.md:238) says the CLI and storage format “may change between releases” and hard-codes `0.2.x`. Remediation: retain only the present compatibility behavior, or derive version information through `jit version`.\n\n4. **F4 — The MCP README says every CLI command is callable, but only schema leaf commands generate tools.** [mcp-server/README.md:11](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:11) and [line 12](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:12) overstate coverage: valid parent commands with behavior, such as `jit query`, have no generated `jit_query` tool. Remediation: say every schema leaf command is callable, or add tools for executable parent commands.\n\n5. **F5 — The MCP README promises permanent CLI/MCP synchronization, though synchronization occurs only at startup.** [mcp-server/README.md:7](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:7) and [lines 155–157](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:155) say the surfaces “can never disagree.” The server loads `jit --schema` once at startup; the same README later requires a restart after rebuilding `jit`. Remediation: state that the MCP surface matches the schema loaded at startup and requires restart after CLI changes.\n\n6. **F6 — The MCP troubleshooting guide says commands execute through a shell, but the implementation directly uses `execFile`.** [mcp-server/README.md:283](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:283) contradicts the direct `execFile('jit', ...)` execution shown in the architecture diagram and implementation. Remediation: say the server launches `jit` directly via `execFile` and inherits the MCP host process environment.\n\n7. **F7 — The MCP version section names the wrong version source.** [mcp-server/README.md:345](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:345) says the server version tracks `mcp-server/package.json`, but the MCP server advertises and logs `jitSchema.version` loaded from `jit --schema`. Remediation: document the schema-derived CLI version, or change the implementation to read and expose the package version.\n\nTotal findings: 7\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Seven blocking documentation defects remain in the root README and MCP README.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"README.md overstates released jit-server binaries as bundled Web UI servers.\",\"file\":\"README.md\",\"line\":55},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"README.md documents an invalid document-archive category and unmanaged path.\",\"file\":\"README.md\",\"line\":188},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"README.md retains future-facing project-status narration and a hard-coded release series.\",\"file\":\"README.md\",\"line\":238},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"The MCP README says every CLI command is callable although only schema leaf commands generate tools.\",\"file\":\"mcp-server/README.md\",\"line\":11},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"The MCP README promises permanent CLI/MCP synchronization even though schema loading occurs only at startup.\",\"file\":\"mcp-server/README.md\",\"line\":155},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"The MCP README says jit commands execute via a shell although the implementation uses execFile directly.\",\"file\":\"mcp-server/README.md\",\"line\":283},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"The MCP README says server version tracks package.json although it uses the version from jit --schema.\",\"file\":\"mcp-server/README.md\",\"line\":345}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10903 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f5120-7438-7883-ae3f-d2ca27edd986\n--------\nuser\n--- 10890 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Seven blocking documentation defects remain in the root README and MCP README.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "README.md overstates released jit-server binaries as bundled Web UI servers.",
+        "file": "README.md",
+        "line": 55
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "README.md documents an invalid document-archive category and unmanaged path.",
+        "file": "README.md",
+        "line": 188
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "README.md retains future-facing project-status narration and a hard-coded release series.",
+        "file": "README.md",
+        "line": 238
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "The MCP README says every CLI command is callable although only schema leaf commands generate tools.",
+        "file": "mcp-server/README.md",
+        "line": 11
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "The MCP README promises permanent CLI/MCP synchronization even though schema loading occurs only at startup.",
+        "file": "mcp-server/README.md",
+        "line": 155
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "The MCP README says jit commands execute via a shell although the implementation uses execFile directly.",
+        "file": "mcp-server/README.md",
+        "line": 283
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "The MCP README says server version tracks package.json although it uses the version from jit --schema.",
+        "file": "mcp-server/README.md",
+        "line": 345
+      }
+    ]
+  }
+}

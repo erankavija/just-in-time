@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "run_id": "d525b0c2-75f4-4088-890e-02862407b372",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "36d5451e-05d1-41d7-baf5-208eba97c4a2",
+  "commit": "49335633b7e12e03297001504d28ac87fcc53e5f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T12:22:52.527811783Z",
+  "completed_at": "2026-07-11T12:31:52.246022303Z",
+  "duration_ms": 539718,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail — MCP setup/version claims and Docker/web deployment instructions drift from implementation (F1–F10). Prior-run findings are resolved: published image tags, MCP response shape, Node 20 floor, inactive strictness setting, and unsupported resource requirements are corrected.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repo-local types, gates, and registries are framed as examples or this repository’s configuration.\n\n## 3. Current behavior only\n\nPass. No unsupported legacy or roadmap narration found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims found.\n\n## 5. Links and referenced paths resolve\n\nPass. All 88 scoped Markdown links, anchors, cited paths, and addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid; the MCP box-drawing block is a directory tree. No applicable math or heading defects found.\n\n## Findings\n\n1. **F1 — The source-install MCP test command cannot find `jit`.** `INSTALL.md:188-190` builds `jit` into `target/release` but never adds it to `PATH`; `npm test` executes `jit --schema` directly (`mcp-server/test-unit.js:18`). Remediation: export the release directory into `PATH` before `cd mcp-server`, or invoke the test with that `PATH`.\n\n2. **F2 — The MCP README’s basic startup path omits its mandatory CLI prerequisite.** `mcp-server/README.md:20-35` instructs `node index.js` after only `npm install`, but startup runs `jit --schema` and fails if `jit` is absent from `PATH` (`mcp-server/lib/schema-loader.js:22-30`). Remediation: require installing/building `jit` and adding it to `PATH` before the basic usage command.\n\n3. **F3 — GitHub Copilot CLI configuration instructions are obsolete.** `mcp-server/README.md:50-80` uses retired `~/.config/github-copilot/{mcp-servers,agents}.json` locations and `gh copilot suggest`. Current GitHub guidance uses `~/.copilot/mcp-config.json` and `copilot mcp add`/`copilot mcp list`. Remediation: replace both configuration alternatives and the verification command with the current Copilot CLI workflow. [GitHub’s MCP-server guide](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers)\n\n4. **F4 — The MCP version statement contradicts the implementation.** `mcp-server/README.md:345-347` says the server version tracks `mcp-server/package.json`, but it exposes and logs `jitSchema.version` (`mcp-server/index.js:161-165`, `331-333`). Remediation: document the loaded CLI-schema version, or change the server to read and expose the package version.\n\n5. **F5 — Installation’s web-development and static-serving instructions do not provide a reachable API.** `INSTALL.md:204-209` starts Vite on port 5173 and says any static server can serve `dist/`, while the client always requests `${window.location.origin}/api` and Vite defines no proxy (`web/src/api/client.ts:4-9`, `web/vite.config.ts`). Remediation: document a same-origin `/api` reverse proxy or use `jit-server --web-dir web/dist` for the built UI.\n\n6. **F6 — The Web UI README’s local-development procedure also leaves `/api` unroutable.** `web/README.md:45-50` starts Vite and separately tells users to run `jit-server`, but no proxy connects the Vite origin to the server. Remediation: provide a proxy configuration and API-server command, or document the supported same-origin built-asset workflow.\n\n7. **F7 — The root README presents `jit-server` as an unconditional Web UI server.** `README.md:55` omits that it serves UI assets only when they were embedded at build time or supplied with `--web-dir`; release binaries are built before the separate web bundle, and `web/dist` is untracked. Remediation: qualify the capability and link to the required asset-serving workflow.\n\n8. **F8 — The individual Web UI container example cannot reach the API container.** `INSTALL.md:116-120` starts the web image without a shared network or `api` alias, while its nginx config proxies `/api/` to `http://api:3000` (`docker/nginx.conf:44-46`). Remediation: prescribe a user-defined network with the API container aliased as `api`, or direct users to Compose.\n\n9. **F9 — The documented CLI “interactive shell” starts `jit sh`, not a shell.** `INSTALL.md:133-138` appends `sh` to an image whose entrypoint is `jit` (`docker/Dockerfile.cli:34-35`). Remediation: add `--entrypoint sh` before the image name.\n\n10. **F10 — The all-in-one container does not supply nginx’s required `api` hostname.** `INSTALL.md:143-150` claims to run API and UI together, but nginx still proxies to `api:3000` and the entrypoint starts `jit-server` locally without creating that hostname (`docker/nginx.conf:44-46`, `docker/entrypoint.sh:12-18`). Remediation: add an `api` host alias mapped to loopback in the invocation/image, or use an nginx upstream that targets the local server.\n\nTotal findings: 10\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Ten blocking documentation defects remain in MCP setup/versioning and Docker/web deployment guidance.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"INSTALL.md runs MCP tests without putting the freshly built jit binary on PATH.\",\"file\":\"INSTALL.md\",\"line\":190},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The MCP README starts the server without documenting its required jit executable on PATH.\",\"file\":\"mcp-server/README.md\",\"line\":31},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The GitHub Copilot CLI configuration paths and verification command are obsolete.\",\"file\":\"mcp-server/README.md\",\"line\":50},{\"id\":\"F4\",\"severity\":\"medium\",\"summary\":\"The MCP README says the server version tracks package.json although implementation exposes the loaded CLI schema version.\",\"file\":\"mcp-server/README.md\",\"line\":345},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"INSTALL.md web development and static-serving steps omit the required same-origin API proxy.\",\"file\":\"INSTALL.md\",\"line\":205},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"The Web UI README local-development flow leaves the Vite-origin /api requests unroutable.\",\"file\":\"web/README.md\",\"line\":45},{\"id\":\"F7\",\"severity\":\"medium\",\"summary\":\"README.md describes jit-server as an unconditional Web UI server despite its conditional embedded or filesystem assets.\",\"file\":\"README.md\",\"line\":55},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"The individual Web UI container example supplies no network alias for nginx's required api host.\",\"file\":\"INSTALL.md\",\"line\":116},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"The documented interactive shell command appends sh to the jit image entrypoint instead of starting a shell.\",\"file\":\"INSTALL.md\",\"line\":134},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"The all-in-one container example does not provide nginx's required api hostname for its local jit-server.\",\"file\":\"INSTALL.md\",\"line\":144}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 23061 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f5121-6c0b-7e70-b962-c08a96c61497\n--------\nuser\n--- 23048 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Ten blocking documentation defects remain in MCP setup/versioning and Docker/web deployment guidance.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "INSTALL.md runs MCP tests without putting the freshly built jit binary on PATH.",
+        "file": "INSTALL.md",
+        "line": 190
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The MCP README starts the server without documenting its required jit executable on PATH.",
+        "file": "mcp-server/README.md",
+        "line": 31
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "The GitHub Copilot CLI configuration paths and verification command are obsolete.",
+        "file": "mcp-server/README.md",
+        "line": 50
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "summary": "The MCP README says the server version tracks package.json although implementation exposes the loaded CLI schema version.",
+        "file": "mcp-server/README.md",
+        "line": 345
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "INSTALL.md web development and static-serving steps omit the required same-origin API proxy.",
+        "file": "INSTALL.md",
+        "line": 205
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "The Web UI README local-development flow leaves the Vite-origin /api requests unroutable.",
+        "file": "web/README.md",
+        "line": 45
+      },
+      {
+        "id": "F7",
+        "severity": "medium",
+        "summary": "README.md describes jit-server as an unconditional Web UI server despite its conditional embedded or filesystem assets.",
+        "file": "README.md",
+        "line": 55
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "The individual Web UI container example supplies no network alias for nginx's required api host.",
+        "file": "INSTALL.md",
+        "line": 116
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "The documented interactive shell command appends sh to the jit image entrypoint instead of starting a shell.",
+        "file": "INSTALL.md",
+        "line": 134
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "The all-in-one container example does not provide nginx's required api hostname for its local jit-server.",
+        "file": "INSTALL.md",
+        "line": 144
+      }
+    ]
+  }
+}
