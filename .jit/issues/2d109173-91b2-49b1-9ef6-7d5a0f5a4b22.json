@@ -23,17 +23,17 @@
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T18:55:32.579194500Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T18:55:39.983360675Z"
+      "updated_at": "2026-07-11T19:04:01.551757493Z"
     },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T18:55:32.267156014Z"
+      "updated_at": "2026-07-11T19:04:01.240009206Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T19:04:09.163274578Z"
     }
   },
   "context": {},
@@ -53,7 +53,7 @@
     "type:epic"
   ],
   "created_at": "2026-07-10T19:05:20.205447770Z",
-  "updated_at": "2026-07-11T19:01:30.708194663Z",
+  "updated_at": "2026-07-11T19:05:04.882142085Z",
   "first_ready_at": "2026-07-10T19:05:20.205456080Z",
   "claimed_at": "2026-07-10T21:51:37.018064530Z"
 }

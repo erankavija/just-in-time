@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "0a72c63d-0b2e-4c15-b3c6-6a0e916bccd8",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "6b7ad215fa74482e693c437c6fbc1e50fd09f64c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T19:04:09.163274578Z",
+  "completed_at": "2026-07-11T19:05:04.881917775Z",
+  "duration_ms": 55718,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. Three findings from the latest review are resolved, but the lease-acquisition finding remains partially unresolved.\n\nAt [docs/concepts/guarantees.md:106](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:106), the second agent still “verif[ies] issue unassigned.” The coordinator actually checks the claims index for an active lease, as shown in `claim_coordinator.rs` lines 410–421. Assignment is updated only after lease acquisition.\n\n## 2. Adopter surface versus repo-local configuration\n\nPass. Repository-specific types, namespaces, rules, gates, and templates are appropriately identified as examples or dogfood configuration.\n\n## 3. Current behavior only\n\nPass. No legacy or future-state narration about JIT behavior was found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No unsupported volatile product totals were found.\n\n## 5. Links and referenced paths resolve\n\nPass. The mechanical audit confirms that Markdown links, anchors, cited repository paths, addressable-item citations, and projections resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid. The remaining box-drawing blocks are permitted directory trees or CLI output. No relevant plain-text mathematics or heading-depth defect was found.\n\n## Findings\n\n1. **F1 — The lease-acquisition diagram still checks issue assignment instead of lease availability.** [docs/concepts/guarantees.md:106](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:106) says the second agent verifies that the issue is unassigned before receiving `Already claimed`. The coordinator instead rejects acquisition when `claims.index.json` contains an active lease for the issue, regardless of its recorded assignee. Remediate the second-agent step to say “verify no active lease,” matching the first-agent step and the coordinator.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking documentation defect remains in the lease-acquisition sequence diagram.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The lease-acquisition diagram still checks issue assignment instead of active lease availability.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":106}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1238 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5290-cd6f-7c32-ad8a-90641c382fa6\n--------\nuser\n--- 1225 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking documentation defect remains in the lease-acquisition sequence diagram.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The lease-acquisition diagram still checks issue assignment instead of active lease availability.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 106
+      }
+    ]
+  }
+}

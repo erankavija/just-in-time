@@ -103,7 +103,7 @@ sequenceDiagram
     A1->>L: release lock
     L-->>A2: lock acquired
     A2->>A2: read claims index
-    A2->>A2: verify issue unassigned
+    A2->>A2: verify no active lease
     Note over A2: ERROR: Already claimed
 ```
 
