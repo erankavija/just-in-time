@@ -2798,7 +2798,9 @@ Start the JIT API and web UI server for the current repository as a background
 daemon, or inspect or stop a running one. jit runs one server process per
 repository, tracked by a PID file (`server.pid.json` under `.jit/`); a second
 `jit serve` reports the already-running server rather than starting a duplicate. When the
-preferred port is taken, jit auto-selects a free port in the range 3000–3099. The
+preferred port is taken, jit scans upward from the requested port through
+requested+99 for the first free one (so 3000–3099 for the default `--port 3000`,
+or 5000–5099 for `--port 5000`). The
 server exposes the HTTP API under `/api` and the web UI at `/` — from built
 static files when a web directory is found, otherwise from assets embedded in the
 binary.
@@ -2809,11 +2811,11 @@ jit serve [OPTIONS]
 
 | Flag | Description |
 |------|-------------|
-| `--port <PORT>` | Preferred port to listen on (default `3000`); auto-selects from 3000–3099 when it is taken. |
+| `--port <PORT>` | Preferred port to listen on (default `3000`); when it is taken, jit scans the 100 ports from the requested port upward for the first free one (3000–3099 for the default). |
 | `--stop` | Stop the running server for this repository. |
 | `--status` | Report whether a server is running and exit. |
 | `--fg` | Run in the foreground instead of daemonizing (useful for debugging; Ctrl+C stops it). |
-| `--log <FILE>` | Write server output to this file, resolved under `.jit/` (default `server.log` there). |
+| `--log <FILE>` | Write server output to this file. A relative path resolves under `.jit/` (default `server.log` there); an absolute path is used as given. |
 | `--web-dir <DIR>` | Directory of built web UI static files (auto-detected when omitted). |
 | `--json` | Emit machine-readable output. |
 
@@ -2844,8 +2846,10 @@ reports the launched process:
 ```
 
 `status` is `started`, `running` (already up, or the `--status` view), `stopped`,
-`not_running`, or `exited` (a foreground run that ended). `web_ui_source` is
-`embedded` or `filesystem`, per where the UI assets were served from.
+`not_running`, `exited` (a foreground run that ended), or `error` (a
+`--stop`/`--status` operation that failed, carrying an accompanying `error`
+message field). `web_ui_source` is `embedded` or `filesystem`, per where the UI
+assets were served from.
 
 ## Git Hook Commands
 

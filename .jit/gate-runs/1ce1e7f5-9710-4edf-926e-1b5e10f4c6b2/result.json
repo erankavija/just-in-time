@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "1ce1e7f5-9710-4edf-926e-1b5e10f4c6b2",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "8682e95a-bb8a-4c73-8a48-ed712e8b08b0",
+  "commit": "a13afade72742e67a0ac0f43003aed38886596e6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T09:21:19.398993230Z",
+  "completed_at": "2026-07-11T09:23:20.813117779Z",
+  "duration_ms": 121414,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nThe `events` command family, filtering, ordering, limits, defaults, and JSON envelopes match clap and the handlers.\n\nThe prior port-range and absolute-log-path findings are resolved. Two `serve` descriptions still drift:\n\n- `--log` does not affect foreground mode.\n- The `error` status also covers daemon-start failures.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. The sections do not present repository-local configuration as shipped defaults.\n\n## 3. Current behavior only\n\nNo findings. “No longer relevant” is an illustrative rejection reason, not historical narration.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings. The numeric values describe fixed defaults, ranges, examples, or response data rather than volatile product totals.\n\n## 5. Links and referenced paths resolve\n\nNo findings. The mechanical documentation check passes all links, anchors, paths, and item citations. Both concrete invariant address forms resolve through `jit item show`.\n\n## 6. Content-standards conformance\n\nNo findings. The scoped file contains no non-Mermaid authored diagrams or improperly formatted mathematical equations.\n\n## Findings\n\n1. **F1 — `--log` is documented as effective in foreground mode.** [docs/reference/cli-commands.md:2818](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2818) unconditionally says the flag writes server output to the selected file. The `Commands::Serve` foreground branch never reads `log_file` and leaves the child attached to the terminal; only daemon mode passes the log path into `ServeOptions`. Remediation: state that `--log` controls daemon output and is ignored with `--fg`, or document foreground behavior separately.\n\n2. **F2 — The `error` status description omits daemon-start failures.** [docs/reference/cli-commands.md:2849](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2849) limits `error` to failed `--stop` and `--status` operations. The ordinary daemon-start branch also emits `{\"status\":\"error\",\"error\":...}` when `start_server` fails. Remediation: describe `error` as covering start, stop, and status failures, with the accompanying `error` field.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior serve corrections are largely resolved, but the reference still misstates foreground logging and incompletely describes the error status.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"The --log description is unconditional, but foreground mode ignores the log path and leaves server output attached to the terminal.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2818},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The serve error status is documented only for stop and status failures, although daemon-start failures emit the same status.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2849}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3763 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f507b-34c3-7ac0-b6e3-284eebdf04c1\n--------\nuser\n--- 3750 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior serve corrections are largely resolved, but the reference still misstates foreground logging and incompletely describes the error status.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "The --log description is unconditional, but foreground mode ignores the log path and leaves server output attached to the terminal.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2818
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The serve error status is documented only for stop and status failures, although daemon-start failures emit the same status.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 2849
+      }
+    ]
+  }
+}

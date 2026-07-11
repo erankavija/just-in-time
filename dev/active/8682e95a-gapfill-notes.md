@@ -17,11 +17,11 @@ port range 3000–3099) and the dispatch in `crates/jit/src/main.rs:6345-6575`
 
 Flags documented (all in `--schema`):
 
-- `--port <PORT>` — cli.rs:429 `default_value = "3000"`, `u16`; auto-selects 3000–3099 when taken.
+- `--port <PORT>` — cli.rs:429 `default_value = "3000"`, `u16`; when taken, `find_available_port` (serve.rs:238-258) scans `start..=start+99` — the 100 ports from the REQUESTED port upward (3000–3099 for the default; 5000–5099 for `--port 5000`), NOT a fixed 3000–3099.
 - `--stop` — cli.rs:433, `conflicts_with_all = ["status", "fg"]`.
 - `--status` — cli.rs:437, `conflicts_with_all = ["stop", "fg"]`.
 - `--fg` — cli.rs:441.
-- `--log <FILE>` — cli.rs:445, `Option<String>`, resolved under `.jit/` (main.rs:6360 `jit_dir.join(l)`), default `.jit/server.log`.
+- `--log <FILE>` — cli.rs:445, `Option<String>`; main.rs:6360 `jit_dir.join(l)`. `Path::join` keeps an absolute argument absolute, so a RELATIVE path resolves under `.jit/` (default `server.log` there) while an ABSOLUTE path is used as given.
 - `--web-dir <DIR>` — cli.rs:449, auto-detected when omitted.
 - `--json` — cli.rs:453.
 
@@ -73,3 +73,28 @@ The event object shape and the full set of event `type` tags are NOT hand-copied
   bare filename in the backtick span and `.jit/` as a separate trailing-slash dir
   token, both of which M3 defers — rather than asserting a path that will never
   exist in the tree.
+
+## Rework attempt 1 (doc-review: 3 serve behavioral drifts)
+
+All three verified against source and corrected; events section untouched.
+
+- F1 [high] port range — was "auto-selects a free port in the range 3000–3099"
+  (fixed range). `find_available_port` (serve.rs:238-258) scans `start..=start+99`
+  RELATIVE to the requested port. Fixed in BOTH the prose (the range is only
+  3000–3099 for the default) and the `--port` flag-table row (the lead cited only
+  the prose; the flag row carried the same fixed-range claim and was corrected too).
+- F2 [medium] `--log` absolute paths — was "resolved under `.jit/`" flat.
+  main.rs:6360 `jit_dir.join(l)`; `Path::join` leaves an absolute argument
+  absolute. Flag row now: relative → under `.jit/`; absolute → used as given.
+- F3 [medium] status taxonomy — added `error` (emitted by the serve handler on a
+  `--stop`/`--status` failure as `{"status":"error","error":<msg>}`), which the
+  documented `status` value list had omitted.
+
+Behavioral sweep of the whole serve section (each claim re-verified, no further
+drift): background-daemon start (start_server daemonizes); PID file
+`.jit/server.pid.json` (serve.rs:3); already-running dedup (ServeOutcome::
+AlreadyRunning); `/api` + `/` endpoints and filesystem-vs-embedded UI (main.rs
+prints; web_ui_source); `--stop`/`--status`/`--fg` mutual exclusion (clap
+conflicts_with_all); `--web-dir` auto-detect (find_web_dir); `--json` started
+shape `{status,pid,port,url,log_file,web_ui,web_ui_source}` (main.rs:6542-6564,
+web_ui hardcoded true on start). All match source.
