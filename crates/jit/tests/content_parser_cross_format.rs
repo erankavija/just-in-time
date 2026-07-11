@@ -183,6 +183,8 @@ fn hard_criterion_rule() -> Rule {
     });
     Rule {
         name: "success-criteria-has-hard".to_string(),
+        origin: None,
+        description: None,
         when: Selector::default(),
         severity: Severity::Error,
         enforce: false,

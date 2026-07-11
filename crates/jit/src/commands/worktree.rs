@@ -315,7 +315,7 @@ fn execute_worktree_list_at(
                 identity.worktree_id
             } else {
                 // No .jit directory yet - use branch-based temporary ID
-                format!("wt:{}", &git_entry.branch)
+                format!("wt:{}", git_entry.branch)
             };
 
             // Count active claims for this worktree

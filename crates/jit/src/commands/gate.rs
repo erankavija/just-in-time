@@ -697,7 +697,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
                     "Gate '{}' is automated and cannot be manually failed. Use 'jit gate evaluate {} {}' to run the checker.",
-                    gate_key, &full_id, gate_key
+                    gate_key, full_id, gate_key
                 ));
             }
         }

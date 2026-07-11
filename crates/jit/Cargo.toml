@@ -2,6 +2,7 @@
 name = "jit"
 version = "0.2.1"
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "CLI-first issue tracker with dependency graphs and quality gates"
 default-run = "jit"
