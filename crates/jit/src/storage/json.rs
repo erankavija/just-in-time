@@ -112,7 +112,9 @@ impl JsonFileStorage {
             .ok()
             .and_then(|s| s.parse().ok())
             .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(5));
+            .unwrap_or(Duration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            ));
 
         let root = root.as_ref().to_path_buf();
         Self {

@@ -46,7 +46,8 @@ pub struct BehaviorSection {
     /// Auto-start heartbeat daemon for lease renewal
     #[serde(default)]
     pub auto_heartbeat: bool,
-    /// Heartbeat interval in seconds (default: 30)
+    /// Heartbeat interval in seconds (default:
+    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`])
     #[serde(default = "default_heartbeat_interval")]
     pub heartbeat_interval: u64,
 }
@@ -55,13 +56,13 @@ impl Default for BehaviorSection {
     fn default() -> Self {
         Self {
             auto_heartbeat: false,
-            heartbeat_interval: 30,
+            heartbeat_interval: default_heartbeat_interval(),
         }
     }
 }
 
 fn default_heartbeat_interval() -> u64 {
-    30
+    crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS
 }
 
 impl AgentConfig {

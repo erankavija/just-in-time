@@ -21,6 +21,7 @@ pub mod hierarchy_templates;
 pub mod labels;
 pub mod output;
 pub mod query_engine;
+pub mod runtime_defaults;
 pub mod schema;
 pub mod search;
 pub mod snapshot;

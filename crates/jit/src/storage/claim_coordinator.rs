@@ -1171,9 +1171,12 @@ impl ClaimCoordinator {
         self.evict_expired(&mut index)?;
         self.write_index_atomic(&index)?;
 
-        // 4. Clean up orphaned temp files (1 hour threshold)
+        // 4. Clean up orphaned temp files
         let jit_data_dir = &self.paths.local_jit;
-        if let Err(e) = temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
+        if let Err(e) = temp_cleanup::cleanup_orphaned_temp_files(
+            jit_data_dir,
+            crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
+        ) {
             // Surface but don't fail - temp file cleanup is best-effort.
             warnings.push(StorageWarning::TempCleanupFailed {
                 reason: e.to_string(),

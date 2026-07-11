@@ -2568,7 +2568,7 @@ pub enum ClaimCommands {
         issue_id: String,
 
         /// Time-to-live in seconds (0 for indefinite, requires --reason)
-        #[arg(long, default_value = "600")]
+        #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         ttl: u64,
 
         /// Agent identifier (defaults to current agent from config)
@@ -2620,7 +2620,7 @@ pub enum ClaimCommands {
         lease_id: String,
 
         /// How many seconds to extend the lease by
-        #[arg(long, default_value = "600")]
+        #[arg(long, default_value_t = crate::runtime_defaults::CLAIM_TTL_SECS)]
         extension: u64,
 
         /// Output as JSON

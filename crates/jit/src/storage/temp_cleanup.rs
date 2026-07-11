@@ -17,7 +17,8 @@ use std::time::{Duration, SystemTime};
 /// # Arguments
 ///
 /// * `root` - Root directory to scan (typically `.jit/`)
-/// * `threshold_secs` - Age threshold in seconds (default: 3600 = 1 hour)
+/// * `threshold_secs` - Age threshold in seconds (recovery passes
+///   [`crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS`])
 ///
 /// # Returns
 ///

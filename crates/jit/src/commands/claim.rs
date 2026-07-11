@@ -835,10 +835,13 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     coordinator.write_index_atomic(&index)?;
     report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
 
-    // 4. Clean up orphaned temp files (1 hour threshold). Best-effort: a
-    // failure is surfaced as a warning rather than aborting recovery.
+    // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
+    // warning rather than aborting recovery.
     let jit_data_dir = &paths.local_jit;
-    match temp_cleanup::cleanup_orphaned_temp_files(jit_data_dir, 3600) {
+    match temp_cleanup::cleanup_orphaned_temp_files(
+        jit_data_dir,
+        crate::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS,
+    ) {
         Ok(removed) => report.temp_files_removed = removed,
         Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
             reason: e.to_string(),

@@ -131,7 +131,7 @@ impl FileLocker {
 
         // Try to acquire lock with polling and timeout
         let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(10);
+        let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
 
         loop {
             match Fs4FileExt::try_lock_exclusive(&file) {
@@ -169,7 +169,7 @@ impl FileLocker {
         let file = self.open_or_create(path)?;
 
         let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(10);
+        let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
 
         loop {
             match Fs4FileExt::try_lock_shared(&file) {
@@ -256,7 +256,7 @@ impl FileLocker {
 
         // Try to acquire lock with polling and timeout
         let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(10);
+        let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
 
         loop {
             match Fs4FileExt::try_lock_exclusive(&file) {
