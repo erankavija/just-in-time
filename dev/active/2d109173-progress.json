@@ -17,12 +17,12 @@
       "wave_number": 2,
       "note": "6 disjoint-footprint content audits, parallel via worktrees.",
       "issues": [
-        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "pending"},
-        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "pending"},
-        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "pending"},
-        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "pending"},
-        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "pending"},
-        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "pending"}
+        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "dispatched"},
+        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "dispatched"},
+        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "dispatched"},
+        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "dispatched"},
+        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "dispatched"},
+        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "dispatched"}
       ]
     },
     {
