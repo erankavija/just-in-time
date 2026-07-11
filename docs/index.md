@@ -56,8 +56,8 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
 - [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
 
-### 🧪 [Examples](examples/) - Sample Configurations
-*Runnable `.jit/` configurations for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
+### 🧪 [Examples](examples/) - Sample Configurations and Rulesets
+*Ready-to-copy configuration and ruleset examples for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
 
 - [sdd](examples/sdd/) - Spec-Driven Development
 - [bug-repro](examples/bug-repro/) - bug triage
@@ -91,5 +91,4 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 **Development documentation** (`dev/`) covers how we build JIT itself - see [dev/index.md](../dev/index.md) for contributor resources.
 
 ---
-
 
