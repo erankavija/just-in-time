@@ -559,8 +559,10 @@ Gates run at two stages in the issue lifecycle:
 flowchart LR
     R[ready] -->|"precheck: tdd-reminder"| P[in_progress]
     P --> W[work happens]
-    W -->|"postcheck: tests, clippy, code-review"| G[gated]
-    G --> D[done]
+    W -->|"update --state done"| Q{"postcheck gates<br/>already passed?"}
+    Q -->|no| G[gated]
+    Q -->|yes| D[done]
+    G -->|"evaluate gates → all pass"| D
 ```
 
 ### Gate Modes: Manual vs Automated

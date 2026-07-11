@@ -98,7 +98,7 @@ sequenceDiagram
     L-->>A1: lock acquired
     Note over A2: blocked waiting for lock
     A1->>A1: read claims index
-    A1->>A1: verify issue unassigned
+    A1->>A1: verify no active lease
     A1->>A1: write new claim
     A1->>L: release lock
     L-->>A2: lock acquired

@@ -19,7 +19,7 @@ Complete reference for JIT configuration options.
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
 
-Priority: environment variables > repository > user > system > hardcoded defaults.
+Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. Some execution paths (structural lease enforcement, claim coordination limits) read the repository `.jit/config.toml` directly rather than through this merge.
 
 ---
 

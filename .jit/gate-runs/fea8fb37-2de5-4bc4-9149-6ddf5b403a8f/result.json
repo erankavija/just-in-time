@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "run_id": "fea8fb37-2de5-4bc4-9149-6ddf5b403a8f",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "2dd1dd59efa43f35541ed2b76e847bf6182f8d00",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T18:55:39.983360675Z",
+  "completed_at": "2026-07-11T19:01:30.707986293Z",
+  "duration_ms": 350724,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. The prior quickstart finding is resolved, but four source mismatches remain:\n\n- [cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:96) accepts prefixes shorter than the documented “any unique prefix” claim only after four normalized characters.\n- [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:101) depicts lease acquisition checking whether an issue is unassigned. The coordinator checks for an existing active lease; acquisition can replace a different recorded assignee.\n- [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:562) depicts postcheck execution as moving work into `gated`. Gate evaluation records results; a completion request with unpassed gates causes that transition.\n- [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:22) presents environment/repository/user/system precedence as universal runtime behavior. Structural lease enforcement and claim policy limits currently consume repository configuration directly; the merged layering primarily governs configuration inspection.\n\n## 2. Adopter surface versus repo-local configuration\n\nPass. Repository-specific types, namespaces, rules, templates, and gates are identified as dogfood configuration, worked examples, or opt-in configuration.\n\n## 3. Current behavior only\n\nPass. The matched historical-marker phrases are ordinary grammar or illustrative statements, not narration of past or future JIT behavior.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No unsupported volatile product totals were found.\n\n## 5. Links and referenced paths resolve\n\nPass. The full mechanical audit confirms that Markdown links, heading anchors, repository paths, addressable-item citations, and projections resolve.\n\n## 6. Content-standards conformance\n\nPass. Diagrams use Mermaid. Plain-text tree blocks are permitted directory listings or CLI output. No relevant plain-text mathematics or heading-depth defect was found.\n\n## Findings\n\n1. **F1 — Issue-prefix grammar omits the four-character minimum.** [docs/reference/cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:96) says an issue reference may be “any unique prefix,” while `resolve_issue_id` rejects normalized prefixes shorter than four characters. Remediate the accepted-forms table and consistency prose to require a unique prefix of at least four characters.\n\n2. **F2 — Lease-acquisition diagram checks the wrong condition.** [docs/concepts/guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:101) and line 106 say the coordinator verifies that the issue is unassigned. It checks whether an active lease already exists; `jit claim acquire` can overwrite a different issue assignee after acquiring the lease. Remediate both diagram steps to say “verify no active lease.”\n\n3. **F3 — Gate workflow diagram attributes the `gated` transition to postchecks.** [docs/concepts/core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:562) shows postchecks moving work from the work phase to `gated`. Evaluating postchecks only records gate results; requesting `done` with unpassed gates causes the diversion to `gated`, while already-passed gates permit direct completion. Remediate the diagram to show those two completion-request outcomes explicitly.\n\n4. **F4 — Configuration precedence is overstated as universal runtime behavior.** [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:22) says environment variables, repository, user, system, and defaults form one general priority chain. Current structural lease enforcement reads the repository’s `.jit/config.toml` through `ConfigManager`, and claim acquisition loads repository coordination limits directly; the system/user merge and related environment overrides are used by the effective configuration inspection surface rather than those execution paths. Remediate the precedence statement and runtime sections to distinguish effective configuration display from configuration actually consumed by commands.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four blocking documentation mismatches remain in issue-prefix grammar, lease acquisition, gate transitions, and configuration precedence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Issue-reference grammar incorrectly permits any unique prefix without stating the four-character minimum.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":96},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The lease-acquisition diagram incorrectly says the coordinator verifies that the issue is unassigned.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":101},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The gate workflow diagram incorrectly depicts postcheck execution as causing the gated transition.\",\"file\":\"docs/concepts/core-model.md\",\"line\":562},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Configuration precedence is documented as universal although execution paths consume repository configuration directly.\",\"file\":\"docs/reference/configuration.md\",\"line\":22}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9257 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5289-087a-73a3-8916-577deacbbd55\n--------\nuser\n--- 9244 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Four blocking documentation mismatches remain in issue-prefix grammar, lease acquisition, gate transitions, and configuration precedence.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Issue-reference grammar incorrectly permits any unique prefix without stating the four-character minimum.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 96
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The lease-acquisition diagram incorrectly says the coordinator verifies that the issue is unassigned.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 101
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "The gate workflow diagram incorrectly depicts postcheck execution as causing the gated transition.",
+        "file": "docs/concepts/core-model.md",
+        "line": 562
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Configuration precedence is documented as universal although execution paths consume repository configuration directly.",
+        "file": "docs/reference/configuration.md",
+        "line": 22
+      }
+    ]
+  }
+}
