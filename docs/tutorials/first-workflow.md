@@ -151,44 +151,28 @@ jit query blocked
 
 # Query what's ready
 jit query available
-# Shows: Nothing ready (tasks have unpassed gates)
+# Shows: the three tasks — ready to claim (the epic stays blocked until they finish)
 ```
 
 **What we did:**
 - Created dependency relationships (epic ← tasks)
 - Visualized the graph
-- Queried to understand blocking
+- Queried to understand blocking (the epic is blocked; the tasks are ready)
 
-## Step 4: Pass Prechecks and Mark Ready
+## Step 4: Confirm the Tasks Are Ready
 
-In a real workflow, these gates would be passed automatically or by team members:
+The tasks have no dependencies of their own, so JIT created them directly in the `ready` state — no manual transition is needed. Their gates are postchecks, verified at completion (Step 7), not before work starts. Only the epic is blocked, waiting on the tasks.
 
 ```bash
-# Pass gates for Task 1
-jit gate evaluate $TASK1 unit-tests --by "ci:github-actions"
-jit gate evaluate $TASK1 review --by "human:tech-lead"
-jit issue update $TASK1 --state ready
-
-# Pass gates for Task 2
-jit gate evaluate $TASK2 unit-tests --by "ci:github-actions"
-jit gate evaluate $TASK2 review --by "human:tech-lead"
-jit issue update $TASK2 --state ready
-
-# Pass gates for Task 3
-jit gate evaluate $TASK3 unit-tests --by "ci:github-actions"
-jit gate evaluate $TASK3 review --by "human:tech-lead"
-jit issue update $TASK3 --state ready
-
 # Check status
 jit status
 jit query available
-# Shows: All 3 tasks are now ready to claim
+# Shows: all 3 tasks ready to claim (the epic stays blocked)
 ```
 
 **What we did:**
-- Passed required gates (simulating CI and human review)
-- Transitioned tasks to ready state
-- Tasks are now available for agents to claim
+- Confirmed the tasks are ready to claim — readiness is automatic once dependencies clear
+- Confirmed the epic stays blocked until its task dependencies finish
 
 ## Step 5: Agents Claim and Work on Tasks
 
@@ -233,15 +217,11 @@ TASK4=$(jit issue create \
   --gate review \
   --json | jq -r '.id')
 
-# Add to epic dependencies (epic now waits for this too)
+# Add to epic dependencies (the epic now waits for this too)
 jit dep add $EPIC $TASK4
 
-# Pass gates and make ready
-jit gate evaluate $TASK4 unit-tests --by "ci:github-actions"
-jit gate evaluate $TASK4 review --by "human:security-team"
-jit issue update $TASK4 --state ready
-
-# Another agent claims it
+# The new task is ready immediately (no dependencies of its own),
+# so another agent claims it right away
 jit issue claim $TASK4 agent:worker-3
 
 echo "Added critical security task: $TASK4"
@@ -253,26 +233,37 @@ echo "Added critical security task: $TASK4"
 - Another agent picked it up
 - Epic automatically updated (now waits for 4 tasks)
 
-## Step 7: Complete the Tasks
+## Step 7: Pass Gates and Complete the Tasks
 
-As agents finish work, mark tasks complete:
+As agents finish work, they pass each task's postcheck gates (unit tests, review), then mark it done. A task whose gates are not yet passed diverts to `gated` instead of `done`:
 
 ```bash
-# Agents complete their work
+# Pass each task's gates (simulating CI and human review), then complete it
+jit gate evaluate $TASK1 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK1 review --by "human:tech-lead"
 jit issue update $TASK1 --state done
+
+jit gate evaluate $TASK2 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK2 review --by "human:tech-lead"
 jit issue update $TASK2 --state done
+
+jit gate evaluate $TASK3 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK3 review --by "human:tech-lead"
 jit issue update $TASK3 --state done
+
+jit gate evaluate $TASK4 unit-tests --by "ci:github-actions"
+jit gate evaluate $TASK4 review --by "human:security-team"
 jit issue update $TASK4 --state done
 
 # Check status
 jit status
 jit query blocked
-# Epic should now be unblocked (all dependencies reached a terminal state)
+# Epic is now unblocked (all dependencies reached a terminal state)
 ```
 
 **What we did:**
-- Marked all tasks complete
-- Epic automatically became unblocked
+- Passed each task's postcheck gates, then marked it done
+- The epic automatically became unblocked once its dependencies reached a terminal state
 - Ready for final integration
 
 ## Step 8: Complete the Epic
@@ -280,15 +271,13 @@ jit query blocked
 Final integration and epic completion:
 
 ```bash
-# Epic is unblocked, but still needs its own gates
+# The epic became ready automatically once its task dependencies finished.
+# The lead agent claims it, then passes the epic's own postcheck gates.
+jit issue claim $EPIC agent:lead
 jit gate evaluate $EPIC review --by "human:tech-lead"
 jit gate evaluate $EPIC integration-tests --by "ci:github-actions"
 
-# Epic is now ready
-jit issue update $EPIC --state ready
-
-# Lead agent claims and completes
-jit issue claim $EPIC agent:lead
+# Complete the epic
 jit issue update $EPIC --state done
 
 # Final status
@@ -297,8 +286,8 @@ jit status
 ```
 
 **What we did:**
-- Passed epic-level gates (review, integration tests)
-- Lead agent claimed the epic
+- The epic became ready automatically once its dependencies finished
+- Lead agent claimed the epic and passed its postcheck gates (review, integration tests)
 - Completed the epic
 - Entire feature is done!
 

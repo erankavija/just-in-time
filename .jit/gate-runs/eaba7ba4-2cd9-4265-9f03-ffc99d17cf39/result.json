@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "run_id": "eaba7ba4-2cd9-4265-9f03-ffc99d17cf39",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4c33d0e5-2740-4bb9-b446-dfa4ef8a2f57",
+  "commit": "ff7355fde187aea6d363d83699e7959a8a829d27",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T07:58:03.594583670Z",
+  "completed_at": "2026-07-11T08:01:19.034017499Z",
+  "duration_ms": 195439,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nBlocking findings:\n\n- `docs/tutorials/quickstart.md:12` and `:167` present `backlog → ready → in_progress → done` as the issue-state set. The current state enum also includes `gated`, `rejected`, and `archived`. Remediation: enumerate the complete lifecycle or explicitly label the four-state sequence as the common successful path.\n- `docs/tutorials/first-workflow.md:241` describes automatic gate evaluation as “simulating CI and human review.” The `unit-tests` and `integration-tests` gates defined at lines 30–47 are automatic gates whose checker commands actually execute. The tutorial neither creates a compatible Cargo project nor supplies the named integration-test target, and its SQLAlchemy example suggests a non-Rust project. Remediation: provide a runnable checker environment and test target, or define these tutorial gates as manual when the intended behavior is simulated attestation.\n- `docs/tutorials/parallel-work-worktrees.md:65` gives an invalid persistent `agent.toml`: `created_at` is required by `AgentSection` and has no default. Remediation: add a valid ISO-8601 `created_at` value and, if useful, the optional behavior/default-TTL fields.\n- `docs/tutorials/parallel-work-worktrees.md:164` and `:205` claim a commit merged into main becomes visible in another worktree automatically. Local `.jit/issues/*.json` files take precedence over Git HEAD, and another worktree remains on its own branch until it merges, rebases, or otherwise updates it. Remediation: instruct the reader to update the other worktree’s branch before expecting the merged issue revision.\n- `docs/tutorials/parallel-work-worktrees.md:186` depicts `.jit/issues/task-1.json`, but persisted issue filenames use full UUIDs. Remediation: show a UUID-shaped filename or label the node generically as `.jit/issues/<issue-uuid>.json`.\n- `docs/tutorials/parallel-work-worktrees.md:13` and `:98` say claiming an issue prevents conflicts. A lease prevents a second lease acquisition, but mutations are not categorically prevented unless lease enforcement is configured appropriately. Remediation: describe claims as coordination, and document the required `worktree.enforce_leases` setting if hard mutation enforcement is intended.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. The tutorials do not present the repository-specific type, namespace, rule, template, item-kind, or checker-script configuration as shipped defaults.\n\n## 3. Current behavior only\n\nNo legacy, migration, in-flight, future-state, or roadmap narration was found in the scoped footprint.\n\n## 4. No hardcoded counts that silently rot\n\nNo volatile product totals were found. Counts of tutorial-created example issues and estimated lesson durations are structurally local to the tutorials rather than copied product registries.\n\n## 5. Links and referenced paths resolve\n\nThe scoped mechanical checks report that all Markdown links, anchors, cited paths, and addressable-item citations resolve. No `@/<kind>/<self-id>` citations occur in the tutorials.\n\nOne prerequisite defect remains:\n\n- `docs/tutorials/quickstart.md:70` lists JIT and basic shell knowledge but omits `jq`, although the required commands at lines 91–100 use it. Remediation: add `jq` to the prerequisites or replace those pipelines with a JIT-only mechanism. Because First Workflow requires completing Quickstart, correcting Quickstart’s prerequisite is sufficient for that sequence.\n\n## 6. Content-standards conformance\n\nNo non-Mermaid diagrams, plain-text equations, or excessive heading depth were found. The plain-text blocks in the worktree tutorial are CLI output, while its actual diagram is Mermaid.\n\n## Consolidated findings\n\n1. **F1 — Incomplete issue-state surface:** `docs/tutorials/quickstart.md:12` and `:167` present only four of the seven current states. Remediation: list all states or call the sequence the common successful path.\n2. **F2 — Automatic gates cannot be completed as written:** `docs/tutorials/first-workflow.md:241` calls real automatic checker execution a simulation without preparing the required Cargo test environment. Remediation: provide runnable tests or use manual gates for simulated attestations.\n3. **F3 — Invalid persistent agent configuration:** `docs/tutorials/parallel-work-worktrees.md:65` omits required `created_at`. Remediation: add a valid ISO-8601 value.\n4. **F4 — Cross-worktree update visibility is overstated:** `docs/tutorials/parallel-work-worktrees.md:164` and `:205` omit the branch update required before another worktree sees a merged issue revision. Remediation: add the merge/rebase/update step.\n5. **F5 — Incorrect persisted issue filename:** `docs/tutorials/parallel-work-worktrees.md:186` uses `task-1.json` instead of the UUID-based filename written by storage. Remediation: use a UUID-shaped or explicitly generic path.\n6. **F6 — Lease guarantees are overstated:** `docs/tutorials/parallel-work-worktrees.md:13` and `:98` imply claims alone prevent edits from conflicting. Remediation: distinguish coordination from enforced mutation blocking and name the required enforcement configuration.\n7. **F7 — Missing `jq` prerequisite:** `docs/tutorials/quickstart.md:70` omits a tool required by commands at lines 91–100. Remediation: list `jq` or remove the dependency.\n\nTotal findings: 7\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Seven blocking tutorial defects remain: incomplete state documentation, a non-self-contained automatic-gate workflow, invalid agent configuration, overstated worktree visibility and lease guarantees, an incorrect storage filename, and a missing jq prerequisite.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"summary\":\"Quickstart presents only four of the seven current issue states\",\"file\":\"docs/tutorials/quickstart.md\",\"line\":12},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"First Workflow treats real automatic checker execution as a simulation without preparing a runnable Cargo test environment\",\"file\":\"docs/tutorials/first-workflow.md\",\"line\":241},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Persistent agent.toml example omits the required created_at field\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":65},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Tutorial claims merged issue changes automatically appear in other worktrees without updating their branches\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":164},{\"id\":\"F5\",\"severity\":\"medium\",\"summary\":\"Mermaid storage diagram shows a non-UUID issue filename\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":186},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"Tutorial overstates leases as preventing conflicts without requiring mutation enforcement\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":13},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Quickstart omits jq from prerequisites despite requiring it in command pipelines\",\"file\":\"docs/tutorials/quickstart.md\",\"line\":70}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4025 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f502e-f9f2-7a60-9c72-6c8585f9c8c2\n--------\nuser\n--- 4012 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Seven blocking tutorial defects remain: incomplete state documentation, a non-self-contained automatic-gate workflow, invalid agent configuration, overstated worktree visibility and lease guarantees, an incorrect storage filename, and a missing jq prerequisite.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "summary": "Quickstart presents only four of the seven current issue states",
+        "file": "docs/tutorials/quickstart.md",
+        "line": 12
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "First Workflow treats real automatic checker execution as a simulation without preparing a runnable Cargo test environment",
+        "file": "docs/tutorials/first-workflow.md",
+        "line": 241
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Persistent agent.toml example omits the required created_at field",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 65
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Tutorial claims merged issue changes automatically appear in other worktrees without updating their branches",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 164
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "summary": "Mermaid storage diagram shows a non-UUID issue filename",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 186
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "Tutorial overstates leases as preventing conflicts without requiring mutation enforcement",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 13
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Quickstart omits jq from prerequisites despite requiring it in command pipelines",
+        "file": "docs/tutorials/quickstart.md",
+        "line": 70
+      }
+    ]
+  }
+}

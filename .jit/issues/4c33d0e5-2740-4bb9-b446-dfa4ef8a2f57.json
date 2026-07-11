@@ -15,10 +15,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T07:57:59.959982587Z"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T23:31:26.311051701Z"
+      "updated_at": "2026-07-11T07:57:59.849133057Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-11T07:58:03.594583670Z"
     }
   },
   "context": {},
@@ -29,6 +39,23 @@
       "label": null,
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/4c33d0e5-audit-notes.md",
+      "commit": null,
+      "label": "Audit notes",
+      "doc_type": "documentation",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "../reference/configuration.md",
+          "resolved_path": "dev/reference/configuration.md",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -43,7 +70,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-10T20:45:11.255393099Z",
-  "updated_at": "2026-07-11T07:39:26.772484434Z",
+  "updated_at": "2026-07-11T08:01:19.034255899Z",
   "first_ready_at": "2026-07-10T20:45:11.255402299Z",
   "claimed_at": "2026-07-11T07:39:26.772484274Z"
 }

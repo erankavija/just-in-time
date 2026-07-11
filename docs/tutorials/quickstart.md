@@ -4,12 +4,6 @@
 > **Time:** 10 minutes  
 > **Goal:** Get started with JIT in 10 minutes
 
-# Quickstart
-
-> **Diátaxis Type:** Tutorial  
-> **Time:** 10 minutes  
-> **Goal:** Get started with JIT in 10 minutes
-
 ## For AI Agents: Quick Orientation
 
 **If you're an AI agent**, you want to get productive fast. Here's the 2-minute version:
@@ -18,7 +12,7 @@
 - **Issues** = Units of work (states: backlog → ready → in_progress → done)
 - **Dependencies** = DAG controlling work order (FROM depends on TO)
 - **Gates** = Quality checkpoints that must pass
-- **Labels** = `namespace:value` format for organization (REQUIRED: `type:*`)
+- **Labels** = `namespace:value` format for organization
 - **Assignees** = `{type}:{identifier}` (e.g., `agent:copilot-session-1`)
 
 **Essential Commands:**
@@ -127,7 +121,7 @@ jit issue update $TASK1 --state done
 
 # Check ready again
 jit query available
-# Now TASK2 shows up (no longer blocked)
+# Now TASK2 shows up (TASK1 is done, so it's unblocked)
 ```
 
 ## Add a Quality Gate
