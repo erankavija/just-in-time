@@ -263,7 +263,8 @@
   },
   "rework_counter_note_2d109173": "Reset to 0 on 2026-07-11T20:07 by invoker authorization (answered escalation for doc-review run 5f09939f: 'authorize rework, be rigorous'). Rework cycle 1 done at 2026-07-11T20:13 (commit 2d053fc5): all 10 findings fixed + each defect class swept whole-surface; F2 fixed at the root scaffold string in hierarchy_templates.rs (+test). fmt/clippy/1545 lib tests pass; repo-validate + docs-mechanical pass. doc-review re-run in progress.",
   "started_at": "2026-07-11T00:00:00Z",
-  "resume_pointer": "Wave 7 local rework is complete but awaiting gates because the reviewer service reported a usage limit. Resume after service availability: run the three child gates, close them, run final epic gates including doc-review, and escalate if that review fails because MAX_REWORK_ATTEMPTS=2.",
+  "resume_pointer": "COMPLETE. Epic 2d109173 transitioned to done 2026-07-11. All 18 children done; final container gates doc-review (0 findings, run c59d9cbe), repo-validate, and docs-mechanical all pass. Convergence trajectory 28->13->10->16->3->1->4->1->1->0 after an owner-authorized 8-agent comprehensive whole-surface audit. Completion report: dev/archive/2d109173-completion-report.md.",
+  "final_state": "done",
   "owner_instructions_this_session": [
     "Do the session handoff AFTER wave 4 (36d5451e) completes.",
     "Before Wave 5 (6d82de03) files follow-up issues, INTERVIEW the owner (AskUserQuestion) on which engine issues surfaced during the audit to include. The interview decisions are authoritative and, once made, authorize adding the approved items to 6d82de03's filing scope (owner is the invoker)."
