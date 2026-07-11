@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "90944e13-45c3-457c-b004-3d2cc8396d0c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2b9a80fb-5d06-40e8-b3a0-ef23534cd89a",
+  "commit": "8a2ed6d991690f024a15915c095f812ef6afa9ca",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T08:41:51.663336479Z",
+  "completed_at": "2026-07-11T08:42:46.750919787Z",
+  "duration_ms": 55087,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nNo findings. Documented commands, flags, aliases, JSON shapes, exit codes, storage behavior, and examples match the HEAD-built CLI and current source. The event example correctly uses `issue_state_changed` and `.to`.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. Repository-local types and the `plan` template are appropriately framed as repository configuration.\n\n## 3. Current behavior only\n\nNo findings. The remaining “No longer relevant” phrase defines the current `obsolete` dependency kind; it is not historical narration.\n\n## 4. No hardcoded counts that silently rot\n\nNo findings. The previously unresolved `rust-tdd` gate count at `docs/reference/cli-commands.md:1797` now directs readers to `jit gate preset show rust-tdd` for the current set.\n\n## 5. Links and referenced paths resolve\n\nNo findings. All scoped links, anchors, cited paths, and addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nNo findings. No non-Mermaid diagrams or plain-text mathematics requiring LaTeX were found.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped CLI command catalog matches the current product surface, and the previously unresolved volatile preset count has been corrected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped CLI command catalog matches the current product surface, and the previously unresolved volatile preset count has been corrected.",
+    "findings": []
+  }
+}

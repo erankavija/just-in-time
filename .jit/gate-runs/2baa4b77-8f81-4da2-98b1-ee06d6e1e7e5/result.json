@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "2baa4b77-8f81-4da2-98b1-ee06d6e1e7e5",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2b9a80fb-5d06-40e8-b3a0-ef23534cd89a",
+  "commit": "8a2ed6d991690f024a15915c095f812ef6afa9ca",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T08:39:35.202470248Z",
+  "completed_at": "2026-07-11T08:40:57.222379131Z",
+  "duration_ms": 82019,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nNo findings. The previously reported status-report defect is fixed: the example now accurately labels the metric as completions among the latest 100 events and explains that date filtering requires processing `.timestamp`.\n\nCommand, flag, JSON-envelope, exit-code, storage, and behavioral claims match the current source and freshly built HEAD binary.\n\n## 2. Adopter surface versus dogfood configuration\n\nNo findings. Repository-local types and templates are either absent from general examples or appropriately framed.\n\n## 3. Current behavior only\n\nNo findings. The maintenance command is described in terms of current stored fields and available events, without historical migration narration.\n\n## 4. No hardcoded counts that silently rot\n\n[docs/reference/cli-commands.md:1797](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1797) still says applying `rust-tdd` gives an issue “all 5 quality gates.” This is the same volatile builtin-preset count class identified in the first review run. It can become stale whenever the builtin preset registry changes.\n\nRemediation: remove the count, for example “Issue now has the preset’s quality gates,” or direct readers to `jit gate preset show rust-tdd` for the live gate list and count.\n\n## 5. Links and referenced paths resolve\n\nNo findings. The scoped link/anchor and citation checks pass:\n\n- `OK: all links and anchors resolve`\n- `OK: all cited paths and @/ items resolve`\n\n## 6. Content-standards conformance\n\nNo findings. There are no box-drawing or ASCII-flow diagrams requiring Mermaid conversion, and no plain-text mathematics requiring LaTeX.\n\n## Findings\n\n1. **F1 — High:** The `rust-tdd` workflow example retains the volatile hardcoded claim “all 5 quality gates,” leaving a previously reported preset-count defect unresolved. Remove the count or obtain it from `jit gate preset show rust-tdd`. Location: `docs/reference/cli-commands.md:1797`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One blocking defect remains: the rust-tdd example hardcodes a volatile builtin-preset gate count.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The rust-tdd workflow example hardcodes the volatile claim that the preset contains five quality gates.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1797}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1445 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: none\nreasoning summaries: none\nsession id: 019f5054-fec5-7883-82ed-b0d237f41b02\n--------\nuser\n--- 1432 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One blocking defect remains: the rust-tdd example hardcodes a volatile builtin-preset gate count.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The rust-tdd workflow example hardcodes the volatile claim that the preset contains five quality gates.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1797
+      }
+    ]
+  }
+}

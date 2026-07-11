@@ -1794,7 +1794,7 @@ Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
 # Apply standard workflow to new issue
 jit issue create --title "Add user login"
 jit gate preset apply rust-tdd abc123
-# Issue now has all 5 quality gates
+# Issue now carries the rust-tdd preset's gates (run `jit gate preset show rust-tdd` for the current set)
 ```
 
 **Create Team Standard:**
@@ -3104,13 +3104,17 @@ echo ""
 READY=$(jit query available --json --quiet | jq -r '.count')
 IN_PROGRESS=$(jit query all --state in_progress --json --quiet | jq -r '.count')
 BLOCKED=$(jit query blocked --json --quiet | jq -r '.count')
-DONE_TODAY=$(jit events query --event-type issue_state_changed --limit 100 --json | \
+# jit events query has no date filter (--event-type/--issue-id/--limit only),
+# so this counts done-transitions within the most recent 100 events, not a
+# calendar-day total. Raise --limit or filter on .timestamp in jq for a wider
+# or date-scoped window.
+RECENT_DONE=$(jit events query --event-type issue_state_changed --limit 100 --json | \
   jq -r '[.events[] | select(.to == "done")] | length')
 
 echo "Ready: $READY"
 echo "In Progress: $IN_PROGRESS"
 echo "Blocked: $BLOCKED"
-echo "Completed Today: $DONE_TODAY"
+echo "Recently completed (last 100 events): $RECENT_DONE"
 ```
 
 ### Exit Codes
