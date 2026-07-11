@@ -15,6 +15,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.329398433Z"
+    },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
@@ -29,15 +34,28 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.329445933Z"
-    },
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.329398433Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/reference/exit-codes.md",
+      "commit": null,
+      "label": "Exit Codes",
+      "doc_type": "reference",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "394ce5f81c6ee95d4a8480fd94853a94d8dd000bcb067e666d2ab7963e68b829",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "milestone:v1.0",
@@ -45,7 +63,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.552297391Z",
-  "updated_at": "2026-07-11T22:50:02.244077655Z",
+  "updated_at": "2026-07-11T23:35:12.078274392Z",
   "first_ready_at": "2026-07-11T13:35:35.552297731Z",
   "claimed_at": "2026-07-11T22:50:02.244077385Z"
 }

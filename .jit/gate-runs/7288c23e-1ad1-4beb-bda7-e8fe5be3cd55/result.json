@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "run_id": "7288c23e-1ad1-4beb-bda7-e8fe5be3cd55",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "a72e06e12ee6012a5c526f1c61969ab7ec0f226b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T23:26:32.267255868Z",
+  "completed_at": "2026-07-11T23:28:36.551465854Z",
+  "duration_ms": 124284,
+  "exit_code": 1,
+  "stdout": "Attribution: `ed049e1d` is a level-4 leaf task. I reviewed its two reachable tagged commits (`cf218523` and `a72e06e`) individually; no fallback attribution was needed.\n\nDecision: fail. The new reference is useful, but it makes inaccurate operational claims, leaves a coordination guide unlinked to the projection, and is absent from the reference index.\n\n1. **F1 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:12) says an optional auto-heartbeat daemon renews indefinite leases. Current configuration documentation states behavior fields do not start a heartbeat runner. Replace this scope with the current inert configuration behavior, or implement the daemon before documenting it.\n\n2. **F2 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:5) claims every production call site reads this source of truth. Claim commands still instantiate five-second `FileLocker` timeouts directly, and `storage::heartbeat` retains a separate 30-second default. Centralize those call sites or narrow the reference’s source-of-truth guarantee.\n\n3. **F3 — blocking, issue-impact, medium:** [multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:222) retains an unlinked literal 600-second claim TTL. This is directly affected coordination documentation and does not consume the new mechanically checked projection. Link the statement to `../reference/runtime-defaults.md` and refer to the built-in claim TTL instead of copying the value.\n\n4. **F4 — blocking, issue-impact, medium:** [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:43) omits the new reference from the canonical Reference list. Add a concise Runtime Coordination Defaults entry so users browsing reference material can discover it.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new runtime-defaults reference contains inaccurate operational guarantees and is incompletely integrated into coordination documentation and reference navigation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The heartbeat row documents an auto-heartbeat daemon that the current product does not start.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":12},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The reference falsely says every production call site reads its source of truth.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":5},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The multi-agent coordination guide retains an unlinked copied claim-TTL default instead of consuming the projection.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":222},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new reference is absent from the canonical Reference navigation list.\",\"file\":\"docs/index.md\",\"line\":43}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9232 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5381-0619-79a1-a2ab-1fce2626aa04\n--------\nuser\n--- 9219 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The new runtime-defaults reference contains inaccurate operational guarantees and is incompletely integrated into coordination documentation and reference navigation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The heartbeat row documents an auto-heartbeat daemon that the current product does not start.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 12
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The reference falsely says every production call site reads its source of truth.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 5
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The multi-agent coordination guide retains an unlinked copied claim-TTL default instead of consuming the projection.",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "line": 222
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The new reference is absent from the canonical Reference navigation list.",
+        "file": "docs/index.md",
+        "line": 43
+      }
+    ]
+  }
+}

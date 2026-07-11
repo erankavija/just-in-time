@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "run_id": "3cfa1425-13e6-4fb2-8573-de4f64004f8c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "a72e06e12ee6012a5c526f1c61969ab7ec0f226b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T23:24:45.068150615Z",
+  "completed_at": "2026-07-11T23:26:32.233579713Z",
+  "duration_ms": 107165,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 and REQ-03 are only partially met: the new projection exists and is tested, but a second heartbeat default remains. REQ-02 is unmet because claim documentation still duplicates the TTL without consuming or checking the projection.\n\n## Architecture and correctness\n\nThe new module is pure and production replacements are appropriately scoped. However, the duplicate heartbeat constant breaks the claimed single source of truth. The ignored regeneration test also writes directly rather than atomically.\n\n## Testing and linting\n\nRecorded `cargo-ci` passed: fmt, clippy, and 3,597 tests. `docs-mechanical` passed. I did not rerun cargo tests. `./scripts/jit-validate.sh` currently fails due to an isolated issue.\n\n## CLI and documentation\n\nExisting `--json` support is retained. New public constants lack the required `# Examples` documentation.\n\n## Dependencies and prior feedback\n\nThe sole prerequisite is done. No prior review feedback was supplied.\n\n1. **High** — `crates/jit/src/storage/heartbeat.rs:54` retains an independent public `DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 30`. Changing `runtime_defaults::HEARTBEAT_INTERVAL_SECS` will not update this value, so the claimed single source of truth for the heartbeat default (REQ-01) is false.\n2. **High** — `docs/reference/claim.md:62` and `docs/reference/claim.md:217` hard-code the `600`-second acquire and renew defaults, without linking to or being checked against `runtime-defaults.md`. This leaves existing coordination documentation outside the projection/checking mechanism, failing REQ-02.\n3. **Medium** — `crates/jit/src/runtime_defaults.rs:143` uses `std::fs::write` to regenerate a repository file directly. This bypasses the required temp-file-plus-rename atomic write invariant.\n4. **High** — `./scripts/jit-validate.sh` fails: `.jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json` is an isolated issue with no DAG connection. The required repository validation gate does not pass.\n5. **Medium** — `crates/jit/src/runtime_defaults.rs:15` through `:37` introduce six public constants with descriptions but no required `# Examples` sections.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Runtime-default projection has duplicate and unchecked documentation sources, violates atomic-write and API-doc requirements, and repository validation fails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"A second independent public heartbeat default remains, breaking the claimed single source of truth for REQ-01.\",\"file\":\"crates/jit/src/storage/heartbeat.rs\",\"line\":54},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Claim documentation hard-codes the TTL defaults without consuming or being checked against the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/reference/claim.md\",\"line\":62},{\"id\":\"F3\",\"severity\":\"medium\",\"summary\":\"The ignored regeneration test writes a repository file directly instead of using the required atomic temp-file-and-rename pattern.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":143},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"./scripts/jit-validate.sh fails because issue 71be6ae9 is isolated from the dependency graph.\",\"file\":\".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json\"},{\"id\":\"F5\",\"severity\":\"medium\",\"summary\":\"New public runtime-default constants lack the required # Examples API documentation.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":15}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2207 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f537f-6888-7251-bd3a-7ab1cd23bbc2\n--------\nuser\n--- 2194 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Runtime-default projection has duplicate and unchecked documentation sources, violates atomic-write and API-doc requirements, and repository validation fails.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "A second independent public heartbeat default remains, breaking the claimed single source of truth for REQ-01.",
+        "file": "crates/jit/src/storage/heartbeat.rs",
+        "line": 54
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Claim documentation hard-codes the TTL defaults without consuming or being checked against the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/reference/claim.md",
+        "line": 62
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "summary": "The ignored regeneration test writes a repository file directly instead of using the required atomic temp-file-and-rename pattern.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 143
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "./scripts/jit-validate.sh fails because issue 71be6ae9 is isolated from the dependency graph.",
+        "file": ".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json"
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "summary": "New public runtime-default constants lack the required # Examples API documentation.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 15
+      }
+    ]
+  }
+}
