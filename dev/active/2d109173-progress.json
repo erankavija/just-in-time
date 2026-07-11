@@ -17,12 +17,12 @@
       "wave_number": 2,
       "note": "6 disjoint-footprint content audits, parallel via worktrees.",
       "issues": [
-        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "dispatched"},
-        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "dispatched"},
-        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "dispatched"},
-        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "dispatched"},
-        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "dispatched"},
-        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "dispatched"}
+        {"id": "2b9a80fb", "short_id": "2b9a80fb", "title": "CLI command catalog audit", "classification": "documentation", "status": "rework", "note": "round2 (attempt 2): prior 3 findings closed (verified, no regression); 1 new finding (undated/limit-bounded 'Completed Today' metric) dispatched. Includes MCP catalog collapse (668->40 lines, cited pointer) + JSON-shape fixes."},
+        {"id": "736a069e", "short_id": "736a069e", "title": "Concepts documentation audit", "classification": "documentation", "status": "rework", "note": "attempt 1: 6 findings (interface overclaims x2, config-taxonomy-as-fixed x3, event-integrity guarantee). Worker under-audited (2 of 9 files); re-audit all 9 dispatched."},
+        {"id": "7c283e95", "short_id": "7c283e95", "title": "Reference documentation audit (excluding the CLI command catalog)", "classification": "documentation", "status": "rework", "note": "attempt 1: 2 findings (CLI-grammar topology incomplete; event-log contract - 10 of 21 variants + false universal issue_id). First pass fixed claim.md exit codes + config invented cmd."},
+        {"id": "b8924a6d", "short_id": "b8924a6d", "title": "How-to guides audit", "classification": "documentation", "status": "rework", "note": "attempt 1: 5 findings (ID-capture from msg not id x2, validate --fix over-credit, repo-local bug/ns unframed, label-as-hierarchy). First pass fixed query --filter, jq envelopes, config show/get, multi-state."},
+        {"id": "4c33d0e5", "short_id": "4c33d0e5", "title": "Tutorials audit", "classification": "documentation", "status": "rework", "note": "attempt 1: 7 findings (4/7 states, gate not self-contained, agent.toml missing created_at, false cross-worktree visibility, non-UUID filename, overstated lease guarantees, missing jq prereq). parallel-work-worktrees.md was under-audited."},
+        {"id": "a70bac75", "short_id": "a70bac75", "title": "Example rulesets audit", "classification": "documentation", "status": "done", "note": "DONE after rework 1: 2 release-checklist prose defects (over-credited enforcement, error-finding mislabeled 'warning'). All 3 gates pass."}
       ]
     },
     {
@@ -50,6 +50,6 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1},
+  "rework_counts": {"99f4a2b4": 2, "d24008f0": 2, "a70bac75": 1, "4c33d0e5": 1, "7c283e95": 1, "736a069e": 1, "b8924a6d": 1, "2b9a80fb": 2},
   "started_at": "2026-07-11T00:00:00Z"
 }
