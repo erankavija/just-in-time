@@ -24,11 +24,44 @@ single-file → illustrative; `bug-repro/` 2-file → illustrative). Because eac
 file is short, every factual claim in it was still individually source-verified; the class
 distinction governed how much *cross-claim lifecycle-interaction* analysis each received.
 
-## Verification result: clean — zero edits
+## Rework (doc-review attempt 1): enforcement/severity prose drift in release-checklist
 
-No drift instance was found in any drift class, so no class-wide sweep was triggered and
-no footprint file was edited. Consistent with plan §"Technical soundness" (REQ-04 already
-satisfied, investigation §4). Every verifiable claim was checked against HEAD source:
+The initial "zero drift" conclusion was WRONG. The `doc-review` gate found one real
+drift class the first pass missed: prose in `docs/examples/release-checklist/rules.toml`
+that conflated blocking-ness with severity and over-credited what blocks the `done`
+transition. Two instances fixed:
+
+- **F1 (header, lines 6-8).** The header said a release "must (a) carry a Checklist
+  section, (b) have an attached release-notes document, and (c) depend on a QA sign-off
+  issue" before done — implying all three block. In fact `release-has-checklist` is
+  `warn` (advisory), `release-has-notes-doc` is `error` + `enforce = true` (the only rule
+  that blocks `done`), and `release-depends-on-qa-signoff` is `error` with no `enforce`
+  (reported, non-blocking at transition). Rewrote the header to state each rule's real
+  strength and that only (b) blocks completion.
+- **F2 (QA-signoff rule comment, line 34).** Called the non-enforced `error`-severity
+  finding "a non-blocking warning". Non-enforced means non-blocking; it does not downgrade
+  the severity to `warn`. Rewrote to: an `error`-severity finding that is non-blocking
+  because enforcement — not severity — gates a transition.
+
+**Class sweep across the rest of `docs/examples/`.** Re-audited every blocking/severity
+claim in all seven rulesets against each rule's actual `severity`/`enforce`:
+`bug-repro`, `cross-epic`, `fresh-evidence`, `nyquist`, `sdd`, `research` all describe
+their rules correctly — `warn` rules say "reports/surfaces without blocking",
+`enforce = true` rules say "blocks", and non-enforced `error` graph rules
+(`cross-epic-req-uniqueness`, `sdd-req-matches-a-criterion`,
+`research-hyp-label-matches-hypothesis`) use "reported/caught immediately", never "blocks".
+No other instance of the drift class exists; `release-checklist/rules.toml` was the sole
+offender.
+
+Triage correction: `release-checklist/` remains **illustrative**, but its prose carried
+semantic drift the file-count signal did not surface — illustrative class does not imply
+prose is automatically accurate, only that it gets less cross-claim analysis. The lesson:
+verify every severity/enforce claim against the rule's own flags even in short files.
+
+## Verification result (rest of footprint): claims match HEAD source
+
+Every other verifiable claim was checked against HEAD source and holds. Consistent with
+plan §"Technical soundness" (REQ-04 largely satisfied, investigation §4):
 
 - **Rule kinds (REQ-01/04):** all 11 named kinds exist in `crates/jit/src/validation/`
   (`require-section`, `json-schema`, `label-value-pattern`, `require-doc-type`,

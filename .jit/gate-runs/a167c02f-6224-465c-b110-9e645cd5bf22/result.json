@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "a167c02f-6224-465c-b110-9e645cd5bf22",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "a70bac75-7669-4b60-a2a3-24efb33ad704",
+  "commit": "0eda32535ce057c40d17e85630db000c20d02c26",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-11T08:05:43.684695127Z",
+  "completed_at": "2026-07-11T08:06:33.865510407Z",
+  "duration_ms": 50180,
+  "exit_code": 0,
+  "stdout": "## 1. Claims match the current source tree\n\nPass. All documented commands, flags, rule kinds, configuration keys, and behavioral claims in `docs/examples/` match the current source-built CLI and validation engine.\n\nThe two findings from the previous review are resolved:\n\n- `docs/examples/release-checklist/rules.toml:6-14` now distinguishes advisory, blocking, and non-blocking reported conditions.\n- `docs/examples/release-checklist/rules.toml:37-44` correctly describes the QA dependency result as an error-severity finding that does not block without `enforce = true`.\n\nAll 60 example-ruleset tests pass.\n\n## 2. Adopter surface versus dogfood configuration\n\nPass. Repository-local vocabulary and mechanisms are clearly framed as example configuration rather than defaults produced by `jit init`.\n\nThe required classification is recorded:\n\n- Reference-grade: `sdd`, `research`\n- Illustrative: `bug-repro`, `cross-epic`, `fresh-evidence`, `nyquist`, `release-checklist`\n\n## 3. Current behavior only\n\nPass. The phrase “no longer trustworthy” at `docs/examples/fresh-evidence/rules.toml:5` describes evidence becoming stale, not a former jit behavior. No legacy, migration, or roadmap narration was found.\n\n## 4. No hardcoded counts that silently rot\n\nPass. No volatile product-total claims occur in the scoped documentation.\n\n## 5. Links and referenced paths resolve\n\nPass. The scoped mechanical checker confirms that all links, anchors, cited repository paths, and addressable-item citations resolve.\n\n## 6. Content-standards conformance\n\nPass. No diagram-shaped ASCII or box-drawing blocks were found. The authored examples contain no plain-text mathematical equations requiring LaTeX, and their prose conforms to the applicable standards.\n\n## Findings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped docs/examples surface matches the current product, and both prior release-checklist findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The scoped docs/examples surface matches the current product, and both prior release-checklist findings are resolved.",
+    "findings": []
+  }
+}

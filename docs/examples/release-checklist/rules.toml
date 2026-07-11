@@ -3,9 +3,15 @@
 # A second non-SDD example, demonstrating the GRAPH and document-shape rule kinds
 # in a workflow that has nothing to do with requirements coverage.
 #
-# The methodology: a `type:release` issue gates a ship. Before it is done it must
-# (a) carry a Checklist section, (b) have an attached `release-notes` document,
-# and (c) depend on a QA sign-off issue.
+# The methodology: a `type:release` issue gates a ship. It (a) should carry a
+# Checklist section, (b) must have an attached `release-notes` document, and
+# (c) should depend on a QA sign-off issue. The three rules enforce these to
+# DIFFERENT strengths, and only (b) blocks completion:
+#   (a) advisory — a `warn` rule, no `enforce`; a checklist-less draft still saves.
+#   (b) blocking — `error` + `enforce = true`; a missing release-notes doc blocks
+#       the transition to `done`.
+#   (c) reported but non-blocking — `error` severity with no `enforce`, so at a
+#       transition it surfaces the finding without blocking it.
 #
 # Engine kinds used:
 #   require-section   (local)  the release must have a `## Checklist` section
@@ -31,9 +37,11 @@ assert = { require-doc-type = { doc-type = "release-notes" } }
 # Graph: a release must depend (directly or transitively) on a QA sign-off issue.
 # Graph rules run in `jit validate`, in gate checkers, and at issue state
 # transitions (over the issue's dependency neighborhood). This rule has no
-# `enforce = true`, so at a transition it only REPORTS (a non-blocking warning);
-# add `enforce = true` (and optionally `when = { state = "done" }`) to block the
-# transition until the QA sign-off dependency exists.
+# `enforce = true`, so at a transition it only REPORTS: the finding is
+# `error`-severity but non-blocking, because enforcement — not severity — is what
+# blocks a transition. Add `enforce = true` (and optionally
+# `when = { state = "done" }`) to block the transition until the QA sign-off
+# dependency exists.
 [[rules]]
 name = "release-depends-on-qa-signoff"
 when = { type = "release" }
