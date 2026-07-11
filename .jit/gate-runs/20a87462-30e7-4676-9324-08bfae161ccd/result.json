@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "20a87462-30e7-4676-9324-08bfae161ccd",
+  "gate_key": "repo-validate",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "b40d28d1341aa6e9a119fb6c14a599e4da426a35",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T19:05:50.175989602Z",
+  "completed_at": "2026-07-11T19:05:50.478295252Z",
+  "duration_ms": 302,
+  "exit_code": 4,
+  "stdout": "❌ Repository integrity error: Found 1 isolated issue(s) not connected to the dependency graph:\n  '7d3a3a47' (Dependency-aware container artifact archival)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n",
+  "stderr": "Error: Found 1 isolated issue(s) not connected to the dependency graph:\n  '7d3a3a47' (Dependency-aware container artifact archival)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n",
+  "command": "jit validate",
+  "by": "auto:executor",
+  "message": null
+}
