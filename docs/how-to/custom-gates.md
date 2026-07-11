@@ -114,7 +114,12 @@ jit gate add $ISSUE tests clippy fmt
 # Manual process gate
 jit gate add $ISSUE code-review
 
-# Automated gates run automatically, manual gate requires sign-off
+# Nothing runs on its own. When the work is done, evaluate each gate: the
+# automated ones run their checker, the manual one records an attestation.
+jit gate evaluate $ISSUE tests
+jit gate evaluate $ISSUE clippy
+jit gate evaluate $ISSUE fmt
+jit gate evaluate $ISSUE code-review --by human:alice
 ```
 
 ## Environment Variables
@@ -396,7 +401,7 @@ The checker receives a `JIT_CONTEXT_FILE` env var pointing to a JSON file:
   "issue": {
     "id": "...", "title": "...", "description": "...",
     "state": "in_progress", "priority": "high",
-    "documents": [], "labels": [], "gates_required": [],
+    "documents": [], "labels": [], "gates": [],
     "dependencies": [
       { "id": "...", "title": "Setup database schema", "state": "done", "priority": "high" },
       { "id": "...", "title": "Implement auth module", "state": "in_progress", "priority": "medium" }
@@ -436,7 +441,8 @@ Each subsequent run includes previous results in `run_history`, sorted chronolog
 # First run: run_history is empty
 jit gate evaluate $ISSUE review
 
-# Second run: run_history contains the first run's stdout/stderr/exit_code
+# Second run: run_history holds the first run's stdout and exit code. stderr is
+# stripped from the history entries, so keep review signal on stdout.
 jit gate evaluate $ISSUE review
 ```
 

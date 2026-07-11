@@ -85,8 +85,8 @@ jit query available --label "epic:auth"
 # View the epic's dependency tree
 jit graph deps $EPIC_ID --depth 0
 
-# Check overall epic progress
-jit query all --label "epic:auth" | grep -E "(ready|in_progress|done)"
+# Check overall epic progress (counts by state)
+jit query count --by state --label "epic:auth"
 
 # Find what's blocking
 jit query blocked --label "epic:auth"
@@ -379,8 +379,9 @@ jit query all --label "epic:release"
 > hierarchy and a base namespace registry (`type`, `component`, `priority`, `team`,
 > `milestone`, `resolution`, `enforces`). To use them, declare the `bug` type in
 > `[type_hierarchy]` and the `severity` namespace in the namespace registry of your
-> `.jit/config.toml` first. `component:` and `epic:`/`milestone:` below are shipped
-> defaults.
+> `.jit/config.toml` first. Of the grouping labels used below, `component:` and
+> `milestone:` are shipped namespaces; `epic:` is not — declare it in the namespace
+> registry too, or accept that an undeclared namespace only warns, never blocks a write.
 
 ### Recipe: Bug Workflow
 
@@ -537,19 +538,19 @@ if [ -z "$ISSUE_ID" ]; then
   exit 0
 fi
 
-# Inspect recorded automated gate runs
-jit gate status-all $ISSUE_ID --json > gate-results.json
+# Read readiness across EVERY required gate (auto + manual)
+jit gate status-all $ISSUE_ID --json > gate-results.json || true
 
-# Check if any recorded run failed
-FAILED=$(jq -r '[.results[] | select(.status == "failed")] | length' gate-results.json)
-
-if [ "$FAILED" -gt 0 ]; then
-  echo "❌ $FAILED gate(s) failed"
-  jq -r '.results[] | select(.status == "failed") | "  - \(.key): \(.stderr // .stdout)"' gate-results.json
-  exit 1
-else
-  echo "✅ All gates passed"
+# `.all_passed` is true only when every required gate is green. `.results` holds
+# recorded automated runs only, so filtering it would miss pending manual gates
+# and gates never evaluated; `.gates` lists every required gate with its status.
+if [ "$(jq -r '.all_passed' gate-results.json)" = "true" ]; then
+  echo "✅ All required gates passed"
   exit 0
+else
+  echo "❌ Required gates not all passed:"
+  jq -r '.gates[] | select(.status != "passed") | "  - \(.key): \(.status)"' gate-results.json
+  exit 1
 fi
 ```
 

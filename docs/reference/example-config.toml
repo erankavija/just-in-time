@@ -16,7 +16,8 @@ schema = 2
 # Root directory for development documentation
 development_root = "dev"
 
-# Paths managed by JIT's document lifecycle (archived when issues complete)
+# Paths whose documents `jit doc archive` may move to the archive root (archival
+# is always an explicit command; nothing archives automatically)
 managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 
 # Where archived documents go

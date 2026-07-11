@@ -56,7 +56,8 @@ jit issue create --title "Learn Spanish" \
 
 # Course with completion gate
 jit gate define course-complete \
-  --title "Course Completed" --mode manual
+  --title "Course Completed" \
+  --description "All course units finished" --mode manual
 
 jit issue create --title "Duolingo Unit 1-10" \
   --label "type:task" --label "skill:spanish" \
@@ -78,7 +79,8 @@ jit query all --label "skill:*"
 jit issue create --title "AWS Solutions Architect" \
   --label "type:epic" --label "cert:aws-sa"
 
-jit gate define exam-passed --title "Exam Passed" --mode manual
+jit gate define exam-passed --title "Exam Passed" \
+  --description "Certification exam passed" --mode manual
 
 jit issue create --title "Complete AWS training" \
   --label "type:task" --label "cert:aws-sa"
@@ -105,8 +107,10 @@ jit issue create --title "Write: Cooking Guide" \
   --label "type:epic" --label "book:cooking"
 
 # Gates for writing workflow
-jit gate define draft-done --title "First Draft Complete" --mode manual
-jit gate define edited --title "Editor Approved" --mode manual
+jit gate define draft-done --title "First Draft Complete" \
+  --description "First draft written" --mode manual
+jit gate define edited --title "Editor Approved" \
+  --description "Editor sign-off received" --mode manual
 
 # Chapters with sequential dependencies
 jit issue create --title "Chapter 1: Kitchen Basics" \
@@ -131,8 +135,10 @@ jit issue create --title "Blog: Remote Work Tips" \
   --label "type:task" --label "content:blog" \
   --gate draft-done --gate seo-reviewed --gate published
 
-jit gate define seo-reviewed --title "SEO Check Done" --mode manual
-jit gate define published --title "Published Live" --mode manual
+jit gate define seo-reviewed --title "SEO Check Done" \
+  --description "SEO review complete" --mode manual
+jit gate define published --title "Published Live" \
+  --description "Article published" --mode manual
 
 # Content calendar view
 jit query all --label "content:blog" --state ready
@@ -150,7 +156,8 @@ jit issue create --title "Annual Team Retreat 2026" \
 
 # Approval gate
 jit gate define budget-approved \
-  --title "Budget Approved" --mode manual
+  --title "Budget Approved" \
+  --description "Budget signed off" --mode manual
 
 # Tasks with dependencies
 jit issue create --title "Get budget approval" \
@@ -191,8 +198,10 @@ jit issue create --title "Q4 Financial Report" \
   --label "type:task" --label "doc:finance" \
   --gate draft-done --gate fact-checked --gate cfo-approved
 
-jit gate define fact-checked --title "Facts Verified" --mode manual
-jit gate define cfo-approved --title "CFO Sign-off" --mode manual
+jit gate define fact-checked --title "Facts Verified" \
+  --description "All figures fact-checked" --mode manual
+jit gate define cfo-approved --title "CFO Sign-off" \
+  --description "CFO approval received" --mode manual
 
 # Link the document
 jit doc add <report-id> reports/q4-2026.md

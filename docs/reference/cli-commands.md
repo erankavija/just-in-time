@@ -9,31 +9,15 @@ responses are the command payload itself, not a `{ "success": true, "data": ... 
 envelope. Commands that return objects may include a top-level `message` field
 for human-readable context.
 
-Example successful issue update (abbreviated):
+Example successful issue update — a lightweight confirmation, not the full
+issue (fetch the body with `jit issue show`):
 
 ```json
 {
   "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
-  "title": "Improve state and gate blocking remediation",
+  "short_id": "5c581575",
   "state": "done",
-  "priority": "high",
-  "assignee": "agent:copilot",
-  "dependencies": [],
-  "gates": [
-    {
-      "key": "cargo-ci",
-      "status": "passed",
-      "last_run_at": "2026-04-28T18:25:16.699033997Z",
-      "exit_code": 0
-    },
-    {
-      "key": "code-review",
-      "status": "passed",
-      "last_run_at": "2026-04-28T18:24:02.114500120Z",
-      "exit_code": 0
-    }
-  ],
-  "labels": ["type:task", "epic:usability"],
+  "updated_at": "2026-04-28T18:25:16.699033997Z",
   "message": "Updated issue 5c581575 to Done"
 }
 ```
@@ -416,10 +400,10 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-d`, `--description <DESCRIPTION>` | Issue body. Defaults to the empty string. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal` (default), `high`, or `critical`. |
 | `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
-| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Each key must already exist in the gate registry (`jit gate define`). |
+| `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to Markdown. `html`/`xml` require the matching cargo feature. |
-| `--force` | Bypass validation warnings. |
+| `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
 | `--orphan` | Suppress the `orphan-leaf` hint for an issue deliberately created without a container. |
 | `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
 
@@ -1148,6 +1132,7 @@ Gates:
       "title": "All Tests Pass",
       "description": "Full test suite must pass",
       "auto": true,
+      "example_integration": null,
       "stage": "postcheck",
       "mode": "auto"
     }
@@ -1414,6 +1399,7 @@ jit gate evaluate abc123 tests --json
 #   "key": "tests",
 #   "status": "passed",
 #   "verdict": "pass",
+#   "already_passed": false,
 #   "message": "Passed gate 'tests' for issue abc123"
 # }
 
@@ -1473,7 +1459,9 @@ jit gate evaluate-all abc123          # exit 4 if a checker fails, 10 on runner 
 
 ### `jit gate fail`
 
-Manually mark a gate as failed.
+Record a failed verdict for a **manual** gate. An automated gate is rejected
+(exit `2`): its verdict comes only from running its checker via
+[`jit gate evaluate`](#jit-gate-evaluate), never from a hand-recorded fail.
 
 **Usage:**
 ```bash
@@ -1482,11 +1470,9 @@ jit gate fail <ISSUE_ID> <GATE_KEY> [--by <WHO>]
 
 **Example:**
 ```bash
-# Fail automated gate manually
-jit gate fail abc123 tests --by "ci:github-actions"
+# Record a manual gate's failing verdict (e.g. a reviewer rejected the change)
+jit gate fail abc123 code-review --by "human:alice"
 ```
-
-**Note:** Typically only used for automated gates run in CI/CD. Manual gates are usually only passed, not failed.
 
 ### `jit gate remove`
 
@@ -1637,12 +1623,13 @@ Apply preset gates to one or more issues. Gates from the preset are added to the
 
 **Usage:**
 ```bash
-jit gate preset apply <NAME> <ISSUE_ID>... [OPTIONS]
+jit gate preset apply <NAME> [ISSUE_ID]... [OPTIONS]
 ```
 
 **Arguments:**
 - `NAME` - Preset name to apply
-- `ISSUE_ID...` - One or more issue IDs (can specify multiple for batch operations)
+- `ISSUE_ID...` - Issue IDs (repeatable for batch operations). Optional: passing
+  none succeeds and applies the preset to nothing.
 
 **Options:**
 - `--timeout <SECONDS>` - Override checker timeout for all automated gates
@@ -1660,8 +1647,8 @@ jit gate preset apply rust-tdd abc123
 # Apply to multiple issues (batch mode)
 jit gate preset apply minimal abc123 def456 ghi789
 
-# Apply from query results
-jit query all | xargs jit gate preset apply rust-tdd
+# Apply from query results (JSON is the xargs-safe source of ids)
+jit query all --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-tdd
 
 # Apply with filtering - skip precheck gates
 jit gate preset apply rust-tdd abc123 --no-precheck
@@ -1728,7 +1715,7 @@ jit gate preset create abc123 my-workflow --json
 
 **Validation:**
 - Issue must have at least one gate
-- Preset name must be valid (no special characters)
+- Preset name must be non-empty and must not collide with a builtin preset's name
 
 **Storage:**
 Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are automatically loaded alongside builtin presets. Custom presets with the same name as a builtin preset override the builtin.
@@ -1807,7 +1794,7 @@ jit gate add abc123 tests clippy code-review docs
 jit gate preset create abc123 team-standard
 
 # Apply to all issues in epic
-jit query all --filter "label:epic:v2.0" | xargs jit gate preset apply team-standard
+jit query all --label epic:v2.0 --json | jq -r '.issues[].id' | xargs jit gate preset apply team-standard
 ```
 
 **Customize for Special Cases:**
@@ -3188,26 +3175,23 @@ done
 **CI/CD integration:**
 ```bash
 #!/bin/bash
-# Pass gates automatically from CI
+# Evaluate automated gates from CI. For an automated gate, `jit gate evaluate`
+# runs its checker and records the verdict; its exit code is nonzero when the
+# gate fails. (`jit gate fail` is for manual gates only.)
 
 ISSUE_ID=$1
 
-# Run tests
-if cargo test; then
-  jit gate evaluate "$ISSUE_ID" tests --quiet
+# tests and clippy are automated gates: evaluate runs their checkers.
+if jit gate evaluate "$ISSUE_ID" tests --quiet; then
   echo "✓ Tests passed for $ISSUE_ID"
 else
-  jit gate fail "$ISSUE_ID" tests --quiet
   echo "✗ Tests failed for $ISSUE_ID"
   exit 1
 fi
 
-# Run linter
-if cargo clippy -- -D warnings; then
-  jit gate evaluate "$ISSUE_ID" clippy --quiet
+if jit gate evaluate "$ISSUE_ID" clippy --quiet; then
   echo "✓ Clippy passed for $ISSUE_ID"
 else
-  jit gate fail "$ISSUE_ID" clippy --quiet
   echo "✗ Clippy failed for $ISSUE_ID"
   exit 1
 fi

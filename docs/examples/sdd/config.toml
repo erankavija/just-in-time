@@ -8,9 +8,9 @@
 # The plan-before-fan-out bracket vocabulary is DECLARED by the `plan` template in
 # the sibling `templates.toml`, which the engine stays agnostic to. The engine
 # hardcodes NONE of these names: the container type (`epic`), the two bracket node
-# types (`planning` / `breakdown`), and the gate presets are read from the template
-# (design `dev/active/planning-bracket-design.md`, D1/D5/D9). Swap the names there
-# and the same engine drives a different methodology — see the research example
+# types (`planning` / `breakdown`), and the gate presets are read from the template.
+# Swap the names there and the same engine drives a different methodology — see the
+# research example
 # (`goal` breakable, no `epic`).
 
 [version]
@@ -19,8 +19,8 @@ schema = 2
 [type_hierarchy]
 # Type name -> hierarchy level (lower = more strategic). SDD's canonical
 # container is `epic`. `planning` and `breakdown` are the two bracket node
-# types: function-typed children of a breakable container (design D5 — function
-# lives in the type axis, no separate `role:` namespace). They are declared here
+# types: function-typed children of a breakable container (function lives in the
+# type axis, no separate `role:` namespace). They are declared here
 # so they are valid children of the breakable `epic`.
 types = { epic = 2, story = 3, planning = 3, breakdown = 3, task = 4, bug = 4 }
 
@@ -44,7 +44,6 @@ story = "story"
 # breakdown-review is the AI review of the decomposition itself.
 
 [validation]
-strictness = "loose"
 default_type = "task"
 
 [namespaces.type]

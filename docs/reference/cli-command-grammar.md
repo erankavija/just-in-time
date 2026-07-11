@@ -71,7 +71,8 @@ Canonical rules:
   several subjects of one kind, they are trailing space-separated positionals, not
   a repeated flag: `jit gate add <id> <gate-key>...`,
   `jit dep add <from> <to>...`, `jit issue show <id>...`,
-  `jit gate preset apply <name> <id>...`.
+  `jit gate preset apply <name> [<id>...]` (its id list is optional; zero ids
+  applies the preset to nothing).
 - **A list modifier is a repeatable/comma-joined flag.** Where a list tunes the
   verb rather than naming its subjects, it is a flag that accepts both repetition
   and comma-separation: `--label a:b --label c:d` or `--label a:b,c:d`. This

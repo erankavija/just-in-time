@@ -235,8 +235,8 @@ enforce = true
 assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
 
 # --- Graph: the BRACKET's plan-time hypothesis-coverage preview -------------
-# The PREVIEW instance of coverage (design `dev/active/planning-bracket-design.md`,
-# D13). Where the closure rule above bites at the goal's `→ done` transition, this
+# The PREVIEW instance of coverage. Where the closure rule above bites at the
+# goal's `→ done` transition, this
 # rule bites at the BREAKDOWN gate — the moment the decomposition is reviewed,
 # before any experiments fan out. The two are the SAME rule kind (`label-coverage`)
 # differing only in TWO knobs:

@@ -131,14 +131,14 @@ jit graph deps <issue-id> --depth 2
 # View all transitive dependencies (entire chain)
 jit graph deps <issue-id> --depth 0
 
-# Example output with tree structure:
+# Example output with tree structure (○ = not done, ✓ = done/rejected):
 # Dependencies of abc123 (depth 2):
 #   Summary: 2/5 complete
 #
-#   ○ def456 - Implement feature X [ready]
-#   ├─ ○ ghi789 - Add tests [ready]
-#   └─ ✓ jkl012 - Update docs [done]
-#   ✓ mno345 - Fix bug Y [done]
+#   ○ def456 - Implement feature X
+#   ├─ ○ ghi789 - Add tests
+#   └─ ✓ jkl012 - Update docs
+#   ✓ mno345 - Fix bug Y
 ```
 
 ## Avoid Circular Dependencies
@@ -209,13 +209,15 @@ Result: CYCLE, reject the add operation.
 
 **Check for integrity issues:**
 ```bash
-# Validate all constraints
+# Validate all constraints (integrity checks + declarative rules)
 jit validate
 
-# Output shows any problems:
-# ✓ No cycles detected
-# ✓ All dependencies reference valid issues
-# ✓ Graph is well-formed
+# On success:
+# ✓ Repository validation passed
+#
+# On failure each finding prints on its own line, e.g.:
+# ❌ Repository validation failed with 1 rule error(s)
+# ❌ [dangling-item-link] <issue-id>: ...
 ```
 
 **Fix validation issues:**
@@ -394,13 +396,15 @@ jit query blocked
 jit query blocked --full --json | jq
 ```
 
-**Output shows blocking reasons:**
+**Output shows blocking reasons** (each `- ` line is one unmet dependency or
+unpassed gate):
 ```
-Issue: Feature Integration [blocked]
-  Blocked by:
-    - Unit Tests (in_progress)
-    - API Documentation (backlog)
-  Labels: epic:v2.0, type:task
+Blocked issues:
+  abc123 | Feature Integration | High
+    - dependency:def456 (Unit Tests:InProgress)
+    - dependency:ghi789 (API Documentation:Backlog)
+
+Total: 1
 ```
 
 ### Identify Upstream Blockers
@@ -413,27 +417,27 @@ jit graph deps <issue-id>
 # Full dependency chain
 jit graph deps <issue-id> --depth 0
 
-# Example output:
+# Example output (○ = not done, ✓ = done/rejected):
 # Dependencies of abc123 (all transitive):
 #   Summary: 1/3 complete
 #
-#   ✓ def456 - Database migration [done]
-#   ○ xyz789 - API implementation [in_progress]
-#   └─ ○ qrs012 - Schema definition [ready]
+#   ✓ def456 - Database migration
+#   ○ xyz789 - API implementation
+#   └─ ○ qrs012 - Schema definition
 ```
 
 ### Identify Downstream Dependents
 
 **What depends on this issue?**
 ```bash
-# Find downstream blockers
+# Find downstream dependents (alias of `jit graph rdeps`)
 jit graph downstream <issue-id>
 
 # Example output:
-# Issue abc123 is blocking (3 dependents):
-#   - def456 [blocked] - Integration tests
-#   - xyz789 [blocked] - Feature rollout
-#   - qrs012 [blocked] - Documentation update
+# Reverse dependencies of abc123:
+#   def456 | Integration tests
+#   xyz789 | Feature rollout
+#   qrs012 | Documentation update
 ```
 
 **Use case: Prioritization**
@@ -452,12 +456,12 @@ jit graph downstream <critical-issue>
 # Find issues with no dependencies
 jit graph roots
 
-# Inspect each root's state and gates before assigning it
+# Inspect each root's state and gates (jit issue status <id>) before assigning it
 # Example output:
-# Root issues (3):
-#   - abc123 [ready] - Database setup
-#   - def456 [ready] - Design mockups
-#   - xyz789 [backlog] - Requirements gathering
+# Root issues (no dependencies):
+#   abc123 | Database setup
+#   def456 | Design mockups
+#   xyz789 | Requirements gathering
 ```
 
 **Use case: Work distribution**

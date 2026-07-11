@@ -285,10 +285,14 @@ $$\mathrm{now} - \mathrm{last\_beat} > 3600\ \mathrm{seconds}$$
 The one-hour threshold is hardcoded. The `[coordination].stale_threshold_secs`
 field is accepted and shown by config commands but does not currently change it.
 
-Stale leases are:
-- Highlighted in `jit claim status`
-- Rejected by pre-commit hooks (in strict mode)
-- Candidates for force-eviction
+A stale lease is:
+- Marked stale in `jit claim status`
+- Not counted as active: with `enforce_leases = "strict"` a structural
+  operation on the issue is blocked as if no lease were held
+- A candidate for `jit claim force-evict`
+
+Staleness never auto-evicts the lease. It persists until a heartbeat,
+`jit claim release`, or force-eviction.
 
 ### Exit Codes
 

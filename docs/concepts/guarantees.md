@@ -306,8 +306,8 @@ Understanding limitations prevents incorrect assumptions:
 - The event log records state-transition events; it is not a cross-operation ordering guarantee
 
 ❌ **Automatic conflict resolution**  
-- First-writer-wins for non-conflicting fields
-- Claim operations detect conflicts explicitly
+- Concurrent writers race on the whole issue file: the last atomic rename wins, with no field-level merge
+- Ordinary `jit issue claim` reads the existing assignee and any lease only to reject a conflict it can see, not to serialize; `jit claim acquire` holds an exclusive lock for that
 - No CRDTs or operational transformation
 
 ### Implications for Multi-Agent Workflows
@@ -341,8 +341,9 @@ state=$(jit issue show abc123 --json | jq -r '.state')
 # ✗ State may change before next operation
 jit issue update abc123 --state in_progress  # Race condition!
 
-# Correct approach: claim the issue instead of updating state directly
-jit issue claim abc123 agent:worker-1  # Fails if already assigned to someone else
+# Better: claim to record ownership; for guaranteed exclusivity acquire a lease
+jit issue claim abc123 agent:worker-1  # Rejects a claim it can see is already assigned, but does not lock
+jit claim acquire abc123 --agent-id agent:worker-1  # Exclusive, serialized (Git worktrees)
 ```
 
 ### File-Based Synchronization

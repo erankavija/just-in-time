@@ -23,7 +23,7 @@ JIT is built from the ground up to support AI agent workflows:
 - 📝 **Document Lifecycle**: Link design docs, session notes, and context to issues with safe archival
 - 📁 **Git-Friendly**: Repository state is plain, diffable JSON, JSONL, and TOML files; version, diff, and merge it like code
 - 🤖 **Agent-First Design**: Uniform JSON envelopes, typed exit codes, short hashes, lifecycle timestamps, append-only event log
-- 🔒 **Multi-Agent Safe**: File locking and advisory work leases prevent race conditions between concurrent agents
+- 🔒 **Multi-Agent Coordination**: Atomic, file-locked writes keep concurrent `.jit/` updates from corrupting each other; advisory work leases (`jit claim acquire`) coordinate who holds an issue
 - ⚙️ **Configurable**: Issue hierarchies, validation rules, gates, and graph templates are declared per repository
 
 Canonical issue data lives in the `.jit/` directory within your project, versioned with git like code. Advisory lease coordination metadata is machine-local under `.git/jit/`. No external database, no cloud service, no API dependencies.

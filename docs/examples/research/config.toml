@@ -8,8 +8,7 @@
 # The plan-before-fan-out bracket vocabulary is DECLARED by the `plan` template in
 # the sibling `templates.toml`, which the engine stays agnostic to. The engine
 # hardcodes NONE of these names: the container type (`goal`), the two bracket node
-# types (`planning` / `breakdown`), and the gate presets are read from the template
-# (design `dev/active/planning-bracket-design.md`, D1/D5/D9/D11).
+# types (`planning` / `breakdown`), and the gate presets are read from the template.
 #
 # The whole point of this example is domain-agnosticism: the breakable container
 # is a research `goal`, NOT a software container. There is no software-development
@@ -25,8 +24,8 @@ schema = 2
 # Type name -> hierarchy level (lower = more strategic). The research program's
 # canonical container is `goal`; `experiment` is its implementation child.
 # `planning` and `breakdown` are the two bracket node types: function-typed
-# children of a breakable container (design D5 — function lives in the type axis,
-# no separate `role:` namespace). They are declared here so they are valid
+# children of a breakable container (function lives in the type axis, no separate
+# `role:` namespace). They are declared here so they are valid
 # children of the breakable `goal`.
 types = { goal = 2, experiment = 3, planning = 3, breakdown = 3 }
 
@@ -53,7 +52,6 @@ experiment = "experiment"
 # structure for a research goal as for a software epic.
 
 [validation]
-strictness = "loose"
 default_type = "experiment"
 
 [namespaces.type]

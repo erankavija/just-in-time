@@ -83,7 +83,7 @@ Each issue is stored as `issues/<uuid>.json`:
 |-------|------|-------------|
 | `id` | UUID | Unique identifier (UUID v4) |
 | `title` | string | Short issue title |
-| `description` | string | Full description (markdown) |
+| `description` | string | Full description body; parsed per `content_format` |
 | `state` | enum | `backlog`, `ready`, `in_progress`, `gated`, `done`, `rejected`, `archived` |
 | `priority` | enum | `critical`, `high`, `normal`, `low` |
 | `assignee` | string? | Format: `type:identifier` (e.g., `agent:copilot-1`) |
@@ -91,6 +91,7 @@ Each issue is stored as `issues/<uuid>.json`:
 | `gates_required` | string[] | Gate keys from registry |
 | `gates_status` | object | Per-gate status with timestamps |
 | `labels` | string[] | Format: `namespace:value` |
+| `content_format` | enum? | `markdown`, `html`, or `xml`; selects the parser for `description`. Absent inherits `[validation].content_format`, falling back to `markdown`. Omitted from JSON when unset |
 | `documents` | object[] | Linked document references |
 | `context` | object | Arbitrary metadata |
 | `created_at` | timestamp | When the issue was created (RFC 3339) |

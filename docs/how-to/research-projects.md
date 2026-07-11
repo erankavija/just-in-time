@@ -69,9 +69,12 @@ jit query closed --label "lit-review:topic-x"
 
 ```bash
 # Experiment with quality gates
-jit gate define irb-approved --title "IRB Approval" --mode manual
-jit gate define data-collected --title "Data Collection Complete" --mode manual
-jit gate define analysis-done --title "Statistical Analysis Done" --mode manual
+jit gate define irb-approved --title "IRB Approval" \
+  --description "IRB approval granted" --mode manual
+jit gate define data-collected --title "Data Collection Complete" \
+  --description "Data collection finished" --mode manual
+jit gate define analysis-done --title "Statistical Analysis Done" \
+  --description "Statistical analysis complete" --mode manual
 
 jit issue create --title "Experiment 1: User Study" \
   --label "type:task" --label "research:main-study" \
@@ -88,9 +91,12 @@ jit dep add <experiment-id> <irb-id>
 
 ```bash
 # Gates for reproducible research
-jit gate define code-documented --title "Code Documented" --mode manual
-jit gate define data-archived --title "Data Archived" --mode manual
-jit gate define methods-described --title "Methods Section Complete" --mode manual
+jit gate define code-documented --title "Code Documented" \
+  --description "Analysis code documented" --mode manual
+jit gate define data-archived --title "Data Archived" \
+  --description "Data deposited in an archive" --mode manual
+jit gate define methods-described --title "Methods Section Complete" \
+  --description "Methods section written" --mode manual
 
 jit issue create --title "Prepare replication package" \
   --label "type:task" --label "research:main-study" \
@@ -116,7 +122,8 @@ jit issue create --title "Write: Results" \
 jit dep add <results-id> <experiment-id>
 
 # Co-author review gates
-jit gate define coauthor-reviewed --title "Co-author Approval" --mode manual
+jit gate define coauthor-reviewed --title "Co-author Approval" \
+  --description "All co-authors approved" --mode manual
 
 jit issue create --title "Final paper draft" \
   --label "type:task" --label "paper:main-paper" \

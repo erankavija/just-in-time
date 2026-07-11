@@ -178,7 +178,7 @@ List of design documents, notes, and artifacts linked to this issue.
 ]
 ```
 
-Documents can be versioned via git, archived when work completes, and validated for broken links.
+Documents can be versioned via git, archived explicitly with `jit doc archive`, and validated for broken links.
 
 #### Context - Agent Metadata
 
@@ -524,16 +524,16 @@ Quality gates are checkpoints that enforce process requirements before issues ca
 Gates exist in three states:
 
 1. **Pending** - Gate is attached to an issue but not yet checked
-2. **Passed** - Gate check succeeded (automated) or approved (manual)
-3. **Failed** - Gate check failed (automated only)
+2. **Passed** - `jit gate evaluate` ran an automated checker that succeeded, or attested a manual gate
+3. **Failed** - `jit gate evaluate` ran an automated checker that failed or errored, or `jit gate fail` recorded a manual gate as failed (`jit gate fail` rejects automated gates)
 
 **State transitions:**
 
 ```mermaid
 stateDiagram-v2
-    Pending --> Passed: check succeeds or manual approval
-    Pending --> Failed: automated check fails
-    Failed --> Passed: fix issue, re-run check
+    Pending --> Passed: evaluate succeeds or manual attestation
+    Pending --> Failed: automated evaluate fails or manual gate fail
+    Failed --> Passed: re-evaluate or re-attest
 ```
 
 ### Gate Types: Prechecks vs Postchecks
@@ -554,7 +554,7 @@ Gates run at two stages in the issue lifecycle:
 
 ```mermaid
 flowchart LR
-    B[backlog] -->|"precheck: tdd-reminder"| P[in_progress]
+    R[ready] -->|"precheck: tdd-reminder"| P[in_progress]
     P --> W[work happens]
     W -->|"postcheck: tests, clippy, code-review"| G[gated]
     G --> D[done]
@@ -569,7 +569,7 @@ flowchart LR
 
 **Automated Gates** - Run programmatic checks
 - Examples: tests, linters, builds, security scans
-- Run automatically: `jit gate evaluate $ISSUE tests`
+- Run the checker on demand: `jit gate evaluate $ISSUE tests`
 - Used for objective, repeatable verification
 - Require checker command and timeout configuration
 - All checkers receive `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS` env vars; see [Environment Variables](../how-to/custom-gates.md#environment-variables) for the full contract, including `JIT_ISSUE_DOCS`'s JSON schema
@@ -608,8 +608,8 @@ jit issue update $ISSUE --state done
 **Example:**
 ```bash
 $ jit issue update abc123 --state done
-Error: Gate validation failed: Cannot transition to 'done' - 2 gate(s) not passed: tests, code-review
-→ Issue automatically transitioned to 'gated' (awaiting gate approval)
+Error: Gate validation failed: Cannot transition to 'done': 2 gate(s) not passed
+Issue automatically transitioned to 'gated' and will move to 'done' when all gates pass.
 
 # Fix and evaluate gates
 $ jit gate evaluate abc123 tests
@@ -879,7 +879,7 @@ type-label exception.
 milestone:*    Groups work under releases (e.g., milestone:v1.0)
 epic:*         Groups tasks under features (e.g., epic:auth)
 component:*    Technical area (e.g., component:backend, component:web)
-priority:*     (Built-in, not a label) - critical, high, normal, low
+priority:*     Label form of priority, distinct from the priority field (e.g. priority:high)
 ```
 
 **Workflow labels:**
@@ -1037,7 +1037,8 @@ for exclusive multi-agent coordination, use an advisory lease.
 
 **All assignees use**: `{type}:{identifier}`
 
-**Supported types:**
+Any non-empty type and identifier are accepted (split on the first colon).
+Common types:
 - `human:{name}` - Human developer (e.g., `human:alice`, `human:bob`)
 - `agent:{id}` - AI agent (e.g., `agent:copilot-session-1`, `agent:worker-2`)
 - `bot:{name}` - Automated bot (e.g., `bot:dependabot`, `bot:automation`)

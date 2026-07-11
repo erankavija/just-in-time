@@ -67,6 +67,6 @@ by C
 
 **Short Hash**: 8-character UUID prefix for referencing issues
 
-**Assignee Type**: Format prefix (agent:, human:, ci:)
+**Assignee Type**: Kind prefix of an assignee (e.g. `agent:`, `human:`, `ci:`); any non-empty kind is accepted
 
 **Event Log**: Append-only audit trail of issue state changes and related lifecycle events (not every repository mutation)

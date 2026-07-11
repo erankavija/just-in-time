@@ -88,10 +88,6 @@ Titles are clean. Do not embed metadata in them:
 
 Position within an epic/story is encoded in dependency edges and labels, not in the title.
 
-JIT escapes `<` and `>` in title strings (stored as `&lt;`/`&gt;`). Reword to avoid them
-in titles — `Fp prime Montgomery batch` not `Fp<P> Montgomery batch`. Description bodies
-render `<...>` correctly.
-
 ---
 
 ## Strategic Labels
@@ -174,8 +170,6 @@ These are JIT CLI / tooling quirks worth knowing while writing or editing issues
   succeeded alone — and the error names every rejected edge, not only the first.
 - **`jit issue update --label` appends; it does not replace.** To rename a label,
   pair it with `--remove-label`: `jit issue update <id> --label new --remove-label old`.
-- **Title HTML-escaping.** See *Issue Titles* above — `<` and `>` are escaped only in
-  the title field, not in the description body.
 - **Strategic-heading matching is case-tolerant.** Tooling that scans for
   `## Success Criteria` should also accept lowercase `criteria`, plus the equivalents
   documented in `jit-manage` Workflow B2 (Acceptance Criteria, Definition of Done).

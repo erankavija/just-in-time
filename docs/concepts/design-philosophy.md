@@ -60,7 +60,7 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 - **Primary audience:** Programmatic agents (AI assistants, automation scripts)
 - **Secondary audience:** Humans (via same CLI, web UI, or MCP)
 
-**Result:** Agents get a powerful, reliable interface. Humans benefit from the same clarity and predictability.
+**Result:** Agents get a predictable interface. Humans benefit from the same clarity.
 
 ### Key Design Principles
 

@@ -102,13 +102,16 @@ are the defaults the bracket tooling assumes. To use your own vocabulary, name
 them in `.jit/templates.toml`'s top-level `[roles]` and `[anchors]` tables — see
 [Template bindings](../reference/configuration.md#template-bindings-jittemplatestoml).
 
-> **Sync the type-known schema.** Adding a type to `[type_hierarchy].types`
-> updates the graph hierarchy, but if your project has a baked
-> `.jit/schemas/default-type-hierarchy-known.json`, the write path reads *that*
-> frozen enum. The shipped examples regenerate it from `[type_hierarchy]`, so
-> their `schemas/` directories already list `planning`/`breakdown`. If you build a
-> ruleset by hand, copy the example `schemas/` directory too, or the write path
-> warns on every `type:planning`/`type:breakdown` issue.
+> **Sync the type-known schema.** If your project has a baked
+> `.jit/schemas/default-type-hierarchy-known.json` (`jit init` scaffolds one), the
+> write-path `type-hierarchy-known` rule reads *that* frozen enum, not
+> `[type_hierarchy]`. Adding a type to config does not update the frozen file, so
+> re-run `jit init` afterwards to refresh it from config (idempotent); otherwise
+> the write path reports an unknown-type warning on every
+> `type:planning`/`type:breakdown` issue (a warning only — it never blocks a
+> write). The shipped examples carry no baked type-known schema, so their
+> write-path check builds the enum in memory from `[type_hierarchy]` and
+> recognizes `planning`/`breakdown` with no extra step.
 
 Declare the `brackets:` namespace so `B`'s container pointer validates cleanly:
 

@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "run_id": "ecd0068a-0990-4f31-8cb1-475af0cfa9aa",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2d109173-91b2-49b1-9ef6-7d5a0f5a4b22",
+  "commit": "2d053fc5fc5ff2fc7aa324f282ceec0701ca5c94",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T17:31:27.922899637Z",
+  "completed_at": "2026-07-11T17:57:18.508723926Z",
+  "duration_ms": 1550585,
+  "exit_code": 1,
+  "stdout": "## 1. Claims match the current source tree\n\nFail. The latest run’s ten findings are addressed at their original locations. This pass found 16 separate source mismatches (F1–F16).\n\n## 2. Adopter surface vs repo-local configuration\n\nPass. Repo-local configuration is signalled as repository-specific or illustrative.\n\n## 3. Current behavior only\n\nPass. Legacy/future-marker matches are illustrative or generic, not claims about JIT’s past or roadmap.\n\n## 4. No rotting counts\n\nPass. No unsupported volatile product totals remain.\n\n## 5. Links and referenced paths resolve\n\nPass. The full-scope mechanical check passed for Markdown links, anchors, cited paths, addressable-item citations, and projections.\n\n## 6. Content-standards conformance\n\nPass. Diagrams are Mermaid where diagrams are used; remaining text blocks are valid file trees or command output. No plaintext-math or heading-depth defect found.\n\n## Findings\n\n1. **F1 — Document archival is falsely described as automatic on completion.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:181) and [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:19) say documents archive when work completes. Archival only occurs through explicit `jit doc archive`. Remediate both statements to describe explicit archival.\n\n2. **F2 — Storage format incorrectly makes every description Markdown and omits its persisted format field.** [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:86) describes the body as Markdown, but issues may carry optional `content_format` values (`markdown`, `html`, or `xml`) and otherwise inherit the repository default. Remediate the field table with `content_format` and its inheritance behavior.\n\n3. **F3 — Priority labels are incorrectly called non-label built-ins.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:882) says `priority:*` is “not a label.” The shipped configuration includes a `priority` label namespace, distinct from the issue priority field. Remediate to distinguish the namespace from the field.\n\n4. **F4 — Assignee kinds are falsely documented as a closed set.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:1040) lists three “supported types,” but parsing accepts any non-empty `kind:identifier` pair. Remediate by presenting `human`, `agent`, and `bot` as examples.\n\n5. **F5 — The precheck diagram starts from the wrong lifecycle state.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:557) runs a precheck from `backlog` to `in_progress`; handlers run prechecks only on `ready → in_progress`. Remediate the Mermaid transition.\n\n6. **F6 — Automated gates are falsely presented as self-running.** [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:117) says automated gates run automatically. A checker runs when `jit gate evaluate` is explicitly invoked. Remediate the workflow to invoke evaluation.\n\n7. **F7 — Run-history documentation incorrectly includes stderr.** [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:439) says prior `stdout`/`stderr`/exit code are supplied. The handler deliberately clears stderr before passing run history to a checker. Remediate to exclude stderr.\n\n8. **F8 — Gate failure semantics are reversed.** [core-model.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/core-model.md:528) and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1485) say failures are automated/manual failure is inappropriate. `jit gate fail` rejects automated gates and records failure for manual gates; automated failures come from evaluation. Remediate the diagram, example, and note.\n\n9. **F9 — Create’s `--force` flag is described incorrectly.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:422) says it bypasses validation warnings. Warnings never block; `--force` bypasses blocking `enforce = true` rule failures and records the bypass. Remediate the flag description.\n\n10. **F10 — The lead issue-update JSON contract is a full issue object, not the actual confirmation shape.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:16) shows title, priority, labels, dependencies, and gates, while the handler returns only id, short_id, state, updated_at, and message. Remediate the lead example to match the later correct confirmation example.\n\n11. **F11 — Two preset-application pipelines are invalid.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1664) pipes human-readable query output into `xargs`, and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1810) also uses nonexistent `query all --filter`. Remediate with `query all --label … --json | jq -r '.issues[].id' | xargs jit gate preset apply …`.\n\n12. **F12 — Preset application incorrectly requires at least one issue ID.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1640) and [cli-command-grammar.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:74) document one-or-more IDs. Clap defines `[IDS]...`; zero IDs succeeds and applies to no issues. Remediate the grammar and usage as optional IDs.\n\n13. **F13 — Preset-name validation is overstated.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:1731) says special characters are invalid. The command rejects an empty or built-in name, not a general special-character class. Remediate to state the actual checks.\n\n14. **F14 — Issue creation is falsely said to require pre-registered gate keys.** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:419) says every `--gate` key must already exist. Creation persists supplied keys without registry lookup; `jit validate` later detects unknown references. Remediate the create behavior description and explain the later integrity check.\n\n15. **F15 — The CI gate-status script can report success with pending gates.** [software-development.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/software-development.md:541) through [line 551](/home/vkaskivuo/Projects/just-in-time/docs/how-to/software-development.md:551) inspects only `.results`, which contains recorded automated runs rather than every required gate. Remediate it to require `.all_passed == true` or inspect `.gates`, including pending manual and automated gates.\n\n16. **F16 — Multi-agent safety claims invent field-level conflict resolution and overstate ordinary claiming.** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:26) and [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:309) claim locks/ordinary claims prevent races or use first-writer-wins field resolution. Writes replace whole issue records after reads; ordinary `issue claim` is not exclusive. Remediate to distinguish atomic replacement and lease acquisition from field merging, and direct exclusive workflows to `jit claim acquire`.\n\nTotal findings: 16\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"16 blocking documentation claims and examples drift from the current CLI and handlers.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Documents are falsely described as archiving automatically when work completes.\",\"file\":\"docs/concepts/core-model.md\",\"line\":181},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Storage format falsely treats every description as Markdown and omits content_format.\",\"file\":\"docs/reference/storage-format.md\",\"line\":86},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Priority labels are falsely described as non-label built-ins.\",\"file\":\"docs/concepts/core-model.md\",\"line\":882},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"Assignee kinds are falsely documented as a closed set.\",\"file\":\"docs/concepts/core-model.md\",\"line\":1040},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"The precheck diagram starts from backlog instead of ready.\",\"file\":\"docs/concepts/core-model.md\",\"line\":557},{\"id\":\"F6\",\"severity\":\"high\",\"summary\":\"Automated gates are falsely presented as self-running.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":117},{\"id\":\"F7\",\"severity\":\"high\",\"summary\":\"Run-history documentation falsely says stderr is passed to later checkers.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":439},{\"id\":\"F8\",\"severity\":\"high\",\"summary\":\"Gate-failure documentation reverses manual and automated failure behavior.\",\"file\":\"docs/concepts/core-model.md\",\"line\":528},{\"id\":\"F9\",\"severity\":\"high\",\"summary\":\"Create --force is falsely described as bypassing warnings.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":422},{\"id\":\"F10\",\"severity\":\"high\",\"summary\":\"The lead issue-update JSON example does not match the actual response shape.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":16},{\"id\":\"F11\",\"severity\":\"high\",\"summary\":\"Two preset-application query pipelines are invalid.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1664},{\"id\":\"F12\",\"severity\":\"high\",\"summary\":\"Preset application is falsely documented as requiring one or more issue IDs.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1640},{\"id\":\"F13\",\"severity\":\"high\",\"summary\":\"Preset-name validation is overstated as forbidding special characters.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1731},{\"id\":\"F14\",\"severity\":\"high\",\"summary\":\"Issue creation is falsely documented as requiring pre-registered gate keys.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":419},{\"id\":\"F15\",\"severity\":\"high\",\"summary\":\"The CI gate-status script can pass while required gates remain pending.\",\"file\":\"docs/how-to/software-development.md\",\"line\":541},{\"id\":\"F16\",\"severity\":\"high\",\"summary\":\"Multi-agent safety documentation falsely claims conflict resolution and race prevention for ordinary claims.\",\"file\":\"README.md\",\"line\":26}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 55988 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: xhigh\nreasoning summaries: none\nsession id: 019f523b-f47f-7eb3-b50f-685b0830d576\n--------\nuser\n--- 55975 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "16 blocking documentation claims and examples drift from the current CLI and handlers.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Documents are falsely described as archiving automatically when work completes.",
+        "file": "docs/concepts/core-model.md",
+        "line": 181
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "Storage format falsely treats every description as Markdown and omits content_format.",
+        "file": "docs/reference/storage-format.md",
+        "line": 86
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Priority labels are falsely described as non-label built-ins.",
+        "file": "docs/concepts/core-model.md",
+        "line": 882
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "summary": "Assignee kinds are falsely documented as a closed set.",
+        "file": "docs/concepts/core-model.md",
+        "line": 1040
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "summary": "The precheck diagram starts from backlog instead of ready.",
+        "file": "docs/concepts/core-model.md",
+        "line": 557
+      },
+      {
+        "id": "F6",
+        "severity": "high",
+        "summary": "Automated gates are falsely presented as self-running.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 117
+      },
+      {
+        "id": "F7",
+        "severity": "high",
+        "summary": "Run-history documentation falsely says stderr is passed to later checkers.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 439
+      },
+      {
+        "id": "F8",
+        "severity": "high",
+        "summary": "Gate-failure documentation reverses manual and automated failure behavior.",
+        "file": "docs/concepts/core-model.md",
+        "line": 528
+      },
+      {
+        "id": "F9",
+        "severity": "high",
+        "summary": "Create --force is falsely described as bypassing warnings.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 422
+      },
+      {
+        "id": "F10",
+        "severity": "high",
+        "summary": "The lead issue-update JSON example does not match the actual response shape.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 16
+      },
+      {
+        "id": "F11",
+        "severity": "high",
+        "summary": "Two preset-application query pipelines are invalid.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1664
+      },
+      {
+        "id": "F12",
+        "severity": "high",
+        "summary": "Preset application is falsely documented as requiring one or more issue IDs.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1640
+      },
+      {
+        "id": "F13",
+        "severity": "high",
+        "summary": "Preset-name validation is overstated as forbidding special characters.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1731
+      },
+      {
+        "id": "F14",
+        "severity": "high",
+        "summary": "Issue creation is falsely documented as requiring pre-registered gate keys.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 419
+      },
+      {
+        "id": "F15",
+        "severity": "high",
+        "summary": "The CI gate-status script can pass while required gates remain pending.",
+        "file": "docs/how-to/software-development.md",
+        "line": 541
+      },
+      {
+        "id": "F16",
+        "severity": "high",
+        "summary": "Multi-agent safety documentation falsely claims conflict resolution and race prevention for ordinary claims.",
+        "file": "README.md",
+        "line": 26
+      }
+    ]
+  }
+}
