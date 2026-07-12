@@ -84,43 +84,44 @@ flowchart TD
 
 ### Policy ownership
 
-The table below assigns every principle from the historical prompt and the current review rubric to one owner. “Reviewer procedure” means the prompt can state the behavior inline. Registry-owned entries are cited and resolved rather than copied.
+The table below assigns every principle from the historical prompt and the current review rubric to one owner. Each row names exactly one canonical owner; supporting citations, enforcement mechanisms, projections, schemas, and storage roles appear only under Reviewer treatment and do not share ownership. “Reviewer procedure” means the prompt can state the named procedural rule inline. Registry-owned entries are cited and resolved rather than copied.
 
 | Guiding principle | Canonical owner | Reviewer treatment |
 |---|---|---|
-| Issue success criteria must be satisfied | Issue description and content standards | Procedure reads hard requirements and verifies current behavior |
-| Attributable work is issue-scoped | Reviewer procedure | Tagged-commit algorithm and no-tag fallback stay inline |
-| Uncommitted changes are not automatically attributable | Reviewer procedure | Stays inline because it controls review scope |
-| Current source determines shipped behavior | Reviewer procedure | Stays inline |
-| Material issue-introduced debt blocks; unrelated debt is advisory | Reviewer procedure | Stays inline as causal finding policy |
-| Latest recorded gates are evidence; passed gates are not rerun | Reviewer procedure plus gate registry | Procedure interprets evidence; executable checks stay registry-owned |
-| Read-only inspection | Reviewer procedure and code-review gate configuration | Procedure states prohibited mutations; gate configuration enforces sandboxing |
-| Bounded reads and truncation recovery | Reviewer procedure | Stays inline |
-| Architecture and layer boundaries | `AGENTS.md` Separation of Concerns | Prompt identifies `AGENTS.md` as baseline; it does not copy the layer list |
-| Pure functions, immutability, iterator style | `AGENTS.md` Testability and Coding Conventions | Loaded from applicable prose |
-| TDD and property testing for graph operations | `AGENTS.md` Testability | Loaded from applicable prose |
-| Unit, harness, and integration test roles | `AGENTS.md` Testing Strategy | Loaded from applicable prose |
-| Relevant success, boundary, failure, and concurrency coverage | `AGENTS.md` Testing Strategy | New approved prose; examples are contextual |
-| Unsafe code is prohibited | `AGENTS.md` Coding Conventions | Loaded from applicable prose |
-| Result-based errors, `thiserror`, and no library panics | `AGENTS.md` Coding Conventions | Loaded from applicable prose |
-| Public API documentation | `AGENTS.md` Coding Conventions | New approved prose; examples are required when behavior is non-obvious |
-| Machine-readable JSON and list envelopes | `AGENTS.md` Coding Conventions | Loaded from applicable prose |
-| Git is optional except for declared features | `AGENTS.md` Coding Conventions and charter decision | Prose provides context; cited decision is resolved when relevant |
-| Label formatting | Invariant and rule registries | Resolve the governing address; do not copy its statement into the prompt |
-| Namespace registration | Invariant and rule registries | Resolve the governing address |
-| DAG acyclicity | Invariant registry | Resolve the governing address |
-| Gate semantics | Invariant registry | Resolve the governing address |
-| Event logging | Invariant registry | Resolve the governing address |
-| Atomic writes | Invariant registry | Resolve the governing address |
-| Assignee formatting | Invariant registry | Resolve the governing address |
-| Domain agnosticism | Invariant registry | Resolve the governing address |
-| Single-source prose | Invariant registry | Resolve the governing address |
-| PID signaling safety | New `pid-safety` invariant | Resolve and cite it when process-signaling code is in the impact cone |
-| Required validation must pass | `AGENTS.md` general gate policy and `@/gate/jit-validate` executable policy | Consume latest evidence; do not copy checker commands into prose |
-| Dependencies are complete and correctly used | DAG plus `AGENTS.md` lifecycle guidance | Procedure inspects enriched dependency state |
-| Findings enumeration and terminal verdict | Tool-agnostic review wrapper | Checker-specific prompt does not duplicate the envelope |
-| Finding disposition and origin | Reviewer procedure and findings schema | Procedure requires classification; schema stores it |
-| Governing policy references | Reviewer procedure and findings schema | Procedure requires references; schema stores strings generically |
+| Issue success criteria must be satisfied | Context issue description — Success Criteria | Reviewer procedure reads the issue-owned hard requirements and verifies current behavior; content standards define the section format but do not own the issue's criteria |
+| Attributable work is issue-scoped | Reviewer procedure — attribution rule | Tagged-commit algorithm and no-tag fallback stay inline |
+| Uncommitted changes are not automatically attributable | Reviewer procedure — attribution rule | Stays inline because it controls review scope |
+| Current source determines shipped behavior | Reviewer procedure — current-tree rule | Stays inline |
+| Material issue-introduced debt blocks; unrelated debt is advisory | Reviewer procedure — causal finding rule | Stays inline as causal finding policy |
+| Latest recorded gates are evidence; passed gates are not rerun | Reviewer procedure — gate-evidence rule | The procedure consumes every latest status according to gate purpose. Incomplete peer judgment is not categorically blocking; executable CI or validation evidence supports a blocking finding only when it demonstrates attributable failure or leaves a hard criterion materially unverified. Gate registries own their executable checks |
+| Read-only inspection | Reviewer procedure — inspection boundary | Procedure states prohibited mutations; the code-review gate's sandbox configuration supports enforcement without sharing policy ownership |
+| Bounded reads and truncation recovery | Reviewer procedure — bounded-inspection rule | Stays inline |
+| Architecture and layer boundaries | Root `AGENTS.md` — Separation of Concerns | Prompt identifies applicable `AGENTS.md` prose as baseline; it does not copy the layer list |
+| Pure functions | Root `AGENTS.md` — Testability | Loaded from applicable prose |
+| Immutability and iterator style | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
+| TDD and property testing for graph operations | Root `AGENTS.md` — Testability | Loaded from applicable prose |
+| Unit, harness, and integration test roles | Root `AGENTS.md` — Testing Strategy | Loaded from applicable prose |
+| Relevant success, boundary, failure, and concurrency coverage | Root `AGENTS.md` — Testing Strategy | Approved prose is canonical; examples are contextual |
+| Unsafe code is prohibited | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
+| Result-based errors, `thiserror`, and no library panics | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
+| Public API documentation | Root `AGENTS.md` — Coding Conventions | Approved prose is canonical; examples are required when behavior is non-obvious |
+| Machine-readable JSON and list envelopes | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
+| Git is optional except for declared features | Root `AGENTS.md` — Coding Conventions | `@/charter/D-4` is a supporting decision citation resolved when relevant |
+| Label formatting | `@/invariant/label-format` | Resolve and cite the invariant; `@/rule/label-format` is its executable validation support, not a co-owner |
+| Namespace registration | `@/invariant/namespace-registry` | Resolve and cite the invariant; `@/rule/namespace-registry` is its executable validation support, not a co-owner |
+| DAG acyclicity | `@/invariant/dag-acyclic` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Gate semantics | `@/invariant/gate-semantics` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Event logging | `@/invariant/event-log` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Atomic writes | `@/invariant/atomic-writes` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Assignee formatting | `@/invariant/assignee-format` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Domain agnosticism | `@/invariant/domain-agnostic` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| Single-source prose | `@/invariant/single-source-prose` | Resolve and cite the governing item; its `AGENTS.md` projection is not the source of truth |
+| PID signaling safety | `@/invariant/pid-safety` | Resolve and cite it when process-signaling code is in the impact cone |
+| Required repository validation must pass | `@/gate/jit-validate` | Consume the latest executable validation evidence without copying checker commands. The reviewer procedure interprets that evidence and does not treat unfinished peer review as an implementation defect |
+| Dependencies are complete and correctly used | Reviewer procedure — dependency-integration rule | Procedure inspects DAG-derived dependency state and applies the lifecycle guidance loaded from `AGENTS.md`; those inputs support the judgment without sharing ownership |
+| Findings enumeration and terminal verdict | Tool-agnostic wrapper contract — report transport | Checker-specific prompt does not duplicate the envelope; jit parses and stores the emitted structured block |
+| Finding disposition and origin | Reviewer procedure — finding-classification rule | Procedure requires classification; the findings schema stores it without sharing policy ownership |
+| Governing policy references | Reviewer procedure — finding-reference rule | Procedure requires resolved references; the findings schema and storage preserve opaque strings without sharing policy ownership |
 
 ### Approved canonical prose
 
