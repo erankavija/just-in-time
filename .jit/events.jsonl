@@ -6786,3 +6786,8 @@
 {"type":"gate_passed","id":"907b3cbd-171a-46ce-8b84-56a4dc0bfc90","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T18:15:20.958951666Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"6e8cd526-3f98-4130-b127-85abd25e2495","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T18:15:41.873561365Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"b5f7f48d-5624-41a7-8d22-7676cb95a884","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T18:15:41.873608195Z"}
+{"type":"issue_created","id":"afe3e3dd-ad47-4603-a4cc-d75c4269bea4","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:11:54.693348939Z","title":"Ground code review in AGENTS.md and addressable policy","priority":"high"}
+{"type":"issue_updated","id":"96e8540d-c103-40c2-be80-4d7477adcae9","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:12:03.102154733Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"68e27739-ae78-4156-9c9d-2887c3df96f9","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-12T19:12:11.510927458Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"dependency_reduced","id":"a6a3562b-3f0d-433d-83a1-7762cbe5fa5c","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-12T19:12:11.516106262Z","old_count":28,"new_count":27,"removed_deps":["76cb968b-8c8b-46e2-8dfb-ad54c32aa284"]}
+{"type":"issue_updated","id":"3818ab6b-0f34-4eb3-9ab2-d79494a1d933","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:12:33.307391958Z","updated_by":"issue-update","fields":["labels"]}
