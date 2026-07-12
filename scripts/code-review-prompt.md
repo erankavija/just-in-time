@@ -39,9 +39,13 @@ If any result contains a truncation marker or omits a requested range, recover t
 
 ## Current evidence semantics
 
-Treat each required gate's latest recorded status and exit code in `context.issue.gates` as the available CI evidence. A newer successful run supersedes older failures. Do not claim that cargo, clippy, or test stdout is present. Do not rerun a gate that is currently recorded as passing. Executable repository validation policy remains owned by `@/gate/jit-validate`; resolve it when it governs the review rather than copying or independently recreating its checker.
+Treat each required gate's latest recorded status and exit code in `context.issue.gates` as available evidence. Include every required gate's latest status in the evidence header and consume it according to the gate's purpose. A newer successful run supersedes older failures. Do not claim that cargo, clippy, or test stdout is present. Do not rerun a gate that is currently recorded as passing. Executable repository validation policy remains owned by `@/gate/jit-validate`; resolve it when it governs the review rather than copying or independently recreating its checker.
 
-Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists. A currently pending, failed, or errored required CI/validation gate must be reported according to its latest projection.
+An unrun, pending, or failed peer review or judgment gate is not by itself an implementation defect and must not create a blocking finding or fail the verdict. Perform this code review's own judgment without treating incomplete independent judgment as proof of a defect.
+
+Executable CI or validation gate evidence may support a blocking finding when it demonstrates an attributable failure or leaves a hard criterion materially unverified. Tie any such finding to the attributable behavior or unmet criterion shown by the evidence, not merely to the gate's status.
+
+Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists.
 
 If `run_history` is non-empty, use its one latest run: structured findings, verdict, and metadata are authoritative; stdout exists only as a compatibility fallback for an unstructured legacy run. Verify that prior blocking findings have been addressed.
 

@@ -50,6 +50,31 @@ fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
 }
 
 #[test]
+fn test_code_review_prompt_does_not_treat_pending_peer_review_as_a_defect() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for required in [
+        "Include every required gate's latest status in the evidence header",
+        "peer review or judgment gate",
+        "is not by itself an implementation defect",
+        "must not create a blocking finding or fail the verdict",
+        "Executable CI or validation gate evidence may support a blocking finding",
+        "demonstrates an attributable failure",
+        "leaves a hard criterion materially unverified",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing peer-review gate evidence policy: {required}"
+        );
+    }
+
+    assert!(
+        !prompt.contains("A currently pending, failed, or errored required"),
+        "prompt retains the blanket rule that made unfinished peer review block code review"
+    );
+}
+
+#[test]
 fn test_code_review_prompt_discovers_applicable_policy_in_precedence_order() {
     let prompt = repo_file("scripts/code-review-prompt.md");
 
