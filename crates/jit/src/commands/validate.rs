@@ -948,8 +948,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         match id {
             Some(partial) => {
-                // Resolve the target issue (partial ids accepted via storage).
-                let issue = self.storage.load_issue(partial)?;
+                // `load_issue` keys on the FULL id, so the caller's id — which may
+                // be a short-id prefix, as every other command accepts — is put
+                // through the store's prefix resolver first.
+                let full_id = self.storage.resolve_issue_id(partial)?;
+                let issue = self.storage.load_issue(&full_id)?;
 
                 // Local rules for this issue only.
                 let evaluation = crate::validation::evaluate_local(&issue, ruleset, repo_format)
@@ -1224,7 +1227,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
-        let issue = self.storage.load_issue(id)?;
+        // `load_issue` keys on the FULL id; resolve a short-id prefix first.
+        let full_id = self.storage.resolve_issue_id(id)?;
+        let issue = self.storage.load_issue(&full_id)?;
         let issues = self.storage.list_issues()?;
 
         // Local findings for this issue, grouped by rule name.
@@ -2464,5 +2469,48 @@ description = \"Full Rust CI pipeline must pass.\"
         // The finding serializes (used by `jit validate --json`).
         let value = serde_json::to_value(&report.findings).unwrap();
         assert!(value.to_string().contains(DANGLING_LINK_RULE));
+    }
+
+    /// `jit validate <id>` takes the same short-id prefix every other command
+    /// takes. `load_issue` keys on the full id, so `run_rules` must resolve the
+    /// prefix first; without that it reports the issue as not found.
+    #[test]
+    fn test_run_rules_accepts_short_id_prefix() {
+        let target =
+            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
+        let full_id = target.id.clone();
+        let short_id = target.short_id();
+        let exec = dangling_exec(vec![target]);
+
+        let by_short = exec
+            .run_rules(Some(&short_id))
+            .expect("short-id prefix must resolve");
+        let by_full = exec
+            .run_rules(Some(&full_id))
+            .expect("full id must resolve");
+
+        assert_eq!(
+            by_short.findings.len(),
+            by_full.findings.len(),
+            "the short-id prefix must select the same issue as the full id"
+        );
+    }
+
+    /// The same resolution holds for `jit validate --explain <id>`.
+    #[test]
+    fn test_explain_rules_accepts_short_id_prefix() {
+        let target =
+            issue_with_labels("target", "## Success Criteria\n\n- [hard] REQ-01: a\n", &[]);
+        let full_id = target.id.clone();
+        let short_id = target.short_id();
+        let exec = dangling_exec(vec![target]);
+
+        let by_short = exec
+            .explain_rules(&short_id)
+            .expect("short-id prefix must resolve");
+        let by_full = exec.explain_rules(&full_id).expect("full id must resolve");
+
+        assert_eq!(by_short.issue_id, by_full.issue_id);
+        assert_eq!(by_short.outcomes.len(), by_full.outcomes.len());
     }
 }
