@@ -6826,3 +6826,7 @@
 {"type":"issue_state_changed","id":"f344b6fd-1f66-4532-8f5b-08b14a56cc18","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:16:30.037797918Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"95b36542-fb31-404f-b789-ec145b44fd98","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:16:57.551409235Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"00a505ac-6af5-4b78-b777-269dcee422d7","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:16:57.551609565Z","assignee":"agent:worker"}
+{"type":"gate_passed","id":"551be699-7835-4b3b-93df-7d5e0719b4fc","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:27:28.096512122Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"e29376de-f2d6-462f-9da9-bc0cd6a53cc9","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:27:28.408869589Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"517f3178-d2b2-4758-a525-8dbebdf38ef5","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:27:28.921004802Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"54635ebd-8dde-4d11-aa75-8f9decb48467","issue_id":"8b479a72-237c-4113-a868-17355cef55bc","timestamp":"2026-07-12T20:30:25.415958115Z","gate_key":"code-review","updated_by":"auto:executor"}

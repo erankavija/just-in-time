@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "2041e9a7-434b-45d7-b59d-00b000550685",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8b479a72-237c-4113-a868-17355cef55bc",
+  "commit": "b62bf8d2161c0f0b47e054c594d967dc6a9fb918",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T20:27:36.601752487Z",
+  "completed_at": "2026-07-12T20:30:25.415531495Z",
+  "duration_ms": 168813,
+  "exit_code": 1,
+  "stdout": "Attribution: b62bf8d2161c0f0b47e054c594d967dc6a9fb918 (`jit:8b479a72`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/gate/doc-review (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/pid-safety, @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (0); repo-validate passed (0); docs-mechanical passed (0); doc-review pending (no exit code)\nTruncation recovery: narrowed truncated wrapper/configuration and parser searches to relevant line ranges\n\n1. `blocking`, `issue-impact`: [docs/how-to/custom-gates.md:306](docs/how-to/custom-gates.md:306) says the wrapper parses structured findings and the verdict. It only parses `VERDICT` ([scripts/ai-review.sh:152](scripts/ai-review.sh:152)); JIT parses the findings block at record time ([crates/jit/src/gate_execution.rs:147](crates/jit/src/gate_execution.rs:147)). This conflicts with the new transport-boundary guidance. References: `@/invariant/single-source-prose`.\n\n2. `blocking`, `issue-impact`: The required `doc-review` gate is still pending with no recorded run or exit code. The gate registry defines it as the documentation-impact review, so current evidence does not satisfy that required projection. References: `@/gate/doc-review`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One attributable documentation-boundary defect and one pending required gate remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Documentation incorrectly says ai-review.sh parses structured findings; JIT performs that parsing.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":306,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Required doc-review gate is pending with no recorded result.\",\"references\":[\"@/gate/doc-review\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4485 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5803-92d6-7d60-a521-ffdab40a0527\n--------\nuser\n--- 4472 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "One attributable documentation-boundary defect and one pending required gate remain.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Documentation incorrectly says ai-review.sh parses structured findings; JIT performs that parsing.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 306,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Required doc-review gate is pending with no recorded result.",
+        "references": [
+          "@/gate/doc-review"
+        ]
+      }
+    ]
+  }
+}
