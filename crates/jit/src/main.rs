@@ -783,8 +783,9 @@ fn render_report_stream(text: &str, tail: Option<usize>) -> String {
 /// One header line carries the gate key, verdict, one-line summary, and finding
 /// count; each finding follows on its own line as `<id> [<severity>]` plus any
 /// `[<disposition>] [<origin>]` classifications, then `<summary>` and an
-/// optional ` (<file>:<line>)` locator and ` references: [<value>, ...]` list.
-/// Empty reference lists add no text. The format is stable and
+/// optional ` (<file>:<line>)` locator and a JSON-encoded `references` array.
+/// JSON encoding preserves arbitrary reference strings without delimiter
+/// ambiguity. Empty reference lists add no text. The format is stable and
 /// greppable (severity via `[high]`, verdict via the header), mirroring the
 /// `issue status` one-line convention. A run with no machine-readable block
 /// renders a single header line with `verdict: n/a` and `findings: 0`, so a
@@ -833,7 +834,9 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
                 let references = if finding.references.is_empty() {
                     String::new()
                 } else {
-                    format!(" references: [{}]", finding.references.join(", "))
+                    let encoded = serde_json::to_string(&finding.references)
+                        .expect("serializing a string array cannot fail");
+                    format!(" references: {encoded}")
                 };
                 out.push_str(&format!(
                     "{} [{}]{} {}{}{}\n",
@@ -900,7 +903,24 @@ mod gate_findings_text_tests {
             "checker:opaque value".to_string(),
         ]));
 
-        assert!(rendered.contains("references: [@/inv/atomic-writes, checker:opaque value]"));
+        assert!(rendered.contains(r#"references: ["@/inv/atomic-writes","checker:opaque value"]"#));
+    }
+
+    #[test]
+    fn test_render_gate_findings_text_json_encoding_distinguishes_collisions() {
+        let comma_value = render_gate_findings_text(&run_with(vec!["a, b".to_string()]));
+        let two_values =
+            render_gate_findings_text(&run_with(vec!["a".to_string(), "b".to_string()]));
+        let empty_value = render_gate_findings_text(&run_with(vec![String::new()]));
+
+        assert!(comma_value.contains(r#"references: ["a, b"]"#));
+        assert!(two_values.contains(r#"references: ["a","b"]"#));
+        assert!(empty_value.contains(r#"references: [""]"#));
+        assert_ne!(comma_value, two_values);
+        assert_ne!(
+            empty_value,
+            render_gate_findings_text(&run_with(Vec::new()))
+        );
     }
 
     #[test]
