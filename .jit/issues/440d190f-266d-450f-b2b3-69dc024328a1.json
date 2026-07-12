@@ -12,7 +12,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T19:44:43.520541723Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T19:44:43.833153050Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,7 +32,7 @@
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.536493359Z",
-  "updated_at": "2026-07-12T19:31:45.947588500Z",
+  "updated_at": "2026-07-12T19:44:44.235948033Z",
   "first_ready_at": "2026-07-12T19:25:27.536502299Z",
   "claimed_at": "2026-07-12T19:31:45.947588180Z"
 }
