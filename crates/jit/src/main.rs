@@ -7191,16 +7191,58 @@ mod exit_code_projection_tests {
     //! fails — so the projection cannot silently drift from runtime behavior.
 
     use super::error_to_exit_code;
+    use jit::domain::{GateRunResult, GateRunStatus, GateStage};
     use jit::schema::CommandSchema;
+
+    /// Build a `gate evaluate` checker failure carrying `status`, so the
+    /// `gate evaluate` / `gate evaluate-all` exception rows (checker verdict `4`,
+    /// runner error `10`) are pinned to the real classifier: `error_to_exit_code`
+    /// splits `GatePassFailed` on this status.
+    fn gate_pass_failed(status: GateRunStatus) -> anyhow::Error {
+        let result = GateRunResult {
+            schema_version: 1,
+            run_id: "run-1".to_string(),
+            gate_key: "tests".to_string(),
+            stage: GateStage::Precheck,
+            issue_id: "abc123".to_string(),
+            commit: None,
+            branch: None,
+            status,
+            started_at: chrono::Utc::now(),
+            completed_at: None,
+            duration_ms: None,
+            exit_code: Some(1),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "false".to_string(),
+            by: None,
+            message: None,
+            findings: None,
+        };
+        jit::commands::GatePassFailed {
+            issue_id: "abc123".to_string(),
+            gate_key: "tests".to_string(),
+            status,
+            exit_code: Some(1),
+            result,
+            warnings: Vec::new(),
+        }
+        .into()
+    }
 
     /// Representative typed errors paired with the exit code the classifier must
     /// produce for them. Only errors constructible through the public library API
-    /// appear here; the crate-private conditions (blocked transitions, checker
-    /// failures, batch writes) are pinned end-to-end by the subprocess tests in
+    /// appear here; the remaining crate-private conditions (blocked transitions,
+    /// batch writes) are pinned end-to-end by the subprocess tests in
     /// `tests/exit_code_tests.rs`.
     fn classifier_cases() -> Vec<(anyhow::Error, i32)> {
         use std::io::{Error as IoError, ErrorKind};
         vec![
+            // Gate-evaluation exception rows route through `error_to_exit_code`:
+            // a checker that failed (`Failed`) is `4`; one that could not run
+            // (`Error`) is `10`.
+            (gate_pass_failed(GateRunStatus::Failed), 4),
+            (gate_pass_failed(GateRunStatus::Error), 10),
             (jit::errors::InvalidArgumentError::new("bad arg").into(), 2),
             (
                 jit::storage::AmbiguousIdError::issue(
@@ -7265,8 +7307,11 @@ mod exit_code_projection_tests {
     #[test]
     fn projection_documents_every_classified_code() {
         let schema = CommandSchema::generate();
-        let documented: std::collections::HashSet<i32> =
-            schema.command_exit_codes.iter().map(|c| c.code).collect();
+        let documented: std::collections::HashSet<i32> = schema
+            .command_exit_codes
+            .iter()
+            .filter_map(|c| c.code)
+            .collect();
         for (error, _expected) in classifier_cases() {
             let actual = error_to_exit_code(&error).code();
             assert!(

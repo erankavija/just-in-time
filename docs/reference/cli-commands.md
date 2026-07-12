@@ -1664,7 +1664,8 @@ Errors (1):
 **Notes:**
 - Gates are automatically added to registry if they don't exist
 - Timeout override applies to all automated gates in the preset
-- Exit code is 1 if any errors occur in batch mode
+- On a partial batch (some issues fail to apply) the command exits `1`; see the
+  [exit-code reference](exit-codes.md#command-specific-mappings)
 - Use `--json` for machine-readable output
 
 ### `jit gate preset create`
@@ -1799,9 +1800,10 @@ jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
 
 ### Exit Codes
 
-- `0` - Success
-- `1` - Error (preset not found, issue not found, validation failed)
-- Exit code 1 in batch mode if any issues fail
+`jit gate preset apply` follows the [exit-code reference](exit-codes.md); its
+[command-specific mappings](exit-codes.md#command-specific-mappings) record the
+partial-batch case (exit `1` when one or more issues fail to apply). A missing
+preset or issue is a not-found error (`3`) per the global taxonomy.
 
 ## Dependency Commands
 
@@ -2991,10 +2993,9 @@ errors and invalid values (both surface when a config source fails to load).
 jit config validate [--json]
 ```
 
-Exit codes:
-- `0` — Valid configuration
-- `1` — Errors found
-- `2` — Warnings only
+Exit codes follow the [exit-code reference](exit-codes.md#command-specific-mappings):
+`0` when the configuration is valid, `1` when any source fails to load or carries
+an invalid value.
 
 ### `jit config show-hierarchy` / `jit config list-templates`
 
@@ -3213,21 +3214,10 @@ echo "Recently completed (last 100 events): $RECENT_DONE"
 
 ### Exit Codes
 
-JIT uses a standardized exit-code taxonomy for scripting:
-
-| Code | Meaning |
-|------|---------|
-| `0`  | Success |
-| `1`  | Generic error (unclassified failure) |
-| `2`  | Invalid argument / usage error |
-| `3`  | Resource not found (issue, gate, repository) |
-| `4`  | Validation failed (cycle detected, gate not passed, broken references) |
-| `5`  | Permission denied |
-| `6`  | Resource already exists |
-| `10` | External dependency failed (git, filesystem, repository format too new) |
-
-This table matches `jit --schema`'s top-level `exit_codes` array, the
-machine-readable source of the same taxonomy.
+JIT uses a standardized exit-code taxonomy for scripting. The full taxonomy, plus
+the per-command mappings and exceptions, is the [Exit Codes reference](exit-codes.md)
+— generated from `jit --schema`'s `exit_codes` array and the runtime classifier,
+so it never drifts. The `--json` `code` distinctions below refine that taxonomy.
 
 Exit `4` covers several validation failures that share the code but carry a
 distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would

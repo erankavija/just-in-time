@@ -19,7 +19,7 @@
 
 ## Command-specific mappings
 
-Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `2` meaning "valid with warnings" for the validation commands). `*` marks a code every command can reach through the shared classifier.
+Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `doc check-links` exits `2` for warnings, not a usage error). A `child` code marks a pass-through, where the command exits with a subprocess's own code. `*` marks a code every command can reach through the shared classifier.
 
 | Command | Code | Condition | Exception |
 |---------|------|-----------|-----------|
@@ -44,11 +44,10 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `validate` | `1` | Rule evaluation reported error-severity findings. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
-| `config validate` | `1` | The configuration has error-severity problems. | yes |
-| `config validate` | `2` | The configuration is valid but has warnings; here 2 means warnings, not a usage error. | yes |
-| `doc validate, doc check-links` | `1` | Document validation found errors. | yes |
-| `doc validate, doc check-links` | `2` | Document validation found only warnings; here 2 means warnings, not a usage error. | yes |
+| `config validate` | `1` | The repo, user, or environment-variable configuration failed to load or carried an invalid value. | yes |
+| `doc check-links` | `1` | One or more documents have broken links. | yes |
+| `doc check-links` | `2` | Documents have only risky-link warnings; here 2 means warnings, not a usage error. | yes |
 | `gate preset apply` | `1` | One or more issues failed to apply the preset (partial batch). | yes |
-| `serve` | `10` | The bundled dev-server child exited non-zero; the child's own exit code is passed through. | yes |
+| `serve` | `child` | Passes through the bundled dev-server child's own exit code (1 when the child is terminated by a signal). | yes |
 
 For the full `jit gate evaluate` verdict taxonomy and the `--json` `verdict` field, see [the gate command reference](cli-commands.md).

@@ -171,7 +171,7 @@ pub struct ExitCodeDoc {
 /// let row = schema
 ///     .command_exit_codes
 ///     .iter()
-///     .find(|c| c.command == "gate status-all" && c.code == 4)
+///     .find(|c| c.command == "gate status-all" && c.code == Some(4))
 ///     .expect("gate status-all exit-4 row");
 /// assert!(row.exception);
 /// ```
@@ -180,13 +180,15 @@ pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
     /// every command.
     pub command: String,
-    /// Exit code emitted. Always a member of the global taxonomy in
-    /// [`CommandSchema::exit_codes`].
-    pub code: i32,
+    /// Exit code emitted, when the command chooses a fixed code (always a member
+    /// of the global taxonomy in [`CommandSchema::exit_codes`]). `None` marks a
+    /// pass-through, where the command exits with a subprocess's own code rather
+    /// than a jit-assigned one (e.g. `serve`).
+    pub code: Option<i32>,
     /// Condition that produces the code.
     pub condition: String,
     /// True when the code's meaning here departs from the global taxonomy entry
-    /// for `code`.
+    /// for `code` (a completed-run findings signal, or a pass-through).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exception: bool,
 }
@@ -708,7 +710,7 @@ impl CommandSchema {
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
             command: command.to_string(),
-            code,
+            code: Some(code),
             condition: condition.to_string(),
             exception,
         };
@@ -845,26 +847,20 @@ impl CommandSchema {
             row(
                 "config validate",
                 1,
-                "The configuration has error-severity problems.",
+                "The repo, user, or environment-variable configuration failed to \
+                 load or carried an invalid value.",
                 true,
             ),
             row(
-                "config validate",
-                2,
-                "The configuration is valid but has warnings; here 2 means \
-                 warnings, not a usage error.",
-                true,
-            ),
-            row(
-                "doc validate, doc check-links",
+                "doc check-links",
                 1,
-                "Document validation found errors.",
+                "One or more documents have broken links.",
                 true,
             ),
             row(
-                "doc validate, doc check-links",
+                "doc check-links",
                 2,
-                "Document validation found only warnings; here 2 means warnings, \
+                "Documents have only risky-link warnings; here 2 means warnings, \
                  not a usage error.",
                 true,
             ),
@@ -875,13 +871,14 @@ impl CommandSchema {
                 true,
             ),
             // Pass-through of a spawned process's own code.
-            row(
-                "serve",
-                10,
-                "The bundled dev-server child exited non-zero; the child's own \
-                 exit code is passed through.",
-                true,
-            ),
+            CommandExitCode {
+                command: "serve".to_string(),
+                code: None,
+                condition: "Passes through the bundled dev-server child's own \
+                            exit code (1 when the child is terminated by a signal)."
+                    .to_string(),
+                exception: true,
+            },
         ]
     }
 }
@@ -926,17 +923,22 @@ pub fn render_exit_code_reference() -> String {
         "Most commands draw only from the global taxonomy above. The rows below \
          identify the codes a specific command family emits. An **exception** is \
          a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `2` meaning \"valid with \
-         warnings\" for the validation commands). `*` marks a code every command \
-         can reach through the shared classifier.\n\n",
+         departs from the global entry (for example, `doc check-links` exits `2` \
+         for warnings, not a usage error). A `child` code marks a pass-through, \
+         where the command exits with a subprocess's own code. `*` marks a code \
+         every command can reach through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");
     for entry in CommandSchema::generate_command_exit_codes() {
+        let code = match entry.code {
+            Some(c) => format!("`{c}`"),
+            None => "`child`".to_string(),
+        };
         out.push_str(&format!(
-            "| `{}` | `{}` | {} | {} |\n",
+            "| `{}` | {} | {} | {} |\n",
             entry.command,
-            entry.code,
+            code,
             entry.condition,
             if entry.exception { "yes" } else { "" }
         ));
@@ -1289,20 +1291,28 @@ mod tests {
 
     #[test]
     fn test_command_exit_codes_within_global_taxonomy() {
-        // Every projected code must be a defined member of the global taxonomy,
-        // so the per-command surface can never introduce a code the taxonomy
-        // does not explain.
+        // Every projected fixed code must be a defined member of the global
+        // taxonomy, so the per-command surface can never introduce a code the
+        // taxonomy does not explain. Pass-through rows (`code: None`, e.g.
+        // `serve`) carry no jit-assigned code and are exempt.
         let taxonomy: std::collections::HashSet<i32> = CommandSchema::generate_exit_codes()
             .iter()
             .map(|d| d.code)
             .collect();
         for entry in CommandSchema::generate_command_exit_codes() {
-            assert!(
-                taxonomy.contains(&entry.code),
-                "command `{}` documents code {}, which is absent from the global taxonomy",
-                entry.command,
-                entry.code
-            );
+            if let Some(code) = entry.code {
+                assert!(
+                    taxonomy.contains(&code),
+                    "command `{}` documents code {code}, which is absent from the global taxonomy",
+                    entry.command,
+                );
+            } else {
+                assert!(
+                    entry.exception,
+                    "pass-through row for `{}` (code: None) must be an exception",
+                    entry.command,
+                );
+            }
         }
     }
 
