@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "run_id": "01503f94-2639-41bb-83ed-53d4f18f120f",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "54d31f287c2ea69b756dae0e7bcbc7b38451b20c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:45:00.469222591Z",
+  "completed_at": "2026-07-12T22:48:22.168935402Z",
+  "duration_ms": 201699,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked to planning issue `1dbc72f6` as a design document. The linked investigation and owner-approved brief are also present.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all six `[hard]` criteria to proposed tasks in §1 and §3. However, the implementation model does not faithfully cover REQ-01 because it confuses dependency reachability with resolved container membership, and pinned document versions are not represented precisely enough to inventory their dependencies.\n\nREQ-03 also remains incomplete: the plan narrows the no-loss guarantee around filesystem races without an approved amendment to the hard criterion.\n\n## Technical soundness and architectural fit\n\nThe pure planner/shared-consumer approach fits the domain/storage/command/CLI boundaries, and the full-UUID destination segment resolves the prior collision finding.\n\nThree technical defects remain blocking:\n\n- Raw transitive dependencies are not a container subtree in a graph that also carries sequencing edges.\n- The proposed path-keyed artifact model cannot distinguish different pinned versions of the same path.\n- Cleanup safety remains path-race-dependent on some platforms, while the plan excludes the problematic cases rather than guaranteeing safe refusal.\n\n## Decomposition and dependencies\n\nThe overall plan-model → discovery/inventory → classifier → preview/execution/candidates ordering is coherent. The membership defect is embedded in the inventory task, however, so every downstream consumer would receive an overbroad artifact set. That is a substantive decomposition input error, not something safely deferred to implementation.\n\n## Risks and actionability\n\nThe risk register is unusually thorough, and the prior short-ID collision is resolved. The prior filesystem-race finding is not fully resolved: D-24 converts parent substitution and same-content replacement into non-goals without changing the owner-approved hard requirement. Pinned-version discovery is also a load-bearing unresolved decision absent from the risk table.\n\n## Prior review feedback\n\nThe previous F2 is addressed through the full UUID at plan lines 39–47 and D-12.\n\nThe previous F1 remains unresolved. Lines 294–309 require hash/size identity and conditionally available handle-anchored traversal, while D-24 at lines 611–622 explicitly excludes the precise substitution races identified in the previous run. Documentation of the limitation does not by itself satisfy REQ-03.\n\n## Findings\n\n1. **F1 — Blocking, high:** The plan inventories a container as its root plus every raw transitive dependency (`dev/active/7d3a3a47-plan.md:19`, lines 224–234), but dependency reachability includes cross-cutting sequencing prerequisites. The canonical hierarchy deliberately resolves containment separately: `crates/jit/src/graph/hierarchy.rs:50–65` defines resolved parent/children, and its cross-edge test at lines 910–927 demonstrates a transitively reachable task belonging to another container. Repository policy likewise states that raw reachability must not absorb unrelated sequencing dependencies (`scripts/doc-review-prompt.md:23`). As written, archival can include and relocate artifacts from outside the selected container, violating REQ-01 and D-2. Inventory must recurse through `resolve_hierarchy(...).children()` or an equivalent resolved-descendant primitive.\n\n2. **F2 — Blocking, high:** The prior external-writer cleanup finding is narrowed away rather than resolved. The mutation task promises only hash/size verification and handle-anchored traversal “wherever the platform provides it” (`dev/active/7d3a3a47-plan.md:281–309`), while D-24 explicitly makes parent-component symlink substitution and same-content identity substitution non-goals at lines 611–622. That leaves unspecified unsafe behavior on platforms or operations without anchored traversal and does not satisfy the unqualified `[hard]` REQ-03 guarantee. The plan must specify an identity/path-anchored deletion primitive with safe refusal where unavailable, or obtain an explicit amendment to REQ-03’s acceptance contract.\n\n3. **F3 — Blocking, high:** Pinned references are collapsed into a path-only artifact identity. The ownership universe recursively scans every `DocumentReference` (`dev/active/7d3a3a47-plan.md:48–50`), but artifact entries record only source path and a `pinned` boolean, and missing-source logic checks only the working-tree path and mirror (`dev/active/7d3a3a47-plan.md:94–122`). In the code, a reference carries the actual commit (`crates/jit/src/domain/types.rs:877–891`) and reads resolve content at that commit (`crates/jit/src/commands/document.rs:349–357`). Two references to the same path at different commits can therefore have different contents and dependency closures, while a valid pinned-only artifact may be absent from the working tree. The plan must define commit-aware discovery and identity, availability checks, and how versioned edges project into the working-tree archive plan; otherwise REQ-01 inventory and REQ-03 pinned-reference safety are not executable without redesign.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan fixes destination collisions but still misidentifies container membership, leaves the prior cleanup race unresolved, and lacks commit-aware pinned-artifact discovery.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Raw transitive dependency closure absorbs sequencing dependencies that are not resolved descendants of the selected container.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":19,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan excludes the previously identified path-substitution cleanup races instead of providing safe deletion or amending the hard no-loss contract.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":296,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/invariant/atomic-writes\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Path-only artifact identity cannot represent or discover distinct pinned versions and their commit-specific dependency closures.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":94,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4666 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5881-5c57-70e3-a167-f68ade48af7b\n--------\nuser\n--- 4653 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan fixes destination collisions but still misidentifies container membership, leaves the prior cleanup race unresolved, and lacks commit-aware pinned-artifact discovery.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Raw transitive dependency closure absorbs sequencing dependencies that are not resolved descendants of the selected container.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 19,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The plan excludes the previously identified path-substitution cleanup races instead of providing safe deletion or amending the hard no-loss contract.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 296,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/invariant/atomic-writes"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Path-only artifact identity cannot represent or discover distinct pinned versions and their commit-specific dependency closures.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 94,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "run_id": "6420711c-f839-4989-8c9f-511241a4a957",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "ae948a4db538ad593a6c2faf196dd922a2145057",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T23:03:26.255051602Z",
+  "completed_at": "2026-07-12T23:07:02.590994846Z",
+  "duration_ms": 216335,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/7d3a3a47-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1), is non-empty, and is linked through `issue.documents` as the approved design document.\n\nThe investigation and owner-approved planning brief are also linked and substantively incorporated.\n\n## Completeness against the criteria\n\nAll six `[hard]` container criteria appear in the §1 narrative and §3 coverage map. The plan does not obviously omit a fixture format or silently reintroduce time-based retention.\n\nHowever, REQ-02 and REQ-03 are not yet specified consistently enough to implement:\n\n- Unreachable pinned references remain unresolved under the real storage behavior.\n- The blocker taxonomy disagrees with the action calculus for active, outside-owned, and permanent artifacts.\n\nThese are behavioral contradictions, not merely coverage-label concerns.\n\n## Technical soundness and architectural fit\n\nThe overall architecture fits the repository: pure planning/classification belongs in domain/document logic, hierarchy membership reuses `resolve_hierarchy`, storage owns mutation, and commands orchestrate.\n\nThree blocking defects remain:\n\n- Section “Artifact identity (D-26)” says an unreachable pin “degrades to working-tree resolution” at [7d3a3a47-plan.md:60](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:60), then immediately says no fallback exists. The code confirms no fallback: `read_document_content` always passes the pinned commit at [document.rs:349](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/document.rs:349), and `read_path_bytes` returns `CommitNotFound` at [json.rs:982](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:982). Retaining the working-tree file therefore does not make the pinned reference resolvable.\n- D-1’s explicit opt-in policy is under-specified. The plan models only `configured|unconfigured`, but every relevant `DocumentationConfig` field is optional and its accessors silently supply defaults at [config.rs:382](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:382). A present but incomplete `[documentation]` table could consequently authorize default paths never explicitly delegated to JIT.\n- The binding blocker taxonomy lists `permanent-path`, `outside-owner-conflict`, and `active-owner` as blockers at [7d3a3a47-plan.md:136](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:136), while D-16 treats those conditions as `needs-source`, producing copy or retain at [7d3a3a47-plan.md:92](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:92). LOCAL-10 explicitly requires an active/shared figure to copy rather than block. The schema cannot be binding until the conditions under which these are evidence versus blockers are defined.\n\nThe revised quarantine backend is otherwise credible: `nix` is a direct dependency, and version 0.31.1 provides safe `openat` and `unlinkat` APIs under its `fs` feature.\n\n## Decomposition and dependencies\n\nThe broad ordering is coherent:\n\n1. Plan schema, inventory, and discovery.\n2. Classification.\n3. Preview/candidates and the mutation primitive.\n4. Coordinated execution.\n5. Legacy-command removal.\n\nNo reversed dependency edge is apparent. The schema/classification task remains non-actionable, however, until the blocker/action conflict above is resolved; different implementers could produce incompatible behavior while following different binding sections of the plan.\n\n## Risks and actionability\n\nThe plan addresses the major filesystem race, retry, topology, hierarchy, and event risks with explicit decisions and tests.\n\nIt incorrectly claims that every load-bearing question is resolved at §4 lines 469–470. The incomplete-policy case is absent from the risk table, despite current configuration defaults making it safety-relevant. The unreachable-pin mitigation also does not repair or block an already-unresolvable reference.\n\n## Prior review feedback\n\n- Prior F1: addressed. D-26 and LOCAL-33 now require commit-specific dependency closures.\n- Prior F2: unresolved. The stale working-tree fallback claim remains in §2, and warning-plus-retention still cannot restore a `CommitNotFound` reference.\n- Prior F3: addressed in design. D-17 now acknowledges the residual name-rebinding race and bounds the claim.\n- Prior F4: addressed. D-17 identifies the existing `nix` dependency and required `fs` feature.\n\n## Findings\n\n1. **F1 — High, blocking:** Unreachable pinned references are still described as degrading to working-tree resolution even though storage has no fallback. Treating `pinned-unreachable` as a warning and retaining the working-tree file cannot make the pinned reference resolve, so execution may leave dangling issue metadata. Location: `dev/active/7d3a3a47-plan.md:60`.\n2. **F2 — High, blocking:** The plan does not define how a partially specified `[documentation]` table is classified. Its binary `configured|unconfigured` status can accidentally accept `DocumentationConfig`’s default managed paths, permanent paths, or archive root, violating D-1’s explicit-delegation safety requirement. Location: `dev/active/7d3a3a47-plan.md:121`.\n3. **F3 — Medium, blocking:** The binding blocker taxonomy classifies active owners, outside owners, and permanent paths as blockers, while D-16 and LOCAL-10 require those same facts to drive copy/retain decisions. The plan must distinguish evidence/constraints from target-specific blockers before decomposition. Location: `dev/active/7d3a3a47-plan.md:136`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Pinned-reference behavior, explicit policy completeness, and blocker/action semantics remain contradictory or under-specified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Unreachable pinned references are claimed to fall back to working-tree resolution although storage returns CommitNotFound, and warning-plus-retention cannot make those references resolvable.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":60,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-03\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configured/unconfigured policy model does not reject partially specified documentation policy fields that currently fall back to undelegated defaults.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":121,\"references\":[\"@/issue/7d3a3a47/decision/D-1\",\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/issue/7d3a3a47/requirement/REQ-05\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The binding blocker taxonomy treats active owners, outside owners, and permanent paths as blockers while the action calculus requires those facts to produce copy or retain decisions.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":136,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-02\",\"@/issue/7d3a3a47/requirement/REQ-04\",\"@/issue/7d3a3a47/decision/D-16\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5069 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5892-3bcf-7c23-8242-e93baf4ce227\n--------\nuser\n--- 5056 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Pinned-reference behavior, explicit policy completeness, and blocker/action semantics remain contradictory or under-specified.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Unreachable pinned references are claimed to fall back to working-tree resolution although storage returns CommitNotFound, and warning-plus-retention cannot make those references resolvable.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 60,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configured/unconfigured policy model does not reject partially specified documentation policy fields that currently fall back to undelegated defaults.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 121,
+        "references": [
+          "@/issue/7d3a3a47/decision/D-1",
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/issue/7d3a3a47/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The binding blocker taxonomy treats active owners, outside owners, and permanent paths as blockers while the action calculus requires those facts to produce copy or retain decisions.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 136,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-02",
+          "@/issue/7d3a3a47/requirement/REQ-04",
+          "@/issue/7d3a3a47/decision/D-16"
+        ]
+      }
+    ]
+  }
+}

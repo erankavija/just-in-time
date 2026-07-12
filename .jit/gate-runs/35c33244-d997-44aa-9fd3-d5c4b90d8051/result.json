@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_id": "35c33244-d997-44aa-9fd3-d5c4b90d8051",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "2ed2be1e968c4e15a35be880e054db64c5074503",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:53:40.144959417Z",
+  "completed_at": "2026-07-12T22:56:16.062447706Z",
+  "duration_ms": 155917,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPASS. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked through `issue.documents` as the approved design. The linked planning brief and investigation also exist and provide the stated design inputs.\n\n## Completeness against the criteria\n\nBLOCKING FAILURE. The plan does not fully satisfy REQ-01’s requirement to enumerate every supported embedded dependency.\n\nSection 2 explicitly excludes commit-specific dependency discovery for pinned artifacts (`dev/active/7d3a3a47-plan.md:63-65`, D-26 at lines 631-640). A pinned Markdown or HTML document can contain supported local links just like its working-tree version. Recording only the pinned root omits those version-specific edges and artifacts from the deterministic plan.\n\nThe codebase already supports the necessary commit-aware reads: `IssueStore::read_path_bytes(path, Some(commit))` reads the blob from that commit (`crates/jit/src/storage/json.rs:982-1010`). The recursive discovery task must therefore carry the version through every edge and read each dependency from the same commit. Deferring this to rendering does not satisfy REQ-01 or the plan schema’s promise of complete supported edges.\n\nREQ-02 through REQ-06 otherwise have concrete approaches, classifications, commands, schemas, and representative fixtures.\n\n## Technical soundness and architectural fit\n\nBLOCKING FAILURE. Two safety assumptions are technically incorrect.\n\nFirst, D-17’s quarantine protocol does not close the cleanup substitution race. The design proposes rename-to-quarantine, verification through an opened handle, and then unlinking (`dev/active/7d3a3a47-plan.md:543-554`). Verification of an opened inode does not make the later pathname unlink conditional on that inode. An external writer can replace the quarantine pathname after verification and before unlink, causing the foreign replacement to be deleted. Consequently D-24’s claim that no external-interference scenario can destroy unverified content (`dev/active/7d3a3a47-plan.md:615-623`) is unsupported. This is the same race class identified in the prior review, merely moved to another pathname.\n\nSecond, D-26 assumes an unreachable pinned commit “degrades to working-tree resolution” (`dev/active/7d3a3a47-plan.md:59-61`, `:631-638`). Current behavior does not do that: document reads select the pinned commit (`crates/jit/src/commands/document.rs:349-357`), while storage returns `CommitNotFound` when it cannot resolve it (`crates/jit/src/storage/json.rs:982-991`). Retaining the working-tree path therefore does not make that pinned reference resolve. The design must either classify an unreachable pin as a blocker or explicitly introduce and assign a tested change to pinned-read semantics.\n\nThe remaining architectural direction is sound: resolved hierarchy is the correct canonical membership surface (`crates/jit/src/graph/hierarchy.rs:458-568`), pure discovery/classification is separated from orchestration, and persistence is assigned to storage.\n\n## Decomposition and dependencies\n\nBLOCKING FAILURE through the pinned-artifact gap. The artifact identity and inventory tasks create pinned historical entries, but the recursive-discovery task covers only the general Markdown/HTML/CSS path and carries no requirement to read or resolve edges at each artifact’s version (`dev/active/7d3a3a47-plan.md:242-275`). No later task fills that gap.\n\nApart from that omission, task ordering is coherent:\n\n- Schema/model precedes inventory, discovery, classification, and CLI work.\n- Classification waits for both inventory and recursive discovery.\n- Execution waits for the mutation primitive and preview/planner.\n- Candidate reporting depends on the shared classifier.\n- Legacy-command removal is sequenced after the replacement executor.\n\nThe planning issue has no formal issue dependencies, so there are no unmet prerequisite edges to assess.\n\n## Risks and actionability\n\nBLOCKING FAILURE. The risk table claims the two unresolved cases are fully mitigated:\n\n- It says D-17 prevents every interference scenario from destroying foreign content (`dev/active/7d3a3a47-plan.md:447`), although pathname substitution remains possible between verification and unlink.\n- It says pinned history is handled by commit-aware reads (`dev/active/7d3a3a47-plan.md:445`) while excluding commit-specific dependency closure and assuming a fallback the read path does not implement.\n\nThese are load-bearing parts of the no-loss and complete-plan contracts, so implementation teams would have to redesign them during fan-out.\n\n## Prior review feedback\n\nThe prior membership finding is addressed: D-25 now uses the canonical resolved-hierarchy children closure rather than raw transitive dependencies (`dev/active/7d3a3a47-plan.md:43-50`, `:624-630`).\n\nThe other prior blockers remain unresolved:\n\n- The cleanup race persists inside D-17.\n- Artifact identity is now versioned, but commit-specific pinned dependency discovery is still explicitly excluded.\n\n## Findings\n\n1. **F1 — High, blocking:** Pinned versions’ commit-specific supported dependency closures are explicitly omitted, so the plan cannot enumerate every supported embedded dependency required by REQ-01. See `dev/active/7d3a3a47-plan.md:63`.\n2. **F2 — High, blocking:** The quarantine protocol still has a verification-to-path-unlink substitution race; an opened-handle check does not prevent unlinking a foreign replacement at the quarantine pathname. See `dev/active/7d3a3a47-plan.md:543`.\n3. **F3 — High, blocking:** The plan assumes unreachable pinned commits fall back to the working tree, contradicting `crates/jit/src/storage/json.rs:982-991`; its retention classification therefore does not make those references resolvable. See `dev/active/7d3a3a47-plan.md:59`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan fixes container membership but still omits pinned-version dependency closures and relies on unsafe cleanup and nonexistent pinned-read fallback semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Pinned versions' commit-specific supported dependency closures are explicitly omitted, leaving REQ-01's deterministic artifact plan incomplete.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":63,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-06\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The quarantine protocol retains a verification-to-unlink pathname-substitution race and cannot support the claimed unconditional no-loss guarantee.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":543,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/invariant/atomic-writes\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The classifier assumes unreachable pinned commits fall back to working-tree reads, but current storage returns CommitNotFound and performs no fallback.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":59,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5290 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5889-4a50-7770-acd6-af40ad618fd4\n--------\nuser\n--- 5277 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The revised plan fixes container membership but still omits pinned-version dependency closures and relies on unsafe cleanup and nonexistent pinned-read fallback semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Pinned versions' commit-specific supported dependency closures are explicitly omitted, leaving REQ-01's deterministic artifact plan incomplete.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 63,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The quarantine protocol retains a verification-to-unlink pathname-substitution race and cannot support the claimed unconditional no-loss guarantee.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 543,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/invariant/atomic-writes"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The classifier assumes unreachable pinned commits fall back to working-tree reads, but current storage returns CommitNotFound and performs no fallback.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 59,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "run_id": "92ec10c7-3d95-46ed-a25f-0e797ea4733a",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "f0e540695d8cc1adc1d83b73b5bb0d6c6b0d7946",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:32:25.957267238Z",
+  "completed_at": "2026-07-12T22:36:25.593365825Z",
+  "duration_ms": 239636,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPASS. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked as a design document in planning issue `1dbc72f6`. Both supporting documents are also present and linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nThe plan maps all six hard requirements to implementation tasks in §1 and the coverage map at `dev/active/7d3a3a47-plan.md:395`. The owner-approved removal of category and retention-time behavior is reflected consistently in REQ-05 and D-21.\n\nHowever, the JavaScript dependency policy still narrows D-5 unsafely: §2 supports relocating `<script src>` targets but detects only a small runtime-loading pattern set. Common static module imports can therefore leave relocated HTML bundles incomplete, affecting REQ-04.\n\n## Technical soundness and architectural fit\n\nThe main architecture is sound: pure planning/classification, DAG-authoritative closure, storage-owned persistence, and command-layer orchestration align with `crates/jit/src/storage/mod.rs:115`, `crates/jit/src/commands/graph.rs:206`, and the repository architecture.\n\nThree critical execution details remain unsound:\n\n- The operation-definition key still cannot distinguish retries from a later independent logical archival of the identical artifact set.\n- The deletion event protocol claims to record a residue deletion as completed before that deletion occurs.\n- The binding plan schema does not represent residue deletion as an executable action, despite requiring the same plan object to drive execution.\n\n## Decomposition and dependencies\n\nThe nine tasks form a generally coherent DAG: schema precedes inventory and discovery; classification joins those branches; preview and candidates consume classification; execution joins preview with the storage primitive; legacy removal follows execution.\n\nThe residue-cleanup schema gap prevents the plan-model and executor tasks from being independently executable as written. The executor would need to invent mutation semantics not present in its binding input model.\n\n## Risks and actionability\n\nThe risk register identifies retry and event risks, but its mitigations assert properties that the specified protocol cannot provide. In particular, §4 says retry events record completed residue deletions, while D-19 mandates appending those events before deletion.\n\n## Prior review feedback\n\nPrior F4 is resolved: `execution_id` is explicitly null for previews and candidate reports at `dev/active/7d3a3a47-plan.md:77`.\n\nPrior F3 is partly addressed through inverse-mapped already-archived recognition, but the resulting residue cleanup is absent from the executable schema.\n\nPrior F1 and F2 remain blocking: execution IDs do not delimit logical operation instances, and the event-before-deletion protocol still cannot record completed cleanup accurately.\n\n## Findings\n\n1. **F1 — High, blocking:** The retry-stable `operation_id` remains unable to distinguish retries from a later independent archival of the identical target and artifact set. Fresh `execution_id` values distinguish individual attempts, not which attempts belong to one logical operation. The claimed “intervening converged state” boundary at `dev/active/7d3a3a47-plan.md:536` is not logged because no-op convergence explicitly emits no event. Consequently log order cannot supply the missing boundary, leaving prior review F1 unresolved.\n\n2. **F2 — High, blocking:** The event/deletion protocol remains internally impossible. Events append before source deletion and can therefore record only planned deletions (`dev/active/7d3a3a47-plan.md:324`), yet the same section and LOCAL-29 claim a residue-cleaning run records its deletion as completed (`dev/active/7d3a3a47-plan.md:329`, `dev/active/7d3a3a47-plan.md:348`). If that deletion fails, the run has already appended an event despite performing no artifact mutation, contradicting the no-mutation/no-event rule. Prior review F2 is unresolved.\n\n3. **F3 — Medium, blocking:** The binding artifact schema cannot drive the required retry cleanup. Every entry must have an action from `move|copy|retain|block`, with `already_archived` only an orthogonal boolean (`dev/active/7d3a3a47-plan.md:87`); there is no planned-deletion or source-cleanup operation. D-18 nevertheless requires the executor to delete a content-identical residue discovered by inverse mapping (`dev/active/7d3a3a47-plan.md:526`). Treating `residue-source`—defined only as a warning—as an executable deletion instruction would require re-deriving behavior outside the supposedly binding plan model.\n\n4. **F4 — Medium, blocking:** The dynamic-loading contract can relocate a script while silently omitting its dependencies. It treats `<script src>` as supported but detects only `fetch(`, dynamic `import(`, `XMLHttpRequest`, `new Worker(`, and selected `data-*` attributes (`dev/active/7d3a3a47-plan.md:120`). Static ES-module imports such as `import \"./module.js\"` and common loaders such as `require(\"./module.js\")` neither enter the dependency graph nor block execution. This contradicts the owner brief’s D-5 requirement that detected JavaScript/runtime loading block rather than produce an incomplete bundle, and can violate REQ-04.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan is well structured, but logical-operation identity, deletion event sequencing, residue cleanup representation, and JavaScript dependency blocking remain unsafe or incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The operation-definition key and per-execution UUIDs do not delimit retries from a later independent logical operation over the identical artifact set.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":536,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An event appended before deletion cannot record residue deletion as completed, and a failed residue deletion would append an event despite performing no artifact mutation.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":324,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The binding plan schema has no executable source-cleanup operation for the residue deletion required by retry convergence.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":87,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The JavaScript detection set can relocate a script while neither discovering nor blocking common static module and loader dependencies.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":120,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2923 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5875-d8fe-7640-9a9f-39d202ab7cdc\n--------\nuser\n--- 2910 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan is well structured, but logical-operation identity, deletion event sequencing, residue cleanup representation, and JavaScript dependency blocking remain unsafe or incomplete.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The operation-definition key and per-execution UUIDs do not delimit retries from a later independent logical operation over the identical artifact set.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 536,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "An event appended before deletion cannot record residue deletion as completed, and a failed residue deletion would append an event despite performing no artifact mutation.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 324,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The binding plan schema has no executable source-cleanup operation for the residue deletion required by retry convergence.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 87,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The JavaScript detection set can relocate a script while neither discovering nor blocking common static module and loader dependencies.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 120,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-04"
+        ]
+      }
+    ]
+  }
+}

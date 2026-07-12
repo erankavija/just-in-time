@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "run_id": "bf8d0e1e-2bbb-46e4-baa6-adb377cbd768",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "a93c5f29475958e3e654da5b32cafffd030ff7e7",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:27:15.613143923Z",
+  "completed_at": "2026-07-12T22:30:38.237726247Z",
+  "duration_ms": 202624,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked from planning issue `1dbc72f6` as a `design` document. The investigation and owner-approved planning brief are also linked and present.\n\n## Completeness against the criteria\n\nThe plan directly addresses all six `[hard]` container criteria in §1 and maps them to implementation tasks in §3. It preserves the stated exclusions around time-based retention, generalized rewriting, LFS policy, scheduled automation, and literal cross-file atomicity.\n\nOne schema defect remains: §2 lines 70–84 makes `execution_id` part of the binding envelope, while defining it only as a UUID for a mutating execution. Candidates and ordinary previews are explicitly non-mutating but must emit “the same envelope” (§2 lines 105–107; preview task lines 283–293). The plan never defines whether their `execution_id` is absent, null, or populated, so the supposedly binding JSON contract is not implementable verbatim.\n\n## Technical soundness and architectural fit\n\nThe plan correctly reuses DAG-authoritative closure from `crates/jit/src/commands/graph.rs:206-233`, repository-wide storage coordination from `crates/jit/src/storage/mod.rs:89-126`, binary reads from `crates/jit/src/storage/mod.rs:473-502`, and the current referential-consistency sequencing demonstrated in `crates/jit/src/commands/document.rs:1180-1231`.\n\nTwo blocking contradictions remain:\n\n- The event protocol cannot record “mutations actually performed” with the specified ordering. The execution task persists the archive event before deleting sources (`dev/active/7d3a3a47-plan.md:297-303`), matching the current safe ordering in `crates/jit/src/commands/document.rs:1194-1219`. But D-19 and LOCAL-29 require that event to include performed mutations and require no event when nothing mutates (`dev/active/7d3a3a47-plan.md:317-339`). A residue-only retry must therefore log a deletion before knowing whether the deletion succeeds; if deletion fails, it has emitted an event for no mutation. Appending afterward instead risks an unlogged mutation when event append fails. The plan needs an explicit compensating protocol or different event semantics.\n\n- Missing-root semantics conflict with document retry convergence. The binding schema says every missing explicit root is blocked (`dev/active/7d3a3a47-plan.md:98-104`). D-18 and LOCAL-28 claim retries reconstruct already-archived artifacts through inverse destination mapping (`dev/active/7d3a3a47-plan.md:307-316, 330-335`). After the document source was successfully deleted but a later bundle-source deletion failed, rerunning `jit archive document <original-path> --execute` has a missing explicit root and is therefore blocked before it can remove the residue. No exception or alternate retry target is defined.\n\n## Decomposition and dependencies\n\nThe nine proposed tasks are generally coherent and correctly ordered:\n\n- Inventory and recursive discovery can proceed independently after the plan model.\n- Classification correctly depends on both.\n- Preview and candidates consume classification.\n- Execution depends on preview and the filesystem mutation primitive.\n- Legacy removal is sequenced after the replacement executor.\n\nThe planning issue itself has no dependencies, so there is no omitted prerequisite to verify. The linked container’s planning/breakdown bracket is workflow structure rather than an implementation dependency.\n\nThe retry contradictions above leave the execution task insufficiently actionable: an implementer cannot satisfy LOCAL-26, LOCAL-28, and LOCAL-29 simultaneously from the specified protocol.\n\n## Risks and actionability\n\nThe risk register is otherwise strong: it gives concrete decisions for pinned references, symlinks, dynamic-loading detection, outside ownership, destination races, and identity-verified deletion.\n\nThe event and missing-root contradictions are load-bearing unresolved risks despite the statement that every question is resolved. They affect the promised recovery behavior under REQ-03, not merely implementation detail.\n\n## Prior review feedback\n\n- Prior F1 is addressed: categories were removed from the unified schema and candidate evaluation through D-21.\n- Prior F2’s direct wording conflict is addressed: LOCAL-26 now defers to D-19 and permits correlated crash-window duplicates. The separate event/deletion sequencing defect above remains.\n- Prior F3 is not fully addressed. Adding the canonical source set distinguishes operations with different artifact sets, but a later independent archival of the same paths—possibly with changed content—still receives the same `operation_id`. `execution_id` distinguishes executions but does not distinguish a retry from a new logical operation.\n- Prior F4 is addressed by D-22 and `symlink-artifact`.\n- Prior F5 is addressed by D-23’s explicit initial detection set.\n\n## Findings\n\n1. **F1 — Blocking, high:** D-19 still conflates retries with later independent archival operations when target, destination root, and canonical source paths are identical. Changed content at the same paths also hashes to the same operation ID because content identity or a persisted operation generation is absent. `execution_id` distinguishes invocations but cannot establish which invocations belong to the same logical operation. (`dev/active/7d3a3a47-plan.md:522`)\n2. **F2 — Blocking, high:** The event-before-source-deletion sequence cannot truthfully satisfy LOCAL-29’s “performed mutations” and “no event when nothing mutates” guarantees for deletion-only retries. The plan does not define compensation or event semantics that close this gap. (`dev/active/7d3a3a47-plan.md:317`)\n3. **F3 — Blocking, high:** Missing explicit roots always block, but document-target retry convergence requires accepting an already-archived explicit root when another bundle source remains for cleanup. The current schema prevents LOCAL-28’s promised recovery in that partial-failure state. (`dev/active/7d3a3a47-plan.md:98`)\n4. **F4 — Blocking, medium:** The binding envelope requires `execution_id` but defines it only for mutating executions, leaving non-mutating previews and candidate envelopes without a valid representation. (`dev/active/7d3a3a47-plan.md:70`)\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan covers the requested scope but remains blocked by operation identity, event/deletion sequencing, retry handling for missing explicit roots, and an incomplete non-mutating JSON schema.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Operation identity still conflates retries with later independent operations over the same target, destination root, and source paths.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":522,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Event-before-deletion ordering cannot record actually performed deletion mutations while also emitting no event when deletion fails and nothing mutates.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":317,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Missing-root blocking contradicts document-target retry convergence after the explicit root was deleted but another source remains for cleanup.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":98,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The binding JSON envelope does not define execution_id semantics for non-mutating previews or candidate reports.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":70,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-05\",\"@/issue/7d3a3a47/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5248 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5871-1cc4-76a3-a681-fc0b6ec41771\n--------\nuser\n--- 5235 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan covers the requested scope but remains blocked by operation identity, event/deletion sequencing, retry handling for missing explicit roots, and an incomplete non-mutating JSON schema.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Operation identity still conflates retries with later independent operations over the same target, destination root, and source paths.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 522,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Event-before-deletion ordering cannot record actually performed deletion mutations while also emitting no event when deletion fails and nothing mutates.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 317,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Missing-root blocking contradicts document-target retry convergence after the explicit root was deleted but another source remains for cleanup.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 98,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The binding JSON envelope does not define execution_id semantics for non-mutating previews or candidate reports.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 70,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-05",
+          "@/issue/7d3a3a47/requirement/REQ-06"
+        ]
+      }
+    ]
+  }
+}

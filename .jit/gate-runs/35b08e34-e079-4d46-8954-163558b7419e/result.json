@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "run_id": "35b08e34-e079-4d46-8954-163558b7419e",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "13dce6f99ba6afae25efa31d13434eec08fbfd02",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:38:49.121015355Z",
+  "completed_at": "2026-07-12T22:43:22.314895155Z",
+  "duration_ms": 273193,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPASS. The required plan exists at [dev/active/7d3a3a47-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1), is non-empty, and is linked from `issue.documents` as the approved design. The investigation and owner-approved brief are also linked and were reviewed in full.\n\n## Completeness against the criteria\n\nPASS. Section 1 addresses all six `[hard]` epic criteria individually ([plan lines 17–24](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:17)), without silently narrowing scope. In particular:\n\n- REQ-01 includes opaque roots and recursive Markdown/HTML/CSS dependencies.\n- REQ-02 defines repository-wide ownership and move/copy/retain/block classification.\n- REQ-03 retains the referential-consistency contract rather than promising unsupported transactionality.\n- REQ-04 covers HTML → sibling CSS → nested theme assets.\n- REQ-05 reflects the amended, non-time-based candidate requirement.\n- REQ-06 specifies structured previews and the required fixture formats.\n\nThe coverage map at [lines 412–421](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:412) has no obvious qualitative gap.\n\n## Technical soundness and architectural fit\n\nFAIL. The proposed domain/storage/command/CLI separation is otherwise consistent with the repository architecture, and the plan correctly reuses DAG hierarchy, storage coordination, byte reads, and the existing referential-consistency sequencing. Two blocking defects remain:\n\n- The container destination namespace uses the eight-character `short_id`. That value is explicitly only the first eight UUID characters ([types.rs:585](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:585)), and storage explicitly handles multiple matching IDs as ambiguous ([json.rs:651](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:651)). Therefore `<archive_root>/<container.short_id>/` is not a uniquely container-owned namespace. Two valid containers can map to the same root, contradicting D-12’s collision claim at [plan lines 502–506](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:502). Use the full issue ID or another collision-proof encoded identity.\n\n- D-14/D-17 do not actually close the external-writer races they claim to close. The repository guard excludes cooperating JIT writers, not arbitrary filesystem changes ([storage/mod.rs:92](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/mod.rs:92)). A physical containment check performed before a later path-based `hard_link` does not prevent an external process from replacing a destination parent with a symlink between those operations. Likewise, hash plus size proves content equality, not file-object identity: an external process can atomically replace a source or finalized destination with another file containing identical bytes, after which the proposed cleanup deletes the replacement. This contradicts D-22 and the stated mitigation at [plan lines 287–301](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:287) and [lines 536–540](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:536). The plan needs descriptor-relative/no-follow operations or equivalent parent/file identity validation, with race tests covering parent-component replacement and same-content file replacement.\n\n## Decomposition and dependencies\n\nPASS, conditional on correcting the two design defects above. The task graph is coherent:\n\n- Schema precedes inventory and discovery.\n- Classification depends on both ownership inventory and recursive discovery.\n- Preview and the mutation primitive can proceed independently.\n- Execution waits for both.\n- Legacy command removal follows the completed replacement.\n- Candidate reporting depends only on the shared classifier.\n\nThe tasks are independently testable and no reverse or missing prerequisite is apparent. The final legacy-removal sweep is concrete and appropriately ordered at [lines 376–388](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:376).\n\nThe planning issue itself has no dependencies, so there is no unmet prerequisite to reconcile.\n\n## Risks and actionability\n\nFAIL because the two blocking risks above are either incorrectly declared impossible or incompletely mitigated.\n\nThe remaining major risks—pinned references, outside embedded owners, broken relative edges, retry convergence, residue cleanup, event sequencing, and legacy removal—have concrete decisions and test obligations. Tasks are generally actionable without re-deriving the design.\n\n## Prior review feedback\n\nAll four prior blocking findings have been materially addressed:\n\n- Prior F1: D-19 now separates the stable operation-definition key, adopt-or-mint logical instance ID, and per-run execution ID.\n- Prior F2: `ArchiveExecuted` records persisted finalization/relink work before deletion, while `ArchiveSourcesRemoved` records actual deletion afterward; a failed deletion is not falsely recorded.\n- Prior F3: `pending_deletions` is now an executable artifact-plan field, including residue cleanup ([plan lines 98–103](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:98)).\n- Prior F4: D-23 now includes static module imports/exports, `require`, script sources, and enumerated loader constructs ([plan lines 130–142](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:130)).\n\n## Findings\n\n1. **F1 — High, blocking:** The external-writer safety design is still subject to parent-component symlink substitution and same-content file replacement. Pre-staging physical checks plus path-based `hard_link` are vulnerable to parent changes, while hash-and-size verification cannot establish that the file being deleted is the same file object that was staged. This invalidates D-14/D-17/D-22’s claimed mitigation and can place artifacts outside the repository or delete a replacement file.\n\n2. **F2 — Medium, blocking:** D-12 namespaces container archives with the non-unique eight-character `container.short_id`. The storage layer explicitly permits such prefixes to be ambiguous, so two containers can share an archive root and conflict permanently. The destination must use a collision-proof container identity.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan resolves all prior findings, but container destination identity and external-writer race handling remain unsafe.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Pre-staging containment checks and hash/size cleanup verification do not prevent parent symlink substitution or deletion of a same-content replacement file.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":287,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The container archive root uses a non-unique eight-character short ID, so distinct containers can collide in the same destination namespace.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":502,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-02\",\"@/issue/7d3a3a47/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5257 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f587b-b1c2-70b2-8a90-03e09087ee03\n--------\nuser\n--- 5244 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The revised plan resolves all prior findings, but container destination identity and external-writer race handling remain unsafe.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Pre-staging containment checks and hash/size cleanup verification do not prevent parent symlink substitution or deletion of a same-content replacement file.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 287,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/atomic-writes"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The container archive root uses a non-unique eight-character short ID, so distinct containers can collide in the same destination namespace.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 502,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-02",
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      }
+    ]
+  }
+}

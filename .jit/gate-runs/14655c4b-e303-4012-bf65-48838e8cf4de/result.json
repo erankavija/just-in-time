@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "run_id": "14655c4b-e303-4012-bf65-48838e8cf4de",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "00bd528fe6464356e46ac062951322050fccc39c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T21:57:28.958500490Z",
+  "completed_at": "2026-07-12T22:00:12.103725746Z",
+  "duration_ms": 163145,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked through `issue.documents` as the approved design document. The investigation and owner-approved brief are also linked.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all six `[hard]` requirements to implementation tasks. REQ-05 correctly excludes `done_at`, matching both the live epic criterion and planning-brief D-6.\n\nHowever, REQ-02 and REQ-04 remain incomplete because the action classifier does not define deterministic semantics for mixed-topology bundles. `dev/active/7d3a3a47-plan.md:154-167` permits shared artifacts to be “copy-or-retain,” while `:206-221` requires all staged edges to resolve. A retained dependency has no mirrored destination, so a relocated parent’s relative link can break. Root-relative links require different treatment again: they continue resolving from repository root, as implemented in `crates/jit/src/document/assets.rs:151-162`. The implementer would still need to derive the action decision table.\n\n## Technical soundness and architectural fit\n\nThe domain/storage/command/CLI separation is sound, and DAG-authoritative closure agrees with `crates/jit/src/commands/graph.rs:206-233`.\n\nD-12 through D-15 substantially improve the design and resolve the prior review’s layout, ownership-universe, finalization, and document-eligibility questions.\n\nTwo safety gaps remain:\n\n- The plan does not specify edge-aware action semantics needed to make D-12 correct for every supported link type.\n- Atomic no-replace finalization prevents overwriting a destination created before `hard_link`, but it does not make later cleanup safe against external writers. The proposed design reuses rollback principles whose current implementation blindly removes finalized paths at `crates/jit/src/commands/document.rs:1735-1739` and `:1777-1787`. If an external writer replaces such a path before rollback, cleanup can delete the foreign file. Source deletion has the analogous race.\n\n## Decomposition and dependencies\n\nThe broad ordering is coherent: model, inventory/discovery, classifier, preview/execution, then legacy removal; candidate reporting can proceed independently after classification.\n\nThe decomposition omits an explicit retry/idempotency contract and acceptance test even though the binding planning brief requires it at `dev/active/7d3a3a47-planning-brief.md:262-264`. Destination occupancy currently always blocks, while partial rollback can intentionally leave duplicates. Without defining recognition of an already-applied plan, identical occupied destinations, reference/event state, and retry after each failure point, the execution task is not independently actionable.\n\n## Risks and actionability\n\nThe plan now mitigates the four risks raised in the previous run:\n\n- F1: D-12 defines deterministic mirrored destinations.\n- F2: D-13 includes indirect supported references originating outside the subtree.\n- F3: D-14 introduces atomic no-replace finalization.\n- F4: D-15 defines document-target lifecycle and ownership eligibility.\n\nThe newly identified mixed-action topology, cleanup race, and retry/idempotency risks are not resolved by the current risk table. They affect hard safety or link-integrity requirements and are blocking.\n\n## Findings\n\n1. **F1 — High, blocking:** The classifier lacks a deterministic, edge-aware decision table for `move`/`copy`/`retain` when an artifact is both a dependency of a relocated parent and permanent, pinned, outside-owned, or root-relative. The “copy-or-retain” wording at `dev/active/7d3a3a47-plan.md:154-167` can leave no mirrored destination for links that execution promises to preserve at `:206-221`. Root-relative paths resolve differently in `crates/jit/src/document/assets.rs:151-162`. Specify whether the action model represents both destination creation and source retention, and require every supported edge’s resolution mode to drive that decision. References: `@/issue/7d3a3a47/requirement/REQ-02`, `@/issue/7d3a3a47/requirement/REQ-04`.\n2. **F2 — High, blocking:** D-14 closes the check-then-rename overwrite window but does not protect rollback or source deletion from external path replacement. `dev/active/7d3a3a47-plan.md:173-188` requires only a pre-finalization race test, while the reused rollback behavior blindly deletes destination paths in `crates/jit/src/commands/document.rs:1735-1739` and `:1777-1787`. The mutation design needs ownership/identity verification before deleting finalized destinations or sources, or an explicitly narrower concurrency contract consistent with REQ-03. References: `@/issue/7d3a3a47/requirement/REQ-03`, `@/inv/atomic-writes`.\n3. **F3 — Medium, blocking:** Retry/idempotency is required by `dev/active/7d3a3a47-planning-brief.md:262-264` but has no defined behavior or task acceptance criterion. The plan must specify retries after partial staging, partial relink, event failure, deletion failure, and successful execution, including how identical occupied destinations and already-emitted events are recognized without duplicating archival or nesting destinations. References: `@/issue/7d3a3a47/requirement/REQ-03`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Prior blockers are addressed, but mixed-action link semantics, cleanup races, and retry/idempotency remain load-bearing gaps.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The classifier lacks deterministic edge-aware move/copy/retain semantics for dependencies that must remain at their sources while also supporting relocated parents.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":154,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-02\",\"@/issue/7d3a3a47/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Atomic no-replace finalization does not prevent rollback or source cleanup from deleting paths replaced by external filesystem writers.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":173,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/atomic-writes\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The binding retry/idempotency verification requirement has no defined execution semantics or task acceptance criterion.\",\"file\":\"dev/active/7d3a3a47-planning-brief.md\",\"line\":262,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6271 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5855-d99d-7aa2-b94d-cac9fe01e80a\n--------\nuser\n--- 6258 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Prior blockers are addressed, but mixed-action link semantics, cleanup races, and retry/idempotency remain load-bearing gaps.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The classifier lacks deterministic edge-aware move/copy/retain semantics for dependencies that must remain at their sources while also supporting relocated parents.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 154,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-02",
+          "@/issue/7d3a3a47/requirement/REQ-04"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Atomic no-replace finalization does not prevent rollback or source cleanup from deleting paths replaced by external filesystem writers.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 173,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/atomic-writes"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The binding retry/idempotency verification requirement has no defined execution semantics or task acceptance criterion.",
+        "file": "dev/active/7d3a3a47-planning-brief.md",
+        "line": 262,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      }
+    ]
+  }
+}

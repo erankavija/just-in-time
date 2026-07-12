@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "run_id": "c2e35f2f-97fc-4db2-adc7-55a8bd6a6522",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "8c14b4bb543f57369a45b5e383e3cc195264e22a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:02:10.976086267Z",
+  "completed_at": "2026-07-12T22:06:41.697821349Z",
+  "duration_ms": 270721,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is non-empty, and is linked from planning issue `1dbc72f6` as a design document. The investigation and owner-approved brief are also linked. The planning issue has no dependencies, so there are no prerequisite assumptions to validate.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses all six `[hard]` criteria in §1 and maps them to tasks in §3. REQ-01 through REQ-06 are not silently narrowed.\n\nHowever, the owner-approved brief requires the formal plan to specify the archive-plan JSON schema and blocker taxonomy before CLI fan-out (`dev/active/7d3a3a47-planning-brief.md:281-289`). The plan instead delegates their definition to the first implementation task (`dev/active/7d3a3a47-plan.md:137-144`). It describes conceptual fields but provides no concrete version field, envelope keys, artifact/edge/reference-change shapes, blocker codes, or distinction between actions and states such as “already archived.” That leaves a binding design obligation unresolved and makes REQ-06 under-specified.\n\n## Technical soundness and architectural fit\n\nSeveral claims match the codebase:\n\n- The repository-wide write guard exists and is re-entrant (`crates/jit/src/storage/mod.rs:89-126`).\n- The existing archive sequence copies first, relinks and appends an event, then removes sources (`crates/jit/src/commands/document.rs:1178-1231`).\n- Current cleanup is vulnerable to deleting externally replaced paths (`crates/jit/src/commands/document.rs:1735-1739`, `1777-1787`), and D-14/D-17 directly address that.\n- D-16 supplies deterministic edge-aware move/copy/retain behavior and resolves the prior mixed-owner blocker.\n- The current event uses a fresh random UUID and append-only write with no deduplication (`crates/jit/src/domain/types.rs:1780-1794`, `crates/jit/src/storage/json.rs:737-751`).\n\nThe retry design remains unsound for container execution. After references and the event persist but source deletion fails, recomputation from issue-linked roots sees the destination references, while D-13 explicitly excludes unreachable source files from the selected artifact graph (`dev/active/7d3a3a47-plan.md:379-384`). Therefore the leftover source cannot be discovered and cleaned by the stated recomputation-only algorithm. D-18 nevertheless claims deletion-failure convergence (`dev/active/7d3a3a47-plan.md:240-256`, `412-418`) without using event history, a recovery record, or another provenance mechanism.\n\nExactly-once event behavior is likewise asserted but not designed. A retry after the archive event exists needs a stable operation identity or defined event-log lookup to distinguish cleanup continuation from a new archival operation. The plan instead postpones the event contract to the execution task (`dev/active/7d3a3a47-plan.md:419-421`). This does not meet the brief’s binding retry/idempotency verification requirement.\n\n## Decomposition and dependencies\n\nThe overall A → B/C shape is coherent, and the legacy-command removal is correctly sequenced after the replacement executor.\n\nOne Group A dependency is incorrect. “Container closure and explicit-root inventory” must satisfy LOCAL-04 by recording owners reached through supported embedded references (`dev/active/7d3a3a47-plan.md:146-155`), but recursive embedded-reference discovery is a parallel sibling with no dependency edge between them (`dev/active/7d3a3a47-plan.md:158-167`). The inventory task therefore cannot be independently implemented and accepted as written. It must depend on discovery, or LOCAL-04 must move into a later integration/classification task.\n\n## Risks and actionability\n\nThe plan now mitigates the prior mixed-action and external-writer cleanup risks through D-16 and D-17. Those prior findings are resolved.\n\nThe prior retry/idempotency finding is not resolved: LOCAL-26 adds acceptance language, but the state and event mechanisms needed to achieve it remain undefined.\n\nCandidate selection is also ambiguous. “Terminal containers” could mean configured strategic types or every configured non-leaf type. The codebase has distinct concepts: `query_strategic` uses `strategic_types` (`crates/jit/src/commands/query.rs:57-77`), while hierarchy resolution treats every type above the maximum leaf level as a container (`crates/jit/src/graph/hierarchy.rs:475-486`). The plan must select one definition for `jit archive candidates` and container-target validation.\n\n## Prior review feedback\n\n- Prior F1, mixed move/copy/retain semantics: resolved by D-16 and LOCAL-07/LOCAL-24.\n- Prior F2, unsafe finalization and cleanup races: resolved in design by D-14, D-17, LOCAL-22, and LOCAL-25.\n- Prior F3, retry/idempotency semantics: still blocking. The new assertions and tests do not supply an executable recovery or event-deduplication design.\n\n## Findings\n\n1. **F1 — High, blocking:** The required archive-plan JSON schema and stable blocker taxonomy are not specified. The plan defers them to an implementation task despite the owner-approved brief requiring the formal plan to define them before CLI fan-out (`dev/active/7d3a3a47-plan.md:137`).\n2. **F2 — High, blocking:** Container retry cannot converge after references and the event persist but source deletion fails. D-13 excludes the now-unreferenced source from recomputed ownership, while D-18 provides no event-history or recovery-state mechanism to rediscover it (`dev/active/7d3a3a47-plan.md:412`).\n3. **F3 — High, blocking:** Exactly-once archive-event behavior is asserted without an idempotency key, event lookup rule, or deduplication algorithm. The current event API generates a fresh UUID for every append, and the plan leaves its replacement contract to the execution task (`dev/active/7d3a3a47-plan.md:419`).\n4. **F4 — Medium, blocking:** The inventory task promises embedded-reference owner analysis but does not depend on the recursive discovery task that produces those edges, contradicting the claim that each task is independently landable and testable (`dev/active/7d3a3a47-plan.md:146`).\n5. **F5 — Medium, blocking:** Candidate reporting and container-target validation do not define whether “container” means configured strategic types or every configured non-leaf hierarchy type, producing materially different candidate sets (`dev/active/7d3a3a47-plan.md:273`).\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan resolves the prior action and filesystem-race defects, but schema definition, retry/event idempotency, one dependency edge, and container selection remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The required archive-plan JSON schema and stable blocker taxonomy are deferred to implementation rather than specified by the formal plan.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":137,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-06\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recomputation cannot rediscover and clean an unreferenced source left after post-event deletion failure, so container retry does not converge as claimed.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":412,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Exactly-once archive-event behavior lacks a stable operation identity, lookup rule, or deduplication mechanism.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":419,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The inventory task requires embedded-reference ownership results but is not ordered after recursive dependency discovery.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":146,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\"]},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate reporting does not define whether containers are strategic types or all configured non-leaf hierarchy types.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":273,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4964 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f585a-274c-70d0-92b8-08d180b181c6\n--------\nuser\n--- 4951 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan resolves the prior action and filesystem-race defects, but schema definition, retry/event idempotency, one dependency edge, and container selection remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The required archive-plan JSON schema and stable blocker taxonomy are deferred to implementation rather than specified by the formal plan.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 137,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Recomputation cannot rediscover and clean an unreferenced source left after post-event deletion failure, so container retry does not converge as claimed.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 412,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Exactly-once archive-event behavior lacks a stable operation identity, lookup rule, or deduplication mechanism.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 419,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The inventory task requires embedded-reference ownership results but is not ordered after recursive dependency discovery.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 146,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01"
+        ]
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Candidate reporting does not define whether containers are strategic types or all configured non-leaf hierarchy types.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 273,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-05"
+        ]
+      }
+    ]
+  }
+}

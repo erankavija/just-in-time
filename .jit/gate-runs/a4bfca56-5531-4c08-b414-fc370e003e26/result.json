@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "run_id": "a4bfca56-5531-4c08-b414-fc370e003e26",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "1de25b48031de457e3f7198ecbfe964775201982",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T22:10:14.041520410Z",
+  "completed_at": "2026-07-12T22:13:20.811066395Z",
+  "duration_ms": 186769,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/7d3a3a47-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1), is non-empty, and is linked from planning issue `1dbc72f6` as a design document. The investigation and owner-approved planning brief are also linked and consistent with the plan’s stated inputs.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all six `[hard]` requirements to implementation tasks in §1 and the §3 coverage map. REQ-01 through REQ-04 and REQ-06 have concrete discovery, classification, execution, and fixture coverage.\n\nREQ-05 remains under-specified. The shared plan schema requires `category` and `destination_root` ([plan §2](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:69)), and destination conflicts and move/copy summaries depend on that category. However, `jit archive candidates` accepts no category and merely promises a “derivable suggested category” without defining how one is derived or what happens when it cannot be derived ([candidate task](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:311)). The existing configuration provides only an arbitrary category-to-directory map in [config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:392), with no inference metadata. The plan must choose a deterministic rule: evaluate every category, define an explicit inference mapping, or define a category-independent candidate-plan schema.\n\n## Technical soundness and architectural fit\n\nThe proposed pure planner, command orchestration, and storage-owned persistence split fits the repository architecture. DAG closure, opaque byte reads, re-entrant repository coordination, component-aware containment, topology mirroring, and atomic no-replace finalization are grounded in existing primitives.\n\nThe retry/event identity design is not sound as specified. `plan_fingerprint` hashes the canonical plan, including state-dependent actions, `already_archived`, owners, evidence, and reference changes ([schema](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:69)). Those fields necessarily change after a partial relink, finalization, or deletion, so a recomputed retry will not retain the same operation identity unless an immutable fingerprint projection is explicitly defined. This prevents the fingerprint from correlating crash-window duplicate events as D-19 claims. It also directly contradicts LOCAL-26’s assertion that retry creates no duplicate event while D-19 permits crash-window duplicates ([execution task](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:267), [D-19](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:466)).\n\nThe blocker taxonomy also leaves missing inputs ambiguous. It has `missing-edge-target` only as a warning and no blocker for a missing explicit root ([schema](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:84)), even though preview promises to enforce source availability and candidate reporting promises missing blockers. The plan does not specify the affected artifact’s action or whether `eligible` becomes false.\n\nAdvisory: the schema’s singular `provenance: explicit|embedded` cannot represent an artifact that is both directly issue-linked and reached through another artifact. The dependency edge remains visible, but the binding schema should specify a set/array or precedence rule.\n\n## Decomposition and dependencies\n\nThe prior inventory-order defect is corrected: classification now depends on both explicit-root inventory and recursive discovery before completing repository-wide embedded ownership.\n\nThe remaining task graph is coherent:\n\n- The plan model precedes discovery and mutation work.\n- Classification follows both inventory and discovery.\n- Preview and candidates follow classification.\n- Execution follows preview and the mutation primitive.\n- Legacy command removal follows completed replacement execution.\n\nNo reversed dependency edge or substantive overlap was found. The candidate-report task is nevertheless not independently actionable until its category-selection contract is resolved.\n\nAdvisory: the mutation task says finalization uses “atomic rename” at line 222, while its binding D-14 design uses hard-link-plus-unlink and rejects rename. The specific D-14 decision is technically sound, but the task outcome should use consistent terminology.\n\n## Risks and actionability\n\nMost material risks have explicit mitigations: pinned references remain historical, external-writer races use no-replace finalization and identity-verified deletion, relative links use mirrored topology and staged edge validation, and active/outside ownership affects copy or retention.\n\nTwo load-bearing risks remain unresolved:\n\n- Retry/event correlation relies on a fingerprint that is not defined over immutable inputs.\n- Candidate classification relies on a category that its command neither receives nor deterministically derives.\n\nThe missing-artifact taxonomy also forces implementers to invent execution eligibility behavior rather than implement the binding schema verbatim.\n\n## Prior review feedback\n\n- Prior F1 is only partially resolved. A formal schema and code taxonomy now exist, but missing explicit sources and dual provenance remain undefined.\n- Prior F2 is addressed conceptually by archived-prefix inversion and identity-verified residue cleanup.\n- Prior F3 remains blocking: a fingerprint was added, but it is not stable across recomputed partial states, and the plan contradicts itself about duplicate events.\n- Prior F4 is resolved by making classification depend on both inventory and recursive discovery.\n- Prior F5 is resolved by D-20’s configured non-leaf hierarchy rule, which matches the existing canonical hierarchy model in [graph/hierarchy.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/graph/hierarchy.rs:90).\n\n## Findings\n\n1. **F1 — High, blocking:** The proposed plan fingerprint is not a stable retry operation identity because it hashes a state-dependent plan, and LOCAL-26’s no-duplicate-event requirement contradicts D-19’s permitted crash-window duplicates. Define an immutable fingerprint projection and one consistent event/retry contract.\n2. **F2 — High, blocking:** Candidate reporting cannot produce category-dependent destinations, conflicts, or move/copy summaries because `jit archive candidates` receives no category and the plan defines no deterministic category inference or multi-category evaluation rule.\n3. **F3 — Medium, blocking:** Missing artifacts have no complete classification contract: a missing embedded target is merely a warning, a missing explicit root has no stable code, and the resulting action and `eligible` value are undefined despite source availability and missing blockers being required.\n4. **F4 — Low, advisory:** Singular `provenance: explicit|embedded` cannot faithfully represent artifacts that are both explicit roots and embedded dependencies.\n5. **F5 — Low, advisory:** The mutation-task wording says “atomic rename,” contradicting the binding hard-link-plus-unlink no-replace mechanism in D-14.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The decomposition is substantially improved, but unstable retry identity, undefined candidate category selection, and incomplete missing-artifact semantics remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The state-dependent plan fingerprint cannot remain a stable retry identity, and the plan contradicts itself about duplicate archive events.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":267,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate reporting requires category-dependent planning but defines neither a category input nor deterministic inference or multi-category evaluation.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":311,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-05\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The taxonomy does not define blocker, action, and eligibility semantics for missing explicit roots or consistently for missing embedded targets.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":84,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/issue/7d3a3a47/requirement/REQ-06\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The singular provenance enum cannot represent an artifact that is both explicitly issue-linked and embedded.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":78,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-06\"]},{\"id\":\"F5\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The mutation task says atomic rename even though binding decision D-14 specifies hard-link-plus-unlink and rejects rename.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":222,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2728 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5861-8648-7402-9057-e8d766da99b0\n--------\nuser\n--- 2715 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The decomposition is substantially improved, but unstable retry identity, undefined candidate category selection, and incomplete missing-artifact semantics remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The state-dependent plan fingerprint cannot remain a stable retry identity, and the plan contradicts itself about duplicate archive events.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 267,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Candidate reporting requires category-dependent planning but defines neither a category input nor deterministic inference or multi-category evaluation.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 311,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The taxonomy does not define blocker, action, and eligibility semantics for missing explicit roots or consistently for missing embedded targets.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 84,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/issue/7d3a3a47/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The singular provenance enum cannot represent an artifact that is both explicitly issue-linked and embedded.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 78,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F5",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The mutation task says atomic rename even though binding decision D-14 specifies hard-link-plus-unlink and rejects rename.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 222,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/atomic-writes"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "run_id": "adcfd59d-11d7-480c-89f9-7ff7b52e4941",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "49e24e04c2340f37915da4c465444ade01a759f4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T21:52:19.583758920Z",
+  "completed_at": "2026-07-12T21:55:10.698695181Z",
+  "duration_ms": 171114,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is non-empty, and is linked through `issue.documents` as a design document. Both supporting documents are also linked. The planning issue has no dependencies, so there are no unmet prerequisites to reconcile.\n\n## Completeness against the criteria\n\nThe coverage map at `dev/active/7d3a3a47-plan.md:219` assigns every hard requirement to proposed tasks. However, several load-bearing semantics remain undefined, particularly destination mapping and single-document eligibility. These gaps prevent the proposed work from fully specifying REQ-01, REQ-03, and REQ-04.\n\n## Technical soundness and architectural fit\n\nThe pure planner, command orchestration, and coordinated storage mutation approach generally fits the repository’s layering. The plan correctly identifies the current shallow discovery, pinned-reference, verifier, and path-prefix defects.\n\nTwo safety problems remain:\n\n- Repository-wide sharing does not clearly include indirect embedded references from documents outside the selected subtree.\n- The proposed collision handling still permits a check/rename race because the existing finalization uses an overwriting rename, while the repository lock coordinates only JIT writers.\n\n## Decomposition and dependencies\n\nThe proposed dependency ordering is coherent: model before inventory/discovery, classifier after both, preview after classification, execution after preview and storage support, and legacy removal last. Candidate reporting can proceed independently after classification.\n\nThe task boundaries nevertheless contain specification gaps that downstream engineers would have to redesign during implementation: destination layout, the universe scanned for indirect ownership, and document-target execution eligibility.\n\n## Risks and actionability\n\nThe plan addresses pinned references, partial failures, stale plans, recursive discovery, and legacy-command migration. It does not address the external destination-creation race, and it leaves the document form of the unified command without an executable lifecycle policy.\n\nThere is no prior run history to reconcile.\n\n## Findings\n\n1. **F1 — Blocking, high:** The destination-layout algorithm is not defined. D-4 says only that artifacts enter a “container-owned directory preserving internal topology” (`dev/active/7d3a3a47-plan.md:274`), while the classifier and executor require concrete proposed destinations. The plan never specifies how roots from different managed directories are mapped, how paths outside a common root are represented, or what the expected result is for the promised identical-filename fixture. An engineer must invent this algorithm, and different choices can either break relative edges or create collisions, directly affecting REQ-01, REQ-03, and REQ-04.\n\n2. **F2 — Blocking, high:** Repository-wide sharing analysis is under-specified for embedded dependencies. The inventory task records all issue owners of explicit `DocumentReference` roots (`dev/active/7d3a3a47-plan.md:117`), while recursive discovery describes traversal from supported roots but does not require scanning outside-subtree documents (`dev/active/7d3a3a47-plan.md:127`). Consequently, an image or CSS file embedded by an outside document—but not directly issue-linked—can appear unshared and be moved, violating D-2. This is especially material because the existing classifier counts references only across the supplied `assets_by_doc` universe (`crates/jit/src/document/assets.rs:189`). The plan must define the repository-wide reverse-edge discovery universe and how unsupported outside roots affect classification.\n\n3. **F3 — Blocking, high:** The no-overwrite guarantee remains vulnerable to a time-of-check/time-of-use race. The mutation task promises staging, collision checks, and atomic rename (`dev/active/7d3a3a47-plan.md:154`), mirroring existing code that checks `exists()` and later calls `std::fs::rename` (`crates/jit/src/commands/document.rs:1670` and `crates/jit/src/commands/document.rs:1720`). On supported platforms that rename replaces a destination created after the check. The repository write guard excludes ordinary JIT writers, not unrelated filesystem writers (`crates/jit/src/storage/mod.rs:90`). REQ-03 therefore requires a specified atomic no-replace finalization mechanism or an equivalent non-clobber protocol, plus a race-focused test; LOCAL-09 covers only a destination occupied before execution.\n\n4. **F4 — Blocking, medium:** The execution policy for `jit archive document <path>` is unresolved. The preview task applies “terminal eligibility” to both document and container targets (`dev/active/7d3a3a47-plan.md:166`), but the executor states only that Done/Rejected containers may execute (`dev/active/7d3a3a47-plan.md:180`). A path has no selected container and may be referenced by zero, one, or several issues in mixed states. The plan must define whether document execution requires all owners to be terminal, selects an owning container, permits unowned documents, or follows another explicit rule, including how outside and active owners affect move/copy/retain/block.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The overall architecture and ordering are sound, but four load-bearing safety and execution semantics remain undefined.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan does not define the deterministic container destination-layout algorithm needed to preserve topology and prevent collisions.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":274,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-01\",\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/issue/7d3a3a47/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repository-wide ownership does not explicitly include indirect embedded references from documents outside the selected subtree.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":117,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-02\",\"@/issue/7d3a3a47/requirement/REQ-04\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The proposed check-then-rename collision handling does not guarantee atomic no-clobber finalization against external filesystem writers.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":154,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-03\",\"@/inv/atomic-writes\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The lifecycle and ownership eligibility rules for executing the document-target command are undefined.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":166,\"references\":[\"@/issue/7d3a3a47/requirement/REQ-02\",\"@/issue/7d3a3a47/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4881 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5851-2125-7811-8a3f-6b352c642758\n--------\nuser\n--- 4868 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The overall architecture and ordering are sound, but four load-bearing safety and execution semantics remain undefined.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The plan does not define the deterministic container destination-layout algorithm needed to preserve topology and prevent collisions.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 274,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-01",
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/issue/7d3a3a47/requirement/REQ-04"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Repository-wide ownership does not explicitly include indirect embedded references from documents outside the selected subtree.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 117,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-02",
+          "@/issue/7d3a3a47/requirement/REQ-04"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The proposed check-then-rename collision handling does not guarantee atomic no-clobber finalization against external filesystem writers.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 154,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-03",
+          "@/inv/atomic-writes"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The lifecycle and ownership eligibility rules for executing the document-target command are undefined.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 166,
+        "references": [
+          "@/issue/7d3a3a47/requirement/REQ-02",
+          "@/issue/7d3a3a47/requirement/REQ-03"
+        ]
+      }
+    ]
+  }
+}
