@@ -437,6 +437,8 @@ jit gate define review \
 
 Each subsequent run includes at most the latest result for the same issue and gate in `run_history`. This compact history enables iterative workflows without recursively injecting several full review narratives:
 
+The `issue.gates` projection contains the other required gates' latest evidence. It omits the gate currently being evaluated because that recorded status necessarily predates the in-flight run; use the top-level `gate` object for the current definition and `run_history` for its prior result.
+
 ```bash
 # First run: run_history is empty
 jit gate evaluate $ISSUE review

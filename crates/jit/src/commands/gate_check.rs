@@ -28,6 +28,20 @@ fn compact_run_history_for_context(runs: &[GateRunResult], gate_key: &str) -> Ve
         .collect()
 }
 
+/// Remove the gate currently being evaluated from the issue's gate projections.
+///
+/// Its recorded status necessarily predates the in-flight evaluation and is not
+/// current evidence. The gate definition identifies the active gate, while its
+/// compact prior result remains available through `run_history`.
+fn omit_current_gate_projection(issue: &mut serde_json::Value, gate_key: &str) {
+    if let Some(gates) = issue
+        .get_mut("gates")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        gates.retain(|gate| gate.get("key").and_then(serde_json::Value::as_str) != Some(gate_key));
+    }
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Repository root used as the checker working directory and as the `git`
     /// context for stamping [`GateRunResult::commit`](crate::domain::GateRunResult).
@@ -235,8 +249,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.storage.load_issue(issue_id)?;
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let issue_response = IssueShowResponse::from_issue(issue, enriched_deps, &all_runs);
-        let issue_json =
+        let mut issue_json =
             serde_json::to_value(&issue_response).context("Failed to serialize issue to JSON")?;
+        omit_current_gate_projection(&mut issue_json, gate_key);
 
         // Build gate definition JSON
         let gate_json = serde_json::json!({
@@ -444,7 +459,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::compact_run_history_for_context;
+    use super::{compact_run_history_for_context, omit_current_gate_projection};
     use crate::commands::CommandExecutor;
     use crate::domain::{
         GateChecker, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, State,
@@ -540,6 +555,25 @@ enforce_leases = "off"
         let runs = vec![prior_run("cargo", "cargo-ci", 10, None)];
 
         assert!(compact_run_history_for_context(&runs, "review").is_empty());
+    }
+
+    #[test]
+    fn test_omit_current_gate_projection_retains_other_gate_evidence() {
+        let mut issue = serde_json::json!({
+            "gates": [
+                {"key": "cargo-ci", "status": "passed", "exit_code": 0},
+                {"key": "review", "status": "failed", "exit_code": 1}
+            ]
+        });
+
+        omit_current_gate_projection(&mut issue, "review");
+
+        assert_eq!(
+            issue["gates"],
+            serde_json::json!([
+                {"key": "cargo-ci", "status": "passed", "exit_code": 0}
+            ])
+        );
     }
 
     #[test]
@@ -1127,6 +1161,14 @@ enforce_leases = "off"
         assert_eq!(context["issue"]["title"], "Implement feature X");
         assert_eq!(context["gate"]["key"], "review");
         assert_eq!(context["gate"]["title"], "Code Review");
+        assert!(
+            context["issue"]["gates"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|gate| gate["key"] != "review"),
+            "the current gate must not receive its stale pre-run projection"
+        );
         assert!(context["run_history"].as_array().unwrap().is_empty());
     }
 

@@ -1245,7 +1245,8 @@ pub struct GateContext {
     pub schema_version: u32,
     /// Resolved prompt (from inline `prompt` or `prompt_file`)
     pub prompt: Option<String>,
-    /// Full issue data as JSON value
+    /// Full issue data as JSON, excluding the current gate's stale pre-run
+    /// projection; the current gate is identified by [`Self::gate`].
     pub issue: serde_json::Value,
     /// Gate definition as JSON value
     pub gate: serde_json::Value,
