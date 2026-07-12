@@ -44,7 +44,9 @@
   "escalations": [
     {"issue": "afbbf6c3", "category": "architectural-decision", "resolved": true, "resolution": "human selected implement-strictness with enforcement-modulator semantics (see decisions)"}
   ],
-  "rework_counts": {"623f3163": 1, "afbbf6c3": 1, "ed049e1d": 2, "3ac07340": 1},
+  "rework_counts": {"623f3163": 1, "afbbf6c3": 1, "ed049e1d": 2, "3ac07340": 2},
+  "3ac07340_decision": "Round-2 reviewers CONTRADICTED on config validate exit 2. Source truth (main.rs:5520): exit(2) branch exists but result.warnings never populated (no warnings.push) => unreachable dead code. Reconciling fix (no behavior change): projection documents 0/1 emitted + 2 RESERVED-not-emitted; lead fixes configuration.md:421 to match. Also serve differs by mode: --fg passthrough child, daemon/stop/status 0/1. rework-2 is FINAL (MAX=2).",
+  "lead_todo": "At 3ac07340 rework-2 integration: lead edits docs/reference/configuration.md:421 config-validate exit section to 0=valid/1=errors/2=reserved-not-currently-emitted, matching 3ac's projection. Sequence AFTER ed049e1d rework-2 integration to avoid configuration.md two-writer conflict.",
   "ed049e1d_decision": "Owner chose: single-source the LOCK_TIMEOUT_SECS constant across all claim.rs FileLocker sites (no behavior change; env-override reach unchanged). Round-2 reviewer correctly found claim.rs keeps 10 hardcoded 5s timeouts + heartbeat row conflated storage-helper staleness (2x=60s) with claim-lease TTL. rework-2 is FINAL attempt (MAX=2); next failure escalates.",
   "wave2_integration_note": "Both ed049e1d and 3ac07340 reworks edit docs/index.md nav (adding runtime-defaults.md and exit-codes.md respectively) — trivial nav-line collision to resolve manually at integration (keep both entries).",
   "concurrent_session_note": "A separate lead is running epic:core-maintenance and committing to main (commits e9c91e02, fc971f18 for issue 71be6ae9). Its transiently-orphaned issue caused a spurious code-review F4 on ed049e1d; now wired (6eb585bc->71be6ae9), jit-validate.sh passes. Watch for main moving under our cherry-picks.",

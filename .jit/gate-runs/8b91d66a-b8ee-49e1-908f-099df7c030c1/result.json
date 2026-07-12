@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "8b91d66a-b8ee-49e1-908f-099df7c030c1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "cbf36579f3ce01f9dd6f8e8c01e0795d41d65d92",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T05:48:17.476705469Z",
+  "completed_at": "2026-07-12T05:50:41.418503940Z",
+  "duration_ms": 143941,
+  "exit_code": 1,
+  "stdout": "Attribution used the three current-branch commits tagged `jit:3ac07340`, inspected individually with rename detection. This leaf has no resolved children; uncommitted changes were excluded. Prior F1 and F2 are resolved, but one required consumer update remains.\n\n1. **F1 — blocking, issue-impact, high:** [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:421) still claims `jit config validate` can exit `2` for warnings. The current command never records warnings, and the generated mapping correctly documents only exit `1` for invalid configuration. Replace this hand-maintained list with a link to the command-specific [Exit Codes reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:47), retaining only command-local behavior if needed.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The configuration reference retains an inaccurate hand-copied config-validate warning exit code despite the new canonical mapping.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference says config validate exits 2 for warnings, but no warning outcome exists and the generated mapping documents only exit 1 for invalid configuration.\",\"file\":\"docs/reference/configuration.md\",\"line\":421}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8435 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f54de-889d-7b83-857f-3c3723ea6d8c\n--------\nuser\n--- 8422 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The configuration reference retains an inaccurate hand-copied config-validate warning exit code despite the new canonical mapping.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The configuration reference says config validate exits 2 for warnings, but no warning outcome exists and the generated mapping documents only exit 1 for invalid configuration.",
+        "file": "docs/reference/configuration.md",
+        "line": 421
+      }
+    ]
+  }
+}

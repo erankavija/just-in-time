@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "3e16ad75-1220-4ee9-bd91-a7bbd2123d72",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "ac7b3fdaee119882d140d2895095a8f8c7b289f6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-11T23:58:53.321498266Z",
+  "completed_at": "2026-07-12T00:01:56.892355704Z",
+  "duration_ms": 183570,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails. The projected lock timeout is not the sole runtime default: claim commands still construct `FileLocker` with literal five-second timeouts, so changing `LOCK_TIMEOUT_SECS` does not update all operational lock behavior.\n\nREQ-02 fails. The worktree coordination tutorial retains an unchecked default-TTL copy.\n\nREQ-03 is otherwise covered by the committed-reference conformance test.\n\n## Architecture and separation of concerns\n\nThe new projection remains pure and does not introduce domain/storage/CLI boundary violations.\n\n## Functional paradigm\n\nNo new blocking concerns.\n\n## Correctness and invariants\n\nAtomic rename is now used by the ignored regeneration test. No unsafe or PID-related changes were introduced.\n\n## Testing\n\nRecorded `cargo-ci` passed for the current commit; I did not rerun Cargo tests. `docs-mechanical` passed. `./scripts/jit-validate.sh` passed.\n\n## Error handling and CLI contract\n\nNo new blocking concerns. Existing JSON command support is unaffected.\n\n## Documentation\n\nThe prior findings about the heartbeat alias, claim-reference links, navigation, atomic regeneration, and public docs on the new runtime-default APIs are addressed. The remaining documentation default below can still drift.\n\n## JIT issue management\n\nThe sole dependency (`6d82de03`) is done; repository validation passes.\n\n## Findings\n\n1. **High** — `LOCK_TIMEOUT_SECS` is presented as the source-defined lock timeout, but production claim operations retain independent `Duration::from_secs(5)` values (for example [claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:130), also at lines 219, 364, 466, 535, 603, 657, 730, and 784). This violates REQ-01’s single maintained source: updating the projection constant and regenerating its reference leaves those claim lock timeouts unchanged.\n\n2. **Medium** — [parallel-work-worktrees.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/parallel-work-worktrees.md:119) independently states the default lease TTL is ten minutes without linking to, or being mechanically checked against, `runtime-defaults.md`. That duplicate can drift when `CLAIM_TTL_SECS` changes, failing REQ-02.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Lock-timeout defaults remain duplicated in production claim paths, and a coordination tutorial retains an unchecked claim-TTL default.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Production claim commands retain independent five-second FileLocker timeouts, so LOCK_TIMEOUT_SECS is not the single source required by REQ-01.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":130},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The worktree coordination tutorial duplicates the ten-minute claim TTL without consuming or being checked against the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":119}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3817 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f539e-a653-7bd2-976a-19c58b2b6738\n--------\nuser\n--- 3804 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Lock-timeout defaults remain duplicated in production claim paths, and a coordination tutorial retains an unchecked claim-TTL default.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Production claim commands retain independent five-second FileLocker timeouts, so LOCK_TIMEOUT_SECS is not the single source required by REQ-01.",
+        "file": "crates/jit/src/commands/claim.rs",
+        "line": 130
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The worktree coordination tutorial duplicates the ten-minute claim TTL without consuming or being checked against the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 119
+      }
+    ]
+  }
+}

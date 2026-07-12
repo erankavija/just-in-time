@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "c94bb487-1ab2-45e9-874b-fda053531011",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "ac7b3fdaee119882d140d2895095a8f8c7b289f6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T00:01:57.208251604Z",
+  "completed_at": "2026-07-12T00:04:12.262720702Z",
+  "duration_ms": 135054,
+  "exit_code": 1,
+  "stdout": "Attribution: `ed049e1d` is a level-4 leaf. I reviewed its three `HEAD`-reachable tagged commits individually (`cf218523`, `a72e06e`, `ff2158ac`) and verified the current tree. The prior navigation and copied-TTL findings are addressed, but two accuracy defects remain in the new projection.\n\n1. **F1 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:5) says each value is defined once and [claims `JIT_LOCK_TIMEOUT` overrides the lock timeout](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:12). Production `jit claim` paths still construct `FileLocker` with literal five-second timeouts, so these locks neither consume the purported single source nor honor that override. Route those paths through one shared timeout resolver, or narrow and distinguish the documented scope.\n\n2. **F2 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:11) says lease heartbeats become stale after 60 seconds, but the actual `jit claim heartbeat` workflow uses a separate one-hour staleness threshold, as the coordination guide correctly states at [multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:225). Distinguish the dormant storage-heartbeat helper from the claim CLI’s explicit heartbeat behavior, including its one-hour threshold.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime-defaults projection still overstates lock-source unification and conflates storage-heartbeat cadence with claim-lease staleness.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The reference falsely states that lock defaults are defined once and universally overridden by JIT_LOCK_TIMEOUT, while production claim commands retain literal five-second lock timeouts.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":5},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The heartbeat row incorrectly applies the storage helper's 60-second staleness rule to jit claim leases, which use a separate one-hour threshold.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":11}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 27419 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f53a1-7f6f-74d0-b7ae-aff41686fbd7\n--------\nuser\n--- 27406 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The runtime-defaults projection still overstates lock-source unification and conflates storage-heartbeat cadence with claim-lease staleness.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The reference falsely states that lock defaults are defined once and universally overridden by JIT_LOCK_TIMEOUT, while production claim commands retain literal five-second lock timeouts.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 5
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The heartbeat row incorrectly applies the storage helper's 60-second staleness rule to jit claim leases, which use a separate one-hour threshold.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 11
+      }
+    ]
+  }
+}
