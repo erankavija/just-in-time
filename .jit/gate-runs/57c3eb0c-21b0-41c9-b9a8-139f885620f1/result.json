@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "57c3eb0c-21b0-41c9-b9a8-139f885620f1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "9e5eb84dbed2a46eb4aceacb3be415f34d4b5e10",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:35:38.609297873Z",
+  "completed_at": "2026-07-12T06:37:50.574628825Z",
+  "duration_ms": 131965,
+  "exit_code": 1,
+  "stdout": "Attribution: `ed049e1d` is a leaf `task` with no resolved children. I inspected its six HEAD-reachable `jit:ed049e1d` commits individually; uncommitted `.jit` metadata was excluded. The prior heartbeat finding is resolved, but the current projection still misstates cleanup scope.\n\nDecision: fail.\n\n1. **F1 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:14) says orphaned temp files are swept “during startup recovery.” No production path invokes `ClaimCoordinator::startup_recovery`; the actual user-facing cleanup runs with `jit recover`. Replace that scope with “when `jit recover` runs” (and regenerate the projection), or wire startup recovery into a production startup path.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime-defaults projection incorrectly describes temporary-file cleanup as automatic startup recovery rather than the jit recover workflow.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The temporary-file cleanup row claims cleanup runs during startup recovery, but production cleanup is invoked by jit recover and no production path calls startup_recovery.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":14}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11368 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5509-e1bd-7df1-8da7-59dec1585d03\n--------\nuser\n--- 11355 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The runtime-defaults projection incorrectly describes temporary-file cleanup as automatic startup recovery rather than the jit recover workflow.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The temporary-file cleanup row claims cleanup runs during startup recovery, but production cleanup is invoked by jit recover and no production path calls startup_recovery.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 14
+      }
+    ]
+  }
+}

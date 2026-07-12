@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "6ee42ac4-5f04-4956-9689-59e60e384c32",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "191384f1e8c57bcd32e652c08e6cb67523ac7106",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T07:28:19.037247101Z",
+  "completed_at": "2026-07-12T07:30:27.151269872Z",
+  "duration_ms": 128114,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails: the lock-timeout projection omits the repository write lock’s scope. REQ-02 and REQ-03 are otherwise covered by linked documentation and the committed-reference conformance test.\n\n## Architecture and functional style\n\nNo layer-boundary or functional-style regression found.\n\n## Correctness and safety\n\nThe generated operational scope is incomplete; no unsafe-code, PID-safety, event-log, or atomic-write regression found.\n\n## Testing\n\nThe recorded `cargo-ci`, `docs-mechanical`, and `doc-review` gates passed. Per instruction, I did not rerun Cargo tests. `./scripts/jit-validate.sh` passes.\n\n## Error handling and CLI contract\n\nNo regression found; existing JSON support is unchanged.\n\n## Documentation\n\nThe reference is generated and discoverable, but its lock-timeout scope is inaccurate.\n\n## JIT issue management\n\nThe sole dependency is done. The latest prior lock-scope finding remains unresolved: the repository write lock is still omitted.\n\n## Findings\n\n1. **High** — [runtime_defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:135) says the `JIT_LOCK_TIMEOUT`-derived timeout applies only to `JsonFileStorage`’s shared `FileLocker`. However, [JsonFileStorage::new](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:121) passes that same timeout to `RepoWriteLock::for_storage_root`, which creates and acquires `.jit/.repo-write.lock` through its own `FileLocker` ([repo_lock.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repo_lock.rs:108)). This omits a real operational scope from the required projection, failing REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated runtime-default reference omits the repository write lock from JIT_LOCK_TIMEOUT's operational scope.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The lock-timeout projection omits the JsonFileStorage repository write lock, although it is constructed with the same JIT_LOCK_TIMEOUT-derived timeout, failing REQ-01.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":135}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8497 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f553a-1cb5-7440-b92f-960889a39622\n--------\nuser\n--- 8484 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated runtime-default reference omits the repository write lock from JIT_LOCK_TIMEOUT's operational scope.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The lock-timeout projection omits the JsonFileStorage repository write lock, although it is constructed with the same JIT_LOCK_TIMEOUT-derived timeout, failing REQ-01.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 135
+      }
+    ]
+  }
+}

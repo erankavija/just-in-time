@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "323337c9-bbe9-4e78-a235-3c4a2dda3455",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "7e409db7ed251bd6e8ebe72d473cf3ffea08e276",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T07:56:59.994288940Z",
+  "completed_at": "2026-07-12T07:59:59.564333989Z",
+  "duration_ms": 179570,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a level-4 leaf; the resolved DAG has no children. I inspected 11 `jit:ed049e1d` commits reachable from `HEAD` individually with rename detection; uncommitted `.jit` metadata was excluded.\n\nPass: the generated [runtime defaults reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:1) accurately covers all five defaults, scopes, and units; linked adopter docs are discoverable; and the source includes conformance coverage. Prior blocking findings remain resolved.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The runtime-defaults projection is accurate, discoverable, and mechanically kept in sync with the current source.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The runtime-defaults projection is accurate, discoverable, and mechanically kept in sync with the current source.",
+    "findings": []
+  }
+}

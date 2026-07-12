@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "0d2f2e4d-6237-479c-ae68-e6e4ff852352",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "8759d1d8ccff16e71cdf9b1cec29f6a87e33d6bc",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:47:20.447854173Z",
+  "completed_at": "2026-07-12T06:49:07.125594317Z",
+  "duration_ms": 106677,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 is not met: the projection omits a real operational scope for temp-file cleanup. REQ-02 and REQ-03 are otherwise addressed.\n\n## Architecture and functional style\n\nNo new layer-boundary or functional-style violation found.\n\n## Correctness and safety\n\nNo unsafe-code, PID-safety, event-log, or atomic-write regression found.\n\n## Testing\n\nRecorded `cargo-ci` and `docs-mechanical` gates passed for the current issue. Per instruction, I did not rerun Cargo tests. `./scripts/jit-validate.sh` passes.\n\n## Error handling and CLI contract\n\nNo regression found.\n\n## Documentation\n\nThe reference is generated and mechanically checked, but the temp-cleanup scope is incomplete.\n\n## JIT issue management\n\nThe sole dependency is done. The latest prior template-literal finding is resolved; the prior scope issue remains in a different default row.\n\n1. **High** — [`runtime_defaults.rs:141`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:141) and the generated [`runtime-defaults.md:14`](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:14) describe the temp-file threshold as applying to `jit recover` only. [`ClaimCoordinator::startup_recovery`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/claim_coordinator.rs:1174) also invokes `cleanup_orphaned_temp_files` with `TEMP_CLEANUP_THRESHOLD_SECS`. The required source-derived projection therefore does not provide the complete operational scope, failing REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime-default projection omits startup recovery as an operational scope for the temp-file cleanup threshold.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The projected temp-file cleanup scope names only jit recover although ClaimCoordinator startup recovery also uses the same threshold, failing REQ-01.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":141}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4750 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5514-98d8-74f2-a00e-d4e7946845c7\n--------\nuser\n--- 4737 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The runtime-default projection omits startup recovery as an operational scope for the temp-file cleanup threshold.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The projected temp-file cleanup scope names only jit recover although ClaimCoordinator startup recovery also uses the same threshold, failing REQ-01.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 141
+      }
+    ]
+  }
+}

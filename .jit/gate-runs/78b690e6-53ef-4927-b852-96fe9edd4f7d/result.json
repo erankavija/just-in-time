@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "78b690e6-53ef-4927-b852-96fe9edd4f7d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "7e409db7ed251bd6e8ebe72d473cf3ffea08e276",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T07:55:24.500466319Z",
+  "completed_at": "2026-07-12T07:56:59.943517783Z",
+  "duration_ms": 95443,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01 through REQ-03 are met. The generated reference covers all four defaults with units and accurate scopes; its conformance test detects stale projections. Prior lock-scope findings are resolved at [runtime_defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:33).\n\n## Architecture and functional style\n\nNo layer-boundary or functional-style regression found.\n\n## Correctness and safety\n\nNo atomic-write, event-log, PID-safety, unsafe-code, or invariant regression found.\n\n## Testing\n\nRecorded cargo-ci passed for reviewed commit `7e409db7`: fmt, clippy, and 3,619 tests passed. I did not rerun Cargo tests. `./scripts/jit-validate.sh` passed.\n\n## Error handling and CLI contract\n\nNo regression found.\n\n## Documentation\n\nThe generated [runtime defaults reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:1) is source-derived, and coordination documentation links to it. Template defaults consume the source constants.\n\n## JIT issue management\n\nThe prerequisite is done. All findings from the most recent prior review are addressed.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; recorded cargo-ci and repository validation pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; recorded cargo-ci and repository validation pass.",
+    "findings": []
+  }
+}

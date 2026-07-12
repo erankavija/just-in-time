@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "1eb408e8-a82a-45b2-b8a1-5e3384b096bd",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "086547f863cfa1288e6c17fef3d14ee7375e8792",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T07:42:41.586358076Z",
+  "completed_at": "2026-07-12T07:44:07.052033885Z",
+  "duration_ms": 85465,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails: the lock-timeout projection remains incomplete. REQ-02 and REQ-03 are otherwise met by the generated reference, linked coordination docs, template interpolation, and committed-reference conformance test.\n\n## Architecture and functional style\n\nNo layer-boundary or functional-style regression found.\n\n## Correctness and safety\n\nNo unsafe-code, PID-safety, atomic-write, or event-log regression found. The documented lock scope is inaccurate.\n\n## Testing\n\nRecorded `cargo-ci`, `docs-mechanical`, and `doc-review` gates passed. Per instruction, Cargo tests were not rerun. `./scripts/jit-validate.sh` passes.\n\n## Error handling and CLI contract\n\nNo regression found.\n\n## Documentation\n\nThe runtime-default reference is generated and discoverable, but its lock scope omits event-log locks.\n\n## JIT issue management\n\nThe sole dependency is done. Prior repository-write-lock feedback was addressed, but the shared-locker scope is still incomplete.\n\n1. **High** — [`runtime_defaults.rs:36`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:36) and the generated [`runtime-defaults.md:12`](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:12) describe the environment-configured shared `FileLocker` as covering index, issue, and gate locks, but it also acquires `.events.lock` for event append/read at [`json.rs:740`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:740) and [`json.rs:761`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:761). This leaves the required operational scope incomplete, failing REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated runtime-default reference omits event-log locks from JIT_LOCK_TIMEOUT's shared-FileLocker scope.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The lock-timeout projection omits .events.lock even though JsonFileStorage's JIT_LOCK_TIMEOUT-derived shared FileLocker acquires it, failing REQ-01.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":36}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2606 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5547-4620-7fb2-ba81-a578df91ac61\n--------\nuser\n--- 2593 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated runtime-default reference omits event-log locks from JIT_LOCK_TIMEOUT's shared-FileLocker scope.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The lock-timeout projection omits .events.lock even though JsonFileStorage's JIT_LOCK_TIMEOUT-derived shared FileLocker acquires it, failing REQ-01.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 36
+      }
+    ]
+  }
+}

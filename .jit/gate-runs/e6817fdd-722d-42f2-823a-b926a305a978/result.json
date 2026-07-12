@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "e6817fdd-722d-42f2-823a-b926a305a978",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "da83609738c3ca61a30fb11f2546121df06252ef",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T07:17:03.213237198Z",
+  "completed_at": "2026-07-12T07:18:28.011017351Z",
+  "duration_ms": 84797,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails: the generated lock-timeout scope is incorrect. REQ-02 and REQ-03 are otherwise satisfied by linked/dynamic documentation and the committed-reference conformance test.\n\n## Architecture and functional style\n\nNo new layer-boundary or functional-style violation found.\n\n## Correctness and safety\n\nThe lock override documentation contradicts the implementation.\n\n## Testing\n\nRecorded `cargo-ci` and `docs-mechanical` passed for `da836097`; Cargo tests were not rerun. `./scripts/jit-validate.sh` passes.\n\n## Error handling and CLI contract\n\nNo regression found.\n\n## Documentation\n\nThe prior temp-cleanup scope finding is addressed. The older lock-scope finding remains unresolved.\n\n## JIT issue management\n\nThe sole dependency is done, and repository validation passes.\n\n1. **High** — [runtime_defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:132) and the generated [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:12) say only the `JsonFileStorage` write lock honors `JIT_LOCK_TIMEOUT`, while other file locks use the fixed default. However, `JsonFileStorage::new` creates `self.locker` with that same environment-derived timeout at [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:111), and that locker guards index and issue locks at [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:197). The projection therefore gives an inaccurate operational scope, failing REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated runtime-default reference incorrectly states which JsonFileStorage locks honor JIT_LOCK_TIMEOUT.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The lock-timeout projection says only the JsonFileStorage write lock honors JIT_LOCK_TIMEOUT, but its shared FileLocker receives the same environment-derived timeout and guards index and issue locks, failing REQ-01.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":132}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5884 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f552f-ccc4-7d81-9eef-d18f89c9244c\n--------\nuser\n--- 5871 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated runtime-default reference incorrectly states which JsonFileStorage locks honor JIT_LOCK_TIMEOUT.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The lock-timeout projection says only the JsonFileStorage write lock honors JIT_LOCK_TIMEOUT, but its shared FileLocker receives the same environment-derived timeout and guards index and issue locks, failing REQ-01.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 132
+      }
+    ]
+  }
+}

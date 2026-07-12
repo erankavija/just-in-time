@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "62308bbc-ae3a-4954-8feb-72948d42916e",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "099c1358a5db0e60955e101d73dc4611dbc5e31c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:23:02.022000021Z",
+  "completed_at": "2026-07-12T06:24:28.845918337Z",
+  "duration_ms": 86823,
+  "exit_code": 1,
+  "stdout": "Attribution: `ed049e1d` is a level-4 leaf with no resolved children. I inspected its five reachable tagged commits individually; uncommitted JIT metadata was excluded.\n\nDecision: fail. The prior heartbeat finding remains unresolved in the current generated reference.\n\n1. **F1 — blocking, issue-impact, high:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:11) says the 30-second value is the default cadence for `jit claim heartbeat`. That command only records one heartbeat and does not read or schedule the 30-second constant; the constant is used by the separate storage-heartbeat helper/config defaults. State that scope explicitly (including that jit does not start a claim-heartbeat scheduler), while retaining the separate one-hour claim-lease staleness rule.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated runtime-defaults reference still incorrectly presents the storage heartbeat interval as a default cadence for the one-shot claim-heartbeat command.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The heartbeat row incorrectly says the 30-second default governs jit claim heartbeat, although that command records one beat and does not use or schedule that interval.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":11}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 13499 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f54fe-565a-7820-a1f8-d13ad475a7d8\n--------\nuser\n--- 13486 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated runtime-defaults reference still incorrectly presents the storage heartbeat interval as a default cadence for the one-shot claim-heartbeat command.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The heartbeat row incorrectly says the 30-second default governs jit claim heartbeat, although that command records one beat and does not use or schedule that interval.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 11
+      }
+    ]
+  }
+}

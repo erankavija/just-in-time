@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "44c819b7-5a20-4e79-ba97-156d56ef08a5",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "191384f1e8c57bcd32e652c08e6cb67523ac7106",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T07:30:27.355872481Z",
+  "completed_at": "2026-07-12T07:32:34.772335085Z",
+  "duration_ms": 127416,
+  "exit_code": 0,
+  "stdout": "Attribution: `ed049e1d` is a level-4 leaf with no resolved children. I inspected its nine reachable `jit:ed049e1d` commits individually with rename detection; no fallback attribution was needed. Uncommitted JIT metadata was excluded.\n\nPass. The generated [runtime-defaults reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:1) accurately covers all five defaults with units and scopes, is linked from configuration and adopter entry points, and its source-conformance test passes. Prior heartbeat, recovery-scope, and lock-scope findings remain resolved.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s runtime-defaults projection is accurate, discoverable, and mechanically kept in sync with the current source.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue’s runtime-defaults projection is accurate, discoverable, and mechanically kept in sync with the current source.",
+    "findings": []
+  }
+}

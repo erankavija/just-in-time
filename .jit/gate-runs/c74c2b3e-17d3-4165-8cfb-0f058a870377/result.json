@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "c74c2b3e-17d3-4165-8cfb-0f058a870377",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "8759d1d8ccff16e71cdf9b1cec29f6a87e33d6bc",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:49:07.155935309Z",
+  "completed_at": "2026-07-12T06:52:53.097483878Z",
+  "duration_ms": 225941,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a level-4 leaf with no resolved children. I inspected all seven reachable `jit:ed049e1d` commits individually with rename detection; no fallback attribution was needed. Uncommitted JIT metadata was excluded.\n\nDecision: fail. The projection, links, navigation, and prior heartbeat/TTL/lock findings are addressed, but its introductory scope still implies unavailable automatic startup recovery. The projection conformance test passes, so this wording must be corrected in its generator.\n\n1. **F1 — blocking, issue-impact, medium:** [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:5) describes these as defaults for “startup recovery,” but no production command invokes `ClaimCoordinator::startup_recovery`; orphaned temporary files are cleaned only when `jit recover` runs. Replace “startup recovery” with “recovery” or explicitly scope it to `jit recover`, then regenerate the projection.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime-defaults introduction still incorrectly implies automatic startup recovery rather than the explicit jit recover workflow.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The generated reference describes defaults for startup recovery although production cleanup runs only through jit recover.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":5}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 30157 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5516-3819-7f82-92ab-d5ca69f58b82\n--------\nuser\n--- 30144 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The runtime-defaults introduction still incorrectly implies automatic startup recovery rather than the explicit jit recover workflow.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The generated reference describes defaults for startup recovery although production cleanup runs only through jit recover.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 5
+      }
+    ]
+  }
+}

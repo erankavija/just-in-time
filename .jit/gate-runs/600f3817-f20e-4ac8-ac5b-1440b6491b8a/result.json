@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "600f3817-f20e-4ac8-ac5b-1440b6491b8a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "9e5eb84dbed2a46eb4aceacb3be415f34d4b5e10",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:32:51.134611580Z",
+  "completed_at": "2026-07-12T06:35:38.577611510Z",
+  "duration_ms": 167442,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 and REQ-02 fail: the projected lock scope is inaccurate, and the shipped coordination template retains unchecked default copies. REQ-03 is covered by the committed-reference conformance test.\n\n## Architecture and functional style\n\nNo layer-boundary or functional-style regression found.\n\n## Correctness and safety\n\nNo unsafe-code, PID-safety, event-log, or atomic-write regression found.\n\n## Testing\n\nRecorded `cargo-ci` and `docs-mechanical` gates passed. I did not rerun Cargo tests as instructed. `./scripts/jit-validate.sh` passed.\n\n## Error handling and CLI contract\n\nNo regression found; JSON support remains intact.\n\n## Documentation\n\nThe reference is generated and discoverable, but its lock scope overstates coverage. The generated project configuration also retains coordination-default facts outside the projection.\n\n## JIT issue management\n\nThe sole dependency is done. The latest prior-review heartbeat finding is addressed; the lock-scope finding remains unresolved in a different form.\n\n## Findings\n\n1. **High** — [runtime_defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:131) says `JsonFileStorage` holds its environment-configured storage locks “for all `.jit` data writes.” This is false: [save_gate_run_result](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:780) and [save_gate_preset](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:940) write under no `FileLocker` or repository write lock. The generated projection therefore still gives an inaccurate operational scope for `JIT_LOCK_TIMEOUT`, failing REQ-01.\n\n2. **Medium** — [hierarchy_templates.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/hierarchy_templates.rs:267) ships user-facing coordination-template comments with independent `600`-second claim TTL and `30`-second heartbeat defaults. They neither consume `runtime_defaults` nor have a conformance check, so either can drift when the projected defaults change, failing REQ-02.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime-default projection still overstates lock coverage, and the generated coordination template retains unchecked default copies.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The generated lock-timeout scope falsely claims JsonFileStorage holds environment-configured locks for all .jit data writes, although gate-run and preset writes take no such locks.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":131},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The shipped coordination template independently hard-codes the claim TTL and heartbeat defaults without consuming or checking the runtime-default projection.\",\"file\":\"crates/jit/src/hierarchy_templates.rs\",\"line\":267}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8912 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5507-555d-76b1-8df1-bedc5e7427e0\n--------\nuser\n--- 8899 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The runtime-default projection still overstates lock coverage, and the generated coordination template retains unchecked default copies.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The generated lock-timeout scope falsely claims JsonFileStorage holds environment-configured locks for all .jit data writes, although gate-run and preset writes take no such locks.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 131
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The shipped coordination template independently hard-codes the claim TTL and heartbeat defaults without consuming or checking the runtime-default projection.",
+        "file": "crates/jit/src/hierarchy_templates.rs",
+        "line": 267
+      }
+    ]
+  }
+}
