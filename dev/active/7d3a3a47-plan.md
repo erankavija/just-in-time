@@ -555,16 +555,19 @@ specification gaps surfaced during planning and review; none is REOPEN.
   **no path is ever unlinked directly. A removal (1) opens the quarantine directory —
   created fresh under `.jit/tmp` with an unpredictable name — as a directory handle,
   (2) atomically renames the target into it, (3) opens the quarantined entry **relative to
-  that directory handle** (`openat`-family where the platform provides it; the `rustix`/
-  `libc` bindings already in the dependency tree expose it on Unix), (4) verifies content
-  identity (hash and size captured at staging) on that open handle, and (5) unlinks the
-  entry **relative to the same directory handle** (`unlinkat`) on match — or restores it
-  no-replace on mismatch, leaving it quarantined with a `quarantined-foreign-file` warning
-  if restore is impossible.** Rename preserves whatever file is present, and steps 3–5 are
-  anchored to one directory handle, so substituting the verified entry requires write
-  access to that directory — and any writer with such access can already delete repository
-  files directly, so JIT's removal adds no destructive capability the interferer lacks
-  (D-24). Applies to ordinary move-source deletions, residue cleanup, and rollback of
+  that directory handle** via the safe `openat` wrapper in `nix` — already a direct
+  dependency of `crates/jit` (`Cargo.toml:41`); this adds the `fs` feature, not a new
+  crate, and keeps `#![deny(unsafe_code)]` intact because the unsafety lives inside the
+  dependency — (4) verifies content identity (hash and size captured at staging) on that
+  open handle, and (5) unlinks the entry by name **relative to the same directory handle**
+  (`unlinkat`) on match — or restores it no-replace on mismatch, leaving it quarantined
+  with a `quarantined-foreign-file` warning if restore is impossible.** The claim is
+  stated exactly: `unlinkat` acts on the *name*, whose binding to the verified inode can
+  change between steps 4 and 5 only through a write inside the just-created, unpredictably
+  named, private quarantine directory. That residual race is **bounded, not denied**: the
+  capability it requires already suffices to delete any repository file directly, so JIT's
+  removal adds no destructive power the interferer lacks (D-24). Rename preserves whatever
+  file is present at capture time, so nothing is overwritten at any step. Applies to ordinary move-source deletions, residue cleanup, and rollback of
   finalized destinations alike; platforms without `openat` semantics fall back to the same
   sequence path-anchored, with the D-24 bound stated for them explicitly. Rejected:
   verify-then-unlink at the original path (a substitution between verification and unlink
@@ -632,11 +635,13 @@ specification gaps surfaced during planning and review; none is REOPEN.
   (silently breaks relocated bundles).
 - **D-24 — The safety bound is stated, provable, and maximal for the platform:** chosen
   **two claims, each verifiable. (1) JIT never overwrites: every finalization and restore
-  is no-replace (D-14, D-17). (2) JIT never removes an unverified inode binding within its
-  directory-handle-anchored sequence (D-17); defeating that sequence requires write access
-  to the quarantine directory JIT just created — a capability that already suffices to
-  delete any repository file without JIT's involvement, so JIT's removals add no
-  destructive power an interfering writer does not independently possess.** This is the
+  is no-replace (D-14, D-17). (2) JIT unlinks a name only after verifying the inode bound
+  to it inside the directory-handle-anchored quarantine sequence (D-17); rebinding that
+  name between verification and unlink requires write access to the quarantine directory
+  JIT just created — a capability that already suffices to delete any repository file
+  without JIT's involvement, so JIT's removals add no destructive power an interfering
+  writer does not independently possess. The residual name-rebinding race is bounded by
+  this capability argument, not denied.** This is the
   strongest no-loss statement a path-based filesystem admits (POSIX has no unlink-by-handle),
   and it is how REQ-03 is satisfied: benign concurrent modification is detected and
   preserved (quarantine/restore/report), and adversarial loss is attributable only to the
@@ -659,13 +664,19 @@ specification gaps surfaced during planning and review; none is REOPEN.
   commit-aware reads (`document.rs:349-357`, `storage/mod.rs:531`) from git history, are
   never relocated or rewritten, appear in plans as informational `pinned-historical`
   entries, and impose no working-tree retention constraint while their commit is
-  reachable; where git or the commit is unavailable the reference degrades to working-tree
-  resolution and imposes needs-source and never-relink**. Their commit-specific dependency
-  closures are not discovered: they resolve at read time from the object database, and
-  serving them is the render path's concern, not relocation's. Rejected: path-only
-  identity (cannot represent two versions of one path); treating every pinned reference as
-  a working-tree retention constraint (needlessly blocks archival of files whose history
-  serves all pinned readers); rewriting pinned references (D-3).
+  reachable. Where git or the commit is unavailable, **read behavior is unchanged** —
+  storage surfaces `CommitNotFound` exactly as today, no fallback exists or is added —
+  and planning responds conservatively: the working-tree file gets needs-source and
+  never-relink, with warning `pinned-unreachable`. Pinned roots' **commit-specific
+  supported dependency closures are discovered**: the adapters are pure text extractors
+  run over commit-resolved content (`read_path_text(path, commit)`, `storage/mod.rs:531`),
+  yielding informational, non-relocating (path, commit) entries (LOCAL-33), so REQ-01's
+  enumeration is complete for pinned roots with nothing to move — history serves every
+  pinned reader.** Rejected: path-only identity (cannot represent two versions of one
+  path); treating every pinned reference as a working-tree retention constraint
+  (needlessly blocks archival of files whose history serves all pinned readers); rewriting
+  pinned references (D-3); inventing a read fallback for unreachable commits (storage has
+  none; planning must not assume semantics the code does not implement).
 - **Assumptions:** Coverage is enforced at the task tier: each of the nine task-tier items
   is a direct child of the epic and carries its own `satisfies: REQ-*` label; the A/B/C
   group headers are conceptual only. This assumes a single breakdown pass produces
