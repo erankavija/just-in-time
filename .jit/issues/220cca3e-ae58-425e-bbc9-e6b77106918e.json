@@ -1,0 +1,39 @@
+{
+  "id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "title": "breakdown: Dependency-aware container artifact archival",
+  "description": "Breakdown node bracketing Dependency-aware container artifact archival (7d3a3a47). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2"
+  ],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "coverage-preview": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T21:36:24.523803664Z"
+    },
+    "breakdown-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T21:36:24.524572154Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:artifact-archival",
+    "component:docs",
+    "milestone:v1.0",
+    "type:breakdown",
+    "brackets:7d3a3a47"
+  ],
+  "created_at": "2026-07-12T21:36:24.522654403Z",
+  "updated_at": "2026-07-12T21:36:24.547241491Z",
+  "first_ready_at": "2026-07-12T21:36:24.522654823Z"
+}
