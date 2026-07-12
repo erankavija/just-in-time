@@ -120,12 +120,12 @@ pub fn render_reference_markdown() -> String {
         (
             "Heartbeat interval",
             format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
-            "Default cadence for the heartbeat updates that keep an indefinite (TTL=0) lease alive; the heartbeat helper marks a heartbeat stale after twice this interval. Finite claim leases expire on their own TTL instead (see Claim lease TTL).",
+            "Default cadence for sending lease heartbeats (`jit claim heartbeat`) that keep an indefinite (TTL=0) lease alive. Lease staleness is governed separately: an indefinite lease is marked stale only after the claim staleness threshold (1 hour) elapses without a heartbeat, not after this cadence. Finite leases expire on their own TTL instead (see Claim lease TTL).",
         ),
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Default timeout to acquire a file lock before failing. The repository storage write lock additionally honors the `JIT_LOCK_TIMEOUT` environment override; other file locks use this fixed default.",
+            "Default timeout to acquire a file lock before failing. The `.jit` repository storage lock resolves its timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; all other file locks, including the claim-coordination locks, use this default and do not read the environment variable.",
         ),
         (
             "Lock poll interval",
@@ -200,7 +200,7 @@ mod tests {
     /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
     #[test]
     #[ignore = "writes the committed reference; run explicitly to regenerate"]
-    fn regenerate_reference() {
+    fn test_regenerate_reference_writes_committed_doc() {
         let path = reference_path();
         let tmp = path.with_extension("md.tmp");
         std::fs::write(&tmp, render_reference_markdown())

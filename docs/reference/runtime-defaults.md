@@ -8,8 +8,8 @@ module, which defines these values.
 
 | Default | Value | Scope |
 | --- | --- | --- |
-| Heartbeat interval | 30 seconds | Default cadence for the heartbeat updates that keep an indefinite (TTL=0) lease alive; the heartbeat helper marks a heartbeat stale after twice this interval. Finite claim leases expire on their own TTL instead (see Claim lease TTL). |
-| Lock acquisition timeout | 5 seconds | Default timeout to acquire a file lock before failing. The repository storage write lock additionally honors the `JIT_LOCK_TIMEOUT` environment override; other file locks use this fixed default. |
+| Heartbeat interval | 30 seconds | Default cadence for sending lease heartbeats (`jit claim heartbeat`) that keep an indefinite (TTL=0) lease alive. Lease staleness is governed separately: an indefinite lease is marked stale only after the claim staleness threshold (1 hour) elapses without a heartbeat, not after this cadence. Finite leases expire on their own TTL instead (see Claim lease TTL). |
+| Lock acquisition timeout | 5 seconds | Default timeout to acquire a file lock before failing. The `.jit` repository storage lock resolves its timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; all other file locks, including the claim-coordination locks, use this default and do not read the environment variable. |
 | Lock poll interval | 10 milliseconds | Wait between successive attempts while blocking on a contended file lock. |
 | Temp-file cleanup threshold | 3600 seconds | Age at which orphaned `*.tmp` files are swept during startup recovery. |
 | Claim lease TTL | 600 seconds | Default time-to-live for a lease from `jit claim acquire`, and the default extension for `jit claim renew`. |

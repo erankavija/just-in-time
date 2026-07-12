@@ -188,7 +188,10 @@ Agent copilot:worker-1 already has 2 indefinite lease(s) (max: 2).
 Error: Failed to acquire lock - timed out after 5 seconds
 ```
 
-**Cause:** A previous process died while holding a lock.
+**Cause:** A previous process died while holding a lock. The `5 seconds` is the
+default lock-acquisition timeout — see
+[Runtime Coordination Defaults](../reference/runtime-defaults.md), the generated
+source of that value.
 
 **Solution:** Run recovery:
 ```bash

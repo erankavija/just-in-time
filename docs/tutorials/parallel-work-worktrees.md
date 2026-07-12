@@ -114,6 +114,10 @@ You should see:
   TTL: 600 seconds
 ```
 
+The `TTL: 600 seconds` shown is the default claim lease TTL — see
+[Runtime Coordination Defaults](../reference/runtime-defaults.md), the
+generated source of that value.
+
 The claim creates a **lease** that:
 - Is held exclusively — while your lease is active, another agent cannot acquire a lease on the same issue
 - Expires after its TTL (see the [default claim lease TTL](../reference/runtime-defaults.md))

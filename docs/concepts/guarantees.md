@@ -450,6 +450,10 @@ Error: Failed to deserialize data: expected value at line 15 column 3
 find .jit -name '*.tmp' -mmin +60 -delete
 ```
 
+The one-hour age is the default temp-file cleanup threshold — see
+[Runtime Coordination Defaults](../reference/runtime-defaults.md), the
+generated source of that value.
+
 ### Stale Claim Leases
 
 **Scenario:** Agent crashes while holding a claim.

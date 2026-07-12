@@ -144,7 +144,7 @@ docker compose up -d
 |----------|---------|-------------|
 | `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; Docker and Compose explicitly set it to `/data` |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
-| `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds |
+| `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds (the default is the lock-acquisition timeout in [Runtime Coordination Defaults](../reference/runtime-defaults.md)) |
 
 ## Troubleshooting
 
