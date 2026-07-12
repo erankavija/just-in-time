@@ -6755,3 +6755,7 @@
 {"type":"gate_added","id":"af01c4de-24bd-465b-960b-87a6c6608bb5","issue_id":"8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06","timestamp":"2026-07-12T13:38:54.144450390Z","gate_key":"cargo-ci"}
 {"type":"gate_added","id":"a7973feb-7df2-4fc2-a604-4066f2566a5a","issue_id":"af4c901a-c7f2-434e-9abb-0887542d5b7f","timestamp":"2026-07-12T13:39:23.681505419Z","gate_key":"doc-review"}
 {"type":"gate_added","id":"08d6d4cb-a9c7-4367-b7d1-6d7956535e52","issue_id":"af4c901a-c7f2-434e-9abb-0887542d5b7f","timestamp":"2026-07-12T13:39:23.689716125Z","gate_key":"docs-mechanical"}
+{"type":"issue_created","id":"dbe2db30-00c3-454a-8282-7bb1c2b4e3f4","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-12T13:45:16.393136492Z","title":"Unify the machine-readable gate field across command outputs","priority":"normal"}
+{"type":"issue_created","id":"d8c58cf9-7869-4217-abf1-716dfc7917f1","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-12T13:45:43.587261567Z","title":"Detect a jit binary that predates the repository it is validating","priority":"normal"}
+{"type":"issue_updated","id":"3c529b70-5e67-4571-b2ee-7eb469d17af4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-12T13:45:47.769434109Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"6993964c-f36a-4edc-9b12-abb60c0452d9","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-12T13:45:47.809805818Z","updated_by":"dependency-add","fields":["dependencies"]}
