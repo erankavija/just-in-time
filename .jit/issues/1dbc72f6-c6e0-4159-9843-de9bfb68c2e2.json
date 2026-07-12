@@ -31,6 +31,13 @@
       "label": "Owner-approved planning brief",
       "doc_type": "planning",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/7d3a3a47-plan.md",
+      "commit": null,
+      "label": "Approved implementation plan",
+      "doc_type": "design",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -40,6 +47,6 @@
     "type:planning"
   ],
   "created_at": "2026-07-12T21:36:24.520972602Z",
-  "updated_at": "2026-07-12T21:36:41.563242554Z",
+  "updated_at": "2026-07-12T21:52:14.196478973Z",
   "first_ready_at": "2026-07-12T21:36:24.520973112Z"
 }
