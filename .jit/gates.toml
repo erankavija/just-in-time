@@ -84,7 +84,7 @@ pass_context = false
 version = 1
 key = "code-review"
 title = "AI Code Review"
-description = "AI-powered code review against just-in-time project standards"
+description = "Issue-scoped, read-only AI code review using jit:<short-id> commit attribution, latest gate evidence, blocking issue-impact versus advisory pre-existing findings, and mandatory truncation recovery"
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -98,7 +98,7 @@ pass_context = true
 prompt_file = "./scripts/code-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-5.6-terra -c model_reasoning_effort="high"'
 
 [gates.reserved]
 

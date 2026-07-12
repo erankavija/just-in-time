@@ -6761,3 +6761,4 @@
 {"type":"issue_updated","id":"6993964c-f36a-4edc-9b12-abb60c0452d9","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-12T13:45:47.809805818Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"491355d0-3b72-4119-bdf3-226cee2c9757","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:15:24.993013945Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"5a689deb-4867-42ee-bbe5-60aad5d85e8a","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:15:24.993263436Z","assignee":"agent:worker"}
+{"type":"gate_definition_updated","id":"12525f0b-88f9-4ef6-a16c-0dc4e7b97b9f","timestamp":"2026-07-12T17:21:06.750360263Z","gate_key":"code-review"}
