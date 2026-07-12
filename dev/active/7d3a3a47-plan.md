@@ -37,8 +37,9 @@ planning.
   issue-reference changes, and stable machine-readable warnings/blockers. Container traversal
   reuses DAG-authoritative closure, not label membership.
   **Destination layout (D-12):** the destination root is `<archive_root>/` plus, for
-  container targets, `<container.short_id>/`; every moved or copied artifact lands at that
-  root plus its repository-relative source path. Archival takes no category input (D-21):
+  container targets, `<container.id>/` (the full UUID — short-id prefixes can collide
+  across containers, full UUIDs cannot, matching `.jit/issues/<uuid>.json` naming); every
+  moved or copied artifact lands at that root plus its repository-relative source path. Archival takes no category input (D-21):
   the mirror rule alone determines every destination.
   Mirroring repository-relative paths under one common prefix keeps every relative offset
   between bundle members invariant, keeps identical filenames from different directories
@@ -289,16 +290,23 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   with `AlreadyExists` instead of clobbering a destination created after the plan's occupancy
   check — never check-then-`rename`, whose overwrite window the repository write guard cannot
   close against external filesystem writers (D-14). Containment checks resolve paths
-  physically before staging, and the primitive never moves, copies, or deletes through a
-  symbolic link (D-22).
+  physically before staging, the primitive never moves, copies, or deletes through a
+  symbolic link (D-22), and identity verification runs on the opened handle with
+  handle-anchored directory traversal used wherever the platform provides it. The binding
+  concurrency contract is explicit (D-24): REQ-03's guarantee holds under concurrent JIT
+  writers (the guard) and non-adversarial external modification (detected by no-replace
+  finalization and identity-verified deletion); adversarial substitution of path components
+  between check and operation is a documented non-goal, not a silently assumed impossibility.
   Own criteria: `[hard] LOCAL-09: Rejects an occupied destination with the pre-existing file
   preserved byte-for-byte.` `[hard] LOCAL-10: Holds one write guard across staging, reference
   saves, and event append.` `[hard] LOCAL-22: A destination created by an external writer
   between planning and finalization fails that artifact's finalization without overwriting the
   foreign file, verified by a race-focused test.` `[hard] LOCAL-25: Deletes a source or rolls
   back a finalized destination only after re-verifying the file's recorded content identity
-  (hash and size captured at staging); on mismatch the file is left in place and reported for
-  manual cleanup.`
+  (hash and size captured at staging) on the opened handle; on mismatch the file is left in
+  place and reported for manual cleanup.` `[hard] LOCAL-33: Documents and tests the D-24
+  concurrency contract boundary — the non-adversarial detection cases are test-covered, and
+  no code comment, doc, or output claims protection against adversarial path substitution.`
   Blast radius: self-contained new storage API; the legacy command keeps its inline `std::fs`
   path until it is removed.
 
@@ -448,7 +456,7 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | An artifact embedded by an outside document (not directly issue-linked) misclassified as unshared and moved | High | Ownership universe is defined repository-wide over all issue references plus their supported embedded closure (D-13, LOCAL-04); the existing classifier's supplied-map limitation (`assets.rs:189`) is superseded. |
 | Document-target execution on a path with mixed-state owners dangles an active reference | Medium | D-15 fixes eligibility: all direct and embedded-closure owners must be terminal; active owners block execution while preview still reports; zero-owner managed-path documents execute with an informational note (LOCAL-23). |
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination, so the dependency moves or copies; root-relative edges instead force source retention; the classifier never emits an unpreservable layout (LOCAL-24) and execution re-validates every edge (LOCAL-13). |
-| Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). |
+| Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified on the opened handle against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). Adversarial substitution beyond detection is an explicit D-24 non-goal, stated rather than silently assumed away (LOCAL-33). |
 | A partial failure leaves an unrecoverable half-archived state on retry | Medium | D-18: retry recomputes and converges — content-identical destinations count as archived, only remaining mutations apply, no duplicate events; orphaned sources are rediscovered through the inverse D-12 mapping (LOCAL-28); covered by failure-injection retry tests (LOCAL-26). |
 | Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: three-level identity (definition key, adopt-or-mint instance id, execution id) and two event kinds (ArchiveExecuted before deletions, ArchiveSourcesRemoved after) keep the record truthful; nothing-mutated reruns append nothing; crash-window anomalies stay within the established contract (LOCAL-29). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
@@ -500,8 +508,10 @@ Plan-level decisions resolving specification gaps surfaced in review (extend, an
 override, the brief's D-1..D-11):
 
 - **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination root
-  `<archive_root>/` (+ `<container.short_id>/` for container targets), each
-  artifact at root + repository-relative source path, with no category segment (D-21)**. Preserves every relative offset under a
+  `<archive_root>/` (+ `<container.id>/`, the full UUID, for container targets), each
+  artifact at root + repository-relative source path, with no category segment (D-21)**.
+  The full UUID is the container segment because short-id prefixes are not unique across
+  containers, and destination determinism must not depend on the current id population. Preserves every relative offset under a
   common prefix, keeps identical filenames distinct, and makes intra-plan collisions
   structurally impossible. Rejected: stripping the managed prefix per artifact (the current
   single-doc rule, `document.rs:1284-1319`) — artifacts from different managed roots could
@@ -598,6 +608,18 @@ override, the brief's D-1..D-11):
   copies, or deletes through a link**. Rejected: transparent symlink following (relocation
   through a link silently changes what other referents resolve to); rewriting links
   (out-of-scope link mutation). Richer symlink relocation is a follow-up.
+- **D-24 — The concurrency contract is explicit and non-adversarial:** chosen **REQ-03's
+  guarantee binds under concurrent JIT writers (repository write guard) and non-adversarial
+  external modification, which the design detects rather than prevents: no-replace
+  finalization (D-14), identity verification on opened handles before any deletion (D-17),
+  and handle-anchored directory traversal wherever the platform provides it. Adversarial
+  races — substituting a parent path component with a symlink, or replacing a file with
+  same-content different identity between check and operation — are a documented non-goal.**
+  Rejected: claiming immunity to adversarial filesystem racing (unattainable with a
+  path-based repository on a shared filesystem and would overstate REQ-03); global
+  filesystem locking (unavailable against arbitrary external writers). The safety posture
+  matches the epic's contract: referential consistency against accidents, not a security
+  boundary against adversaries.
 - **D-23 — Dynamic-loading detection is an enumerated textual contract:** chosen
   **`<script src>` is a static supported edge; a relocated HTML or script member containing
   a local-path-bearing construct from the binding set — `fetch(`, `import(`,
