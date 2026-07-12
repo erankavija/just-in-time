@@ -6672,3 +6672,10 @@
 {"type":"issue_claimed","id":"dd335375-a0d9-4c3a-93ad-a044949aa7e3","issue_id":"9e0abec5-f81d-4a23-b7a5-4fc9f4b87752","timestamp":"2026-07-12T09:21:16.085197769Z","assignee":"agent:worker"}
 {"type":"issue_state_changed","id":"fd082d7b-57ff-4553-b488-c4a3526e0d92","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T09:21:16.102042871Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"3e2b13bc-a2b2-4ebe-a27c-471af8f7971a","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T09:21:16.102297271Z","assignee":"agent:worker"}
+{"type":"gate_failed","id":"703bfcf7-9d3c-4b94-9d77-2b9f64c983ba","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T10:00:30.053085568Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"8906317e-f177-4b90-b5fc-ce56beb64f11","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T10:03:18.354453833Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"7a94ae6b-c1a6-413b-a0c2-412573632f90","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T10:07:23.247821873Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"928c6580-e036-4ebd-8e46-2cb38bcc1eba","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T11:19:23.236309296Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"01277baa-c858-4285-88c2-8b1c8c66c8d8","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T11:20:37.444741448Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"2d4bdea7-5586-4490-a421-eb51aec93e2c","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T11:20:42.229902018Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"525755c3-50b9-4f26-9c9b-54885cf42f26","issue_id":"6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45","timestamp":"2026-07-12T11:20:42.229938098Z"}

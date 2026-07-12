@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "7085b4cd-adcc-4d40-8b6a-d77215417e9c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45",
+  "commit": "824a4e741c3666f7f5941c1a8ec0fc6878c65545",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T11:19:26.114709029Z",
+  "completed_at": "2026-07-12T11:20:37.442866957Z",
+  "duration_ms": 71328,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01–03 are met. `-d`/`--description` now explains its initial body, verbatim storage, and empty-string default at `crates/jit/src/cli.rs:640-643`; focused rendered-help tests cover the wording at `crates/jit/tests/help_cross_reference_tests.rs:111-127`.\n\n## Architecture, correctness, safety, and error handling\n\nThe changes stay in the CLI and command layers. The validation follow-up correctly resolves ID prefixes through `IssueStore` before loading at `crates/jit/src/commands/validate.rs:949-955` and `:1230-1232`, with focused regression tests at `:2478-2515`. No I/O boundary, invariant, PID-safety, unsafe-code, or error-context issues found.\n\n## Testing and linting\n\nI did not rerun tests because the current-commit `cargo-ci` gate passed: fmt and clippy succeeded; 3,637 tests passed with 0 failures (`.jit/gate-runs/e9006c9b-b8c5-4e89-a28b-b5d34d0dd8a9/result.json:9-15`). `./scripts/jit-validate.sh 6ad894cb` also passes. The completed prerequisite is done.\n\n## CLI contract and documentation\n\nThe option documentation accurately reflects the value forwarded unchanged from CLI to command creation (`crates/jit/src/main.rs:1713-1722`, `crates/jit/src/commands/issue.rs:139-143`). No new public APIs were introduced.\n\n## Prior review feedback\n\nBoth prior findings are resolved: current `cargo-ci` evidence passes, and short-ID validation now succeeds.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; prior gate and validation findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; prior gate and validation findings are resolved.",
+    "findings": []
+  }
+}

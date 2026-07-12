@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "75642c5f-36a2-443e-ad74-e4e8ac383e8e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "6ad894cb-4c9c-4db4-b3de-0e76ff8c8c45",
+  "commit": "d98db0577e3c2f71615e40c7823f9ccb5299725d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T10:00:36.162317500Z",
+  "completed_at": "2026-07-12T10:03:18.224559908Z",
+  "duration_ms": 162062,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nThe rendered `jit issue create --help` meets REQ-01 and REQ-02: [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:640) describes the initial description/body, verbatim storage, and empty-string default. Focused coverage was added at [help_cross_reference_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/help_cross_reference_tests.rs:111), satisfying REQ-03 subject to CI verification.\n\n## Architecture and functional style\n\nThe change is confined to the CLI definition and CLI-level integration tests. No layering, I/O, safety, error-handling, PID, or public-API documentation issues were introduced.\n\n## Testing and linting\n\nThe cargo-ci gate did not complete successfully; it timed out after 900 seconds with no exit code. Therefore fmt, clippy, and test success are not established.\n\n## JIT issue management\n\nThe sole prerequisite is done. There is no prior review feedback. Required `./scripts/jit-validate.sh 6ad894cb` currently fails with exit code 3 because `jit validate` cannot locate the issue.\n\n## Documentation\n\nThe new option documentation accurately matches the observed CLI behavior.\n\n1. **F1 — High:** The required `cargo-ci` gate is failed because its run ended in `error` after the configured 900-second timeout; no passing fmt, clippy, or test evidence exists for this change. [result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/1ac5ce9d-0533-4ede-8cce-a81be8eab9d7/result.json:9)\n\n2. **F2 — High:** `./scripts/jit-validate.sh 6ad894cb` fails with exit code 3: `Issue 6ad894cb not found in local storage, git, or main worktree`. The required JIT validation check therefore does not pass. [jit-validate.sh](/home/vkaskivuo/Projects/just-in-time/scripts/jit-validate.sh:2)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The help-text implementation is correct, but cargo-ci timed out and required JIT validation fails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The required cargo-ci gate ended in error after its 900-second timeout, so fmt, clippy, and tests lack passing evidence.\",\"file\":\".jit/gate-runs/1ac5ce9d-0533-4ede-8cce-a81be8eab9d7/result.json\",\"line\":9},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"scripts/jit-validate.sh 6ad894cb exits 3 because jit validate cannot locate the issue.\",\"file\":\"scripts/jit-validate.sh\",\"line\":2}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1886 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f55c5-8a0b-75b0-ac8f-6f6ce76e16a0\n--------\nuser\n--- 1873 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The help-text implementation is correct, but cargo-ci timed out and required JIT validation fails.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The required cargo-ci gate ended in error after its 900-second timeout, so fmt, clippy, and tests lack passing evidence.",
+        "file": ".jit/gate-runs/1ac5ce9d-0533-4ede-8cce-a81be8eab9d7/result.json",
+        "line": 9
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "scripts/jit-validate.sh 6ad894cb exits 3 because jit validate cannot locate the issue.",
+        "file": "scripts/jit-validate.sh",
+        "line": 2
+      }
+    ]
+  }
+}
