@@ -17,7 +17,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/b4e55aa2-ground-code-review-policy.md",
+      "commit": null,
+      "label": "Policy-grounded code review design",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:core-maintenance",
     "milestone:v1.0",
@@ -30,6 +38,6 @@
     "story:policy-grounded-review"
   ],
   "created_at": "2026-07-12T19:11:54.679863159Z",
-  "updated_at": "2026-07-12T19:12:33.307157938Z",
+  "updated_at": "2026-07-12T19:15:11.562881638Z",
   "first_ready_at": "2026-07-12T19:11:54.679869049Z"
 }

@@ -6791,3 +6791,4 @@
 {"type":"issue_updated","id":"68e27739-ae78-4156-9c9d-2887c3df96f9","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-12T19:12:11.510927458Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"dependency_reduced","id":"a6a3562b-3f0d-433d-83a1-7762cbe5fa5c","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-12T19:12:11.516106262Z","old_count":28,"new_count":27,"removed_deps":["76cb968b-8c8b-46e2-8dfb-ad54c32aa284"]}
 {"type":"issue_updated","id":"3818ab6b-0f34-4eb3-9ab2-d79494a1d933","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:12:33.307391958Z","updated_by":"issue-update","fields":["labels"]}
+{"type":"issue_updated","id":"399036d0-dd8b-459c-b1e3-5ffca3b55b19","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:15:11.563174428Z","updated_by":"doc-add","fields":["documents"]}
