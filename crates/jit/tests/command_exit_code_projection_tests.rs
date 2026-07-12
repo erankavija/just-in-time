@@ -763,9 +763,9 @@ fn test_command_exit_codes_every_row_is_verified() {
     let verified: std::collections::HashSet<(String, Option<i32>)> = [
         // Pinned by the `main.rs` classifier test (typed error -> row).
         ("*", Some(1)),
-        ("*", Some(4)),
         ("*", Some(5)),
         ("*", Some(10)),
+        ("any command that writes an issue", Some(4)),
         ("issue batch-create", Some(10)),
         ("gate evaluate, gate evaluate-all", Some(4)),
         ("gate evaluate, gate evaluate-all", Some(10)),

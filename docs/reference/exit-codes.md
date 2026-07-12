@@ -27,9 +27,9 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `1` | No typed classifier matched the failure (generic error). |  |
 | `*` | `2` | Invalid arguments or usage error, including an unresolvable, ambiguous, or too-short id prefix. |  |
 | `*` | `3` | A referenced issue, gate, gate-run, preset, lease, repository, or file path was not found. |  |
-| `*` | `4` | An enforcing validation rule rejected the write (the shared write path blocks on rule findings). |  |
 | `*` | `5` | A filesystem operation was denied. |  |
 | `*` | `10` | The repository's on-disk format is newer than this binary, or a filesystem/subprocess I/O operation failed. |  |
+| `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
 | `gate define` | `6` | The gate key is already registered. |  |

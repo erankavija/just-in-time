@@ -737,13 +737,6 @@ impl CommandSchema {
                  or file path was not found.",
                 false,
             ),
-            row(
-                "*",
-                4,
-                "An enforcing validation rule rejected the write (the shared \
-                 write path blocks on rule findings).",
-                false,
-            ),
             row("*", 5, "A filesystem operation was denied.", false),
             row(
                 "*",
@@ -753,6 +746,13 @@ impl CommandSchema {
                 false,
             ),
             // Command-family classification (standard taxonomy meaning).
+            row(
+                "any command that writes an issue",
+                4,
+                "An enforcing validation rule rejected the write (the shared \
+                 write-validation path blocks on rule findings).",
+                false,
+            ),
             row(
                 "dep add",
                 4,

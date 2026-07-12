@@ -7293,11 +7293,13 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (IoError::new(ErrorKind::NotFound, "missing").into(), 3, "*"),
-            // The shared write path rejects a blocking rule finding with this type.
+            // `validate_for_write` is the shared write-validation path, so every
+            // command that writes an issue — and only those — can reject a
+            // blocking rule finding with this type.
             (
                 jit::errors::ValidationFailedError::new("bad").into(),
                 4,
-                "*",
+                "any command that writes an issue",
             ),
             (
                 IoError::new(ErrorKind::PermissionDenied, "denied").into(),
