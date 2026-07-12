@@ -832,6 +832,20 @@ impl CommandSchema {
                 true,
             ),
             row(
+                "validate --branch-drift",
+                1,
+                "Branch-drift validation failed: the check reported drift from \
+                 the upstream branch or could not run.",
+                true,
+            ),
+            row(
+                "validate --leases",
+                1,
+                "Lease validation found one or more invalid leases, or the lease \
+                 check could not run.",
+                true,
+            ),
+            row(
                 "gate status-all",
                 4,
                 "One or more required gates have not passed.",

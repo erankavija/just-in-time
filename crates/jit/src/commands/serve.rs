@@ -118,6 +118,30 @@ pub enum StopOutcome {
 /// let path = pid_file_path(Path::new("/repo/.jit"));
 /// assert_eq!(path.file_name().unwrap(), "server.pid.json");
 /// ```
+/// The exit code `jit serve --fg` reports for a foreground `jit-server` child
+/// that exited unsuccessfully.
+///
+/// Foreground mode passes the child's own exit status straight through, so the
+/// caller sees exactly what `jit-server` returned. A child terminated by a
+/// signal carries no code; it is reported as `1`. This is the single decision
+/// the `serve --fg` dispatch uses, so the exit-code projection for that row and
+/// the runtime behaviour cannot drift apart.
+///
+/// # Examples
+///
+/// ```
+/// use jit::commands::serve::foreground_exit_code;
+///
+/// // The child's own code is passed through verbatim.
+/// assert_eq!(foreground_exit_code(Some(3)), 3);
+/// assert_eq!(foreground_exit_code(Some(101)), 101);
+/// // A signal-terminated child reports no code, so `1` stands in.
+/// assert_eq!(foreground_exit_code(None), 1);
+/// ```
+pub fn foreground_exit_code(child_code: Option<i32>) -> i32 {
+    child_code.unwrap_or(1)
+}
+
 pub fn pid_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("server.pid.json")
 }

@@ -42,6 +42,8 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate evaluate, gate evaluate-all` | `10` | A checker could not run to a verdict (timeout, crash, or command not found). | yes |
 | `validate` | `4` | Repository-integrity, scope, or drift validation found error-severity findings. | yes |
 | `validate` | `1` | Rule evaluation reported error-severity findings. | yes |
+| `validate --branch-drift` | `1` | Branch-drift validation failed: the check reported drift from the upstream branch or could not run. | yes |
+| `validate --leases` | `1` | Lease validation found one or more invalid leases, or the lease check could not run. | yes |
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `config validate` | `1` | The repo, user, or environment-variable configuration failed to load or carried an invalid value. | yes |

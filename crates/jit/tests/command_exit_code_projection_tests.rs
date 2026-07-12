@@ -4,12 +4,15 @@
 //! Findings-signal and pass-through rows are emitted by direct
 //! `std::process::exit` sites, so they are observed by running the binary. The
 //! two gate-evaluation exception rows route through `error_to_exit_code` and are
-//! pinned by the classifier unit test in `main.rs` (`exit_code_projection_tests`);
-//! `serve --fg` and the reserved `config validate` `2` carry no observable fixed
-//! code and are asserted structurally against their cited source sites.
+//! pinned by the classifier unit test in `main.rs` (`exit_code_projection_tests`).
+//! `serve --fg` has no fixed code to observe, so it is verified against the
+//! production function its dispatch calls (`serve::foreground_exit_code`); the
+//! reserved `config validate` `2` is unreachable by construction (the handler
+//! defines no warning condition) and is asserted to be documented as reserved.
 //! `test_command_exit_codes_every_exception_row_is_verified` keeps the set
 //! complete: adding an exception row without a binding fails the build.
 
+use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
 use std::fs;
 use std::process::Command;
@@ -333,13 +336,73 @@ fn test_command_exit_codes_serve_daemon_error_emits_1() {
 }
 
 /// `jit serve --fg` passes the inline dev-server child's own exit code through,
-/// so the projection models it as a pass-through (`code: None`). Spawning a real
-/// server here is impractical; the runtime site is `crates/jit/src/main.rs`
-/// (`std::process::exit(status.code().unwrap_or(1))`), which carries no fixed
-/// code to observe, so this row is asserted structurally.
+/// so the projection models it as a pass-through (`code: None`).
+///
+/// The mapping is owned by `serve::foreground_exit_code`, which the `serve --fg`
+/// dispatch in `crates/jit/src/main.rs` calls to compute the code it exits with.
+/// Exercising that production function verifies the documented pass-through
+/// against the runtime path: the child's code is returned verbatim, and a
+/// signal-terminated child (no code) reports `1`.
 #[test]
 fn test_command_exit_codes_serve_foreground_is_passthrough() {
     documented_row("serve --fg", None, true);
+
+    for child_code in [0, 1, 2, 3, 4, 10, 101, 127] {
+        assert_eq!(
+            foreground_exit_code(Some(child_code)),
+            child_code,
+            "serve --fg must pass the child's exit code {child_code} through verbatim"
+        );
+    }
+    assert_eq!(
+        foreground_exit_code(None),
+        1,
+        "a signal-terminated child carries no code, so serve --fg reports 1"
+    );
+}
+
+/// `jit validate --branch-drift` exits 1 when the drift check reports drift or
+/// cannot run, matching the projected `validate --branch-drift` row.
+#[test]
+fn test_command_exit_codes_validate_branch_drift_emits_1() {
+    let temp = setup();
+    // No git upstream here, so the branch-drift check cannot succeed.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["validate", "--branch-drift"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "validate --branch-drift must exit 1 when the check fails; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("validate --branch-drift", Some(1), true);
+}
+
+/// `jit validate --leases` exits 1 when lease validation finds invalid leases or
+/// cannot run, matching the projected `validate --leases` row.
+#[test]
+fn test_command_exit_codes_validate_leases_emits_1() {
+    let temp = setup();
+    // Corrupt the claims index so lease validation cannot produce a clean result.
+    let shared = temp.path().join(".git/jit");
+    fs::create_dir_all(&shared).unwrap();
+    fs::write(shared.join("claims.index.json"), "not json").unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["validate", "--leases"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "validate --leases must exit 1 when lease validation fails; stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("validate --leases", Some(1), true);
 }
 
 /// Guard: every exception row in the projection must be covered by a binding in
@@ -354,6 +417,8 @@ fn test_command_exit_codes_every_exception_row_is_verified() {
         // Pinned by the subprocess tests above.
         ("validate", Some(4)),
         ("validate", Some(1)),
+        ("validate --branch-drift", Some(1)),
+        ("validate --leases", Some(1)),
         ("gate status-all", Some(4)),
         ("invariant check", Some(4)),
         ("config validate", Some(1)),

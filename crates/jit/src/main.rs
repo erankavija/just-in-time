@@ -6526,7 +6526,9 @@ fn run() -> Result<()> {
                         );
                     }
                     if !status.success() {
-                        std::process::exit(status.code().unwrap_or(1));
+                        std::process::exit(jit::commands::serve::foreground_exit_code(
+                            status.code(),
+                        ));
                     }
                 } else {
                     // Daemonize via start_server.

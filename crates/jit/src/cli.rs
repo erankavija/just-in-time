@@ -2457,10 +2457,12 @@ pub enum ConfigCommands {
     /// - Deprecated options
     /// - Missing required fields
     ///
-    /// Exit codes:
+    /// Exit codes (see docs/reference/exit-codes.md, the generated reference):
     ///   0 - Valid configuration
     ///   1 - Errors found (invalid configuration)
-    ///   2 - Warnings only (valid but may cause issues)
+    ///
+    /// The handler also carries a 2 (warnings-only) branch, but it defines no
+    /// warning condition, so 2 is never emitted.
     Validate {
         #[arg(long)]
         json: bool,
