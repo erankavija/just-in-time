@@ -74,8 +74,10 @@ planning.
     destination root, and the sorted canonical source-path set, where an
     already-archived artifact contributes its inverse-mapped original source — invariant
     across retries of one operation yet distinct for a later operation over a different
-    artifact set; D-19), `execution_id` (fresh UUID per mutating execution, distinguishing
-    every invocation including re-runs of an identical operation; D-19), `plan_fingerprint`
+    artifact set; D-19), `execution_id` (fresh UUID minted only when a mutating execution
+    begins and recorded in its event and `--execute` output; **null in every non-mutating
+    envelope** — previews and candidate reports, which execute nothing; D-19),
+    `plan_fingerprint`
     (hash of the canonical plan serialization excluding volatile fields — staleness detection
     for D-7 revalidation, expected to change as repository state changes), `eligible` (bool),
     `policy_status` (`configured`|`unconfigured`), `counts` (one integer per action plus
@@ -95,13 +97,18 @@ planning.
     `non-terminal-target`, `stale-plan`, `missing-source`, `symlink-artifact`.
   - **Warning codes:** `missing-edge-target`, `external-edge`, `no-owner`,
     `residue-source`, `deletion-failed`, `not-selected-sibling`.
-  - **Missing-artifact semantics:** an explicit root whose source path does not exist gets
-    action `block` with blocker `missing-source` — the dangling issue reference must be
-    resolved (or the reference removed) before the operation executes, never silently
-    entrenched or skipped. A missing **embedded** target gets warning `missing-edge-target`
-    on the referencing artifact: it contributes no needs-destination constraint, is excluded
-    from before/after edge validation (the edge resolves nowhere before archival, so no
-    regression is possible), and never blocks.
+  - **Missing-artifact semantics (evaluation order is normative):** each explicit root is
+    evaluated in this order. (1) **Already-archived recognition:** a reference whose path
+    resolves under the destination root, or whose stated source path maps through the D-12
+    mirror to existing content, classifies `already_archived` — so a root moved by a prior
+    partial execution can never read as missing on retry, and cleanup of its residues
+    proceeds. (2) **`missing-source`:** only a root absent at both its stated location and
+    its mirror image blocks — a genuinely dangling issue reference that must be resolved (or
+    removed) before the operation executes, never silently entrenched or skipped. A missing
+    **embedded** target gets warning `missing-edge-target` on the referencing artifact: it
+    contributes no needs-destination constraint, is excluded from before/after edge
+    validation (the edge resolves nowhere before archival, so no regression is possible),
+    and never blocks.
   - **Candidate evaluation context:** `jit archive candidates` produces the same envelope
     per candidate with every check evaluated — archival takes no category input (D-21), so
     destinations are always computable and nothing is deferred or guessed.
@@ -314,16 +321,22 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   the post-commit deletion-failure case: for every already-archived artifact, recomputation
   derives the original source path from the destination, and a still-existing, content-identical
   source (`residue-source` warning) is completed as an identity-verified deletion (D-17) even
-  though no reference points at it anymore. Every mutating execution appends one archive event
-  recording the operation id — the retry-stable hash of target, destination root, and
-  the sorted canonical source set (already-archived artifacts contribute their inverse-mapped
-  original sources, so the set is invariant across retries) — a fresh per-execution
-  `execution_id`, the executed plan's fingerprint, and the mutations actually performed (D-19).
-  A rerun recomputes state, so its fingerprint differs, but its operation id does not; a later
-  independent archival over a different artifact set hashes to a different operation id, and
-  re-runs of an identical operation are distinguished by execution id and log order. A
-  crash-window duplicate for one operation remains possible and correlates by operation id,
-  preserving the existing reported-duplicate contract (`document.rs:1050-1074`).
+  though no reference points at it anymore. Event content respects the deletion-last
+  principle: each mutating execution appends one archive event — after finalization and
+  reference relinks, before source deletion — recording the operation id, its fresh
+  `execution_id`, the executed plan's fingerprint, the **completed** finalization and relink
+  mutations, and the **planned** source deletions. Deletions then run; any that fail surface
+  as `residue-source`, and a later run that removes residues is itself a mutating execution
+  whose event records those deletions as completed mutations. A rerun that mutates nothing
+  appends nothing. The operation id is an **operation-definition key** (hash of target,
+  destination root, and sorted canonical source set — already-archived artifacts contribute
+  their inverse-mapped original sources, so it is invariant across retries): events sharing
+  it describe executions of the same operation by definition, retries share it by
+  construction, and **instances are separated by execution ids and log order**, not by the
+  key — a later independent re-archival of the identical set is the same definition
+  re-instantiated, distinguishable temporally. A crash-window duplicate remains possible and
+  is exactly the reported-duplicate case the established contract tolerates
+  (`document.rs:1050-1074`).
   Own criteria: `[hard] LOCAL-13: Validates each staged local edge in the proposed layout, not
   against source-resolved paths, before commit.` `[hard] LOCAL-23: Refuses document-target
   execution while any owner of the document or its bundle artifacts is non-terminal.`
@@ -333,10 +346,11 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   remaining mutations complete — verified by failure-injection retry tests.` `[hard] LOCAL-28: After a post-commit deletion
   failure, a rerun rediscovers the orphaned source through the inverse destination mapping and
   completes its identity-verified removal.` `[hard] LOCAL-29: Each mutating execution appends
-  one archive event carrying the retry-stable operation id, a unique execution id, the
-  executed plan's fingerprint, and the performed mutations; a rerun that mutates nothing
-  appends no event; events of one operation correlate by operation id across retries while
-  distinct operations over different artifact sets never share one.` `[hard] LOCAL-14: A partial-relink, event-append,
+  one archive event — after relinks, before deletions — carrying the retry-stable
+  operation-definition key, a unique execution id, the executed plan's fingerprint, its
+  completed finalization/relink mutations, and its planned deletions; a residue-cleaning
+  rerun records its deletions as completed mutations in its own event; a rerun that mutates
+  nothing appends no event; operations over different artifact sets never share a key.` `[hard] LOCAL-14: A partial-relink, event-append,
   or deletion failure leaves no artifact lost, no destination overwritten, and no reference
   relying solely on a missing path.` `[hard] LOCAL-15: Refuses execution on a non-terminal
   container and on a stale recomputed plan.`
@@ -419,7 +433,7 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination, so the dependency moves or copies; root-relative edges instead force source retention; the classifier never emits an unpreservable layout (LOCAL-24) and execution re-validates every edge (LOCAL-13). |
 | Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). |
 | A partial failure leaves an unrecoverable half-archived state on retry | Medium | D-18: retry recomputes and converges — content-identical destinations count as archived, only remaining mutations apply, no duplicate events; orphaned sources are rediscovered through the inverse D-12 mapping (LOCAL-28); covered by failure-injection retry tests (LOCAL-26). |
-| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the retry-stable operation id (target, destination root, canonical source set) plus a unique execution id; nothing-mutated reruns append nothing; crash-window duplicates correlate by operation id (LOCAL-29). |
+| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the operation-definition key plus a unique execution id, recording completed relinks and planned deletions; nothing-mutated reruns append nothing; instances separate by execution id and log order; crash-window duplicates correlate by the key (LOCAL-29). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
 | Event granularity for a multi-artifact action undefined | Low | Executor emits a container/plan-scoped archive event carrying artifact and reference detail; current single event cannot audit a multi-artifact action (`types.rs:1466`). Decided in the execution task. |
 
@@ -521,11 +535,15 @@ override, the brief's D-1..D-11):
   even though no reference points at it any longer.
 - **D-19 — Two identities: retry-stable operation id, state-dependent plan fingerprint:**
   chosen **`operation_id` = hash of (target, destination root, sorted canonical source-path
-  set — already-archived artifacts contribute their inverse-mapped original sources), plus a
-  fresh per-execution `execution_id` UUID; the operation id is invariant across retries of
-  one operation, distinct for later operations over different artifact sets, and the
-  correlation key for every event of one archival operation, while execution ids and log
-  order separate re-runs of an identical operation;
+  set — already-archived artifacts contribute their inverse-mapped original sources): an
+  **operation-definition key**, invariant across retries and distinct for operations over
+  different artifact sets, that makes no instance-identity claim — a later independent
+  re-archival of the identical set shares the key and is separated by the fresh
+  per-mutating-execution `execution_id` UUID and log order (an intervening converged state
+  in the log marks the instance boundary). `execution_id` is null in every non-mutating
+  envelope. Events append after relinks and before deletions, so each records its completed
+  finalization/relink mutations plus planned deletions, and residue-cleaning reruns record
+  their deletions in their own events;
   `plan_fingerprint` = hash of the canonical plan serialization excluding volatile fields,
   used only for D-7 staleness detection and expected to change whenever repository state
   changes**. Every mutating execution appends one archive event recording both plus the
