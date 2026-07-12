@@ -183,10 +183,9 @@ lists every tag, its scope, and which tags omit `issue_id`.
 
 ### Event Types
 
-The event vocabulary is defined by the
-[`Event` enum](../../crates/jit/src/domain/types.rs), whose serde declaration
-uses a snake-case `type` tag. Consult that source for the current variants;
-this reference intentionally does not duplicate the list.
+The [Event Log Tags reference](events.md) is the authoritative catalog of the tag
+vocabulary: it is generated from the event type, and lists every tag with its
+scope and whether its records carry an `issue_id`.
 
 Fields beyond `id` and `timestamp` vary by type.
 
