@@ -35,8 +35,6 @@ fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
     for required in [
         "latest recorded status and exit code",
         "newer successful run supersedes older failures",
-        "in-flight verdict supersedes its prior projection",
-        "do not block solely because",
         "issue-impact",
         "blocking",
         "pre-existing",

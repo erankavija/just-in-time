@@ -27,8 +27,6 @@ Treat each required gate's latest recorded status and exit code in `context.issu
 
 Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists. A currently pending, failed, or errored required CI/validation gate must be reported according to its latest projection.
 
-The current `code-review` gate is not CI evidence. Its in-flight verdict supersedes its prior projection, so do not block solely because `context.issue.gates` reports `code-review` as pending or failed. Use `run_history` to verify that prior blocking findings were addressed; the current verdict becomes the new projection after the checker exits.
-
 If `run_history` is non-empty, use its one latest run: structured findings, verdict, and metadata are authoritative; stdout exists only as a compatibility fallback for an unstructured legacy run. Verify that prior blocking findings have been addressed.
 
 ## Finding and verdict policy
