@@ -69,27 +69,38 @@ planning.
 - **Archive-plan JSON schema and blocker taxonomy (binding for the plan-model task):**
   - **Envelope:** `schema_version` (starts at 1; codes are append-only and never change
     meaning), `target` (`{"kind": "container"|"document", "id"|"path": …}`), `category`,
-    `destination_root`, `plan_fingerprint` (hash of the canonical plan serialization
-    excluding volatile fields — the operation identity for D-19), `eligible` (bool),
+    `destination_root`, `operation_id` (hash of the stable operation identity — target,
+    category, destination root — invariant across retries; D-19), `plan_fingerprint` (hash of
+    the canonical plan serialization excluding volatile fields — staleness detection for D-7
+    revalidation, expected to change as repository state changes), `eligible` (bool),
     `policy_status` (`configured`|`unconfigured`), `counts` (one integer per action plus
     `already_archived`), `artifact_count` + `artifacts` (the repository list-envelope
     convention; entries deterministically ordered by normalized source path), and plan-level
     `blockers`/`warnings` (each sorted by code, then path).
   - **Artifact entry:** `source`, `destination` (null when retained), `action`
     (`move|copy|retain|block`), `already_archived` (bool), `provenance`
-    (`explicit|embedded`), `format`, `owners` (issue id, state, `inside_subtree`, `pinned`),
+    (a flag set — `["explicit"]`, `["embedded"]`, or both when an artifact is issue-linked
+    and embedded), `format`, `owners` (issue id, state, `inside_subtree`, `pinned`),
     `edges` (`supported` / `unsupported` / `external`, each with resolution mode),
     `reference_changes` (issue, from-path, to-path), and per-artifact `evidence`,
     `blockers`, `warnings`.
   - **Blocker codes (stable kebab-case):** `policy-unconfigured`, `unmanaged-path`,
     `permanent-path`, `destination-conflict`, `outside-owner-conflict`, `active-owner`,
     `unsupported-dynamic-edge`, `repository-escape`, `unresolvable-edge`,
-    `non-terminal-target`, `stale-plan`.
+    `non-terminal-target`, `stale-plan`, `missing-source`.
   - **Warning codes:** `missing-edge-target`, `external-edge`, `no-owner`,
-    `residue-source`, `deletion-failed`, `not-selected-sibling`. The command layer loads inputs,
+    `residue-source`, `deletion-failed`, `not-selected-sibling`.
+  - **Missing-artifact semantics:** an explicit root whose source path does not exist gets
+    action `block` with blocker `missing-source` — the dangling issue reference must be
+    resolved (or the reference removed) before the operation executes, never silently
+    entrenched or skipped. A missing **embedded** target gets warning `missing-edge-target`
+    on the referencing artifact: it contributes no needs-destination constraint, is excluded
+    from before/after edge validation (the edge resolves nowhere before archival, so no
+    regression is possible), and never blocks. The command layer loads inputs,
   calls the pure planner, renders preview, and executes an accepted plan; it does not
   duplicate decision logic between preview and execution. A storage-owned artifact mutation
-  primitive centralizes staging, containment, atomic rename, and collision semantics so the
+  primitive centralizes staging, containment, no-replace finalization (D-14), and collision
+  semantics so the
   command layer stops issuing raw `std::fs` calls (`document.rs:1637-1787`). Candidates,
   preview, and execution are all consumers of the one plan model (formal-planning obligation 5).
 
@@ -159,7 +170,8 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 - **Artifact plan model and blocker taxonomy**  `type: task`  `satisfies: REQ-01`  `depends-on: —`
   Outcome: a serializable artifact-plan type implementing the §2 archive-plan JSON schema and
   blocker/warning taxonomy verbatim (envelope, artifact entry, and code sets are binding),
-  emitted as a deterministically ordered JSON envelope carrying the plan fingerprint.
+  emitted as a deterministically ordered JSON envelope carrying the operation id and plan
+  fingerprint.
   Own criteria: `[hard] LOCAL-01: Serializes a plan with stable artifact and blocker ordering
   independent of input order.` `[hard] LOCAL-02: The same plan object is the input to both
   preview rendering and execution.`
@@ -220,7 +232,8 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 
 - **Storage-owned artifact mutation primitive**  `type: task`  `satisfies: REQ-03`  `depends-on: Artifact plan model and blocker taxonomy`
   Outcome: a reusable storage primitive that stages a full artifact set to temp, finalizes by
-  atomic rename, relinks references, and deletes sources last, holding the re-entrant repository
+  atomic no-replace finalization (hard-link-then-unlink, D-14), relinks references, and deletes
+  sources last, holding the re-entrant repository
   write guard across the sequence and centralizing containment, atomic-write, and collision
   semantics, testable through tempdir-backed storage (the in-memory backend performs no virtual
   file I/O, so filesystem assertions run against `JsonFileStorage` at a tempdir).
@@ -275,9 +288,11 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   derives the original source path from the destination, and a still-existing, content-identical
   source (`residue-source` warning) is completed as an identity-verified deletion (D-17) even
   though no reference points at it anymore. Every mutating execution appends one archive event
-  recording the plan fingerprint and the mutations actually performed (D-19); duplicates are
-  possible only across a crash window and correlate by fingerprint, preserving the existing
-  reported-duplicate contract (`document.rs:1050-1074`).
+  recording the operation id — the retry-stable hash of target, category, and destination root —
+  alongside the executed plan's fingerprint and the mutations actually performed (D-19). A rerun
+  recomputes state, so its fingerprint differs, but its operation id does not: events of one
+  archival operation, including a crash-window duplicate, correlate by operation id, preserving
+  the existing reported-duplicate contract (`document.rs:1050-1074`).
   Own criteria: `[hard] LOCAL-13: Validates each staged local edge in the proposed layout, not
   against source-resolved paths, before commit.` `[hard] LOCAL-23: Refuses document-target
   execution while any owner of the document or its bundle artifacts is non-terminal.`
@@ -287,8 +302,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   verified by failure-injection retry tests.` `[hard] LOCAL-28: After a post-commit deletion
   failure, a rerun rediscovers the orphaned source through the inverse destination mapping and
   completes its identity-verified removal.` `[hard] LOCAL-29: Each mutating execution appends
-  one archive event carrying the plan fingerprint and the performed mutations; a rerun that
-  mutates nothing appends no event.` `[hard] LOCAL-14: A partial-relink, event-append,
+  one archive event carrying the retry-stable operation id, the executed plan's fingerprint,
+  and the performed mutations; a rerun that mutates nothing appends no event; events of one
+  operation correlate by operation id across retries.` `[hard] LOCAL-14: A partial-relink, event-append,
   or deletion failure leaves no artifact lost, no destination overwritten, and no reference
   relying solely on a missing path.` `[hard] LOCAL-15: Refuses execution on a non-terminal
   container and on a stale recomputed plan.`
@@ -316,12 +332,21 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   documentation-policy status, managed/permanent path status, repository-wide artifact ownership,
   artifact counts, outside-subtree/active/pinned/missing/unsupported/conflict blockers, a
   move/copy/retain summary, and a derivable suggested category, in both human and JSON form, with
-  no filesystem, issue, or event mutation and no age or retention filtering.
+  no filesystem, issue, or event mutation and no age or retention filtering. Category handling is
+  deterministic (D-21): per candidate, the suggested category is the unique `[documentation]`
+  category that every explicit root's `doc_type` maps to; when the mapping is absent or not
+  unique, the suggestion is null and destination-dependent checks (destination conflicts,
+  proposed layouts) are reported as `not-evaluated` rather than guessed. An optional
+  `--type <category>` argument evaluates every candidate fully against that category; explicit
+  selection always remains the execution-time contract (D-4).
   Own criteria: `[hard] LOCAL-17: Lists terminal containers with policy status, ownership, counts,
   and blockers, explaining exclusions rather than omitting them.` `[hard] LOCAL-18: Emits identical
   human and JSON results while mutating nothing, and applies no time/retention filter.`
   `[hard] LOCAL-30: Derives candidate container-ness from the configured type hierarchy's
   non-leaf levels and DAG-authoritative membership, with no hardcoded type names.`
+  `[hard] LOCAL-31: Suggests a category only when every explicit root's doc_type maps to one
+  unique configured category; otherwise reports a null suggestion with destination-dependent
+  checks marked not-evaluated, and accepts an explicit category argument for full evaluation.`
   Blast radius: self-contained new read-only command consuming Group A.
 
 **Coverage map** (single source for criterion→item; every `[hard]` criterion → ≥1 item):
@@ -365,7 +390,7 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination, so the dependency moves or copies; root-relative edges instead force source retention; the classifier never emits an unpreservable layout (LOCAL-24) and execution re-validates every edge (LOCAL-13). |
 | Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). |
 | A partial failure leaves an unrecoverable half-archived state on retry | Medium | D-18: retry recomputes and converges — content-identical destinations count as archived, only remaining mutations apply, no duplicate events; orphaned sources are rediscovered through the inverse D-12 mapping (LOCAL-28); covered by failure-injection retry tests (LOCAL-26). |
-| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the plan fingerprint and performed mutations; nothing-mutated reruns append nothing; crash-window duplicates correlate by fingerprint (LOCAL-29). |
+| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the retry-stable operation id (target, category, destination root) and performed mutations; nothing-mutated reruns append nothing; crash-window duplicates correlate by operation id (LOCAL-29). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
 | Event granularity for a multi-artifact action undefined | Low | Executor emits a container/plan-scoped archive event carrying artifact and reference detail; current single event cannot audit a multi-artifact action (`types.rs:1466`). Decided in the execution task. |
 
@@ -463,22 +488,32 @@ override, the brief's D-1..D-11):
   source path of every already-archived artifact, so an orphaned source left by a
   post-commit deletion failure is rediscovered and removed under D-17 identity verification
   even though no reference points at it any longer.
-- **D-19 — Operation identity is the plan fingerprint:** chosen **hash the canonical plan
-  serialization (excluding volatile fields) into `plan_fingerprint`; every mutating
-  execution appends one archive event recording the fingerprint and the mutations actually
-  performed; a rerun that mutates nothing appends nothing; duplicates are possible only
-  across a crash window and correlate by fingerprint**. This keeps the established
-  referential-consistency contract, which already tolerates a reported duplicate
-  (`document.rs:1050-1074`), while making every event attributable to one operation.
-  Rejected: literal exactly-once event semantics (unachievable across a crash between
-  mutation and the append-only event write); per-artifact events without an operation id
-  (cannot audit a multi-artifact action).
+- **D-19 — Two identities: retry-stable operation id, state-dependent plan fingerprint:**
+  chosen **`operation_id` = hash of (target, category, destination root), invariant across
+  retries and the correlation key for every event of one archival operation;
+  `plan_fingerprint` = hash of the canonical plan serialization excluding volatile fields,
+  used only for D-7 staleness detection and expected to change whenever repository state
+  changes**. Every mutating execution appends one archive event recording both plus the
+  mutations actually performed; a rerun that mutates nothing appends nothing; a crash-window
+  duplicate for one operation id remains possible and is exactly the reported-duplicate case
+  the established referential-consistency contract already tolerates
+  (`document.rs:1050-1074`). Rejected: the plan fingerprint as retry identity (recomputation
+  changes it, so retries would not correlate); literal exactly-once event semantics
+  (unachievable across a crash between mutation and the append-only event write);
+  per-artifact events without an operation id (cannot audit a multi-artifact action).
 - **D-20 — Container-ness derives from the type hierarchy:** chosen **a candidate container
   is a terminal issue whose configured type sits at a non-leaf level of `[type_hierarchy]`,
   with membership resolved DAG-authoritatively**. Engine code names no type; the boundary
   comes from repository configuration (`@/inv/domain-agnostic`). Rejected: hardcoding
   strategic type names (epic/milestone); treating every issue with DAG children as a
   container (an incidental dependency fan-in is not a container).
+- **D-21 — Candidate category is derived-or-explicit, never guessed:** chosen **suggest the
+  unique configured category that every explicit root's `doc_type` maps to; a missing or
+  ambiguous mapping yields a null suggestion with destination-dependent checks reported
+  `not-evaluated`; an optional explicit category argument evaluates candidates fully; explicit
+  selection remains the execution contract (D-4)**. Rejected: evaluating every candidate
+  against every configured category (a combinatorial report that buries blockers); picking a
+  default category on ambiguity (silent guessing contradicts D-1's opt-in posture).
 - **Assumptions:** Coverage is enforced at the task tier: each of the nine task-tier
   items is a direct child of the epic and carries its own `satisfies: REQ-*` label; the
   A/B/C group headers are conceptual only. This assumes a single breakdown pass produces
