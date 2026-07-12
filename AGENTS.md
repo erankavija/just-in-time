@@ -127,6 +127,8 @@ Three-layer approach (see dev/TESTING.md for details):
 - **Harness tests** (`tests/harness_demo.rs`) — Use `TestHarness` for isolated in-process tests with `CommandExecutor` directly. Fast and reliable.
 - **Integration tests** (`tests/*.rs`, e.g. `integration_test.rs`) — Spawn `jit` as subprocess, test actual CLI interface end-to-end.
 
+Tests cover relevant success, boundary, failure, and concurrency behavior. Depending on the affected subsystem, representative cases include empty graphs, cycles, missing issues, and concurrent claims.
+
 Test naming: `test_<function>_<scenario>` (e.g., `test_query_ready_returns_unassigned`).
 
 ## Key Design Principles
@@ -155,6 +157,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **No unsafe code** — `#![deny(unsafe_code)]` enforced.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
+- **Public API documentation** — Public APIs have doc comments describing their purpose and material contracts, including errors or invariants where relevant. Add examples when usage or behavior is non-obvious.
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
@@ -169,6 +172,7 @@ Each invariant is addressable at `@/inv/<name>`.
 - **gate-semantics** — An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated.
 - **event-log** — Every state change appends an event to events.jsonl.
 - **atomic-writes** — All file writes use the temp-file + atomic-rename pattern.
+- **pid-safety** — Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`.
 - **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
 - **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
 - **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.

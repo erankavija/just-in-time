@@ -44,6 +44,11 @@ statement = "All file writes use the temp-file + atomic-rename pattern."
 kind = "advisory"
 
 [[invariants]]
+id = "pid-safety"
+statement = "Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`."
+kind = "advisory"
+
+[[invariants]]
 id = "assignee-format"
 statement = "Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice)."
 kind = "advisory"
