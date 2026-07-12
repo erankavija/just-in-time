@@ -6850,3 +6850,8 @@
 {"type":"issue_state_changed","id":"9e39500c-f4c4-4720-9669-7903c3e6882a","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:58:39.040422878Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"c830a2bd-1b4a-4812-bd2e-bc61b1ba44db","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:58:39.040475458Z"}
 {"type":"issue_state_changed","id":"8d077ce6-9a3a-4f43-84df-353e8d32f46d","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T20:58:39.125370810Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"814d18b5-a2bf-4167-8aa8-17350ca74218","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T21:03:51.414703249Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"cd637621-d145-4b88-9fef-605b7952d02b","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T21:03:51.730289829Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b8777904-9840-408e-b214-59837136d7f0","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T21:03:52.241703501Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8b61d824-b84d-4ff1-a119-a462ba15c0f2","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T21:06:00.766533461Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"5bed2df8-b0fd-47da-ba3e-1afdcdcae1ee","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T21:09:47.636515285Z","gate_key":"code-review","updated_by":"auto:executor"}

@@ -16,7 +16,33 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:03:51.738556865Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T20:59:26.164099675Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:06:17.494747435Z"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:04:01.887277965Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:03:51.426393318Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -39,7 +65,7 @@
     "story:policy-grounded-review"
   ],
   "created_at": "2026-07-12T19:11:54.679863159Z",
-  "updated_at": "2026-07-12T20:58:39.123910009Z",
+  "updated_at": "2026-07-12T21:09:47.636300965Z",
   "first_ready_at": "2026-07-12T19:11:54.679869049Z",
   "claimed_at": "2026-07-12T19:31:01.301633995Z"
 }
