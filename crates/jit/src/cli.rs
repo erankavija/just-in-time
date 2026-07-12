@@ -637,6 +637,8 @@ pub enum IssueCommands {
         #[arg(short = 't', long, conflicts_with = "positional_title")]
         title: Option<String>,
 
+        /// Initial description (body) of the issue, stored verbatim. Defaults
+        /// to an empty string when omitted.
         #[arg(short = 'd', long = "description", default_value = "")]
         description: String,
 

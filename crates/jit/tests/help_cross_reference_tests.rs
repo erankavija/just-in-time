@@ -103,6 +103,30 @@ fn test_doc_remove_help_mentions_events_verification() {
 }
 
 // ============================================================================
+// REQ-01 + REQ-02 (jit:6ad894cb): `issue create --help` describes `-d`/
+// `--description` as the initial issue description/body, and states its
+// actual default (an empty string) when the flag is omitted.
+// ============================================================================
+
+#[test]
+fn test_issue_create_help_describes_description_as_initial_body() {
+    let help = help_text(&["issue", "create", "--help"]);
+    assert!(
+        help.contains("Initial description (body) of the issue"),
+        "issue create --help should describe -d/--description as the initial issue description/body, got: {help}"
+    );
+}
+
+#[test]
+fn test_issue_create_help_states_description_default() {
+    let help = help_text(&["issue", "create", "--help"]);
+    assert!(
+        help.contains("Defaults to an empty string when omitted"),
+        "issue create --help should state --description's actual default (empty string), got: {help}"
+    );
+}
+
+// ============================================================================
 // REQ-02: top-level help mentions `jit --schema` for JSON shapes and exit
 // codes; `jit --schema` actually documents both.
 // ============================================================================
