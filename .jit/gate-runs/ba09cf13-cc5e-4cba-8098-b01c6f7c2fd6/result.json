@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "ba09cf13-cc5e-4cba-8098-b01c6f7c2fd6",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a",
+  "commit": "56983070b4d4c789cc72ff87c804278b08afb2f7",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T11:29:29.820152559Z",
+  "completed_at": "2026-07-12T11:31:31.930273925Z",
+  "duration_ms": 122110,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a leaf type (level 4) with no resolved children. I reviewed the two reachable `jit:2c66e9f7` commits individually and their current-tree effects. The generated catalog is accurate and discoverable, but one affected storage-reference section contradicts it.\n\n1. **F1 — medium — blocking / issue-impact:** [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:184) still directs readers to the Rust `Event` enum for the current vocabulary, contradicting the generated canonical catalog linked four lines earlier. Remove this obsolete subsection or replace it with a direct link to `events.md`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated event-tag catalog is accurate, but the storage reference retains a contradictory source-code direction.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The storage reference still tells users to consult the Event enum instead of the new generated Event Log Tags catalog.\",\"file\":\"docs/reference/storage-format.md\",\"line\":184}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.PsyslH7nDi: binary file matches\n--- agent stderr (first 12 of 12711 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5616-f4c8-7a33-a53b-5cdb98d8b840\n--------\n--- 12699 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated event-tag catalog is accurate, but the storage reference retains a contradictory source-code direction.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The storage reference still tells users to consult the Event enum instead of the new generated Event Log Tags catalog.",
+        "file": "docs/reference/storage-format.md",
+        "line": 184
+      }
+    ]
+  }
+}

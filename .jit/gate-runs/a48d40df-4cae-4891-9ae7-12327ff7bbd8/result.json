@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "a48d40df-4cae-4891-9ae7-12327ff7bbd8",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a",
+  "commit": "42e8b9567c56dcc83517e816a01f97e8c4f77585",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T11:51:06.483194381Z",
+  "completed_at": "2026-07-12T11:52:24.427213500Z",
+  "duration_ms": 77944,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01–03 are met. The catalog is exposed through [`CommandSchema::generate`](crates/jit/src/schema.rs:243), rendered to [`events.md`](docs/reference/events.md:1), and guarded against stale serde tags and `issue_id` associations in [`event_catalog` tests](crates/jit/src/domain/event_catalog.rs:765).\n\n## Architecture and separation of concerns\n\nThe catalog is pure domain logic in [`event_catalog.rs`](crates/jit/src/domain/event_catalog.rs:575); storage serialization remains behind [`IssueStore::append_event`](crates/jit/src/storage/json.rs:737).\n\n## Functional paradigm\n\nThe implementation uses iterator pipelines for catalog and documentation projection.\n\n## Correctness and invariants\n\nThe exact five-tag no-issue set is asserted in [`test_no_issue_set_is_exactly_the_shared_state_events`](crates/jit/src/domain/event_catalog.rs:853). Serialization and `get_issue_id` agreement are both verified.\n\n## Safety\n\nNo unsafe code or PID-related changes were introduced.\n\n## Testing\n\nThe current-commit `cargo-ci` evidence passed: fmt, Clippy, and 3,659 tests. Per instruction, I did not rerun tests. `./scripts/jit-validate.sh` passed.\n\n## Error handling\n\nNo swallowed serialization errors remain in the production catalog path.\n\n## CLI contract\n\n`jit --schema` now carries the machine-consumable `events` array.\n\n## Documentation\n\nThe generated reference is linked from storage, CLI, and index documentation. New public catalog APIs include examples.\n\n## Prior review feedback\n\nAll three prior findings are resolved by the current commit.\n\n## JIT issue management\n\nThe prerequisite dependency is done; no unmet dependencies remain.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All acceptance criteria are met; prior findings are resolved and current gate evidence passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All acceptance criteria are met; prior findings are resolved and current gate evidence passes.",
+    "findings": []
+  }
+}

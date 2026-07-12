@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "4c42dad7-bdd1-4293-82b9-cf4cba66abaa",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a",
+  "commit": "e0a950f58d4d209a39dd7d87f2505bbce74dfb08",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T11:31:50.818295959Z",
+  "completed_at": "2026-07-12T11:33:30.070494573Z",
+  "duration_ms": 99252,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a leaf type (level 4) with no resolved children. I reviewed the four reachable `jit:2c66e9f7` commits individually and verified their combined current-tree behavior. The prior blocking storage-reference finding is resolved at [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:184).\n\nThe generated event catalog accurately matches `jit --schema` (20 tags), includes the exact no-`issue_id` set, and is discoverable from the documentation index, storage reference, and event-command reference. No issue-impact documentation defects remain.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The generated event-tag catalog and its direct documentation links accurately describe the current shipped behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The generated event-tag catalog and its direct documentation links accurately describe the current shipped behavior.",
+    "findings": []
+  }
+}
