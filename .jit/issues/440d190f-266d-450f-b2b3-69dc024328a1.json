@@ -2,9 +2,9 @@
   "id": "440d190f-266d-450f-b2b3-69dc024328a1",
   "title": "Establish canonical review policy in repository sources",
   "description": "Add the approved repository-wide review policy to its canonical prose and registry-owned locations. Generated projections are updated only through their configured renderers so authoritative policy exists before review procedure begins consuming it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/invariants.toml` defines advisory invariant `pid-safety` with the approved statement that process-signaling code rejects sentinel or lossy PID conversions before operating-system invocation, including the `u32::MAX as i32 == -1` case that could produce `kill(-1, sig)`.\n- [hard] REQ-02: The new invariant resolves at `@/inv/pid-safety` and appears in the renderer-owned invariant region of `AGENTS.md` without a hand-maintained duplicate.\n- [hard] REQ-03: The hand-authored Coding Conventions section of `AGENTS.md` requires public APIs to document purpose and material contracts, including relevant errors or invariants, with examples for non-obvious usage or behavior.\n- [hard] REQ-04: The hand-authored Testing Strategy section of `AGENTS.md` requires relevant success, boundary, failure, and concurrency coverage, with contextual examples including empty graphs, cycles, missing issues, and concurrent claims.\n- [hard] REQ-05: Registry and Markdown projections affected by the policy changes are mechanically fresh, and unaffected projections are not rewritten without a changed configured input.\n- [hard] REQ-06: The PID rule remains advisory unless the implementation identifies an existing deterministic rule or gate that mechanically enforces it.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "code-review",
@@ -21,6 +21,7 @@
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.536493359Z",
-  "updated_at": "2026-07-12T19:25:27.538526390Z",
-  "first_ready_at": "2026-07-12T19:25:27.536502299Z"
+  "updated_at": "2026-07-12T19:31:45.947588500Z",
+  "first_ready_at": "2026-07-12T19:25:27.536502299Z",
+  "claimed_at": "2026-07-12T19:31:45.947588180Z"
 }

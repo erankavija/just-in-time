@@ -2,9 +2,9 @@
   "id": "99604a20-cb66-4712-8e09-5d8bbd0337b8",
   "title": "Add structured policy references to gate findings",
   "description": "Extend the generic gate-finding contract so findings can carry opaque qualified-policy references through parsing, persistence, schemas, and output. The field remains backward compatible and does not make the engine resolve repository-specific policy.\n\n## Background\n\n`GateFinding` already carries checker-defined classification and location fields. Policy traceability requires an optional string collection that is preserved exactly, defaults safely for legacy records, and stays absent from serialized output when empty.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateFinding` exposes `references: Vec<String>` with default-empty deserialization, empty-value serialization omission, and generated JSON-schema coverage.\n- [hard] REQ-02: Findings parsing preserves multiple reference strings exactly, treats a missing field as an empty vector, and retains the existing graceful-degradation behavior when a `references` array contains a non-string member.\n- [hard] REQ-03: Gate-run storage round-trips populated references unchanged and loads legacy stored findings without the field as an empty vector.\n- [hard] REQ-04: Gate-status structured JSON and human inspection paths expose populated references unchanged, while empty references add no compatibility noise.\n- [hard] REQ-05: The widest stored-record sample and `docs/reference/storage-records.md` document the optional references field and remain mechanically fresh.\n- [hard] REQ-06: Core domain, storage, and output code treats reference values as opaque strings and performs no item lookup, kind validation, or repository-policy resolution.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -22,6 +22,7 @@
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.406642864Z",
-  "updated_at": "2026-07-12T19:25:27.408419046Z",
-  "first_ready_at": "2026-07-12T19:25:27.406648564Z"
+  "updated_at": "2026-07-12T19:31:45.930889708Z",
+  "first_ready_at": "2026-07-12T19:25:27.406648564Z",
+  "claimed_at": "2026-07-12T19:31:45.930889498Z"
 }

@@ -1,0 +1,54 @@
+{
+  "epic_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
+  "epic_short_id": "b4e55aa2",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "99604a20-cb66-4712-8e09-5d8bbd0337b8",
+          "short_id": "99604a20",
+          "title": "Add structured policy references to gate findings",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "440d190f-266d-450f-b2b3-69dc024328a1",
+          "short_id": "440d190f",
+          "title": "Establish canonical review policy in repository sources",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "8b479a72-237c-4113-a868-17355cef55bc",
+          "short_id": "8b479a72",
+          "title": "Cut over code review to canonical policy discovery",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "155a2d43-8b1a-4761-bf6b-82f5ea605643",
+          "short_id": "155a2d43",
+          "title": "Record a representative policy-grounded live review",
+          "classification": "documentation",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-12T22:31:20+03:00"
+}
