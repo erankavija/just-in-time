@@ -2,7 +2,7 @@
   "epic_id": "004d10b7-13d7-4a35-9467-f9572a373b27",
   "epic_short_id": "004d10b7",
   "epic_title": "Documentation contract follow-ups",
-  "current_wave": 3,
+  "current_wave": 4,
   "wave_rationale": "All 10 children depend only on the done audit record 6d82de03 (no inter-sibling deps). Waves are conflict-serialization sub-waves: within each wave, no two issues touch the same source file, so parallel worktrees integrate cleanly.",
   "decisions": {
     "afbbf6c3": "Human chose: IMPLEMENT strictness behavior as an ENFORCEMENT MODULATOR. strict = any violation (warning or error) blocks transitions; loose = current behavior unchanged (only enforced/error rules block); permissive = nothing blocks, all violations report-only. Severity + enforce flags unchanged; strictness is a global gate multiplier.",
@@ -39,6 +39,16 @@
         {"id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752", "short_id": "9e0abec5", "title": "Add a projector for built-in gate presets", "classification": "implementation", "status": "pending", "files": ["gate_presets/builtin.rs", "gate_presets/manager.rs", "commands/invariant.rs", "commands/reference.rs", "cli.rs", "docs"], "gates": ["cargo-ci", "code-review", "doc-review", "docs-mechanical"]}
       ]
     }
+  ],
+  "wave3_status": {
+    "6ad894cb": "DONE. code-review F2 exposed a PRE-EXISTING product bug: `jit validate <short-id>` exited 3 for EVERY issue (run_rules/explain_rules passed the raw id to load_issue, which keys on the full UUID). Owner approved fixing it inside this epic. Fixed + regression tests that fail without the fix (InMemoryStorage::load_issue is an exact-key lookup, so they bind resolution, not storage). F1 (cargo-ci 900s timeout) was CPU contention from 3 concurrent worktree builds; passed on re-run.",
+    "2c66e9f7": "DONE. code-review found the freshness guard was CIRCULAR (compared EventTag::ALL against EventTag's own derived schema), so a new Event variant reusing an existing tag would serialize an uncataloged `type` while compiling. Fixed: Event now derives JsonSchema (+ hand-written JsonSchema for Assignee, which serializes as a `{type}:{identifier}` string) and the guard reads each variant's `type` const off THAT schema. Also: carries_issue_id no longer swallows a serialization error (derives from scope; tests bind it to the serialized record AND Event::get_issue_id); added missing # Examples; EventTag::sample made public.",
+    "9e0abec5": "DONE. All four gates passed first time."
+  },
+  "wave4_dispatch": "562e977c dispatched (worktree anchored to main e4b3026c) once 2c66e9f7's event contract existed for its REQ-02 to cite.",
+  "follow_ups_for_epic_close": [
+    "Semi-dead code surfaced by reviewers across the epic: startup_recovery() has no production caller; the auto-heartbeat interval is a config default with no production scheduler; `config validate`'s exit(2) warnings branch is unreachable (result.warnings is never populated); `apply`'s validate_delta_acyclic guard is unreachable (a template delta cannot close a cycle: anchor edges only run anchor->node and node depends_on names nodes only) AND maps to a bare anyhow! so it would exit 1, not 4.",
+    "Ask the owner where to file these — they are engine gaps, not documentation-contract work, so they do not belong under this epic."
   ],
   "created_during_execution": [],
   "escalations": [
