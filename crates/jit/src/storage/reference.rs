@@ -433,10 +433,12 @@ pub fn render_reference_markdown() -> Result<String> {
 
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
     let prefix_rules = [
-        "- a full id — all 32 hex digits, hyphenated or not — resolves to that issue directly;"
+        "- an input of full-id length (32 hex digits once normalized) is looked up directly, \
+         as given: it resolves only in the canonical hyphenated lowercase form the record is \
+         stored under, and is not searched for as a prefix;"
             .to_string(),
         format!(
-            "- a shorter input must be at least {MIN_ID_PREFIX_LENGTH} characters after that \
+            "- a shorter input must be at least {MIN_ID_PREFIX_LENGTH} characters after \
              normalization; below the minimum it is refused as an argument error (exit code 2, \
              see [Exit Codes](exit-codes.md)) rather than searched for;"
         ),
@@ -487,7 +489,7 @@ pub fn render_reference_markdown() -> Result<String> {
          share their leading {SHORT_ID_LENGTH} characters would print the same short id.\n\
          \n\
          Commands take an id **prefix** wherever they take an issue id. Resolution\n\
-         lowercases the input and drops its hyphens, then:\n\
+         lowercases the input and drops its hyphens to measure it, then:\n\
          \n\
          {prefix_rules}\n\
          \n\
@@ -702,6 +704,38 @@ mod tests {
                 .resolve_issue_id(&shortest)
                 .expect("a prefix at the minimum resolves"),
             id
+        );
+    }
+
+    /// REQ-01: an input of full-id length is looked up **as given**, so it
+    /// resolves only in the canonical hyphenated lowercase form — the page must
+    /// not promise that a hyphenless or uppercased full id resolves.
+    ///
+    /// Resolution normalizes the input to *measure* it, then takes the full-id
+    /// fast path with the original string; a 32-hex-digit input therefore never
+    /// falls through to the prefix search that would have matched it.
+    #[test]
+    fn test_full_id_resolves_only_in_canonical_form() {
+        let storage = InMemoryStorage::new();
+        storage.init().expect("in-memory storage initializes");
+        let issue = Issue::new("Probe".to_string(), String::new());
+        let id = issue.id.clone();
+        storage.save_issue(issue).expect("the issue saves");
+
+        assert_eq!(
+            storage
+                .resolve_issue_id(&id)
+                .expect("the canonical full id resolves"),
+            id
+        );
+
+        assert!(
+            storage.resolve_issue_id(&id.replace('-', "")).is_err(),
+            "a hyphenless full id is looked up as given, so it does not resolve"
+        );
+        assert!(
+            storage.resolve_issue_id(&id.to_uppercase()).is_err(),
+            "an uppercased full id is looked up as given, so it does not resolve"
         );
     }
 

@@ -25,10 +25,10 @@ record carries it, and nothing enforces its uniqueness — two issues whose UUID
 share their leading 8 characters would print the same short id.
 
 Commands take an id **prefix** wherever they take an issue id. Resolution
-lowercases the input and drops its hyphens, then:
+lowercases the input and drops its hyphens to measure it, then:
 
-- a full id — all 32 hex digits, hyphenated or not — resolves to that issue directly;
-- a shorter input must be at least 4 characters after that normalization; below the minimum it is refused as an argument error (exit code 2, see [Exit Codes](exit-codes.md)) rather than searched for;
+- an input of full-id length (32 hex digits once normalized) is looked up directly, as given: it resolves only in the canonical hyphenated lowercase form the record is stored under, and is not searched for as a prefix;
+- a shorter input must be at least 4 characters after normalization; below the minimum it is refused as an argument error (exit code 2, see [Exit Codes](exit-codes.md)) rather than searched for;
 - the prefix must match exactly one id in the repository index. Several matches are refused as ambiguous, and the error lists the candidates.
 
 A short id is 8 characters and the minimum is 4,
