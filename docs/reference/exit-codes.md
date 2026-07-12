@@ -45,9 +45,11 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate status-all` | `4` | One or more required gates have not passed. | yes |
 | `invariant check` | `4` | Enforcement drift was found (declared enforcement not backed by an enforcing rule). | yes |
 | `config validate` | `1` | The repo, user, or environment-variable configuration failed to load or carried an invalid value. | yes |
+| `config validate` | `2` | Reserved: the handler has an exit(2) branch for configuration warnings, but no warning condition is defined today, so 2 is never emitted. | yes |
 | `doc check-links` | `1` | One or more documents have broken links. | yes |
 | `doc check-links` | `2` | Documents have only risky-link warnings; here 2 means warnings, not a usage error. | yes |
 | `gate preset apply` | `1` | One or more issues failed to apply the preset (partial batch). | yes |
-| `serve` | `child` | Passes through the bundled dev-server child's own exit code (1 when the child is terminated by a signal). | yes |
+| `serve, serve --stop, serve --status` | `1` | The daemon start, stop, or status operation failed (exits 0 on success). |  |
+| `serve --fg` | `child` | Foreground mode passes through the inline dev-server child's own exit code (1 when the child produced none). | yes |
 
 For the full `jit gate evaluate` verdict taxonomy and the `--json` `verdict` field, see [the gate command reference](cli-commands.md).

@@ -7294,7 +7294,7 @@ mod exit_code_projection_tests {
     }
 
     #[test]
-    fn classifier_produces_expected_codes() {
+    fn test_error_to_exit_code_produces_documented_codes() {
         for (error, expected) in classifier_cases() {
             assert_eq!(
                 error_to_exit_code(&error).code(),
@@ -7305,7 +7305,7 @@ mod exit_code_projection_tests {
     }
 
     #[test]
-    fn projection_documents_every_classified_code() {
+    fn test_command_exit_codes_documents_every_classified_code() {
         let schema = CommandSchema::generate();
         let documented: std::collections::HashSet<i32> = schema
             .command_exit_codes

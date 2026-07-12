@@ -1,14 +1,14 @@
-//! REQ-02: bind every EXCEPTION row of the `command_exit_codes` projection to
+//! REQ-02: bind every `command_exit_codes` row emitted by a direct exit site to
 //! the code that actually emits it.
 //!
-//! Exception rows are emitted by direct `std::process::exit` sites (a completed
-//! run signalling findings) or by a pass-through, so most are observed by running
-//! the binary. The two gate-evaluation rows route through `error_to_exit_code`
-//! and are pinned by the classifier unit test in `main.rs`
-//! (`exit_code_projection_tests`); the `serve` pass-through carries no fixed code
-//! and is asserted structurally. [`every_exception_row_is_verified`] enforces
-//! that this set stays complete: adding an exception row without a binding fails
-//! the build.
+//! Findings-signal and pass-through rows are emitted by direct
+//! `std::process::exit` sites, so they are observed by running the binary. The
+//! two gate-evaluation exception rows route through `error_to_exit_code` and are
+//! pinned by the classifier unit test in `main.rs` (`exit_code_projection_tests`);
+//! `serve --fg` and the reserved `config validate` `2` carry no observable fixed
+//! code and are asserted structurally against their cited source sites.
+//! `test_command_exit_codes_every_exception_row_is_verified` keeps the set
+//! complete: adding an exception row without a binding fails the build.
 
 use jit::schema::CommandSchema;
 use std::fs;
@@ -43,9 +43,10 @@ fn create_issue(temp: &TempDir, title: &str, extra: &[&str]) -> String {
     json["id"].as_str().unwrap().to_string()
 }
 
-/// Assert the projection carries an exception row for `command` at `code`
-/// (`None` = pass-through).
-fn assert_documented_exception(command: &str, code: Option<i32>) {
+/// Assert the projection carries a row for `command` at `code` (`None` =
+/// pass-through) with the expected `exception` flag, and return its condition so
+/// callers can assert on the documented text.
+fn documented_row(command: &str, code: Option<i32>, exception: bool) -> String {
     let schema = CommandSchema::generate();
     let row = schema
         .command_exit_codes
@@ -54,15 +55,16 @@ fn assert_documented_exception(command: &str, code: Option<i32>) {
         .unwrap_or_else(|| {
             panic!("command_exit_codes projection has no row for `{command}` code {code:?}")
         });
-    assert!(
-        row.exception,
-        "row for `{command}` code {code:?} must be flagged as an exception"
+    assert_eq!(
+        row.exception, exception,
+        "row for `{command}` code {code:?} has wrong exception flag"
     );
+    row.condition.clone()
 }
 
 /// `jit validate` exits 4 on repository-integrity findings — matching `validate`/4.
 #[test]
-fn validate_integrity_exit_matches_projection() {
+fn test_command_exit_codes_validate_integrity_emits_4() {
     let temp = setup();
     let id = create_issue(&temp, "Corruptible", &[]);
 
@@ -83,14 +85,14 @@ fn validate_integrity_exit_matches_projection() {
         .unwrap();
 
     assert_eq!(output.status.code(), Some(4));
-    assert_documented_exception("validate", Some(4));
+    documented_row("validate", Some(4), true);
 }
 
 /// Whole-repo `jit validate` exits 1 on an error-severity rule finding —
 /// matching `validate`/1. A non-enforced error rule reports without diverting
 /// through the integrity (exit-4) path.
 #[test]
-fn validate_rule_findings_exit_matches_projection() {
+fn test_command_exit_codes_validate_rule_findings_emits_1() {
     let temp = setup();
     fs::write(
         temp.path().join(".jit/rules.toml"),
@@ -119,13 +121,13 @@ fn validate_rule_findings_exit_matches_projection() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_documented_exception("validate", Some(1));
+    documented_row("validate", Some(1), true);
 }
 
 /// `jit gate status-all` exits 4 while any required gate is unpassed —
 /// matching `gate status-all`/4.
 #[test]
-fn gate_status_all_exit_matches_projection() {
+fn test_command_exit_codes_gate_status_all_emits_4() {
     let temp = setup();
     let status = Command::new(jit_binary())
         .current_dir(&temp)
@@ -151,13 +153,13 @@ fn gate_status_all_exit_matches_projection() {
         .unwrap();
 
     assert_eq!(output.status.code(), Some(4));
-    assert_documented_exception("gate status-all", Some(4));
+    documented_row("gate status-all", Some(4), true);
 }
 
 /// `jit invariant check` exits 4 on enforcement drift (an `enforced-by` naming a
 /// missing rule) — matching `invariant check`/4.
 #[test]
-fn invariant_check_drift_exit_matches_projection() {
+fn test_command_exit_codes_invariant_check_emits_4() {
     let temp = setup();
     fs::write(
         temp.path().join(".jit/rules.toml"),
@@ -179,34 +181,62 @@ fn invariant_check_drift_exit_matches_projection() {
         .unwrap();
 
     assert_eq!(output.status.code(), Some(4));
-    assert_documented_exception("invariant check", Some(4));
+    documented_row("invariant check", Some(4), true);
 }
 
-/// `jit config validate` exits 1 when a configuration source carries an invalid
-/// value — matching `config validate`/1.
+/// `jit config validate` emits only {0, 1} in practice: 0 on a valid config, 1
+/// when a source carries an invalid value. The projection documents `2` as
+/// RESERVED — the handler has an `exit(2)` warnings branch, but no warning
+/// condition is defined, so `2` is never produced. This test drives both live
+/// outcomes, asserts neither is `2`, and asserts the reserved row is documented.
 #[test]
-fn config_validate_error_exit_matches_projection() {
+fn test_command_exit_codes_config_validate_emits_only_0_and_1() {
     let temp = setup();
-    let output = Command::new(jit_binary())
+
+    // Valid configuration -> 0.
+    let valid = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["config", "validate"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        valid.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&valid.stderr)
+    );
+
+    // Invalid environment-variable value -> 1.
+    let invalid = Command::new(jit_binary())
         .current_dir(&temp)
         .args(["config", "validate"])
         .env("JIT_WORKTREE_MODE", "definitely-not-a-mode")
         .output()
         .unwrap();
-
     assert_eq!(
-        output.status.code(),
+        invalid.status.code(),
         Some(1),
         "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&invalid.stderr)
     );
-    assert_documented_exception("config validate", Some(1));
+
+    // Neither live outcome is 2.
+    assert_ne!(valid.status.code(), Some(2));
+    assert_ne!(invalid.status.code(), Some(2));
+
+    // 1 is emitted; 2 is documented as reserved (present, exception-flagged).
+    documented_row("config validate", Some(1), true);
+    let reserved = documented_row("config validate", Some(2), true);
+    assert!(
+        reserved.to_lowercase().contains("reserved"),
+        "config validate 2 must be documented as reserved, got: {reserved}"
+    );
 }
 
 /// `jit doc check-links` exits 1 on a broken link and 2 on a risky-link warning
 /// — matching the two `doc check-links` rows.
 #[test]
-fn doc_check_links_exits_match_projection() {
+fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
     // Broken link -> exit 1.
     let temp = setup();
     let id = create_issue(&temp, "Doc host", &[]);
@@ -228,7 +258,7 @@ fn doc_check_links_exits_match_projection() {
         .output()
         .unwrap();
     assert_eq!(broken.status.code(), Some(1));
-    assert_documented_exception("doc check-links", Some(1));
+    documented_row("doc check-links", Some(1), true);
 
     // Risky (deep relative) but valid link -> exit 2.
     let temp = setup();
@@ -253,14 +283,14 @@ fn doc_check_links_exits_match_projection() {
         .output()
         .unwrap();
     assert_eq!(risky.status.code(), Some(2));
-    assert_documented_exception("doc check-links", Some(2));
+    documented_row("doc check-links", Some(2), true);
 }
 
 /// `jit gate preset apply` exits 1 when an issue fails to apply (a partial
 /// batch) — matching `gate preset apply`/1. Applying a builtin preset to a
 /// well-formed but nonexistent id fails that id and exits 1.
 #[test]
-fn gate_preset_apply_partial_failure_exit_matches_projection() {
+fn test_command_exit_codes_gate_preset_apply_emits_1() {
     let temp = setup();
     let output = Command::new(jit_binary())
         .current_dir(&temp)
@@ -274,24 +304,49 @@ fn gate_preset_apply_partial_failure_exit_matches_projection() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_documented_exception("gate preset apply", Some(1));
+    documented_row("gate preset apply", Some(1), true);
 }
 
-/// `jit serve` passes through the bundled dev-server child's own exit code, so
-/// the projection models it as a pass-through (`code: None`) rather than a fixed
-/// jit code. Starting a real server is impractical here; the runtime site is
-/// `crates/jit/src/main.rs` (`status.code().unwrap_or(1)`), which carries no
-/// fixed code to observe, so this row is asserted structurally.
+/// `jit serve --status` (like the daemon start and `--stop`) exits 1 on an
+/// error — here a malformed PID file — matching the `serve, serve --stop, serve
+/// --status`/1 row (standard taxonomy, not an exception).
 #[test]
-fn serve_passthrough_is_modeled_as_none() {
-    assert_documented_exception("serve", None);
+fn test_command_exit_codes_serve_daemon_error_emits_1() {
+    let temp = setup();
+    // A malformed PID file makes `server_status` (via `read_pid_file`) error, so
+    // the `--status` arm hits its `exit(1)` site.
+    fs::write(temp.path().join(".jit/server.pid.json"), "not json").unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["serve", "--status"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("serve, serve --stop, serve --status", Some(1), false);
+}
+
+/// `jit serve --fg` passes the inline dev-server child's own exit code through,
+/// so the projection models it as a pass-through (`code: None`). Spawning a real
+/// server here is impractical; the runtime site is `crates/jit/src/main.rs`
+/// (`std::process::exit(status.code().unwrap_or(1))`), which carries no fixed
+/// code to observe, so this row is asserted structurally.
+#[test]
+fn test_command_exit_codes_serve_foreground_is_passthrough() {
+    documented_row("serve --fg", None, true);
 }
 
 /// Guard: every exception row in the projection must be covered by a binding in
 /// this file or by the `gate evaluate` classifier test in `main.rs`. Adding a new
 /// exception row without a test fails here.
 #[test]
-fn every_exception_row_is_verified() {
+fn test_command_exit_codes_every_exception_row_is_verified() {
     let verified: std::collections::HashSet<(String, Option<i32>)> = [
         // Pinned by main.rs `exit_code_projection_tests` (classifier).
         ("gate evaluate, gate evaluate-all", Some(4)),
@@ -305,8 +360,9 @@ fn every_exception_row_is_verified() {
         ("doc check-links", Some(1)),
         ("doc check-links", Some(2)),
         ("gate preset apply", Some(1)),
-        // Pinned structurally (pass-through carries no fixed code).
-        ("serve", None),
+        // Reserved / pass-through: asserted structurally against cited sites.
+        ("config validate", Some(2)),
+        ("serve --fg", None),
     ]
     .into_iter()
     .map(|(c, code)| (c.to_string(), code))

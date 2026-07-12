@@ -1279,10 +1279,11 @@ jit gate status-all <ISSUE_ID> [--json] [--full]
 - Considers EVERY required gate on the issue — automated AND manual. A required
   manual gate that has not been attested counts as pending.
 - Does not execute any checker commands; it only reports recorded state.
-- Exits `0` only when every required gate has passed; otherwise exits `4`. A
-  pending (auto never run, manual never attested) or failed gate is not green,
-  and both map to the single nonzero code. This readiness contract is a single
-  behaviour with no flag.
+- Exits `0` only when every required gate has passed; otherwise exits `4` (see
+  the [exit-code reference](exit-codes.md#command-specific-mappings)). A pending
+  (auto never run, manual never attested) or failed gate is not green, and both
+  map to the single nonzero code. This readiness contract is a single behaviour
+  with no flag.
 - With `--json`, the output is the list envelope
   `{"count": N, "gates": [...], …}`. `count` is the length of
   `gates` (one entry per required gate); it is the collection size, not
@@ -1421,9 +1422,9 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
   its entry reports `already_passed: true`).
 - **Fail-fast:** on the FIRST gate that does not pass, the command stops
   immediately and exits with that gate's code from the
-  [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (`0` pass / `2` bad-args / `3`
-  not-found / `4` checker-failed / `10` runner-error). Later gates are never
-  attempted.
+  [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (see the
+  [exit-code reference](exit-codes.md#command-specific-mappings)). Later gates are
+  never attempted.
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
@@ -2197,9 +2198,10 @@ Validate the links and asset references of the documents in scope.
 jit doc check-links [--scope all|issue:<ID>] [--json]
 ```
 
-`--scope` defaults to `all`. The exit code carries the verdict: `0` when every
-document is valid, `2` when only warnings were found, `1` when any error was
-found. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
+`--scope` defaults to `all`. The exit code carries the verdict per the
+[exit-code reference](exit-codes.md#command-specific-mappings): `0` when every
+document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
+reports `valid`, `errors`, `warnings`, and a `summary`.
 
 ### `jit doc archive`
 
@@ -2470,7 +2472,7 @@ jit validate --branch-drift [--leases] [--json]
 | (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, claims index) plus every local and graph rule. |
 | `<ID>` | The local and graph rules for that issue only. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
-| `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean. |
+| `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply the automatic fixes (e.g. dropping transitively redundant edges). `--dry-run` reports what would be fixed and writes nothing. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check that active leases are consistent and not stale. |
@@ -2664,7 +2666,8 @@ jit invariant check [--json]
 Reports enforcement drift in the declared-but-unenforced direction: an invariant
 whose `enforced-by` names a rule or gate that does not load. Bindings are
 declarations, and this check never executes them. Exits `4` when any drift is
-present. JSON uses the list envelope `{"count": N, "findings": [...]}`.
+present (see the [exit-code reference](exit-codes.md#command-specific-mappings)).
+JSON uses the list envelope `{"count": N, "findings": [...]}`.
 
 ### `jit reference render`
 
@@ -2729,7 +2732,8 @@ JSON uses the list envelope, with the query echoed back:
 the file belongs to, or `null` for a file that is not an issue record. `matches`
 gives each match's byte offsets within `line_text`. A missing ripgrep
 returns the error envelope with code `RIPGREP_NOT_FOUND`; any other matcher
-failure returns `SEARCH_FAILED`. Both exit `10` (external dependency failed).
+failure returns `SEARCH_FAILED`. Both exit `10` (external dependency failed; see
+the [exit-code reference](exit-codes.md)).
 
 To search issue fields rather than raw storage lines, use
 [`jit issue search`](#searching-issues-jit-issue-search); to search addressable
@@ -2945,11 +2949,10 @@ are loaded from sibling files (`.jit/templates.toml`, `.jit/invariants.toml`)
 rather than `config.toml` itself. Introspect them via `jit config
 list-templates` / `jit item list --kind invariant`.
 
-**Exit codes:**
-- `0` — key resolved
-- `2` — unknown key (`INVALID_ARGUMENT`). An unknown TOP-LEVEL key names the
-  valid sections; an unknown NESTED key names the missing segment and its
-  resolved parent path.
+**Exit codes** (per the [exit-code reference](exit-codes.md#command-specific-mappings)):
+`0` when the key resolves, `2` (`INVALID_ARGUMENT`) for an unknown key. An unknown
+TOP-LEVEL key names the valid sections; an unknown NESTED key names the missing
+segment and its resolved parent path.
 
 ```bash
 jit config get bogus_section

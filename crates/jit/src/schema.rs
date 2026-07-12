@@ -852,6 +852,14 @@ impl CommandSchema {
                 true,
             ),
             row(
+                "config validate",
+                2,
+                "Reserved: the handler has an exit(2) branch for configuration \
+                 warnings, but no warning condition is defined today, so 2 is \
+                 never emitted.",
+                true,
+            ),
+            row(
                 "doc check-links",
                 1,
                 "One or more documents have broken links.",
@@ -870,12 +878,21 @@ impl CommandSchema {
                 "One or more issues failed to apply the preset (partial batch).",
                 true,
             ),
-            // Pass-through of a spawned process's own code.
+            // `serve` default (daemon), `--stop`, and `--status` follow the
+            // standard taxonomy: 0 on success, 1 on a start/stop/status error.
+            row(
+                "serve, serve --stop, serve --status",
+                1,
+                "The daemon start, stop, or status operation failed (exits 0 on \
+                 success).",
+                false,
+            ),
+            // `serve --fg` passes the inline server child's own code through.
             CommandExitCode {
-                command: "serve".to_string(),
+                command: "serve --fg".to_string(),
                 code: None,
-                condition: "Passes through the bundled dev-server child's own \
-                            exit code (1 when the child is terminated by a signal)."
+                condition: "Foreground mode passes through the inline dev-server \
+                            child's own exit code (1 when the child produced none)."
                     .to_string(),
                 exception: true,
             },
