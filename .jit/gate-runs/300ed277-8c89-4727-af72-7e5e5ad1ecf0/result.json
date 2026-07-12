@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "300ed277-8c89-4727-af72-7e5e5ad1ecf0",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
+  "commit": "c64fb2052f817184373c49f822fd4ff63572ce24",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T21:13:43.924391108Z",
+  "completed_at": "2026-07-12T21:16:49.248305881Z",
+  "duration_ms": 185323,
+  "exit_code": 0,
+  "stdout": "Attribution: `story` is container-capable; its seven DAG-resolved children are all done. I inspected individually tagged patches for the story and each child, then verified the combined current documentation contract. No intent-only fallback was needed; uncommitted changes were excluded.\n\nThe affected README, item-address/CLI references, custom-gate guide, storage-record reference, labels, guarantees, and generated rules/gates projection accurately cover aliases, canonical policy discovery, structured finding references, and rule descriptions. Prior doc-review had no unresolved blockers.\n\nFindings: none.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered container documentation is accurate, discoverable, and concise for its combined user-visible behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The delivered container documentation is accurate, discoverable, and concise for its combined user-visible behavior.",
+    "findings": []
+  }
+}

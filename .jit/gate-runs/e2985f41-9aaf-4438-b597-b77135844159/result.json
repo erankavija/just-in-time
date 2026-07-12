@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "e2985f41-9aaf-4438-b597-b77135844159",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
+  "commit": "c64fb2052f817184373c49f822fd4ff63572ce24",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T21:17:14.428457332Z",
+  "completed_at": "2026-07-12T21:20:26.060808342Z",
+  "duration_ms": 191632,
+  "exit_code": 1,
+  "stdout": "Attribution: d4642a62, 38376069, f5e12ca8, a61d69b0, 7b2c16ee, c64fb205 (`jit:b4e55aa2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-7 (markdown-first: dev/vision/9db27a3a-charter.md); @/invariant/label-format, namespace-registry, dag-acyclic, gate-semantics, event-log, atomic-writes, pid-safety, assignee-format, domain-agnostic, single-source-prose (registry-first: .jit/invariants.toml); @/gate/code-review, jit-validate (registry-first: .jit/gates.toml)\nGate evidence: cargo-ci passed (0); repo-validate passed (0); doc-review passed (0); docs-mechanical passed (0); prior code-review failed (1, F1)\nTruncation recovery: recovered the broad-search truncation with narrow prompt, findings-model, storage, output, test, gate, and live-report reads; issue-scoped `jit item show` attempted a lock and was unavailable under the read-only sandbox, so supplied issue context was used.\n\n1. **[blocking][issue-impact] F1** — The policy-ownership matrix still fails REQ-02’s complete, exact-one-owner requirement. It assigns “Issue success criteria must be satisfied” to the context issue rather than one of the allowed owner categories, and omits historical rubric principles for the `test_<function>_<scenario>` naming convention and user-facing/configuration discoverability. The prior finding’s multiple-owner wording is corrected, but these gaps leave principles unowned. See [b4e55aa2-ground-code-review-policy.md](/home/vkaskivuo/Projects/just-in-time/dev/active/b4e55aa2-ground-code-review-policy.md:91) against the historical rubric’s omitted requirements.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The policy-ownership matrix remains incomplete and non-conforming to REQ-02.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The matrix leaves historical reviewer-rubric principles unowned and assigns issue success criteria to a disallowed owner category.\",\"file\":\"dev/active/b4e55aa2-ground-code-review-policy.md\",\"line\":91,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4491 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5831-0222-7aa3-8a5e-dacf18b8e9b6\n--------\nuser\n--- 4478 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The policy-ownership matrix remains incomplete and non-conforming to REQ-02.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The matrix leaves historical reviewer-rubric principles unowned and assigns issue success criteria to a disallowed owner category.",
+        "file": "dev/active/b4e55aa2-ground-code-review-policy.md",
+        "line": 91
+      }
+    ]
+  }
+}
