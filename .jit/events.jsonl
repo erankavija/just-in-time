@@ -6843,3 +6843,10 @@
 {"type":"issue_state_changed","id":"ac52f28f-0d10-4be0-bef4-7418c0a51bd9","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:50:32.717256556Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"d7882364-ce7c-4dfc-9a0e-e4a51d127a65","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:50:32.720218148Z","assignee":"agent:worker"}
 {"type":"issue_updated","id":"142e1224-b094-4b11-ac64-adb6b3f89220","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:54:58.353684700Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_passed","id":"e2132e2e-645a-4b74-a422-43db60164903","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:55:19.608072426Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"76f0af71-5798-477e-a15a-ce1529e00b84","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:55:20.019037885Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a8b165a2-1a9f-4732-abee-47df1176e0a4","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:56:07.167606520Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1947ed48-24a6-4bef-88fa-997dd19f6ff4","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:58:16.015996925Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"9e39500c-f4c4-4720-9669-7903c3e6882a","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:58:39.040422878Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"c830a2bd-1b4a-4812-bd2e-bc61b1ba44db","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T20:58:39.040475458Z"}
+{"type":"issue_state_changed","id":"8d077ce6-9a3a-4f43-84df-353e8d32f46d","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T20:58:39.125370810Z","from":"backlog","to":"ready"}
