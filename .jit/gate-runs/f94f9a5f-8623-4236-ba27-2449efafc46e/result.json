@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "f94f9a5f-8623-4236-ba27-2449efafc46e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "696f1f4ed10f5c1f25e3dd61c6a97f2787f9471a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T18:12:51.561606998Z",
+  "completed_at": "2026-07-12T18:15:20.957810735Z",
+  "duration_ms": 149396,
+  "exit_code": 0,
+  "stdout": "Reviewed 15 reachable `jit:71be6ae9` commits; working tree is clean. All required non-review gate projections passed (exit 0). Prior code-review F1 is superseded by this in-flight review per REQ-10. Truncated reads were recovered by commit/path.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-scoped review changes satisfy the stated criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Issue-scoped review changes satisfy the stated criteria with no unresolved issue-impact defects.",
+    "findings": []
+  }
+}
