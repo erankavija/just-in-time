@@ -2,9 +2,9 @@
   "id": "8b479a72-237c-4113-a868-17355cef55bc",
   "title": "Cut over code review to canonical policy discovery",
   "description": "Atomically replace the repository-specific review prompt's duplicated engineering rubric with a procedure that loads applicable canonical prose, resolves relevant addressable policy, and emits auditable evidence and finding references. All prompt, wrapper, regression-test, and affected documentation changes land together so the code-review contract remains coherent when the cutover completes.\n\n## Background\n\nThe canonical repository policy and backward-compatible structured-reference field are stable prerequisites. The repository-specific prompt owns review procedure, while the shared wrapper remains tool-agnostic and registry-owned statements remain in their configured sources of truth.\n\n## Success Criteria\n\n- [hard] REQ-01: The review procedure treats every `AGENTS.md` from repository root to each affected path as the complete prose baseline, applies closer specialization, and reports unresolved contradictions.\n- [hard] REQ-02: Qualified-item discovery is bounded to citations in applicable policy, issue content, relationship labels, linked documents, attributable patches, and directly implicated behavior; every collected item is resolved from its configured source of truth before it governs a judgment.\n- [hard] REQ-03: The procedure treats `satisfies:`, `enforces:`, and `per:` labels as evidence claims, makes attributable dangling, contradictory, or unsupported claims blocking, and classifies unrelated pre-existing defects as advisory.\n- [hard] REQ-04: Every review emits the five Markdown header fields `Attribution`, `Policy sources`, `Resolved items`, `Gate evidence`, and `Truncation recovery`, using `none` for every empty value.\n- [hard] REQ-05: The procedure consumes the latest recorded required-gate evidence, leaves executable validation policy with `@/gate/jit-validate`, and does not rerun a currently passing gate.\n- [hard] REQ-06: Findings governed by addressable policy carry valid resolved qualified IDs in `references`, findings based only on ordinary code correctness may use an empty array, and PID-signaling findings cite `@/inv/pid-safety` when that invariant governs them.\n- [hard] REQ-07: `scripts/code-review-prompt.md` contains procedural discovery and judgment rules but no copied registry statements or replacement engineering rubric.\n- [hard] REQ-08: `scripts/ai-review.sh` and `contrib/gates/ai-review.sh` remain behaviorally identical and tool-agnostic, document the optional references field in their common finding example, and pass a classified referenced finding through the existing verdict contract.\n- [hard] REQ-09: Deterministic positive and negative tests cover policy precedence, bounded discovery, source-of-truth selection, relationship claims, evidence-header completeness and explicit empty values, structured references, legacy compatibility, wrapper parity, and rejection of duplicated registry prose.\n- [hard] REQ-10: User-facing custom-gate documentation and contributor guidance explain policy ownership, applicable `AGENTS.md` discovery, addressable traceability, structured references, and the boundary between repository-specific prompts and tool-agnostic wrappers.\n- [hard] REQ-11: All prompt behavior, policy regression tests, wrapper contract examples, and documentation required to validate the new review procedure are present together in the completed change.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "440d190f-266d-450f-b2b3-69dc024328a1",
     "99604a20-cb66-4712-8e09-5d8bbd0337b8"
@@ -25,6 +25,7 @@
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.638742933Z",
-  "updated_at": "2026-07-12T20:16:30.037541378Z",
-  "first_ready_at": "2026-07-12T19:25:27.638749413Z"
+  "updated_at": "2026-07-12T20:16:57.551467665Z",
+  "first_ready_at": "2026-07-12T19:25:27.638749413Z",
+  "claimed_at": "2026-07-12T20:16:57.551467515Z"
 }
