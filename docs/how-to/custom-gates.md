@@ -577,44 +577,29 @@ Gate presets are pre-configured bundles of quality gates that dramatically reduc
 
 ### Using Builtin Presets
 
-JIT ships builtin presets covering language TDD workflows (`rust-tdd`,
-`python-tdd`, `js-tdd`), a `security-audit` workflow, a `minimal` review-only
-workflow, and the three [planning-bracket](../concepts/planning-bracket.md) gates
-(`plan-review`, `coverage-preview`, `breakdown-review`). `jit gate preset list` is
-the authoritative source; each line reports a preset name, its description, and its
-gate count:
+Every preset the binary ships — each one's gates with their keys, stages, modes,
+descriptions, and checker configuration — is listed in
+[Built-in Gate Presets](../reference/gate-presets.md), a reference generated from
+the preset definitions themselves. Among them are the three
+[planning-bracket](../concepts/planning-bracket.md) presets.
 
 **List available presets:**
 ```bash
 jit gate preset list
 ```
 
-Each line is prefixed `[builtin]` and names one preset. To inspect the gates a
-preset carries, run `jit gate preset show <name>`.
+Each line names one preset with its description and gate count, prefixed
+`[builtin]` for a preset the binary ships. To inspect the gates a preset carries,
+run `jit gate preset show <name>`.
 
 **View preset details:**
 ```bash
 jit gate preset show rust-tdd
 ```
 
-**Output:**
-```
-Preset: rust-tdd
-Description: Test-driven development workflow for Rust projects
-
-Gates:
-  tdd-reminder - Write tests first (TDD) (precheck:manual)
-  tests - All tests pass (postcheck:auto)
-    Command: cargo test
-    Timeout: 300s
-  clippy - Clippy lints pass (postcheck:auto)
-    Command: cargo clippy --all-targets -- -D warnings
-    Timeout: 120s
-  fmt - Code formatted (postcheck:auto)
-    Command: cargo fmt --check
-    Timeout: 30s
-  code-review - Code review completed (postcheck:manual)
-```
+The output names the preset and its description, then each bundled gate with its
+key, title, stage, mode, and — for automated gates — the checker command and
+timeout.
 
 **Apply preset to issue:**
 ```bash
@@ -625,10 +610,9 @@ jit issue create --title "Implement user authentication"
 jit gate preset apply rust-tdd abc123
 ```
 
-**Done!** The issue now has:
-- TDD reminder (precheck)
-- Tests, clippy, fmt (automated postchecks)
-- Code review (manual postcheck)
+The issue now requires every gate the preset bundles, and each of those gates is
+defined in `.jit/gates.toml` — `apply` inserts the definition for any key the
+registry does not already carry.
 
 ### Customizing Preset Application
 
@@ -638,14 +622,14 @@ Filter which gates to apply using command options:
 ```bash
 # For hotfixes or situations where TDD isn't required
 jit gate preset apply rust-tdd abc123 --no-precheck
-# Adds: tests, clippy, fmt, code-review (skips tdd-reminder)
+# Applies only the preset's postcheck gates
 ```
 
 **Skip postcheck gates:**
 ```bash
 # For planning or precheck-only workflows
 jit gate preset apply rust-tdd abc123 --no-postcheck
-# Adds: tdd-reminder only
+# Applies only the preset's precheck gates
 ```
 
 **Exclude specific gates:**
@@ -655,21 +639,21 @@ jit gate preset apply rust-tdd abc123 --except clippy
 
 # Skip multiple gates
 jit gate preset apply rust-tdd abc123 --except clippy --except fmt
-# Adds: tdd-reminder, tests, code-review
+# Applies every other gate the preset bundles
 ```
 
 **Override timeouts:**
 ```bash
 # Increase timeout for slow CI
 jit gate preset apply rust-tdd abc123 --timeout 600
-# All automated gates get 600s timeout instead of defaults
+# Every automated gate in the preset gets a 600s timeout instead of its own
 ```
 
 **Combine filters:**
 ```bash
 # Hotfix workflow: no precheck, no linter, fast timeout
 jit gate preset apply rust-tdd abc123 --no-precheck --except clippy --timeout 60
-# Adds: tests (60s), fmt (60s), code-review
+# Applies the preset's postcheck gates except clippy, each with a 60s timeout
 ```
 
 ### Batch Operations

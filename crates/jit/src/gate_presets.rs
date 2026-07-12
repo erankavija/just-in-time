@@ -3,10 +3,16 @@
 //! This module provides functionality for managing gate presets - pre-configured
 //! bundles of quality gates that can be applied to issues. Presets encode best
 //! practices for common workflows (e.g., rust-tdd, minimal) and reduce setup time.
+//!
+//! [`BuiltinPresets`] carries the presets the binary ships; [`PresetManager`]
+//! loads those plus a project's own presets from `.jit/config/gate-presets/`.
+//! The [`reference`] submodule projects the built-in definitions into the
+//! committed markdown reference [`REFERENCE_PATH`].
 
 mod builtin;
 mod manager;
 mod planning;
+pub mod reference;
 
 pub use builtin::BuiltinPresets;
 pub use manager::PresetManager;
@@ -14,6 +20,7 @@ pub use planning::{
     breakdown_review_preset, coverage_preview_preset, plan_review_preset, preview_coverage_rule,
     BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_GATE, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
 };
+pub use reference::{render_reference_markdown, REFERENCE_PATH};
 
 use crate::domain::{Gate, GateChecker, GateMode, GateStage};
 use anyhow::{anyhow, Result};

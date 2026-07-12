@@ -1712,22 +1712,18 @@ Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are auto
 
 ### Builtin Presets
 
-JIT embeds a set of builtin presets in the binary. The builtin registry is the
-source of truth for their names and contents, so introspect them with the live
-commands rather than a hand-maintained copy: `jit gate preset list` prints every
-preset with a one-line summary, and `jit gate preset show <name>` prints a
-preset's full gate list (keys, stages, commands, timeouts). The bundles shipped:
+JIT embeds a set of builtin presets in the binary. Their definitions are the
+source of truth for what each one bundles;
+[Built-in Gate Presets](gate-presets.md) is generated from those definitions and
+lists every preset with each of its gates (key, title, stage, mode, description,
+checker). The live commands introspect the same set: `jit gate preset list` prints
+every preset with a one-line summary, and `jit gate preset show <name>` prints one
+preset's gate list.
 
-- **Language TDD starters** — `rust-tdd`, `python-tdd`, `js-tdd`: a tests-first
-  reminder plus that ecosystem's test/lint/format gates and a code review.
-- **`security-audit`** — a security review plus automated secret- and
-  dependency-scanning gates.
-- **`minimal`** — a single code-review gate.
-- **Planning-bracket trio** — `plan-review`, `coverage-preview`,
-  `breakdown-review`: attach automatically to the planning (`P`) and breakdown
-  (`B`) nodes when a breakable container is
-  [bracketed](../concepts/planning-bracket.md), reviewing the plan and the
-  decomposition before fan-out.
+Among them are the planning-bracket presets, which attach to the planning (`P`)
+and breakdown (`B`) nodes when a breakable container is
+[bracketed](../concepts/planning-bracket.md), reviewing the plan and the
+decomposition before fan-out.
 
 **Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
 
