@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "642c5afe-4ea9-4e68-847a-69a2ef27428d",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "004d10b7-13d7-4a35-9467-f9572a373b27",
+  "commit": "3bf803be722eed8a1bb59c172e46570814f01df6",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T12:57:43.830278487Z",
+  "completed_at": "2026-07-12T13:00:09.694896846Z",
+  "duration_ms": 145864,
+  "exit_code": 0,
+  "stdout": "Attribution used the configured hierarchy (level 4 maximum): `004d10b7` is a container with ten resolved, delivered leaf children. I reviewed the 64 `jit:<short-id>` commits reachable from `HEAD` individually with rename detection, excluding non-reachable tagged commits. No included issue lacked commit attribution.\n\nThe combined contract is accurate and discoverable: generated references cover exit codes, events, storage records, runtime defaults, and shipped gate presets; configuration, installation, help, and cross-links match current behavior. No prior review run exists.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable documentation effects are accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable documentation effects are accurate, discoverable, and concise.",
+    "findings": []
+  }
+}
