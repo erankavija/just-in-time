@@ -15,6 +15,16 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.351187949Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.351083239Z"
+    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -24,20 +34,36 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.351163149Z"
-    },
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.351083239Z"
-    },
-    "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.351187949Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "docs/reference/events.md",
+      "commit": null,
+      "label": "Event Log Tags",
+      "doc_type": null,
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "8b492a0b0fc26407087a158347e53c6624eb916cba4eac7d8a8c7be6d9307881",
+          "is_shared": false
+        },
+        {
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md",
+          "asset_type": "local",
+          "mime_type": "text/markdown",
+          "content_hash": "f85181c18f659df6849ecb1938c475562d0f1a14db2123262caeb50e575f1fbb",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "type:task",
     "milestone:v1.0",
@@ -45,7 +71,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.552941581Z",
-  "updated_at": "2026-07-12T09:21:16.065005304Z",
+  "updated_at": "2026-07-12T11:25:43.137830961Z",
   "first_ready_at": "2026-07-11T13:35:35.552941921Z",
   "claimed_at": "2026-07-12T09:21:16.065005114Z"
 }
