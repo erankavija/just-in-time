@@ -2,9 +2,9 @@
   "id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
   "title": "Make code review issue-scoped, evidence-aware, and truncation-resistant",
   "description": "Make the AI code-review gate reliably review only the work attributable to its context issue, consume compact current evidence, and complete repository inspection without losing relevant output to truncation.\n\n## Background\n\nSession-record analysis found that the review prompt and issue payload generally reach Codex intact, but the reviewer must infer its implementation footprint from a busy repository, receives full prior review narratives instead of compact structured findings, and frequently loses broad command output to tool truncation. The prompt also describes test-run evidence that gate context does not provide and does not clearly separate issue-introduced debt from useful pre-existing observations.\n\nCode-review attribution follows the repository's existing documentation-review convention: commits reachable on the current branch whose messages contain the literal `jit:<short-id>` tag define the attributable patches. Current source establishes the behavior that will ship. The generic gate context remains domain-agnostic and git-optional; attribution discovery belongs to the repository review policy rather than core engine assumptions.\n\n## Success Criteria\n\n- [hard] REQ-01: Code review constructs its attributable footprint from commits reachable on the current branch whose messages contain `jit:<short-id>`, inspecting individual patches with rename and deletion detection and using the current tree to verify behavior.\n- [hard] REQ-02: When no tagged commit exists, review falls back to issue intent and linked documents, states that commit attribution was unavailable, and neither attributes uncommitted changes nor expands into a repository-wide audit.\n- [hard] REQ-03: Generic gate context supplies only the latest prior run's structured findings, verdict, and metadata, with stdout retained solely as a compatibility fallback for unstructured legacy runs.\n- [hard] REQ-04: Code review treats the latest recorded exit status as sufficient CI evidence, allows a newer successful run to supersede older failures, and no longer claims unavailable test-run output is present.\n- [hard] REQ-05: Issue-introduced material debt is blocking; useful pre-existing debt is reported as advisory and cannot fail the issue. Test adequacy is reviewed, while test-first history is required only when explicit evidence exists.\n- [hard] REQ-06: Code review is explicitly read-only, does not invoke issue-lifecycle skills or mutating commands, and runs Codex with an explicit read-only sandbox.\n- [hard] REQ-07: The inspection protocol starts with tagged commits, diff statistics, and changed-file lists, reads patches and files in bounded calls, and recovers every relevant truncated result before issuing a verdict.\n- [hard] REQ-08: The existing `JIT-FINDINGS-JSON` protocol remains compatible, its duplicated prompt instructions are consolidated, and regression tests cover both repository and contributed checker copies.\n- [hard] REQ-09: Deterministic tests cover attribution policy, compact prior-review context, CI semantics, debt classification, read-only behavior, and truncation recovery.\n- [hard] REQ-10: A representative live review demonstrates correct attribution, complete context, no unresolved truncated evidence, and a valid verdict and findings contract; its report records the session id and measurements under `dev/active/` and is linked to the issue.\n\n## Notes\n\nThe existing `JIT-FINDINGS-JSON` fenced protocol is retained. This work does not migrate the checker to `codex exec --output-schema` and does not sequence behind the separate merged-commit verification issue.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -36,6 +36,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-11T23:25:03.291514967Z",
-  "updated_at": "2026-07-12T13:38:46.022137554Z",
-  "first_ready_at": "2026-07-11T23:25:03.291533827Z"
+  "updated_at": "2026-07-12T17:15:24.993086285Z",
+  "first_ready_at": "2026-07-11T23:25:03.291533827Z",
+  "claimed_at": "2026-07-12T17:15:24.993086065Z"
 }
