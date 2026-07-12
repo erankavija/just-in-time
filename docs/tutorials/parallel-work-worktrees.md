@@ -116,7 +116,7 @@ You should see:
 
 The claim creates a **lease** that:
 - Is held exclusively — while your lease is active, another agent cannot acquire a lease on the same issue
-- Expires after TTL (default: 10 minutes)
+- Expires after its TTL (see the [default claim lease TTL](../reference/runtime-defaults.md))
 - Can be renewed if you need more time
 
 A lease is advisory work coordination: it signals intent and hands out exclusive *ownership of the lease*, but by default it does not lock the issue's files against an agent that skips claiming. Whether write operations require a lease is configurable — see `enforce_leases` in the [Configuration Reference](../reference/configuration.md#enforce_leases).

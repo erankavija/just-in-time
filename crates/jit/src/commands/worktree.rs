@@ -687,7 +687,9 @@ mod tests {
         let clock = Arc::new(FixedClock::new(base));
         let coordinator = ClaimCoordinator::new(
             paths.clone(),
-            FileLocker::new(StdDuration::from_secs(5)),
+            FileLocker::new(StdDuration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
             worktree_id,
             "agent:test".to_string(),
         )

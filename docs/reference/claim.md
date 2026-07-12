@@ -67,7 +67,7 @@ multi-agent coordination.
 ### Examples
 
 ```bash
-# Standard 10-minute lease
+# Lease with the default TTL
 jit claim acquire abc123
 
 # 1-hour lease
@@ -220,7 +220,7 @@ Extends the expiry time of an existing lease. For finite leases, adds time to th
 ### Examples
 
 ```bash
-# Extend by 10 minutes (default)
+# Extend by the default TTL
 jit claim renew abc12345-6789-...
 
 # Extend by 1 hour

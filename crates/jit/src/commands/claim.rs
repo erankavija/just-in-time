@@ -126,8 +126,10 @@ pub fn execute_claim_acquire<S: IssueStore>(
         .build();
     let coord_config = config.coordination();
 
-    // Create file locker with 5-second timeout
-    let locker = FileLocker::new(Duration::from_secs(5));
+    // Create file locker with the default lock-acquisition timeout
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
 
     // Create claim coordinator
     let coordinator = ClaimCoordinator::new(
@@ -216,7 +218,9 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
     let agent = resolve_agent_id(None)?;
 
     // Create coordinator
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
 
     // Send heartbeat
@@ -361,7 +365,9 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
         .context("Cannot release lease without an attributable acting identity")?;
 
     // Create file locker and coordinator using the actor as the agent id.
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         locker,
@@ -463,7 +469,9 @@ pub fn execute_claim_renew<S: IssueStore>(
     let agent = resolve_agent_id(None)?;
 
     // Create locker and coordinator
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
         locker,
@@ -532,7 +540,9 @@ pub fn execute_claim_status<S: IssueStore>(
     let current_agent_id = resolve_agent_id(None)?;
 
     // Create claim coordinator
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(
         paths,
         locker,
@@ -600,7 +610,9 @@ pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     let agent = "system:list".to_string();
 
     // Create claim coordinator
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
     coordinator.init()?;
 
@@ -654,7 +666,9 @@ pub fn check_issue_lease(
 
     // Create coordinator to check leases
     let agent = current_agent.unwrap_or("system:check").to_string();
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent.clone());
 
     // Don't fail if control plane doesn't exist yet
@@ -727,7 +741,9 @@ pub fn execute_claim_force_evict<S: IssueStore>(
     let agent = "system:admin".to_string();
 
     // Create claim coordinator
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
     coordinator.init()?;
 
@@ -781,7 +797,9 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
 
     // Create claim coordinator
     let agent = "system:recovery".to_string();
-    let locker = FileLocker::new(Duration::from_secs(5));
+    let locker = FileLocker::new(Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
 
@@ -891,7 +909,9 @@ mod tests {
             load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
 
         // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
@@ -910,7 +930,9 @@ mod tests {
         let paths = create_test_paths(temp);
 
         // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator =
             ClaimCoordinator::new(paths, locker, "wt:test".to_string(), agent_id.to_string());
 
@@ -933,7 +955,9 @@ mod tests {
         let full_id = storage.resolve_issue_id(issue_id)?;
         let paths = create_test_paths(temp);
 
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator =
             ClaimCoordinator::new(paths, locker, "wt:test".to_string(), actor.to_string());
         coordinator.init()?;
@@ -1105,7 +1129,9 @@ mod tests {
         let paths = create_test_paths(temp);
 
         // Create coordinator
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
@@ -1249,7 +1275,9 @@ mod tests {
         let identity =
             load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
 
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator =
             ClaimCoordinator::new(paths, locker, identity.worktree_id, agent_id.to_string());
 
@@ -1267,7 +1295,9 @@ mod tests {
 
         // Get original lease
         let paths = create_test_paths(&temp);
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
@@ -1539,7 +1569,9 @@ mod tests {
     fn execute_claim_list_test(temp: &TempDir) -> Result<Vec<Lease>> {
         let paths = create_test_paths(temp);
 
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
@@ -1621,7 +1653,9 @@ mod tests {
     fn execute_claim_force_evict_test(temp: &TempDir, lease_id: &str, reason: &str) -> Result<()> {
         let paths = create_test_paths(temp);
 
-        let locker = FileLocker::new(Duration::from_secs(5));
+        let locker = FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,

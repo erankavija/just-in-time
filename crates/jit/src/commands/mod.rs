@@ -1184,9 +1184,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let locks_dir = control_plane.join("locks");
         std::fs::create_dir_all(&locks_dir)
             .context("Failed to create control-plane locks directory")?;
-        FileLocker::new(Duration::from_secs(5))
-            .lock_exclusive(&locks_dir.join(lock_file))
-            .map(Some)
+        FileLocker::new(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ))
+        .lock_exclusive(&locks_dir.join(lock_file))
+        .map(Some)
     }
 
     /// Resolve the git control-plane dir (`<git-common-dir>/jit`) for the

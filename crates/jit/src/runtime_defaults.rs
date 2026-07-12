@@ -3,9 +3,9 @@
 //! These constants are the single source of truth for the operational defaults
 //! that govern multi-agent coordination and startup recovery: the lease
 //! heartbeat cadence, the file-lock acquisition timeout and poll interval, the
-//! orphaned temp-file cleanup threshold, and the default claim lease TTL. The
-//! default-resolution paths reference the constants here instead of inline
-//! literals, so each default is defined in exactly one place.
+//! orphaned temp-file cleanup threshold, and the default claim lease TTL. Call
+//! sites reference the constants here instead of inline literals, so each
+//! default value has one definition.
 //!
 //! [`render_reference_markdown`] projects these constants into the committed
 //! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
@@ -120,12 +120,12 @@ pub fn render_reference_markdown() -> String {
         (
             "Heartbeat interval",
             format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
-            "Default interval between lease heartbeat updates; a lease heartbeat is treated as stale after twice this interval.",
+            "Default cadence for the heartbeat updates that keep an indefinite (TTL=0) lease alive; the heartbeat helper marks a heartbeat stale after twice this interval. Finite claim leases expire on their own TTL instead (see Claim lease TTL).",
         ),
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Maximum time a writer waits for a `.jit` file lock or the repository write lock before failing. Override with the `JIT_LOCK_TIMEOUT` environment variable.",
+            "Default timeout to acquire a file lock before failing. The repository storage write lock additionally honors the `JIT_LOCK_TIMEOUT` environment override; other file locks use this fixed default.",
         ),
         (
             "Lock poll interval",
@@ -155,9 +155,9 @@ pub fn render_reference_markdown() -> String {
          \n\
          # Runtime Coordination Defaults\n\
          \n\
-         Built-in defaults for multi-agent coordination and startup recovery. Each\n\
-         value is defined once in the `crates/jit/src/runtime_defaults.rs` module,\n\
-         and this reference is generated from it.\n\
+         Built-in defaults for multi-agent coordination and startup recovery. This\n\
+         reference is generated from the `crates/jit/src/runtime_defaults.rs`\n\
+         module, which defines these values.\n\
          \n\
          | Default | Value | Scope |\n\
          | --- | --- | --- |\n\

@@ -1289,7 +1289,9 @@ mod tests {
             shared_jit: temp_dir.path().join(".git/jit"),
         };
 
-        let locker = FileLocker::new(StdDuration::from_secs(5));
+        let locker = FileLocker::new(StdDuration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ));
         let coordinator = ClaimCoordinator::new(
             paths,
             locker,
@@ -1538,7 +1540,9 @@ mod tests {
         };
         let coordinator2 = ClaimCoordinator::new(
             paths,
-            FileLocker::new(StdDuration::from_secs(5)),
+            FileLocker::new(StdDuration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
             "wt:other".to_string(),
             "agent:other".to_string(),
         );
@@ -1594,7 +1598,9 @@ mod tests {
         };
         let coordinator2 = ClaimCoordinator::new(
             paths,
-            FileLocker::new(StdDuration::from_secs(5)),
+            FileLocker::new(StdDuration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
             "wt:other".to_string(),
             "agent:other".to_string(),
         );
@@ -1622,7 +1628,9 @@ mod tests {
         };
         let admin_coordinator = ClaimCoordinator::new(
             paths,
-            FileLocker::new(StdDuration::from_secs(5)),
+            FileLocker::new(StdDuration::from_secs(
+                crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+            )),
             "wt:admin".to_string(),
             "admin:alice".to_string(),
         );
