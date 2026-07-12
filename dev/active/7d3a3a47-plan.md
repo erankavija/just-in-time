@@ -20,7 +20,7 @@ in the §3 coverage map.
 | REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | A pure classifier computes an action per artifact from all reference owners (repository-wide, not directory convention), current lifecycle state, component-aware managed/permanent policy, destination occupancy, and pinned-commit semantics. Ambiguous cases resolve to `block`. | Replaces the two inconsistent directory-heuristic notions of "shared" (`document.rs:1463-1495`, `assets.rs:185-233`) with one repository-wide reference-count classifier. |
 | REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under repository write coordination, stages the complete set, validates every supported local edge at its proposed destination, persists reference and event changes, then deletes only sources proven safe. Reuses the current copy-to-temp/finalize/relink/delete sequencing and rollback principles (`document.rs:1637-1787`, `:1391-1435`), generalized through a storage-owned mutation primitive holding the re-entrant write guard (`storage/mod.rs:126`). Finalization is atomic no-replace (D-14), closing the overwrite window against external writers. Guarantee: no failure loses an artifact, overwrites a destination, or leaves a reference relying exclusively on a missing path; unverifiable rollback retains resolvable duplicates and reports manual cleanup. | Only Done/Rejected containers execute (D-8); non-terminal containers preview only. |
 | REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`, so a sibling `base.css` and `themes/rust.css` are recognized as bundle dependencies rather than mislabelled shared. The D-12 mirror layout keeps every relative offset between bundle members invariant, and execution validates every moved edge resolves in the proposed layout before metadata commit, fixing the source/destination path-set mismatch in the current verifier (`document.rs:1832-1858`). | Detected JavaScript/runtime loading is reported unsupported, never guessed (D-5). |
-| REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers, each with documentation-policy status, repository-wide artifact ownership, artifact counts, blockers, and move/copy/retain summaries, plus a derivable suggested category. It consumes the same plan model and performs no filesystem, issue, or event mutation. | No time/retention semantics: eligibility is current terminal state and policy only (D-6); the live REQ-05 wording is already amended to remove `done_at`. |
+| REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers, each with documentation-policy status, repository-wide artifact ownership, artifact counts, blockers, and move/copy/retain summaries. It consumes the same plan model, always evaluates fully (archival takes no category input, D-21), and performs no filesystem, issue, or event mutation. | No time/retention semantics: eligibility is current terminal state and policy only (D-6); the live REQ-05 wording is already amended to remove `done_at`. |
 | REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | The plan model serializes to a stable JSON envelope; preview is the non-mutating default for both `jit archive document` and `jit archive container`. A representative fixture corpus (Markdown links; HTML→sibling CSS→nested theme image/font; CSS `@import`/`url()`; direct CSV/PNG/SVG roots; permanent shared figures; active outside consumers; identical filenames; missing edges; pinned commits; a dependency cycle) exercises discovery, classification, preview, and execution. | Preview is the default; mutation requires `--execute`, which recomputes and revalidates immediately before mutating (D-7). |
 
 No criterion is silently narrowed or dropped. No missing criterion surfaced during
@@ -36,9 +36,10 @@ planning.
   active/terminal/permanent/pinned/missing/conflict evidence, supported/unsupported edges,
   issue-reference changes, and stable machine-readable warnings/blockers. Container traversal
   reuses DAG-authoritative closure, not label membership.
-  **Destination layout (D-12):** the destination root is
-  `<archive_root>/<category-mapping>/` plus, for container targets, `<container.short_id>/`;
-  every moved or copied artifact lands at that root plus its repository-relative source path.
+  **Destination layout (D-12):** the destination root is `<archive_root>/` plus, for
+  container targets, `<container.short_id>/`; every moved or copied artifact lands at that
+  root plus its repository-relative source path. Archival takes no category input (D-21):
+  the mirror rule alone determines every destination.
   Mirroring repository-relative paths under one common prefix keeps every relative offset
   between bundle members invariant, keeps identical filenames from different directories
   distinct, and makes intra-plan destination collisions impossible (two artifacts collide only
@@ -68,11 +69,15 @@ planning.
 
 - **Archive-plan JSON schema and blocker taxonomy (binding for the plan-model task):**
   - **Envelope:** `schema_version` (starts at 1; codes are append-only and never change
-    meaning), `target` (`{"kind": "container"|"document", "id"|"path": …}`), `category`,
+    meaning), `target` (`{"kind": "container"|"document", "id"|"path": …}`),
     `destination_root`, `operation_id` (hash of the stable operation identity — target,
-    category, destination root — invariant across retries; D-19), `plan_fingerprint` (hash of
-    the canonical plan serialization excluding volatile fields — staleness detection for D-7
-    revalidation, expected to change as repository state changes), `eligible` (bool),
+    destination root, and the sorted canonical source-path set, where an
+    already-archived artifact contributes its inverse-mapped original source — invariant
+    across retries of one operation yet distinct for a later operation over a different
+    artifact set; D-19), `execution_id` (fresh UUID per mutating execution, distinguishing
+    every invocation including re-runs of an identical operation; D-19), `plan_fingerprint`
+    (hash of the canonical plan serialization excluding volatile fields — staleness detection
+    for D-7 revalidation, expected to change as repository state changes), `eligible` (bool),
     `policy_status` (`configured`|`unconfigured`), `counts` (one integer per action plus
     `already_archived`), `artifact_count` + `artifacts` (the repository list-envelope
     convention; entries deterministically ordered by normalized source path), and plan-level
@@ -87,7 +92,7 @@ planning.
   - **Blocker codes (stable kebab-case):** `policy-unconfigured`, `unmanaged-path`,
     `permanent-path`, `destination-conflict`, `outside-owner-conflict`, `active-owner`,
     `unsupported-dynamic-edge`, `repository-escape`, `unresolvable-edge`,
-    `non-terminal-target`, `stale-plan`, `missing-source`.
+    `non-terminal-target`, `stale-plan`, `missing-source`, `symlink-artifact`.
   - **Warning codes:** `missing-edge-target`, `external-edge`, `no-owner`,
     `residue-source`, `deletion-failed`, `not-selected-sibling`.
   - **Missing-artifact semantics:** an explicit root whose source path does not exist gets
@@ -96,7 +101,23 @@ planning.
     entrenched or skipped. A missing **embedded** target gets warning `missing-edge-target`
     on the referencing artifact: it contributes no needs-destination constraint, is excluded
     from before/after edge validation (the edge resolves nowhere before archival, so no
-    regression is possible), and never blocks. The command layer loads inputs,
+    regression is possible), and never blocks.
+  - **Candidate evaluation context:** `jit archive candidates` produces the same envelope
+    per candidate with every check evaluated — archival takes no category input (D-21), so
+    destinations are always computable and nothing is deferred or guessed.
+  - **Symlink semantics (D-22):** an explicit root or embedded target that is a symbolic
+    link, or whose repository-relative path traverses one, classifies as `block` with
+    blocker `symlink-artifact`; the mutation primitive resolves paths physically and
+    verifies the resolved target stays inside the repository before staging, and never
+    moves, copies, or deletes through a link. Richer symlink relocation is a follow-up.
+  - **Dynamic-loading detection contract (D-23):** `<script src="…">` is a static supported
+    edge (the script file is a bundle dependency like any other). The
+    `unsupported-dynamic-edge` blocker fires when a relocated HTML or script bundle member
+    textually contains a runtime-loading construct from the binding initial set —
+    `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`, or a URL-bearing `data-*`
+    attribute (e.g. reveal.js `data-markdown`, lazy-load `data-src`) — detected by pattern
+    match over the content, never by execution or guessing (D-5). Constructs outside the
+    set are outside the contract; the set is append-only under `schema_version`. The command layer loads inputs,
   calls the pure planner, renders preview, and executes an accepted plan; it does not
   duplicate decision logic between preview and execution. A storage-owned artifact mutation
   primitive centralizes staging, containment, no-replace finalization (D-14), and collision
@@ -195,8 +216,10 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   before/after edge reachability, repository-escape rejection, and detected JavaScript/runtime
   loading reported as an unsupported edge rather than guessed.
   Own criteria: `[hard] LOCAL-05: Discovers an HTML→sibling-CSS→nested-figure chain and CSS
-  @import/url() targets to full depth.` `[hard] LOCAL-06: Terminates on dependency cycles and
-  reports detected dynamic JavaScript loading as unsupported.`
+  @import/url() targets to full depth, treating script-element src URLs as static supported
+  edges.` `[hard] LOCAL-06: Terminates on dependency cycles and reports runtime-loading
+  constructs from the binding detection set (§2 dynamic-loading contract) as unsupported
+  edges, by textual pattern match only.`
   Blast radius: extends the document adapter/scanner surface; existing Markdown/HTML callers
   (snapshot export) are unaffected because discovery is a new recursive path.
 
@@ -221,7 +244,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   dev/active-other does not match dev/active.`
   `[hard] LOCAL-19: Classifies an artifact whose proposed destination is occupied by differing
   content as blocked, citing the conflicting path in the blocker evidence; a content-identical
-  occupied destination classifies as already archived.`
+  occupied destination classifies as already archived.` `[hard] LOCAL-32: Classifies a symlink
+  root or embedded target, or a path traversing one, as blocked with the symlink-artifact
+  code (D-22).`
   `[hard] LOCAL-21: Proposes destinations by mirroring each artifact's repository-relative
   source path beneath the target's destination root, so identical filenames from different
   directories stay distinct and every relative offset between bundle members is preserved.`
@@ -241,7 +266,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   directory (`.jit/tmp` lives inside the repository) then unlink the staged copy, which fails
   with `AlreadyExists` instead of clobbering a destination created after the plan's occupancy
   check — never check-then-`rename`, whose overwrite window the repository write guard cannot
-  close against external filesystem writers (D-14).
+  close against external filesystem writers (D-14). Containment checks resolve paths
+  physically before staging, and the primitive never moves, copies, or deletes through a
+  symbolic link (D-22).
   Own criteria: `[hard] LOCAL-09: Rejects an occupied destination with the pre-existing file
   preserved byte-for-byte.` `[hard] LOCAL-10: Holds one write guard across staging, reference
   saves, and event append.` `[hard] LOCAL-22: A destination created by an external writer
@@ -288,23 +315,28 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   derives the original source path from the destination, and a still-existing, content-identical
   source (`residue-source` warning) is completed as an identity-verified deletion (D-17) even
   though no reference points at it anymore. Every mutating execution appends one archive event
-  recording the operation id — the retry-stable hash of target, category, and destination root —
-  alongside the executed plan's fingerprint and the mutations actually performed (D-19). A rerun
-  recomputes state, so its fingerprint differs, but its operation id does not: events of one
-  archival operation, including a crash-window duplicate, correlate by operation id, preserving
-  the existing reported-duplicate contract (`document.rs:1050-1074`).
+  recording the operation id — the retry-stable hash of target, destination root, and
+  the sorted canonical source set (already-archived artifacts contribute their inverse-mapped
+  original sources, so the set is invariant across retries) — a fresh per-execution
+  `execution_id`, the executed plan's fingerprint, and the mutations actually performed (D-19).
+  A rerun recomputes state, so its fingerprint differs, but its operation id does not; a later
+  independent archival over a different artifact set hashes to a different operation id, and
+  re-runs of an identical operation are distinguished by execution id and log order. A
+  crash-window duplicate for one operation remains possible and correlates by operation id,
+  preserving the existing reported-duplicate contract (`document.rs:1050-1074`).
   Own criteria: `[hard] LOCAL-13: Validates each staged local edge in the proposed layout, not
   against source-resolved paths, before commit.` `[hard] LOCAL-23: Refuses document-target
   execution while any owner of the document or its bundle artifacts is non-terminal.`
   `[hard] LOCAL-26: Rerunning execution after a partial staging, relink, event, or deletion
   failure converges — content-identical occupied destinations count as archived, no duplicate
-  destination, reference, or event is created, and the remaining mutations complete —
-  verified by failure-injection retry tests.` `[hard] LOCAL-28: After a post-commit deletion
+  destination or reference is created, event emission follows the D-19 contract, and the
+  remaining mutations complete — verified by failure-injection retry tests.` `[hard] LOCAL-28: After a post-commit deletion
   failure, a rerun rediscovers the orphaned source through the inverse destination mapping and
   completes its identity-verified removal.` `[hard] LOCAL-29: Each mutating execution appends
-  one archive event carrying the retry-stable operation id, the executed plan's fingerprint,
-  and the performed mutations; a rerun that mutates nothing appends no event; events of one
-  operation correlate by operation id across retries.` `[hard] LOCAL-14: A partial-relink, event-append,
+  one archive event carrying the retry-stable operation id, a unique execution id, the
+  executed plan's fingerprint, and the performed mutations; a rerun that mutates nothing
+  appends no event; events of one operation correlate by operation id across retries while
+  distinct operations over different artifact sets never share one.` `[hard] LOCAL-14: A partial-relink, event-append,
   or deletion failure leaves no artifact lost, no destination overwritten, and no reference
   relying solely on a missing path.` `[hard] LOCAL-15: Refuses execution on a non-terminal
   container and on a stale recomputed plan.`
@@ -315,6 +347,8 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   stub, and all consumers (CLI/main dispatch, `ArchiveResult`, event catalog/schema references,
   integration and unit tests, fixtures, docs, README, and the auto-generated MCP tool set) are
   updated in the same change so the tree builds and tests pass with only the unified surface.
+  The legacy `[documentation.categories]` configuration table retires with it (D-21): its
+  loader field, docs, and this repository's config entries go in the same change.
   Own criteria: `[hard] LOCAL-16: A tree-wide search for the legacy surface (the strings
   "doc archive", "archive_document", "ArchiveResult") across crates/, mcp-server/, web/,
   docs/, and dev/ returns no live production or test reference; only historical dev/ records
@@ -331,22 +365,17 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   the DAG — each with
   documentation-policy status, managed/permanent path status, repository-wide artifact ownership,
   artifact counts, outside-subtree/active/pinned/missing/unsupported/conflict blockers, a
-  move/copy/retain summary, and a derivable suggested category, in both human and JSON form, with
-  no filesystem, issue, or event mutation and no age or retention filtering. Category handling is
-  deterministic (D-21): per candidate, the suggested category is the unique `[documentation]`
-  category that every explicit root's `doc_type` maps to; when the mapping is absent or not
-  unique, the suggestion is null and destination-dependent checks (destination conflicts,
-  proposed layouts) are reported as `not-evaluated` rather than guessed. An optional
-  `--type <category>` argument evaluates every candidate fully against that category; explicit
-  selection always remains the execution-time contract (D-4).
+  move/copy/retain summary, in both human and JSON form, with no filesystem, issue, or event
+  mutation and no age or retention filtering. Every candidate is evaluated fully: archival
+  takes no category input (D-21), so the D-12 mirror rule determines each destination and no
+  check is deferred or guessed.
   Own criteria: `[hard] LOCAL-17: Lists terminal containers with policy status, ownership, counts,
   and blockers, explaining exclusions rather than omitting them.` `[hard] LOCAL-18: Emits identical
   human and JSON results while mutating nothing, and applies no time/retention filter.`
   `[hard] LOCAL-30: Derives candidate container-ness from the configured type hierarchy's
   non-leaf levels and DAG-authoritative membership, with no hardcoded type names.`
-  `[hard] LOCAL-31: Suggests a category only when every explicit root's doc_type maps to one
-  unique configured category; otherwise reports a null suggestion with destination-dependent
-  checks marked not-evaluated, and accepts an explicit category argument for full evaluation.`
+  `[hard] LOCAL-31: Evaluates every candidate fully — including destination conflicts under
+  the mirror rule — with no category input, suggestion, or deferred check.`
   Blast radius: self-contained new read-only command consuming Group A.
 
 **Coverage map** (single source for criterion→item; every `[hard]` criterion → ≥1 item):
@@ -390,7 +419,7 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination, so the dependency moves or copies; root-relative edges instead force source retention; the classifier never emits an unpreservable layout (LOCAL-24) and execution re-validates every edge (LOCAL-13). |
 | Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). |
 | A partial failure leaves an unrecoverable half-archived state on retry | Medium | D-18: retry recomputes and converges — content-identical destinations count as archived, only remaining mutations apply, no duplicate events; orphaned sources are rediscovered through the inverse D-12 mapping (LOCAL-28); covered by failure-injection retry tests (LOCAL-26). |
-| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the retry-stable operation id (target, category, destination root) and performed mutations; nothing-mutated reruns append nothing; crash-window duplicates correlate by operation id (LOCAL-29). |
+| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the retry-stable operation id (target, destination root, canonical source set) plus a unique execution id; nothing-mutated reruns append nothing; crash-window duplicates correlate by operation id (LOCAL-29). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
 | Event granularity for a multi-artifact action undefined | Low | Executor emits a container/plan-scoped archive event carrying artifact and reference detail; current single event cannot audit a multi-artifact action (`types.rs:1466`). Decided in the execution task. |
 
@@ -410,9 +439,11 @@ Provisional; none is REOPEN — the investigation supports each.
 - **D-3 — Pinned references remain historical:** chosen **never rewrite a pinned reference;
   keep its historical source path, copy content into the bundle when needed**. Rejected:
   path-only relink; implicit conversion to working-tree provenance.
-- **D-4 — One category, one container-owned destination:** chosen **caller selects one
-  category; destination is a container-owned directory preserving internal topology**.
-  Rejected: category-per-artifact placement (fragments bundles).
+- **D-4 — One container-owned destination (amended by owner, 2026-07-13):** chosen
+  **destination is a container-owned directory preserving internal topology; the brief's
+  category-selection clause is superseded — archival takes no category input (D-21)**.
+  Rejected: category-per-artifact placement (fragments bundles); caller-selected categories
+  (legacy taxonomy scrapped by the owner in favor of the pure mirror rule).
 - **D-5 — Initial recursive discovery is static:** chosen **follow Markdown/HTML/CSS local
   references incl CSS `url()`/`@import`; block on detected local JavaScript/runtime loading**.
   Rejected: guessing dynamic dependencies.
@@ -438,8 +469,8 @@ Plan-level decisions resolving specification gaps surfaced in review (extend, an
 override, the brief's D-1..D-11):
 
 - **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination root
-  `<archive_root>/<category-mapping>/` (+ `<container.short_id>/` for container targets), each
-  artifact at root + repository-relative source path**. Preserves every relative offset under a
+  `<archive_root>/` (+ `<container.short_id>/` for container targets), each
+  artifact at root + repository-relative source path, with no category segment (D-21)**. Preserves every relative offset under a
   common prefix, keeps identical filenames distinct, and makes intra-plan collisions
   structurally impossible. Rejected: stripping the managed prefix per artifact (the current
   single-doc rule, `document.rs:1284-1319`) — artifacts from different managed roots could
@@ -489,8 +520,12 @@ override, the brief's D-1..D-11):
   post-commit deletion failure is rediscovered and removed under D-17 identity verification
   even though no reference points at it any longer.
 - **D-19 — Two identities: retry-stable operation id, state-dependent plan fingerprint:**
-  chosen **`operation_id` = hash of (target, category, destination root), invariant across
-  retries and the correlation key for every event of one archival operation;
+  chosen **`operation_id` = hash of (target, destination root, sorted canonical source-path
+  set — already-archived artifacts contribute their inverse-mapped original sources), plus a
+  fresh per-execution `execution_id` UUID; the operation id is invariant across retries of
+  one operation, distinct for later operations over different artifact sets, and the
+  correlation key for every event of one archival operation, while execution ids and log
+  order separate re-runs of an identical operation;
   `plan_fingerprint` = hash of the canonical plan serialization excluding volatile fields,
   used only for D-7 staleness detection and expected to change whenever repository state
   changes**. Every mutating execution appends one archive event recording both plus the
@@ -507,13 +542,16 @@ override, the brief's D-1..D-11):
   comes from repository configuration (`@/inv/domain-agnostic`). Rejected: hardcoding
   strategic type names (epic/milestone); treating every issue with DAG children as a
   container (an incidental dependency fan-in is not a container).
-- **D-21 — Candidate category is derived-or-explicit, never guessed:** chosen **suggest the
-  unique configured category that every explicit root's `doc_type` maps to; a missing or
-  ambiguous mapping yields a null suggestion with destination-dependent checks reported
-  `not-evaluated`; an optional explicit category argument evaluates candidates fully; explicit
-  selection remains the execution contract (D-4)**. Rejected: evaluating every candidate
-  against every configured category (a combinatorial report that buries blockers); picking a
-  default category on ambiguity (silent guessing contradicts D-1's opt-in posture).
+- **D-21 — Document categorization is scrapped (owner, 2026-07-13):** chosen **archival
+  takes no category input anywhere in the command family; the D-12 mirror rule alone
+  determines destinations, candidates always evaluate fully, and the legacy
+  `[documentation.categories]` table retires with the legacy command**. The category
+  taxonomy was a legacy idea; the mirror rule already yields unambiguous, human-navigable,
+  collision-free destinations without it. Rejected: caller-selected categories (an extra
+  input that adds a failure mode and no information the path does not already carry);
+  doc_type-derived category inference (no doc_type→category mapping exists in the
+  configuration model — `doc_type` is a free-form optional string, `types.rs:885` — so any
+  inference would be guessing).
 - **Assumptions:** Coverage is enforced at the task tier: each of the nine task-tier
   items is a direct child of the epic and carries its own `satisfies: REQ-*` label; the
   A/B/C group headers are conceptual only. This assumes a single breakdown pass produces

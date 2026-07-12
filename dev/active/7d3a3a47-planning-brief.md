@@ -216,6 +216,16 @@ jit archive candidates is read-only. It lists terminal containers and explains:
 
 It performs no age or retention filtering.
 
+## Owner amendment (2026-07-13)
+
+Document categorization is scrapped as a legacy idea. This supersedes the
+category clauses of D-4 and D-9: the archive command family takes no category
+input (`--type` disappears from the target surface), destinations derive solely
+from the archive root and the container-owned mirror layout, candidate
+reporting suggests no category, and the `[documentation.categories]` table
+retires with the legacy command. The container-owned-destination and
+unified-command-family halves of D-4/D-9 stand unchanged.
+
 ## Reconcile the epic criteria
 
 REQ-01 through REQ-04 and REQ-06 remain aligned with the approved direction.
