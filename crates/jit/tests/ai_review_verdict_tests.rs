@@ -55,6 +55,20 @@ fn run_script(script: &Path, context_file: &Path, reviewer_agent: &str) -> i32 {
     output.status.code().unwrap_or(1)
 }
 
+fn run_script_output(
+    script: &Path,
+    context_file: &Path,
+    reviewer_agent: &str,
+) -> std::process::Output {
+    Command::new("bash")
+        .arg(script)
+        .env("JIT_CONTEXT_FILE", context_file)
+        .env("REVIEWER_AGENT", reviewer_agent)
+        .env("AGENT_STDERR_HEAD_LINES", "0")
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run {}: {error}", script.display()))
+}
+
 /// Skips the test if jq is not on PATH (required by the ai-review.sh scripts).
 fn require_jq() -> bool {
     Command::new("jq")
@@ -194,4 +208,33 @@ fn test_ai_review_wrapper_copies_remain_identical() {
         !String::from_utf8(canonical).unwrap().contains("codex"),
         "generic wrapper must not prescribe a reviewer tool"
     );
+}
+
+#[test]
+fn test_prompt_contract_does_not_execute_markdown_as_shell_commands() {
+    if !require_jq() {
+        eprintln!("SKIP: jq not found on PATH");
+        return;
+    }
+
+    let temp = TempDir::new().unwrap();
+    let context = write_context_file(&temp);
+    let agent = write_fake_agent(
+        &temp,
+        "Total findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"clear\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
+    );
+
+    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
+        let output = run_script_output(
+            &repo_root().join(relative),
+            &context,
+            agent.to_str().unwrap(),
+        );
+        assert!(output.status.success(), "wrapper failed: {relative}");
+        assert!(
+            output.stderr.is_empty(),
+            "prompt construction emitted stderr in {relative}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
