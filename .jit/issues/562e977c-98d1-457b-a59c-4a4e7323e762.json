@@ -2,9 +2,9 @@
   "id": "562e977c-98d1-457b-a59c-4a4e7323e762",
   "title": "Project authoritative storage-layout specifics",
   "description": "Issue-ID shape, event-file serialization, and gate-run result layout have no maintained storage projection, so adopter documentation must cite implementation directly.\n\nSource: `crates/jit/src/domain/types.rs:16-17,547-579`; `crates/jit/src/storage/json.rs:24-39,82-89,152-179,634-670,735-775,778-812`; `dev/archive/2d109173-plan.md:31,384-403`.\n\n## Success Criteria\n\n- [hard] REQ-01: A generated storage reference specifies UUID issue IDs and the eight-character human short-ID convention only where source supports it.\n- [hard] REQ-02: It specifies JSON Lines events in `.jit/events.jsonl` and links to the authoritative event contract rather than copying a second tag catalog.\n- [hard] REQ-03: It projects `.jit/gate-runs/<run-id>/result.json` and source-backed structured result fields.\n- [hard] REQ-04: Freshness or conformance coverage prevents drift from storage code.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
@@ -15,11 +15,6 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.362170487Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
@@ -29,6 +24,11 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.362201107Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.362170487Z"
     },
     "cargo-ci": {
       "status": "pending",
@@ -45,6 +45,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.553516821Z",
-  "updated_at": "2026-07-11T19:47:55.362581508Z",
-  "first_ready_at": "2026-07-11T13:35:35.553517081Z"
+  "updated_at": "2026-07-12T12:07:29.919258753Z",
+  "first_ready_at": "2026-07-11T13:35:35.553517081Z",
+  "claimed_at": "2026-07-12T12:07:29.919258543Z"
 }
