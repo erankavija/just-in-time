@@ -177,6 +177,11 @@ fn test_code_review_prompt_is_procedure_not_a_registry_or_engineering_rubric() {
 fn test_code_review_documentation_explains_policy_and_transport_ownership() {
     let custom_gates = repo_file("docs/how-to/custom-gates.md");
     let contributor = repo_file("dev/index.md");
+    let custom_gates_normalized = custom_gates
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let contributor_normalized = contributor.split_whitespace().collect::<Vec<_>>().join(" ");
 
     for required in [
         "applicable `AGENTS.md`",
@@ -187,8 +192,29 @@ fn test_code_review_documentation_explains_policy_and_transport_ownership() {
         "tool-agnostic wrapper",
     ] {
         assert!(
-            custom_gates.contains(required),
+            custom_gates_normalized.contains(required),
             "documentation is missing: {required}"
+        );
+    }
+
+    for required in [
+        "The reviewer emits human-readable findings, a structured findings block, and a terminal verdict.",
+        "The wrapper transports the prompt and context and determines its checker exit code from the terminal verdict.",
+        "jit parses and persists the structured findings block.",
+    ] {
+        assert!(
+            custom_gates_normalized.contains(required),
+            "documentation is missing exact findings ownership: {required}"
+        );
+    }
+
+    for inaccurate in [
+        "parses the shared findings and verdict contract",
+        "parses the common verdict contract",
+    ] {
+        assert!(
+            !custom_gates_normalized.contains(inaccurate),
+            "documentation assigns JIT's structured-findings parsing to the wrapper: {inaccurate}"
         );
     }
 
@@ -203,6 +229,17 @@ fn test_code_review_documentation_explains_policy_and_transport_ownership() {
         assert!(
             contributor.contains(required),
             "contributor guidance is missing: {required}"
+        );
+    }
+
+    for required in [
+        "The reviewer emits human-readable findings, a structured findings block, and a terminal verdict.",
+        "The shared AI-review wrapper stays tool-agnostic: it transports the prompt and context and determines its checker exit code from the terminal verdict.",
+        "jit parses and persists the structured findings block.",
+    ] {
+        assert!(
+            contributor_normalized.contains(required),
+            "contributor guidance is missing exact findings ownership: {required}"
         );
     }
 }

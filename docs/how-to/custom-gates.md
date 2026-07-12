@@ -302,10 +302,12 @@ review agent to append this block after the human-readable findings list.
 ### Ground a Repository Review in Canonical Policy
 
 Keep transport and repository policy separate. The `ai-review.sh` checker is a
-tool-agnostic wrapper: it passes a prompt and context to the configured
-`REVIEWER_AGENT`, then parses the shared findings and verdict contract. A
-repository-specific prompt owns the inspection procedure but should not copy an
-engineering rubric or registry statements.
+tool-agnostic wrapper. The reviewer emits human-readable findings, a structured
+findings block, and a terminal verdict. The wrapper transports the prompt and
+context and determines its checker exit code from the terminal verdict. jit
+parses and persists the structured findings block. A repository-specific prompt
+owns the inspection procedure but should not copy an engineering rubric or
+registry statement.
 
 For each affected path, that prompt should direct the reviewer to load every
 applicable `AGENTS.md` from the repository root toward the path. The closer file
@@ -497,7 +499,7 @@ jit gate define ai-review \
   --timeout 120
 ```
 
-`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and parses the common verdict contract. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
+`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and determines the checker exit code from the terminal verdict; jit parses and persists the structured findings block from the checker output. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
 
 ### Prompt Library
 
