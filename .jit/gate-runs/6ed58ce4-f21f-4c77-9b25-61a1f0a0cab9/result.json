@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "6ed58ce4-f21f-4c77-9b25-61a1f0a0cab9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "f363038ce7d2c736939d12dc767f666ca4d3c1a8",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:50:24.363873918Z",
+  "completed_at": "2026-07-12T17:52:56.877445362Z",
+  "duration_ms": 152513,
+  "exit_code": 1,
+  "stdout": "1. F1 — high, blocking, issue-impact: Final required-gate evidence is incomplete: the latest `code-review` projection remains failed (exit 1), despite newer cargo, documentation, and mechanical gate passes. This leaves REQ-10’s final validation unresolved. [.jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json:26)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Final required-gate evidence is incomplete because the latest code-review projection remains failed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The latest required code-review gate remains failed, leaving final completion evidence unresolved.\",\"file\":\".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json\",\"line\":26}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3533 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5773-a51d-7630-84b7-8194943afe43\n--------\nuser\n--- 3520 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Final required-gate evidence is incomplete because the latest code-review projection remains failed.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The latest required code-review gate remains failed, leaving final completion evidence unresolved.",
+        "file": ".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json",
+        "line": 26
+      }
+    ]
+  }
+}

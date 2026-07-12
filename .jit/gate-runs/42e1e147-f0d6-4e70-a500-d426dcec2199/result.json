@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "42e1e147-f0d6-4e70-a500-d426dcec2199",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "f363038ce7d2c736939d12dc767f666ca4d3c1a8",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T17:48:21.815358963Z",
+  "completed_at": "2026-07-12T17:50:13.562936484Z",
+  "duration_ms": 111747,
+  "exit_code": 0,
+  "stdout": "Attribution: `enhancement` is a leaf type (level 4); its resolved DAG node has no children. I reviewed the 12 individually tagged `jit:71be6ae9` commits with rename/copy detection and verified their current behavior. Uncommitted `.jit` state was excluded.\n\nDocumentation impact: pass. The prior blocking findings are resolved: compact history guidance, inspection-only reviewer setup, and the literal commit tag are accurate in [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:438) and [rules-and-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:41). The repo-local projection is clearly identified.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-scoped documentation accurately reflects the compact review-context and read-only review changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Issue-scoped documentation accurately reflects the compact review-context and read-only review changes.",
+    "findings": []
+  }
+}
