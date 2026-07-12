@@ -3219,8 +3219,12 @@ echo "Recently completed (last 100 events): $RECENT_DONE"
 
 JIT uses a standardized exit-code taxonomy for scripting. The full taxonomy, plus
 the per-command mappings and exceptions, is the [Exit Codes reference](exit-codes.md)
-— generated from `jit --schema`'s `exit_codes` array and the runtime classifier,
-so it never drifts. The `--json` `code` distinctions below refine that taxonomy.
+— generated from `jit --schema`'s `exit_codes` array (the taxonomy) and its
+`command_exit_codes` array (the per-command rows). Every row is bound by a test to
+the runtime that produces it: to the shared classifier for codes raised as typed
+errors, and to the command's own exit site for codes a completed run emits
+directly. Neither the taxonomy nor the mappings can drift from behavior. The
+`--json` `code` distinctions below refine that taxonomy.
 
 Exit `4` covers several validation failures that share the code but carry a
 distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would
