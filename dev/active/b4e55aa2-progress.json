@@ -55,6 +55,8 @@
       "detail": "The configured code-review and doc-review gates send issue-scoped repository context to an external Codex reviewer. The approval layer requires explicit authorization after disclosure of that risk."
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "99604a20": 1
+  },
   "started_at": "2026-07-12T22:31:20+03:00"
 }
