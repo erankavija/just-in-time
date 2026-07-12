@@ -6802,3 +6802,4 @@
 {"type":"issue_updated","id":"020862da-374c-45a1-98fe-b7e2e15f59e6","issue_id":"155a2d43-8b1a-4761-bf6b-82f5ea605643","timestamp":"2026-07-12T19:26:09.729964831Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"9eb78c2d-b76b-4b80-9ed6-a90f8b4f6684","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:26:09.785785522Z","from":"ready","to":"backlog"}
 {"type":"issue_updated","id":"02fbd93e-799a-4e39-a124-2e67ac3436da","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:26:09.785820702Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_claimed","id":"0384de84-b422-4766-ba7b-646045e85a5f","issue_id":"b4e55aa2-3681-40ea-baf2-27acac862c17","timestamp":"2026-07-12T19:31:01.301881985Z","assignee":"agent:jit-execution-lead"}
