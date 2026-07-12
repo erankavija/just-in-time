@@ -2041,9 +2041,10 @@ never changes the validate exit status.
 `events.jsonl` is the repository's append-only history: every issue creation,
 state transition, claim, gate result, and registry edit appends one line.
 `jit events` reads that log — it never writes to it. Both subcommands emit events
-in the log's stored (append) order. The event object shape and the full set of
-event `type` tags are documented under
-[Event Log Format](storage-format.md#event-log-format).
+in the log's stored (append) order. The event object shape is documented under
+[Event Log Format](storage-format.md#event-log-format); the full set of event
+`type` tags, with each tag's scope and `issue_id` presence, is the generated
+[Event Log Tags reference](events.md).
 
 Human output prints one JSON event object per line (JSONL, the same encoding the
 log stores); `--json` wraps the same events in the list envelope

@@ -47,6 +47,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
+- [Event Log Tags](reference/events.md) - Generated catalog of event tags, scopes, and `issue_id` presence
 - [Configuration](reference/configuration.md) - config.toml and settings
 - [Runtime Coordination Defaults](reference/runtime-defaults.md) - Built-in heartbeat, lock, cleanup, and claim-TTL defaults
 - [Item Addresses](reference/item-addresses.md) - Address grammar for addressable structured items

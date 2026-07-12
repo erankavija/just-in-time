@@ -5,6 +5,8 @@
 //! - **projection**: Pure normalization of an Issue into the canonical validation shape
 //! - **item**: Addressable structured items (qualified ids, item kinds) projected
 //!   from issue descriptions
+//! - **event_catalog**: The event-log tag vocabulary, each tag's association scope,
+//!   and their projection into `jit --schema` and the committed events reference
 //! - **gate_findings**: Pure parser extracting structured findings from checker stdout
 //! - **queries**: Pure query operations on issue collections
 //! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
@@ -15,6 +17,7 @@
 //! The domain layer is independent of CLI orchestration and can be used
 //! directly for library integration.
 
+pub mod event_catalog;
 pub mod gate_findings;
 pub mod item;
 pub mod projection;
@@ -27,6 +30,12 @@ pub use types::*;
 
 // Re-export the structured gate-findings parser and its types.
 pub use gate_findings::{parse_gate_findings, GateFinding, GateFindings};
+
+// Re-export the event-tag catalog and its projection.
+pub use event_catalog::{
+    event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc,
+    REFERENCE_PATH as EVENT_REFERENCE_PATH,
+};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.
 pub use projection::{project, ProjectedSection, Projection};

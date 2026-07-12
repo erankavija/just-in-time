@@ -170,10 +170,10 @@ which of their violations block operations. See
 Each event is a JSON object tagged by a snake-case `type` field, with the
 remaining fields flat on the object (not nested under a `data` key). Every event
 carries its own `id` and a `timestamp`. Issue-scoped events also carry the
-`issue_id` they concern; repository- and registry-scoped events (for example
-`document_archived`, the `gate_definition_*` registry edits, and
-`lifecycle_timestamps_backfilled`) carry no `issue_id`, because they record a
-change to shared state rather than to a single issue:
+`issue_id` they concern; repository- and registry-scoped events carry no
+`issue_id`, because they record a change to shared state rather than to a single
+issue. The [Event Log Tags reference](events.md) is the generated catalog: it
+lists every tag, its scope, and which tags omit `issue_id`.
 
 ```jsonl
 {"type":"issue_created","id":"e5095588-...","issue_id":"abc123","timestamp":"2026-01-15T10:00:00Z","title":"probe","priority":"normal"}

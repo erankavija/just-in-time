@@ -4,6 +4,7 @@
 //! using clap's introspection API. The schema enables AI agents to discover
 //! available commands, arguments, and types.
 
+use crate::domain::EventTagDoc;
 use clap::{Arg, ArgAction, CommandFactory};
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,11 @@ pub struct CommandSchema {
     /// Per-command-family exit-code mappings, including exceptions to the global
     /// taxonomy in `exit_codes`.
     pub command_exit_codes: Vec<CommandExitCode>,
+    /// The event-log tag vocabulary: every `type` tag `.jit/events.jsonl` stores,
+    /// its association scope, and whether its records carry an `issue_id`.
+    /// Projected from the `Event` type by
+    /// [`event_catalog`](crate::domain::event_catalog).
+    pub events: Vec<EventTagDoc>,
 }
 
 /// Command definition
@@ -234,6 +240,7 @@ impl CommandSchema {
             types: Self::generate_types(),
             exit_codes: Self::generate_exit_codes(),
             command_exit_codes: Self::generate_command_exit_codes(),
+            events: crate::domain::event_catalog(),
         }
     }
 

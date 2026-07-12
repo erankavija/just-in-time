@@ -2004,30 +2004,14 @@ impl Event {
         }
     }
 
-    /// Get the event type as a string
+    /// Get the event type as a string.
+    ///
+    /// The string is the value serde writes into the record's `type` field, and
+    /// the value `jit events query --event-type` matches against. It is supplied
+    /// by [`EventTag::as_str`](crate::domain::EventTag::as_str), the single
+    /// definition of the tag vocabulary, via [`Event::tag`].
     pub fn get_type(&self) -> &str {
-        match self {
-            Event::IssueCreated { .. } => "issue_created",
-            Event::IssueClaimed { .. } => "issue_claimed",
-            Event::IssueStateChanged { .. } => "issue_state_changed",
-            Event::GatePassed { .. } => "gate_passed",
-            Event::GateFailed { .. } => "gate_failed",
-            Event::GateAdded { .. } => "gate_added",
-            Event::GateRemoved { .. } => "gate_removed",
-            Event::IssueCompleted { .. } => "issue_completed",
-            Event::IssueDeleted { .. } => "issue_deleted",
-            Event::IssueReleased { .. } => "issue_released",
-            Event::IssueUpdated { .. } => "issue_updated",
-            Event::DocumentArchived { .. } => "document_archived",
-            Event::DependencyReduced { .. } => "dependency_reduced",
-            Event::LocalRuleBypassed { .. } => "local_rule_bypassed",
-            Event::TransitionBlocked { .. } => "transition_blocked",
-            Event::GraphRuleBypassed { .. } => "graph_rule_bypassed",
-            Event::GateDefinitionUpdated { .. } => "gate_definition_updated",
-            Event::GateDefinitionCreated { .. } => "gate_definition_created",
-            Event::GateDefinitionRemoved { .. } => "gate_definition_removed",
-            Event::LifecycleTimestampsBackfilled { .. } => "lifecycle_timestamps_backfilled",
-        }
+        self.tag().as_str()
     }
 }
 
