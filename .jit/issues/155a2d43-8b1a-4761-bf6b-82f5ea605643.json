@@ -16,14 +16,22 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/b4e55aa2-code-review-live-verification.md",
+      "commit": null,
+      "label": "Policy-grounded live review verification",
+      "doc_type": "report",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "story:policy-grounded-review",
     "component:gates",
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.741080828Z",
-  "updated_at": "2026-07-12T20:50:32.717313516Z",
+  "updated_at": "2026-07-12T20:54:58.353449400Z",
   "first_ready_at": "2026-07-12T19:25:27.741086778Z",
   "claimed_at": "2026-07-12T20:50:32.717313366Z"
 }
