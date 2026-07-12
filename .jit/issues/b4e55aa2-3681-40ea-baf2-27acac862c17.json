@@ -2,7 +2,7 @@
   "id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
   "title": "Ground code review in AGENTS.md and addressable policy",
   "description": "Make automated code review consume the repository's canonical engineering policy from applicable `AGENTS.md` files and trace issue-specific policy through addressable items. This prevents the reviewer prompt from becoming a weaker, drifting second copy of project principles while making review evidence and findings auditable.\n\n## Background\n\nThe completed SSOT adoption work established a three-tier rule for registry-owned knowledge: rendered projections on hot paths, short glosses plus addresses in explanatory prose, and bare resolvable addresses in behavioral agent instructions. Code review still duplicates a condensed engineering rubric, does not systematically resolve qualified policy items, and cannot represent governing item references as structured finding data.\n\nThis story extends that foundation to review policy. `AGENTS.md` remains the canonical prose baseline; registry-backed facts remain authoritative in their declared sources; the reviewer prompt owns only review procedure. The work also canonicalizes the previously prompt-only PID safety rule as an invariant and adds approved prose for public API documentation and contextual test coverage.\n\n## Success Criteria\n\n- [hard] REQ-01: Code review treats every `AGENTS.md` applicable from repository root to an affected path as the complete canonical prose baseline; closer files may specialize broader guidance, and unresolved contradictions produce findings.\n- [hard] REQ-02: The design contains a policy-ownership matrix mapping every guiding principle from the historical and current reviewer rubrics to exactly one canonical `AGENTS.md` section, registry-backed qualified item, or reviewer-procedure rule; no principle is unowned and no registry-owned behavior is hand-copied into the prompt.\n- [hard] REQ-03: A registry-backed `pid-safety` invariant uses the approved statement, resolves at `@/inv/pid-safety`, projects into `AGENTS.md`, and is cited by relevant review findings.\n- [hard] REQ-04: `AGENTS.md` contains the approved public-API documentation and contextual testing guidance, including relevant success, boundary, failure, and concurrency behavior.\n- [hard] REQ-05: Following `76cb968b`'s tier-3 policy, code review discovers qualified IDs from applicable `AGENTS.md`, issue text, relationship labels, linked documents, attributable patches, and directly implicated behavior; it resolves them through `jit item show`, follows each configured source of truth, and stays within the attributable impact cone.\n- [hard] REQ-06: Code review treats `satisfies:`, `enforces:`, and `per:` as evidence claims; attributable dangling, contradictory, or unsupported relationships block, while unrelated pre-existing defects are advisory.\n- [hard] REQ-07: Every review emits the fixed five-field Markdown evidence header—Attribution, Policy sources, Resolved items, Gate evidence, and Truncation recovery—with `none` used explicitly when empty.\n- [hard] REQ-08: `GateFinding` supports an optional/default-empty `references` array of strings across parsing, storage, schemas, JSON output, and backward-compatible legacy records; generic engine code preserves values without repository-specific resolution.\n- [hard] REQ-09: Findings governed by addressable policy include qualified IDs in `references`; the repository review policy requires valid resolved IDs, while findings with no governing item may keep the array empty.\n- [hard] REQ-10: Validation behavior is split correctly: `@/gate/jit-validate` owns executable validation, `AGENTS.md` owns the general required-gate policy, and the reviewer consumes current recorded evidence without redundantly rerunning a passing gate.\n- [hard] REQ-11: Deterministic positive and negative tests cover policy precedence, bounded item discovery, source-of-truth selection, relationship claims, evidence-header completeness, structured references, legacy compatibility, and absence of duplicated registry prose.\n- [hard] REQ-12: User-facing and contributor documentation explains policy ownership, addressable review traceability, structured references, and the tool-agnostic reviewer contract; registry projections are regenerated and mechanically fresh.\n- [hard] REQ-13: A representative live review demonstrates correct `AGENTS.md` loading, qualified-item resolution, bounded inspection, evidence-header output, structured references, truncation recovery, and a valid verdict/findings contract; a linked report records the session ID and measurements.\n\n## Notes\n\nThe generic review wrapper remains tool-agnostic. The findings parser stores reference strings without repository-specific item resolution. A live positive review is required; deterministic tests provide both positive and negative coverage without requiring a fragile live negative fixture.\n",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
@@ -17,6 +17,21 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:24:02.076727164Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T21:25:12.505888838Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T20:59:26.164099675Z"
+    },
     "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -25,22 +40,7 @@
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T21:13:34.861806128Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T21:13:35.200569584Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T20:59:26.164099675Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T21:17:14.428457332Z"
+      "updated_at": "2026-07-12T21:24:01.739960509Z"
     }
   },
   "context": {},
@@ -50,6 +50,13 @@
       "commit": null,
       "label": "Policy-grounded code review design",
       "doc_type": "design",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/archive/b4e55aa2-completion-report.md",
+      "commit": null,
+      "label": "Execution completion report",
+      "doc_type": "report",
       "format": "markdown"
     }
   ],
@@ -65,7 +72,8 @@
     "story:policy-grounded-review"
   ],
   "created_at": "2026-07-12T19:11:54.679863159Z",
-  "updated_at": "2026-07-12T21:20:26.061048952Z",
+  "updated_at": "2026-07-12T21:30:52.812219281Z",
   "first_ready_at": "2026-07-12T19:11:54.679869049Z",
-  "claimed_at": "2026-07-12T19:31:01.301633995Z"
+  "claimed_at": "2026-07-12T19:31:01.301633995Z",
+  "done_at": "2026-07-12T21:30:52.812218551Z"
 }

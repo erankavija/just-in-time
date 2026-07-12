@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "72ea564a-44fc-413d-8a50-e007ac6e3ce9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
+  "commit": "12c77ee74af2f5d17362e58a191ac327adc61ae0",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T21:25:12.505888838Z",
+  "completed_at": "2026-07-12T21:28:45.940846243Z",
+  "duration_ms": 213434,
+  "exit_code": 0,
+  "stdout": "Attribution: d4642a62, 38376069, f5e12ca8, a61d69b0, 7b2c16ee, c64fb205, 12c77ee7 (`jit:b4e55aa2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/* (.jit/invariants.toml, registry-first); @/rule/label-format,@/rule/namespace-registry (.jit/rules.toml, registry-first); @/gate/cargo-ci,@/gate/code-review,@/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (0); repo-validate passed (0); doc-review passed (0); docs-mechanical passed (0)\nTruncation recovery: recovered tagged design/planning patches and current policy, implementation, and live-verification evidence with bounded reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable policy-ownership and integrated dependency work satisfies the story criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable policy-ownership and integrated dependency work satisfies the story criteria.",
+    "findings": []
+  }
+}
