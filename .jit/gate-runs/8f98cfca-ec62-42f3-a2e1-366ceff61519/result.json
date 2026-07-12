@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "8f98cfca-ec62-42f3-a2e1-366ceff61519",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "562e977c-98d1-457b-a59c-4a4e7323e762",
+  "commit": "12981b50016dc74cf2a84cd6aced5e29b5631fc2",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T12:49:41.933016133Z",
+  "completed_at": "2026-07-12T12:51:31.615930041Z",
+  "duration_ms": 109682,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01–REQ-04 are satisfied. The corrected generated text accurately states canonical full-ID resolution at [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:30), matching the exact lookup path in [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:631). UUID/short-ID, JSON Lines event, and gate-run result claims are source-backed and projected.\n\n## Architecture and functional style\n\nThe new reference renderer remains in the storage layer and has no production I/O. Its projection derives values from domain/storage definitions; no boundary violations or imperative technical debt found.\n\n## Correctness, invariants, and safety\n\nThe prior F1 is resolved: hyphenless and uppercase full IDs are no longer documented as resolving. The regression test covers this contract at [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/reference.rs:718). No unsafe code, PID handling, event-log, gate, or atomic-write regressions found.\n\n## Testing\n\nThe provided `cargo-ci` evidence passed: formatting, clippy, and 3,684 tests succeeded with no failures. Per instruction, I did not rerun tests. Current `./scripts/jit-validate.sh` passed.\n\nThe committed-reference freshness guard is present at [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/reference.rs:786).\n\n## Error handling, CLI, and documentation\n\nThe public projection API has Rust documentation and examples. The generated page links to the authoritative event-tag catalog rather than duplicating it, and documents structured gate-run fields.\n\n## JIT issue management\n\nThe sole dependency is done. Repository validation passes; local uncommitted `.jit` changes are gate artifacts and were excluded from the review scope.\n\n## Findings\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All storage-reference acceptance criteria are met and the prior full-ID documentation defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All storage-reference acceptance criteria are met and the prior full-ID documentation defect is resolved.",
+    "findings": []
+  }
+}

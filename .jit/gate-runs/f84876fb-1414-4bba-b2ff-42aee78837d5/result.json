@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "f84876fb-1414-4bba-b2ff-42aee78837d5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "562e977c-98d1-457b-a59c-4a4e7323e762",
+  "commit": "e46a0c35ce4b2e9c0b9536339c8c51bdf7b65623",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T12:41:09.267936595Z",
+  "completed_at": "2026-07-12T12:42:49.152173678Z",
+  "duration_ms": 99884,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails: the generated identifier reference documents unsupported full-ID normalization (F1). REQ-02 through REQ-04 are otherwise covered by the generated reference and its conformance tests.\n\n## Architecture and functional style\n\nNo new boundary violations or significant imperative technical debt found.\n\n## Correctness and safety\n\nNo unsafe code, PID handling changes, or atomic-write regressions found in this change.\n\n## Testing\n\nThe provided `cargo-ci` gate passed, so I did not rerun tests. `./scripts/jit-validate.sh` passes. No prior review run history exists.\n\n## Error handling, CLI, and documentation\n\nThe generated reference is linked from the docs and event-tag authority is correctly centralized. Its ID-resolution claim is inaccurate (F1).\n\n## JIT issue management\n\nThe sole prerequisite dependency is `done`; repository validation passes (label warnings permitted).\n\n1. **F1 (high):** `docs/reference/storage-records.md:24` says a full ID “hyphenated or not” resolves after normalization. However, `JsonFileStorage::resolve_issue_id` recognizes a normalized 32-character input but calls `load_issue(partial_id)` with the original string (`crates/jit/src/storage/json.rs:634-645`); unhyphenated or uppercase full UUID input therefore looks for a non-canonical filename and fails. This violates hard REQ-01 because the generated storage reference claims behavior not supported by the source.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated storage reference documents unsupported full-ID normalization, failing hard REQ-01.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The reference says hyphenless or uppercase full UUIDs resolve, but the resolver loads the original input rather than the normalized canonical ID.\",\"file\":\"docs/reference/storage-records.md\",\"line\":24}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6208 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5658-8438-74b3-ba78-d177d4bafdd7\n--------\nuser\n--- 6195 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated storage reference documents unsupported full-ID normalization, failing hard REQ-01.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The reference says hyphenless or uppercase full UUIDs resolve, but the resolver loads the original input rather than the normalized canonical ID.",
+        "file": "docs/reference/storage-records.md",
+        "line": 24
+      }
+    ]
+  }
+}
