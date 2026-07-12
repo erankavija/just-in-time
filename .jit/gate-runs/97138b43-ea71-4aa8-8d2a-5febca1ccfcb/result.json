@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "97138b43-ea71-4aa8-8d2a-5febca1ccfcb",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "98e8927099eb7a182d7e2bafbf4a7a620c6b7d4d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T17:59:34.070547011Z",
+  "completed_at": "2026-07-12T18:01:39.107463055Z",
+  "duration_ms": 125036,
+  "exit_code": 0,
+  "stdout": "Attribution: `enhancement` is level-4 leaf with no resolved children. I inspected all 15 reachable `jit:71be6ae9` commits individually with rename/copy detection and verified current behavior; uncommitted `.jit` state was excluded.\n\nDocumentation impact passes. The custom-gates how-to accurately documents compact history and inspection-only reviewers, and the clearly marked repo-local registry projection matches configuration. Prior doc-review findings are resolved.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-scoped documentation accurately reflects the compact review-context and read-only reviewer changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Issue-scoped documentation accurately reflects the compact review-context and read-only reviewer changes.",
+    "findings": []
+  }
+}
