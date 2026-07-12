@@ -80,13 +80,11 @@ For JSON output (the response envelope also carries `message` and `warnings`):
 }
 ```
 
-#### Exit Codes
+#### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | Not in a git repository |
-| 1 | Worktree detection failed |
+The command fails outside a git repository and when worktree detection cannot
+complete. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -149,13 +147,11 @@ For JSON output (envelope also carries `message` and `warnings`):
 }
 ```
 
-#### Exit Codes
+#### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | Not in a git repository |
-| 1 | Failed to list worktrees |
+The command fails outside a git repository and when the worktrees cannot be
+listed. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -249,15 +245,24 @@ Warnings: 1
 Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
 `⚠ [<rule>]`.
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Validation passed (or `--fix` completed its repairs) |
-| 1 | A declarative-rule error (whole-repo or per-issue), an `--explain` / `--branch-drift` / `--leases` failure, or `--dry-run` given without `--fix` |
-| 2 | Usage error — includes the hidden `--divergence` stub, which errors and redirects to `--branch-drift` or `jit query divergence` |
-| 3 | The positional issue id, or the `--scope` container, was not found |
-| 4 | A repository-integrity failure (broken dependency, DAG cycle, isolated issue, redundant edge, unknown gate reference, or bad claims index), or a `--scope` error finding |
+`jit validate` passes when it finds nothing to report (and, under `--fix`, when
+its repairs complete). It signals findings by exiting non-zero:
+
+- **Declarative-rule errors** — whole-repo or per-issue.
+- **Repository-integrity failures** — a broken dependency, a DAG cycle, an
+  isolated issue, a redundant edge, an unknown gate reference, or a bad claims
+  index. A `--scope` error finding reports the same way.
+- **Check failures** under `--explain`, `--branch-drift`, or `--leases`.
+
+It fails as a usage error when `--dry-run` is given without `--fix`, and on the
+hidden `--divergence` stub, which errors and redirects to `--branch-drift` or
+`jit query divergence`. It fails as not-found when the positional issue id or the
+`--scope` container does not resolve.
+
+The code each outcome exits with — including the codes that signal findings
+rather than errors — is in the [Exit Codes reference](exit-codes.md).
 
 ### Integration with Hooks
 
@@ -318,12 +323,10 @@ Recovery complete:
   • Temp files removed: 0
 ```
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Recovery successful |
-| 1 | Recovery failed |
+The command fails when recovery itself fails. For the code that failure exits
+with, see the [Exit Codes reference](exit-codes.md).
 
 ---
 

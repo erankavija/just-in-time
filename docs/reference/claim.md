@@ -103,15 +103,12 @@ operations: `jit doc add`, `jit doc list`, `jit doc archive`, and working-tree
 document reads work without Git. Document history, diffs, and commit-specific
 reads require Git.
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Lease acquired successfully |
-| 1 | Issue already claimed by another agent |
-| 1 | TTL=0 without required --reason |
-| 1 | Exceeded indefinite lease limits |
-| 3 | Issue not found |
+Acquisition fails when another agent already holds the lease, when `--ttl 0` is
+given without `--reason`, when the agent is at its indefinite-lease limit, and
+when the issue does not exist. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ### Policy Limits (TTL=0)
 
@@ -180,13 +177,11 @@ jit claim release abc123
 jit claim release abc123 --json
 ```
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Lease released successfully |
-| 1 | No acting identity available |
-| 3 | Issue not found, or issue has no active lease to release |
+Release fails when no acting identity is available, when the issue does not
+exist, and when the issue carries no active lease. For the code each failure
+exits with, see the [Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -230,13 +225,11 @@ jit claim renew abc12345-6789-... --extension 3600
 jit claim renew abc12345-6789-... --json
 ```
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Lease renewed successfully |
-| 1 | Not authorized (different owner) |
-| 3 | Lease not found |
+Renewal fails when the lease belongs to a different owner and when the lease
+does not exist. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -294,13 +287,11 @@ A stale lease is:
 Staleness never auto-evicts the lease. It persists until a heartbeat,
 `jit claim release`, or force-eviction.
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Heartbeat sent successfully |
-| 1 | Not authorized (different owner) |
-| 3 | Lease not found |
+A heartbeat fails when the lease belongs to a different owner and when the lease
+does not exist. For the code each failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -373,12 +364,11 @@ For stale indefinite leases:
      Use 'jit claim heartbeat abc12345-6789-...' to refresh
 ```
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success (even if no leases found) |
-| 1 | Error querying leases |
+Finding no leases is a success, not a failure. The command fails only when the
+lease query itself cannot run. For the code that failure exits with, see the
+[Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -412,12 +402,10 @@ jit claim list
 jit claim list --json
 ```
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Success |
-| 1 | Error reading lease index |
+The command fails only when the lease index cannot be read. For the code that
+failure exits with, see the [Exit Codes reference](exit-codes.md).
 
 ---
 
@@ -469,13 +457,10 @@ Force-evictions are logged to the claims audit log with:
 - Timestamp
 - Who performed the eviction
 
-### Exit Codes
+### Failure modes
 
-| Code | Description |
-|------|-------------|
-| 0 | Lease evicted successfully |
-| 2 | Missing required --reason |
-| 3 | Lease not found |
+Eviction fails when `--reason` is omitted and when the lease does not exist. For
+the code each failure exits with, see the [Exit Codes reference](exit-codes.md).
 
 ---
 
