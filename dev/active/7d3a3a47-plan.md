@@ -74,7 +74,13 @@ planning.
     destination root, and the sorted canonical source-path set, where an
     already-archived artifact contributes its inverse-mapped original source — invariant
     across retries of one operation yet distinct for a later operation over a different
-    artifact set; D-19), `execution_id` (fresh UUID minted only when a mutating execution
+    artifact set; D-19), `operation_instance_id` (UUID delimiting one logical operation:
+    a mutating execution **adopts** the instance id of the latest event bearing the same
+    definition key when current state still shows that operation unconverged — outstanding
+    relinks or pending deletions attributable to it — and **mints a fresh one** when the
+    prior operation converged, so retries share an instance while a later independent
+    re-archival of the identical set starts a new one; null in non-mutating envelopes;
+    D-19), `execution_id` (fresh UUID minted only when a mutating execution
     begins and recorded in its event and `--execute` output; **null in every non-mutating
     envelope** — previews and candidate reports, which execute nothing; D-19),
     `plan_fingerprint`
@@ -89,8 +95,12 @@ planning.
     (a flag set — `["explicit"]`, `["embedded"]`, or both when an artifact is issue-linked
     and embedded), `format`, `owners` (issue id, state, `inside_subtree`, `pinned`),
     `edges` (`supported` / `unsupported` / `external`, each with resolution mode),
-    `reference_changes` (issue, from-path, to-path), and per-artifact `evidence`,
-    `blockers`, `warnings`.
+    `reference_changes` (issue, from-path, to-path), `pending_deletions` (source paths
+    this plan will remove — the ordinary source of a `move`, or a residue left by an
+    earlier partial execution, each removed only under D-17 identity verification; this
+    makes residue cleanup an executable plan operation, not an out-of-band effect), and
+    per-artifact `evidence`, `blockers`, `warnings`. The envelope `counts` include
+    `pending_deletions`.
   - **Blocker codes (stable kebab-case):** `policy-unconfigured`, `unmanaged-path`,
     `permanent-path`, `destination-conflict`, `outside-owner-conflict`, `active-owner`,
     `unsupported-dynamic-edge`, `repository-escape`, `unresolvable-edge`,
@@ -120,11 +130,16 @@ planning.
   - **Dynamic-loading detection contract (D-23):** `<script src="…">` is a static supported
     edge (the script file is a bundle dependency like any other). The
     `unsupported-dynamic-edge` blocker fires when a relocated HTML or script bundle member
-    textually contains a runtime-loading construct from the binding initial set —
-    `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`, or a URL-bearing `data-*`
-    attribute (e.g. reveal.js `data-markdown`, lazy-load `data-src`) — detected by pattern
-    match over the content, never by execution or guessing (D-5). Constructs outside the
-    set are outside the contract; the set is append-only under `schema_version`. The command layer loads inputs,
+    textually contains a local-path-bearing loading construct from the binding initial
+    set — runtime loaders `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`,
+    `importScripts(`, a URL-bearing `data-*` attribute (e.g. reveal.js `data-markdown`,
+    lazy-load `data-src`), or **static module syntax with a relative specifier**
+    (`import … from './…'`, `export … from './…'`, `require('./…')`) — detected by pattern
+    match over the content, never by execution or guessing (D-5). JIT has no JavaScript
+    adapter, so a script whose content declares local dependencies is never relocated
+    silently: it blocks until the dependency situation is resolved by hand. Constructs
+    outside the set are outside the contract; the set is append-only under
+    `schema_version`. The command layer loads inputs,
   calls the pure planner, renders preview, and executes an accepted plan; it does not
   duplicate decision logic between preview and execution. A storage-owned artifact mutation
   primitive centralizes staging, containment, no-replace finalization (D-14), and collision
@@ -321,22 +336,24 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   the post-commit deletion-failure case: for every already-archived artifact, recomputation
   derives the original source path from the destination, and a still-existing, content-identical
   source (`residue-source` warning) is completed as an identity-verified deletion (D-17) even
-  though no reference points at it anymore. Event content respects the deletion-last
-  principle: each mutating execution appends one archive event — after finalization and
-  reference relinks, before source deletion — recording the operation id, its fresh
-  `execution_id`, the executed plan's fingerprint, the **completed** finalization and relink
-  mutations, and the **planned** source deletions. Deletions then run; any that fail surface
-  as `residue-source`, and a later run that removes residues is itself a mutating execution
-  whose event records those deletions as completed mutations. A rerun that mutates nothing
-  appends nothing. The operation id is an **operation-definition key** (hash of target,
-  destination root, and sorted canonical source set — already-archived artifacts contribute
-  their inverse-mapped original sources, so it is invariant across retries): events sharing
-  it describe executions of the same operation by definition, retries share it by
-  construction, and **instances are separated by execution ids and log order**, not by the
-  key — a later independent re-archival of the identical set is the same definition
-  re-instantiated, distinguishable temporally. A crash-window duplicate remains possible and
-  is exactly the reported-duplicate case the established contract tolerates
-  (`document.rs:1050-1074`).
+  though no reference points at it anymore. Event recording uses two kinds so the record
+  stays truthful under the deletion-last principle (D-19). An execution that finalizes or
+  relinks appends **`ArchiveExecuted`** after those mutations persist and before any source
+  deletion, recording the operation-definition key, operation instance id, its fresh
+  `execution_id`, the executed plan's fingerprint, the completed finalization/relink
+  mutations, and the plan's `pending_deletions`. Deletions then run; a run whose deletions
+  (ordinary or residue) actually remove sources appends **`ArchiveSourcesRemoved`** after
+  they complete, recording exactly the paths removed — so completed deletions are recorded
+  as completed, and a run whose deletions all fail appends nothing and mutates nothing,
+  leaving `residue-source` warnings. A crash between deletion and the removal event leaves
+  an unrecorded removal of an already-safe-to-delete path; like the crash-window duplicate,
+  this is within the referential-consistency contract (`document.rs:1050-1074`) — the
+  authoritative record is `ArchiveExecuted` plus observable state. Identity is three-level
+  (D-19): the **definition key** (hash of target, destination root, sorted canonical source
+  set) is retry-invariant; the **instance id** delimits one logical operation via the
+  adopt-or-mint rule (adopt while the prior same-key operation is unconverged, mint fresh
+  after convergence), so retries group and independent re-archivals separate; the
+  **execution id** is unique per mutating run.
   Own criteria: `[hard] LOCAL-13: Validates each staged local edge in the proposed layout, not
   against source-resolved paths, before commit.` `[hard] LOCAL-23: Refuses document-target
   execution while any owner of the document or its bundle artifacts is non-terminal.`
@@ -345,12 +362,12 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   destination or reference is created, event emission follows the D-19 contract, and the
   remaining mutations complete — verified by failure-injection retry tests.` `[hard] LOCAL-28: After a post-commit deletion
   failure, a rerun rediscovers the orphaned source through the inverse destination mapping and
-  completes its identity-verified removal.` `[hard] LOCAL-29: Each mutating execution appends
-  one archive event — after relinks, before deletions — carrying the retry-stable
-  operation-definition key, a unique execution id, the executed plan's fingerprint, its
-  completed finalization/relink mutations, and its planned deletions; a residue-cleaning
-  rerun records its deletions as completed mutations in its own event; a rerun that mutates
-  nothing appends no event; operations over different artifact sets never share a key.` `[hard] LOCAL-14: A partial-relink, event-append,
+  completes its identity-verified removal.` `[hard] LOCAL-29: A finalizing or relinking execution appends
+  ArchiveExecuted — after relinks, before deletions — carrying the definition key, the
+  adopt-or-mint instance id, a unique execution id, the plan fingerprint, completed
+  mutations, and pending deletions; completed source removals append ArchiveSourcesRemoved
+  after they happen; a rerun that mutates nothing appends no event; retries share an
+  instance id while a re-archival after convergence mints a new one.` `[hard] LOCAL-14: A partial-relink, event-append,
   or deletion failure leaves no artifact lost, no destination overwritten, and no reference
   relying solely on a missing path.` `[hard] LOCAL-15: Refuses execution on a non-terminal
   container and on a stale recomputed plan.`
@@ -433,7 +450,7 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination, so the dependency moves or copies; root-relative edges instead force source retention; the classifier never emits an unpreservable layout (LOCAL-24) and execution re-validates every edge (LOCAL-13). |
 | Rollback or source deletion removes a file an external writer replaced | High | D-17: deletions are identity-verified against the hash/size captured at staging; a mismatch leaves the file and reports manual cleanup (LOCAL-25). |
 | A partial failure leaves an unrecoverable half-archived state on retry | Medium | D-18: retry recomputes and converges — content-identical destinations count as archived, only remaining mutations apply, no duplicate events; orphaned sources are rediscovered through the inverse D-12 mapping (LOCAL-28); covered by failure-injection retry tests (LOCAL-26). |
-| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: every mutating execution appends one event carrying the operation-definition key plus a unique execution id, recording completed relinks and planned deletions; nothing-mutated reruns append nothing; instances separate by execution id and log order; crash-window duplicates correlate by the key (LOCAL-29). |
+| Archive events cannot be attributed or deduplicated across retries and crashes | Medium | D-19: three-level identity (definition key, adopt-or-mint instance id, execution id) and two event kinds (ArchiveExecuted before deletions, ArchiveSourcesRemoved after) keep the record truthful; nothing-mutated reruns append nothing; crash-window anomalies stay within the established contract (LOCAL-29). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
 | Event granularity for a multi-artifact action undefined | Low | Executor emits a container/plan-scoped archive event carrying artifact and reference detail; current single event cannot audit a multi-artifact action (`types.rs:1466`). Decided in the execution task. |
 
@@ -534,16 +551,21 @@ override, the brief's D-1..D-11):
   post-commit deletion failure is rediscovered and removed under D-17 identity verification
   even though no reference points at it any longer.
 - **D-19 — Two identities: retry-stable operation id, state-dependent plan fingerprint:**
-  chosen **`operation_id` = hash of (target, destination root, sorted canonical source-path
-  set — already-archived artifacts contribute their inverse-mapped original sources): an
-  **operation-definition key**, invariant across retries and distinct for operations over
-  different artifact sets, that makes no instance-identity claim — a later independent
-  re-archival of the identical set shares the key and is separated by the fresh
-  per-mutating-execution `execution_id` UUID and log order (an intervening converged state
-  in the log marks the instance boundary). `execution_id` is null in every non-mutating
-  envelope. Events append after relinks and before deletions, so each records its completed
-  finalization/relink mutations plus planned deletions, and residue-cleaning reruns record
-  their deletions in their own events;
+  chosen **three-level identity plus two event kinds**. `operation_id` = hash of (target,
+  destination root, sorted canonical source-path set — already-archived artifacts contribute
+  their inverse-mapped original sources): the retry-invariant **definition key**.
+  `operation_instance_id` delimits one logical operation by **adopt-or-mint**: a mutating
+  execution adopts the instance id of the latest same-key event while current state shows
+  that operation unconverged (outstanding relinks or pending deletions), and mints a fresh
+  UUID once it converged — retries group, independent re-archivals of an identical set
+  separate, and no persistent state beyond the existing event log is needed because
+  convergence is recomputable (D-18). `execution_id` is unique per mutating run; both
+  UUIDs are null in non-mutating envelopes. **`ArchiveExecuted`** appends after
+  finalization/relinks and before deletions, recording completed mutations and pending
+  deletions; **`ArchiveSourcesRemoved`** appends after source removals complete, recording
+  exactly the removed paths; a run whose deletions all fail appends nothing. A crash can
+  leave a duplicate `ArchiveExecuted` or an unrecorded removal of an already-safe path —
+  both within the established referential-consistency contract (`document.rs:1050-1074`);
   `plan_fingerprint` = hash of the canonical plan serialization excluding volatile fields,
   used only for D-7 staleness detection and expected to change whenever repository state
   changes**. Every mutating execution appends one archive event recording both plus the
@@ -570,6 +592,22 @@ override, the brief's D-1..D-11):
   doc_type-derived category inference (no doc_type→category mapping exists in the
   configuration model — `doc_type` is a free-form optional string, `types.rs:885` — so any
   inference would be guessing).
+- **D-22 — Symlinks block in v1:** chosen **a symlink root or embedded target, or a path
+  traversing one, classifies `block` with `symlink-artifact`; the mutation primitive
+  resolves paths physically, verifies containment on resolved targets, and never moves,
+  copies, or deletes through a link**. Rejected: transparent symlink following (relocation
+  through a link silently changes what other referents resolve to); rewriting links
+  (out-of-scope link mutation). Richer symlink relocation is a follow-up.
+- **D-23 — Dynamic-loading detection is an enumerated textual contract:** chosen
+  **`<script src>` is a static supported edge; a relocated HTML or script member containing
+  a local-path-bearing construct from the binding set — `fetch(`, `import(`,
+  `XMLHttpRequest`, `new Worker(`, `importScripts(`, URL-bearing `data-*` attributes, or
+  static module syntax with a relative specifier (`import`/`export … from './…'`,
+  `require('./…')`) — blocks with `unsupported-dynamic-edge`; detection is pattern match
+  only, and the set is append-only under `schema_version`**. JIT has no JavaScript adapter,
+  so a script declaring local dependencies never relocates silently. Rejected: executing or
+  parsing JavaScript to resolve its dependencies (guessing, D-5); ignoring script content
+  (silently breaks relocated bundles).
 - **Assumptions:** Coverage is enforced at the task tier: each of the nine task-tier
   items is a direct child of the epic and carries its own `satisfies: REQ-*` label; the
   A/B/C group headers are conceptual only. This assumes a single breakdown pass produces
