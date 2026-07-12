@@ -82,13 +82,13 @@ Before the verdict line, output a numbered list of every finding across all cate
 Then emit a machine-readable findings block so jit can consume the findings as data. The block is two line-exact fence markers wrapping a single JSON object:
 
 <<<JIT-FINDINGS-JSON
-{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"path/to/file.rs","line":42}]}
+{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"path/to/file.rs","line":42,"references":["<qualified-policy-id>"]}]}
 JIT-FINDINGS-JSON>>>
 
 Rules for the block:
 - \`verdict\` is "pass" or "fail" and MUST match the VERDICT line below.
 - \`findings\` lists every finding from the numbered list above, in order. Use an empty array when there are none; when the checker-specific policy distinguishes blocking from advisory feedback, a passing verdict may include advisory findings.
-- \`severity\` is one of "high", "medium", "low". \`disposition\` (blocking or advisory) and \`origin\` (issue-impact or pre-existing) are optional classifications that checker-specific policies may require. \`file\` and \`line\` are optional; omit them when a finding is not tied to a specific location.
+- \`severity\` is one of "high", "medium", "low". \`disposition\` (blocking or advisory) and \`origin\` (issue-impact or pre-existing) are optional classifications that checker-specific policies may require. \`file\` and \`line\` are optional; omit them when a finding is not tied to a specific location. \`references\` is an optional array of policy identifiers and may be omitted when no policy reference governs the finding.
 - Emit valid JSON on a single line. Do not wrap the block in a code fence.
 
 You MUST end your response with exactly one of these lines:

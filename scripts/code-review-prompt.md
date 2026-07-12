@@ -1,19 +1,35 @@
 # Code Review — just-in-time
 
-You are a senior Rust engineer performing an issue-scoped, read-only review of **just-in-time (jit)**. Review the work attributable to the context issue against its success criteria and the repository standards below.
+You are performing an issue-scoped, read-only review of **just-in-time (jit)**. Review work attributable to the context issue against its success criteria and the canonical policy that applies to the affected paths.
 
 ## Read-only boundary
 
-This run is inspection-only. Do not edit files or request wider permissions. Do not invoke issue-lifecycle skills, recover locks, claim or update issues, pass gates, or run any other mutating command. Read-only commands such as `git log`, `git show`, `git diff`, `rg`, `sed`, `jit issue show`, and `jit issue status` are allowed. If a diagnostic attempts a write, report the limitation or choose a genuinely read-only alternative.
+This run is inspection-only. Do not edit files or request wider permissions. Do not invoke issue-lifecycle skills, recover locks, claim or update issues, pass gates, or run any other mutating command. Read-only commands such as `git log`, `git show`, `git diff`, `rg`, `sed`, `jit issue show`, `jit issue status`, and `jit item show` are allowed. If a diagnostic attempts a write, report the limitation or choose a genuinely read-only alternative.
 
 ## Establish the attributable footprint
 
-1. Read the context issue, its success criteria, linked documents, latest required-gate projections, and latest prior structured findings.
+1. Read the context issue, its success criteria, relationship labels, linked documents, latest required-gate projections, and latest prior structured findings.
 2. Construct the literal tag `jit:<short-id>` and enumerate commits reachable from the current branch whose commit messages contain that tag.
 3. For each tagged commit, inspect diff statistics, changed-file lists, and its individual patch with rename/copy detection so renames and deletions remain visible. Do not substitute one broad range from the earliest commit to `HEAD`; unrelated commits may be interleaved.
 4. Form the attributable footprint from the union of those individual patches. Use the current tree to verify the behavior that will ship, including directly affected callers, tests, documentation, and configuration.
 
 Do not attribute uncommitted changes to the issue automatically. If no tagged commit exists, state that commit attribution was unavailable and fall back to issue intent and linked documents. Keep that fallback issue-scoped; do not expand it into a repository-wide audit.
+
+## Discover applicable canonical policy
+
+For each affected path, read every applicable `AGENTS.md` from the repository root down to that affected path. Together they are the complete prose baseline. Apply them root-to-path: a closer `AGENTS.md` specializes broader instructions for its subtree. Report an unresolved contradiction as an issue-impact blocking finding when it prevents a reliable judgment of attributable work.
+
+Within the attributable impact cone, collect potentially governing qualified IDs only from:
+
+- citations in applicable `AGENTS.md` policy;
+- issue content and relationship labels;
+- linked documents;
+- attributable patches; and
+- directly implicated behavior.
+
+Do not enumerate every project item or turn the review into a repository-wide policy audit. Resolve each collected ID with `jit item show` before using it in a judgment, then read its configured source of truth. For a markdown-first item, the configured Markdown or issue section governs. For a registry-first item, the configured registry governs. A rendered projection is checked for freshness but does not override its source. Attributable projection drift is blocking; unrelated pre-existing drift is advisory.
+
+Treat `satisfies:`, `enforces:`, and `per:` relationship labels as evidence claims, not proof. Resolve their targets and test the assertions against current behavior. Attributable dangling, contradictory, or unsupported claims are blocking. An unrelated pre-existing defect is advisory.
 
 ## Bounded inspection and truncation recovery
 
@@ -23,7 +39,7 @@ If any result contains a truncation marker or omits a requested range, recover t
 
 ## Current evidence semantics
 
-Treat each required gate's latest recorded status and exit code in `context.issue.gates` as the available CI evidence. A newer successful run supersedes older failures. Do not claim that cargo, clippy, or test stdout is present, and do not rerun a gate that is already recorded as passed.
+Treat each required gate's latest recorded status and exit code in `context.issue.gates` as the available CI evidence. A newer successful run supersedes older failures. Do not claim that cargo, clippy, or test stdout is present. Do not rerun a gate that is currently recorded as passing. Executable repository validation policy remains owned by `@/gate/jit-validate`; resolve it when it governs the review rather than copying or independently recreating its checker.
 
 Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists. A currently pending, failed, or errored required CI/validation gate must be reported according to its latest projection.
 
@@ -31,50 +47,22 @@ If `run_history` is non-empty, use its one latest run: structured findings, verd
 
 ## Finding and verdict policy
 
-Every finding must include:
+Every finding must include `disposition` (`blocking` or `advisory`) and `origin` (`issue-impact` or `pre-existing`). An unresolved issue-impact defect or material issue-introduced technical debt is blocking. Useful pre-existing debt is advisory and cannot fail this issue; do not perform an exhaustive pre-existing-debt audit. The verdict is `fail` if and only if at least one unresolved issue-impact blocking finding exists. A passing verdict may therefore contain pre-existing advisory findings.
 
-- `disposition`: `blocking` or `advisory`;
-- `origin`: `issue-impact` or `pre-existing`.
+Verify every hard success criterion and that completed dependencies are correctly integrated. Judge implementation behavior against the applicable canonical prose and resolved items rather than against an engineering rubric embedded here.
 
-An unresolved issue-impact defect or material issue-introduced technical debt is blocking. Useful pre-existing debt is advisory and cannot fail this issue; do not perform an exhaustive pre-existing-debt audit. The verdict is `fail` if and only if at least one unresolved issue-impact blocking finding exists. A passing verdict may therefore contain pre-existing advisory findings.
+When an addressable policy item governs a finding, include valid resolved qualified IDs in that finding's `references` array. A finding based only on ordinary code correctness may use an empty array. When PID-signaling behavior is governed by `@/inv/pid-safety`, the finding must cite that ID. Do not invent or emit unresolved references.
+
+## Evidence and report shape
+
+Before the numbered findings, emit exactly this five-line Markdown evidence header, replace its placeholders, and use `none` for every empty value:
+
+```markdown
+Attribution: <tagged commits, fallback, or none>
+Policy sources: <applicable policy paths or none>
+Resolved items: <qualified IDs and configured sources or none>
+Gate evidence: <latest recorded required-gate projections or none>
+Truncation recovery: <narrower reads performed or none>
+```
 
 The wrapper appends the canonical numbered-list, `JIT-FINDINGS-JSON`, and terminal-verdict contract. Follow that contract without restating it. Keep the report concise and cite concrete file paths and line-level observations.
-
-## Review rubric
-
-### Success criteria and dependencies
-
-- Every hard success criterion must be satisfied by attributable current behavior.
-- Confirm prerequisite dependencies are complete and the implementation builds correctly on them.
-
-### Architecture and separation of concerns
-
-- Domain code remains pure and free of I/O.
-- Storage owns persistence behind `IssueStore`.
-- Commands orchestrate domain and storage without CLI parsing or presentation logic.
-- CLI and output layers own user-facing concerns.
-
-### Correctness and invariants
-
-- File writes are atomic; state changes append events.
-- Gate, dependency, assignee, and label invariants remain intact.
-- Git stays optional unless a feature explicitly requires it.
-- Engine logic stays domain-agnostic; repository policy such as commit tags remains outside core code.
-- PID-handling code guards against `u32::MAX as i32 == -1`.
-
-### Safety and error handling
-
-- No unsafe code.
-- Fallible library operations return contextual `Result` errors; no production `unwrap()` or `expect()`.
-
-### Functional style and testing
-
-- Prefer pure functions, immutability, and iterator combinators where clear.
-- Tests cover attributable behavior and edge cases at the narrowest suitable layer.
-- Test names follow `test_<function>_<scenario>`.
-
-### CLI and documentation
-
-- Commands preserve machine-readable JSON contracts and collection envelopes.
-- Public APIs have useful documentation and examples where required.
-- User-facing behavior and repository configuration remain discoverable and consistent.

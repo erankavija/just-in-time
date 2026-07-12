@@ -232,7 +232,7 @@ recorded and exposes no structured finding fields.
 ```
 <<<JIT-FINDINGS-JSON
 {"verdict":"fail","summary":"2 issues found","findings":[
-  {"id":"F1","severity":"high","summary":"missing error context","file":"src/x.rs","line":42},
+  {"id":"F1","severity":"high","summary":"non-atomic write","file":"src/x.rs","line":42,"references":["@/inv/atomic-writes"]},
   {"id":"F2","severity":"low","summary":"prefer iterator combinator"}
 ]}
 JIT-FINDINGS-JSON>>>
@@ -255,6 +255,7 @@ JIT-FINDINGS-JSON>>>
 | `summary` | string | One-line description. |
 | `file` | string, optional | Path the finding refers to. Omit when not location-specific. |
 | `line` | integer, optional | Line within `file`. |
+| `references` | array of strings, optional | Opaque policy identifiers that govern the finding. Omit it or use an empty array when none apply. |
 
 **Rules:**
 
@@ -297,6 +298,33 @@ jit gate status <ISSUE_ID> <GATE_KEY> --findings --json   # structured JSON
 
 The bundled `scripts/ai-review.sh` is a conforming checker: it instructs the
 review agent to append this block after the human-readable findings list.
+
+### Ground a Repository Review in Canonical Policy
+
+Keep transport and repository policy separate. The `ai-review.sh` checker is a
+tool-agnostic wrapper: it passes a prompt and context to the configured
+`REVIEWER_AGENT`, then parses the shared findings and verdict contract. A
+repository-specific prompt owns the inspection procedure but should not copy an
+engineering rubric or registry statements.
+
+For each affected path, that prompt should direct the reviewer to load every
+applicable `AGENTS.md` from the repository root toward the path. The closer file
+may specialize broader guidance. The reviewer can then collect relevant
+qualified IDs from those instructions, the issue and its relationship labels,
+linked documents, attributable changes, and directly implicated behavior. Keep
+discovery bounded to that impact; do not sweep the whole item registry.
+
+Resolve each collected item and follow its configured source of truth before
+using it in a judgment. For example, a registry-first invariant is read from
+its registry, while an issue-scoped markdown-first requirement is read from its
+issue section. A rendered projection helps detect drift but does not replace
+the canonical source.
+
+When a resolved item governs a finding, put its qualified ID in the finding's
+optional `references` array. This preserves addressable traceability without
+making the generic findings model interpret repository policy. Existing
+checkers and stored findings remain compatible because `references` may be
+absent or empty.
 
 ### Best Practices
 
@@ -469,7 +497,7 @@ jit gate define ai-review \
   --timeout 120
 ```
 
-`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and parses the common verdict contract.
+`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and parses the common verdict contract. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
 
 ### Prompt Library
 

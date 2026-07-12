@@ -50,6 +50,164 @@ fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
 }
 
 #[test]
+fn test_code_review_prompt_discovers_applicable_policy_in_precedence_order() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for required in [
+        "complete prose baseline",
+        "repository root",
+        "affected path",
+        "closer `AGENTS.md`",
+        "specializes",
+        "unresolved contradiction",
+        "blocking",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing policy phrase: {required}"
+        );
+    }
+}
+
+#[test]
+fn test_code_review_prompt_bounds_and_resolves_addressable_policy() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for required in [
+        "applicable `AGENTS.md`",
+        "issue content",
+        "relationship labels",
+        "linked documents",
+        "attributable patches",
+        "directly implicated behavior",
+        "Do not enumerate every project item",
+        "configured source of truth",
+        "markdown-first",
+        "registry-first",
+        "rendered projection",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing policy phrase: {required}"
+        );
+    }
+}
+
+#[test]
+fn test_code_review_prompt_checks_relationship_evidence_claims() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for required in [
+        "`satisfies:`",
+        "`enforces:`",
+        "`per:`",
+        "evidence claims",
+        "dangling",
+        "contradictory",
+        "unsupported",
+        "unrelated pre-existing",
+        "advisory",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing policy phrase: {required}"
+        );
+    }
+}
+
+#[test]
+fn test_code_review_prompt_requires_complete_evidence_header_and_empty_values() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for field in [
+        "Attribution:",
+        "Policy sources:",
+        "Resolved items:",
+        "Gate evidence:",
+        "Truncation recovery:",
+    ] {
+        assert_eq!(
+            prompt.matches(field).count(),
+            1,
+            "evidence field must occur exactly once: {field}"
+        );
+    }
+    assert!(prompt.contains("use `none` for every empty value"));
+}
+
+#[test]
+fn test_code_review_prompt_uses_recorded_gates_and_structured_references() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    for required in [
+        "latest recorded",
+        "Do not rerun a gate that is currently recorded as passing",
+        "@/gate/jit-validate",
+        "valid resolved qualified IDs",
+        "`references`",
+        "empty array",
+        "@/inv/pid-safety",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing policy phrase: {required}"
+        );
+    }
+}
+
+#[test]
+fn test_code_review_prompt_is_procedure_not_a_registry_or_engineering_rubric() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+
+    assert!(!prompt.contains("## Review rubric"));
+    for copied_registry_statement in [
+        "All file writes use the temp-file + atomic-rename pattern.",
+        "Every state change appends an event to events.jsonl.",
+        "Every label is namespace:value",
+        "Process-signaling code rejects sentinel or lossy PID conversions",
+    ] {
+        assert!(
+            !prompt.contains(copied_registry_statement),
+            "prompt copied registry prose: {copied_registry_statement}"
+        );
+    }
+}
+
+#[test]
+fn test_code_review_documentation_explains_policy_and_transport_ownership() {
+    let custom_gates = repo_file("docs/how-to/custom-gates.md");
+    let contributor = repo_file("dev/index.md");
+
+    for required in [
+        "applicable `AGENTS.md`",
+        "qualified IDs",
+        "configured source of truth",
+        "`references`",
+        "repository-specific prompt",
+        "tool-agnostic wrapper",
+    ] {
+        assert!(
+            custom_gates.contains(required),
+            "documentation is missing: {required}"
+        );
+    }
+
+    for required in [
+        "applicable `AGENTS.md`",
+        "canonical",
+        "engineering prose",
+        "Repository-specific review",
+        "tool-agnostic",
+        "`references`",
+    ] {
+        assert!(
+            contributor.contains(required),
+            "contributor guidance is missing: {required}"
+        );
+    }
+}
+
+#[test]
 fn test_code_review_prompt_requires_read_only_bounded_inspection() {
     let prompt = repo_file("scripts/code-review-prompt.md");
 

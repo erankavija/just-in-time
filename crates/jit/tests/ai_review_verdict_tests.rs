@@ -198,6 +198,47 @@ fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
 }
 
 #[test]
+fn test_classified_referenced_finding_passes_in_both_wrapper_copies() {
+    if !require_jq() {
+        eprintln!("SKIP: jq not found on PATH");
+        return;
+    }
+
+    let temp = TempDir::new().unwrap();
+    let context = write_context_file(&temp);
+    let agent = write_fake_agent(
+        &temp,
+        "1. Policy defect.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"policy defect\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"policy defect\",\"references\":[\"@/inv/pid-safety\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n",
+    );
+
+    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
+        let output = run_script_output(
+            &repo_root().join(relative),
+            &context,
+            agent.to_str().unwrap(),
+        );
+        assert_eq!(output.status.code(), Some(1), "wrapper failed: {relative}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("@/inv/pid-safety"),
+            "wrapper did not preserve a referenced finding: {relative}"
+        );
+    }
+}
+
+#[test]
+fn test_wrapper_contract_documents_optional_references_without_requiring_them() {
+    let wrapper = fs::read_to_string(repo_root().join("scripts/ai-review.sh")).unwrap();
+
+    assert!(wrapper.contains("references"));
+    assert!(wrapper.contains("optional"));
+    assert!(wrapper.contains("\"references\":[\"<qualified-policy-id>\"]"));
+    assert!(
+        wrapper.contains("may be omitted"),
+        "legacy findings without references must remain valid"
+    );
+}
+
+#[test]
 fn test_ai_review_wrapper_copies_remain_identical() {
     let repository = repo_root();
     let canonical = fs::read(repository.join("scripts/ai-review.sh")).unwrap();

@@ -140,6 +140,16 @@ archive/        → After 1-2 releases
 
 **Authoring guidelines:** See [authoring-conventions.md](authoring-conventions.md) for asset management and link patterns that ensure documents remain portable during archival.
 
+**Review policy ownership:** Treat applicable `AGENTS.md` files as canonical
+engineering prose and configured addressable-item sources as canonical for
+registry or issue policy. Repository-specific review prompts describe how to
+discover and judge that policy; they do not duplicate it. The shared AI-review
+wrapper stays tool-agnostic and only transports context plus the structured
+verdict contract. When a qualified item governs a finding, record its resolved
+ID in the finding's optional `references` array so the review remains
+traceable. See [Custom Gates](../docs/how-to/custom-gates.md#ground-a-repository-review-in-canonical-policy)
+for the integration pattern.
+
 **See also:**
 - [docs/index.md](../docs/index.md) - Product documentation
 - [TESTING.md](TESTING.md) - Testing strategy
