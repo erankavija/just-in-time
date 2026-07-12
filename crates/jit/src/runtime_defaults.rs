@@ -1,7 +1,7 @@
 //! Built-in runtime coordination and recovery defaults.
 //!
 //! These constants are the single source of truth for the operational defaults
-//! that govern multi-agent coordination and startup recovery: the lease
+//! that govern multi-agent lease coordination and recovery cleanup: the lease
 //! heartbeat cadence, the file-lock acquisition timeout and poll interval, the
 //! orphaned temp-file cleanup threshold, and the default claim lease TTL. Call
 //! sites reference the constants here instead of inline literals, so each
@@ -59,8 +59,9 @@ pub const LOCK_TIMEOUT_SECS: u64 = 5;
 /// ```
 pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 
-/// Age, in seconds, at which `jit recover` sweeps orphaned `*.tmp` files
-/// (1 hour).
+/// Minimum age, in seconds, at which `cleanup_orphaned_temp_files` sweeps an
+/// orphaned `*.tmp` file (1 hour). Passed by both callers: the `jit recover`
+/// command and `ClaimCoordinator::startup_recovery`.
 ///
 /// # Examples
 ///
@@ -138,7 +139,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Temp-file cleanup threshold",
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
-            "Age at which `jit recover` sweeps orphaned `*.tmp` files.",
+            "Minimum age at which `cleanup_orphaned_temp_files` sweeps an orphaned `*.tmp` file. Both callers pass this threshold: the `jit recover` command and `ClaimCoordinator::startup_recovery`.",
         ),
         (
             "Claim lease TTL",
@@ -158,7 +159,7 @@ pub fn render_reference_markdown() -> String {
          \n\
          # Runtime Coordination Defaults\n\
          \n\
-         Built-in defaults for multi-agent coordination and startup recovery. This\n\
+         Built-in defaults for multi-agent lease coordination and recovery cleanup. This\n\
          reference is generated from the `crates/jit/src/runtime_defaults.rs`\n\
          module, which defines these values.\n\
          \n\
