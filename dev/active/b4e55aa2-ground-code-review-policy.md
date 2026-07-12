@@ -84,26 +84,32 @@ flowchart TD
 
 ### Policy ownership
 
-The table below assigns every principle from the historical prompt and the current review rubric to one owner. Each row names exactly one canonical owner; supporting citations, enforcement mechanisms, projections, schemas, and storage roles appear only under Reviewer treatment and do not share ownership. “Reviewer procedure” means the prompt can state the named procedural rule inline. Registry-owned entries are cited and resolved rather than copied.
+The table below assigns every principle from the historical prompt and the current review rubric to one owner. The only allowed owner forms are one specific applicable `AGENTS.md` section, one exact registry-backed qualified item, or one named reviewer-procedure rule. Each row names exactly one canonical owner; issue content, supporting citations, enforcement mechanisms, projections, schemas, storage roles, and transport implementations appear only under Reviewer treatment and do not share ownership. “Reviewer procedure” means the prompt can state the named procedural rule inline. Registry-owned entries are cited and resolved rather than copied.
 
 | Guiding principle | Canonical owner | Reviewer treatment |
 |---|---|---|
-| Issue success criteria must be satisfied | Context issue description — Success Criteria | Reviewer procedure reads the issue-owned hard requirements and verifies current behavior; content standards define the section format but do not own the issue's criteria |
+| Issue success criteria must be satisfied | Reviewer procedure — success-criteria verification rule | The context issue's Success Criteria are the issue-owned input being verified, not a canonical policy owner; content standards define the section format |
 | Attributable work is issue-scoped | Reviewer procedure — attribution rule | Tagged-commit algorithm and no-tag fallback stay inline |
 | Uncommitted changes are not automatically attributable | Reviewer procedure — attribution rule | Stays inline because it controls review scope |
 | Current source determines shipped behavior | Reviewer procedure — current-tree rule | Stays inline |
 | Material issue-introduced debt blocks; unrelated debt is advisory | Reviewer procedure — causal finding rule | Stays inline as causal finding policy |
 | Latest recorded gates are evidence; passed gates are not rerun | Reviewer procedure — gate-evidence rule | The procedure consumes every latest status according to gate purpose. Incomplete peer judgment is not categorically blocking; executable CI or validation evidence supports a blocking finding only when it demonstrates attributable failure or leaves a hard criterion materially unverified. Gate registries own their executable checks |
+| Test-first history is required only when explicit evidence exists | Reviewer procedure — test-history evidence rule | The procedure reviews current test adequacy without inventing unavailable development history |
 | Read-only inspection | Reviewer procedure — inspection boundary | Procedure states prohibited mutations; the code-review gate's sandbox configuration supports enforcement without sharing policy ownership |
 | Bounded reads and truncation recovery | Reviewer procedure — bounded-inspection rule | Stays inline |
-| Architecture and layer boundaries | Root `AGENTS.md` — Separation of Concerns | Prompt identifies applicable `AGENTS.md` prose as baseline; it does not copy the layer list |
+| Domain code remains pure and free of I/O | Root `AGENTS.md` — Separation of Concerns | Loaded from applicable prose; this owns the domain-layer boundary rather than the general functional-style preference |
+| Storage owns persistence behind `IssueStore` | Root `AGENTS.md` — Separation of Concerns | Loaded from applicable prose |
+| Commands orchestrate domain and storage without CLI parsing or presentation logic | Root `AGENTS.md` — Separation of Concerns | Loaded from applicable prose |
+| CLI and output layers own user-facing concerns | Root `AGENTS.md` — Separation of Concerns | Loaded from applicable prose |
 | Pure functions | Root `AGENTS.md` — Testability | Loaded from applicable prose |
 | Immutability and iterator style | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
 | TDD and property testing for graph operations | Root `AGENTS.md` — Testability | Loaded from applicable prose |
 | Unit, harness, and integration test roles | Root `AGENTS.md` — Testing Strategy | Loaded from applicable prose |
 | Relevant success, boundary, failure, and concurrency coverage | Root `AGENTS.md` — Testing Strategy | Approved prose is canonical; examples are contextual |
+| Tests use the narrowest suitable layer | Root `AGENTS.md` — Testing Strategy | The reviewer judges test adequacy using the documented unit, harness, and integration roles |
+| Test names follow `test_<function>_<scenario>` | Root `AGENTS.md` — Testing Strategy | Loaded from applicable prose |
 | Unsafe code is prohibited | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
-| Result-based errors, `thiserror`, and no library panics | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
+| Fallible library operations return contextual `Result` errors; production code has no panic sites such as `unwrap()` or `expect()` | Root `AGENTS.md` — Coding Conventions | The applicable result-based error and no-library-panic prose governs; `thiserror` is the repository's custom-error convention |
 | Public API documentation | Root `AGENTS.md` — Coding Conventions | Approved prose is canonical; examples are required when behavior is non-obvious |
 | Machine-readable JSON and list envelopes | Root `AGENTS.md` — Coding Conventions | Loaded from applicable prose |
 | Git is optional except for declared features | Root `AGENTS.md` — Coding Conventions | `@/charter/D-4` is a supporting decision citation resolved when relevant |
@@ -119,9 +125,10 @@ The table below assigns every principle from the historical prompt and the curre
 | PID signaling safety | `@/invariant/pid-safety` | Resolve and cite it when process-signaling code is in the impact cone |
 | Required repository validation must pass | `@/gate/jit-validate` | Consume the latest executable validation evidence without copying checker commands. The reviewer procedure interprets that evidence and does not treat unfinished peer review as an implementation defect |
 | Dependencies are complete and correctly used | Reviewer procedure — dependency-integration rule | Procedure inspects DAG-derived dependency state and applies the lifecycle guidance loaded from `AGENTS.md`; those inputs support the judgment without sharing ownership |
-| Findings enumeration and terminal verdict | Tool-agnostic wrapper contract — report transport | Checker-specific prompt does not duplicate the envelope; jit parses and stores the emitted structured block |
+| Findings enumeration and terminal verdict | Reviewer procedure — report-transport rule | The tool-agnostic wrapper implements the mechanical envelope and terminal-verdict contract; jit parses and stores the emitted structured block |
 | Finding disposition and origin | Reviewer procedure — finding-classification rule | Procedure requires classification; the findings schema stores it without sharing policy ownership |
 | Governing policy references | Reviewer procedure — finding-reference rule | Procedure requires resolved references; the findings schema and storage preserve opaque strings without sharing policy ownership |
+| User-facing behavior and repository configuration remain discoverable and consistent | Reviewer procedure — discoverability-and-consistency rule | Applicable `AGENTS.md`, user documentation, and repository configuration are inputs to the consistency judgment; none is a co-owner of the combined procedural principle |
 
 ### Approved canonical prose
 
