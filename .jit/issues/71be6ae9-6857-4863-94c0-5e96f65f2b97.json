@@ -21,12 +21,17 @@
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T17:28:09.203883231Z"
+      "updated_at": "2026-07-12T17:34:07.555470966Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-12T17:22:24.619780218Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T17:40:02.321396693Z"
     }
   },
   "context": {},
@@ -53,7 +58,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-11T23:25:03.291514967Z",
-  "updated_at": "2026-07-12T17:33:40.272939817Z",
+  "updated_at": "2026-07-12T17:42:33.362263537Z",
   "first_ready_at": "2026-07-11T23:25:03.291533827Z",
   "claimed_at": "2026-07-12T17:15:24.993086065Z"
 }

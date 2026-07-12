@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "833f75d8-e14d-4ae8-acc4-072e8e5c1ab2",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "dbde6f38172d460fa1239a88d990811f023f4b18",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:40:02.321396693Z",
+  "completed_at": "2026-07-12T17:42:33.361522396Z",
+  "duration_ms": 151040,
+  "exit_code": 1,
+  "stdout": "Attribution: leaf `enhancement` (level 4) with no resolved children; reviewed ten reachable `jit:71be6ae9` commits individually. Initial broad outputs were narrowed to the affected source and documentation paths. Uncommitted gate-run state was not attributed.\n\nDocumentation impact: fail. The issue changes generic context history and review-wrapper guidance, but affected adopter docs remain inaccurate; the issue-authored gate projection also hides its literal tag in rendered Markdown.\n\n1. **F1 — blocking, issue-impact (high):** [`docs/how-to/custom-gates.md`](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:438) says each context-aware run receives chronological prior results and that the second run receives stdout and exit code. Current behavior supplies only the latest same-gate run; structured runs retain findings/metadata while omitting stdout and stderr, with stdout only for legacy unstructured runs. Update this section and example to state the compact latest-run contract.\n\n2. **F2 — blocking, issue-impact (medium):** [`docs/how-to/custom-gates.md`](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:180) and its later AI-review examples configure `REVIEWER_AGENT=\"codex review -\"`, despite this issue changing the contributed wrapper guidance to require an inspection-only reviewer and the repository code-review policy to an explicit read-only sandbox. Replace these product-specific commands (including the CLI reference example) with a tool-neutral inspection-only placeholder, or an explicit read-only invocation, and explain the requirement briefly.\n\n3. **F3 — blocking, issue-impact (medium):** [`docs/reference/rules-and-gates.md`](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:41) renders `jit:<short-id>` without Markdown code delimiters. `<short-id>` is parsed as an HTML tag, so the literal attribution tag is not reliably visible. Put the tag in backticks in the `.jit/gates.toml` source description and re-render the projection.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue leaves inaccurate context-history and reviewer-setup guidance, and its rendered gate description hides the literal commit tag.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Custom-gates documentation still promises chronological full run history instead of the current compact latest-run contract.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":438},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"AI-review examples retain a non-read-only Codex command after the wrapper and repository policy moved review guidance to inspection-only/read-only execution.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":180},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The issue-authored gate projection leaves jit:<short-id> unescaped, so Markdown treats the placeholder as HTML instead of showing the literal tag.\",\"file\":\"docs/reference/rules-and-gates.md\",\"line\":41}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10153 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f576a-2735-7ee3-a271-624b73e9b0a3\n--------\nuser\n--- 10140 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The issue leaves inaccurate context-history and reviewer-setup guidance, and its rendered gate description hides the literal commit tag.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Custom-gates documentation still promises chronological full run history instead of the current compact latest-run contract.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 438
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "AI-review examples retain a non-read-only Codex command after the wrapper and repository policy moved review guidance to inspection-only/read-only execution.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 180
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The issue-authored gate projection leaves jit:<short-id> unescaped, so Markdown treats the placeholder as HTML instead of showing the literal tag.",
+        "file": "docs/reference/rules-and-gates.md",
+        "line": 41
+      }
+    ]
+  }
+}

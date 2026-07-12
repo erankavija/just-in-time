@@ -6769,3 +6769,7 @@
 {"type":"gate_failed","id":"6e9ae8fc-a438-4bfa-9a97-171f7214e9f9","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:25:48.937375743Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"24e54240-5d4c-473d-992a-a40a44694b94","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:31:04.467612339Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_updated","id":"b2771db4-5371-43e5-9774-0e250da99197","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:33:40.273602257Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_failed","id":"4efa283e-3cf2-440c-9950-6f20699466ed","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:37:08.652979206Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"d5a7b134-26a3-4ac0-bf81-18963260f9c6","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:40:28.508918776Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"e7548e42-28e7-4a54-95e0-3bbe75113b71","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:42:33.362872857Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_definition_updated","id":"3721df63-7ac0-4144-8b57-ce55a58d39ad","timestamp":"2026-07-12T17:43:50.783448926Z","gate_key":"code-review"}

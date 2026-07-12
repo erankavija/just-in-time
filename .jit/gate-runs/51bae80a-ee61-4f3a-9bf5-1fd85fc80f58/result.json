@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "51bae80a-ee61-4f3a-9bf5-1fd85fc80f58",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "eec40f5a141b4487ec042ab88ec37858beb229a1",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:34:07.555470966Z",
+  "completed_at": "2026-07-12T17:37:08.651586455Z",
+  "duration_ms": 181096,
+  "exit_code": 1,
+  "stdout": "1. **F1 — high, blocking, issue-impact:** Final required-gate evidence is incomplete: `code-review` is still failed and `doc-review` remains pending. The linked report says a subsequent evaluation verifies resolution, but no post-link rerun exists; the design explicitly requires rerunning affected gates. [Issue state](/home/vkaskivuo/Projects/just-in-time/.jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json:21), [report](/home/vkaskivuo/Projects/just-in-time/dev/active/71be6ae9-live-review-report.md:76), [design](/home/vkaskivuo/Projects/just-in-time/dev/active/71be6ae9-code-review-reliability.md:214)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Final required-gate evidence remains incomplete: code review is failed and documentation review is pending.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The linked report claims a subsequent gate evaluation verified resolution, but the current issue still records code-review failed and doc-review pending; the design requires rerunning affected gates after linking the report.\",\"file\":\".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json\",\"line\":21}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3175 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5764-bd71-7e71-beb7-fa3b5078b0de\n--------\nuser\n--- 3162 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Final required-gate evidence remains incomplete: code review is failed and documentation review is pending.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The linked report claims a subsequent gate evaluation verified resolution, but the current issue still records code-review failed and doc-review pending; the design requires rerunning affected gates after linking the report.",
+        "file": ".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json",
+        "line": 21
+      }
+    ]
+  }
+}
