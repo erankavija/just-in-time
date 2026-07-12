@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "87633e3c-4fc2-4e28-aa98-863c042ee36f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
+  "commit": "3600a632e0d3b5f194b0dc7bb1fb264794b8b92c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T12:05:58.899521365Z",
+  "completed_at": "2026-07-12T12:07:15.840514945Z",
+  "duration_ms": 76940,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nAll three requirements are met. The deterministic renderer covers all built-ins and gate/checker fields in [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/reference.rs:37), [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/reference.rs:49), and the committed reference. It explicitly separates shipped presets from project-local configuration in [gate-presets.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/gate-presets.md:16). The byte-for-byte freshness test is in [reference.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_presets/reference.rs:245).\n\n## Architecture and functional style\n\nPass. Projection logic is isolated in `gate_presets`, does not add I/O to domain code, and uses deterministic sorting plus iterator pipelines.\n\n## Correctness, safety, and error handling\n\nPass. Checker metadata is fully rendered, including environment values in sorted order. The regeneration helper uses temp-file then rename. No unsafe code, PID handling, lifecycle, or storage-boundary regression is introduced.\n\n## Testing\n\nPass. Recorded `cargo-ci` succeeded: fmt and clippy passed; 3,668 tests passed with zero failures. Per instruction, I did not rerun tests. The new unit coverage checks freshness, completeness, exact built-in membership, determinism, checker fields, and markdown escaping.\n\n## CLI contract and documentation\n\nPass. No CLI surface changed. The new public exports have descriptions and examples. The generated reference is discoverable from [docs/index.md](/home/vkaskivuo/Projects/just-in-time/docs/index.md:60) and cited from relevant preset documentation.\n\n## JIT issue management and prior feedback\n\nPass. The sole dependency is done. `./scripts/jit-validate.sh` passed. `run_history` is empty, so there is no prior review feedback to reconcile.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Built-in gate-preset projection is deterministic, complete, discoverable, and freshness-protected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Built-in gate-preset projection is deterministic, complete, discoverable, and freshness-protected.",
+    "findings": []
+  }
+}

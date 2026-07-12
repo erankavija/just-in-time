@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "351b54a7-f951-4da5-88d4-e48d9249fea3",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
+  "commit": "3600a632e0d3b5f194b0dc7bb1fb264794b8b92c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T12:02:05.980159442Z",
+  "completed_at": "2026-07-12T12:05:55.190284158Z",
+  "duration_ms": 229210,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf task (level 4), no resolved children; inspected reachable tagged commits `3f61f7f7` and `3600a632` individually. Uncommitted `.jit` changes were excluded.\n\nDocumentation impact: the generated reference accurately covers all shipped presets, distinguishes project-local configuration, is linked from the docs index and affected gate docs, and has source-level freshness coverage.\n\nFindings:\n\nNone.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Built-in gate-preset projection is accurate, discoverable, concise, and freshness-protected.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Built-in gate-preset projection is accurate, discoverable, concise, and freshness-protected.",
+    "findings": []
+  }
+}

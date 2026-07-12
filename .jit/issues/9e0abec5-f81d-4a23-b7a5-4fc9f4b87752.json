@@ -2,7 +2,7 @@
   "id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
   "title": "Add a projector for built-in gate presets",
   "description": "Built-in gate presets are defined in Rust and can change without a maintained documentation surface. Add a deterministic projection that distinguishes shipped presets from project-local registries.\n\nSource: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372`; `crates/jit/src/gate_presets/manager.rs:27-44,111-137`; `crates/jit/src/commands/invariant.rs:1-23`; `crates/jit/src/commands/reference.rs:1-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: A deterministic discoverable projection renders every built-in preset with gate keys, stages, modes, descriptions, and relevant checker metadata.\n- [hard] REQ-02: The rendered surface distinguishes shipped presets from project-local/custom configuration.\n- [hard] REQ-03: Freshness coverage fails when a built-in preset or gate definition changes without regeneration.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [
@@ -15,25 +15,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T12:05:58.899521365Z"
+    },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373839796Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T12:02:05.175857887Z"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373813626Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373786686Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T12:02:05.980159442Z"
     },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373733096Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T11:58:22.622850452Z"
     }
   },
   "context": {},
@@ -63,7 +63,8 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.555687123Z",
-  "updated_at": "2026-07-12T11:58:22.563206828Z",
+  "updated_at": "2026-07-12T12:07:21.881794508Z",
   "first_ready_at": "2026-07-11T13:35:35.555687363Z",
-  "claimed_at": "2026-07-12T09:21:16.085050668Z"
+  "claimed_at": "2026-07-12T09:21:16.085050668Z",
+  "done_at": "2026-07-12T12:07:21.881793998Z"
 }
