@@ -100,8 +100,10 @@ subject. The forms are fixed per identifier kind:
 
 **Consistency rule.** Every positional that names an issue (`issue show`,
 `issue update`, `gate add`, `gate evaluate`, `dep add`, `doc add`, `claim acquire`,
-`claim release`, and the rest) accepts the full UUID, the 8-char short id, and a
-unique prefix, identically. Id acceptance is uniform across the issue, gate,
+`claim release`, and the rest) accepts the full UUID, the short id, and a unique
+prefix, identically — the three forms and their resolution are specified in
+[Storage Record Layout → Issue Identifiers](storage-records.md#issue-identifiers).
+Id acceptance is uniform across the issue, gate,
 claim, and doc surfaces; `jit issue show` documents the three forms as "full id,
 short id, or unique prefix", and every issue-subject command resolves them the
 same way. A command that resolved only the full UUID, or whose help omitted the

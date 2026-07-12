@@ -353,14 +353,33 @@ impl RepositoryFormatTooNewError {
     }
 }
 
-/// Error raised when an id prefix is too short to resolve (fewer than 4 chars).
+/// Shortest issue-id prefix the storage layer resolves, counted after
+/// normalization (lowercased, hyphens removed).
+///
+/// The single definition of the minimum: both
+/// [`IssueStore::resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id)
+/// implementations reject a shorter prefix with [`InvalidIdPrefixError`], whose
+/// message reads the length from here, and the storage reference projects it
+/// (`crate::storage::reference`).
+///
+/// # Examples
+///
+/// ```
+/// use jit::storage::{InvalidIdPrefixError, MIN_ID_PREFIX_LENGTH};
+///
+/// let err = InvalidIdPrefixError::new("ab");
+/// assert!(err.to_string().contains(&MIN_ID_PREFIX_LENGTH.to_string()));
+/// ```
+pub const MIN_ID_PREFIX_LENGTH: usize = 4;
+
+/// Error raised when an id prefix is shorter than [`MIN_ID_PREFIX_LENGTH`].
 ///
 /// Returned by the storage layer's [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id)
 /// and by `jit dep rm`'s per-target prefix matching. The CLI downcasts to this
 /// type to classify the failure as an argument error (exit code `2`) and to
 /// render an `INVALID_ID_PREFIX` JSON error, rather than scanning the message
-/// text. `Display` reproduces the previous `anyhow!` phrasing verbatim; the
-/// offending prefix is carried separately for the JSON `details` field.
+/// text. The offending prefix is carried separately for the JSON `details`
+/// field.
 ///
 /// # Examples
 ///
@@ -372,7 +391,7 @@ impl RepositoryFormatTooNewError {
 /// assert_eq!(err.prefix(), "ab");
 /// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-#[error("Issue ID prefix must be at least 4 characters")]
+#[error("Issue ID prefix must be at least {MIN_ID_PREFIX_LENGTH} characters")]
 pub struct InvalidIdPrefixError {
     prefix: String,
 }

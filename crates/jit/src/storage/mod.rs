@@ -26,6 +26,7 @@ pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
+pub mod reference;
 pub mod repo_lock;
 pub mod ruleset_store;
 pub mod temp_cleanup;
@@ -39,11 +40,12 @@ pub use clock::{Clock, SystemClock};
 pub use errors::{
     AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
-    RepositoryNotFoundError,
+    RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use warnings::StorageWarning;
 

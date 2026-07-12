@@ -8,6 +8,7 @@
 
 use crate::domain::{
     DocumentReference, GateChecker, GateContext, GateRunResult, GateRunStatus, GateStage,
+    GATE_RUN_SCHEMA_VERSION,
 };
 use anyhow::{Context, Result};
 use std::io::Write;
@@ -158,7 +159,7 @@ pub fn execute_gate_checker_with_context(
     };
 
     Ok(GateRunResult {
-        schema_version: 1,
+        schema_version: GATE_RUN_SCHEMA_VERSION,
         run_id: uuid::Uuid::new_v4().to_string(),
         gate_key: gate_key.to_string(),
         stage,

@@ -2038,7 +2038,7 @@ never changes the validate exit status.
 state transition, claim, gate result, and registry edit appends one line.
 `jit events` reads that log — it never writes to it. Both subcommands emit events
 in the log's stored (append) order. The event object shape is documented under
-[Event Log Format](storage-format.md#event-log-format); the full set of event
+[Event Log Records](storage-records.md#event-log-records); the full set of event
 `type` tags, with each tag's scope and `issue_id` presence, is the generated
 [Event Log Tags reference](events.md).
 

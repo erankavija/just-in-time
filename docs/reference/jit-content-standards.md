@@ -99,7 +99,8 @@ kebab-case slug describing the bucket — never the issue's JIT short ID:
 - ✅ `epic:user-auth`, `story:auth-rate-limiting`, `milestone:q3-perf`
 
 Slugs are stable across renames, navigable from any view, and meaningful when grepped
-from CI output. JIT short IDs are non-descriptive 8-char hashes.
+from CI output. JIT short IDs are non-descriptive
+[UUID prefixes](storage-records.md#issue-identifiers).
 
 ---
 

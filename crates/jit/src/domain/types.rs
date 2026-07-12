@@ -1253,10 +1253,30 @@ pub struct GateContext {
     pub run_history: Vec<GateRunResult>,
 }
 
-/// Result of a gate execution
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Record-format version stamped into every [`GateRunResult`] a gate execution
+/// records, and the version this binary writes into
+/// `.jit/gate-runs/<run-id>/result.json`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::GATE_RUN_SCHEMA_VERSION;
+///
+/// assert_eq!(GATE_RUN_SCHEMA_VERSION, 1);
+/// ```
+pub const GATE_RUN_SCHEMA_VERSION: u32 = 1;
+
+/// Result of a gate execution, as persisted to
+/// `.jit/gate-runs/<run-id>/result.json`.
+///
+/// `JsonSchema` is derived so the storage reference's freshness guard can read
+/// this record's field set off the derived schema
+/// (`storage::reference::tests::test_gate_run_fields_match_derived_schema`): a
+/// field added here appears there, and the projection fails until the field is
+/// documented.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GateRunResult {
-    /// Schema version for future evolution
+    /// Schema version for future evolution ([`GATE_RUN_SCHEMA_VERSION`])
     pub schema_version: u32,
     /// Unique run identifier
     pub run_id: String,

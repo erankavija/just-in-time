@@ -7,6 +7,11 @@ repository root. Machine-local runtime state lives there too, gitignored, and
 multi-agent lease coordination lives under `.git/jit/` (see
 [The `.git/jit/` Control Plane](#the-gitjit-control-plane)).
 
+Three record shapes are defined by the code that writes them and are generated
+from it: the issue identifier, the event-log line, and the gate-run record. They
+live in [Storage Record Layout](storage-records.md), which this page links to
+where each comes up.
+
 ## Directory Structure
 
 ```
@@ -23,7 +28,7 @@ multi-agent lease coordination lives under `.git/jit/` (see
 │   └── <uuid>.lock   # File lock for atomic operations
 ├── gate-runs/        # Recorded gate runs, one directory per run
 │   └── <run-id>/
-│       └── result.json  # Run record; carries its issue id and gate key
+│       └── result.json  # Run record (see Storage Record Layout)
 └── schemas/          # JSON Schema files referenced by rules.toml
 ```
 
@@ -81,7 +86,7 @@ Each issue is stored as `issues/<uuid>.json`:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | UUID | Unique identifier (UUID v4) |
+| `id` | UUID | Unique identifier; its shape and prefix resolution are specified in [Storage Record Layout](storage-records.md#issue-identifiers) |
 | `title` | string | Short issue title |
 | `description` | string | Full description body; parsed per `content_format` |
 | `state` | enum | `backlog`, `ready`, `in_progress`, `gated`, `done`, `rejected`, `archived` |
@@ -165,29 +170,17 @@ which of their violations block operations. See
 
 ## Event Log Format
 
-`events.jsonl` is an append-only log (one JSON object per line):
+`events.jsonl` is the append-only event log. Its serialization — JSON Lines, one
+tagged record per line, with sample records — is specified in
+[Storage Record Layout](storage-records.md#event-log-records); the tag
+vocabulary, each tag's scope, and which tags carry an `issue_id` are the
+generated [Event Log Tags](events.md) catalog.
 
-Each event is a JSON object tagged by a snake-case `type` field, with the
-remaining fields flat on the object (not nested under a `data` key). Every event
-carries its own `id` and a `timestamp`. Issue-scoped events also carry the
-`issue_id` they concern; repository- and registry-scoped events carry no
-`issue_id`, because they record a change to shared state rather than to a single
-issue. The [Event Log Tags reference](events.md) is the generated catalog: it
-lists every tag, its scope, and which tags omit `issue_id`.
+## Gate Run Records
 
-```jsonl
-{"type":"issue_created","id":"e5095588-...","issue_id":"abc123","timestamp":"2026-01-15T10:00:00Z","title":"probe","priority":"normal"}
-{"type":"issue_state_changed","id":"758cfeb0-...","issue_id":"abc123","timestamp":"2026-01-15T10:05:00Z","from":"ready","to":"in_progress"}
-{"type":"issue_claimed","id":"0176a0ac-...","issue_id":"abc123","timestamp":"2026-01-15T10:10:00Z","assignee":"agent:worker-1"}
-```
-
-### Event Types
-
-The [Event Log Tags reference](events.md) is the authoritative catalog of the tag
-vocabulary: it is generated from the event type, and lists every tag with its
-scope and whether its records carry an `issue_id`.
-
-Fields beyond `id` and `timestamp` vary by type.
+A gate execution records its result under `gate-runs/`. The run's path, the
+record's fields, and how an unset field is written are specified in
+[Storage Record Layout](storage-records.md#gate-run-records).
 
 ## Gate Registry
 

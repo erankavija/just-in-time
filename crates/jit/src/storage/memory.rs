@@ -6,7 +6,7 @@
 use crate::domain::{Event, Issue};
 use crate::storage::{
     AmbiguousIdError, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, PresetNotFoundError, RepoWriteGuard, RepoWriteLock,
+    IssueStore, PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -170,7 +170,7 @@ impl IssueStore for InMemoryStorage {
         }
 
         // Minimum length check
-        if normalized.len() < 4 {
+        if normalized.len() < MIN_ID_PREFIX_LENGTH {
             return Err(InvalidIdPrefixError::new(partial_id).into());
         }
 

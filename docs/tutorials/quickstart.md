@@ -169,6 +169,6 @@ You've learned the basics! Now explore:
 
 - **Issues**: Units of work. A dependency-free issue starts at `ready`; claiming moves it to `in_progress`, and completing lands in `done` (or `gated` if a required gate has not passed). See [Core Model → States](../concepts/core-model.md#states) for the full state machine (incl. `backlog`, `rejected`, `archived`)
 - **Dependencies**: Express "A blocks B" relationships (directed acyclic graph)
-- **Short hashes**: 4-8 character prefixes for convenience (like git)
+- **Short hashes**: id prefixes for convenience (like git). See [Storage Record Layout → Issue Identifiers](../reference/storage-records.md#issue-identifiers) for the id shape and how a prefix resolves
 - **Gates**: Quality checkpoints that must pass before completion
 - **Labels**: Optional organizational power (namespace:value format)

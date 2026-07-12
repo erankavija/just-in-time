@@ -10,7 +10,7 @@ use crate::domain::{Event, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
     IssueNotFoundError, IssueStore, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
-    RepositoryNotFoundError,
+    RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -642,7 +642,7 @@ impl IssueStore for JsonFileStorage {
         }
 
         // Minimum length check
-        if normalized.len() < 4 {
+        if normalized.len() < MIN_ID_PREFIX_LENGTH {
             return Err(InvalidIdPrefixError::new(partial_id).into());
         }
 
