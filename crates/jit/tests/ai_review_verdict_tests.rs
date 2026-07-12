@@ -158,3 +158,40 @@ fn test_verdict_unparseable_scripts_copy() {
         "expected non-zero exit for unparseable verdict"
     );
 }
+
+#[test]
+fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
+    if !require_jq() {
+        eprintln!("SKIP: jq not found on PATH");
+        return;
+    }
+
+    let temp = TempDir::new().unwrap();
+    let context = write_context_file(&temp);
+    let agent = write_fake_agent(
+        &temp,
+        "1. Existing cleanup opportunity.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"implementation is sound\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"existing cleanup opportunity\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
+    );
+
+    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
+        let script = repo_root().join(relative);
+        let exit_code = run_script(&script, &context, agent.to_str().unwrap());
+        assert_eq!(
+            exit_code, 0,
+            "classified advisory output failed in {relative}"
+        );
+    }
+}
+
+#[test]
+fn test_ai_review_wrapper_copies_remain_identical() {
+    let repository = repo_root();
+    let canonical = fs::read(repository.join("scripts/ai-review.sh")).unwrap();
+    let contributed = fs::read(repository.join("contrib/gates/ai-review.sh")).unwrap();
+
+    assert_eq!(canonical, contributed);
+    assert!(
+        !String::from_utf8(canonical).unwrap().contains("codex"),
+        "generic wrapper must not prescribe a reviewer tool"
+    );
+}

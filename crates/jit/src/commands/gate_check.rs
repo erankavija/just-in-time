@@ -7,6 +7,27 @@ use crate::gate_execution;
 use crate::output::IssueShowResponse;
 use std::collections::HashMap;
 
+/// Select and sanitize the latest run for one gate before it enters checker context.
+///
+/// Stored results are never mutated. Structured findings replace verbose stdout;
+/// legacy unstructured runs retain stdout as their compatibility signal. Stderr is
+/// always diagnostic noise and is removed from the context copy.
+fn compact_run_history_for_context(runs: &[GateRunResult], gate_key: &str) -> Vec<GateRunResult> {
+    runs.iter()
+        .filter(|run| run.gate_key == gate_key)
+        .max_by_key(|run| run.started_at)
+        .cloned()
+        .map(|mut run| {
+            run.stderr.clear();
+            if run.findings.is_some() {
+                run.stdout.clear();
+            }
+            run
+        })
+        .into_iter()
+        .collect()
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Repository root used as the checker working directory and as the `git`
     /// context for stamping [`GateRunResult::commit`](crate::domain::GateRunResult).
@@ -143,9 +164,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(runs.into_iter().next_back())
     }
 
-    /// Maximum number of recent runs included in gate context.
-    const MAX_RUN_HISTORY: usize = 5;
-
     /// Maximum prompt file size in bytes (~1000 lines of 80 chars).
     const MAX_PROMPT_FILE_SIZE: u64 = 100_000;
 
@@ -228,26 +246,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             "stage": gate.stage,
         });
 
-        // Load run history for this gate+issue pair, sorted chronologically.
-        // Cap to the most recent N runs to bound context size.
-        let mut run_history: Vec<_> = all_runs
-            .into_iter()
-            .filter(|r| r.gate_key == gate_key)
-            .collect();
-        run_history.sort_by_key(|run| run.started_at);
-        if run_history.len() > Self::MAX_RUN_HISTORY {
-            run_history = run_history.split_off(run_history.len() - Self::MAX_RUN_HISTORY);
-        }
-
-        // stderr is a diagnostic stream (agent banners, echoed prompts, logs),
-        // never review signal -- findings live in stdout. Strip it from the
-        // context handed to the next checker so a verbose reviewer's stderr
-        // cannot drown the prior rounds' findings. Keeping checker output lean
-        // is the checker's job (see scripts/ai-review.sh); this is the jit-side
-        // guarantee that diagnostics never re-enter a review prompt.
-        for run in &mut run_history {
-            run.stderr.clear();
-        }
+        let run_history = compact_run_history_for_context(&all_runs, gate_key);
 
         Ok(Some(GateContext {
             schema_version: 1,
@@ -445,9 +444,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
+    use super::compact_run_history_for_context;
     use crate::commands::CommandExecutor;
-    use crate::domain::{GateChecker, GateMode, GateRunStatus, GateStage, State};
+    use crate::domain::{
+        GateChecker, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, State,
+        GATE_RUN_SCHEMA_VERSION,
+    };
     use crate::storage::{InMemoryStorage, IssueStore};
+    use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
@@ -463,6 +467,79 @@ enforce_leases = "off"
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
         CommandExecutor::new(storage)
+    }
+
+    fn prior_run(
+        run_id: &str,
+        gate_key: &str,
+        started_at: i64,
+        findings: Option<GateFindings>,
+    ) -> GateRunResult {
+        GateRunResult {
+            schema_version: GATE_RUN_SCHEMA_VERSION,
+            run_id: run_id.to_string(),
+            gate_key: gate_key.to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: Some("abc123".to_string()),
+            branch: Some("main".to_string()),
+            status: GateRunStatus::Failed,
+            started_at: Utc.timestamp_opt(started_at, 0).unwrap(),
+            completed_at: Some(Utc.timestamp_opt(started_at + 1, 0).unwrap()),
+            duration_ms: Some(1_000),
+            exit_code: Some(1),
+            stdout: format!("stdout-{run_id}"),
+            stderr: format!("stderr-{run_id}"),
+            command: "review".to_string(),
+            by: Some("agent:reviewer".to_string()),
+            message: Some("review complete".to_string()),
+            findings,
+        }
+    }
+
+    #[test]
+    fn test_compact_run_history_selects_latest_matching_run_by_timestamp() {
+        let latest = prior_run("latest", "review", 30, None);
+        let runs = vec![
+            latest.clone(),
+            prior_run("other-gate", "cargo-ci", 40, None),
+            prior_run("oldest", "review", 10, None),
+            prior_run("middle", "review", 20, None),
+        ];
+
+        let compact = compact_run_history_for_context(&runs, "review");
+
+        assert_eq!(compact.len(), 1);
+        assert_eq!(compact[0].run_id, latest.run_id);
+        assert_eq!(compact[0].stdout, latest.stdout);
+        assert!(compact[0].stderr.is_empty());
+        assert_eq!(runs[0], latest, "source run must remain unchanged");
+    }
+
+    #[test]
+    fn test_compact_run_history_prefers_structured_findings_over_stdout() {
+        let findings = GateFindings {
+            verdict: "fail".to_string(),
+            summary: "one defect".to_string(),
+            findings: Vec::new(),
+        };
+        let source = prior_run("structured", "review", 10, Some(findings.clone()));
+
+        let compact = compact_run_history_for_context(std::slice::from_ref(&source), "review");
+
+        assert_eq!(compact.len(), 1);
+        assert_eq!(compact[0].findings, Some(findings));
+        assert!(compact[0].stdout.is_empty());
+        assert!(compact[0].stderr.is_empty());
+        assert_eq!(source.stdout, "stdout-structured");
+        assert_eq!(source.stderr, "stderr-structured");
+    }
+
+    #[test]
+    fn test_compact_run_history_is_empty_without_matching_runs() {
+        let runs = vec![prior_run("cargo", "cargo-ci", 10, None)];
+
+        assert!(compact_run_history_for_context(&runs, "review").is_empty());
     }
 
     #[test]
@@ -1115,7 +1192,7 @@ enforce_leases = "off"
     }
 
     #[test]
-    fn test_check_gate_run_history_accumulates() {
+    fn test_check_gate_run_history_keeps_only_latest_legacy_run() {
         let executor = setup();
 
         // Define a gate with pass_context that always fails (exit 1) but outputs context
@@ -1182,11 +1259,13 @@ enforce_leases = "off"
             "stderr must be stripped from run_history context"
         );
 
-        // Third run - should include both previous runs
+        // Third run still includes only the latest previous run.
         let result3 = executor.check_gate(&issue_id, "review").unwrap();
         let ctx3: serde_json::Value = serde_json::from_str(&result3.stdout).unwrap();
         let history3 = ctx3["run_history"].as_array().unwrap();
-        assert_eq!(history3.len(), 2);
+        assert_eq!(history3.len(), 1);
+        assert_eq!(history3[0]["run_id"], result2.run_id);
+        assert!(!history3[0]["stdout"].as_str().unwrap().is_empty());
     }
 
     #[test]
@@ -1236,7 +1315,7 @@ enforce_leases = "off"
     }
 
     #[test]
-    fn test_run_history_capped_at_limit() {
+    fn test_run_history_is_compacted_to_one_latest_run() {
         let executor = setup();
 
         // Define a context-aware gate that always fails
@@ -1273,20 +1352,16 @@ enforce_leases = "off"
         executor.storage.save_issue(issue).unwrap();
         executor.add_gate(&issue_id, "review".to_string()).unwrap();
 
-        // Run the gate 7 times (more than the cap of 5)
+        // Run the gate repeatedly to exercise history compaction.
         for _ in 0..7 {
             let _ = executor.check_gate(&issue_id, "review").unwrap();
         }
 
-        // 8th run should have at most 5 entries in run_history
+        // The next run receives exactly one latest prior run.
         let result = executor.check_gate(&issue_id, "review").unwrap();
         let ctx: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
         let history = ctx["run_history"].as_array().unwrap();
-        assert!(
-            history.len() <= 5,
-            "Expected at most 5 history entries, got {}",
-            history.len()
-        );
+        assert_eq!(history.len(), 1);
     }
 
     #[test]

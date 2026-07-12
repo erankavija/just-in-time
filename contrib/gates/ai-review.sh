@@ -18,7 +18,7 @@ set -euo pipefail
 #                       review to stdout. Evaluated as a shell command.
 #
 # Example REVIEWER_AGENT values:
-#   codex review -
+#   your-reviewer-command                   # configure inspection-only mode
 #   cat                                    # dry-run (echoes the prompt)
 #
 # Setup:
@@ -32,9 +32,9 @@ set -euo pipefail
 #          --pass-context \
 #          --prompt "Review the implementation for correctness and style." \
 #          --checker-command "./scripts/ai-review.sh" \
-#          --env REVIEWER_AGENT="codex review -" \
+#          --env REVIEWER_AGENT="your-reviewer-command" \
 #          --timeout 120
-#   4. Run: jit gate check <issue> ai-review
+#   4. Run: jit gate evaluate <issue> ai-review
 
 if [ -z "${JIT_CONTEXT_FILE:-}" ]; then
   echo "ERROR: JIT_CONTEXT_FILE not set. This gate requires --pass-context." >&2
@@ -49,7 +49,7 @@ fi
 if [ -z "${REVIEWER_AGENT:-}" ]; then
   echo "ERROR: REVIEWER_AGENT not set." >&2
   echo "  Set it to a command that reads a prompt from stdin and writes to stdout." >&2
-  echo "  Example: REVIEWER_AGENT='codex review -'" >&2
+  echo "  Example: REVIEWER_AGENT='your-reviewer-command'" >&2
   exit 1
 fi
 
@@ -79,6 +79,18 @@ ${CONTEXT_JSON}
 
 Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
 
+Then emit a machine-readable findings block so jit can consume the findings as data. The block is two line-exact fence markers wrapping a single JSON object:
+
+<<<JIT-FINDINGS-JSON
+{"verdict":"fail","summary":"<one line>","findings":[{"id":"F1","severity":"high","summary":"<one line>","file":"path/to/file.rs","line":42}]}
+JIT-FINDINGS-JSON>>>
+
+Rules for the block:
+- \`verdict\` is "pass" or "fail" and MUST match the VERDICT line below.
+- \`findings\` lists every finding from the numbered list above, in order. Use an empty array when there are none; when the checker-specific policy distinguishes blocking from advisory feedback, a passing verdict may include advisory findings.
+- \`severity\` is one of "high", "medium", "low". \`disposition\` (`blocking` or `advisory`) and \`origin\` (`issue-impact` or `pre-existing`) are optional classifications that checker-specific policies may require. \`file\` and \`line\` are optional; omit them when a finding is not tied to a specific location.
+- Emit valid JSON on a single line. Do not wrap the block in a code fence.
+
 You MUST end your response with exactly one of these lines:
 VERDICT: PASS
 VERDICT: FAIL
@@ -86,10 +98,40 @@ No text may follow the verdict line.
 EOF
 ) || true
 
+# A reviewer agent's stderr can be enormous -- it may echo its entire prompt and
+# context back (observed: thousands of lines per run). jit stores this verbatim
+# in the gate run result, and a --pass-context gate feeds prior runs back into
+# the next review round, so an unbounded dump both bloats .jit/gate-runs/ and
+# drowns the next reviewer. The one durably useful line is the session id, which
+# points at the agent's full transcript -- resume that to see everything. So we
+# keep only through the session id plus a couple lines, and drop the rest.
+#
+# Tunables:
+#   AGENT_STDERR_ID_PATTERN -- grep -i pattern locating the transcript pointer
+#   AGENT_STDERR_AFTER_ID   -- extra lines kept after the matched line
+#   AGENT_STDERR_HEAD_LINES -- fallback head when no pointer line is found
+AGENT_STDERR_ID_PATTERN="${AGENT_STDERR_ID_PATTERN:-session id}"
+AGENT_STDERR_AFTER_ID="${AGENT_STDERR_AFTER_ID:-2}"
+AGENT_STDERR_HEAD_LINES="${AGENT_STDERR_HEAD_LINES:-12}"
+
+# Surface a tight slice of the agent's stderr: through the session id (+ a couple
+# lines), or a small head if no session id is present. Never called on the PASS
+# path -- a passing review's stderr is pure noise.
 show_agent_stderr() {
-  if [ -s "$AGENT_STDERR" ]; then
-    echo "--- agent stderr ---" >&2
-    cat "$AGENT_STDERR" >&2
+  if [ ! -s "$AGENT_STDERR" ]; then
+    return
+  fi
+  total=$(wc -l <"$AGENT_STDERR")
+  id_line=$(grep -in "$AGENT_STDERR_ID_PATTERN" "$AGENT_STDERR" | head -1 | cut -d: -f1 || true)
+  if [ -n "$id_line" ]; then
+    keep=$((id_line + AGENT_STDERR_AFTER_ID))
+  else
+    keep="$AGENT_STDERR_HEAD_LINES"
+  fi
+  echo "--- agent stderr (first ${keep} of ${total} lines; the session id below points to the full agent transcript) ---" >&2
+  head -n "$keep" "$AGENT_STDERR" >&2
+  if [ "$total" -gt "$keep" ]; then
+    echo "--- $((total - keep)) more lines omitted (resume the session for the rest) ---" >&2
   fi
 }
 

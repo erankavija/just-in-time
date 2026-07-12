@@ -1249,7 +1249,9 @@ pub struct GateContext {
     pub issue: serde_json::Value,
     /// Gate definition as JSON value
     pub gate: serde_json::Value,
-    /// Chronologically-sorted run history for this gate+issue pair
+    /// Latest run for this gate+issue pair, or an empty vector when none exists.
+    /// Structured runs retain findings and metadata but omit stdout and stderr;
+    /// legacy unstructured runs retain stdout as a compatibility fallback.
     pub run_history: Vec<GateRunResult>,
 }
 
