@@ -16,10 +16,10 @@ in the §3 coverage map.
 
 | Criterion | Approach (how it is met) | Notes / open gap |
 |---|---|---|
-| REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency | Resolve the container root through normal storage id semantics, enumerate the root plus its DAG-authoritative transitive dependency closure (`crates/jit/src/commands/graph.rs:206`, `:227`), collect every distinct `DocumentReference.path` on those issues including opaque/binary roots, then recursively discover supported local dependencies (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. |
+| REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency | Resolve the container root through normal storage id semantics, enumerate the root plus its DAG-authoritative transitive dependency closure (`crates/jit/src/commands/graph.rs:206`, `:227`), collect every distinct `DocumentReference.path` on those issues including opaque/binary roots, then recursively discover supported local dependencies (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object with destinations computed by the D-12 mirror rule. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. |
 | REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | A pure classifier computes an action per artifact from all reference owners (repository-wide, not directory convention), current lifecycle state, component-aware managed/permanent policy, destination occupancy, and pinned-commit semantics. Ambiguous cases resolve to `block`. | Replaces the two inconsistent directory-heuristic notions of "shared" (`document.rs:1463-1495`, `assets.rs:185-233`) with one repository-wide reference-count classifier. |
-| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under repository write coordination, stages the complete set, validates every supported local edge at its proposed destination, persists reference and event changes, then deletes only sources proven safe. Reuses the current copy-to-temp/finalize/relink/delete sequencing and rollback principles (`document.rs:1637-1787`, `:1391-1435`), generalized through a storage-owned mutation primitive holding the re-entrant write guard (`storage/mod.rs:126`). Guarantee: no failure loses an artifact, overwrites a destination, or leaves a reference relying exclusively on a missing path; unverifiable rollback retains resolvable duplicates and reports manual cleanup. | Only Done/Rejected containers execute (D-8); non-terminal containers preview only. |
-| REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`, so a sibling `base.css` and `themes/rust.css` are recognized as bundle dependencies rather than mislabelled shared. Execution preserves relative topology by default and validates every moved edge resolves in the proposed layout before metadata commit, fixing the source/destination path-set mismatch in the current verifier (`document.rs:1832-1858`). | Detected JavaScript/runtime loading is reported unsupported, never guessed (D-5). |
+| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under repository write coordination, stages the complete set, validates every supported local edge at its proposed destination, persists reference and event changes, then deletes only sources proven safe. Reuses the current copy-to-temp/finalize/relink/delete sequencing and rollback principles (`document.rs:1637-1787`, `:1391-1435`), generalized through a storage-owned mutation primitive holding the re-entrant write guard (`storage/mod.rs:126`). Finalization is atomic no-replace (D-14), closing the overwrite window against external writers. Guarantee: no failure loses an artifact, overwrites a destination, or leaves a reference relying exclusively on a missing path; unverifiable rollback retains resolvable duplicates and reports manual cleanup. | Only Done/Rejected containers execute (D-8); non-terminal containers preview only. |
+| REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`, so a sibling `base.css` and `themes/rust.css` are recognized as bundle dependencies rather than mislabelled shared. The D-12 mirror layout keeps every relative offset between bundle members invariant, and execution validates every moved edge resolves in the proposed layout before metadata commit, fixing the source/destination path-set mismatch in the current verifier (`document.rs:1832-1858`). | Detected JavaScript/runtime loading is reported unsupported, never guessed (D-5). |
 | REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers, each with documentation-policy status, repository-wide artifact ownership, artifact counts, blockers, and move/copy/retain summaries, plus a derivable suggested category. It consumes the same plan model and performs no filesystem, issue, or event mutation. | No time/retention semantics: eligibility is current terminal state and policy only (D-6); the live REQ-05 wording is already amended to remove `done_at`. |
 | REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | The plan model serializes to a stable JSON envelope; preview is the non-mutating default for both `jit archive document` and `jit archive container`. A representative fixture corpus (Markdown links; HTML→sibling CSS→nested theme image/font; CSS `@import`/`url()`; direct CSV/PNG/SVG roots; permanent shared figures; active outside consumers; identical filenames; missing edges; pinned commits; a dependency cycle) exercises discovery, classification, preview, and execution. | Preview is the default; mutation requires `--execute`, which recomputes and revalidates immediately before mutating (D-7). |
 
@@ -35,7 +35,21 @@ planning.
   explicit-reference vs embedded-dependency provenance, owners inside and outside the subtree,
   active/terminal/permanent/pinned/missing/conflict evidence, supported/unsupported edges,
   issue-reference changes, and stable machine-readable warnings/blockers. Container traversal
-  reuses DAG-authoritative closure, not label membership. The command layer loads inputs,
+  reuses DAG-authoritative closure, not label membership.
+  **Destination layout (D-12):** the destination root is
+  `<archive_root>/<category-mapping>/` plus, for container targets, `<container.short_id>/`;
+  every moved or copied artifact lands at that root plus its repository-relative source path.
+  Mirroring repository-relative paths under one common prefix keeps every relative offset
+  between bundle members invariant, keeps identical filenames from different directories
+  distinct, and makes intra-plan destination collisions impossible (two artifacts collide only
+  if they share a repository path, which cannot occur).
+  **Ownership universe (D-13):** repository-wide ownership is computed over every
+  `DocumentReference` across all issues plus the recursive supported embedded closure of each
+  (Markdown/HTML/CSS edges); an artifact referenced directly or through an embedded edge from
+  outside the selected subtree is outside-owned and never moved (D-2). Files unreachable from
+  any issue reference are outside JIT's referential contract: they are reported as
+  informational not-selected entries when they sit beside bundle members (D-10) but are never
+  silently relocated and never counted as owners. The command layer loads inputs,
   calls the pure planner, renders preview, and executes an accepted plan; it does not
   duplicate decision logic between preview and execution. A storage-owned artifact mutation
   primitive centralizes staging, containment, atomic rename, and collision semantics so the
@@ -121,7 +135,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   selected subtree.
   Own criteria: `[hard] LOCAL-03: Inventories every distinct DocumentReference path in the
   closure, including CSV/PNG/SVG roots with no registered adapter.` `[hard] LOCAL-04: Records
-  every owner of each artifact across the whole repository, flagging owners outside the subtree.`
+  every owner of each artifact across the whole repository — direct issue references and
+  supported embedded references reachable from any issue-linked document — flagging owners
+  outside the subtree.`
   Blast radius: self-contained; reuses `graph.rs:206`/`:227` and `storage/mod.rs:498`.
 
 - **Recursive supported-dependency discovery**  `type: task`  `satisfies: REQ-01, REQ-04`  `depends-on: Artifact plan model and blocker taxonomy`
@@ -146,6 +162,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   dev/active-other does not match dev/active.`
   `[hard] LOCAL-19: Classifies an artifact whose proposed destination is already occupied as
   blocked, citing the conflicting path in the blocker evidence.`
+  `[hard] LOCAL-21: Proposes destinations by mirroring each artifact's repository-relative
+  source path beneath the target's destination root, so identical filenames from different
+  directories stay distinct and every relative offset between bundle members is preserved.`
   Blast radius: self-contained; supersedes the archive-time directory heuristic without touching
   the legacy command until Group B.
 
@@ -157,9 +176,16 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   write guard across the sequence and centralizing containment, atomic-write, and collision
   semantics, testable through tempdir-backed storage (the in-memory backend performs no virtual
   file I/O, so filesystem assertions run against `JsonFileStorage` at a tempdir).
+  Finalization uses an atomic no-replace primitive — hard-link from the same-filesystem staging
+  directory (`.jit/tmp` lives inside the repository) then unlink the staged copy, which fails
+  with `AlreadyExists` instead of clobbering a destination created after the plan's occupancy
+  check — never check-then-`rename`, whose overwrite window the repository write guard cannot
+  close against external filesystem writers (D-14).
   Own criteria: `[hard] LOCAL-09: Rejects an occupied destination with the pre-existing file
   preserved byte-for-byte.` `[hard] LOCAL-10: Holds one write guard across staging, reference
-  saves, and event append.`
+  saves, and event append.` `[hard] LOCAL-22: A destination created by an external writer
+  between planning and finalization fails that artifact's finalization without overwriting the
+  foreign file, verified by a race-focused test.`
   Blast radius: self-contained new storage API; the legacy command keeps its inline `std::fs`
   path until it is removed.
 
@@ -183,9 +209,13 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
   persists reference changes and the archive event(s), refreshes or invalidates cached asset
   metadata on moved references, leaves pinned references at their historical path (copying the
   source when needed), and removes only sources proven safe, retaining resolvable duplicates with
-  a manual-cleanup report when rollback cannot be verified. Only Done/Rejected containers execute.
+  a manual-cleanup report when rollback cannot be verified. Only Done/Rejected containers execute;
+  a document target executes only when every direct or embedded-closure owner of the document and
+  of every bundle artifact is terminal, active owners block execution (preview still reports), and
+  a zero-owner document in a managed path executes with an informational no-owner note (D-15).
   Own criteria: `[hard] LOCAL-13: Validates each staged local edge in the proposed layout, not
-  against source-resolved paths, before commit.` `[hard] LOCAL-14: A partial-relink, event-append,
+  against source-resolved paths, before commit.` `[hard] LOCAL-23: Refuses document-target
+  execution while any owner of the document or its bundle artifacts is non-terminal.` `[hard] LOCAL-14: A partial-relink, event-append,
   or deletion failure leaves no artifact lost, no destination overwritten, and no reference
   relying solely on a missing path.` `[hard] LOCAL-15: Refuses execution on a non-terminal
   container and on a stale recomputed plan.`
@@ -251,7 +281,9 @@ fan-out (obligation 4). Coverage is enforced at the task tier: each task carries
 | Removing `jit doc archive` breaks docs/tests/MCP mid-flight | Medium | Removal ordered last (`depends-on: Coordinated plan execution`); old and new coexist until then; consumer migration is in the same change; acceptance is the tree-wide search above. |
 | Recursive CSS/HTML discovery mis-scopes a shared theme or figure | Medium | Repository-wide reference-count classification (LOCAL-07), not directory heuristic; shared-but-active artifacts copy/retain, never force-relink the active consumer (D-2, D-10). |
 | Post-archive verification defect masks broken links | Medium | Executor validates each edge in the proposed layout, not against source-resolved paths (LOCAL-13); replaces `document.rs:1832-1858`. |
-| Coordination gap (time-of-check/time-of-use) during multi-write execution | Medium | Storage mutation primitive holds the re-entrant write guard across staging, saves, and event append (LOCAL-10, `storage/mod.rs:126`); execution rejects stale recomputed plans (LOCAL-15). |
+| Coordination gap (time-of-check/time-of-use) during multi-write execution | Medium | Storage mutation primitive holds the re-entrant write guard across staging, saves, and event append (LOCAL-10, `storage/mod.rs:126`); execution rejects stale recomputed plans (LOCAL-15). The guard covers only JIT writers, so finalization additionally uses the atomic no-replace primitive (D-14, LOCAL-22) against external filesystem writers. |
+| An artifact embedded by an outside document (not directly issue-linked) misclassified as unshared and moved | High | Ownership universe is defined repository-wide over all issue references plus their supported embedded closure (D-13, LOCAL-04); the existing classifier's supplied-map limitation (`assets.rs:189`) is superseded. |
+| Document-target execution on a path with mixed-state owners dangles an active reference | Medium | D-15 fixes eligibility: all direct and embedded-closure owners must be terminal; active owners block execution while preview still reports; zero-owner managed-path documents execute with an informational note (LOCAL-23). |
 | Opaque roots need an adapter to be inventoried | Low | Inventory reads bytes via `storage/mod.rs:498` and treats parser support as edge-discovery-only, not root eligibility (LOCAL-03). |
 | Event granularity for a multi-artifact action undefined | Low | Executor emits a container/plan-scoped archive event carrying artifact and reference detail; current single event cannot audit a multi-artifact action (`types.rs:1466`). Decided in the execution task. |
 
@@ -294,6 +326,35 @@ Provisional; none is REOPEN — the investigation supports each.
 - **D-11 — Candidates are container-oriented:** chosen **list terminal containers with policy
   status, artifact counts, blockers, and summaries; individual artifacts are details inside a
   candidate**. Rejected: individual artifacts as independent archival candidates.
+
+Plan-level decisions resolving specification gaps surfaced in review (extend, and do not
+override, the brief's D-1..D-11):
+
+- **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination root
+  `<archive_root>/<category-mapping>/` (+ `<container.short_id>/` for container targets), each
+  artifact at root + repository-relative source path**. Preserves every relative offset under a
+  common prefix, keeps identical filenames distinct, and makes intra-plan collisions
+  structurally impossible. Rejected: stripping the managed prefix per artifact (the current
+  single-doc rule, `document.rs:1284-1319`) — artifacts from different managed roots could
+  collide and cross-directory relative links would break; content-addressed layout — destroys
+  human-navigable topology.
+- **D-13 — Ownership universe is the issue-linked closure:** chosen **all `DocumentReference`s
+  across all issues plus each one's recursive supported embedded closure; outside owners
+  (direct or embedded) forbid a move**. Files unreachable from any issue reference are outside
+  JIT's referential contract: reported informationally near bundles (D-10), never counted as
+  owners, never relocated. Rejected: scanning the entire working tree for arbitrary referencing
+  files — unbounded, and JIT's guarantee is scoped to issue references.
+- **D-14 — Finalization is atomic no-replace:** chosen **hard-link from same-filesystem staging
+  then unlink staging; `AlreadyExists` aborts that artifact's finalization and triggers
+  rollback**. Rejected: check-then-`rename` — `rename` replaces a destination created after the
+  check, and the repository write guard cannot exclude external filesystem writers
+  (`storage/mod.rs:90`).
+- **D-15 — Document-target execution requires all-terminal owners:** chosen **`jit archive
+  document --execute` requires every direct or embedded-closure owner of the document and its
+  bundle artifacts to be terminal; active owners block (preview still reports); a zero-owner
+  managed-path document executes with an informational note**. Rejected: selecting an owning
+  container implicitly (ambiguous with several owners); a force override (mirrors the rejected
+  D-8 force path).
 - **Assumptions:** Event granularity (one container/plan-scoped archive event carrying
   artifact/reference detail) is resolved inside the execution task — rationale: the current
   single-source event cannot audit a multi-artifact action; risk if wrong is only event
