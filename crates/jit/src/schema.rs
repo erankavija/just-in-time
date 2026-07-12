@@ -737,6 +737,13 @@ impl CommandSchema {
                  or file path was not found.",
                 false,
             ),
+            row(
+                "*",
+                4,
+                "An enforcing validation rule rejected the write (the shared \
+                 write path blocks on rule findings).",
+                false,
+            ),
             row("*", 5, "A filesystem operation was denied.", false),
             row(
                 "*",
@@ -779,9 +786,9 @@ impl CommandSchema {
                 false,
             ),
             row(
-                "apply",
-                4,
-                "The template's internal depends-on edges form a cycle.",
+                "snapshot export",
+                6,
+                "The snapshot output path already exists.",
                 false,
             ),
             row(

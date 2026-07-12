@@ -1,16 +1,26 @@
-//! REQ-02: bind every `command_exit_codes` row emitted by a direct exit site to
-//! the code that actually emits it.
+//! REQ-02: bind every `command_exit_codes` row to the runtime behavior it
+//! documents, so no mapping in the generated reference is hand-authored.
 //!
-//! Findings-signal and pass-through rows are emitted by direct
-//! `std::process::exit` sites, so they are observed by running the binary. The
-//! two gate-evaluation exception rows route through `error_to_exit_code` and are
-//! pinned by the classifier unit test in `main.rs` (`exit_code_projection_tests`).
-//! `serve --fg` has no fixed code to observe, so it is verified against the
-//! production function its dispatch calls (`serve::foreground_exit_code`); the
-//! reserved `config validate` `2` is unreachable by construction (the handler
-//! defines no warning condition) and is asserted to be documented as reserved.
-//! `test_command_exit_codes_every_exception_row_is_verified` keeps the set
-//! complete: adding an exception row without a binding fails the build.
+//! Each row is bound one of two ways:
+//!
+//! - **Subprocess** (this file): run the real command into the documented
+//!   condition and assert the process exit code. This covers the rows emitted by
+//!   direct `std::process::exit` sites (findings signals) and the command families
+//!   whose condition is reachable end-to-end.
+//! - **Classifier** (`main.rs`, `exit_code_projection_tests`): run the typed error
+//!   the condition raises through `error_to_exit_code` — the exact classifier CLI
+//!   dispatch uses — and assert it lands on that row. This covers conditions that
+//!   are impractical to provoke through the binary (a mid-batch write failure) and
+//!   the gate-evaluation verdict rows.
+//!
+//! Two rows have no fixed code to observe: `serve --fg` is a pass-through, so it
+//! is verified against the production function its dispatch calls
+//! (`serve::foreground_exit_code`); the reserved `config validate` `2` is
+//! unreachable by construction (the handler defines no warning condition) and is
+//! asserted to be documented as reserved.
+//!
+//! `test_command_exit_codes_every_row_is_verified` keeps the set complete: adding
+//! a row without a binding fails the build.
 
 use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
@@ -405,16 +415,372 @@ fn test_command_exit_codes_validate_leases_emits_1() {
     documented_row("validate --leases", Some(1), true);
 }
 
-/// Guard: every exception row in the projection must be covered by a binding in
-/// this file or by the `gate evaluate` classifier test in `main.rs`. Adding a new
-/// exception row without a test fails here.
+/// `jit issue list` on a healthy repository exits 0 — the universal `*`/0 row.
 #[test]
-fn test_command_exit_codes_every_exception_row_is_verified() {
+fn test_command_exit_codes_success_emits_0() {
+    let temp = setup();
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "list"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    documented_row("*", Some(0), false);
+}
+
+/// A too-short id prefix is a usage error — the universal `*`/2 row.
+#[test]
+fn test_command_exit_codes_invalid_argument_emits_2() {
+    let temp = setup();
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "show", "ab"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    documented_row("*", Some(2), false);
+}
+
+/// An unresolvable issue id is a not-found error — the universal `*`/3 row.
+#[test]
+fn test_command_exit_codes_not_found_emits_3() {
+    let temp = setup();
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "show", "0123456789abcdef"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(3));
+    documented_row("*", Some(3), false);
+}
+
+/// `jit dep add` exits 4 when the edge would close a cycle — matching `dep add`/4.
+#[test]
+fn test_command_exit_codes_dep_add_cycle_emits_4() {
+    let temp = setup();
+    let first = create_issue(&temp, "First", &[]);
+    let second = create_issue(&temp, "Second", &[]);
+
+    // second -> first is fine.
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["dep", "add", &second, &first])
+        .status()
+        .unwrap()
+        .success());
+
+    // first -> second closes the cycle.
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["dep", "add", &first, &second])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("dep add", Some(4), false);
+}
+
+/// Build a dependency-blocked pair: `(dependency, dependent)`, where `dependent`
+/// depends on the still-unmet `dependency`.
+fn blocked_pair(temp: &TempDir) -> (String, String) {
+    let dependency = create_issue(temp, "Dependency", &[]);
+    let dependent = create_issue(temp, "Dependent", &[]);
+    assert!(Command::new(jit_binary())
+        .current_dir(temp)
+        .args(["dep", "add", &dependent, &dependency])
+        .status()
+        .unwrap()
+        .success());
+    (dependency, dependent)
+}
+
+/// All three commands in the `issue update, issue claim, issue claim-next`/4 row
+/// exit 4 on a blocked transition: `update` and `claim` on unmet dependencies,
+/// `claim-next` on an unpassed precheck gate.
+#[test]
+fn test_command_exit_codes_blocked_transition_emits_4() {
+    // `issue update` into `ready`, which the unmet dependency blocks (a dependency
+    // must reach a terminal state before its dependent becomes ready).
+    let temp = setup();
+    let (_dependency, dependent) = blocked_pair(&temp);
+    let update = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "update", &dependent, "--state", "ready"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        update.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&update.stderr)
+    );
+
+    // `issue claim` on the same blocked issue.
+    let claim = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "claim", &dependent, "agent:test"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        claim.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&claim.stderr)
+    );
+
+    // `issue claim-next` picking up an issue whose precheck gate has not passed.
+    let temp = setup();
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp)
+        .args([
+            "gate",
+            "define",
+            "precheck-gate",
+            "--title",
+            "Precheck",
+            "-d",
+            "Precheck",
+            "--stage",
+            "precheck",
+            "--mode",
+            "manual",
+        ])
+        .status()
+        .unwrap()
+        .success());
+    create_issue(&temp, "Precheck work", &["--gate", "precheck-gate"]);
+    let claim_next = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["issue", "claim-next", "agent:test"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        claim_next.status.code(),
+        Some(4),
+        "stderr: {}",
+        String::from_utf8_lossy(&claim_next.stderr)
+    );
+
+    documented_row(
+        "issue update, issue claim, issue claim-next",
+        Some(4),
+        false,
+    );
+}
+
+/// `jit gate define` exits 6 when the key is already registered — matching
+/// `gate define`/6.
+#[test]
+fn test_command_exit_codes_gate_define_duplicate_emits_6() {
+    let temp = setup();
+    let define = || {
+        Command::new(jit_binary())
+            .current_dir(&temp)
+            .args([
+                "gate",
+                "define",
+                "--title",
+                "Tests",
+                "--description",
+                "Tests",
+                "tests",
+            ])
+            .output()
+            .unwrap()
+    };
+    assert!(define().status.success());
+
+    let duplicate = define();
+    assert_eq!(
+        duplicate.status.code(),
+        Some(6),
+        "stderr: {}",
+        String::from_utf8_lossy(&duplicate.stderr)
+    );
+    documented_row("gate define", Some(6), false);
+}
+
+/// `jit issue batch-create` exits 2 when pre-validation rejects the file (here an
+/// entry depending on a key the file never defines) — matching
+/// `issue batch-create`/2. The companion `/10` row (a write that fails after some
+/// issues were created) is pinned by the classifier test in `main.rs`, which runs
+/// the `BatchWriteError` that path raises through `error_to_exit_code`.
+#[test]
+fn test_command_exit_codes_batch_create_prevalidation_emits_2() {
+    let temp = setup();
+    let batch = temp.path().join("batch.json");
+    fs::write(
+        &batch,
+        r#"[{"key": "a", "title": "A", "depends_on": ["ghost"]}]"#,
+    )
+    .unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args([
+            "issue",
+            "batch-create",
+            "--from-json",
+            batch.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("issue batch-create", Some(2), false);
+}
+
+/// Enable `[documentation]` so `jit doc archive` can resolve an archive
+/// destination, and return the managed source path it archives from.
+fn enable_doc_archive(temp: &TempDir) -> std::path::PathBuf {
+    let config = temp.path().join(".jit/config.toml");
+    let mut toml = fs::read_to_string(&config).unwrap();
+    toml.push_str(
+        "\n[documentation]\ndevelopment_root = \"dev\"\n\
+         archive_root = \"dev/archive\"\n\
+         [documentation.categories]\nsession = \"sessions\"\n",
+    );
+    fs::write(&config, toml).unwrap();
+    fs::create_dir_all(temp.path().join("dev/active")).unwrap();
+    temp.path().join("dev/active/note.md")
+}
+
+/// `jit doc archive` exits 3 when the source is missing and 6 when the archive
+/// destination is occupied — matching the two `doc archive` rows.
+#[test]
+fn test_command_exit_codes_doc_archive_emits_3_and_6() {
+    let temp = setup();
+    let source = enable_doc_archive(&temp);
+
+    // Missing source -> 3.
+    let missing = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args([
+            "doc",
+            "archive",
+            "dev/active/absent.md",
+            "--type",
+            "session",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        missing.status.code(),
+        Some(3),
+        "stderr: {}",
+        String::from_utf8_lossy(&missing.stderr)
+    );
+    documented_row("doc archive", Some(3), false);
+
+    // Archive once, recreate the source, archive again -> destination occupied -> 6.
+    fs::write(&source, "# Note\n").unwrap();
+    assert!(Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["doc", "archive", "dev/active/note.md", "--type", "session"])
+        .status()
+        .unwrap()
+        .success());
+    fs::write(&source, "# Note, again\n").unwrap();
+
+    let occupied = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["doc", "archive", "dev/active/note.md", "--type", "session"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        occupied.status.code(),
+        Some(6),
+        "stderr: {}",
+        String::from_utf8_lossy(&occupied.stderr)
+    );
+    documented_row("doc archive", Some(6), false);
+}
+
+/// `jit snapshot export` exits 6 when the output path is already occupied —
+/// matching `snapshot export`/6.
+#[test]
+fn test_command_exit_codes_snapshot_export_occupied_emits_6() {
+    let temp = setup();
+    create_issue(&temp, "Snapshot me", &[]);
+    fs::create_dir(temp.path().join("taken")).unwrap();
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["snapshot", "export", "--out", "taken", "--working-tree"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(6),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("snapshot export", Some(6), false);
+}
+
+/// A lease subcommand run outside a git repository exits 10 — matching `claim`/10.
+/// `setup()` inits `.jit` without a git repository, which is exactly that case.
+#[test]
+fn test_command_exit_codes_claim_without_git_emits_10() {
+    let temp = setup();
+    let output = Command::new(jit_binary())
+        .current_dir(&temp)
+        .args(["claim", "status"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(10),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    documented_row("claim", Some(10), false);
+}
+
+/// Guard: **every** row in the projection — exception and standard alike — must be
+/// bound to runtime behavior, either by a subprocess test in this file or by the
+/// classifier test in `main.rs` (`exit_code_projection_tests`), which runs the
+/// typed error the row's condition raises through `error_to_exit_code` and asserts
+/// it lands on that exact row. A row added without a binding fails here, so no
+/// mapping in the reference is hand-authored.
+#[test]
+fn test_command_exit_codes_every_row_is_verified() {
     let verified: std::collections::HashSet<(String, Option<i32>)> = [
-        // Pinned by main.rs `exit_code_projection_tests` (classifier).
+        // Pinned by the `main.rs` classifier test (typed error -> row).
+        ("*", Some(1)),
+        ("*", Some(4)),
+        ("*", Some(5)),
+        ("*", Some(10)),
+        ("issue batch-create", Some(10)),
         ("gate evaluate, gate evaluate-all", Some(4)),
         ("gate evaluate, gate evaluate-all", Some(10)),
-        // Pinned by the subprocess tests above.
+        // Pinned by the subprocess tests in this file.
+        ("*", Some(0)),
+        ("*", Some(2)),
+        ("*", Some(3)),
+        ("dep add", Some(4)),
+        ("issue update, issue claim, issue claim-next", Some(4)),
+        ("gate define", Some(6)),
+        ("issue batch-create", Some(2)),
+        ("snapshot export", Some(6)),
+        ("doc archive", Some(3)),
+        ("doc archive", Some(6)),
+        ("claim", Some(10)),
         ("validate", Some(4)),
         ("validate", Some(1)),
         ("validate --branch-drift", Some(1)),
@@ -425,7 +791,8 @@ fn test_command_exit_codes_every_exception_row_is_verified() {
         ("doc check-links", Some(1)),
         ("doc check-links", Some(2)),
         ("gate preset apply", Some(1)),
-        // Reserved / pass-through: asserted structurally against cited sites.
+        ("serve, serve --stop, serve --status", Some(1)),
+        // Reserved / pass-through: asserted against the production sites they cite.
         ("config validate", Some(2)),
         ("serve --fg", None),
     ]
@@ -433,16 +800,15 @@ fn test_command_exit_codes_every_exception_row_is_verified() {
     .map(|(c, code)| (c.to_string(), code))
     .collect();
 
-    let exceptions: std::collections::HashSet<(String, Option<i32>)> = CommandSchema::generate()
+    let projected: std::collections::HashSet<(String, Option<i32>)> = CommandSchema::generate()
         .command_exit_codes
         .into_iter()
-        .filter(|c| c.exception)
         .map(|c| (c.command, c.code))
         .collect();
 
     assert_eq!(
-        exceptions, verified,
-        "every exception row must have a verifying test; \
+        projected, verified,
+        "every projected row must have a verifying binding; \
          left = projection, right = verified set"
     );
 }

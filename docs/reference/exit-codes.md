@@ -27,6 +27,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `1` | No typed classifier matched the failure (generic error). |  |
 | `*` | `2` | Invalid arguments or usage error, including an unresolvable, ambiguous, or too-short id prefix. |  |
 | `*` | `3` | A referenced issue, gate, gate-run, preset, lease, repository, or file path was not found. |  |
+| `*` | `4` | An enforcing validation rule rejected the write (the shared write path blocks on rule findings). |  |
 | `*` | `5` | A filesystem operation was denied. |  |
 | `*` | `10` | The repository's on-disk format is newer than this binary, or a filesystem/subprocess I/O operation failed. |  |
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
@@ -34,7 +35,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `gate define` | `6` | The gate key is already registered. |  |
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
 | `issue batch-create` | `10` | A write failed after some issues were already created. |  |
-| `apply` | `4` | The template's internal depends-on edges form a cycle. |  |
+| `snapshot export` | `6` | The snapshot output path already exists. |  |
 | `doc archive` | `3` | The source document to archive does not exist. |  |
 | `doc archive` | `6` | The archive destination path is already occupied. |  |
 | `claim` | `10` | A lease subcommand was run outside a git repository (leases require git for worktree identity). |  |

@@ -7232,20 +7232,42 @@ mod exit_code_projection_tests {
         .into()
     }
 
-    /// Representative typed errors paired with the exit code the classifier must
-    /// produce for them. Only errors constructible through the public library API
-    /// appear here; the remaining crate-private conditions (blocked transitions,
-    /// batch writes) are pinned end-to-end by the subprocess tests in
-    /// `tests/exit_code_tests.rs`.
-    fn classifier_cases() -> Vec<(anyhow::Error, i32)> {
+    /// Representative typed errors, each paired with the exit code the classifier
+    /// must produce for it and the `command_exit_codes` **row** that pair pins
+    /// (`"*"` for the universal rows, which any command reaches through the shared
+    /// classifier).
+    ///
+    /// Naming the row — not just the code — is what binds each documented
+    /// command-family mapping to runtime behavior: a row whose condition is raised
+    /// by a typed error is verified here against the classifier that command's
+    /// dispatch actually runs. The rows whose conditions are raised by
+    /// crate-private errors (`TransitionBlockedError`) or by direct
+    /// `std::process::exit` sites are bound end-to-end instead, by the subprocess
+    /// tests in `tests/command_exit_code_projection_tests.rs`; the guard there
+    /// asserts every row is covered by one binding or the other.
+    fn classifier_cases() -> Vec<(anyhow::Error, i32, &'static str)> {
         use std::io::{Error as IoError, ErrorKind};
         vec![
             // Gate-evaluation exception rows route through `error_to_exit_code`:
             // a checker that failed (`Failed`) is `4`; one that could not run
             // (`Error`) is `10`.
-            (gate_pass_failed(GateRunStatus::Failed), 4),
-            (gate_pass_failed(GateRunStatus::Error), 10),
-            (jit::errors::InvalidArgumentError::new("bad arg").into(), 2),
+            (
+                gate_pass_failed(GateRunStatus::Failed),
+                4,
+                "gate evaluate, gate evaluate-all",
+            ),
+            (
+                gate_pass_failed(GateRunStatus::Error),
+                10,
+                "gate evaluate, gate evaluate-all",
+            ),
+            // Universal rows: raised from shared paths, reachable from any command.
+            (anyhow::anyhow!("untyped failure"), 1, "*"),
+            (
+                jit::errors::InvalidArgumentError::new("bad arg").into(),
+                2,
+                "*",
+            ),
             (
                 jit::storage::AmbiguousIdError::issue(
                     "aaaa",
@@ -7253,8 +7275,9 @@ mod exit_code_projection_tests {
                 )
                 .into(),
                 2,
+                "*",
             ),
-            (jit::storage::InvalidIdPrefixError::new("ab").into(), 2),
+            (jit::storage::InvalidIdPrefixError::new("ab").into(), 2, "*"),
             (
                 jit::commands::GateNotRequiredError {
                     issue_id: "abc123".to_string(),
@@ -7262,11 +7285,32 @@ mod exit_code_projection_tests {
                 }
                 .into(),
                 2,
+                "*",
             ),
-            (jit::storage::IssueNotFoundError::new("abc123").into(), 3),
-            (IoError::new(ErrorKind::NotFound, "missing").into(), 3),
-            (jit::errors::ValidationFailedError::new("bad").into(), 4),
-            (jit::GraphError::CycleDetected.into(), 4),
+            (
+                jit::storage::IssueNotFoundError::new("abc123").into(),
+                3,
+                "*",
+            ),
+            (IoError::new(ErrorKind::NotFound, "missing").into(), 3, "*"),
+            // The shared write path rejects a blocking rule finding with this type.
+            (
+                jit::errors::ValidationFailedError::new("bad").into(),
+                4,
+                "*",
+            ),
+            (
+                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
+                5,
+                "*",
+            ),
+            (
+                jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                10,
+                "*",
+            ),
+            // Command-family rows, each pinned by the error that command raises.
+            (jit::GraphError::CycleDetected.into(), 4, "dep add"),
             (
                 jit::errors::RedundantDependencyError::new(
                     ("aaaa1111".to_string(), "bbbb2222".to_string()),
@@ -7274,30 +7318,70 @@ mod exit_code_projection_tests {
                 )
                 .into(),
                 4,
+                "dep add",
             ),
             (
-                IoError::new(ErrorKind::PermissionDenied, "denied").into(),
-                5,
+                jit::storage::GateAlreadyExistsError::new("tests").into(),
+                6,
+                "gate define",
             ),
-            (jit::storage::GateAlreadyExistsError::new("tests").into(), 6),
-            (jit::errors::AlreadyExistsError::new("occupied").into(), 6),
+            (
+                jit::errors::AlreadyExistsError::new("Output path already exists: taken").into(),
+                6,
+                "snapshot export",
+            ),
+            (
+                jit::commands::BatchValidationError {
+                    problems: vec![jit::commands::BatchValidationProblem::UnknownDependency {
+                        key: "a".to_string(),
+                        missing: "ghost".to_string(),
+                    }],
+                }
+                .into(),
+                2,
+                "issue batch-create",
+            ),
+            (
+                jit::commands::BatchWriteError {
+                    created: vec![("a".to_string(), "aaaa1111".to_string())],
+                    failed_key: "b".to_string(),
+                    stage: "create".to_string(),
+                    reason: "disk full".to_string(),
+                }
+                .into(),
+                10,
+                "issue batch-create",
+            ),
+            (
+                jit::commands::ArchiveError::SourceMissing {
+                    path: "dev/active/missing.md".to_string(),
+                }
+                .into(),
+                3,
+                "doc archive",
+            ),
+            (
+                jit::commands::ArchiveError::DestinationOccupied {
+                    path: "dev/archive/sessions/note.md".to_string(),
+                }
+                .into(),
+                6,
+                "doc archive",
+            ),
             (
                 jit::errors::ClaimRequiresGitError::new(
                     jit::errors::GitRequirementGap::NoRepository,
                 )
                 .into(),
                 10,
-            ),
-            (
-                jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
-                10,
+                "claim",
             ),
         ]
     }
 
     #[test]
     fn test_error_to_exit_code_produces_documented_codes() {
-        for (error, expected) in classifier_cases() {
+        for (error, expected, _row) in classifier_cases() {
             assert_eq!(
                 error_to_exit_code(&error).code(),
                 expected,
@@ -7306,20 +7390,22 @@ mod exit_code_projection_tests {
         }
     }
 
+    /// Every classifier case must land on the exact projected row it documents —
+    /// same command family, same code. Code-level membership is not enough: a row
+    /// that names the wrong command family, or a command family whose error is
+    /// reclassified, must fail here.
     #[test]
-    fn test_command_exit_codes_documents_every_classified_code() {
+    fn test_command_exit_codes_documents_every_classified_row() {
         let schema = CommandSchema::generate();
-        let documented: std::collections::HashSet<i32> = schema
-            .command_exit_codes
-            .iter()
-            .filter_map(|c| c.code)
-            .collect();
-        for (error, _expected) in classifier_cases() {
+        for (error, _expected, row) in classifier_cases() {
             let actual = error_to_exit_code(&error).code();
             assert!(
-                documented.contains(&actual),
-                "classifier emits code {actual} (for `{error}`) but the \
-                 command_exit_codes projection documents no row for it"
+                schema
+                    .command_exit_codes
+                    .iter()
+                    .any(|c| c.command == row && c.code == Some(actual)),
+                "classifier emits code {actual} for `{error}`, but the \
+                 command_exit_codes projection has no `{row}` row documenting it"
             );
         }
     }
