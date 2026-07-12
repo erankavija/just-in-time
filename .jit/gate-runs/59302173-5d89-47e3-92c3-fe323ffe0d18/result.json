@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "run_id": "59302173-5d89-47e3-92c3-fe323ffe0d18",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
+  "commit": "8140c55611aa718a3cf641e411c3a6d8215d6d28",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T06:01:59.602473300Z",
+  "completed_at": "2026-07-12T06:05:52.953170297Z",
+  "duration_ms": 233350,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 fails: the generated projection’s lock-timeout operational scope is inaccurate. REQ-02 fails because several coordination/recovery docs retain unchecked copies of projected defaults. REQ-03 is satisfied by the committed-reference conformance test.\n\n## Architecture and separation of concerns\n\nNo new domain/storage/command/CLI boundary violation found.\n\n## Functional paradigm\n\nNo blocking concern found.\n\n## Correctness and safety\n\nNo unsafe-code, PID-safety, event-logging, or atomic-write regression found. However, the inaccurate generated scope is a correctness defect.\n\n## Testing\n\nRecorded `cargo-ci` succeeded on `8140c556`: fmt, clippy, and 3,619 tests passed. `docs-mechanical` also passed. I did not rerun Cargo tests. `./scripts/jit-validate.sh` passes.\n\n## Error handling and CLI contract\n\nNo regression found; no CLI contract changed.\n\n## Documentation\n\nThe reference is discoverable and generated correctly, but unchecked default copies remain in user-facing documentation.\n\n## JIT issue management\n\nThe sole prerequisite `6d82de03` is done. Prior code-level lock-timeout duplication is addressed, but the prior documentation concern is not fully resolved: the tutorial still prints an unchecked default TTL.\n\n## Findings\n\n1. **High** — [runtime-defaults.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/runtime-defaults.md:12) incorrectly says only the repository write lock honors `JIT_LOCK_TIMEOUT`. `JsonFileStorage::new` supplies that same environment-derived timeout to its general `FileLocker` at [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:123), which guards issue, index, gate, and event locks. This makes REQ-01’s required operational scope false.\n\n2. **Medium** — [parallel-work-worktrees.md](/home/vkaskivuo/Projects/just-in-time/docs/tutorials/parallel-work-worktrees.md:114) hard-codes the `600 seconds` output of an omitted-TTL claim. The nearby link does not mechanically check that output, so a `CLAIM_TTL_SECS` change can leave this coordination tutorial stale, failing REQ-02.\n\n3. **Medium** — [guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:446) independently states the one-hour temporary-file cleanup threshold without consuming or being checked against `runtime-defaults.md`. This recovery default can drift, failing REQ-02.\n\n4. **Medium** — [deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:147) independently lists `JIT_LOCK_TIMEOUT`’s default as `5`, without a link or conformance check to the generated runtime-defaults projection. This fails REQ-02.\n\n5. **Medium** — [troubleshooting.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:188) hard-codes a five-second lock timeout in user-facing recovery guidance without consuming the projection. It can drift when the default changes, failing REQ-02.\n\n6. **Low** — [runtime_defaults.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/runtime_defaults.rs:203) adds an ignored `#[test]` named `regenerate_reference`, which does not follow the required `test_<function>_<scenario>` convention.\n\nTotal findings: 6\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated projection has an incorrect lock-override scope and multiple unchecked user-documentation copies of runtime defaults remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The generated lock-timeout scope incorrectly excludes storage file locks that also receive the JIT_LOCK_TIMEOUT-derived timeout, failing REQ-01.\",\"file\":\"docs/reference/runtime-defaults.md\",\"line\":12},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"The worktree tutorial hard-codes the omitted-TTL claim output without mechanical checking against the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/tutorials/parallel-work-worktrees.md\",\"line\":114},{\"id\":\"F3\",\"severity\":\"medium\",\"summary\":\"The guarantees document independently states the temporary-file cleanup threshold without consuming or checking the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":446},{\"id\":\"F4\",\"severity\":\"medium\",\"summary\":\"The deployment guide independently lists the JIT_LOCK_TIMEOUT default without consuming or checking the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/how-to/deployment.md\",\"line\":147},{\"id\":\"F5\",\"severity\":\"medium\",\"summary\":\"The troubleshooting guide hard-codes the lock-timeout default without consuming or checking the runtime-defaults projection, failing REQ-02.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":188},{\"id\":\"F6\",\"severity\":\"low\",\"summary\":\"The newly added ignored test does not follow the required test_<function>_<scenario> naming convention.\",\"file\":\"crates/jit/src/runtime_defaults.rs\",\"line\":203}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4090 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f54eb-143f-7ce0-956c-9745e1374d66\n--------\nuser\n--- 4077 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated projection has an incorrect lock-override scope and multiple unchecked user-documentation copies of runtime defaults remain.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The generated lock-timeout scope incorrectly excludes storage file locks that also receive the JIT_LOCK_TIMEOUT-derived timeout, failing REQ-01.",
+        "file": "docs/reference/runtime-defaults.md",
+        "line": 12
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "summary": "The worktree tutorial hard-codes the omitted-TTL claim output without mechanical checking against the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/tutorials/parallel-work-worktrees.md",
+        "line": 114
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "summary": "The guarantees document independently states the temporary-file cleanup threshold without consuming or checking the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/concepts/guarantees.md",
+        "line": 446
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "summary": "The deployment guide independently lists the JIT_LOCK_TIMEOUT default without consuming or checking the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/how-to/deployment.md",
+        "line": 147
+      },
+      {
+        "id": "F5",
+        "severity": "medium",
+        "summary": "The troubleshooting guide hard-codes the lock-timeout default without consuming or checking the runtime-defaults projection, failing REQ-02.",
+        "file": "docs/how-to/troubleshooting.md",
+        "line": 188
+      },
+      {
+        "id": "F6",
+        "severity": "low",
+        "summary": "The newly added ignored test does not follow the required test_<function>_<scenario> naming convention.",
+        "file": "crates/jit/src/runtime_defaults.rs",
+        "line": 203
+      }
+    ]
+  }
+}
