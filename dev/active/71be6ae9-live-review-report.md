@@ -73,4 +73,4 @@ The checker emitted a terminal `VERDICT: FAIL` and a valid fenced `JIT-FINDINGS-
 - `F1`: read-only reviewer runtime validation had not previously succeeded.
 - `F2`: the live report, issue link, and final rerun evidence were absent.
 
-Both findings were classified `blocking` / `issue-impact`, carried file locations, and caused exit code `1`, demonstrating that the wrapper verdict and structured-findings contracts agree. This successful read-only session supplies the runtime evidence for F1; this durable report and its JIT document link supply the missing artifacts for F2. The subsequent gate evaluation verifies their resolution against the completed issue context.
+Both findings were classified `blocking` / `issue-impact`, carried file locations, and caused exit code `1`, demonstrating that the wrapper verdict and structured-findings contracts agree. This successful read-only session supplies the runtime evidence for F1; this durable report and its JIT document link supply the missing artifacts for F2. Subsequent gate evaluations verify their resolution against the completed issue context.
