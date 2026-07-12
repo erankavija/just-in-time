@@ -239,9 +239,10 @@ impl GateRunField {
             GateRunField::Message => "Free-text note attached to the run.".to_string(),
             GateRunField::Findings => {
                 "Structured findings parsed from the checker's machine-readable block, carrying \
-                 the checker's `verdict`, a `summary`, and the `findings` array. Unset when the \
-                 checker emitted no such block; the raw `stdout` is kept either way. \
-                 `jit gate status --findings` prints this field."
+                 the checker's `verdict`, a `summary`, and the `findings` array. Each finding may \
+                 carry an optional `references` array of opaque strings; it is omitted when \
+                 empty. Unset when the checker emitted no such block; the raw `stdout` is kept \
+                 either way. `jit gate status --findings` prints this field."
                     .to_string()
             }
         }
@@ -318,6 +319,7 @@ fn sample_gate_run() -> GateRunResult {
                 summary: "the temp path deserves a name".to_string(),
                 file: Some("crates/jit/src/storage/json.rs".to_string()),
                 line: Some(793),
+                references: vec!["@/inv/atomic-writes".to_string()],
             }],
         }),
     }

@@ -92,7 +92,10 @@ other `.jit/` write uses.
         "origin": "issue-impact",
         "summary": "the temp path deserves a name",
         "file": "crates/jit/src/storage/json.rs",
-        "line": 793
+        "line": 793,
+        "references": [
+          "@/inv/atomic-writes"
+        ]
       }
     ]
   }
@@ -124,4 +127,4 @@ a `null` one alike.
 | `command` | always | The command line that was executed. |
 | `by` | `null` when unset | Who triggered the run. |
 | `message` | `null` when unset | Free-text note attached to the run. |
-| `findings` | omitted when unset | Structured findings parsed from the checker's machine-readable block, carrying the checker's `verdict`, a `summary`, and the `findings` array. Unset when the checker emitted no such block; the raw `stdout` is kept either way. `jit gate status --findings` prints this field. |
+| `findings` | omitted when unset | Structured findings parsed from the checker's machine-readable block, carrying the checker's `verdict`, a `summary`, and the `findings` array. Each finding may carry an optional `references` array of opaque strings; it is omitted when empty. Unset when the checker emitted no such block; the raw `stdout` is kept either way. `jit gate status --findings` prints this field. |

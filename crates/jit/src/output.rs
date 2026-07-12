@@ -2467,6 +2467,47 @@ mod tests {
     }
 
     #[test]
+    fn test_gate_findings_response_preserves_populated_references_and_omits_empty() {
+        use crate::domain::GateFinding;
+
+        let finding = |id: &str, references: Vec<String>| GateFinding {
+            id: id.to_string(),
+            severity: "high".to_string(),
+            disposition: Some("blocking".to_string()),
+            origin: Some("issue-impact".to_string()),
+            summary: "defect".to_string(),
+            file: None,
+            line: None,
+            references,
+        };
+        let response = GateFindingsResponse {
+            key: "review".to_string(),
+            run_id: "run-1".to_string(),
+            has_findings: true,
+            verdict: Some("fail".to_string()),
+            summary: Some("two defects".to_string()),
+            findings: vec![
+                finding(
+                    "F1",
+                    vec![
+                        "@/inv/atomic-writes".to_string(),
+                        "checker:opaque value".to_string(),
+                    ],
+                ),
+                finding("F2", Vec::new()),
+            ],
+        };
+
+        let encoded = serde_json::to_value(response).unwrap();
+
+        assert_eq!(
+            encoded["findings"][0]["references"],
+            serde_json::json!(["@/inv/atomic-writes", "checker:opaque value"])
+        );
+        assert!(encoded["findings"][1].get("references").is_none());
+    }
+
+    #[test]
     fn test_json_output_with_message() {
         let data = json!({"id": "abc12345", "title": "Test issue"});
         let output = JsonOutput::success(data, "issue create")

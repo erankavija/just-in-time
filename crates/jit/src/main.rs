@@ -783,7 +783,8 @@ fn render_report_stream(text: &str, tail: Option<usize>) -> String {
 /// One header line carries the gate key, verdict, one-line summary, and finding
 /// count; each finding follows on its own line as `<id> [<severity>]` plus any
 /// `[<disposition>] [<origin>]` classifications, then `<summary>` and an
-/// optional ` (<file>:<line>)` locator. The format is stable and
+/// optional ` (<file>:<line>)` locator and ` references: [<value>, ...]` list.
+/// Empty reference lists add no text. The format is stable and
 /// greppable (severity via `[high]`, verdict via the header), mirroring the
 /// `issue status` one-line convention. A run with no machine-readable block
 /// renders a single header line with `verdict: n/a` and `findings: 0`, so a
@@ -829,9 +830,14 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
                     (Some(file), None) => format!(" ({})", file),
                     _ => String::new(),
                 };
+                let references = if finding.references.is_empty() {
+                    String::new()
+                } else {
+                    format!(" references: [{}]", finding.references.join(", "))
+                };
                 out.push_str(&format!(
-                    "{} [{}]{} {}{}\n",
-                    id, severity, classifications, finding.summary, locator
+                    "{} [{}]{} {}{}{}\n",
+                    id, severity, classifications, finding.summary, locator, references
                 ));
             }
             out
@@ -840,6 +846,68 @@ fn render_gate_findings_text(result: &GateRunResult) -> String {
             "{} verdict: n/a findings: 0 (no machine-readable findings block)\n",
             result.gate_key
         ),
+    }
+}
+
+#[cfg(test)]
+mod gate_findings_text_tests {
+    use super::render_gate_findings_text;
+    use chrono::Utc;
+    use jit::domain::{
+        GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStage, GATE_RUN_SCHEMA_VERSION,
+    };
+
+    fn run_with(references: Vec<String>) -> GateRunResult {
+        GateRunResult {
+            schema_version: GATE_RUN_SCHEMA_VERSION,
+            run_id: "run-1".to_string(),
+            gate_key: "review".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-1".to_string(),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Failed,
+            started_at: Utc::now(),
+            completed_at: None,
+            duration_ms: None,
+            exit_code: Some(1),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "review".to_string(),
+            by: None,
+            message: None,
+            findings: Some(GateFindings {
+                verdict: "fail".to_string(),
+                summary: "one defect".to_string(),
+                findings: vec![GateFinding {
+                    id: "F1".to_string(),
+                    severity: "high".to_string(),
+                    disposition: Some("blocking".to_string()),
+                    origin: Some("issue-impact".to_string()),
+                    summary: "unsafe write".to_string(),
+                    file: Some("src/storage.rs".to_string()),
+                    line: Some(12),
+                    references,
+                }],
+            }),
+        }
+    }
+
+    #[test]
+    fn test_render_gate_findings_text_exposes_references_exactly() {
+        let rendered = render_gate_findings_text(&run_with(vec![
+            "@/inv/atomic-writes".to_string(),
+            "checker:opaque value".to_string(),
+        ]));
+
+        assert!(rendered.contains("references: [@/inv/atomic-writes, checker:opaque value]"));
+    }
+
+    #[test]
+    fn test_render_gate_findings_text_omits_empty_references() {
+        let rendered = render_gate_findings_text(&run_with(Vec::new()));
+
+        assert!(!rendered.contains("references:"));
     }
 }
 

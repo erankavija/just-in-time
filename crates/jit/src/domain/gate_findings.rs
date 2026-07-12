@@ -45,8 +45,9 @@ const FINDINGS_END: &str = "JIT-FINDINGS-JSON>>>";
 ///
 /// `id`, `severity`, and `summary` are the minimum a finding carries;
 /// `disposition` and `origin` are optional checker-defined classifications,
-/// while `file` and `line` are optional locators. All fields default (to empty
-/// / `None`) when absent from the checker's JSON, so older checkers and stored
+/// while `file` and `line` are optional locators. `references` carries opaque
+/// checker-defined strings for traceability. All fields default (to empty /
+/// `None`) when absent from the checker's JSON, so older checkers and stored
 /// findings remain compatible.
 ///
 /// # Examples
@@ -83,6 +84,9 @@ pub struct GateFinding {
     /// Optional line number within [`file`](Self::file).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub line: Option<u32>,
+    /// Opaque policy or evidence references supplied by the checker.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<String>,
 }
 
 /// Structured result parsed from a checker's machine-readable findings block.
@@ -272,6 +276,48 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_gate_findings_preserves_references_exactly() {
+        let stdout = block(
+            r#"{"findings":[{"summary":"policy defect","references":["@/inv/atomic-writes","checker:opaque value"]}]}"#,
+        );
+
+        let parsed = parse_gate_findings(&stdout).unwrap();
+
+        assert_eq!(
+            parsed.findings[0].references,
+            ["@/inv/atomic-writes", "checker:opaque value"]
+        );
+    }
+
+    #[test]
+    fn test_gate_finding_missing_references_defaults_empty_and_omits_on_write() {
+        let finding: GateFinding =
+            serde_json::from_str(r#"{"id":"F1","summary":"ordinary defect"}"#).unwrap();
+        assert!(finding.references.is_empty());
+
+        let encoded = serde_json::to_value(&finding).unwrap();
+        assert!(!encoded.as_object().unwrap().contains_key("references"));
+
+        let schema = serde_json::to_value(schemars::schema_for!(GateFinding)).unwrap();
+        assert_eq!(
+            schema["properties"]["references"]["type"],
+            serde_json::json!("array")
+        );
+        assert_eq!(
+            schema["properties"]["references"]["items"]["type"],
+            serde_json::json!("string")
+        );
+    }
+
+    #[test]
+    fn test_parse_gate_findings_non_string_reference_degrades_to_none() {
+        let stdout =
+            block(r#"{"findings":[{"summary":"bad checker output","references":["opaque",7]}]}"#);
+
+        assert!(parse_gate_findings(&stdout).is_none());
+    }
+
+    #[test]
     fn test_parse_gate_findings_empty_object_is_present_but_empty() {
         let parsed = parse_gate_findings(&block("{}")).unwrap();
         assert_eq!(parsed.verdict, "");
@@ -291,6 +337,7 @@ mod tests {
                 summary: "bug".to_string(),
                 file: Some("a.rs".to_string()),
                 line: Some(3),
+                references: vec!["@/inv/atomic-writes".to_string()],
             }],
         };
         let json = serde_json::to_string(&findings).unwrap();

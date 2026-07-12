@@ -47,6 +47,10 @@ mod tests {
                     summary: "nit".to_string(),
                     file: Some("src/x.rs".to_string()),
                     line: Some(7),
+                    references: vec![
+                        "@/inv/atomic-writes".to_string(),
+                        "checker:opaque value".to_string(),
+                    ],
                 }],
             }),
         };
@@ -71,6 +75,10 @@ mod tests {
         );
         assert_eq!(findings.findings[0].origin.as_deref(), Some("pre-existing"));
         assert_eq!(findings.findings[0].line, Some(7));
+        assert_eq!(
+            findings.findings[0].references,
+            ["@/inv/atomic-writes", "checker:opaque value"]
+        );
     }
 
     #[test]
@@ -101,6 +109,38 @@ mod tests {
         });
         let loaded: GateRunResult = serde_json::from_value(legacy).unwrap();
         assert!(loaded.findings.is_none());
+    }
+
+    #[test]
+    fn test_load_legacy_gate_finding_without_references_defaults_empty() {
+        let legacy = serde_json::json!({
+            "schema_version": 1,
+            "run_id": "legacy-finding-run",
+            "gate_key": "review",
+            "stage": "postcheck",
+            "issue_id": "issue-legacy",
+            "commit": null,
+            "branch": null,
+            "status": "failed",
+            "started_at": Utc::now().to_rfc3339(),
+            "completed_at": null,
+            "duration_ms": null,
+            "exit_code": 1,
+            "stdout": "review",
+            "stderr": "",
+            "command": "review",
+            "by": null,
+            "message": null,
+            "findings": {
+                "verdict": "fail",
+                "summary": "one defect",
+                "findings": [{"id": "F1", "severity": "high", "summary": "legacy"}]
+            }
+        });
+
+        let loaded: GateRunResult = serde_json::from_value(legacy).unwrap();
+
+        assert!(loaded.findings.unwrap().findings[0].references.is_empty());
     }
 
     #[test]
