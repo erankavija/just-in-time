@@ -19,7 +19,7 @@ in the §3 coverage map.
 |---|---|---|
 | REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency | Resolve the container root through normal storage id semantics, enumerate the root plus its **resolved-hierarchy descendants** (the DAG-authoritative membership relation, `graph/hierarchy.rs:458`, `:321` — not the raw dependency closure, which absorbs cross-container sequencing edges; D-25), collect every distinct `DocumentReference` on those issues as **(path, version)** artifacts (D-26) including opaque/binary roots, then recursively discover supported local dependencies (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object with destinations computed by the D-12 mirror rule. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. Pinned versions are enumerated as non-relocating historical entries (D-26). |
 | REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | A pure classifier computes an action per working-tree artifact through the D-16 edge-aware calculus from all reference owners (repository-wide, direct and embedded; D-13), current lifecycle state, component-aware managed/permanent policy, destination occupancy, and pinned semantics (D-26). Ambiguous or unpreservable cases resolve to `block`. | Replaces the two inconsistent directory-heuristic notions of "shared" (`document.rs:1463-1495`, `assets.rs:185-233`) with one repository-wide reference analysis. |
-| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under repository write coordination, stages the complete set, validates every supported local edge at its proposed destination, persists reference and event changes, then removes sources through the **quarantine protocol** (D-17): atomic rename to quarantine, identity verification on the opened handle, then unlink — or restore on mismatch. Nothing is ever destroyed unverified, so no-loss holds under any external interference (D-24). Finalization is atomic no-replace (D-14). Reuses the proven sequencing and rollback principles (`document.rs:1637-1787`, `:1391-1435`) behind a storage-owned mutation primitive holding the re-entrant write guard (`storage/mod.rs:126`). | Only Done/Rejected containers execute (D-8); document targets follow D-15; non-terminal targets preview only. |
+| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under repository write coordination, stages the complete set, validates every supported local edge at its proposed destination, persists reference and event changes, then removes sources through the **quarantine protocol** (D-17): a directory-handle-anchored rename/verify/unlink sequence in which nothing is unlinked before its bound inode is verified on an open handle. JIT never overwrites (D-14 no-replace finalization), and its removals add no destructive capability an interfering writer does not already possess (D-24 — the provable bound on a path-based filesystem). Reuses the proven sequencing and rollback principles (`document.rs:1637-1787`, `:1391-1435`) behind a storage-owned mutation primitive holding the re-entrant write guard (`storage/mod.rs:126`). | Only Done/Rejected containers execute (D-8); document targets follow D-15; non-terminal targets preview only. |
 | REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`, so a sibling `base.css` and `themes/rust.css` are recognized as bundle dependencies rather than mislabelled shared. The D-12 mirror layout keeps every relative offset between bundle members invariant, the D-16 calculus guarantees every relative edge from a relocated parent has its target at the mirror, and execution validates every supported edge in the proposed layout before metadata commit, fixing the source/destination path-set mismatch in the current verifier (`document.rs:1832-1858`). | Detected JavaScript/runtime loading blocks per the D-23 enumerated contract, never guessed (D-5). |
 | REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers (container-ness from the configured type hierarchy, D-20; membership per D-25), each with documentation-policy status, repository-wide artifact ownership, artifact counts, blockers, and move/copy/retain summaries. It consumes the same plan model, always evaluates fully (archival takes no category input, D-21), and performs no filesystem, issue, or event mutation. | No time/retention semantics: eligibility is current terminal state and policy only (D-6); the live REQ-05 wording is already amended to remove `done_at`. |
 | REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | The plan model serializes to the binding §2 JSON schema; preview is the non-mutating default for both `jit archive document` and `jit archive container`. A representative fixture corpus (Markdown links; HTML→sibling CSS→nested theme image/font; CSS `@import`/`url()`; direct CSV/PNG/SVG roots; permanent shared figures; active outside consumers; identical filenames; missing edges; pinned commits; a dependency cycle) exercises discovery, classification, preview, and execution. | Preview is the default; mutation requires `--execute`, which recomputes and revalidates immediately before mutating (D-7). |
@@ -58,11 +58,17 @@ planning.
   references are never rewritten. Therefore a pinned reference imposes **no** working-tree
   retention constraint when its commit is reachable in git; where the repository lacks git
   or the commit is unreachable, the reference degrades to working-tree resolution and then
-  imposes needs-source (and never-relink) like any other staying reader. Pinned versions
-  appear in the plan as informational non-relocating entries with evidence
-  `pinned-historical`; their commit-specific dependency closures are not discovered — they
-  resolve at read time from the object database, and serving them is the existing
-  render-path's concern, not relocation's.
+  and planning then imposes needs-source (and never-relink) on the working-tree file as the
+  conservative constraint, with warning `pinned-unreachable`; **no read fallback is claimed
+  or implemented** — an unreachable commit surfaces from storage as `CommitNotFound` today,
+  and this plan does not change read semantics. Pinned versions appear in the plan as
+  informational non-relocating entries with evidence `pinned-historical`, **including their
+  commit-specific supported dependency closures**: the adapters are pure text extractors,
+  so discovery runs them over commit-resolved content (`read_path_text(path, commit)`,
+  `storage/mod.rs:531`) exactly as over working-tree content, producing (path, commit)
+  dependency entries that are likewise informational and non-relocating — REQ-01's
+  "every supported embedded local dependency" is met for pinned roots deterministically,
+  with nothing to move because history serves every pinned reader.
 
 - **Destination layout (D-12).** The destination root is `<archive_root>/` plus, for
   container targets, `<container.id>/` (the full UUID — short-id prefixes can collide across
@@ -133,7 +139,7 @@ planning.
     `non-terminal-target`, `stale-plan`, `missing-source`, `symlink-artifact`.
   - **Warning codes:** `missing-edge-target`, `external-edge`, `no-owner`,
     `residue-source`, `deletion-failed`, `not-selected-sibling`, `pinned-historical`,
-    `quarantined-foreign-file`.
+    `pinned-unreachable`, `quarantined-foreign-file`.
   - **Missing-artifact semantics (evaluation order is normative):** each explicit root is
     evaluated in this order. (1) **Already-archived recognition:** a reference whose path
     resolves under the destination root, or whose stated source path maps through the D-12
@@ -266,11 +272,16 @@ issues.
   Outcome: recursive discovery of supported local dependencies — Markdown/HTML element URLs
   and CSS `@import`/`url()` — with cycle detection, normalized component-aware path
   resolution, before/after edge reachability, repository-escape rejection, and the D-23
-  detection contract for dynamic and module-loading constructs.
+  detection contract for dynamic and module-loading constructs. Discovery is version-aware
+  (D-26): pinned roots are scanned over commit-resolved content through the storage layer's
+  commit-aware reads, yielding informational (path, commit) dependency entries.
   Own criteria: `[hard] LOCAL-07: Discovers an HTML→sibling-CSS→nested-figure chain and CSS
   @import/url() targets to full depth, treating script-element src URLs as static supported
   edges.` `[hard] LOCAL-08: Terminates on dependency cycles and reports local-path-bearing
   constructs from the binding D-23 set as unsupported edges, by textual pattern match only.`
+  `[hard] LOCAL-33: Discovers a pinned root's supported closure from its commit-resolved
+  content, emitting non-relocating (path, commit) entries, and emits pinned-unreachable
+  when the commit cannot be read.`
   Blast radius: extends the document adapter/scanner surface; existing Markdown/HTML
   callers (snapshot export) are unaffected because discovery is a new recursive path.
 
@@ -315,10 +326,10 @@ issues.
   reference saves, and event append.` `[hard] LOCAL-17: A destination created by an
   external writer between planning and finalization fails that artifact's finalization
   without overwriting the foreign file, verified by a race-focused test.` `[hard] LOCAL-18:
-  Never unlinks a path directly: every removal quarantines by atomic rename, verifies
-  identity on the opened handle, and unlinks only on match — a mismatched file is restored
-  no-replace or left quarantined and reported, so no interference scenario destroys
-  unverified content.`
+  Never unlinks a path directly: every removal runs the D-17 directory-handle-anchored
+  quarantine sequence (rename in, openat-verify on the handle, unlinkat on match; no-replace
+  restore or quarantined-and-reported on mismatch), race-tested, with the path-anchored
+  fallback and its D-24 bound documented on platforms without openat semantics.`
   Blast radius: self-contained new storage API; the legacy command keeps its inline
   `std::fs` path until it is removed.
 
@@ -444,7 +455,7 @@ issues.
 | Membership drawn from the wrong relation relocates another container's artifacts | High | D-25: membership is the resolved-hierarchy children closure (`hierarchy.rs:458`, `:321`), never the raw dependency closure; a sequencing edge contributes no member (LOCAL-04). |
 | Pinned references silently corrupt provenance | High | D-3 + D-26: pinned references are never rewritten; git-resolvable pins read from history and impose no working-tree constraint; unresolvable pins force retention (LOCAL-10). |
 | A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination; root-relative edges force source retention; the classifier never emits an unpreservable layout (LOCAL-11) and execution re-validates every edge (LOCAL-22). |
-| Deletion or rollback destroys a file an external writer replaced | High | D-17 quarantine protocol: every removal is rename-to-quarantine, handle-verified, then unlink or no-replace restore — no interference scenario destroys unverified content (LOCAL-18); the residual exposure is a foreign file briefly quarantined and restored or reported (D-24). |
+| Deletion or rollback destroys a file an external writer replaced | High | D-17: removals are directory-handle-anchored quarantine sequences — rename in, verify on the open handle, unlinkat on match, no-replace restore on mismatch (LOCAL-18). Defeating the sequence requires write access that already suffices to delete files directly, so JIT adds no destructive capability (D-24, the provable platform bound). |
 | Removing `jit doc archive` breaks docs/tests/MCP mid-flight | Medium | Removal ordered last (`depends-on: Coordinated plan execution`); old and new coexist until then; consumer migration in the same change; acceptance is the tree-wide search above (LOCAL-28). |
 | Recursive CSS/HTML discovery mis-scopes a shared theme or figure | Medium | Repository-wide reference-count classification over the D-13 universe (LOCAL-09, LOCAL-10), not directory heuristics; shared-but-active artifacts copy/retain, never force-relink (D-2, D-10). |
 | An artifact embedded by an outside document misclassified as unshared and moved | High | D-13's universe includes the supported embedded closure of every issue-linked document; the supplied-map limitation of the existing classifier (`assets.rs:189`) is superseded (LOCAL-09). |
@@ -540,18 +551,25 @@ specification gaps surfaced during planning and review; none is REOPEN.
   copy-or-retain choice (leaves a relocated parent's relative edge without its target);
   treating root-relative edges like relative ones (their resolution ignores the referencing
   document's location, `assets.rs:151-162`).
-- **D-17 — Every removal goes through quarantine:** chosen **no path is ever unlinked
-  directly: a removal atomically renames the path into a unique quarantine location under
-  `.jit/tmp`, verifies content identity (hash and size captured at staging) on the opened
-  handle, then unlinks the quarantined file — or restores it no-replace on mismatch,
-  leaving it quarantined and reported if restore is impossible**. Rename preserves whatever
-  file is present, so no interference scenario destroys unverified content: the worst
-  outcomes are a foreign file briefly quarantined then restored, or retained in quarantine
-  with a `quarantined-foreign-file` warning. Applies to ordinary move-source deletions,
-  residue cleanup, and rollback of finalized destinations alike. Rejected: verify-then-
-  unlink at the path (a substitution between verification and unlink destroys the
-  substitute); unverified cleanup (deletes foreign files); global filesystem locking
-  (unavailable against arbitrary external writers).
+- **D-17 — Every removal is a directory-handle-anchored quarantine sequence:** chosen
+  **no path is ever unlinked directly. A removal (1) opens the quarantine directory —
+  created fresh under `.jit/tmp` with an unpredictable name — as a directory handle,
+  (2) atomically renames the target into it, (3) opens the quarantined entry **relative to
+  that directory handle** (`openat`-family where the platform provides it; the `rustix`/
+  `libc` bindings already in the dependency tree expose it on Unix), (4) verifies content
+  identity (hash and size captured at staging) on that open handle, and (5) unlinks the
+  entry **relative to the same directory handle** (`unlinkat`) on match — or restores it
+  no-replace on mismatch, leaving it quarantined with a `quarantined-foreign-file` warning
+  if restore is impossible.** Rename preserves whatever file is present, and steps 3–5 are
+  anchored to one directory handle, so substituting the verified entry requires write
+  access to that directory — and any writer with such access can already delete repository
+  files directly, so JIT's removal adds no destructive capability the interferer lacks
+  (D-24). Applies to ordinary move-source deletions, residue cleanup, and rollback of
+  finalized destinations alike; platforms without `openat` semantics fall back to the same
+  sequence path-anchored, with the D-24 bound stated for them explicitly. Rejected:
+  verify-then-unlink at the original path (a substitution between verification and unlink
+  destroys the substitute); unverified cleanup (deletes foreign files); global filesystem
+  locking (unavailable against arbitrary external writers).
 - **D-18 — Retry converges by recomputation:** chosen **a rerun after any partial failure
   recomputes the plan against current state, treats content-identical occupied destinations
   as already archived, applies only the remaining mutations, and appends no event when
@@ -612,15 +630,22 @@ specification gaps surfaced during planning and review; none is REOPEN.
   so a script declaring local dependencies never relocates silently. Rejected: executing or
   parsing JavaScript to resolve its dependencies (guessing, D-5); ignoring script content
   (silently breaks relocated bundles).
-- **D-24 — The concurrency posture is detect-and-preserve:** chosen **REQ-03's no-loss
-  guarantee holds unconditionally because nothing is ever destroyed unverified: no-replace
-  finalization (D-14) cannot overwrite, and quarantine removal (D-17) cannot destroy a
-  substituted file — external interference at worst blocks an artifact's finalization,
-  or briefly quarantines a foreign file that is then restored or reported. Concurrent JIT
-  writers are excluded by the repository write guard.** Rejected: claiming adversarial
-  *liveness* (an interferer can always make an operation fail or leave reported residue —
-  only safety, never loss, is guaranteed); global filesystem locking (unavailable against
-  arbitrary external writers).
+- **D-24 — The safety bound is stated, provable, and maximal for the platform:** chosen
+  **two claims, each verifiable. (1) JIT never overwrites: every finalization and restore
+  is no-replace (D-14, D-17). (2) JIT never removes an unverified inode binding within its
+  directory-handle-anchored sequence (D-17); defeating that sequence requires write access
+  to the quarantine directory JIT just created — a capability that already suffices to
+  delete any repository file without JIT's involvement, so JIT's removals add no
+  destructive power an interfering writer does not independently possess.** This is the
+  strongest no-loss statement a path-based filesystem admits (POSIX has no unlink-by-handle),
+  and it is how REQ-03 is satisfied: benign concurrent modification is detected and
+  preserved (quarantine/restore/report), and adversarial loss is attributable only to the
+  adversary's own pre-existing access, never to JIT's operations. Concurrent JIT writers
+  are excluded outright by the repository write guard. Rejected: claiming unconditional
+  no-loss under adversarial substitution (unprovable — and vacuous, since such an adversary
+  can delete files directly); claiming adversarial liveness (an interferer can always force
+  a failure or reported residue; only safety is guaranteed); global filesystem locking
+  (unavailable against arbitrary external writers).
 - **D-25 — Container membership is the resolved-hierarchy subtree:** chosen **the archival
   membership of a container is the root plus the transitive `children` closure of the
   repository-wide hierarchy resolution (`hierarchy.rs:458`, `:321`)** — the same
