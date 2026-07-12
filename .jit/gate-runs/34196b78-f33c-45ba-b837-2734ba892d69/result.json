@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "34196b78-f33c-45ba-b837-2734ba892d69",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "99604a20-cb66-4712-8e09-5d8bbd0337b8",
+  "commit": "5ddf6a5184077d92de87e638f45dbc62e6cbfc87",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T20:10:57.092682058Z",
+  "completed_at": "2026-07-12T20:12:07.341262921Z",
+  "duration_ms": 70248,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured leaf (level 4) with no resolved children. I reviewed the three reachable commits tagged `jit:99604a20` individually; only the feature commit changes adopter docs. Uncommitted `.jit/` state was excluded.\n\nThe impact cone is satisfied: [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:56) documents the populated sample and the optional, opaque `references` array with empty-value omission. It is the generated canonical storage-record reference, and current code preserves the same behavior in JSON and human findings output.\n\nNumbered findings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's gate-finding references contract is accurately and discoverably documented in the canonical generated storage-record reference.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's gate-finding references contract is accurately and discoverably documented in the canonical generated storage-record reference.",
+    "findings": []
+  }
+}

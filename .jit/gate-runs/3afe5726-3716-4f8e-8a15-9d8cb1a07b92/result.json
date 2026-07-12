@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "run_id": "3afe5726-3716-4f8e-8a15-9d8cb1a07b92",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "99604a20-cb66-4712-8e09-5d8bbd0337b8",
+  "commit": "5ddf6a5184077d92de87e638f45dbc62e6cbfc87",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T20:08:26.565219078Z",
+  "completed_at": "2026-07-12T20:10:47.949704849Z",
+  "duration_ms": 141384,
+  "exit_code": 0,
+  "stdout": "1. F1 — advisory, issue-impact, low: Human findings rendering introduces a production `expect()` despite the repository’s no-`expect()` standard. [crates/jit/src/main.rs:838](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:838)\n\n2. F2 — advisory, issue-impact, low: The latest required-gate projection still reports `doc-review` as pending with no exit code.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met and the prior ambiguous reference rendering is fixed; two advisory items remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Human findings rendering introduces a production expect() despite the repository no-expect standard.\",\"file\":\"crates/jit/src/main.rs\",\"line\":838},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The latest required-gate projection still reports doc-review as pending with no exit code.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are met and the prior ambiguous reference rendering is fixed; two advisory items remain.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Human findings rendering introduces a production expect() despite the repository no-expect standard.",
+        "file": "crates/jit/src/main.rs",
+        "line": 838
+      },
+      {
+        "id": "F2",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The latest required-gate projection still reports doc-review as pending with no exit code."
+      }
+    ]
+  }
+}
