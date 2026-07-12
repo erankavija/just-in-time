@@ -1,7 +1,7 @@
 {
   "epic_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
   "epic_short_id": "b4e55aa2",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -30,7 +30,7 @@
           "short_id": "8b479a72",
           "title": "Cut over code review to canonical policy discovery",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },

@@ -2,7 +2,7 @@
   "id": "155a2d43-8b1a-4761-bf6b-82f5ea605643",
   "title": "Record a representative policy-grounded live review",
   "description": "Perform a representative positive end-to-end review of the completed policy-grounded code-review behavior and capture auditable evidence in a durable report. The report demonstrates that the integrated procedure and structured contract work on attributable repository changes without requiring a separate live negative fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: A Markdown report at `dev/active/b4e55aa2-code-review-live-verification.md` records the gate-run ID, reviewer session ID, exact attributable commit set, model, reasoning effort, and prompt and context measurements.\n- [hard] REQ-02: The report identifies every applicable `AGENTS.md` path, each resolved qualified ID, and the configured source of truth used for each item.\n- [hard] REQ-03: The captured review emits all five evidence-header fields and records the final verdict plus every parsed finding's `references` array.\n- [hard] REQ-04: The report records every relevant truncation event and its narrower recovery, or explicitly records `Truncation recovery: none` when no relevant evidence was truncated.\n- [hard] REQ-05: The representative run demonstrates bounded inspection, current gate-evidence consumption, valid qualified-item resolution, and a valid terminal verdict and findings contract over the completed implementation.\n- [hard] REQ-06: Deterministic negative coverage remains the source for failure-path verification; the live report does not introduce a fragile standalone negative fixture.\n",
-  "state": "backlog",
+  "state": "ready",
   "priority": "normal",
   "assignee": null,
   "dependencies": [
@@ -23,6 +23,6 @@
     "type:task"
   ],
   "created_at": "2026-07-12T19:25:27.741080828Z",
-  "updated_at": "2026-07-12T19:26:09.729722761Z",
+  "updated_at": "2026-07-12T20:50:02.516886235Z",
   "first_ready_at": "2026-07-12T19:25:27.741086778Z"
 }
