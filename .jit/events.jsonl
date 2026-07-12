@@ -6762,3 +6762,10 @@
 {"type":"issue_state_changed","id":"491355d0-3b72-4119-bdf3-226cee2c9757","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:15:24.993013945Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"5a689deb-4867-42ee-bbe5-60aad5d85e8a","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:15:24.993263436Z","assignee":"agent:worker"}
 {"type":"gate_definition_updated","id":"12525f0b-88f9-4ef6-a16c-0dc4e7b97b9f","timestamp":"2026-07-12T17:21:06.750360263Z","gate_key":"code-review"}
+{"type":"gate_failed","id":"7c1478ab-4ac9-49c4-b0f8-0abcac9a6765","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:22:12.130479666Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a54faa60-572d-48e5-957d-a2e47694b623","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:25:15.071773657Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"28372704-8026-42dd-b34a-c987543182de","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:25:18.932743334Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9a85aef8-9680-4b11-a0e7-9244cbec4a68","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:25:41.266918135Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"6e9ae8fc-a438-4bfa-9a97-171f7214e9f9","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:25:48.937375743Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"24e54240-5d4c-473d-992a-a40a44694b94","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:31:04.467612339Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"b2771db4-5371-43e5-9774-0e250da99197","issue_id":"71be6ae9-6857-4863-94c0-5e96f65f2b97","timestamp":"2026-07-12T17:33:40.273602257Z","updated_by":"doc-add","fields":["documents"]}

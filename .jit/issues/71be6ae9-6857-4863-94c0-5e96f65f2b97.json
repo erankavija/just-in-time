@@ -14,9 +14,19 @@
   ],
   "gates_status": {
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:46.022097044Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T17:25:40.862926511Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T17:28:09.203883231Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T17:22:24.619780218Z"
     }
   },
   "context": {},
@@ -27,6 +37,13 @@
       "label": "Code-review reliability design",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/71be6ae9-live-review-report.md",
+      "commit": null,
+      "label": "Live code-review verification",
+      "doc_type": "report",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -36,7 +53,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-11T23:25:03.291514967Z",
-  "updated_at": "2026-07-12T17:15:24.993086285Z",
+  "updated_at": "2026-07-12T17:33:40.272939817Z",
   "first_ready_at": "2026-07-11T23:25:03.291533827Z",
   "claimed_at": "2026-07-12T17:15:24.993086065Z"
 }

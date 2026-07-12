@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "87188d5e-d32a-499e-8a5e-56caf0bf9ffc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "1a57f68ac379c20da782074ead7252437e8eca49",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:28:09.203883231Z",
+  "completed_at": "2026-07-12T17:31:04.466309578Z",
+  "duration_ms": 175262,
+  "exit_code": 1,
+  "stdout": "1. **F1 — blocking, issue-impact:** The configured read-only reviewer has no successful live validation. The only recorded code-review run failed with no review output; stderr shows the in-process client failed on a read-only filesystem. The test only asserts that the TOML command contains `--sandbox read-only`, so it cannot detect this runtime failure. [result.json](/home/vkaskivuo/Projects/just-in-time/.jit/gate-runs/6e7140f3-5164-400a-b00c-caa6bda3e93a/result.json:15) [code_review_policy_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/code_review_policy_test.rs:83)\n\n2. **F2 — blocking, issue-impact:** REQ-10 is incomplete: no `dev/active/71be6ae9-live-review-report.md` exists and the issue links only the design document, not a report. The design requires a linked report plus rerun gate evidence; the latest code-review projection remains failed and doc-review is pending. [.jit issue record](/home/vkaskivuo/Projects/just-in-time/.jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json:33) [design](/home/vkaskivuo/Projects/just-in-time/dev/active/71be6ae9-code-review-reliability.md:205)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The configured read-only review has no successful live validation, and the required REQ-10 report/completion evidence is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Configured read-only reviewer failed at runtime and is not validated end-to-end.\",\"file\":\".jit/gate-runs/6e7140f3-5164-400a-b00c-caa6bda3e93a/result.json\",\"line\":15},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-10 live-review report, link, and final gate evidence are absent.\",\"file\":\".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json\",\"line\":33}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5110 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f575f-46c4-79f2-97b3-0bb564423c07\n--------\nuser\n--- 5097 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The configured read-only review has no successful live validation, and the required REQ-10 report/completion evidence is absent.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Configured read-only reviewer failed at runtime and is not validated end-to-end.",
+        "file": ".jit/gate-runs/6e7140f3-5164-400a-b00c-caa6bda3e93a/result.json",
+        "line": 15
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-10 live-review report, link, and final gate evidence are absent.",
+        "file": ".jit/issues/71be6ae9-6857-4863-94c0-5e96f65f2b97.json",
+        "line": 33
+      }
+    ]
+  }
+}

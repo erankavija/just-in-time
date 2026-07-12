@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "6e7140f3-5164-400a-b00c-caa6bda3e93a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "9348c49fbd95e5d77a41758a7479622640279b78",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:25:48.732293934Z",
+  "completed_at": "2026-07-12T17:25:48.936257062Z",
+  "duration_ms": 203,
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "./scripts/ai-review.sh: line 99: blocking: command not found\n./scripts/ai-review.sh: line 99: advisory: command not found\n./scripts/ai-review.sh: line 99: issue-impact: command not found\n./scripts/ai-review.sh: line 99: pre-existing: command not found\n---\nERROR: Agent produced no output.\n--- agent stderr (first 12 of 3 lines; the session id below points to the full agent transcript) ---\nWARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)\nReading prompt from stdin...\nError: failed to initialize in-process app-server client: Read-only file system (os error 30)\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null
+}

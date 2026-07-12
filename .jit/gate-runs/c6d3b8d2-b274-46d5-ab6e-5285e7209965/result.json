@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c6d3b8d2-b274-46d5-ab6e-5285e7209965",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "71be6ae9-6857-4863-94c0-5e96f65f2b97",
+  "commit": "5c3950ba693042fdab9ec31606c12e2c0d5f6b85",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T17:25:18.528901931Z",
+  "completed_at": "2026-07-12T17:25:18.931653953Z",
+  "duration_ms": 402,
+  "exit_code": 1,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\n\n",
+  "stderr": "DRIFT: projected region(s) are stale — the committed copy does not match\n       'jit invariant render' / 'jit reference render'. Re-render and commit:\n docs/reference/rules-and-gates.md | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}
