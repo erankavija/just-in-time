@@ -30,12 +30,13 @@
 /// ```
 pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
-/// Maximum time, in seconds, a `FileLocker` waits to acquire a file lock before
-/// failing. `JsonFileStorage` builds one shared `FileLocker` whose timeout comes
-/// from the `JIT_LOCK_TIMEOUT` environment variable (whole seconds) when set,
-/// falling back to this default, and uses it for every lock it takes, including
-/// the index and issue locks. The claim-coordination and worktree locks build
-/// their own `FileLocker` from this constant and ignore the variable.
+/// Maximum time, in seconds, a lock holder waits to acquire a file lock before
+/// failing. `JsonFileStorage` resolves one timeout from the `JIT_LOCK_TIMEOUT`
+/// environment variable (whole seconds) when set, falling back to this default,
+/// and applies it to both its repository write lock and the shared `FileLocker`
+/// it uses for the index, issue, and gate locks. The claim-coordination and
+/// worktree locks build their own `FileLocker` from this constant and ignore the
+/// variable.
 ///
 /// # Examples
 ///
@@ -132,7 +133,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Default timeout for acquiring a file lock before failing. `JsonFileStorage` builds one shared `FileLocker` whose timeout comes from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default, and uses it for every lock it takes, including the index and issue locks. The claim-coordination and worktree locks construct their own `FileLocker` from this constant directly and ignore the environment variable.",
+            "Default timeout for acquiring a file lock before failing. `JsonFileStorage` resolves one timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default, and applies it to both its repository write lock and the shared `FileLocker` it uses for the index, issue, and gate locks. The claim-coordination and worktree locks build their own `FileLocker` from this constant and ignore the environment variable.",
         ),
         (
             "Lock poll interval",
