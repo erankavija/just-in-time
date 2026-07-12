@@ -2,7 +2,7 @@
   "id": "3ac07340-8901-404a-ac66-a98658bf95c4",
   "title": "Project command-specific exit-code mappings",
   "description": "The schema exposes a global exit-code taxonomy but not the command outcomes that produce each code. Documentation must currently cite runtime classification and direct exits instead of a maintained projection.\n\nSource: `crates/jit/src/schema.rs:520-556`; `crates/jit/src/main.rs:33-247`; `crates/jit/src/output_macros.rs:112-121`; `dev/archive/2d109173-plan.md:384-403`.\n\n## Success Criteria\n\n- [hard] REQ-01: A discoverable generated surface identifies per-command or per-command-family exit codes, including exceptions to the global taxonomy.\n- [hard] REQ-02: The projection derives from or is mechanically verified against runtime classification and dispatch sources.\n- [hard] REQ-03: Documentation consuming the new surface does not hand-copy per-command exit-code tables.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [
@@ -16,24 +16,24 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T05:44:19.555546349Z"
+      "updated_at": "2026-07-12T09:18:22.916688274Z"
     },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T05:44:19.122365074Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T05:48:17.476705469Z"
+      "updated_at": "2026-07-12T09:13:52.652200935Z"
     },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T05:42:07.373842039Z"
+      "updated_at": "2026-07-12T09:13:53.090122433Z"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T09:10:59.954044203Z"
     }
   },
   "context": {},
@@ -63,7 +63,8 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.552297391Z",
-  "updated_at": "2026-07-12T05:50:41.418750441Z",
+  "updated_at": "2026-07-12T09:20:44.139421978Z",
   "first_ready_at": "2026-07-11T13:35:35.552297731Z",
-  "claimed_at": "2026-07-11T22:50:02.244077385Z"
+  "claimed_at": "2026-07-11T22:50:02.244077385Z",
+  "done_at": "2026-07-12T09:20:44.139421318Z"
 }

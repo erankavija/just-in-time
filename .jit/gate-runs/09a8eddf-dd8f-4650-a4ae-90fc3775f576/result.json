@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "09a8eddf-dd8f-4650-a4ae-90fc3775f576",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "c683a7038bd80e98757e10fbab0244fd661cfae0",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T08:20:37.789488327Z",
+  "completed_at": "2026-07-12T08:24:23.338706831Z",
+  "duration_ms": 225549,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is the configured level-4 leaf and has no DAG-resolved children. I inspected its six reachable `jit:3ac07340` commits individually with rename/copy detection; no commit attribution was unavailable. Uncommitted `.jit` changes were excluded.\n\nThe prior blocking findings remain resolved. The generated reference is discoverable from the Reference index and CLI scripting section, accurately documents `serve --fg` passthrough and validation variants, and its renderer-currentness and exception-coverage tests pass.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped generated exit-code reference and directly affected consumers are accurate, discoverable, concise, and mechanically checked.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue-scoped generated exit-code reference and directly affected consumers are accurate, discoverable, concise, and mechanically checked.",
+    "findings": []
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "837bb206-bfe9-4dc5-a85d-e7407f2d11ef",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "a7e45dce5813797eaeb95159428b18251da4987b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T09:05:00.057231714Z",
+  "completed_at": "2026-07-12T09:09:10.884999660Z",
+  "duration_ms": 250827,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is the configured level-4 leaf and has no DAG-resolved children. I inspected the 12 reachable `jit:3ac07340` commits individually with rename/copy detection; uncommitted JIT records were excluded. The prior generated-reference and CLI-consumer findings are resolved and the focused projection/freshness tests pass.\n\n1. **F1 — blocking, issue-impact, high:** [claim.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/claim.md:106) retains seven hand-copied per-command exit-code tables. This violates REQ-03 and omits the generated reference’s documented no-Git `claim` exit-10 case. Replace the tables with concise links to the generated Exit Codes reference; retain only command-local behavior that is not an exit-code mapping.\n\n2. **F2 — blocking, issue-impact, high:** [worktree-validate.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:83) retains four hand-copied exit-code tables instead of consuming the new canonical taxonomy. Replace them with concise links to the generated Exit Codes reference, preserving only non-exit-code command behavior.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two adopter reference pages still hand-copy per-command exit-code tables instead of using the generated canonical reference.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The claim reference retains seven hand-copied exit-code tables and omits the generated no-Git exit-10 case.\",\"file\":\"docs/reference/claim.md\",\"line\":106},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The worktree/validate reference retains four hand-copied exit-code tables rather than linking to the generated canonical reference.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":83}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14503 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5592-a03e-7da0-be8b-2e79cccd1595\n--------\nuser\n--- 14490 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two adopter reference pages still hand-copy per-command exit-code tables instead of using the generated canonical reference.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The claim reference retains seven hand-copied exit-code tables and omits the generated no-Git exit-10 case.",
+        "file": "docs/reference/claim.md",
+        "line": 106
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The worktree/validate reference retains four hand-copied exit-code tables rather than linking to the generated canonical reference.",
+        "file": "docs/reference/worktree-validate.md",
+        "line": 83
+      }
+    ]
+  }
+}

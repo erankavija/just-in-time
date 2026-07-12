@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "830a4e18-f729-478c-bf2f-5bb4059f87f0",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "2448ed6dc3e8616c0491f65c1ce9f8b435f034dd",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T08:57:06.197989965Z",
+  "completed_at": "2026-07-12T09:00:17.307645326Z",
+  "duration_ms": 191109,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a configured level-4 leaf with no resolved children. I inspected the ten reachable `jit:3ac07340` commits individually with rename/copy detection; uncommitted `.jit` gate records were excluded. The latest prior finding is resolved, but one generated-reference accuracy defect remains.\n\n1. **F1 — blocking, issue-impact, high:** [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:22) says `*` marks a code every command reaches “through the shared classifier,” but the `*`/`0` row is produced by the normal successful-return path; `error_to_exit_code` only runs on errors. Update the renderer in `schema.rs`, regenerate this page, and distinguish successful completion from classifier-derived error outcomes.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated exit-code legend incorrectly says the universal success outcome is reached through the shared error classifier.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The `*` legend says every listed code reaches the shared classifier, but exit 0 is produced by successful completion without invoking that classifier.\",\"file\":\"docs/reference/exit-codes.md\",\"line\":22}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.ZGZQUEC1nT: binary file matches\n--- agent stderr (first 13 of 12205 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f558b-6565-7032-b6e5-d7c2bba42088\n--------\nuser\n--- 12192 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated exit-code legend incorrectly says the universal success outcome is reached through the shared error classifier.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The `*` legend says every listed code reaches the shared classifier, but exit 0 is produced by successful completion without invoking that classifier.",
+        "file": "docs/reference/exit-codes.md",
+        "line": 22
+      }
+    ]
+  }
+}

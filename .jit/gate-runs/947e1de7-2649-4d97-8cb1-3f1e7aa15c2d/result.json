@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "run_id": "947e1de7-2649-4d97-8cb1-3f1e7aa15c2d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "c683a7038bd80e98757e10fbab0244fd661cfae0",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T08:18:30.004898645Z",
+  "completed_at": "2026-07-12T08:20:37.740891221Z",
+  "duration_ms": 127735,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nREQ-01 and REQ-03 are met: the generated, discoverable reference covers command-family mappings, and consuming docs link to it rather than retain per-command tables. Prior omissions for validate modes and serve behavior are addressed.\n\nREQ-02 is not met; the standard-taxonomy command-family rows are not mechanically bound to runtime behavior.\n\n## Architecture and separation of concerns\n\nNo new domain/storage/command boundary violations found.\n\n## Functional paradigm\n\nNo blocking functional-style issues found.\n\n## Correctness and invariants\n\nNo atomic-write, event-log, gate, label, assignee, PID-safety, or unsafe-code regression found.\n\n## Safety\n\nNo unsafe code introduced.\n\n## Testing\n\nThe succeeded cargo-ci gate is the primary evidence; tests and lint were not rerun. `./scripts/jit-validate.sh` passed. Test naming now follows the required convention.\n\n## Error handling and CLI contract\n\nNo new error-handling or JSON-contract issue found.\n\n## Documentation\n\nThe generated reference is current and discoverable. CLI documentation now consumes it through links rather than duplicating tables.\n\n## JIT issue management\n\nThe prerequisite `6d82de03` is done. The latest review’s prior findings are addressed, but the remaining REQ-02 coverage gap is blocking.\n\n## Findings\n\n1. **F1 — High:** The projection’s non-exception command-family rows are hand-authored but not mechanically verified against their runtime dispatch/classifier paths, failing hard REQ-02. The only comprehensive guard deliberately filters to `exception` rows at [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_exit_code_projection_tests.rs:408), while the standard rows such as `dep add`, `issue update`, `gate define`, and `claim` are defined at [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:748). The schema test checks only that a code belongs to the global taxonomy, and the main test checks only that some projection row has each classified code; neither binds a command row to its runtime source. For example, changing the `dep add` row from `4` to `10` would preserve those checks despite documenting the wrong command outcome.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Standard command-family exit-code rows are not mechanically verified against runtime behavior, so REQ-02 remains unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Non-exception command-family mappings are hand-authored without a runtime binding; existing guards verify only exception rows or global code membership.\",\"file\":\"crates/jit/tests/command_exit_code_projection_tests.rs\",\"line\":408}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7511 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5568-0dba-7a82-abfe-8a198d781065\n--------\nuser\n--- 7498 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Standard command-family exit-code rows are not mechanically verified against runtime behavior, so REQ-02 remains unmet.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "Non-exception command-family mappings are hand-authored without a runtime binding; existing guards verify only exception rows or global code membership.",
+        "file": "crates/jit/tests/command_exit_code_projection_tests.rs",
+        "line": 408
+      }
+    ]
+  }
+}

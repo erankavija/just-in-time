@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "921ecb52-dd09-4d33-aef3-93d1c87e7208",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "6f8ea6291bf26d93d810c3e0d3416d0773079a28",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T09:10:59.954044203Z",
+  "completed_at": "2026-07-12T09:13:49.176889037Z",
+  "duration_ms": 169222,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured level-4 leaf with no resolved children. I inspected its 13 reachable `jit:3ac07340` commits individually with rename/copy detection; uncommitted JIT records were excluded.\n\nThe generated reference is current, discoverable from the docs index and CLI scripting reference, and runtime-verified. Prior blocking findings are resolved: reserved and direct-exit mappings are accurately qualified, and claim/worktree tables now link to the canonical page. Focused projection and freshness tests pass.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The command-specific exit-code reference is accurate, generated and verified against runtime behavior, discoverable, and consumed without hand-copied per-command tables.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The command-specific exit-code reference is accurate, generated and verified against runtime behavior, discoverable, and consumed without hand-copied per-command tables.",
+    "findings": []
+  }
+}

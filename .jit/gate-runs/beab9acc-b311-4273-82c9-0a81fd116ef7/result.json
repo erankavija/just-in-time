@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "beab9acc-b311-4273-82c9-0a81fd116ef7",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "f8fc9e717215d70113c21a37529f208fc782b954",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T08:45:43.992194561Z",
+  "completed_at": "2026-07-12T08:50:50.844669667Z",
+  "duration_ms": 306852,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a configured level-4 leaf with no resolved children. I inspected eight reachable `jit:3ac07340` commits individually with rename/copy detection; uncommitted `.jit` changes were excluded. Prior CLI-consumer finding is resolved.\n\nThe generated reference is discoverable and its mappings are verified, but its own introduction misstates the projection sources.\n\n1. **F1 — blocking, issue-impact, high:** [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:5) says the page is projected from the taxonomy and shared classifier only. The current schema explicitly derives exception rows from direct dispatch exit sites, including `serve --fg`. Update the renderer text, then regenerate the page, to name both schema arrays and both runtime verification paths.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The generated exit-code reference inaccurately says all mappings derive from the shared classifier, omitting direct-dispatch exit mappings.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The generated reference says its mappings come from the taxonomy and shared classifier only, but exception rows also derive from direct dispatch exit sites.\",\"file\":\"docs/reference/exit-codes.md\",\"line\":5}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.qvzhJiLanh: binary file matches\n--- agent stderr (first 13 of 19623 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5580-fb6b-78a1-88c5-ddb4d2d70cfd\n--------\nuser\n--- 19610 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The generated exit-code reference inaccurately says all mappings derive from the shared classifier, omitting direct-dispatch exit mappings.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The generated reference says its mappings come from the taxonomy and shared classifier only, but exception rows also derive from direct dispatch exit sites.",
+        "file": "docs/reference/exit-codes.md",
+        "line": 5
+      }
+    ]
+  }
+}

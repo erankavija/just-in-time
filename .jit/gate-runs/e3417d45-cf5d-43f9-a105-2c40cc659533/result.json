@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "e3417d45-cf5d-43f9-a105-2c40cc659533",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "4f1a61ee182f1be3abb2d0bd525c7293fdc5cab4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T08:43:45.534369732Z",
+  "completed_at": "2026-07-12T08:45:22.722690695Z",
+  "duration_ms": 97188,
+  "exit_code": 1,
+  "stdout": "Attribution: `task` is a configured level-4 leaf with no DAG-resolved children. I individually inspected the seven reachable `jit:3ac07340` commits with rename/copy detection; none lacked commit attribution. Uncommitted `.jit` changes were excluded. Prior blocking findings remain resolved.\n\nThe generated reference is discoverable and current, but its CLI consumer inaccurately describes the schema/runtime sources for command-specific rows.\n\n1. **F1 — blocking, issue-impact, high:** [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3222) says per-command mappings are generated from `jit --schema`’s `exit_codes` array and the runtime classifier. The mappings actually ship in the separate `command_exit_codes` schema field, and include direct-dispatch outcomes such as `serve --fg`; they are mechanically verified against both classifier and dispatch behavior. Update this sentence to name both schema arrays and the direct-dispatch verification.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The CLI scripting reference inaccurately describes the schema and runtime sources of the generated command-specific exit-code mappings.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference attributes command-specific mappings only to the exit_codes schema array and classifier, omitting the command_exit_codes field and direct-dispatch mappings they contain.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3222}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.JFEyuo7Yzu: binary file matches\n--- agent stderr (first 13 of 10428 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f557f-2e98-7010-b106-41af68800cd1\n--------\nuser\n--- 10415 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The CLI scripting reference inaccurately describes the schema and runtime sources of the generated command-specific exit-code mappings.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The CLI reference attributes command-specific mappings only to the exit_codes schema array and classifier, omitting the command_exit_codes field and direct-dispatch mappings they contain.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 3222
+      }
+    ]
+  }
+}

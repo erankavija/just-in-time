@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "bb7ea79d-fdce-4b20-bdab-9734831b021a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "6f8ea6291bf26d93d810c3e0d3416d0773079a28",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-12T09:18:22.916688274Z",
+  "completed_at": "2026-07-12T09:20:33.169862691Z",
+  "duration_ms": 130253,
+  "exit_code": 0,
+  "stdout": "## Acceptance criteria\n\nREQ-01–03 are met. The generated `command_exit_codes` projection is discoverable through `jit --schema`, renders to [exit-codes.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/exit-codes.md:1), covers exceptional/direct outcomes, and consuming documentation now links to it instead of maintaining tables.\n\n## Architecture and separation of concerns\n\nNo boundary violations found. Projection generation remains isolated in [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:701); runtime behavior remains in dispatch and command code.\n\n## Functional paradigm\n\nNo new imperative or mutability debt found.\n\n## Correctness and invariants\n\nThe previous `serve`, `validate`, and standard-family mapping issues are addressed. Each projection row is covered by the row-completeness guard in [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_exit_code_projection_tests.rs:762), with classifier and subprocess bindings.\n\n## Safety\n\nNo unsafe code or PID-safety regression found.\n\n## Testing\n\nThe succeeded `cargo-ci` gate is the primary evidence; tests were not rerun. `./scripts/jit-validate.sh` passed. Test names follow the required convention.\n\n## Error handling and CLI contract\n\nNo regression found. No new command was added, and JSON behavior is unaffected.\n\n## Documentation\n\nThe generated reference is current and command documentation no longer hand-copies the relevant exit-code tables.\n\n## JIT issue management\n\nThe prerequisite is done. All findings from the most recent failed review run have been addressed.\n\n## Findings\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Generated command exit-code mappings are runtime-bound, documented, and free of review findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Generated command exit-code mappings are runtime-bound, documented, and free of review findings.",
+    "findings": []
+  }
+}

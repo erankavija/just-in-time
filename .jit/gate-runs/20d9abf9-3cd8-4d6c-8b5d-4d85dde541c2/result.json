@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "20d9abf9-3cd8-4d6c-8b5d-4d85dde541c2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3ac07340-8901-404a-ac66-a98658bf95c4",
+  "commit": "5987799d953e56ee89860829746227a8e48d1ef6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T08:05:51.277208206Z",
+  "completed_at": "2026-07-12T08:08:08.452340027Z",
+  "duration_ms": 137175,
+  "exit_code": 1,
+  "stdout": "## Acceptance criteria\n\nFails. The projection remains incomplete and not fully mechanically verified; command help still duplicates its mapping.\n\n## Architecture and separation of concerns\n\nNo new domain/storage/command boundary violation found.\n\n## Functional paradigm\n\nNo blocking concern found.\n\n## Correctness and invariants\n\nNo atomic-write, event-log, gate-semantics, assignee/label-format, unsafe-code, or PID-safety regression found.\n\n## Safety\n\nNo unsafe code introduced.\n\n## Testing\n\nThe recorded `cargo-ci` gate passed, so I did not rerun tests. `./scripts/jit-validate.sh` passes. Test naming from the prior review has been corrected, but the remaining verification gaps below are blocking.\n\n## Error handling and CLI contract\n\nNo separate error-handling or JSON-contract failure found.\n\n## Documentation\n\nThe generated reference is current, but CLI help retains a contradictory hand-maintained table.\n\n## JIT issue management\n\nPrerequisite `6d82de03` is done. Prior review findings were only partially remediated.\n\n1. **F1 — High:** The `validate` projection omits command-specific `1` outcomes for `--branch-drift` and `--leases`. Its sole `validate`/`1` row says rule evaluation findings, but dispatch directly exits `1` for branch drift and invalid/erroring leases. This leaves REQ-01 incomplete and has no runtime binding for those modes, failing REQ-02. [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:829) and [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:5997)\n\n2. **F2 — High:** The `serve --fg` pass-through mapping is not mechanically verified against dispatch. Its test only asserts that the schema contains a `None` row; it neither executes nor inspects the `status.code().unwrap_or(1)` runtime path. A dispatch change could silently invalidate the generated reference, failing REQ-02. [command_exit_code_projection_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/command_exit_code_projection_tests.rs:341) and [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:6529)\n\n3. **F3 — High:** `jit config validate --help` still hand-copies a per-command exit-code table and contradicts the generated reference by advertising a live warning-only exit `2`, while the projection says that code is reserved and never emitted. This leaves prior documentation-duplication feedback unresolved and fails REQ-03. [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:2460) and [schema.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:854)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The exit-code projection omits validate modes, lacks runtime verification for serve foreground pass-through, and conflicts with CLI help.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The validate projection omits direct exit-1 outcomes for branch-drift and lease validation, and those modes are not mechanically verified.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":829},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"The serve --fg pass-through row is only asserted to exist in the schema, not verified against its runtime dispatch path.\",\"file\":\"crates/jit/tests/command_exit_code_projection_tests.rs\",\"line\":341},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"Config validate CLI help duplicates and contradicts the generated mapping by advertising a live warnings-only exit 2.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":2460}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5937 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f555c-79e6-7af3-ad70-828794321640\n--------\nuser\n--- 5924 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The exit-code projection omits validate modes, lacks runtime verification for serve foreground pass-through, and conflicts with CLI help.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "summary": "The validate projection omits direct exit-1 outcomes for branch-drift and lease validation, and those modes are not mechanically verified.",
+        "file": "crates/jit/src/schema.rs",
+        "line": 829
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "summary": "The serve --fg pass-through row is only asserted to exist in the schema, not verified against its runtime dispatch path.",
+        "file": "crates/jit/tests/command_exit_code_projection_tests.rs",
+        "line": 341
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "summary": "Config validate CLI help duplicates and contradicts the generated mapping by advertising a live warnings-only exit 2.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 2460
+      }
+    ]
+  }
+}
