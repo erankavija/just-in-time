@@ -14,11 +14,15 @@
 //!   fails to compile until it is given a tag here.
 //! - [`EventTag::sample`] constructs one representative record per tag with a
 //!   wildcard-free match, so a new tag fails to compile until it is sampled.
-//! - Each row's `carries_issue_id` is read off the sample's serialized record —
-//!   the same `serde_json` encoding `append_event` writes — rather than declared.
-//! - A conformance test compares [`EventTag::ALL`] against the variant list
-//!   schemars derives from the enum, so a tag missing from `ALL` fails the suite,
-//!   and a golden test asserts the committed reference equals the projection
+//! - A row's `carries_issue_id` follows from its [`EventScope`]: only
+//!   issue-scoped records name an issue. Tests hold that against reality from
+//!   both sides — against the serialized sample (the same `serde_json` encoding
+//!   `append_event` writes to `events.jsonl`) and against [`Event::get_issue_id`],
+//!   the accessor every consumer reads an event's issue through.
+//! - Conformance tests compare the catalog against the variant lists schemars
+//!   derives from the enums: every serde `type` tag of [`Event`] must be
+//!   cataloged, and every [`EventTag`] must appear in [`EventTag::ALL`]. A golden
+//!   test asserts the committed reference equals the projection
 //!   (`@/inv/single-source-prose`).
 
 use chrono::{DateTime, Utc};
@@ -29,6 +33,14 @@ use super::types::{Assignee, Event, Priority, State};
 
 /// Path of the committed markdown reference this module projects, relative to
 /// the repository root.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::event_catalog::REFERENCE_PATH;
+///
+/// assert_eq!(REFERENCE_PATH, "docs/reference/events.md");
+/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 
 /// What an event is about: the state it records a change to.
@@ -36,6 +48,18 @@ pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 /// The scope decides whether a record carries an `issue_id`: only
 /// [`EventScope::Issue`] events name a single issue, so registry- and
 /// repository-scoped records omit the field entirely.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{EventScope, EventTag};
+///
+/// // A state change is about one issue, so its record names that issue.
+/// assert_eq!(EventTag::IssueStateChanged.scope(), EventScope::Issue);
+///
+/// // A gate-registry edit changes shared state, so it names no issue.
+/// assert_eq!(EventTag::GateDefinitionCreated.scope(), EventScope::Registry);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventScope {
@@ -72,6 +96,18 @@ impl EventScope {
 /// The tag is the value of a record's `type` field. [`Event::tag`] is the
 /// wildcard-free mapping from a record to its tag, and [`Event::get_type`]
 /// renders that tag as the string serde writes.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{Event, EventTag, Issue};
+///
+/// let issue = Issue::new("Probe".to_string(), String::new());
+/// let event = Event::new_issue_created(&issue);
+///
+/// assert_eq!(event.tag(), EventTag::IssueCreated);
+/// assert_eq!(EventTag::IssueCreated.as_str(), "issue_created");
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventTag {
@@ -279,10 +315,26 @@ impl EventTag {
 
     /// A representative record with this tag.
     ///
-    /// The catalog reads each row's record shape off this sample, so the shape it
-    /// reports is the shape `serde_json` actually writes. The match is
-    /// wildcard-free: a new tag fails to compile until it is sampled here.
-    fn sample(self) -> Event {
+    /// The record shape here is the shape `serde_json` actually writes, so the
+    /// catalog's claims are tested against these samples rather than against a
+    /// restatement of them. The match is wildcard-free: a new tag fails to compile
+    /// until it is sampled here.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use jit::domain::EventTag;
+    ///
+    /// let event = EventTag::IssueCreated.sample();
+    /// assert_eq!(event.tag(), EventTag::IssueCreated);
+    ///
+    /// // An issue-scoped record names its issue; the serialized form is what
+    /// // `events.jsonl` stores.
+    /// let record = serde_json::to_value(&event).unwrap();
+    /// assert_eq!(record["type"], "issue_created");
+    /// assert!(record.get("issue_id").is_some());
+    /// ```
+    pub fn sample(self) -> Event {
         let id = "00000000-0000-0000-0000-000000000000".to_string();
         let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
         let gate_key = "tests".to_string();
@@ -468,13 +520,31 @@ impl Event {
 
 /// One catalog row: an event tag, what it is about, and whether its records
 /// carry an `issue_id`.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{event_catalog, EventScope, EventTag};
+///
+/// let catalog = event_catalog();
+/// let row = catalog
+///     .iter()
+///     .find(|row| row.tag == EventTag::DocumentArchived)
+///     .expect("document_archived is cataloged");
+///
+/// // Archiving a document changes repository state, so the record names no issue.
+/// assert_eq!(row.scope, EventScope::Repository);
+/// assert!(!row.carries_issue_id);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EventTagDoc {
     /// The record's `type` tag.
     pub tag: EventTag,
     /// The state the record is about.
     pub scope: EventScope,
-    /// Whether records with this tag carry an `issue_id` field.
+    /// Whether records with this tag carry an `issue_id` field. True exactly for
+    /// [`EventScope::Issue`] tags; tests hold this against the serialized record
+    /// and against [`Event::get_issue_id`].
     pub carries_issue_id: bool,
     /// What appends a record with this tag.
     pub description: String,
@@ -508,23 +578,10 @@ pub fn event_catalog() -> Vec<EventTagDoc> {
         .map(|&tag| EventTagDoc {
             tag,
             scope: tag.scope(),
-            carries_issue_id: record_carries_issue_id(&tag.sample()),
+            carries_issue_id: tag.scope() == EventScope::Issue,
             description: tag.description().to_string(),
         })
         .collect()
-}
-
-/// Whether a record's serialized JSON object has an `issue_id` field.
-///
-/// Serializes with `serde_json`, the encoding
-/// [`append_event`](crate::storage::IssueStore::append_event) writes to
-/// `events.jsonl`, so the answer is the on-disk record shape rather than a
-/// declaration about it.
-fn record_carries_issue_id(event: &Event) -> bool {
-    serde_json::to_value(event)
-        .ok()
-        .and_then(|value| value.as_object().map(|obj| obj.contains_key("issue_id")))
-        .unwrap_or(false)
 }
 
 /// Render the event-log reference page ([`REFERENCE_PATH`]).
@@ -700,6 +757,72 @@ mod tests {
                 row.carries_issue_id,
                 row.scope == EventScope::Issue,
                 "`{}` must carry an issue_id exactly when it is issue-scoped",
+                row.tag.as_str(),
+            );
+        }
+    }
+
+    /// REQ-03: every serde `type` tag the `Event` enum admits is cataloged.
+    ///
+    /// `Event::tag()` being wildcard-free forces a new variant to be *given* a
+    /// tag, but nothing stops it being given an existing one — serde would then
+    /// write a `type` string absent from the catalog while the code still
+    /// compiles. This reads the tags off the schema schemars derives from `Event`
+    /// itself (each variant contributes its `type` const), so the catalog is bound
+    /// to the serde encoding rather than to `EventTag`'s own variant list.
+    #[test]
+    fn test_event_variant_tags_are_all_cataloged() {
+        let schema = serde_json::to_value(schema_for!(Event)).expect("Event schema is JSON");
+        let variants = schema
+            .get("oneOf")
+            .and_then(|one_of| one_of.as_array())
+            .expect("an internally-tagged enum derives a oneOf of its variants");
+
+        let serde_tags: BTreeSet<String> = variants
+            .iter()
+            .map(|variant| {
+                let accepted = schema_accepted_strings(&variant["properties"]["type"]);
+                assert_eq!(
+                    accepted.len(),
+                    1,
+                    "each variant pins exactly one `type` string, got {accepted:?}"
+                );
+                accepted.into_iter().next().expect("checked above")
+            })
+            .collect();
+
+        assert_eq!(
+            serde_tags.len(),
+            variants.len(),
+            "two Event variants serialize to the same `type` tag"
+        );
+
+        let cataloged: BTreeSet<String> = event_catalog()
+            .iter()
+            .map(|row| row.tag.as_str().to_string())
+            .collect();
+
+        assert_eq!(
+            serde_tags, cataloged,
+            "every `type` tag Event serializes must be cataloged; \
+             left = serde, right = catalog"
+        );
+    }
+
+    /// REQ-01/REQ-03: the `issue_id` column agrees with the on-disk record — the
+    /// same `serde_json` encoding `append_event` writes to `events.jsonl`. The
+    /// column follows from the tag's scope, so this is what holds that scope
+    /// against the record it claims to describe.
+    #[test]
+    fn test_carries_issue_id_matches_serialized_record() {
+        for row in event_catalog() {
+            let record =
+                serde_json::to_value(row.tag.sample()).expect("an event record serializes to JSON");
+            let object = record.as_object().expect("a record is a JSON object");
+            assert_eq!(
+                row.carries_issue_id,
+                object.contains_key("issue_id"),
+                "`{}`: catalog and serialized record disagree on issue_id",
                 row.tag.as_str(),
             );
         }

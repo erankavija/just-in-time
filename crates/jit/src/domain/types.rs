@@ -455,6 +455,18 @@ impl Serialize for Assignee {
     }
 }
 
+/// Schema for the `{type}:{identifier}` string form `Serialize` writes and
+/// `Deserialize` reads, hand-written because the serde impls are (@/inv/assignee-format).
+impl schemars::JsonSchema for Assignee {
+    fn schema_name() -> String {
+        "Assignee".to_string()
+    }
+
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(generator)
+    }
+}
+
 impl<'de> Deserialize<'de> for Assignee {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -1303,7 +1315,12 @@ pub enum GateRunStatus {
 }
 
 /// System event types for audit log
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// `JsonSchema` is derived so the event catalog's freshness guard can read the
+/// serde `type` tag of every variant off the derived schema
+/// (`event_catalog::tests::test_event_variant_tags_are_all_cataloged`): a new
+/// variant appears there whether or not it was given a distinct [`EventTag`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
     /// A new issue was created
