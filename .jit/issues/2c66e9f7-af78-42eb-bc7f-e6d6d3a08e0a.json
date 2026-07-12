@@ -2,9 +2,9 @@
   "id": "2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a",
   "title": "Project event tags and issue association semantics",
   "description": "The event stream has a finite source-defined tag vocabulary, but no maintained projection records event tags or which events carry an `issue_id`.\n\nSource: `crates/jit/src/domain/types.rs:1305-1581,1981-2031`; `crates/jit/src/storage/json.rs:735-775`.\n\n## Success Criteria\n\n- [hard] REQ-01: A generated machine-consumable and documentation-friendly surface lists every event tag and its association scope, including `issue_id` presence.\n- [hard] REQ-02: The no-issue set correctly includes `document_archived`, gate-definition events, and `lifecycle_timestamps_backfilled`.\n- [hard] REQ-03: Automated coverage fails when an Event change leaves the catalog stale.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
@@ -15,25 +15,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.351083239Z"
-    },
     "code-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.351137579Z"
     },
-    "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.351187949Z"
-    },
     "doc-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.351163149Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.351083239Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.351187949Z"
     }
   },
   "context": {},
@@ -45,6 +45,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.552941581Z",
-  "updated_at": "2026-07-11T19:47:55.351500649Z",
-  "first_ready_at": "2026-07-11T13:35:35.552941921Z"
+  "updated_at": "2026-07-12T09:21:16.065005304Z",
+  "first_ready_at": "2026-07-11T13:35:35.552941921Z",
+  "claimed_at": "2026-07-12T09:21:16.065005114Z"
 }

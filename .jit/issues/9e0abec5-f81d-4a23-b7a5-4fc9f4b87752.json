@@ -2,9 +2,9 @@
   "id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
   "title": "Add a projector for built-in gate presets",
   "description": "Built-in gate presets are defined in Rust and can change without a maintained documentation surface. Add a deterministic projection that distinguishes shipped presets from project-local registries.\n\nSource: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372`; `crates/jit/src/gate_presets/manager.rs:27-44,111-137`; `crates/jit/src/commands/invariant.rs:1-23`; `crates/jit/src/commands/reference.rs:1-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: A deterministic discoverable projection renders every built-in preset with gate keys, stages, modes, descriptions, and relevant checker metadata.\n- [hard] REQ-02: The rendered surface distinguishes shipped presets from project-local/custom configuration.\n- [hard] REQ-03: Freshness coverage fails when a built-in preset or gate definition changes without regeneration.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
@@ -15,6 +15,16 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373839796Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-11T19:47:55.373786686Z"
+    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
@@ -24,16 +34,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-11T19:47:55.373813626Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373786686Z"
-    },
-    "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-11T19:47:55.373839796Z"
     }
   },
   "context": {},
@@ -45,6 +45,7 @@
     "epic:documentation-contract-followups"
   ],
   "created_at": "2026-07-11T13:35:35.555687123Z",
-  "updated_at": "2026-07-11T19:47:55.374105706Z",
-  "first_ready_at": "2026-07-11T13:35:35.555687363Z"
+  "updated_at": "2026-07-12T09:21:16.085050888Z",
+  "first_ready_at": "2026-07-11T13:35:35.555687363Z",
+  "claimed_at": "2026-07-12T09:21:16.085050668Z"
 }
