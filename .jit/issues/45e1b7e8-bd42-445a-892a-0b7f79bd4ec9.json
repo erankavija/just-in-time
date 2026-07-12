@@ -7,9 +7,34 @@
   "assignee": null,
   "dependencies": [],
   "gates_required": [
-    "jit-validate"
+    "jit-validate",
+    "doc-review",
+    "docs-mechanical",
+    "cargo-ci",
+    "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:54.111163406Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:54.119821852Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.900796176Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.891781339Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -18,6 +43,6 @@
     "component:gates"
   ],
   "created_at": "2026-07-10T11:01:51.147435115Z",
-  "updated_at": "2026-07-10T11:01:51.149864287Z",
+  "updated_at": "2026-07-12T13:38:54.119877522Z",
   "first_ready_at": "2026-07-10T11:01:51.147453635Z"
 }

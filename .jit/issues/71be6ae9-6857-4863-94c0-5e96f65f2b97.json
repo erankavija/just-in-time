@@ -9,9 +9,16 @@
   "gates_required": [
     "cargo-ci",
     "code-review",
-    "doc-review"
+    "doc-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:46.022097044Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -29,6 +36,6 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-11T23:25:03.291514967Z",
-  "updated_at": "2026-07-11T23:27:54.395933730Z",
+  "updated_at": "2026-07-12T13:38:46.022137554Z",
   "first_ready_at": "2026-07-11T23:25:03.291533827Z"
 }

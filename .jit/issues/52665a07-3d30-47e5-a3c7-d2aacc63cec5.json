@@ -8,18 +8,30 @@
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
   ],
   "gates_status": {
-    "code-review": {
+    "doc-review": {
       "status": "pending",
       "updated_by": null,
-      "updated_at": "2026-07-09T11:25:06.721789985Z"
+      "updated_at": "2026-07-12T13:38:45.908852562Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.917666958Z"
     },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-09T11:25:06.721752485Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-09T11:25:06.721789985Z"
     }
   },
   "context": {},
@@ -32,6 +44,6 @@
     "per:@/charter/D-2"
   ],
   "created_at": "2026-07-09T11:25:06.642012697Z",
-  "updated_at": "2026-07-09T11:25:06.721807665Z",
+  "updated_at": "2026-07-12T13:38:45.917716818Z",
   "first_ready_at": "2026-07-09T11:25:06.642021737Z"
 }

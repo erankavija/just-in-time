@@ -8,18 +8,36 @@
   "dependencies": [],
   "gates_required": [
     "mcp-ci",
-    "code-review"
+    "code-review",
+    "doc-review",
+    "docs-mechanical",
+    "cargo-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-10T00:04:05.589815393Z"
-    },
     "mcp-ci": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-10T00:04:05.580911697Z"
+    },
+    "cargo-ci": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:54.144443770Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.957811887Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.966174493Z"
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-10T00:04:05.589815393Z"
     }
   },
   "context": {},
@@ -30,6 +48,6 @@
     "type:bug"
   ],
   "created_at": "2026-07-10T00:04:01.947276575Z",
-  "updated_at": "2026-07-10T00:04:05.589875033Z",
+  "updated_at": "2026-07-12T13:38:54.144487670Z",
   "first_ready_at": "2026-07-10T00:04:01.947282485Z"
 }

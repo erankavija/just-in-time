@@ -56,13 +56,20 @@
   "gates_required": [
     "cargo-ci",
     "code-review",
-    "repo-validate"
+    "repo-validate",
+    "doc-review",
+    "docs-mechanical"
   ],
   "gates_status": {
     "repo-validate": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.846127671Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:46.014124388Z"
     },
     "cargo-ci": {
       "status": "pending",
@@ -73,6 +80,11 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-04T23:25:14.846112271Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:46.006041922Z"
     }
   },
   "context": {},
@@ -104,6 +116,6 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-06-16T18:30:52.029597744Z",
-  "updated_at": "2026-07-12T13:35:19.708223137Z",
+  "updated_at": "2026-07-12T13:38:46.014171648Z",
   "first_ready_at": "2026-07-05T08:08:20.123562836Z"
 }
