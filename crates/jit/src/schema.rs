@@ -715,7 +715,8 @@ impl CommandSchema {
             exception,
         };
         vec![
-            // Universal: any command reaches these through the shared classifier.
+            // Universal: any command reaches these — `0` on successful completion,
+            // the failure codes through the shared classifier.
             row("*", 0, "Command completed successfully.", false),
             row(
                 "*",
@@ -968,7 +969,8 @@ pub fn render_exit_code_reference() -> String {
          departs from the global entry (for example, `doc check-links` exits `2` \
          for warnings, not a usage error). A `child` code marks a pass-through, \
          where the command exits with a subprocess's own code. `*` marks a code \
-         every command can reach through the shared classifier.\n\n",
+         every command can reach: `0` on successful completion, and the failure \
+         codes through the shared classifier.\n\n",
     );
     out.push_str("| Command | Code | Condition | Exception |\n");
     out.push_str("|---------|------|-----------|-----------|\n");

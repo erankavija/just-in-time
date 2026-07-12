@@ -19,7 +19,7 @@
 
 ## Command-specific mappings
 
-Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `doc check-links` exits `2` for warnings, not a usage error). A `child` code marks a pass-through, where the command exits with a subprocess's own code. `*` marks a code every command can reach through the shared classifier.
+Most commands draw only from the global taxonomy above. The rows below identify the codes a specific command family emits. An **exception** is a code a completed run emits to signal findings, or a code whose meaning departs from the global entry (for example, `doc check-links` exits `2` for warnings, not a usage error). A `child` code marks a pass-through, where the command exits with a subprocess's own code. `*` marks a code every command can reach: `0` on successful completion, and the failure codes through the shared classifier.
 
 | Command | Code | Condition | Exception |
 |---------|------|-----------|-----------|
