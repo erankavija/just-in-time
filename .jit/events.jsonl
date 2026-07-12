@@ -6691,3 +6691,4 @@
 {"type":"gate_passed","id":"671a4f10-f4d1-4ddf-b0b0-50340b851eb5","issue_id":"2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a","timestamp":"2026-07-12T11:53:42.736049735Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"fbe1dca0-6371-4b86-a2fa-dc9724edc215","issue_id":"2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a","timestamp":"2026-07-12T11:53:50.537294728Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"9c33fb4f-e09a-45f2-b84d-cf25fdc38fc0","issue_id":"2c66e9f7-af78-42eb-bc7f-e6d6d3a08e0a","timestamp":"2026-07-12T11:53:50.537335918Z"}
+{"type":"issue_updated","id":"1d00f39a-2d13-4144-a395-134e8cf38256","issue_id":"9e0abec5-f81d-4a23-b7a5-4fc9f4b87752","timestamp":"2026-07-12T11:58:22.563842799Z","updated_by":"doc-add","fields":["documents"]}
