@@ -12,9 +12,12 @@
 //! committed copy matches the projection, so changing a default without
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
 
-/// Default interval, in seconds, between lease heartbeat updates. A lease
-/// heartbeat is treated as stale once more than twice this interval has elapsed
-/// since its last beat.
+/// Default value, in seconds, of the agent `heartbeat_interval` configuration
+/// setting — the recommended cadence at which an agent sends `jit claim
+/// heartbeat` to keep an indefinite (TTL=0) lease alive. jit does not itself run
+/// a heartbeat loop: `jit claim heartbeat` records a single beat on demand.
+/// Lease staleness is governed separately — an indefinite lease is marked stale
+/// only after the claim staleness threshold (1 hour) without a beat.
 ///
 /// # Examples
 ///
@@ -120,12 +123,12 @@ pub fn render_reference_markdown() -> String {
         (
             "Heartbeat interval",
             format!("{HEARTBEAT_INTERVAL_SECS} seconds"),
-            "Default cadence for sending lease heartbeats (`jit claim heartbeat`) that keep an indefinite (TTL=0) lease alive. Lease staleness is governed separately: an indefinite lease is marked stale only after the claim staleness threshold (1 hour) elapses without a heartbeat, not after this cadence. Finite leases expire on their own TTL instead (see Claim lease TTL).",
+            "Default value of the agent `heartbeat_interval` setting — the recommended cadence at which an agent sends `jit claim heartbeat` to keep an indefinite (TTL=0) lease alive. jit does not run a heartbeat loop itself; the command records a single beat on demand. Lease staleness is governed separately: an indefinite lease is marked stale only after the claim staleness threshold (1 hour) without a beat, not after this interval. Finite leases expire on their own TTL instead (see Claim lease TTL).",
         ),
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Default timeout to acquire a file lock before failing. The `.jit` repository storage lock resolves its timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; all other file locks, including the claim-coordination locks, use this default and do not read the environment variable.",
+            "Default timeout to acquire a file lock before failing. The `.jit` repository storage locks (held by `JsonFileStorage` for all `.jit` data writes) resolve their timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; the claim-coordination file locks use this default only and ignore the environment variable.",
         ),
         (
             "Lock poll interval",
