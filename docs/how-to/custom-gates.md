@@ -177,10 +177,10 @@ jit gate define ai-review \
   --description "AI-powered code review" \
   --mode auto \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="codex review -"
+  --env REVIEWER_AGENT="your-reviewer-command"
 ```
 
-These are passed to the checker process alongside the built-in variables. Use `--env` multiple times to set several variables.
+These are passed to the checker process alongside the built-in variables. Use `--env` multiple times to set several variables. Review wrappers only prompt the configured command; choose a tool that reads the prompt from standard input, writes its review to standard output, and supports an inspection-only mode.
 
 ```bash
 #!/bin/bash
@@ -435,14 +435,15 @@ jit gate define review \
 
 ### Run History
 
-Each subsequent run includes previous results in `run_history`, sorted chronologically. This enables iterative workflows — a review gate can see its prior feedback:
+Each subsequent run includes at most the latest result for the same issue and gate in `run_history`. This compact history enables iterative workflows without recursively injecting several full review narratives:
 
 ```bash
 # First run: run_history is empty
 jit gate evaluate $ISSUE review
 
-# Second run: run_history holds the first run's stdout and exit code. stderr is
-# stripped from the history entries, so keep review signal on stdout.
+# Second run: run_history holds the first run's metadata and exit code. When
+# structured findings exist, they are retained while stdout and stderr are
+# omitted. Legacy unstructured runs retain stdout; stderr is always omitted.
 jit gate evaluate $ISSUE review
 ```
 
@@ -462,9 +463,11 @@ jit gate define ai-review \
   --pass-context \
   --prompt-file "contrib/gates/prompts/code-review.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="codex review -" \
+  --env REVIEWER_AGENT="your-reviewer-command" \
   --timeout 120
 ```
+
+`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and parses the common verdict contract.
 
 ### Prompt Library
 
@@ -485,7 +488,7 @@ jit gate define security-audit \
   --mode auto --pass-context \
   --prompt-file "contrib/gates/prompts/security-audit.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="codex review -"
+  --env REVIEWER_AGENT="your-reviewer-command"
 ```
 
 The prompts reference the context JSON structure (issue, gate, documents, dependencies, run_history) and end with the verdict format. Customize them or use them as starting points for your own.

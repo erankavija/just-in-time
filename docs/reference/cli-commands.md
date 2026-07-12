@@ -1011,7 +1011,7 @@ jit gate define review \
   --pass-context \
   --prompt-file "docs/review-prompt.md" \
   --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="codex review -"
+  --env REVIEWER_AGENT="your-reviewer-command"
 ```
 
 ### `jit gate update`
