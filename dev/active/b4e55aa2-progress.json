@@ -1,7 +1,7 @@
 {
   "epic_id": "b4e55aa2-3681-40ea-baf2-27acac862c17",
   "epic_short_id": "b4e55aa2",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -11,14 +11,14 @@
           "short_id": "99604a20",
           "title": "Add structured policy references to gate findings",
           "classification": "implementation",
-          "status": "implemented; local gates passed; external reviews pending"
+          "status": "done"
         },
         {
           "id": "440d190f-266d-450f-b2b3-69dc024328a1",
           "short_id": "440d190f",
           "title": "Establish canonical review policy in repository sources",
           "classification": "implementation",
-          "status": "implemented; local gates passed; external reviews pending"
+          "status": "done"
         }
       ]
     },
@@ -51,8 +51,8 @@
   "escalations": [
     {
       "category": "blocker outside story scope",
-      "status": "awaiting invoker authorization",
-      "detail": "The configured code-review and doc-review gates send issue-scoped repository context to an external Codex reviewer. The approval layer requires explicit authorization after disclosure of that risk."
+      "status": "resolved",
+      "detail": "The invoker confirmed the configured Codex reviewer is trusted and granted standing authorization for jit gate evaluate."
     }
   ],
   "rework_counts": {
