@@ -44,7 +44,8 @@
   "escalations": [
     {"issue": "afbbf6c3", "category": "architectural-decision", "resolved": true, "resolution": "human selected implement-strictness with enforcement-modulator semantics (see decisions)"}
   ],
-  "rework_counts": {"623f3163": 1, "afbbf6c3": 1, "ed049e1d": 1, "3ac07340": 1},
+  "rework_counts": {"623f3163": 1, "afbbf6c3": 1, "ed049e1d": 2, "3ac07340": 1},
+  "ed049e1d_decision": "Owner chose: single-source the LOCK_TIMEOUT_SECS constant across all claim.rs FileLocker sites (no behavior change; env-override reach unchanged). Round-2 reviewer correctly found claim.rs keeps 10 hardcoded 5s timeouts + heartbeat row conflated storage-helper staleness (2x=60s) with claim-lease TTL. rework-2 is FINAL attempt (MAX=2); next failure escalates.",
   "wave2_integration_note": "Both ed049e1d and 3ac07340 reworks edit docs/index.md nav (adding runtime-defaults.md and exit-codes.md respectively) — trivial nav-line collision to resolve manually at integration (keep both entries).",
   "concurrent_session_note": "A separate lead is running epic:core-maintenance and committing to main (commits e9c91e02, fc971f18 for issue 71be6ae9). Its transiently-orphaned issue caused a spurious code-review F4 on ed049e1d; now wired (6eb585bc->71be6ae9), jit-validate.sh passes. Watch for main moving under our cherry-picks.",
   "wave2_status": {"ed049e1d": "rework-1 in flight (single-source gaps: heartbeat.rs, claim.md, multi-agent-coordination.md, index.md; daemon fact fix; Examples). cargo-ci+docs-mechanical passed.", "3ac07340": "in progress"},
