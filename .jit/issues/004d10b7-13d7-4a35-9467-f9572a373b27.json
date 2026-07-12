@@ -23,11 +23,6 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:57:40.557666027Z"
-    },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -37,17 +32,30 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-12T12:57:43.830278487Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-12T12:57:40.557666027Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/archive/sessions/004d10b7-completion-report.md",
+      "commit": null,
+      "label": "Completion Report",
+      "doc_type": null,
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:documentation-contract-followups",
     "milestone:v1.0",
     "type:epic"
   ],
   "created_at": "2026-07-11T13:38:53.076392475Z",
-  "updated_at": "2026-07-12T13:00:56.749317583Z",
+  "updated_at": "2026-07-12T13:01:09.390010435Z",
   "first_ready_at": "2026-07-11T13:38:53.076398555Z",
   "claimed_at": "2026-07-11T21:17:08.385831388Z",
   "done_at": "2026-07-12T13:00:56.749316963Z"

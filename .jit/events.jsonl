@@ -6716,3 +6716,6 @@
 {"type":"gate_passed","id":"1de3e6cf-d3a0-4fa0-968d-75f0a94d80d8","issue_id":"004d10b7-13d7-4a35-9467-f9572a373b27","timestamp":"2026-07-12T13:00:09.695282756Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"6b0e8442-299f-4a39-b2b9-f84c3e36b4f6","issue_id":"004d10b7-13d7-4a35-9467-f9572a373b27","timestamp":"2026-07-12T13:00:56.749563143Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"04bdd91f-b5e6-47d0-9926-c0505099332e","issue_id":"004d10b7-13d7-4a35-9467-f9572a373b27","timestamp":"2026-07-12T13:00:56.749599303Z"}
+{"type":"document_archived","id":"d19ab36a-319c-4f12-808b-2a109706ba10","timestamp":"2026-07-12T13:01:06.046939414Z","source":"dev/active/004d10b7-completion-report.md","destination":"dev/archive/sessions/004d10b7-completion-report.md","category":"session","issues_updated":0}
+{"type":"document_archived","id":"499238d6-7aed-413d-80a0-c46661df7d22","timestamp":"2026-07-12T13:01:06.079546798Z","source":"dev/active/004d10b7-progress.json","destination":"dev/archive/sessions/004d10b7-progress.json","category":"session","issues_updated":0}
+{"type":"issue_updated","id":"0a8d0c1b-2452-4d32-beeb-9b0730458f46","issue_id":"004d10b7-13d7-4a35-9467-f9572a373b27","timestamp":"2026-07-12T13:01:09.390255675Z","updated_by":"doc-add","fields":["documents"]}
