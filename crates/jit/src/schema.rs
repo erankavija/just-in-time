@@ -945,8 +945,12 @@ pub fn render_exit_code_reference() -> String {
     out.push_str(
         "`jit` returns a small, stable set of process exit codes so scripts and \
          agents can branch on outcomes without parsing output. This page is \
-         projected from the exit-code taxonomy and the command classifier \
-         (`error_to_exit_code` in `crates/jit/src/main.rs`).\n\n",
+         projected from the exit-code taxonomy and the command mappings in \
+         `jit --schema`. Each mapping is bound by a test to the runtime that \
+         produces it: the shared classifier (`error_to_exit_code` in \
+         `crates/jit/src/main.rs`) for codes raised as typed errors, and the \
+         command's own `std::process::exit` site for codes a completed run emits \
+         directly (the findings signals and the `serve --fg` pass-through).\n\n",
     );
 
     out.push_str("## Global taxonomy\n\n");
