@@ -59,8 +59,8 @@ pub const LOCK_TIMEOUT_SECS: u64 = 5;
 /// ```
 pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 
-/// Age, in seconds, at which orphaned `*.tmp` files are swept during startup
-/// recovery (1 hour).
+/// Age, in seconds, at which `jit recover` sweeps orphaned `*.tmp` files
+/// (1 hour).
 ///
 /// # Examples
 ///
@@ -128,7 +128,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Default timeout to acquire a file lock before failing. The `.jit` repository storage locks (held by `JsonFileStorage` for all `.jit` data writes) resolve their timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; the claim-coordination file locks use this default only and ignore the environment variable.",
+            "Default timeout to acquire a file lock before failing. The `JsonFileStorage` write lock resolves its timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default; other file locks, including the claim-coordination locks, use this default and ignore the environment variable.",
         ),
         (
             "Lock poll interval",
@@ -138,7 +138,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Temp-file cleanup threshold",
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
-            "Age at which orphaned `*.tmp` files are swept during startup recovery.",
+            "Age at which `jit recover` sweeps orphaned `*.tmp` files.",
         ),
         (
             "Claim lease TTL",
