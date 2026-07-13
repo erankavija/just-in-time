@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "205afb82-a9e5-4d7d-84cf-a825c9eb9fbf",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "beb7956e8acb5ab4d2cc34cb8b6f7ae23844d125",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T11:26:06.707418020Z",
+  "completed_at": "2026-07-13T11:29:25.128879107Z",
+  "duration_ms": 198421,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The planning issue requires `dev/active/7d3a3a47-plan.md`, and that non-empty document is linked as a design document in `.jit/issues/1dbc72f6-c6e0-4159-9843-de9bfb68c2e2.json:35`. The investigation and owner-approved brief are also linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nThe plan substantively addresses all six hard requirements in §1 and maps them to implementation tasks in §3:\n\n- REQ-01: hierarchy-based inventory, opaque roots, and recursive dependency discovery.\n- REQ-02: repository-wide ownership and the D-16 action calculus.\n- REQ-03: coordinated staging, relinking, publication, and verified deletion.\n- REQ-04: topology-preserving mirror layout and destination-edge validation.\n- REQ-05: read-only container candidate reporting without time semantics.\n- REQ-06: shared JSON schema and the required fixture formats.\n\nNo obvious criterion or owner-approved scope is otherwise omitted. The event contract, however, contradicts the linked planning brief as detailed in F1.\n\n## Technical soundness and architectural fit\n\nThe principal architecture is sound: pure graph/classification logic remains in the domain/document layers, persistence primitives belong to storage, orchestration belongs to commands, and CLI/output remain presentation concerns (`dev/active/7d3a3a47-plan.md:41-52`, `:307-313`). The resolved-hierarchy membership choice and repository-relative mirror layout fit the existing hierarchy and path-resolution primitives.\n\nThe event recovery design is not sound against the current append implementation. `JsonFileStorage::append_event` opens `.jit/events.jsonl` in append mode and uses `writeln!` (`crates/jit/src/storage/json.rs:737-750`), while `read_events` parses every non-empty line as complete JSON (`:754-777`). F2 explains why skipping a malformed trailing line cannot repair this protocol.\n\n## Decomposition and dependencies\n\nThe nine-leaf breakdown is coherent and correctly ordered:\n\n- Schema precedes inventory, discovery, and classification.\n- The storage mutation primitive can proceed independently.\n- Preview depends on the classifier.\n- Execution joins preview with the storage primitive.\n- Candidate reporting consumes the classifier and command surface.\n- Legacy removal waits for execution and candidates.\n\nThe tasks are generally independently testable with clear local acceptance criteria. However, `Coordinated plan execution` embeds both blocking event defects in LOCAL-31 (`dev/active/7d3a3a47-plan.md:486-502`), so fan-out would implement an unsound contract unless the plan is corrected first.\n\n## Risks and actionability\n\nThe plan identifies and mitigates the major path, ownership, concurrency, topology, and deletion risks. Its event-risk mitigation is internally inconsistent: §4 claims the event log provides an audit trail “for every published state” (`dev/active/7d3a3a47-plan.md:583`), while §2 explicitly leaves publication-only executions unrecorded (`:227-233`). The torn-tail mitigation also lacks the required writer-side repair step.\n\n## Prior review feedback\n\nNeither prior blocking finding is resolved:\n\n- Prior F1 was answered by redefining “mutating execution” as “issue-mutating execution,” contrary to the owner-approved brief.\n- Prior F2 added tolerant reading but did not make subsequent appends safe after an unterminated partial record.\n\n## Findings\n\n1. **F1 — Blocking: publication-only executions remain deliberately unrecorded.** The owner-approved proportionality amendment requires “a single archive event per mutating execution” (`dev/active/7d3a3a47-planning-brief.md:231-240`). The revised plan instead narrows this to issue mutations and says a pure-copy execution appends no event (`dev/active/7d3a3a47-plan.md:227-233`, `:486-492`). That is an unauthorized narrowing, not a resolution of the prior finding. It also contradicts the current repository-scoped `DocumentArchived` behavior, which appends after archival even when zero issue references were updated (`crates/jit/src/commands/document.rs:1194-1213`). Such publications cannot trigger the proposed destination-reference reconciliation, so they can remain permanently absent from the audit log.\n\n2. **F2 — Blocking: skipping one malformed trailing event does not make retry/reconciliation safe.** The plan prescribes detecting and skipping a torn final record (`dev/active/7d3a3a47-plan.md:247-251`) but does not repair or delimit the log before the next append. The current append-mode `writeln!` can fail after writing partial JSON—or complete JSON without its newline (`crates/jit/src/storage/json.rs:737-750`). A retry then appends directly to those bytes, fusing the successful retry or reconciling event into the same malformed line; skipping that line discards both records. The plan needs a writer-side, lock-held tail-repair/delimiter protocol with failure-injection coverage, not reader tolerance alone.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Both prior blocking event-recovery defects remain unresolved: publication-only mutations are unrecorded and torn-tail reading does not make subsequent appends safe.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Publication-only archive executions remain unrecorded despite the owner-approved requirement for one event per mutating execution.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":227,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Skipping a malformed trailing event does not repair an unterminated append, so a successful retry can be fused into and discarded with the torn record.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":247,\"references\":[\"@/inv/event-log\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3673 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b3a-2c06-7db0-a034-c643a5e4f5dd\n--------\nuser\n--- 3660 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Both prior blocking event-recovery defects remain unresolved: publication-only mutations are unrecorded and torn-tail reading does not make subsequent appends safe.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Publication-only archive executions remain unrecorded despite the owner-approved requirement for one event per mutating execution.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 227,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Skipping a malformed trailing event does not repair an unterminated append, so a successful retry can be fused into and discarded with the torn record.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 247,
+        "references": [
+          "@/inv/event-log"
+        ]
+      }
+    ]
+  }
+}
