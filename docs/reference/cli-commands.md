@@ -146,6 +146,44 @@ namespaces`, `jit label values`) — it never touches an issue's labels. See
 Under `--json`, the same hint is in `error.message` with code
 `INVALID_ARGUMENT`, exit code 2 — identical to any other usage error.
 
+## Archive previews
+
+The `archive` command group builds dependency-aware plans without changing the
+working tree, issue records, or event log:
+
+```bash
+jit archive document dev/active/design.md
+jit archive document dev/active/design.md --json
+jit archive container 2f84c930
+jit archive container 2f84c930 --json
+```
+
+Both target forms use the same planner and are preview-only. A document target
+includes its recursively supported local bundle. A container target includes
+documents attached to the container and its resolved-hierarchy descendants;
+ordinary sequencing dependencies do not define membership.
+
+Human output reports the same target, policy status, eligibility, action counts,
+artifacts, owners, embedded edges, reference changes, pending deletions,
+evidence, warnings, and blockers as JSON. User-facing issue identifiers are
+short IDs. JSON retains full durable IDs in owner and target records.
+
+`--json` prints the schema-version-1 artifact-plan object directly. Its top-level
+fields are `schema_version`, `target`, `destination_root`, `eligible`,
+`policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
+`warnings`; it does not add a `message` field. Artifact order is deterministic
+by normalized source path and version.
+
+A blocked preview is still a successful read-only command and exits zero. Check
+`eligible`, then inspect target-level and per-artifact `blockers`. In particular,
+an absent `[documentation]` table reports `policy_status = "unconfigured"`; a
+partial table reports `"incomplete"`. Neither state silently receives defaults
+that would make the plan eligible, and the human view explicitly says archival
+execution is disabled.
+
+The older `jit doc archive` command remains a separate document-lifecycle
+surface. It is not an alias for these dependency-aware previews.
+
 Gate-blocked example:
 
 ```json

@@ -28,6 +28,7 @@
 //! - `item`: Addressable-item queries (`jit item list/show/search`) over the pure
 //!   item model
 
+mod archive;
 pub mod batch_create;
 mod breakdown;
 pub mod bulk_update;

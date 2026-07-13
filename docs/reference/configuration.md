@@ -53,6 +53,32 @@ study = "studies"
 
 Controls document lifecycle management. Documents in `managed_paths` can be archived; documents in `permanent_paths` never archive.
 
+Dependency-aware `jit archive document` and `jit archive container` previews
+classify this table by authored completeness. Mutation-authorizing policy is
+`configured` only when all three of these keys are explicitly present:
+
+| Required key | Archive-planner meaning |
+|--------------|-------------------------|
+| `managed_paths` | Repository-relative component roots whose selected artifacts may relocate |
+| `permanent_paths` | Repository-relative component roots whose source artifacts must remain |
+| `archive_root` | Repository-relative mirror root for proposed destinations |
+
+If the table is absent, previews report `unconfigured`. If it exists but any of
+the three keys is absent, previews report `incomplete`. Both statuses make a
+plan ineligible and explain that archival execution is disabled. Explicit empty
+arrays still count as authored fields; their policy meaning is deliberately
+different from an omitted key.
+
+The `DocumentationConfig` accessors retain fallback values for older display and
+document-lifecycle callers, but archive planning never uses those fallbacks to
+claim eligibility. This prevents a partial policy from silently authorizing a
+future mutation.
+
+The values above are an adopter-facing example, not universal engine constants.
+Repositories choose their own component-aware paths. For example, this
+repository's `.jit/config.toml` is dogfood configuration and must not be read as
+the shipped path vocabulary.
+
 ### `[type_hierarchy]`
 
 ```toml

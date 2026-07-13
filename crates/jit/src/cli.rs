@@ -164,6 +164,10 @@ pub enum Commands {
     #[command(subcommand, visible_alias = "document")]
     Doc(DocCommands),
 
+    /// Preview dependency-aware artifact archival plans
+    #[command(subcommand)]
+    Archive(ArchiveCommands),
+
     /// Graph query commands
     #[command(subcommand)]
     Graph(GraphCommands),
@@ -1967,6 +1971,30 @@ pub enum DocCommands {
         force: bool,
 
         /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+/// Non-mutating dependency-aware archive planning commands.
+#[derive(Subcommand)]
+pub enum ArchiveCommands {
+    /// Preview archival of one repository-relative document and its supported bundle
+    Document {
+        /// Repository-relative document or opaque artifact path
+        path: String,
+
+        /// Output the binding schema-version-1 plan as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Preview archival of all issue-linked artifacts in a container subtree
+    Container {
+        /// Container issue ID or unique prefix
+        id: String,
+
+        /// Output the binding schema-version-1 plan as JSON
         #[arg(long)]
         json: bool,
     },

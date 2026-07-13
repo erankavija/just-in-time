@@ -163,7 +163,7 @@ pub fn classify_artifacts(
     policy: ArtifactClassificationPolicy,
     facts: ArtifactClassificationFacts,
 ) -> Result<ArtifactPlan, PlanError> {
-    let destination_root = destination_root(&inventory.target, &policy.archive_root);
+    let destination_root = artifact_destination_root(&inventory.target, &policy.archive_root);
     let mut plan_blockers = inventory.blockers;
     append_container_destination_blocker(
         &inventory.target,
@@ -335,7 +335,7 @@ fn classify_entry(
         (false, _) => ArtifactAction::Retain,
     };
 
-    let mirror = mirror_destination(destination_root, &source);
+    let mirror = artifact_mirror_destination(destination_root, &source);
     let mut blockers = entry
         .blockers()
         .iter()
@@ -674,7 +674,8 @@ fn append_container_destination_blocker(
     }
 }
 
-fn destination_root(target: &PlanTarget, archive_root: &str) -> String {
+/// Compute the stable target destination root used by planning and storage inspection.
+pub fn artifact_destination_root(target: &PlanTarget, archive_root: &str) -> String {
     match target {
         PlanTarget::Container { id } => join_path(archive_root, &container_short_id(id)),
         PlanTarget::Document { .. } => normalize_artifact_path(archive_root),
@@ -692,7 +693,8 @@ fn container_short_id(id: &str) -> String {
     id.chars().take(SHORT_ID_LENGTH).collect()
 }
 
-fn mirror_destination(destination_root: &str, source: &str) -> String {
+/// Mirror one repository-relative source beneath a target destination root.
+pub fn artifact_mirror_destination(destination_root: &str, source: &str) -> String {
     join_path(destination_root, source)
 }
 

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 pub mod artifact_discovery;
 pub mod artifact_mutation;
+pub mod artifact_planning;
 pub mod atomic_write;
 pub mod claim_coordinator;
 pub mod clock;
@@ -43,6 +44,7 @@ pub use artifact_discovery::{
     DiscoveredArtifactInventory,
 };
 pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
+pub use artifact_planning::collect_artifact_classification_facts;
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{

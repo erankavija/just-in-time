@@ -19,8 +19,8 @@ mod output_macros;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
-    ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands, GateCommands,
-    GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
+    ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
+    GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
     ReferenceCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
@@ -4893,6 +4893,21 @@ fn run() -> Result<()> {
                 }
             }
         },
+        Commands::Archive(archive_cmd) => {
+            let (plan, json) = match archive_cmd {
+                ArchiveCommands::Document { path, json } => {
+                    (executor.preview_archive_document(&path)?, json)
+                }
+                ArchiveCommands::Container { id, json } => {
+                    (executor.preview_archive_container(&id)?, json)
+                }
+            };
+            if json {
+                println!("{}", serde_json::to_string_pretty(&plan)?);
+            } else {
+                print!("{}", jit::output::render_archive_plan(&plan));
+            }
+        }
         Commands::Query {
             subcommand,
             state: bare_state,

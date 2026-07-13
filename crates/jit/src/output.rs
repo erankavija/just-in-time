@@ -19,6 +19,268 @@ use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
 };
 
+/// Render the complete schema-v1 archive plan without introducing a second
+/// decision model. Every action, fact, edge, relink, deletion, warning, and
+/// blocker comes directly from the serialized plan object.
+pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) -> String {
+    use crate::domain::artifact_plan::PlanTarget;
+    use std::fmt::Write;
+
+    let mut rendered = String::new();
+    let target = match plan.target() {
+        PlanTarget::Container { id } => format!("container {}", short_id(id)),
+        PlanTarget::Document { path } => format!("document {path}"),
+    };
+    let counts = plan.action_counts();
+    let _ = writeln!(rendered, "Archive preview: {target}");
+    let _ = writeln!(rendered, "  Schema version: {}", plan.schema_version());
+    let _ = writeln!(rendered, "  Policy: {}", wire_name(&plan.policy_status()));
+    let _ = writeln!(rendered, "  Eligible for execution: {}", plan.eligible());
+    let _ = writeln!(
+        rendered,
+        "  Destination root: {}",
+        display_optional(plan.destination_root())
+    );
+    let _ = writeln!(
+        rendered,
+        "  Actions: move={} copy={} retain={} block={} already-archived={} pending-deletions={}",
+        counts.r#move,
+        counts.copy,
+        counts.retain,
+        counts.block,
+        counts.already_archived,
+        counts.pending_deletions
+    );
+    render_diagnostics(&mut rendered, "Blockers", plan.blockers());
+    render_diagnostics(&mut rendered, "Warnings", plan.warnings());
+
+    let _ = writeln!(rendered, "Artifacts ({}):", plan.count());
+    for artifact in plan.artifacts() {
+        let _ = writeln!(
+            rendered,
+            "  - [{}] {} @ {}",
+            wire_name(&artifact.action()),
+            artifact.source(),
+            artifact.version().as_str()
+        );
+        let _ = writeln!(
+            rendered,
+            "    destination: {}",
+            artifact.destination().unwrap_or("-")
+        );
+        let _ = writeln!(
+            rendered,
+            "    format: {}",
+            artifact.format().unwrap_or("opaque")
+        );
+        let _ = writeln!(
+            rendered,
+            "    already archived: {}",
+            artifact.already_archived()
+        );
+        if let Some(identity) = artifact.content_identity() {
+            let _ = writeln!(
+                rendered,
+                "    content identity: sha256={} bytes={}",
+                identity.sha256(),
+                identity.byte_size()
+            );
+        }
+        let _ = writeln!(
+            rendered,
+            "    provenance: {}",
+            joined_wire_names(artifact.provenance())
+        );
+        let _ = writeln!(
+            rendered,
+            "    evidence: {}",
+            joined_wire_names(artifact.evidence())
+        );
+        if !artifact.owners().is_empty() {
+            let _ = writeln!(rendered, "    owners:");
+            for owner in artifact.owners() {
+                let _ = writeln!(
+                    rendered,
+                    "      - issue={} document-index={} state={} inside-subtree={} pinned={} selected-for-relink={}",
+                    short_id(&owner.issue),
+                    owner.document_index,
+                    wire_name(&owner.state),
+                    owner.inside_subtree,
+                    owner.pinned,
+                    owner.selected_for_relink
+                );
+            }
+        }
+        if !artifact.edges().is_empty() {
+            let _ = writeln!(rendered, "    edges:");
+            for edge in artifact.edges() {
+                let _ = writeln!(
+                    rendered,
+                    "      - {} {} reference={} target={}",
+                    wire_name(&edge.kind),
+                    wire_name(&edge.resolution_mode),
+                    edge.reference,
+                    edge.target.as_deref().unwrap_or("-")
+                );
+            }
+        }
+        if !artifact.reference_changes().is_empty() {
+            let _ = writeln!(rendered, "    reference changes:");
+            for change in artifact.reference_changes() {
+                let _ = writeln!(
+                    rendered,
+                    "      - issue={} document-index={} {} -> {}",
+                    short_id(&change.issue),
+                    change.document_index,
+                    change.from_path,
+                    change.to_path
+                );
+            }
+        }
+        if !artifact.pending_deletions().is_empty() {
+            let _ = writeln!(rendered, "    pending deletions:");
+            for deletion in artifact.pending_deletions() {
+                let _ = writeln!(
+                    rendered,
+                    "      - {} sha256={} bytes={}",
+                    deletion.source,
+                    deletion.content_identity.sha256(),
+                    deletion.content_identity.byte_size()
+                );
+            }
+        }
+        render_diagnostics(&mut rendered, "    blockers", artifact.blockers());
+        render_diagnostics(&mut rendered, "    warnings", artifact.warnings());
+    }
+    if !plan.eligible() {
+        let _ = writeln!(
+            rendered,
+            "Archival execution is disabled until every blocker is resolved."
+        );
+    }
+    rendered
+}
+
+fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagnostics: &[T]) {
+    use std::fmt::Write;
+    if diagnostics.is_empty() {
+        return;
+    }
+    let _ = writeln!(rendered, "{heading}:");
+    for diagnostic in diagnostics {
+        let value = serde_json::to_value(diagnostic).unwrap_or(Value::Null);
+        let code = value
+            .get("code")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let path = value
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("target");
+        let _ = writeln!(rendered, "  - {code}: {path}");
+    }
+}
+
+fn joined_wire_names<T: Serialize>(values: &[T]) -> String {
+    if values.is_empty() {
+        "-".to_string()
+    } else {
+        values.iter().map(wire_name).collect::<Vec<_>>().join(", ")
+    }
+}
+
+fn wire_name<T: Serialize>(value: &T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn display_optional(value: &str) -> &str {
+    if value.is_empty() {
+        "(not configured)"
+    } else {
+        value
+    }
+}
+
+#[cfg(test)]
+mod archive_render_tests {
+    use super::*;
+    use crate::domain::artifact_plan::{
+        ArtifactAction, ArtifactEdge, ArtifactOwner, ArtifactPlan, ArtifactPlanEntry,
+        ArtifactProvenance, ArtifactVersion, BlockerCode, EdgeKind, EdgeResolutionMode,
+        EvidenceCode, PlanBlocker, PlanTarget, PlanWarning, PolicyStatus, WarningCode,
+    };
+    use crate::domain::State;
+
+    #[test]
+    fn test_human_archive_preview_projects_every_plan_decision_and_diagnostic() {
+        let artifact = ArtifactPlanEntry::new(
+            "dev/active/page.md",
+            ArtifactVersion::WorkingTree,
+            ArtifactAction::Block,
+        )
+        .with_provenance(vec![ArtifactProvenance::Explicit])
+        .with_format("markdown")
+        .with_owners(vec![ArtifactOwner {
+            issue: "12345678-1234-1234-1234-123456789abc".into(),
+            document_index: 2,
+            state: State::Done,
+            inside_subtree: true,
+            pinned: false,
+            selected_for_relink: false,
+        }])
+        .with_edges(vec![ArtifactEdge {
+            reference: "missing.png".into(),
+            target: Some("dev/active/missing.png".into()),
+            kind: EdgeKind::Supported,
+            resolution_mode: EdgeResolutionMode::Relative,
+        }])
+        .with_evidence(vec![EvidenceCode::PermanentPath])
+        .with_blockers(vec![PlanBlocker::new(
+            BlockerCode::DestinationConflict,
+            Some("dev/archive/page.md"),
+        )])
+        .with_warnings(vec![PlanWarning::new(
+            WarningCode::MissingEdgeTarget,
+            Some("dev/active/missing.png"),
+        )]);
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document {
+                path: "dev/active/page.md".into(),
+            },
+            "dev/archive",
+            PolicyStatus::Configured,
+            vec![artifact],
+            vec![],
+            vec![],
+        )
+        .unwrap();
+
+        let human = render_archive_plan(&plan);
+        for expected in [
+            "Schema version: 1",
+            "Policy: configured",
+            "Eligible for execution: false",
+            "[block] dev/active/page.md @ working-tree",
+            "format: markdown",
+            "provenance: explicit",
+            "evidence: permanent-path",
+            "issue=12345678 document-index=2 state=done",
+            "supported relative reference=missing.png target=dev/active/missing.png",
+            "destination-conflict: dev/archive/page.md",
+            "missing-edge-target: dev/active/missing.png",
+            "Archival execution is disabled",
+        ] {
+            assert!(
+                human.contains(expected),
+                "human preview omitted {expected:?}\n{human}"
+            );
+        }
+    }
+}
+
 // ============================================================================
 // Output Context for Quiet Mode
 // ============================================================================
