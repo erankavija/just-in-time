@@ -7102,3 +7102,5 @@
 {"type":"issue_state_changed","id":"dfe89623-cac6-4368-a178-3ff9125a4d6b","issue_id":"a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b","timestamp":"2026-07-13T21:59:43.492212938Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"4f334c8c-e97c-413d-b660-70a0302fa9f3","issue_id":"a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b","timestamp":"2026-07-13T21:59:43.492245808Z"}
 {"type":"issue_state_changed","id":"a0c3a518-1c7b-4826-9624-693ef54244f8","issue_id":"271dc224-a0cf-4f49-bfdb-a8be33f9e7d5","timestamp":"2026-07-13T21:59:43.552793892Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"02e1a2df-4a29-4a20-9e6a-f1fc965ee520","issue_id":"271dc224-a0cf-4f49-bfdb-a8be33f9e7d5","timestamp":"2026-07-13T22:00:15.732074082Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"b67f9351-9168-40ca-8b00-c62952029e21","issue_id":"271dc224-a0cf-4f49-bfdb-a8be33f9e7d5","timestamp":"2026-07-13T22:00:15.733610383Z","assignee":"agent:legacy-removal"}

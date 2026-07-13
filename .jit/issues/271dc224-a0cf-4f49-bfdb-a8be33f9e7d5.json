@@ -2,9 +2,9 @@
   "id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5",
   "title": "Remove the legacy document-archive command",
   "description": "Remove `jit doc archive` as a clean cut with no alias or compatibility stub. Remove its CLI and main dispatch, `archive_document`, `ArchiveResult`, obsolete event catalog/schema references, tests and fixtures, and all adopter-facing docs/README references. Regenerate and test the MCP tool set so the removed subcommand disappears. Retire the legacy `[documentation.categories]` loader field, documentation, and this repository's config entries in the same change; archival has no category input and uses only the repository-relative mirror layout. Historical development records may remain clearly historical. `crates/server` and `web` require verification but have no expected live command consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: A tree-wide search for `doc archive`, `archive_document`, and `ArchiveResult` across `crates/`, `mcp-server/`, `web/`, `docs/`, and `dev/` finds no live production or test reference; only clearly historical `dev/` records may mention the removed surface, the generated MCP schema/tests expose no legacy tool, `[documentation.categories]` has no live loader/config/docs reference, and all affected Rust and MCP tests pass.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:legacy-removal",
   "dependencies": [
     "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b",
     "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b"
@@ -17,15 +17,15 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-13T15:57:36.763797720Z"
-    },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-13T15:58:38.960619378Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-13T15:57:36.763797720Z"
     }
   },
   "context": {},
@@ -35,6 +35,7 @@
     "epic:artifact-archival"
   ],
   "created_at": "2026-07-13T00:59:48.566160952Z",
-  "updated_at": "2026-07-13T21:59:43.552477402Z",
-  "first_ready_at": "2026-07-13T00:59:48.566161202Z"
+  "updated_at": "2026-07-13T22:00:15.732133692Z",
+  "first_ready_at": "2026-07-13T00:59:48.566161202Z",
+  "claimed_at": "2026-07-13T22:00:15.732133542Z"
 }
