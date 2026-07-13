@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -42,7 +42,7 @@
     {
       "wave_number": 7,
       "issues": [
-        {"id": "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b", "short_id": "f205aa7e", "title": "Coordinated plan execution", "classification": "implementation", "status": "pending"}
+        {"id": "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b", "short_id": "f205aa7e", "title": "Coordinated plan execution", "classification": "implementation", "status": "completed"}
       ]
     },
     {
