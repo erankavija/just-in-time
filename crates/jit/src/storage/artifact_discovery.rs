@@ -5,6 +5,7 @@
 //! minimum I/O loop needed to feed that domain core and never reads pinned
 //! historical entries.
 
+use crate::domain::artifact_classifier::EmbeddedArtifactOwner;
 use crate::domain::artifact_discovery::{
     parse_artifact, resolve_reference, DiscoveryGraph, ReferenceResolution,
 };
@@ -13,6 +14,7 @@ use crate::domain::artifact_plan::{
     ArtifactAction, ArtifactPlanEntry, ArtifactProvenance, ArtifactVersion, BlockerCode,
     PlanBlocker, PlanError, PlanTarget, PlanWarning, WarningCode,
 };
+use crate::domain::Issue;
 use crate::storage::{IssueStore, PathReadError};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
@@ -213,6 +215,82 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
     })
 }
 
+/// Discover embedded ownership from every unpinned issue-linked document.
+///
+/// This repository-wide pass is intentionally distinct from selected-target
+/// inventory: direct references remain [`ArtifactOwner`](crate::domain::artifact_plan::ArtifactOwner)
+/// records and only successfully read supported descendants become
+/// [`EmbeddedArtifactOwner`] records. Consequently embedded ownership can
+/// constrain source retention but can never create an issue metadata relink.
+pub fn discover_repository_embedded_owners<S: IssueStore>(
+    storage: &S,
+    issues: &[Issue],
+    selected_member_ids: &BTreeSet<String>,
+) -> Result<Vec<EmbeddedArtifactOwner>, ArtifactDiscoveryError> {
+    let mut ordered_issues = issues.iter().collect::<Vec<_>>();
+    ordered_issues.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut owners = Vec::new();
+
+    for issue in ordered_issues {
+        for document in issue
+            .documents
+            .iter()
+            .filter(|document| document.commit.is_none())
+        {
+            let root = crate::domain::artifact_plan::normalize_artifact_path(&document.path);
+            let mut graph = DiscoveryGraph::new([root.clone()]);
+            while let Some(path) = graph.next_path() {
+                let bytes = match storage.read_path_bytes(&path, None) {
+                    Ok((bytes, _)) => bytes,
+                    Err(PathReadError::NotFound(_)) => continue,
+                    Err(PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_)) => {
+                        continue;
+                    }
+                    Err(source) => {
+                        return Err(ArtifactDiscoveryError::Read { path, source });
+                    }
+                };
+                if path != root {
+                    owners.push(EmbeddedArtifactOwner {
+                        artifact: path.clone(),
+                        root: root.clone(),
+                        issue: issue.id.clone(),
+                        state: issue.state,
+                        inside_subtree: selected_member_ids.contains(&issue.id),
+                    });
+                }
+                let parsed = parse_artifact(&path, &bytes);
+                parsed.references().iter().for_each(|reference| {
+                    if let ReferenceResolution::Local { target, .. } =
+                        resolve_reference(&path, reference)
+                    {
+                        graph.enqueue(target);
+                    }
+                });
+            }
+        }
+    }
+
+    owners.sort_by(|left, right| {
+        (
+            &left.artifact,
+            &left.root,
+            &left.issue,
+            left.state,
+            left.inside_subtree,
+        )
+            .cmp(&(
+                &right.artifact,
+                &right.root,
+                &right.issue,
+                right.state,
+                right.inside_subtree,
+            ))
+    });
+    owners.dedup();
+    Ok(owners)
+}
+
 fn append_blocker(entry: &mut ArtifactPlanEntry, blocker: PlanBlocker) -> Result<(), PlanError> {
     let mut updated = entry
         .clone()
@@ -233,4 +311,67 @@ fn append_warning(entry: &mut ArtifactPlanEntry, warning: PlanWarning) -> Result
 
 fn merge<T: Clone>(existing: &[T], additional: impl IntoIterator<Item = T>) -> Vec<T> {
     existing.iter().cloned().chain(additional).collect()
+}
+
+#[cfg(test)]
+mod repository_ownership_tests {
+    use super::*;
+    use crate::domain::{DocumentReference, State};
+    use crate::storage::JsonFileStorage;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_repository_ownership_scans_unpinned_closures_and_preserves_owner_scope() {
+        let repo = TempDir::new().unwrap();
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+        fs::create_dir_all(repo.path().join("docs/assets")).unwrap();
+        fs::write(
+            repo.path().join("docs/outside.md"),
+            "![shared](assets/shared.png) ![missing](assets/missing.png)",
+        )
+        .unwrap();
+        fs::write(repo.path().join("docs/assets/shared.png"), b"shared").unwrap();
+        fs::write(
+            repo.path().join("docs/inside.md"),
+            "![shared](assets/shared.png)",
+        )
+        .unwrap();
+
+        let mut outside = Issue::new("outside".into(), "outside".into());
+        outside.id = "outside-full-id".into();
+        outside.state = State::InProgress;
+        outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
+        let mut inside = Issue::new("inside".into(), "inside".into());
+        inside.id = "inside-full-id".into();
+        inside.state = State::Done;
+        inside.documents = vec![
+            DocumentReference::new("docs/inside.md".into()),
+            DocumentReference::at_commit("docs/pinned.md".into(), "HEAD".into()),
+        ];
+
+        let owners = discover_repository_embedded_owners(
+            &JsonFileStorage::new(repo.path().join(".jit")),
+            &[outside, inside],
+            &BTreeSet::from(["inside-full-id".to_string()]),
+        )
+        .unwrap();
+
+        assert_eq!(owners.len(), 2);
+        assert!(owners.iter().any(|owner| {
+            owner.artifact == "docs/assets/shared.png"
+                && owner.root == "docs/outside.md"
+                && owner.issue == "outside-full-id"
+                && !owner.inside_subtree
+                && owner.state == State::InProgress
+        }));
+        assert!(owners.iter().any(|owner| {
+            owner.artifact == "docs/assets/shared.png"
+                && owner.issue == "inside-full-id"
+                && owner.inside_subtree
+        }));
+        assert!(!owners
+            .iter()
+            .any(|owner| owner.artifact.ends_with("missing.png")));
+    }
 }

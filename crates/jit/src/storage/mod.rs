@@ -39,7 +39,8 @@ pub mod worktree_paths;
 
 // Re-export for convenience
 pub use artifact_discovery::{
-    discover_artifact_dependencies, ArtifactDiscoveryError, DiscoveredArtifactInventory,
+    discover_artifact_dependencies, discover_repository_embedded_owners, ArtifactDiscoveryError,
+    DiscoveredArtifactInventory,
 };
 pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
 pub use claim_coordinator::{ClaimCoordinator, Lease};

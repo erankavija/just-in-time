@@ -50,6 +50,48 @@ struct Index {
     deleted_ids: Vec<String>,
 }
 
+#[cfg(all(test, unix))]
+mod artifact_location_tests {
+    use super::*;
+    use crate::domain::artifact_classifier::ArtifactLocation;
+    use std::os::unix::fs::symlink;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_inspect_artifact_location_does_not_follow_leaf_or_traversal_symlinks() {
+        let repo = TempDir::new().unwrap();
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+        fs::create_dir_all(repo.path().join("real")).unwrap();
+        fs::write(repo.path().join("real/file.md"), b"content").unwrap();
+        symlink(
+            repo.path().join("real/file.md"),
+            repo.path().join("leaf.md"),
+        )
+        .unwrap();
+        symlink(repo.path().join("real"), repo.path().join("linked-dir")).unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+
+        assert_eq!(
+            storage.inspect_artifact_location("leaf.md").unwrap(),
+            ArtifactLocation::Symlink
+        );
+        assert_eq!(
+            storage
+                .inspect_artifact_location("linked-dir/file.md")
+                .unwrap(),
+            ArtifactLocation::Symlink
+        );
+        assert_eq!(
+            storage.inspect_artifact_location("missing.md").unwrap(),
+            ArtifactLocation::Missing
+        );
+        assert!(matches!(
+            storage.inspect_artifact_location("real/file.md").unwrap(),
+            ArtifactLocation::Regular(_)
+        ));
+    }
+}
+
 impl Default for Index {
     fn default() -> Self {
         Self {
@@ -149,6 +191,57 @@ impl JsonFileStorage {
         self.load_index()?;
 
         Ok(())
+    }
+
+    /// Inspect one working-tree artifact without following symbolic links.
+    ///
+    /// Every existing path component is checked with `symlink_metadata` before
+    /// bytes are read. This is stricter than general repository reads, which
+    /// permit in-repository symlinks, because archival planning must classify
+    /// roots, destinations, and traversals as `symlink-artifact` rather than
+    /// silently operating on their referents.
+    pub fn inspect_artifact_location(
+        &self,
+        path: &str,
+    ) -> Result<crate::domain::artifact_classifier::ArtifactLocation, crate::storage::PathReadError>
+    {
+        use crate::domain::artifact_classifier::ArtifactLocation;
+        use crate::domain::artifact_plan::ContentIdentity;
+        use crate::storage::PathReadError;
+
+        validate_repo_relative_input(path)?;
+        let repo_root = self.root.parent().ok_or_else(|| {
+            PathReadError::Other(
+                crate::errors::InvalidArgumentError::new("Invalid storage path").into(),
+            )
+        })?;
+        let mut candidate = repo_root.to_path_buf();
+        for component in Path::new(path).components() {
+            candidate.push(component.as_os_str());
+            match fs::symlink_metadata(&candidate) {
+                Ok(metadata) if metadata.file_type().is_symlink() => {
+                    return Ok(ArtifactLocation::Symlink);
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    return Ok(ArtifactLocation::Missing);
+                }
+                Err(error) => return Err(PathReadError::Other(error.into())),
+            }
+        }
+
+        let metadata = fs::symlink_metadata(&candidate)?;
+        if !metadata.is_file() {
+            return Err(PathReadError::Other(
+                crate::errors::InvalidArgumentError::new(format!(
+                    "Artifact path is not a regular file: {path}"
+                ))
+                .into(),
+            ));
+        }
+        fs::read(candidate)
+            .map(|bytes| ArtifactLocation::Regular(ContentIdentity::from_bytes(&bytes)))
+            .map_err(PathReadError::from)
     }
 
     fn issue_path(&self, id: &str) -> PathBuf {

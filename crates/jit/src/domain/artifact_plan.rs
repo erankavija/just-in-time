@@ -534,6 +534,12 @@ impl ArtifactPlanEntry {
         self
     }
 
+    /// Replace the provisional inventory action with the classifier's result.
+    pub fn with_action(mut self, action: ArtifactAction) -> Self {
+        self.action = action;
+        self
+    }
+
     /// Set and normalize the mirror destination.
     pub fn with_destination(mut self, destination: impl Into<String>) -> Self {
         let destination = destination.into();
