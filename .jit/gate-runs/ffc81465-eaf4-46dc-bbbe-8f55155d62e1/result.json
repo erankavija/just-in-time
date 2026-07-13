@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "run_id": "ffc81465-eaf4-46dc-bbbe-8f55155d62e1",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "14a1c44e1b845dde308c9b216b80946ea204b690",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T00:15:52.681106939Z",
+  "completed_at": "2026-07-13T00:18:51.600490125Z",
+  "duration_ms": 178919,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/7d3a3a47-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1), is non-empty, and is linked through `issue.documents` as the approved design document. The investigation and owner-approved planning brief are also linked and consistent with the plan’s intended scope.\n\n## Completeness against the criteria\n\nThe plan explicitly covers all six `[hard]` requirements in §1 and maps them to executable tasks in §3. It preserves the amended REQ-05 semantics—current terminal state without retention timestamps—and incorporates the owner amendment removing archival categories.\n\nNotable coverage includes:\n\n- Resolved-hierarchy subtree inventory and opaque roots for REQ-01.\n- Repository-wide ownership plus edge-aware move/copy/retain/block classification for REQ-02.\n- Coordinated execution, no-replace publication, durable recovery, and reference handling for REQ-03.\n- Recursive Markdown/HTML/CSS discovery and destination-edge validation for REQ-04.\n- Shared-planner candidate reporting for REQ-05.\n- One JSON schema and representative format fixtures for REQ-06.\n\nNo criterion is silently narrowed. However, the deletion-recovery defect below means the proposed mechanism does not actually satisfy REQ-03 as claimed.\n\n## Technical soundness and architectural fit\n\nThe broad architecture fits the repository:\n\n- Container membership correctly uses `resolve_hierarchy` and `HierarchyResolution::children` from `crates/jit/src/graph/hierarchy.rs`, avoiding raw dependency closure.\n- Pure inventory/discovery/classification is separated from command orchestration and storage-owned filesystem operations.\n- The proposed executor correctly builds on `IssueStore::acquire_repo_write_lock`, commit-aware reads, atomic issue persistence, and the current archive operation’s referential-consistency principles.\n- The plan correctly replaces the current direct source deletion in `crates/jit/src/commands/document.rs:1759` with an identity-checked removal protocol.\n\nTwo blocking protocol defects remain:\n\n1. D-17 moves a source into a freshly named quarantine directory before verifying or removing it, but the durable `ArchiveStarted` contract records only the original deletion path and content identity. A crash after the rename at lines 870–878 leaves the source absent and the possibly modified file at an unrecorded quarantine location. D-19 then permits recovery to treat an absent original path as a completed deletion at lines 927–940. The plan supplies no durable quarantine mapping or recovery scan capable of associating a mismatching quarantined file with its original path. That can strand a post-Started edit and incorrectly close the operation, contradicting REQ-03 and LOCAL-24.\n\n2. Document recovery identity is defined as the original target plus every artifact source/destination alias in the operation contract at lines 270–276 and 913–917. Embedded and shared dependencies are artifacts, not aliases of the document target. If document A’s bundle contains B, invoking archival for B can incorrectly adopt A’s open operation. Two document operations sharing B can also become spuriously ambiguous. Recovery identity must be limited to the target root’s canonical source and its own destination aliases.\n\n## Decomposition and dependencies\n\nThe task graph is generally coherent:\n\n- Schema → inventory → recursive discovery → classification.\n- Classification → preview.\n- Storage primitives plus preview → coordinated execution.\n- Classification → candidate reporting.\n- Legacy removal follows the working replacement.\n\nThe prior missing inventory foundation is now repaired by “Target root inventory and ownership.”\n\nThe quarantine recovery gap spans both “Storage-owned artifact mutation primitive” and “Coordinated plan execution,” but neither task owns durable quarantine-state recovery or a crash test between rename and verification. The document-alias defect is embedded directly in the coordinated execution task’s acceptance criteria, so breakdown would currently preserve the faulty behavior.\n\nThe planning issue itself has no dependencies, so there is no unmet prerequisite to evaluate.\n\n## Risks and actionability\n\nThe plan resolves most material risks, including pinned revisions, stale plans, outside ownership, destination races, policy defaults, and post-archive link verification.\n\nThe claim that every load-bearing question is resolved is nevertheless premature:\n\n- Crash recovery for an in-progress quarantine rename is unspecified and unsafe.\n- Recovery matching conflates document target identity with bundle-artifact identity.\n- Advisory: D-17 fixes quarantine under `.jit/tmp`; an artifact on a nested filesystem cannot be atomically renamed there. Unlike publication, which calls for same-filesystem staging, the plan defines no cross-device preflight, blocker, or same-filesystem quarantine placement.\n\n## Prior review feedback\n\nBoth prior findings were addressed:\n\n- Prior F1: the plan now records SHA-256 and byte size for every publication/deletion source in `ArchiveStarted` and forbids recapturing expected identity.\n- Prior F2: §3 now contains a dedicated “Target root inventory and ownership” task covering container and arbitrary document targets.\n\nThe current quarantine crash gap is distinct from the prior content-identity omission: identity is now durable, but the temporary location created during deletion is not.\n\n## Findings\n\n1. **F1 — Blocking, high:** The quarantine protocol is not recoverable across a crash after source-to-quarantine rename. The unpredictable quarantine location is absent from the durable intent, while reconciliation may close the deletion merely because the original path is absent. A modified source can therefore be stranded or later discarded without being restored or reported. See `dev/active/7d3a3a47-plan.md:867`.\n2. **F2 — Blocking, high:** Document recovery identity includes every source/destination in the bundle contract, conflating embedded/shared artifacts with aliases of the document target. This can adopt the wrong open operation or create false ambiguity between otherwise independent document archives. See `dev/active/7d3a3a47-plan.md:270`.\n3. **F3 — Advisory, medium:** Quarantine is fixed beneath `.jit/tmp`, but atomic rename cannot cross filesystem boundaries. The plan needs same-filesystem quarantine placement or an explicit preflight/blocker for repository paths on nested mounts. See `dev/active/7d3a3a47-plan.md:870`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Prior blockers are repaired, but crash-safe quarantine recovery and document target identity remain unsound.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The unpredictable quarantine location is not durably recorded, so a crash after rename can strand a modified source while recovery treats the original path as successfully removed.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":867,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Document recovery identity treats every bundle artifact source and destination as a target alias, allowing shared dependencies to adopt the wrong operation or create false recovery ambiguity.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":270},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Quarantining beneath .jit/tmp has no cross-filesystem strategy even though rename fails for repository artifacts located on nested mounts.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":870,\"references\":[\"@/inv/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3203 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f58d4-8e14-7351-a07b-788d2e950c4e\n--------\nuser\n--- 3190 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Prior blockers are repaired, but crash-safe quarantine recovery and document target identity remain unsound.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The unpredictable quarantine location is not durably recorded, so a crash after rename can strand a modified source while recovery treats the original path as successfully removed.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 867,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Document recovery identity treats every bundle artifact source and destination as a target alias, allowing shared dependencies to adopt the wrong operation or create false recovery ambiguity.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 270
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Quarantining beneath .jit/tmp has no cross-filesystem strategy even though rename fails for repository artifacts located on nested mounts.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 870,
+        "references": [
+          "@/inv/atomic-writes"
+        ]
+      }
+    ]
+  }
+}

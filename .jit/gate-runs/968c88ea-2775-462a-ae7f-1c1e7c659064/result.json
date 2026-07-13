@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "968c88ea-2775-462a-ae7f-1c1e7c659064",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "14a1c44e1b845dde308c9b216b80946ea204b690",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T00:05:13.794565156Z",
+  "completed_at": "2026-07-13T00:08:12.537707414Z",
+  "duration_ms": 178743,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nThe required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked through `issue.documents` as the approved design document. The linked investigation and owner-approved planning brief also exist and were reviewed in full.\n\nThe planning issue itself has no dependencies.\n\n## Completeness against the criteria\n\nREQ-01, REQ-02, REQ-04, REQ-05, and REQ-06 are addressed explicitly in §1 and assigned coherently in the §3 coverage map. The plan preserves the amended REQ-05 semantics and the owner’s removal of document categories.\n\nREQ-03 remains incomplete because the crash-recovery contract does not durably identify the content that a later attempt may delete. This is blocking finding F1 below.\n\n## Technical soundness and architectural fit\n\nThe principal architecture is sound:\n\n- Resolved-hierarchy children are an appropriate container-membership primitive; `resolve_hierarchy` computes canonical parent/children relationships from the repository-wide dependency graph (`crates/jit/src/graph/hierarchy.rs:424-466`, `:497-531`).\n- The proposed command/storage split respects repository boundaries.\n- Explicit policy completeness fits the existing optional configuration representation (`crates/jit/src/config.rs:380-390`).\n- Commit-aware storage reads support the revised pinned-reference model (`crates/jit/src/storage/mod.rs:473-537`).\n- Holding `RepoWriteGuard` correctly coordinates ordinary JIT writers (`crates/jit/src/storage/mod.rs:90-126`).\n\nHowever, that guard does not protect working-tree files from external edits. The event/schema design therefore needs a durable per-artifact content identity for recovery, as described in F1.\n\n## Decomposition and dependencies\n\nThe container path is decomposed coherently: schema → inventory → recursive discovery → classification → preview → coordinated execution.\n\nThe document path has a decomposition gap. “Container closure and explicit-root inventory” owns only container resolution, while recursive discovery and classification depend on that task. No task owns converting an arbitrary `jit archive document <path>` target—including the specified zero-owner case—into the shared planner’s versioned root inventory. Leaving that work implicit in the CLI task makes the supposedly shared planner incomplete and forces implementation design to be re-derived. See F2.\n\n## Risks and actionability\n\nThe plan addresses destination races, symlinks, partial relinks, event failures, changed configuration, changed ownership, and archive-root recovery.\n\nIt does not address a source being modified after `ArchiveStarted` or after publication but before a retry removes it. The risk table’s deletion mitigation relies on a hash captured during staging, but that identity is absent from the durable Started contract. This is a load-bearing recovery risk, not a stylistic omission.\n\n## Prior review feedback\n\nAll three prior blocking findings were substantively addressed:\n\n- Legacy archive-root paths now receive explicit, edge-aware `archived-source` precedence (§2 “Archive-root evidence and precedence”; LOCAL-39/42).\n- Relinking is now defined per `DocumentReference`, with `reference_changes` exactly identifying selected unpinned references (§2 “Per-reference selection”; LOCAL-40/41).\n- Recovery now searches by stable target identity before applying current configuration or recomputing the source-set key (§2 event contract; LOCAL-26/27).\n\nNo prior blocker remains unresolved as originally stated.\n\n## Findings\n\n1. **F1 — Blocking, high severity:** The durable recovery contract lacks per-artifact expected content identity. The artifact schema lists paths, actions, and pending deletions but no source hash/size (`dev/active/7d3a3a47-plan.md:174`), while `ArchiveStarted` records only publication/relink/deletion sets (`dev/active/7d3a3a47-plan.md:261`). D-17 verifies against a hash and size “captured at staging” (`dev/active/7d3a3a47-plan.md:829`), which is not durable across a crash. If a source is published, execution crashes, and the source is edited before retry, recovery cannot distinguish the original source from the later edit; recapturing its identity can authorize deleting that edit. A plan fingerprint is not an invertible per-file recovery contract. REQ-03 requires the Started contract to persist expected content identity per publication/deletion and recovery to quarantine rather than delete any mismatch.\n\n2. **F2 — Blocking, high severity:** No decomposition item owns document-target root inventory. “Container closure and explicit-root inventory” is explicitly limited to resolving a container and its issue-linked artifacts (`dev/active/7d3a3a47-plan.md:400`), and recursive discovery depends on that container-specific task (`dev/active/7d3a3a47-plan.md:416`). Nevertheless, the preview and executor require arbitrary `jit archive document <path>` targets, including zero-owner documents (`dev/active/7d3a3a47-plan.md:503`, `:537`). The plan must assign normalized/versioned inventory, direct-owner lookup, pinned variants, and zero-owner handling for document roots to a concrete foundation task—or generalize the inventory task to both target kinds—with corresponding dependencies and acceptance tests.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Prior blockers are repaired, but durable deletion recovery lacks content identity and the decomposition omits document-target inventory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ArchiveStarted does not persist per-artifact content identity, so crash recovery cannot safely distinguish an original deletion candidate from a later source edit.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":174,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The decomposition has no foundation task that inventories arbitrary document targets for the shared planner and executor.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":400}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4312 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f58ca-ce6e-74c3-884e-b1a2904b9314\n--------\nuser\n--- 4299 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Prior blockers are repaired, but durable deletion recovery lacks content identity and the decomposition omits document-target inventory.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "ArchiveStarted does not persist per-artifact content identity, so crash recovery cannot safely distinguish an original deletion candidate from a later source edit.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 174,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The decomposition has no foundation task that inventories arbitrary document targets for the shared planner and executor.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 400
+      }
+    ]
+  }
+}

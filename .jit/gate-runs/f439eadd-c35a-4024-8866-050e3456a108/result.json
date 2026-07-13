@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "f439eadd-c35a-4024-8866-050e3456a108",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "14a1c44e1b845dde308c9b216b80946ea204b690",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T00:48:56.481992752Z",
+  "completed_at": "2026-07-13T00:50:48.151559915Z",
+  "duration_ms": 111669,
+  "exit_code": 0,
+  "stdout": "## Plan document present and linked\n\nPASS. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked through `issue.documents` as the approved design document. The plan identifies both the planning node and criteria source at lines 1–10.\n\n## Completeness against criteria\n\nPASS. All six `[hard]` criteria are addressed explicitly at `dev/active/7d3a3a47-plan.md:18-25` and assigned to executable tasks in the coverage map at lines 818–827.\n\nThe plan preserves the full scope: recursive supported dependencies, opaque artifacts, repository-wide ownership, safe execution, relative-link preservation, candidate reporting, and structured multi-format previews. It also correctly adopts the amended REQ-05 without reintroducing time or category semantics.\n\n## Technical soundness and architectural fit\n\nPASS. The design matches the codebase:\n\n- Resolved hierarchy membership uses `resolve_hierarchy` and its child relation, consistent with `crates/jit/src/graph/hierarchy.rs:458-486`.\n- Pinned reads are grounded in commit-aware storage behavior at `crates/jit/src/storage/json.rs:961-1007`; the proposed canonical full-OID resolver correctly strengthens the current short display hash.\n- The pure planner, command orchestration, and storage-owned mutation primitives respect repository layer boundaries (`dev/active/7d3a3a47-plan.md:30-42`).\n- The destination-provenance repair at lines 118–130 resolves the prior blocking finding: identical content and `ArchiveStarted` intent cannot authorize deletion. Deletion requires a durable non-reconciliation publication receipt plus destination identity verification.\n- The staged no-replace publication and quarantine protocol at lines 957–1062 avoids overwrite and recaptured-identity deletion hazards while honestly bounding residual adversarial filesystem races.\n\n## Decomposition and dependencies\n\nPASS. The task graph is coherent:\n\n- The schema/model precedes inventory, discovery, and classification.\n- Preview and candidates independently consume the classifier.\n- Filesystem primitives can proceed independently.\n- Coordinated execution joins the preview/planner surface with storage primitives.\n- Legacy command removal waits for the replacement executor.\n\nThe dependency edges at lines 575–816 contain no reverse ordering, overlapping ownership, or obvious implementation gap. The planning issue itself has no dependencies, so there is no omitted prerequisite from `issue.dependencies`.\n\n## Risks and actionability\n\nPASS. Material risks have concrete decisions, acceptance criteria, and failure-injection coverage at `dev/active/7d3a3a47-plan.md:844-870`. The plan is unusually specific about policy completeness, path containment, pinned revisions, ownership changes, publication provenance, crash recovery, event truth, symlinks, nested mounts, and quarantine failures. No load-bearing question remains unresolved.\n\n## Prior review feedback\n\nPASS. The previous blocker is fully addressed. Lines 21–22, 118–130, 674–755, and 972–980 distinguish:\n\n- pre-existing identical destinations;\n- externally created or otherwise unreceipted destinations;\n- receipt-backed destinations published by this operation.\n\nOnly the last category can authorize deletion, and it must still pass immediate identity verification. The specified tests cover both destination modification and the crash window between publication and receipt.\n\n## Findings\n\n1. No blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The plan is complete, technically sound, correctly decomposed, and fully resolves the prior destination-identity deletion hazard.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The plan is complete, technically sound, correctly decomposed, and fully resolves the prior destination-identity deletion hazard.",
+    "findings": []
+  }
+}

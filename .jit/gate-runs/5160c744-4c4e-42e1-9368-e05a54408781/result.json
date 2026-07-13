@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "run_id": "5160c744-4c4e-42e1-9368-e05a54408781",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "14a1c44e1b845dde308c9b216b80946ea204b690",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T23:44:13.262078397Z",
+  "completed_at": "2026-07-12T23:47:43.508437743Z",
+  "duration_ms": 210246,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is substantive, and is linked from planning issue `1dbc72f6` as a design document. The investigation and owner-approved planning brief are also linked and were reviewed in full.\n\nThe planning issue has no dependencies, so there are no unmet prerequisite assumptions to validate.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all six `[hard]` requirements in §1 and assigns them to implementation tasks in the §3 coverage map. It does not reintroduce time-based retention, category selection, generalized rewriting, or other excluded scope.\n\nHowever, the plan is not complete enough to satisfy REQ-03 in two material cases:\n\n- Existing artifacts already beneath the configured archive root are not correctly represented by the target-specific “already archived” rule.\n- The plan does not define which unpinned references are rewritten when an artifact is copied for mixed inside/outside or active/terminal owners.\n\nThese are blocking because they affect whether an eligible operation preserves references and converges safely.\n\n## Technical soundness and architectural fit\n\nThe revised architecture is substantially improved:\n\n- Pure discovery and classification remain in domain/document logic.\n- Filesystem mutation is limited to storage primitives.\n- Command orchestration owns locking, relinks, events, and rollback.\n- Pinned revisions are canonicalized to full immutable commit OIDs.\n- `ArchiveStarted` now durably records operation identity before mutation.\n- Execution recomputes under `RepoWriteGuard` instead of accepting stale preview state.\n\nThree blocking technical defects remain.\n\nFirst, §2’s missing-artifact semantics only recognize a path as archived when it is beneath the current target’s `destination_root` or maps to that target’s mirror destination (`dev/active/7d3a3a47-plan.md:189`). For containers, D-12 makes that root `archive_root/<container UUID>` (`dev/active/7d3a3a47-plan.md:79`). Existing references such as `dev/archive/features/90a2dbfd-completion-report.md` do not satisfy that rule and are outside this repository’s configured managed paths (`.jit/config.toml:12-14`). There are currently 45 issue records containing `dev/archive/...` references. The normative `unmanaged-selected-root` rule therefore blocks them or risks treating their archive paths as fresh sources. The planner needs an explicit retain/already-archived policy for artifacts anywhere under the configured archive root, including the retired category layout.\n\nSecond, D-16 defines artifact placement but not reference-change selection. The schema merely lists `reference_changes` (`dev/active/7d3a3a47-plan.md:148`), while coordinated execution says to persist those changes (`dev/active/7d3a3a47-plan.md:456`). For a copied artifact shared by a selected terminal issue, an outside issue, and potentially an active descendant, the design does not specify which unpinned references move to the mirror and which remain at the source. D-2 and D-15 provide constraints but no complete per-reference calculus. This is essential to REQ-03 and cannot be left for implementation to infer.\n\nThird, D-19 calls `operation_id` retry-invariant while hashing the current canonical source set (`dev/active/7d3a3a47-plan.md:747`). A retry only adopts an open same-key instance, and a new instance cannot be minted until the old one closes (`dev/active/7d3a3a47-plan.md:751`). Because the write guard is held only during an individual attempt, an issue or hierarchy change between attempts can change the source set. The next execution then has a different key, cannot adopt the old instance, and has no defined procedure for closing it before minting another. The durable event contains enough data to design a recovery protocol, but that protocol is absent.\n\n## Decomposition and dependencies\n\nThe proposed waves are otherwise coherent:\n\n- Schema → inventory → recursive discovery → classification.\n- Preview and candidates consume classification independently.\n- The storage mutation primitive can proceed independently.\n- Execution joins preview/planning with storage mutation.\n- Legacy removal follows the replacement executor.\n\nLayer ownership from the prior review is now clear, and the legacy-removal task is explicitly exempt from requirement coverage.\n\nThe remaining gaps need explicit task ownership:\n\n- The classifier task must own archive-root/legacy-layout recognition.\n- Classification or execution must own a normative per-reference relink calculus.\n- Coordinated execution must own recovery when an open operation’s definition key differs from the newly recomputed key.\n\n## Risks and actionability\n\nThe risk table handles filesystem races, pinned revisions, policy completeness, layer boundaries, and pre-mutation event durability well. Nevertheless, it declares all load-bearing questions resolved while omitting the three cases above.\n\nThe reference-selection and changed-key recovery cases are especially under-specified: an engineer would have to invent correctness-critical behavior during implementation. That fails the actionability threshold for a pre-fan-out plan.\n\n## Prior review feedback\n\n- Prior F1 is substantially addressed by durable `ArchiveStarted` intent before mutation, but retry recovery is still incomplete when the recomputed operation key changes.\n- Prior F2 is addressed: storage no longer owns relinks, events, operation locking, or rollback orchestration.\n- Prior F3 is addressed through canonical full immutable commit OIDs.\n- Prior F4 is addressed by making previews informational and recomputing exactly once under the write guard; no expected-fingerprint protocol is needed.\n- Prior F5 is addressed by explicitly exempting the legacy-removal support task from requirement coverage.\n\n## Findings\n\n1. **F1 — Blocking, high:** Already-archived recognition is target-specific and does not handle existing artifacts beneath the configured archive root, particularly the retired category layout. Such issue-linked roots fall outside `managed_paths` and become `unmanaged-selected-root` blockers even though they are already archived. This contradicts the actual repository, which contains 45 issue records referencing `dev/archive/...`, and prevents dependable container planning over existing data. (`dev/active/7d3a3a47-plan.md:189`, `.jit/config.toml:12`)\n2. **F2 — Blocking, high:** The plan defines move/copy/retain at artifact level but never defines the per-reference relink rule for mixed inside/outside and active/terminal owners. The schema carries `reference_changes`, and execution persists them, but no task can determine those entries without re-deriving a load-bearing policy. (`dev/active/7d3a3a47-plan.md:148`)\n3. **F3 — Blocking, high:** The operation key hashes the recomputed source set, yet retries adopt only an open same-key instance and may not mint a new instance until the prior one closes. Repository changes between attempts can alter that set, leaving the old durable intent with no specified adoption or closure path. (`dev/active/7d3a3a47-plan.md:747`, `@/inv/event-log`)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised plan fixes the prior boundary, OID, and stale-preview defects but remains blocked by legacy archive-root handling, undefined per-reference relinking, and changed-key retry recovery.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Already-archived recognition is target-specific and misclassifies existing archive-root references as unmanaged selected roots.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":189},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Artifact actions do not define which unpinned references are relinked for mixed inside/outside or active/terminal owners.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":148},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An open operation has no recovery protocol when repository changes cause retry recomputation to produce a different source-set operation key.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":747,\"references\":[\"@/inv/event-log\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4695 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f58b7-9272-7740-8a20-ef250af8ac6a\n--------\nuser\n--- 4682 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The revised plan fixes the prior boundary, OID, and stale-preview defects but remains blocked by legacy archive-root handling, undefined per-reference relinking, and changed-key retry recovery.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Already-archived recognition is target-specific and misclassifies existing archive-root references as unmanaged selected roots.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 189
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Artifact actions do not define which unpinned references are relinked for mixed inside/outside or active/terminal owners.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 148
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "An open operation has no recovery protocol when repository changes cause retry recomputation to produce a different source-set operation key.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 747,
+        "references": [
+          "@/inv/event-log"
+        ]
+      }
+    ]
+  }
+}

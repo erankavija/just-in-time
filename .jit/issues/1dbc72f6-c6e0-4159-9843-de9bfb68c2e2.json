@@ -2,7 +2,7 @@
   "id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
   "title": "planning: Dependency-aware container artifact archival",
   "description": "Planning node for Dependency-aware container artifact archival (7d3a3a47). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/7d3a3a47-plan.md and link it to this node once written.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [],
@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T23:03:26.255051602Z"
+      "updated_at": "2026-07-13T00:48:56.481992752Z"
     }
   },
   "context": {},
@@ -47,6 +47,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-12T21:36:24.520972602Z",
-  "updated_at": "2026-07-12T23:07:02.591235786Z",
-  "first_ready_at": "2026-07-12T21:36:24.520973112Z"
+  "updated_at": "2026-07-13T00:51:17.765768540Z",
+  "first_ready_at": "2026-07-12T21:36:24.520973112Z",
+  "done_at": "2026-07-13T00:51:17.765768010Z"
 }

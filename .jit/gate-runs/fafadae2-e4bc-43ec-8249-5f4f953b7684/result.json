@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "run_id": "fafadae2-e4bc-43ec-8249-5f4f953b7684",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "14a1c44e1b845dde308c9b216b80946ea204b690",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-12T23:31:07.701973316Z",
+  "completed_at": "2026-07-12T23:33:46.134492695Z",
+  "duration_ms": 158432,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at `dev/active/7d3a3a47-plan.md`, is non-empty, and is linked through `issue.documents` as the approved implementation plan.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses all six `[hard]` requirements in §1 and maps them to decomposition items in §3. It preserves the amended REQ-05 scope and the owner’s removal of archival categories.\n\nHowever, the pinned-version design undermines REQ-01’s deterministic inventory, and the unrecoverable retry identity undermines REQ-03’s execution design. These are blocking technical defects rather than simple coverage omissions.\n\n## Technical soundness and architectural fit\n\nThe hierarchy, component-aware path policy, recursive bundle discovery, copy-versus-move calculus, and explicit policy checks are well grounded in the current code.\n\nThree load-bearing aspects are unsound or insufficiently specified:\n\n- The event-only retry identity cannot recover an unrecorded operation instance after an event failure.\n- The storage mutation task crosses the repository’s command/storage responsibility boundary.\n- Pinned artifact identity assumes a stable commit identifier that the cited API does not provide.\n- `stale-plan` has no defined comparison input or protocol.\n\n## Decomposition and dependencies\n\nThe Group A classifier dependency ordering is coherent, and candidate reporting can proceed independently of execution after classification.\n\nThe storage task overlaps the coordinated-execution task by claiming ownership of relinking and event sequencing. This creates both an architectural violation and unclear implementation ownership. There is also a minor internal inconsistency: the plan says every task-tier issue receives a `satisfies:` label, but the legacy-removal task explicitly has none.\n\nThe planning issue itself has no dependencies, so there is no prerequisite work to validate.\n\n## Risks and actionability\n\nThe plan identifies many relevant risks and supplies unusually concrete test criteria. Nevertheless, it declares every load-bearing question resolved while leaving operation-instance recovery, pinned commit canonicalization, and stale-plan detection unresolved. Engineers would have to redesign these contracts during implementation.\n\n## Prior review feedback\n\nThe prior run is recorded as failed but contains no stdout, stderr, or message. There is therefore no recoverable prior finding list to compare against the current revision.\n\n## Findings\n\n1. **F1 — Blocking/high: retry-stable operation-instance identity is impossible under the event-only design.** Plan D-19 says a retry adopts the latest same-key event and rejects a durable journal (`dev/active/7d3a3a47-plan.md:681`), while LOCAL-27 requires retries to share an instance ID (`dev/active/7d3a3a47-plan.md:445`). If finalization or relinking succeeds but `ArchiveExecuted` fails to append, no event contains the minted UUID; `append_event` is a separate fallible persistence operation (`crates/jit/src/storage/json.rs:737`). After an incomplete rollback or crash, recomputation can detect unfinished work but cannot reconstruct that UUID. The plan must either persist intent before mutation, weaken the identity guarantee for unrecorded attempts, or specify another recoverable identity source.\n\n2. **F2 — Blocking/high: the storage mutation task improperly owns command orchestration and overlaps the execution task.** The task says the storage primitive “relinks references” and holds coordination through reference saves and event append (`dev/active/7d3a3a47-plan.md:371`), while the coordinated-execution task also owns reference changes and event sequencing (`dev/active/7d3a3a47-plan.md:414`). Repository architecture assigns persistence primitives to storage and orchestration of domain plus storage to commands (`AGENTS.md:138`). The command should hold the reentrant guard and orchestrate issue/event persistence, while storage supplies narrowly scoped staging, no-replace publication, quarantine, and atomic persistence operations.\n\n3. **F3 — Blocking/high: pinned artifact identity is not canonicalized to an immutable full commit ID.** The plan defines identity as `(path, version)` where version is “a commit id” and cites `read_path_text`/`read_path_bytes` as its source (`dev/active/7d3a3a47-plan.md:52`, `dev/active/7d3a3a47-plan.md:759`). In reality, document references accept an unchecked string (`crates/jit/src/domain/types.rs:880`), git resolution accepts symbolic revisions such as `HEAD`, and storage returns only a seven-character abbreviated hash (`crates/jit/src/storage/json.rs:982`, `crates/jit/src/storage/json.rs:1009`). Symbolic revisions can move and abbreviated IDs can collide, breaking deterministic historical identity, fingerprints, ordering, and retry keys. The plan must require resolution to the full immutable object ID and specify which value is serialized and hashed.\n\n4. **F4 — Blocking/medium: `stale-plan` has no executable detection protocol.** The schema defines `plan_fingerprint` and the `stale-plan` blocker, and LOCAL-25 requires rejecting a stale recomputed plan (`dev/active/7d3a3a47-plan.md:130`, `dev/active/7d3a3a47-plan.md:175`, `dev/active/7d3a3a47-plan.md:439`). But the proposed CLI accepts neither a prior fingerprint nor a persisted plan, and execution is described as recomputing directly under the write guard. There is therefore nothing against which to compare the recomputed fingerprint. The plan must define an unlocked-to-locked comparison, accept an expected fingerprint, persist an approved plan, or remove this blocker and criterion in favor of under-lock recomputation alone.\n\n5. **F5 — Advisory/low: the decomposition contradicts its own coverage-label rule.** Section 3 says every task-tier item carries a `satisfies: REQ-*` label (`dev/active/7d3a3a47-plan.md:288`), and the assumptions repeat that claim for all nine tasks (`dev/active/7d3a3a47-plan.md:779`), but “Remove the legacy document-archive command” declares `satisfies: —` (`dev/active/7d3a3a47-plan.md:453`). Either associate it with the relevant requirement or explicitly exempt migration-only tasks from that stated rule.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan covers the stated scope but has blocking defects in retry identity, layer ownership, pinned-version identity, and stale-plan detection.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Event-only retry identity cannot recover an operation instance when mutation occurs but ArchiveExecuted is not durably appended.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":681,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The storage mutation task owns relinking and event orchestration, crossing layer boundaries and overlapping coordinated execution.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":371,\"references\":[\"@/inv/atomic-writes\",\"@/inv/event-log\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Pinned artifact versions are not specified as canonical full immutable commit IDs despite symbolic inputs and seven-character storage results.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":52},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The stale-plan blocker and acceptance criterion lack any prior fingerprint, persisted plan, or defined comparison protocol.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":130},{\"id\":\"F5\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The plan says every task carries a satisfies label, but the legacy-command removal task explicitly carries none.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":453}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3886 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f58ab-9600-76a0-b168-d44fe1091683\n--------\nuser\n--- 3873 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan covers the stated scope but has blocking defects in retry identity, layer ownership, pinned-version identity, and stale-plan detection.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Event-only retry identity cannot recover an operation instance when mutation occurs but ArchiveExecuted is not durably appended.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 681,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The storage mutation task owns relinking and event orchestration, crossing layer boundaries and overlapping coordinated execution.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 371,
+        "references": [
+          "@/inv/atomic-writes",
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Pinned artifact versions are not specified as canonical full immutable commit IDs despite symbolic inputs and seven-character storage results.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 52
+      },
+      {
+        "id": "F4",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The stale-plan blocker and acceptance criterion lack any prior fingerprint, persisted plan, or defined comparison protocol.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 130
+      },
+      {
+        "id": "F5",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The plan says every task carries a satisfies label, but the legacy-command removal task explicitly carries none.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 453
+      }
+    ]
+  }
+}
