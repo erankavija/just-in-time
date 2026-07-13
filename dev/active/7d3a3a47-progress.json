@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -12,7 +12,7 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485", "short_id": "67f4ded1", "title": "Storage-owned artifact mutation primitive", "classification": "implementation", "status": "pending"}
+        {"id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485", "short_id": "67f4ded1", "title": "Storage-owned artifact mutation primitive", "classification": "implementation", "status": "completed"}
       ]
     },
     {

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "174007f0-702c-480f-af77-1cf55a9e1f7a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485",
+  "commit": "a6e7fbb52861f6eb860040834c6524ad60571f80",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T15:23:03.059426692Z",
+  "completed_at": "2026-07-13T15:26:59.146431568Z",
+  "duration_ms": 236087,
+  "exit_code": 0,
+  "stdout": "Attribution: `1b709360`, `30e6a713`, `c6723583`, `ca4f567a`, `a6e7fbb`\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/atomic-writes` (`.jit/invariants.toml`, registry-first); `@/gate/cargo-ci`, `@/gate/code-review` (`.jit/gates.toml`, registry-first); `REQ-03` (`.jit/issues/67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485.json`, markdown-first)\nGate evidence: `cargo-ci` passed (exit 0, fix commit); `code-review` failed (exit 1, prior structured F1/F2, both addressed by `a6e7fbb`)\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; the prior verified-publication and symlink-collision findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria are satisfied; the prior verified-publication and symlink-collision findings are addressed.",
+    "findings": []
+  }
+}
