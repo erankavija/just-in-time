@@ -29,7 +29,7 @@ in the §3 coverage map.
 |---|---|---|
 | REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency of its working-tree artifacts | Resolve the container root through normal storage id semantics, enumerate the root plus its **resolved-hierarchy descendants** (the DAG-authoritative membership relation, `graph/hierarchy.rs:458`, `:321` — not the raw dependency closure, which absorbs cross-container sequencing edges; D-25), collect every distinct `DocumentReference` on those issues as **(path, version)** artifacts (D-26) including opaque/binary roots, canonicalize every supplied pinned revision to its full immutable commit object ID, then recursively discover supported local dependencies of **working-tree** artifacts (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object with destinations computed by the D-12 mirror rule. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. Pinned versions are enumerated as non-relocating historical entries; per the amended REQ-01 their commit-resolved closures are outside relocation scope and not enumerated (D-26). |
 | REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | A pure classifier computes an action per working-tree artifact through the D-16 edge-aware calculus from all reference owners (repository-wide, direct and embedded; D-13), per-reference selection, current lifecycle state, component-aware managed/permanent policy with explicit three-state completeness, archive-root precedence, destination occupancy, and pinned semantics (D-26). Ownership and policy facts are evidence feeding copy/retain; blockers are structural (conflicts, unpreservable edges, symlinks, missing sources, failed pinned reads, ineligible targets). | Replaces the two inconsistent directory-heuristic notions of "shared" (`document.rs:1463-1495`, `assets.rs:185-233`) with one repository-wide reference analysis. |
-| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under the held repository write guard, stages and verifies content, validates every supported local edge at its proposed destination, publishes no-replace (a collision — even content-identical — is `AlreadyExists`, never silent success; D-14), applies exactly the planned reference changes, appends one archive event, then deletes each planned source under one unified precondition (D-17/D-18): **committed issue references are the deletion provenance** — a source is removed only when every selected reference for that artifact already points at its destination in durable issue state and the file re-verifies against its recorded content identity. Failed deletions are reported warnings; rerunning converges by recomputation (D-18): content-identical destinations classify already-archived (publication skipped), and a residual source rediscovered through the inverse mirror mapping satisfies exactly the same precondition before removal — no separate residue rule and no provenance tracking needed. Within the amended contract no step loses a file, overwrites a destination, or leaves a reference relying solely on a missing path. | Only Done/Rejected containers execute (D-8); document targets follow D-15; non-terminal targets preview only. |
+| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under the held repository write guard, stages and verifies content, validates every supported local edge at its proposed destination, publishes no-replace (at the primitive layer a collision — even content-identical — is `AlreadyExists`, never a claimed creation; the command layer then converges by **adoption-by-content**: a mirror destination bearing exactly the planned bytes is adopted regardless of who created it, because content identity makes the relink semantics-preserving and later foreign removal is out-of-contract external mutation; D-14/D-18), applies exactly the planned reference changes, appends one archive event, then deletes each planned source under one unified precondition (D-17/D-18): **committed issue references are the deletion provenance** — a source is removed only when every selected reference for that artifact already points at its destination in durable issue state and the file re-verifies against its recorded content identity. Failed deletions are reported warnings; rerunning converges by recomputation (D-18): content-identical destinations classify already-archived (publication skipped), and a residual source rediscovered through the inverse mirror mapping satisfies exactly the same precondition before removal — no separate residue rule and no provenance tracking needed. Within the amended contract no step loses a file, overwrites a destination, or leaves a reference relying solely on a missing path. | Only Done/Rejected containers execute (D-8); document targets follow D-15; non-terminal targets preview only. |
 | REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`. The D-16 calculus puts every relative-edge target of a relocated parent at the mirror (an archive-root dependency is copied there while its archived source is retained); root-relative and staying-parent edges keep resolving at source. Execution validates every supported edge in the proposed layout before metadata commit, fixing the current verifier's source/destination path-set mismatch (`document.rs:1832-1858`). | Detected dynamic or module loading in a relocated member warns (`dynamic-loading-suspected`, D-23); an actually unpreservable supported edge still blocks (`unpreservable-layout`). |
 | REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers (container-ness from the configured type hierarchy, D-20; membership per D-25), each with three-state documentation-policy status (`configured`/`incomplete`/`unconfigured`), repository-wide ownership evidence, artifact counts, blockers, and move/copy/retain summaries. It consumes the same plan model, always evaluates fully (archival takes no category input, D-21), and performs no filesystem, issue, or event mutation. | Accessor defaults may support display but never authorize mutation; incomplete/unconfigured policy is ineligible. No time/retention semantics (D-6). |
 | REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | The plan model serializes to the binding §2 schema; preview is the non-mutating default for both `jit archive document` and `jit archive container`. A representative fixture corpus (Markdown links; HTML→sibling CSS→nested theme image/font; CSS `@import`/`url()`; direct CSV/PNG/SVG roots; permanent shared figures; active outside consumers; identical filenames; missing edges; pinned commits; a dependency cycle; occupied destinations; a partial-deletion rerun) exercises discovery, classification, preview, and execution. | Preview is informational; `--execute` recomputes and revalidates under the held guard rather than trusting preview output (D-7). |
@@ -204,9 +204,15 @@ plan-side narrowing.
     **mirror recognition** — a root whose stated source path maps through D-12 to
     content-identical existing content classifies `already_archived`, which means exactly
     that publication is unnecessary (a root moved by a prior partial execution can never
-    read as missing on rerun); the artifact's action and any source deletion still follow
-    the ordinary calculus and the unified deletion precondition (D-17/D-18), so
-    already-archived recognition neither forbids nor authorizes removal by itself; (2)
+    read as missing on rerun). This is **adoption-by-content, deliberately without
+    provenance** (D-18): whether the identical bytes were placed by an interrupted JIT
+    execution or by someone else is immaterial — relinking to identical content is
+    semantics-preserving either way, the publish primitive never overwrites anyone, and a
+    foreign creator later removing the adopted file is out-of-contract external mutation.
+    The artifact's action and any source deletion still follow the ordinary calculus and
+    the unified deletion precondition (D-17/D-18), so already-archived recognition neither
+    forbids nor authorizes removal by itself; only a **differing-content** occupied
+    destination is a conflict (`destination-conflict`); (2)
     **`missing-source`** —
     only a root absent at both its stated location and its mirror image blocks, a genuinely
     dangling reference to resolve or remove, never silently entrenched or skipped. A
@@ -221,8 +227,13 @@ plan-side narrowing.
   - **Event contract (binding; one event kind).** A mutating execution appends one archive
     event after publications and reference relinks persist and before source deletions,
     recording the target, destination root, published artifacts, applied reference changes,
-    and the planned deletions with their recorded identities. Deletions then run under the
-    D-17 reference-proven precondition and identity verification; failures surface as
+    and the planned deletions with their recorded identities. **An event-append failure
+    reverts the just-applied reference changes** (sources still exist because deletions
+    have not run — the same rollback the current single-document command performs,
+    `document.rs:1391-1435`), so no reference mutation ever persists unrecorded; the
+    published destination files remain as inert content that the next mutating run adopts
+    by content and records in its own event. Deletions then run under the D-17
+    reference-proven precondition and identity verification; failures surface as
     `deletion-failed` warnings in the command result. A rerun that performs mutations (including residue deletions) appends its own
     event; a rerun that mutates nothing appends nothing. "Durable" means the repository's
     process-level append contract (`append_event` returned success); this plan does not
@@ -292,8 +303,11 @@ the dependency-derived hierarchy from absorbing the storage primitive or preview
 into an intermediate container). Every task is independently landable and green at its
 boundary. Ordering is expressed only through `depends-on`. Group A is the pure foundation;
 the filesystem-only storage primitive is independent; coordinated execution joins it with
-the preview/planner surface; Groups B and C proceed independently after A. The plan schema
-and blocker taxonomy land first, before any CLI fan-out (obligation 4). Coverage is
+the preview/planner surface; the candidate report consumes the classifier plus the
+`jit archive` command surface the preview task establishes; and the clean-cut legacy
+removal lands only after the complete replacement family — execution and candidates —
+exists. The plan schema and blocker taxonomy land first, before any CLI fan-out
+(obligation 4). Coverage is
 enforced at the task tier: each requirement-bearing task carries its `satisfies: REQ-*`
 label directly.
 
@@ -454,8 +468,9 @@ label directly.
   owner, unselected references remain source-resolvable — and holds one write guard from
   recomputation through the final deletion attempt.` `[hard] LOCAL-31: Appends one archive
   event after publications and relinks and before deletions, recording publications,
-  reference changes, and planned deletions; a rerun that mutates nothing appends no
-  event.` `[hard] LOCAL-32: Failure injection for partial relink, event-append failure,
+  reference changes, and planned deletions; an event-append failure reverts the
+  just-applied reference changes so no unrecorded reference mutation persists; a rerun
+  that mutates nothing appends no event.` `[hard] LOCAL-32: Failure injection for partial relink, event-append failure,
   deletion failure, and a source edited after planning proves no artifact is lost, no
   destination overwritten, and no reference relying solely on a missing path; a rerun
   after each injected failure converges — already-archived recognition, inverse-mapping
@@ -466,7 +481,7 @@ label directly.
   Blast radius: command-layer execution over the storage primitive and shared planner; no
   legacy-command change.
 
-- **Remove the legacy document-archive command**  `type: task`  `satisfies: —`  `depends-on: Coordinated plan execution`
+- **Remove the legacy document-archive command**  `type: task`  `satisfies: —`  `depends-on: Coordinated plan execution, Read-only container candidate report`
   Outcome: `jit doc archive` is removed completely as a clean-cut migration with no alias
   or stub, and all consumers (CLI/main dispatch, `ArchiveResult`, event catalog/schema
   references, integration and unit tests, fixtures, docs, README, and the auto-generated
@@ -485,7 +500,7 @@ label directly.
 
 ### Group C: Container candidate reporting — covers REQ-05
 
-- **Read-only container candidate report**  `type: task`  `satisfies: REQ-05`  `depends-on: Move/copy/retain/block classification`
+- **Read-only container candidate report**  `type: task`  `satisfies: REQ-05`  `depends-on: Move/copy/retain/block classification, Unified archive preview surface`
   Outcome: `jit archive candidates` lists terminal containers using the shared planner —
   container-ness derives from the configured type hierarchy (any type at a non-leaf level
   of `[type_hierarchy]`, D-20), membership from the resolved hierarchy (D-25), never from
@@ -516,9 +531,9 @@ label directly.
 | REQ-06 | Unified archive preview surface |
 
 > **Removal acceptance check (D-9, clean cut, no alias).** The removal task depends on
-> Coordinated plan execution, so the old `jit doc archive` and the new `jit archive`
-> family coexist through every intermediate wave and no wave breaks a consumer before its
-> replacement exists. Acceptance is a tree-wide search across `crates/`, `mcp-server/`,
+> Coordinated plan execution and the candidate report, so the old `jit doc archive` and
+> the complete new `jit archive` family coexist through every intermediate wave and no
+> wave breaks a consumer before its replacement exists. Acceptance is a tree-wide search across `crates/`, `mcp-server/`,
 > `web/`, `docs/`, and `dev/` for `doc archive`, `archive_document`, and `ArchiveResult`,
 > which must return no live production or test reference (historical `dev/` records
 > excepted). The pre-plan sweep of that exact pattern reported **103 matches across 33
@@ -626,7 +641,10 @@ review; none is REOPEN.
   creation — is `AlreadyExists`, never silent success**. Requires amending the
   registry-first `@/inv/atomic-writes` invariant and its projection before implementation
   (LOCAL-21). Rejected: check-then-`rename` (replaces a destination created after the
-  check); treating identical content as success (misattributes another writer's file).
+  check); the *primitive* claiming success on identical content (a primitive must report
+  exactly what it did — it created nothing; the *command* layer separately adopts
+  content-identical destinations on recompute via D-18 adoption-by-content, and the two
+  layers are deliberately distinct).
 - **D-15 — Document-target execution requires all-terminal owners:** chosen **`jit archive
   document --execute` requires every direct or embedded-closure owner of the document and
   its bundle artifacts to be terminal; active owners block (preview still reports); a
@@ -656,9 +674,12 @@ review; none is REOPEN.
   sequences, and adversarial-substitution defenses — the interference they defend against
   is out of contract, and git history recovers versioned repositories; unverified deletion
   (destroys benign concurrent edits detectably avoidable at one hash's cost).
-- **D-18 — Rerun converges by recomputation:** chosen **a rerun after any partial failure
-  recomputes the plan against current state, treats content-identical occupied
-  destinations as already archived (publication skipped), rediscovers residual sources
+- **D-18 — Rerun converges by recomputation and adoption-by-content:** chosen **a rerun
+  after any partial failure recomputes the plan against current state, treats
+  content-identical occupied destinations as already archived (publication skipped,
+  adoption-by-content: identical bytes are adopted without provenance because relinking
+  to them is semantics-preserving whoever wrote them, and their later foreign removal is
+  out-of-contract external mutation), rediscovers residual sources
   through the inverse D-12 mapping, and applies only the remaining mutations — every
   removal under the same D-17 reference-proven precondition, which is what distinguishes
   a deletable residue (all selected references committed to the destination) from a
@@ -672,7 +693,11 @@ review; none is REOPEN.
   publications and reference relinks persist and before deletions, recording target,
   destination root, publications, applied reference changes, and planned deletions;
   deletion failures are command-result warnings; a mutating rerun appends its own event
-  and a no-op rerun appends none**. Durability is the existing process-level
+  and a no-op rerun appends none; an event-append failure reverts the just-applied
+  reference changes (deletions have not run, so sources exist for the revert — the
+  rollback the single-document command already performs, `document.rs:1391-1435`), so no
+  reference mutation persists unrecorded and the adoption rerun is never a forbidden
+  no-op over unrecorded state**. Durability is the existing process-level
   `append_event` contract (`@/inv/event-log`); a crash between mutation and append is
   within the amended contract and the next rerun recomputes and reports. Rejected (owner
   proportionality amendment): the four-event Started/Executed/SourcesRemoved/Aborted

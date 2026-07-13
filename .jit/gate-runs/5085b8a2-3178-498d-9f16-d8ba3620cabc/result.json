@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "run_id": "5085b8a2-3178-498d-9f16-d8ba3620cabc",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "b4adcaad7adc34c36214495aea0334ba179e88e5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T11:03:58.657160113Z",
+  "completed_at": "2026-07-13T11:09:05.444049811Z",
+  "duration_ms": 306786,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required `dev/active/7d3a3a47-plan.md` exists, contains 757 lines, and is linked from `.jit/issues/1dbc72f6-c6e0-4159-9843-de9bfb68c2e2.json:36` as a design document. The investigation and owner-approved planning brief are also linked.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all six `[hard]` criteria in §1 (`dev/active/7d3a3a47-plan.md:23-39`) and provides corresponding implementation tasks in §3. REQ-01, REQ-02, REQ-04, REQ-05, and REQ-06 are substantively covered.\n\nREQ-03 is not yet executable as written because event-append failure recovery remains ambiguous and permits an unaudited mutation, detailed as F1 below.\n\nThe plan correctly incorporates the owner amendments: no category input, no time-based candidate filtering, pinned dependency closures excluded, and proportional concurrency/crash guarantees.\n\n## Technical soundness and architectural fit\n\nThe principal architecture is sound:\n\n- Resolved hierarchy is an appropriate membership primitive; `resolve_hierarchy` and `HierarchyResolution::children` exist at `crates/jit/src/graph/hierarchy.rs:458-486` and `:304-325`.\n- The operation-wide reentrant write guard exists at `crates/jit/src/storage/mod.rs:90-126`.\n- Explicit policy completeness can be distinguished because `DocumentationConfig` retains its fields as `Option` values at `crates/jit/src/config.rs:380-393`.\n- Moving pure classification out of the command layer and putting filesystem mutation behind storage aligns with repository boundaries.\n\nHowever, event recovery remains blocking. The plan places the event after publication and relinking (`dev/active/7d3a3a47-plan.md:227-237`) and says a no-op rerun appends no event. Consider a `copy` action:\n\n1. Publication and selected relinks persist.\n2. `append_event` returns an error.\n3. The source intentionally remains because the action is `copy`, so there is no residue deletion.\n4. The rerun adopts the identical destination and sees the relinks already applied.\n5. The rerun is therefore a no-op and is forbidden from appending the missing event.\n\nThe existing implementation avoids this state by invoking rollback when append fails at `crates/jit/src/commands/document.rs:1208-1210`, with verified reference restoration and safe duplicate retention at `:1391-1435`. The new plan neither requires equivalent rollback for a returned append error nor permits a recovery event. LOCAL-32 tests “event-append failure” but does not define the required postcondition that exactly one event ultimately covers persisted publication/relink mutations.\n\n## Decomposition and dependencies\n\nThe planning issue itself has no dependencies, so there is no unmet upstream prerequisite to assess.\n\nThe nine-task breakdown is generally well scoped, but two dependency defects remain:\n\n- The candidate-report task depends only on classification (`dev/active/7d3a3a47-plan.md:494`). The preview task is what introduces the new top-level `jit archive` command group (`:419-436`). The current CLI contains only `Commands::Doc` and no archive group (`crates/jit/src/cli.rs:163-165`). Both tasks would therefore have to create or modify the same command enum, dispatch, rendering, and schema surfaces independently. The candidate task must depend on a shared command-family scaffold—most simply the preview task—or that scaffold must become a separate prerequisite.\n- Legacy removal depends only on coordinated execution (`dev/active/7d3a3a47-plan.md:475`), while candidate reporting can still be underway. This contradicts the risk mitigation claiming removal is “ordered last” (`:555`) and allows concurrent edits to the same CLI/main/schema surfaces. Removal must also depend on candidate-report delivery.\n\n## Risks and actionability\n\nMost major risks have concrete decisions and tests. The remaining event-recovery risk is load-bearing: the risk table claims rerun convergence with no duplicate events (`dev/active/7d3a3a47-plan.md:552`), but copy-style append failure shows that convergence may instead leave no event.\n\nLikewise, the stated clean-cut removal mitigation is not represented by the proposed dependency graph. These are execution-order and correctness defects, not stylistic concerns.\n\n## Prior review feedback\n\n- Prior F1 remains unresolved: adoption-by-content does not recover the missing event for copy-style executions that become no-op reruns.\n- Prior F2 remains unresolved: candidate reporting still lacks a dependency on the task establishing the shared archive command surface.\n- Prior F3 remains unresolved: legacy removal still does not depend on candidate-report completion.\n- Prior F4 is resolved: the cited superseded issue file is gone, and `jit validate` now passes.\n\n## Findings\n\n1. **F1 — Blocking, high:** Event-append failure can leave publications and relinks persisted for a copy action, after which adoption-by-content produces a no-op rerun that must append no event. The plan must require verified rollback for returned append failures or define a recovery-event path that records the already-applied mutations. (`dev/active/7d3a3a47-plan.md:227`, `@/inv/event-log`)\n2. **F2 — Blocking, high:** The candidate-report task does not depend on the task that introduces the shared `jit archive` command family, even though both must modify the currently nonexistent archive CLI group and its dispatch/schema surfaces. (`dev/active/7d3a3a47-plan.md:494`)\n3. **F3 — Blocking, high:** Legacy command removal is claimed to run last but depends only on coordinated execution, allowing it to run before or concurrently with candidate-report delivery and overlap on the command-family surfaces. (`dev/active/7d3a3a47-plan.md:475`)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Event-append recovery and two command-family dependency edges remain blocking; the prior repository-validation defect is resolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Copy-style execution can persist publications and relinks, fail event append, and then produce a no-op adoption rerun that is forbidden from recording the missing archive event.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":227,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The candidate-report task lacks a dependency on the task establishing the shared jit archive command surface, so the leaves overlap and are not independently implementable.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":494},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Legacy command removal is claimed to run last but does not depend on candidate-report delivery and may overlap or precede completion of the replacement command family.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":475}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5207 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b25-e862-76a3-bfeb-7b22baa22327\n--------\nuser\n--- 5194 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Event-append recovery and two command-family dependency edges remain blocking; the prior repository-validation defect is resolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Copy-style execution can persist publications and relinks, fail event append, and then produce a no-op adoption rerun that is forbidden from recording the missing archive event.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 227,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The candidate-report task lacks a dependency on the task establishing the shared jit archive command surface, so the leaves overlap and are not independently implementable.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 494
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Legacy command removal is claimed to run last but does not depend on candidate-report delivery and may overlap or precede completion of the replacement command family.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 475
+      }
+    ]
+  }
+}
