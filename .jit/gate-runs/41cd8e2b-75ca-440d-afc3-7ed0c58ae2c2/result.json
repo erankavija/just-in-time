@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "41cd8e2b-75ca-440d-afc3-7ed0c58ae2c2",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "4b0c4a62c02bde7c2c61a4e4079526a5a1180a90",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T11:19:02.975655192Z",
+  "completed_at": "2026-07-13T11:24:10.815871346Z",
+  "duration_ms": 307840,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required [plan document](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1) exists, is substantive, and is linked to planning issue `1dbc72f6` as a design document at the exact required path. The investigation and owner-approved brief are also linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses all six hard epic criteria in [§1](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:23) and maps them to implementation tasks in the [coverage map](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:530). It preserves the owner amendments concerning categories, working-tree scope, proportional concurrency, terminal eligibility, and time-independent candidate reporting.\n\nThe criteria coverage is otherwise complete, but REQ-03’s recovery design remains technically unsound as described below.\n\n## Technical soundness and architectural fit\n\nFail. The pure planner, storage mutation boundary, command orchestration, repository write guard, hierarchy resolution, and shared preview/execution model fit the repository architecture. However, the event recovery contract still has two blocking defects:\n\n- Its reconciliation trigger cannot observe every unrecorded publication.\n- It assumes a failed append leaves an event log that can still be read, which the current storage implementation does not guarantee.\n\nThese defects invalidate the plan’s claim that retries converge with every mutating execution represented by an archive event.\n\n## Decomposition and dependencies\n\nThe nine-task dependency structure is coherent: model → inventory → discovery → classifier → preview, with the storage primitive independent; execution and candidates can then proceed in parallel, and legacy removal correctly waits for both.\n\nThere is nevertheless a decomposition gap: no task owns hardening or repairing partial event-log appends, despite the coordinated-execution task relying on successful event-log inspection during reconciliation.\n\n## Risks and actionability\n\nMost material risks have explicit decisions and tests, including partial staging cleanup, destination races, stale sources, symlinks, topology validation, and legacy removal.\n\nEvent-append recovery is listed as resolved, but the mitigations do not cover the two cases below. These are load-bearing because `LOCAL-31` and `LOCAL-32` make retry convergence and event uniqueness acceptance requirements.\n\n## Prior review feedback\n\nThe previous advisory finding about partial-staging failure injection is addressed by [LOCAL-32](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:479).\n\nThe previous blocking event-recovery finding is only partially addressed. Destination-rooted reference reconciliation handles failed compensating relinks, but it does not cover publication-only state.\n\n## Findings\n\n1. **F1 — High, blocking, issue-impact:** Publication-only executions can still become permanently unrecorded. The event contract leaves published files after append failure and reconciles only when a rerun discovers destination-rooted issue references not covered by an event ([plan lines 227–243](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:227), [LOCAL-31](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:474)). A concrete supported case is a zero-owner managed document, expressly executable under [D-15](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:656), that also falls under a permanent path: D-16 classifies it as copy, so it publishes a mirror but changes no reference and deletes no source. Configuration currently permits managed/permanent overlap because the fields are independent and have no disjointness validation ([config.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:380)). After append failure, the rerun adopts the identical destination, performs no mutation, finds no destination-rooted reference, and therefore appends no event under D-18/D-19. This contradicts the binding “one event per mutating execution” contract and leaves the prior blocking feedback unresolved for copy-only publication.\n\n2. **F2 — High, blocking, issue-impact:** Reconciliation assumes `read_events` remains usable after `append_event` returns an error, but the current API does not provide that contract. `JsonFileStorage::append_event` writes directly with `writeln!` ([json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:737)); an ordinary partial-write error can leave a truncated trailing JSON record. `read_events` then fails on that malformed line rather than recovering or ignoring a proven incomplete tail ([json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:754)). The plan’s generic event-failure injection does not assign append-tail integrity, truncation, or repair to any task. Consequently, the proposed rerun may be unable to inspect prior events and cannot execute the reconciliation promised by `LOCAL-31`. This is an ordinary process-level I/O failure, not merely the explicitly excluded power-loss or exactly-once case.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Event recovery remains unsound for publication-only operations and for partial writes that leave the current event log unreadable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Publication-only copy executions can remain permanently unrecorded because reconciliation triggers only on uncovered destination-rooted references.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":227,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The recovery design assumes failed event appends leave a readable log, but the current direct append can leave a malformed trailing record that prevents reconciliation.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":244,\"references\":[\"@/inv/event-log\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6691 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b33-b4d3-7f63-aedd-0a8a68477567\n--------\nuser\n--- 6678 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Event recovery remains unsound for publication-only operations and for partial writes that leave the current event log unreadable.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Publication-only copy executions can remain permanently unrecorded because reconciliation triggers only on uncovered destination-rooted references.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 227,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The recovery design assumes failed event appends leave a readable log, but the current direct append can leave a malformed trailing record that prevents reconciliation.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 244,
+        "references": [
+          "@/inv/event-log"
+        ]
+      }
+    ]
+  }
+}

@@ -224,9 +224,16 @@ plan-side narrowing.
     list-envelope convention; each candidate is the same target plan envelope. Every check
     with explicit inputs is evaluated; an incomplete/unconfigured policy reports its
     distinct blocker and never substitutes defaults to claim eligibility.
-  - **Event contract (binding; one event kind).** A mutating execution appends one archive
-    event after publications and reference relinks persist and before source deletions,
-    recording the target, destination root, published artifacts, applied reference changes,
+  - **Event contract (binding; one event kind).** The event's authoritative scope follows
+    `@/inv/event-log`, which covers **issue state changes**: an execution that mutates
+    issue state (reference relinks, deletions of referenced paths) appends one archive
+    event; an execution whose only effects are filesystem publications with no issue
+    mutation (a pure copy operation) appends none, by design — exactly as any other pure
+    filesystem preparation appends none, with the published mirror content itself the
+    durable record (recomputation classifies it `already_archived`). A mutating execution
+    appends its event after publications and reference relinks persist and before source
+    deletions, recording the target, destination root, published artifacts
+    (informatively), applied reference changes,
     and the planned deletions with their recorded identities. **An event-append failure
     reverts the just-applied reference changes** (sources still exist because deletions
     have not run — the same rollback the current single-document command performs,
@@ -237,9 +244,14 @@ plan-side narrowing.
     **reconstructible from observed state**: a rerun that finds references resolving under
     the destination root uncovered by any recorded archive event appends one reconciling
     archive event describing the observed adopted state — the sole exception to the
-    no-op-rerun-appends-nothing rule. Deletions then run under the D-17 reference-proven
-    precondition and identity verification; failures surface as `deletion-failed`
-    warnings in the command result. A rerun that performs mutations (including residue deletions) appends its own
+    no-op-rerun-appends-nothing rule. Archive-path event reading tolerates a malformed
+    trailing record: a failed append can tear the last line of the append-only log, and
+    the reader detects and skips exactly one torn trailing record (by construction the
+    artifact of the failed append whose content the reconciling or retry append
+    restates), so a failed append can never make the log unreadable or block
+    reconciliation. Deletions then run under the D-17 reference-proven precondition and
+    identity verification; failures surface as `deletion-failed` warnings in the command
+    result. A rerun that performs mutations (including residue deletions) appends its own
     event; a rerun that mutates nothing appends nothing. "Durable" means the repository's
     process-level append contract (`append_event` returned success); this plan does not
     add power-loss or exactly-once semantics beyond `@/inv/event-log`. A crash between
@@ -473,10 +485,12 @@ label directly.
   owner, unselected references remain source-resolvable — and holds one write guard from
   recomputation through the final deletion attempt.` `[hard] LOCAL-31: Appends one archive
   event after publications and relinks and before deletions, recording publications,
-  reference changes, and planned deletions; an event-append failure reverts the
-  just-applied reference changes; a rerun that mutates nothing appends no event, except
-  that destination-rooted references uncovered by any recorded archive event trigger one
-  reconciling event describing the observed adopted state.` `[hard] LOCAL-32: Failure injection for partial staging (including staged-temp cleanup
+  reference changes, and planned deletions; a publication-only execution with no issue
+  mutation appends none; an event-append failure reverts the just-applied reference
+  changes; a rerun that mutates nothing appends no event, except that destination-rooted
+  references uncovered by any recorded archive event trigger one reconciling event; and
+  event reading skips a single malformed trailing record left by a failed append.`
+  `[hard] LOCAL-32: Failure injection for partial staging (including staged-temp cleanup
   verification), partial relink, event-append failure with and without a successful
   compensating revert, deletion failure, and a source edited after planning proves no
   artifact is lost, no
@@ -697,9 +711,13 @@ review; none is REOPEN.
   proportionality amendment — recovery state machines for a short, recomputable,
   git-recoverable operation); treating every occupied destination as a blocker (makes
   every partial failure permanent).
-- **D-19 — One archive event per mutating execution:** chosen **append one event after
-  publications and reference relinks persist and before deletions, recording target,
-  destination root, publications, applied reference changes, and planned deletions;
+- **D-19 — One archive event per issue-mutating execution:** chosen **the event's scope
+  is `@/inv/event-log`'s own: issue state changes. An execution that relinks references
+  or deletes referenced paths appends one event after publications and relinks persist
+  and before deletions, recording target, destination root, publications
+  (informatively), applied reference changes, and planned deletions; a publication-only
+  execution (pure copies, no issue mutation) appends none by design, its published
+  mirror content being the durable record that recomputation re-derives;
   deletion failures are command-result warnings; a mutating rerun appends its own event
   and a no-op rerun appends none; an event-append failure reverts the just-applied
   reference changes (deletions have not run, so sources exist for the revert — the
@@ -707,7 +725,9 @@ review; none is REOPEN.
   when both the append and the revert fail, a rerun detecting destination-rooted
   references uncovered by any recorded archive event appends one reconciling event
   describing the observed adopted state — the record is reconstructible from state, so
-  no reference mutation persists permanently unrecorded**. Durability is the existing process-level
+  no reference mutation persists permanently unrecorded; and archive-path event reading
+  detects and skips one malformed trailing record (the torn artifact of a failed append),
+  so a failed append never leaves the log unreadable**. Durability is the existing process-level
   `append_event` contract (`@/inv/event-log`); a crash between mutation and append is
   within the amended contract and the next rerun recomputes and reports. Rejected (owner
   proportionality amendment): the four-event Started/Executed/SourcesRemoved/Aborted
