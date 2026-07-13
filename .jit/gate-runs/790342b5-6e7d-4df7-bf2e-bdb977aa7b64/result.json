@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "790342b5-6e7d-4df7-bf2e-bdb977aa7b64",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485",
+  "commit": "c6723583f4b60a4d8f9a8c131ee0bd7de116cf49",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T15:10:01.259295405Z",
+  "completed_at": "2026-07-13T15:12:59.778079920Z",
+  "duration_ms": 178518,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:67f4ded1` — `c6723583`, `30e6a713`, `1b709360`\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/atomic-writes` (`.jit/invariants.toml`, registry-first); `@/gate/cargo-ci`, `@/gate/code-review` (`.jit/gates.toml`, registry-first); `@/charter/D-1`, `D-4`, `D-6` (`dev/vision/9db27a3a-charter.md`, markdown-first)\nGate evidence: `cargo-ci` passed (exit 0, 2026-07-13T15:07:29Z); `code-review` unrun\nTruncation recovery: none\n\n1. **[blocking][issue-impact] F1:** `publish_staged_artifact` accepts an unverified `StagedArtifact`; verification returns `()` and does not produce a verified-only capability. A caller can stage and publish arbitrary bytes without supplying or checking the recorded SHA-256/size, violating the required verified-staging publication contract. [artifact_mutation.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/artifact_mutation.rs:191) (`@/invariant/atomic-writes`).\n\n2. **[blocking][issue-impact] F2:** An occupied symlink destination does not return `AlreadyExists`. `publish_staged_artifact` calls `physical_repo_path` first, which rejects a symlink leaf as `SymlinkArtifact` before the collision checks. This violates the hard requirement that every occupied destination returns `AlreadyExists`; existing tests cover only regular-file collisions. [artifact_mutation.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/artifact_mutation.rs:193) (`@/invariant/atomic-writes`).\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Publication can bypass required identity verification and misclassifies occupied symlink destinations.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Publish accepts an unverified stage, so verified staging is not enforced.\",\"file\":\"crates/jit/src/storage/artifact_mutation.rs\",\"line\":191,\"references\":[\"@/invariant/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An occupied symlink destination returns SymlinkArtifact instead of AlreadyExists.\",\"file\":\"crates/jit/src/storage/artifact_mutation.rs\",\"line\":193,\"references\":[\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2902 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5c07-2c54-7522-9669-7ed55ef2d4ec\n--------\nuser\n--- 2889 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Publication can bypass required identity verification and misclassifies occupied symlink destinations.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Publish accepts an unverified stage, so verified staging is not enforced.",
+        "file": "crates/jit/src/storage/artifact_mutation.rs",
+        "line": 191,
+        "references": [
+          "@/invariant/atomic-writes"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "An occupied symlink destination returns SymlinkArtifact instead of AlreadyExists.",
+        "file": "crates/jit/src/storage/artifact_mutation.rs",
+        "line": 193,
+        "references": [
+          "@/invariant/atomic-writes"
+        ]
+      }
+    ]
+  }
+}
