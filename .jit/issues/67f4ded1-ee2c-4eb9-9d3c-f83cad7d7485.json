@@ -2,9 +2,9 @@
   "id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485",
   "title": "Storage-owned artifact mutation primitive",
   "description": "Add narrowly scoped `JsonFileStorage` filesystem primitives for physical containment checks, staging, SHA-256 plus byte-size verification, atomic no-replace publication, and identity-verified source deletion. The primitives stage bytes, verify staged bytes against a caller-supplied recorded identity, publish new destinations so that success is returned only when this call created the destination (any collision — including identical bytes — is `AlreadyExists`), validate physical containment with no symlink traversal, and delete a caller-named source only after re-verifying its caller-supplied recorded identity. A destination on a different filesystem from the repository is a typed error, not a fallback. The primitive does not plan, lock the whole operation, append events, save issues, relink references, or decide deletion eligibility. As an interim hardening, the legacy document-archive mutation section acquires the repository write guard until that command's removal, so no unguarded JIT writer coexists with the guarded executor. Tempdir-backed `JsonFileStorage` tests cover filesystem behavior. Amend `.jit/invariants.toml` and its rendered AGENTS.md projection so `atomic-writes` explicitly covers staged atomic no-replace publication alongside temp-file plus atomic-rename replacement.\n\n## Success Criteria\n\n- [hard] REQ-01: Atomic no-replace publish rejects any occupied destination and preserves its bytes; the registry-first `atomic-writes` invariant and rendered projection explicitly cover staged no-replace publication as well as temp-file plus atomic-rename replacement.\n- [hard] REQ-02: The API exposes only physical containment, stage, verify, atomic no-replace publish, and identity-verified delete; publish reports success only when that call created the destination, and a collision — including identical bytes — returns `AlreadyExists`; the primitive performs no planning, issue or event mutation, operation-wide locking, or deletion-eligibility decision.\n- [hard] REQ-03: A race-focused test proves an external writer occupying the destination between planning and finalization causes failure without overwriting the foreign file.\n- [hard] REQ-04: Deletion removes a source only when it matches the caller-supplied recorded SHA-256 and byte size; a mismatch performs no removal and reports it, and a cross-filesystem destination fails with a typed error naming both paths.\n- [hard] REQ-05: The legacy document-archive mutation section holds the repository write guard until the command's removal.\n",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "220cca3e-ae58-425e-bbc9-e6b77106918e"
   ],
@@ -21,6 +21,7 @@
     "satisfies:REQ-03"
   ],
   "created_at": "2026-07-13T00:59:48.564654331Z",
-  "updated_at": "2026-07-13T13:56:04.608417448Z",
-  "first_ready_at": "2026-07-13T00:59:48.564654571Z"
+  "updated_at": "2026-07-13T14:55:12.781099965Z",
+  "first_ready_at": "2026-07-13T00:59:48.564654571Z",
+  "claimed_at": "2026-07-13T14:55:12.781099795Z"
 }
