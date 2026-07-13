@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "8bbdd1c1-9089-49c7-9761-dbff9110b682",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "0c86d83b-fc85-4696-94a3-65d19d934c9c",
+  "commit": "1d76f24ebb6d2a47a9576a17fdbdd2b7ac7f4b1b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T18:05:29.002247729Z",
+  "completed_at": "2026-07-13T18:08:38.518903271Z",
+  "duration_ms": 189516,
+  "exit_code": 0,
+  "stdout": "Attribution: `ece1bac5` (claim record), `1d76f24e` (classifier implementation)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-1`, `@/charter/D-3`, `@/charter/D-4`, `@/charter/D-6` (vision charter); `@/invariant/gate-semantics` (invariants registry); `@/invariant/domain-agnostic` (invariants registry); `@/gate/cargo-ci` (gate registry)\nGate evidence: `cargo-ci` passed, exit 0 (2026-07-13T18:02:22Z); no prior `code-review` run\nTruncation recovery: narrowed broad issue-search output to the context/dependency and affected paths; inspected each tagged patch separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable pure classifier, discovery ownership helper, and symlink inspection satisfy the issue-scoped criteria; the preview integration is explicitly deferred to dependent issue 41aa6056.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributable pure classifier, discovery ownership helper, and symlink inspection satisfy the issue-scoped criteria; the preview integration is explicitly deferred to dependent issue 41aa6056.",
+    "findings": []
+  }
+}
