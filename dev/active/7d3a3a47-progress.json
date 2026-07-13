@@ -60,6 +60,8 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "28fb4e6a": 1
+  },
   "started_at": "2026-07-13T17:15:12+03:00"
 }

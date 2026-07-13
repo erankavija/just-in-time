@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "f6705ee8-3291-400d-a942-6ac191eb5ed6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "28fb4e6a-89c8-4b02-ac3c-5bcf3708e674",
+  "commit": "003cfbf3c4cc234ae9d5d0fc83c6ea3ff86c68ec",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T14:37:51.698399804Z",
+  "completed_at": "2026-07-13T14:41:47.726779099Z",
+  "duration_ms": 236028,
+  "exit_code": 0,
+  "stdout": "Attribution: 003cfbf3, 10a1554b (`jit:28fb4e6a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review unrun in context\nTruncation recovery: artifact-plan source and commit patch reread in bounded chunks after the initial combined-output truncation\n\nNo findings. The prior breakdown-review schema-contract finding was addressed before the tagged implementation; the current issue contract and [golden test](crates/jit/tests/artifact_plan_model_tests.rs:230) cover the specified v1 fields and code sets.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged artifact-plan model implementation satisfies the issue-scoped schema, determinism, policy, identity, and conformance-test criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Tagged artifact-plan model implementation satisfies the issue-scoped schema, determinism, policy, identity, and conformance-test criteria.",
+    "findings": []
+  }
+}
