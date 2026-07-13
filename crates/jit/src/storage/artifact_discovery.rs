@@ -105,6 +105,19 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
         let bytes = match read_working_tree_path_without_symlinks(storage, &path) {
             Ok(WorkingTreeDiscoveryRead::Bytes(bytes)) => bytes,
             Ok(WorkingTreeDiscoveryRead::Symlink) => continue,
+            Ok(WorkingTreeDiscoveryRead::Unsupported) => {
+                let parents = referencing_paths.get(&path).cloned().unwrap_or_default();
+                for parent in parents {
+                    let parent_entry = working
+                        .get_mut(&parent)
+                        .ok_or_else(|| ArtifactDiscoveryError::MissingGraphEntry(parent.clone()))?;
+                    append_warning(
+                        parent_entry,
+                        PlanWarning::new(WarningCode::UnsupportedEdgeTarget, Some(&path)),
+                    )?;
+                }
+                continue;
+            }
             Err(PathReadError::NotFound(_)) => {
                 let entry = working
                     .get_mut(&path)
@@ -247,6 +260,7 @@ pub fn discover_repository_embedded_owners<S: IssueStore>(
                 let bytes = match read_working_tree_path_without_symlinks(storage, &path) {
                     Ok(WorkingTreeDiscoveryRead::Bytes(bytes)) => bytes,
                     Ok(WorkingTreeDiscoveryRead::Symlink) => continue,
+                    Ok(WorkingTreeDiscoveryRead::Unsupported) => continue,
                     Err(PathReadError::NotFound(_)) => continue,
                     Err(PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_)) => {
                         continue;
@@ -378,5 +392,33 @@ mod repository_ownership_tests {
         assert!(!owners
             .iter()
             .any(|owner| owner.artifact.ends_with("missing.png")));
+    }
+
+    #[test]
+    fn test_repository_ownership_does_not_swallow_unrepresentable_read_failures() {
+        let repo = TempDir::new().unwrap();
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+        fs::create_dir_all(repo.path().join("docs")).unwrap();
+        fs::write(repo.path().join("docs/not-a-directory"), "bytes").unwrap();
+
+        let mut issue = Issue::new("owner".into(), "owner".into());
+        issue.id = "owner-full-id".into();
+        issue.documents = vec![DocumentReference::new(
+            "docs/not-a-directory/child.md".into(),
+        )];
+
+        let result = discover_repository_embedded_owners(
+            &JsonFileStorage::new(repo.path().join(".jit")),
+            &[issue],
+            &BTreeSet::new(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(ArtifactDiscoveryError::Read {
+                path,
+                source: PathReadError::Other(_),
+            }) if path == "docs/not-a-directory/child.md"
+        ));
     }
 }

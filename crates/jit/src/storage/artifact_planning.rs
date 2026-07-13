@@ -65,6 +65,9 @@ fn inspect_location<S: IssueStore>(storage: &S, path: &str) -> Result<ArtifactLo
     if working_tree_path_has_symlink(storage, path)? {
         return Ok(ArtifactLocation::Symlink);
     }
+    if working_tree_path_is_unsupported(storage, path)? {
+        return Ok(ArtifactLocation::Unsupported);
+    }
     match storage.read_path_bytes(path, None) {
         Ok((bytes, _)) => Ok(ArtifactLocation::Regular(ContentIdentity::from_bytes(
             &bytes,
@@ -80,6 +83,8 @@ pub(crate) enum WorkingTreeDiscoveryRead {
     Bytes(Vec<u8>),
     /// The leaf or an intermediate component is a symbolic link.
     Symlink,
+    /// An existing filesystem object is neither a regular file nor a symlink.
+    Unsupported,
 }
 
 /// Read one repository-relative working-tree path only when no component is a
@@ -95,10 +100,30 @@ pub(crate) fn read_working_tree_path_without_symlinks<S: IssueStore>(
 ) -> Result<WorkingTreeDiscoveryRead, PathReadError> {
     if working_tree_path_has_symlink(storage, path)? {
         Ok(WorkingTreeDiscoveryRead::Symlink)
+    } else if working_tree_path_is_unsupported(storage, path)? {
+        Ok(WorkingTreeDiscoveryRead::Unsupported)
     } else {
         storage
             .read_path_bytes(path, None)
             .map(|(bytes, _)| WorkingTreeDiscoveryRead::Bytes(bytes))
+    }
+}
+
+/// Report whether the leaf is an existing non-regular, non-symlink object.
+///
+/// Missing paths remain ordinary storage reads so discovery can preserve its
+/// existing missing-root and missing-edge diagnostics. Metadata failures other
+/// than absence stay fatal instead of being flattened into plan diagnostics.
+fn working_tree_path_is_unsupported<S: IssueStore>(
+    storage: &S,
+    path: &str,
+) -> Result<bool, PathReadError> {
+    validate_repo_relative_path(path)?;
+    let repo_root = repository_root(storage).map_err(PathReadError::Other)?;
+    match fs::symlink_metadata(repo_root.join(path)) {
+        Ok(metadata) => Ok(!metadata.is_file() && !metadata.file_type().is_symlink()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(PathReadError::from(error)),
     }
 }
 

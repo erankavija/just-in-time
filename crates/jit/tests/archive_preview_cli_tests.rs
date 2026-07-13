@@ -717,6 +717,136 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
 }
 
 #[test]
+fn test_archive_candidates_cli_reports_directory_root_and_continues_without_mutation() {
+    let repo = TempDir::new().unwrap();
+    assert_success(&jit(&repo, &["init", "--json"]));
+    let config_path = repo.path().join(".jit/config.toml");
+    let shipped = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        &config_path,
+        format!(
+            "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n\n{shipped}"
+        ),
+    )
+    .unwrap();
+    fs::create_dir_all(repo.path().join("dev/active")).unwrap();
+    fs::write(repo.path().join("dev/index.md"), "[active](active/)").unwrap();
+    fs::write(repo.path().join("dev/active/regular.md"), "regular").unwrap();
+
+    let create = |title: &str| {
+        let created = jit(
+            &repo,
+            &[
+                "issue", "create", "--title", title, "--type", "epic", "--json",
+            ],
+        );
+        assert_success(&created);
+        serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let directory_candidate = create("Directory candidate");
+    let regular_candidate = create("Regular candidate");
+    for (id, path) in [
+        (&directory_candidate, "dev/index.md"),
+        (&regular_candidate, "dev/active/regular.md"),
+    ] {
+        assert_success(&jit(
+            &repo,
+            &["doc", "add", id, path, "--skip-scan", "--json"],
+        ));
+        assert_success(&jit(
+            &repo,
+            &["issue", "update", id, "--state", "rejected", "--json"],
+        ));
+    }
+    let before = snapshot_tree(repo.path());
+
+    let first = jit(&repo, &["archive", "candidates", "--json"]);
+    let second = jit(&repo, &["archive", "candidates", "--json"]);
+    assert_success(&first);
+    assert_success(&second);
+    assert_eq!(first.stdout, second.stdout);
+    let report: Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(report["count"], 2);
+    let directory_plan = report["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["target"]["id"] == directory_candidate)
+        .unwrap();
+    assert_eq!(directory_plan["eligible"], false);
+    let directory_artifact = directory_plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == "dev/active")
+        .unwrap();
+    assert_eq!(directory_artifact["action"], "block");
+    assert!(directory_artifact["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|blocker| {
+            blocker["code"] == "unsupported-artifact-type" && blocker["path"] == "dev/active"
+        }));
+    let parent_artifact = directory_plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == "dev/index.md")
+        .unwrap();
+    assert!(parent_artifact["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| {
+            warning["code"] == "unsupported-edge-target" && warning["path"] == "dev/active"
+        }));
+
+    let preview = jit(
+        &repo,
+        &["archive", "container", &directory_candidate, "--json"],
+    );
+    assert_success(&preview);
+    let preview_plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(preview_plan, *directory_plan);
+    let document_preview = jit(&repo, &["archive", "document", "dev/active", "--json"]);
+    assert_success(&document_preview);
+    let document_plan: Value = serde_json::from_slice(&document_preview.stdout).unwrap();
+    assert!(document_plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["source"] == "dev/active")
+        .unwrap()["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|blocker| {
+            blocker["code"] == "unsupported-artifact-type" && blocker["path"] == "dev/active"
+        }));
+    let execute = jit(
+        &repo,
+        &[
+            "archive",
+            "container",
+            &directory_candidate,
+            "--execute",
+            "--json",
+        ],
+    );
+    assert!(!execute.status.success());
+    let document_execute = jit(
+        &repo,
+        &["archive", "document", "dev/active", "--execute", "--json"],
+    );
+    assert!(!document_execute.status.success());
+    assert_eq!(snapshot_tree(repo.path()), before);
+}
+
+#[test]
 fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutation() {
     for (config, expected) in [
         ("", "unconfigured"),

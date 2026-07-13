@@ -62,6 +62,7 @@ mod artifact_location_tests {
         let repo = TempDir::new().unwrap();
         fs::create_dir_all(repo.path().join(".jit")).unwrap();
         fs::create_dir_all(repo.path().join("real")).unwrap();
+        fs::create_dir_all(repo.path().join("directory-artifact")).unwrap();
         fs::write(repo.path().join("real/file.md"), b"content").unwrap();
         symlink(
             repo.path().join("real/file.md"),
@@ -88,6 +89,16 @@ mod artifact_location_tests {
         assert!(matches!(
             storage.inspect_artifact_location("real/file.md").unwrap(),
             ArtifactLocation::Regular(_)
+        ));
+        assert_eq!(
+            storage
+                .inspect_artifact_location("directory-artifact")
+                .unwrap(),
+            ArtifactLocation::Unsupported
+        );
+        assert!(matches!(
+            storage.inspect_artifact_location("real/file.md/child"),
+            Err(crate::storage::PathReadError::Other(_))
         ));
     }
 }
@@ -199,7 +210,9 @@ impl JsonFileStorage {
     /// bytes are read. This is stricter than general repository reads, which
     /// permit in-repository symlinks, because archival planning must classify
     /// roots, destinations, and traversals as `symlink-artifact` rather than
-    /// silently operating on their referents.
+    /// silently operating on their referents. Existing non-regular leaves are
+    /// returned as `Unsupported`; metadata and traversal failures remain typed
+    /// storage errors.
     pub fn inspect_artifact_location(
         &self,
         path: &str,
@@ -232,12 +245,7 @@ impl JsonFileStorage {
 
         let metadata = fs::symlink_metadata(&candidate)?;
         if !metadata.is_file() {
-            return Err(PathReadError::Other(
-                crate::errors::InvalidArgumentError::new(format!(
-                    "Artifact path is not a regular file: {path}"
-                ))
-                .into(),
-            ));
+            return Ok(ArtifactLocation::Unsupported);
         }
         fs::read(candidate)
             .map(|bytes| ArtifactLocation::Regular(ContentIdentity::from_bytes(&bytes)))

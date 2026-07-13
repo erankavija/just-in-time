@@ -326,6 +326,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "non-terminal-target",
             "missing-source",
             "symlink-artifact",
+            "unsupported-artifact-type",
         ]
     );
     assert_eq!(
@@ -338,6 +339,7 @@ fn test_archive_plan_schema_v1_golden_fields_and_codes() {
             "deletion-failed",
             "not-selected-sibling",
             "dynamic-loading-suspected",
+            "unsupported-edge-target",
         ]
     );
 }

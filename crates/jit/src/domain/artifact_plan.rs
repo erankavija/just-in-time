@@ -405,11 +405,12 @@ pub enum BlockerCode {
     NonTerminalTarget,
     MissingSource,
     SymlinkArtifact,
+    UnsupportedArtifactType,
 }
 
 impl BlockerCode {
     /// Complete schema-v1 blocker vocabulary, in binding contract order.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::PolicyUnconfigured,
         Self::PolicyIncomplete,
         Self::UnmanagedSelectedRoot,
@@ -422,6 +423,7 @@ impl BlockerCode {
         Self::NonTerminalTarget,
         Self::MissingSource,
         Self::SymlinkArtifact,
+        Self::UnsupportedArtifactType,
     ];
 
     /// Stable kebab-case wire spelling.
@@ -439,6 +441,7 @@ impl BlockerCode {
             Self::NonTerminalTarget => "non-terminal-target",
             Self::MissingSource => "missing-source",
             Self::SymlinkArtifact => "symlink-artifact",
+            Self::UnsupportedArtifactType => "unsupported-artifact-type",
         }
     }
 }
@@ -454,11 +457,12 @@ pub enum WarningCode {
     DeletionFailed,
     NotSelectedSibling,
     DynamicLoadingSuspected,
+    UnsupportedEdgeTarget,
 }
 
 impl WarningCode {
     /// Complete schema-v1 warning vocabulary, in binding contract order.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::MissingEdgeTarget,
         Self::ExternalEdge,
         Self::NoOwner,
@@ -466,6 +470,7 @@ impl WarningCode {
         Self::DeletionFailed,
         Self::NotSelectedSibling,
         Self::DynamicLoadingSuspected,
+        Self::UnsupportedEdgeTarget,
     ];
 
     /// Stable kebab-case wire spelling.
@@ -478,6 +483,7 @@ impl WarningCode {
             Self::DeletionFailed => "deletion-failed",
             Self::NotSelectedSibling => "not-selected-sibling",
             Self::DynamicLoadingSuspected => "dynamic-loading-suspected",
+            Self::UnsupportedEdgeTarget => "unsupported-edge-target",
         }
     }
 }

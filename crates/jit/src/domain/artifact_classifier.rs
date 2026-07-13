@@ -81,6 +81,8 @@ pub enum ArtifactLocation {
     Regular(ContentIdentity),
     /// The path or any traversed component is a symbolic link.
     Symlink,
+    /// An existing filesystem object is neither a regular file nor a symlink.
+    Unsupported,
 }
 
 /// Source and computed-mirror facts for one working-tree artifact.
@@ -368,6 +370,18 @@ fn classify_entry(
         blockers.push(PlanBlocker::new(
             BlockerCode::SymlinkArtifact,
             Some(&source),
+        ));
+    }
+    if matches!(location.source, ArtifactLocation::Unsupported) {
+        blockers.push(PlanBlocker::new(
+            BlockerCode::UnsupportedArtifactType,
+            Some(&source),
+        ));
+    }
+    if matches!(location.destination, ArtifactLocation::Unsupported) {
+        blockers.push(PlanBlocker::new(
+            BlockerCode::DestinationConflict,
+            Some(&mirror),
         ));
     }
 
@@ -1308,6 +1322,28 @@ mod tests {
             .blockers()
             .iter()
             .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
+    }
+
+    #[test]
+    fn test_non_regular_source_and_destination_use_distinct_blockers() {
+        let plan = container(
+            vec![explicit("dev/active", vec![owner("i", State::Done, true)])],
+            locations(&[(
+                "dev/active",
+                ArtifactLocation::Unsupported,
+                ArtifactLocation::Unsupported,
+            )]),
+        );
+        let artifact = entry(&plan, "dev/active");
+        assert_eq!(artifact.action(), ArtifactAction::Block);
+        assert!(artifact.blockers().iter().any(|blocker| {
+            blocker.code == BlockerCode::UnsupportedArtifactType
+                && blocker.path.as_deref() == Some("dev/active")
+        }));
+        assert!(artifact.blockers().iter().any(|blocker| {
+            blocker.code == BlockerCode::DestinationConflict
+                && blocker.path.as_deref() == Some("dev/archive/abcdef12/dev/active")
+        }));
     }
 
     #[test]

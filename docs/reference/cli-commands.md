@@ -229,6 +229,16 @@ available. Human output renders the identical evaluated list and retains the
 reasons an entry is ineligible. Candidate order is deterministic by full target
 ID, while the human view identifies targets by short ID.
 
+An issue-linked path that exists but is not a regular file or symbolic link
+(for example, a directory) is represented in its target plan with action
+`block` and blocker `unsupported-artifact-type`; it does not abort the report
+or omit other candidates. Direct document and container previews use the same
+diagnostic, and `--execute` refuses the ineligible plan without mutation.
+When a supported local reference resolves to such an object, its parent also
+reports warning `unsupported-edge-target` with the normalized target path.
+Unexpected metadata or storage failures still fail planning instead of being
+converted into this blocker.
+
 The candidates command has no age, retention, category, suggestion, or default
 target behavior, and it has no `--execute` form. It never writes artifacts,
 issue records, or events. Missing and partial documentation policy therefore
