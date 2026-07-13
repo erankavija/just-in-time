@@ -57,8 +57,12 @@ copied to the mirror while their source remains in place; “permanent” preven
 source deletion, not mirror publication.
 
 Dependency-aware `jit archive document` and `jit archive container` planning
-and `--execute` classify this table by authored completeness. Mutation-authorizing policy is
-`configured` only when all three of these keys are explicitly present:
+and `--execute` classify this table by authored completeness. The read-only
+`jit archive candidates` report consumes the same policy: for every candidate
+it derives and reports `configured`, `incomplete`, or `unconfigured`, without
+authorizing execution or substituting accessor defaults. For target planning
+and execution, mutation-authorizing policy is `configured` only when all three
+of these keys are explicitly present:
 
 | Required key | Archive-planner meaning |
 |--------------|-------------------------|
