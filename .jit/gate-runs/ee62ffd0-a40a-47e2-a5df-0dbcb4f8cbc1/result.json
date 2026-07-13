@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "ee62ffd0-a40a-47e2-a5df-0dbcb4f8cbc1",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "2804bab20c845d2ffa78a31ea2c0cd421e61f085",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T11:11:16.961410468Z",
+  "completed_at": "2026-07-13T11:17:32.001451858Z",
+  "duration_ms": 375040,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPASS. The required [plan document](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1) exists at the exact requested path, is substantive, and is linked through `issue.documents` as the approved design. The investigation and owner-approved brief are also linked and complete. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nPASS. Section 1 maps all six `[hard]` epic criteria to concrete behavior, and the coverage map at [lines 522–531](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:522) assigns each criterion to implementation leaves.\n\nThe plan preserves the owner-approved amendments: no category input, no retention filtering, working-tree-only dependency closure for pinned artifacts, explicit execution, and scoped concurrency guarantees. Markdown, HTML, CSS, CSV, PNG, and SVG fixtures are assigned to the preview surface.\n\n## Technical soundness and architectural fit\n\nFAIL due to F1.\n\nThe principal architecture is appropriate: pure discovery/classification, storage-owned filesystem mutation, command-layer coordination under `RepoWriteGuard`, and CLI/output-only presentation. Hierarchy resolution, commit-aware reads, configuration option fields, and the repository write guard all exist where the plan claims.\n\nHowever, the event-append recovery guarantee at [lines 227–242](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:227) assumes compensating reference writes cannot fail. The cited existing rollback explicitly describes restoration as best effort and retains both copies when restoration is incomplete ([document.rs:1391](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/document.rs:1391)). Ordinary `save_issue` also changes `updated_at`; exact compensation requires the existing `restore_issue_verbatim` facility ([storage/mod.rs:128](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/mod.rs:128)).\n\nAfter a copy-style archive, an append failure followed by failed compensation can leave the source, destination, and all selected references in their intended final positions. Recalculation then produces a no-op, for which the plan forbids an event. This contradicts LOCAL-31’s claim that no reference mutation persists unrecorded and leaves the prior event-log blocker unresolved.\n\n## Decomposition and dependencies\n\nPASS. The prior dependency defects are corrected:\n\n- Candidate reporting now depends on the unified preview/command surface at [line 503](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:503).\n- Legacy removal depends on both coordinated execution and candidate reporting at [line 484](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:484).\n- The resulting waves are coherent: model/storage, inventory, discovery, classification, preview, execution/candidates, then removal.\n\nF2 is advisory: the owner-required partial-staging failure-injection case is not assigned to a task criterion.\n\n## Risks and actionability\n\nFAIL due to F1. The risk table’s assertion that reruns provide an audit trail for every published state at [line 561](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:561) does not cover failed or unverifiable compensation.\n\nThe plan must specify exact issue snapshots and verbatim restoration, plus behavior when that restoration cannot be completed. That behavior must ensure a later recovery run records the archival state even when adopting it requires no further filesystem or issue mutation.\n\n## Prior review feedback\n\n- Prior F1: only partially addressed and remains blocking. Successful rollback fixes the ordinary append-error path, but failed compensation recreates the same forbidden no-op recovery state.\n- Prior F2: resolved by the candidate-report dependency on the unified preview surface.\n- Prior F3: resolved by making legacy removal depend on both replacement command branches.\n\n## Findings\n\n1. **F1 — High, blocking:** Event-append recovery assumes infallible reference compensation, contrary to the cited best-effort rollback. If compensating saves fail after a copy-style execution, publications and relinks can remain while the next recomputation is a no-op forbidden from appending the missing archive event. The plan must define exact snapshot restoration and a recovery/event rule for unverifiable compensation.\n2. **F2 — Low, advisory:** The owner-approved brief requires partial-staging failure injection, but the storage and execution task criteria do not assign or define that test or staged-artifact cleanup behavior.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Event-append recovery remains unsound when compensating reference restoration fails; command-family dependency edges are fixed, with one advisory failure-injection omission.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Copy-style execution can still leave unrecorded publications and relinks when event append and compensating reference restoration both fail, after which the mandated no-op rerun cannot append the missing event.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":230,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The decomposition does not assign the owner-required partial-staging failure-injection and cleanup verification to any task criterion.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":402}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6545 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b2c-9884-70a0-a75c-d7088f12be77\n--------\nuser\n--- 6532 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Event-append recovery remains unsound when compensating reference restoration fails; command-family dependency edges are fixed, with one advisory failure-injection omission.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Copy-style execution can still leave unrecorded publications and relinks when event append and compensating reference restoration both fail, after which the mandated no-op rerun cannot append the missing event.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 230,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The decomposition does not assign the owner-required partial-staging failure-injection and cleanup verification to any task criterion.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 402
+      }
+    ]
+  }
+}

@@ -232,9 +232,14 @@ plan-side narrowing.
     have not run — the same rollback the current single-document command performs,
     `document.rs:1391-1435`), so no reference mutation ever persists unrecorded; the
     published destination files remain as inert content that the next mutating run adopts
-    by content and records in its own event. Deletions then run under the D-17
-    reference-proven precondition and identity verification; failures surface as
-    `deletion-failed` warnings in the command result. A rerun that performs mutations (including residue deletions) appends its own
+    by content and records in its own event. Should both the append and the compensating
+    revert fail, the record is still never lost permanently, because the event is
+    **reconstructible from observed state**: a rerun that finds references resolving under
+    the destination root uncovered by any recorded archive event appends one reconciling
+    archive event describing the observed adopted state — the sole exception to the
+    no-op-rerun-appends-nothing rule. Deletions then run under the D-17 reference-proven
+    precondition and identity verification; failures surface as `deletion-failed`
+    warnings in the command result. A rerun that performs mutations (including residue deletions) appends its own
     event; a rerun that mutates nothing appends nothing. "Durable" means the repository's
     process-level append contract (`append_event` returned success); this plan does not
     add power-loss or exactly-once semantics beyond `@/inv/event-log`. A crash between
@@ -469,9 +474,12 @@ label directly.
   recomputation through the final deletion attempt.` `[hard] LOCAL-31: Appends one archive
   event after publications and relinks and before deletions, recording publications,
   reference changes, and planned deletions; an event-append failure reverts the
-  just-applied reference changes so no unrecorded reference mutation persists; a rerun
-  that mutates nothing appends no event.` `[hard] LOCAL-32: Failure injection for partial relink, event-append failure,
-  deletion failure, and a source edited after planning proves no artifact is lost, no
+  just-applied reference changes; a rerun that mutates nothing appends no event, except
+  that destination-rooted references uncovered by any recorded archive event trigger one
+  reconciling event describing the observed adopted state.` `[hard] LOCAL-32: Failure injection for partial staging (including staged-temp cleanup
+  verification), partial relink, event-append failure with and without a successful
+  compensating revert, deletion failure, and a source edited after planning proves no
+  artifact is lost, no
   destination overwritten, and no reference relying solely on a missing path; a rerun
   after each injected failure converges — already-archived recognition, inverse-mapping
   residue rediscovery, deletion only under the unified precondition (every selected
@@ -695,9 +703,11 @@ review; none is REOPEN.
   deletion failures are command-result warnings; a mutating rerun appends its own event
   and a no-op rerun appends none; an event-append failure reverts the just-applied
   reference changes (deletions have not run, so sources exist for the revert — the
-  rollback the single-document command already performs, `document.rs:1391-1435`), so no
-  reference mutation persists unrecorded and the adoption rerun is never a forbidden
-  no-op over unrecorded state**. Durability is the existing process-level
+  rollback the single-document command already performs, `document.rs:1391-1435`); and
+  when both the append and the revert fail, a rerun detecting destination-rooted
+  references uncovered by any recorded archive event appends one reconciling event
+  describing the observed adopted state — the record is reconstructible from state, so
+  no reference mutation persists permanently unrecorded**. Durability is the existing process-level
   `append_event` contract (`@/inv/event-log`); a crash between mutation and append is
   within the amended contract and the next rerun recomputes and reports. Rejected (owner
   proportionality amendment): the four-event Started/Executed/SourcesRemoved/Aborted
