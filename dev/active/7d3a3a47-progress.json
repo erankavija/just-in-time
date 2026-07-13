@@ -73,6 +73,16 @@
       "authorization": "User authorized an exceptional third rework cycle and requested immediate handoff.",
       "resolved_at": "2026-07-13T20:40:51+03:00",
       "resolution": "Exceptional rework commit 263c04a4 passed cargo-ci and code-review."
+    },
+    {
+      "issue_short_id": "41aa6056",
+      "kind": "rework_limit_exceeded",
+      "status": "awaiting_user_direction",
+      "root_finding": "Archive preview documentation remains structurally ambiguous after two rework cycles.",
+      "latest_finding": "The archive-preview section absorbs an unrelated gate-blocked JSON example and implies the wrong error behavior.",
+      "gate_commit": "4025ebbc3b336e445dc30f48bf57f9aa01d09573",
+      "rework_cycles": 2,
+      "recorded_at": "2026-07-13T22:09:47+03:00"
     }
   ],
   "rework_counts": {
