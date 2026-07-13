@@ -40,7 +40,7 @@ kind = "advisory"
 
 [[invariants]]
 id = "atomic-writes"
-statement = "All file writes use the temp-file + atomic-rename pattern."
+statement = "All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten."
 kind = "advisory"
 
 [[invariants]]
