@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "746c0786-c526-415b-b35e-720974b76f55",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
+  "commit": "d94bcb59aa58b224b5336864c78c2cb738660a3b",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T19:03:18.778462277Z",
+  "completed_at": "2026-07-13T19:05:19.960367238Z",
+  "duration_ms": 121181,
+  "exit_code": 1,
+  "stdout": "Attribution: `41aa6056` is a leaf `task` (level 4) with no resolved children. I inspected its four individually tagged commits; only the feature and follow-up fix affect the shipped archive-preview surface.\n\nThe new preview commands are well covered in the CLI and configuration references, but the canonical command-grammar reference was not updated for the new top-level noun.\n\n1. **F1 — blocking, issue-impact, medium.** [CLI Command-Grammar Standard](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-command-grammar.md:19) claims to enumerate the CLI noun groups but omits `archive`; its issue-ID consistency rule also does not include `archive container <id>`. Add `archive` to the noun list and specify `archive document <path>` / `archive container <id>` (including normal issue-ID resolution for the latter).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new archive command group is absent from the canonical CLI command-grammar reference.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical CLI grammar omits the new archive noun and its container issue-ID subject.\",\"file\":\"docs/reference/cli-command-grammar.md\",\"line\":19}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.Cl3EkPTFsX: binary file matches\n--- agent stderr (first 13 of 11234 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5cdc-c0bf-7f21-80f9-9de4eeefd914\n--------\nuser\n--- 11221 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The new archive command group is absent from the canonical CLI command-grammar reference.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical CLI grammar omits the new archive noun and its container issue-ID subject.",
+        "file": "docs/reference/cli-command-grammar.md",
+        "line": 19
+      }
+    ]
+  }
+}

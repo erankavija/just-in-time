@@ -15,25 +15,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "cargo-ci": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T18:29:59.006374860Z"
+      "updated_at": "2026-07-13T18:59:30.359218016Z"
     },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-13T15:58:38.937127191Z"
     },
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-13T15:57:36.739886482Z"
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-13T18:55:17.668879556Z"
     },
-    "code-review": {
+    "doc-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T18:34:20.814984701Z"
+      "updated_at": "2026-07-13T19:03:18.778462277Z"
     }
   },
   "context": {},
@@ -44,7 +44,7 @@
     "satisfies:REQ-06"
   ],
   "created_at": "2026-07-13T00:59:48.565182241Z",
-  "updated_at": "2026-07-13T18:38:11.760915070Z",
+  "updated_at": "2026-07-13T19:05:19.960562098Z",
   "first_ready_at": "2026-07-13T00:59:48.565182681Z",
   "claimed_at": "2026-07-13T18:09:16.615389393Z"
 }

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0044aad1-ac01-4ef9-855d-e811e827ebb5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
+  "commit": "d94bcb59aa58b224b5336864c78c2cb738660a3b",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T18:59:30.359218016Z",
+  "completed_at": "2026-07-13T19:03:03.246981523Z",
+  "duration_ms": 212887,
+  "exit_code": 0,
+  "stdout": "Attribution: 8e8c0bce, a87deba1, 6d8af8c2, d94bcb59\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending\nTruncation recovery: narrowed a truncated broad search to the context/dependency/epic records and linked archival documents; patches were read per commit and path\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The symlink-discovery and required fixture/parity gaps from the prior review are addressed; the attributable preview surface meets its hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The symlink-discovery and required fixture/parity gaps from the prior review are addressed; the attributable preview surface meets its hard criteria.",
+    "findings": []
+  }
+}
