@@ -1,0 +1,28 @@
+{
+  "id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+  "title": "Use strategic label slugs in archive directory names",
+  "description": "Archive container directories use a human-readable suffix derived from the container's curated strategic label while retaining the JIT short ID as the stable identity prefix. This makes archived artifacts navigable from the filesystem and aligns directory names with the vocabulary used by labels and queries.\n\n## Background\n\nContainer archives currently use an ID-only directory such as `dev/archive/7d3a3a47/`. Strategic labels already provide concise, stable handles such as `epic:artifact-archival`; using that label value produces the more readable `dev/archive/7d3a3a47-artifact-archival/` without making prose titles part of identity. Existing archives and repositories without a usable strategic label must remain valid.\n\n## Success Criteria\n\n- [hard] REQ-01: Selects the value of exactly one label in the namespace associated with the container's own configured type as the preferred archive slug; for example, `epic:artifact-archival` produces `<archive-root>/7d3a3a47-artifact-archival/`.\n- [hard] REQ-02: Keeps the short ID and marker-recorded full issue ID authoritative; the human-readable suffix never participates in identity matching.\n- [hard] REQ-03: Freezes the chosen directory name when an archive is first created, so later title or label changes reuse the marker-backed destination instead of renaming it or creating a second archive.\n- [hard] REQ-04: Recognizes and reconciles existing ID-only archive directories without migration, data movement, or duplicate destination creation.\n- [hard] REQ-05: Falls back deterministically to a normalized, length-bounded title slug when no unambiguous own-type strategic label exists, while preserving collision and overwrite protection for the resolved destination.\n- [hard] REQ-06: Shows the resolved slugged destination consistently in document/container previews, candidate reports, execution results, JSON output, and human output.\n- [hard] REQ-07: Verifies label selection, ambiguous and missing labels, normalization, title and label changes, legacy ID-only adoption, destination conflicts, repeat execution, and representative Unicode titles without mutating during preview.\n- [hard] REQ-08: Documents the naming, stability, fallback, marker-authority, and backward-compatibility contract in the canonical archive reference.\n\n## Notes\n\nThe strategic label is a curated display handle, not a replacement identifier. Directory lookup and adoption must continue to trust the container marker and full issue ID rather than parsing or trusting the suffix.",
+  "state": "ready",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "epic:core-maintenance",
+    "milestone:v1.0",
+    "component:storage",
+    "component:docs",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-13T23:43:56.890660860Z",
+  "updated_at": "2026-07-13T23:43:56.906342682Z",
+  "first_ready_at": "2026-07-13T23:43:56.890673860Z"
+}
