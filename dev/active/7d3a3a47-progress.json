@@ -77,19 +77,21 @@
     {
       "issue_short_id": "41aa6056",
       "kind": "rework_limit_exceeded",
-      "status": "awaiting_user_direction",
+      "status": "authorized",
       "root_finding": "Archive preview documentation remains structurally ambiguous after two rework cycles.",
       "latest_finding": "The archive-preview section absorbs an unrelated gate-blocked JSON example and implies the wrong error behavior.",
       "gate_commit": "4025ebbc3b336e445dc30f48bf57f9aa01d09573",
       "rework_cycles": 2,
-      "recorded_at": "2026-07-13T22:09:47+03:00"
+      "recorded_at": "2026-07-13T22:09:47+03:00",
+      "authorized_at": "2026-07-13T22:12:00+03:00",
+      "authorization": "User authorized an exceptional third rework cycle."
     }
   ],
   "rework_counts": {
     "28fb4e6a": 1,
     "67f4ded1": 1,
     "971c67f4": 3,
-    "41aa6056": 2
+    "41aa6056": 3
   },
   "started_at": "2026-07-13T17:15:12+03:00"
 }
