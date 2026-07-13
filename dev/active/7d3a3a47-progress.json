@@ -1,0 +1,65 @@
+{
+  "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
+  "epic_short_id": "7d3a3a47",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "28fb4e6a-89c8-4b02-ac3c-5bcf3708e674", "short_id": "28fb4e6a", "title": "Artifact plan model and blocker taxonomy", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485", "short_id": "67f4ded1", "title": "Storage-owned artifact mutation primitive", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "b45ad545-01ac-4bdc-9838-facea0751c42", "short_id": "b45ad545", "title": "Target root inventory and ownership", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6", "short_id": "971c67f4", "title": "Recursive supported-dependency discovery", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "0c86d83b-fc85-4696-94a3-65d19d934c9c", "short_id": "0c86d83b", "title": "Move/copy/retain/block classification", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id": "41aa6056-ecec-4924-94a6-a2bb275350ee", "short_id": "41aa6056", "title": "Unified archive preview surface", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id": "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b", "short_id": "f205aa7e", "title": "Coordinated plan execution", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {"id": "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b", "short_id": "a9f8e04d", "title": "Read-only container candidate report", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {"id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5", "short_id": "271dc224", "title": "Remove the legacy document-archive command", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-07-13T17:15:12+03:00"
+}
