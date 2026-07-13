@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0deaefcd-aa86-4921-baaa-6a9cf6554b50",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b",
+  "commit": "e8b3af1b8c97d451c6741555a015ff8b03438fb0",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T21:57:35.522793602Z",
+  "completed_at": "2026-07-13T21:59:26.618033248Z",
+  "duration_ms": 111095,
+  "exit_code": 0,
+  "stdout": "Attribution: `a9f8e04d` is a level-4 leaf with no resolved children. I individually inspected its four reachable `jit:a9f8e04d` commits with rename detection. The prior policy-status omission is resolved in [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:59); the command reference and grammar accurately cover the read-only report, JSON envelope, eligibility explanations, and flags.\n\nDocumentation impact decision: sufficient and accurate; no issue-impact documentation defects remain.\n\n1. No documentation findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s command and configuration-policy documentation accurately matches the current archive-candidates contract; the prior blocking omission is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue’s command and configuration-policy documentation accurately matches the current archive-candidates contract; the prior blocking omission is resolved.",
+    "findings": []
+  }
+}

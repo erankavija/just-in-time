@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -48,7 +48,7 @@
     {
       "wave_number": 8,
       "issues": [
-        {"id": "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b", "short_id": "a9f8e04d", "title": "Read-only container candidate report", "classification": "implementation", "status": "pending"}
+        {"id": "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b", "short_id": "a9f8e04d", "title": "Read-only container candidate report", "classification": "implementation", "status": "completed"}
       ]
     },
     {
