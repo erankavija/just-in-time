@@ -19,21 +19,21 @@
   "context": {},
   "documents": [
     {
-      "path": "dev/active/7d3a3a47-investigation.md",
+      "path": "dev/archive/7d3a3a47/dev/active/7d3a3a47-investigation.md",
       "commit": null,
       "label": "Current archival mechanism audit",
       "doc_type": "study",
       "format": "markdown"
     },
     {
-      "path": "dev/active/7d3a3a47-planning-brief.md",
+      "path": "dev/archive/7d3a3a47/dev/active/7d3a3a47-planning-brief.md",
       "commit": null,
       "label": "Owner-approved planning brief",
       "doc_type": "planning",
       "format": "markdown"
     },
     {
-      "path": "dev/active/7d3a3a47-plan.md",
+      "path": "dev/archive/7d3a3a47/dev/active/7d3a3a47-plan.md",
       "commit": null,
       "label": "Approved implementation plan",
       "doc_type": "design",
@@ -47,7 +47,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-12T21:36:24.520972602Z",
-  "updated_at": "2026-07-13T11:38:29.704845670Z",
+  "updated_at": "2026-07-13T23:28:29.821594948Z",
   "first_ready_at": "2026-07-12T21:36:24.520973112Z",
   "done_at": "2026-07-13T00:51:17.765768010Z"
 }
