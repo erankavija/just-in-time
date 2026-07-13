@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "890a508c-8f45-453b-9200-f624d588eebf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b",
+  "commit": "944068262b45b9fef2e9c10f12a2323393a53489",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T21:22:40.112154139Z",
+  "completed_at": "2026-07-13T21:26:56.970676291Z",
+  "duration_ms": 256858,
+  "exit_code": 0,
+  "stdout": "Attribution: 42005b3b, eece52e4, 4af58993, e9b96a12 (`jit:f205aa7e`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T21:20:39Z); doc-review pending; docs-mechanical pending\nTruncation recovery: re-read 42005b3b and 4af58993 archive patches in bounded slices; re-read affected storage, tests, and docs patches individually\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the attributable coordinated archive execution footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No unresolved issue-impact defects found in the attributable coordinated archive execution footprint.",
+    "findings": []
+  }
+}
