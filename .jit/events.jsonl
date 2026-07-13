@@ -7129,3 +7129,10 @@
 {"type":"issue_state_changed","id":"ed19deca-978e-41ff-b684-dbebb918db67","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:13:51.577892560Z","from":"backlog","to":"ready"}
 {"type":"gate_passed","id":"b013afa0-a0a2-43a4-8376-cecdcd76793c","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:18:55.028915772Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"b091997a-7fbe-4c1b-91a8-5051f7b0bf03","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:21:06.225834266Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"0857e028-7dc5-45b9-be38-82977d289388","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:21:52.693145346Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a921a16d-d0fa-4979-b84e-0669508516fa","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:23:46.262431680Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"8593fdbb-cd04-484a-9f12-a12c1d939cb1","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:23:46.666417134Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"31dbfd9a-9abe-4144-b562-50e45322ba5c","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:25:23.802326479Z","from":"ready","to":"done"}
+{"type":"issue_completed","id":"0d6f0321-3a30-45ce-9b79-8e2765dad0fa","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:25:23.802365009Z"}
+{"type":"issue_updated","id":"c4f8687c-23a1-4155-a997-c3c562febb5c","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:25:58.273129765Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"508f40fc-ea53-413d-bcbd-05ca69ba31b3","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:25:58.281115481Z","updated_by":"doc-add","fields":["documents"]}
