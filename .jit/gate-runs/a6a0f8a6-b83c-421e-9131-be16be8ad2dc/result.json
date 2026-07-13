@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "a6a0f8a6-b83c-421e-9131-be16be8ad2dc",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "commit": "9640669b57fdb36733c438c56f4fb1e4653249fb",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T11:38:41.321479477Z",
+  "completed_at": "2026-07-13T11:42:52.632992745Z",
+  "duration_ms": 251311,
+  "exit_code": 1,
+  "stdout": "## Content standards\n\nAll nine task titles are clean, all have marked and verifiable `## Success Criteria`, and their `epic:artifact-archival` membership slug is valid kebab-case. No child is a story or epic requiring its own identifying membership label.\n\nBlocking defect F1: `a9f8e04d` is not self-contained. Its description says each candidate carries “the same target plan envelope used by preview,” requiring the reader to recover the contract from sibling work. This violates the standalone-description rule in [jit-content-standards.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/jit-content-standards.md:13) and its explicit sibling-reference prohibition at line 67. The offending text is in [a9f8e04d](/home/vkaskivuo/Projects/just-in-time/.jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json:4).\n\nConcrete fix:\n\n- Replace “each candidate carrying the same target plan envelope used by preview” with:\n\n  > Each `candidates` element is a complete schema-version-1 artifact-plan envelope containing `schema_version`, `target`, `destination_root`, `eligible`, `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and `warnings`. Each artifact preserves `source`, `version`, `content_identity`, `destination`, `action`, `already_archived`, `provenance`, `format`, `owners`, `edges`, `reference_changes`, `pending_deletions`, `evidence`, `blockers`, and `warnings`.\n\n- Rewrite `REQ-05` as:\n\n  > - [hard] REQ-05: JSON uses `{\"schema_version\":1,\"count\":N,\"candidates\":[...]}`; every candidate contains the complete schema-version-1 plan and artifact fields enumerated above and preserves its `configured`, `incomplete`, or `unconfigured` `policy_status`.\n\n## Coverage vs. design\n\nThe nine design items all have corresponding issues; no active extra issue remains.\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Artifact plan model and blocker taxonomy | `28fb4e6a` | Yes |\n| Target root inventory and ownership | `b45ad545` | Yes |\n| Recursive supported-dependency discovery | `971c67f4` | Yes |\n| Move/copy/retain/block classification | `0c86d83b` | Yes |\n| Storage-owned artifact mutation primitive | `67f4ded1` | Yes |\n| Unified archive preview surface | `41aa6056` | Yes |\n| Coordinated plan execution | `f205aa7e` | Yes |\n| Remove the legacy document-archive command | `271dc224` | Yes |\n| Read-only container candidate report | `a9f8e04d` | Partial: scope matches, but its prerequisite ordering does not |\n\nThe previously superseded `1e6fce38` and `b8281931` issues were archived, disconnected, and deleted. They now appear only in historical events.\n\n## Dependency DAG correctness\n\nThe foundation chain, storage/execution join, and final legacy-removal join match the plan. There are no observed over-constraints.\n\nBlocking defect F2: the candidate report has the wrong prerequisite. Design §3 says it depends on both classifier and preview ([plan line 522](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:522)); the rationale states it consumes “the `jit archive` command surface the preview task establishes” ([line 321](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:321)). However, [a9f8e04d dependencies](/home/vkaskivuo/Projects/just-in-time/.jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json:8) contain only classifier `0c86d83b`. It can therefore start before preview `41aa6056` creates the command family it must extend.\n\nConcrete fix:\n\n```bash\njit dep add a9f8e04d 41aa6056 --reduce\n```\n\n`--reduce` is required because `41aa6056` already depends on `0c86d83b`; it replaces the now-redundant direct classifier edge while preserving classifier reachability.\n\nBlank-workspace reachability otherwise passes. The two implementation roots are `28fb4e6a` and `67f4ded1`; both add capabilities within the existing Rust workspace and require no sibling-created crate, directory, or project skeleton.\n\n## Structural integrity\n\nThe flat task tier is justified in design §3 lines 314–326: group headings are deliberately organizational, all leaves are independently landable, and intermediate containers would distort dependency-derived hierarchy. The resolved hierarchy confirms all nine tasks are direct children of epic `7d3a3a47`, while planning `1dbc72f6` remains under breakdown `220cca3e`.\n\nNo active isolated, dangling, or wrongly nested issue was found. The integrated scope of `f205aa7e` is large but remains one coherent transactional executor and does not invalidate the stated flat-tier rationale.\n\n## Prior review feedback\n\nBoth prior blocking findings were addressed:\n\n- Planning issue `1dbc72f6` now records a passing `plan-review` from 2026-07-13 11:30 UTC.\n- Superseded tasks `1e6fce38` and `b8281931` were removed from the live issue store and all dependency edges.\n\nNo prior blocking finding remains unresolved.\n\n## Findings\n\n1. **F1 — High, blocking:** Candidate-report issue `a9f8e04d` is not standalone because “the same target plan envelope used by preview” leaves its required schema defined only by sibling context. Apply the exact description and `REQ-05` rewrites above.\n2. **F2 — High, blocking:** Candidate-report issue `a9f8e04d` can begin before prerequisite preview surface `41aa6056`, contrary to design §3. Run `jit dep add a9f8e04d 41aa6056 --reduce`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Candidate reporting is not self-contained and can start before the preview command surface it must extend.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue a9f8e04d defines each candidate only as the plan envelope used by preview, leaving the issue non-standalone.\",\"file\":\".jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json\",\"line\":4},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue a9f8e04d lacks its designed prerequisite on preview surface 41aa6056 and can start before that command surface exists.\",\"file\":\".jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json\",\"line\":8}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 30056 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b45-afc5-7083-b852-f9e24eac88ad\n--------\nuser\n--- 30043 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Candidate reporting is not self-contained and can start before the preview command surface it must extend.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Issue a9f8e04d defines each candidate only as the plan envelope used by preview, leaving the issue non-standalone.",
+        "file": ".jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json",
+        "line": 4
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Issue a9f8e04d lacks its designed prerequisite on preview surface 41aa6056 and can start before that command surface exists.",
+        "file": ".jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json",
+        "line": 8
+      }
+    ]
+  }
+}
