@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "52eea027-4701-4ada-98cd-b902f6c3f01c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
+  "commit": "985983911d4b1302f03ad5f825e22666b10d4218",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T19:13:13.342131210Z",
+  "completed_at": "2026-07-13T19:14:33.406236430Z",
+  "duration_ms": 80064,
+  "exit_code": 0,
+  "stdout": "Attribution: leaf task (level 4, no resolved children); reviewed nine reachable `jit:41aa6056` commits individually. No uncommitted work was attributed.\n\nDocumentation accurately covers the preview commands, JSON contract, policy prerequisites, and discoverability through the CLI/configuration references. The prior misplaced gate-error example is now outside the archive section.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Archive preview documentation is accurate, discoverable, and the prior placement finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Archive preview documentation is accurate, discoverable, and the prior placement finding is resolved.",
+    "findings": []
+  }
+}

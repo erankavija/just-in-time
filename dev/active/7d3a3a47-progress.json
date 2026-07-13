@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -36,7 +36,7 @@
     {
       "wave_number": 6,
       "issues": [
-        {"id": "41aa6056-ecec-4924-94a6-a2bb275350ee", "short_id": "41aa6056", "title": "Unified archive preview surface", "classification": "implementation", "status": "pending"}
+        {"id": "41aa6056-ecec-4924-94a6-a2bb275350ee", "short_id": "41aa6056", "title": "Unified archive preview surface", "classification": "implementation", "status": "completed"}
       ]
     },
     {
@@ -77,14 +77,16 @@
     {
       "issue_short_id": "41aa6056",
       "kind": "rework_limit_exceeded",
-      "status": "authorized",
+      "status": "resolved",
       "root_finding": "Archive preview documentation remains structurally ambiguous after two rework cycles.",
       "latest_finding": "The archive-preview section absorbs an unrelated gate-blocked JSON example and implies the wrong error behavior.",
       "gate_commit": "4025ebbc3b336e445dc30f48bf57f9aa01d09573",
       "rework_cycles": 2,
       "recorded_at": "2026-07-13T22:09:47+03:00",
       "authorized_at": "2026-07-13T22:12:00+03:00",
-      "authorization": "User authorized an exceptional third rework cycle."
+      "authorization": "User authorized an exceptional third rework cycle.",
+      "resolved_at": "2026-07-13T22:14:54+03:00",
+      "resolution": "Exceptional doc fix 5598f73e passed doc-review and docs-mechanical; all four issue gates pass."
     }
   ],
   "rework_counts": {
