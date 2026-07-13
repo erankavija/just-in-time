@@ -7092,3 +7092,5 @@
 {"type":"gate_passed","id":"f9380587-1fd2-4c7d-80e0-fb86cdb00571","issue_id":"f205aa7e-dc5f-4d1f-95c4-ec76cb48538b","timestamp":"2026-07-13T21:35:06.863486859Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"be722179-5541-4ce1-907a-18aa65116120","issue_id":"f205aa7e-dc5f-4d1f-95c4-ec76cb48538b","timestamp":"2026-07-13T21:35:16.280507147Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"e32644ee-1237-48c8-9dd0-830671b0070f","issue_id":"f205aa7e-dc5f-4d1f-95c4-ec76cb48538b","timestamp":"2026-07-13T21:35:16.280540117Z"}
+{"type":"issue_state_changed","id":"06654347-bf8c-4503-9e1c-30c7591a8197","issue_id":"a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b","timestamp":"2026-07-13T21:36:01.492359414Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"63eb3d9e-9d0e-4edd-8016-686cee277763","issue_id":"a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b","timestamp":"2026-07-13T21:36:01.492604594Z","assignee":"agent:candidates"}
