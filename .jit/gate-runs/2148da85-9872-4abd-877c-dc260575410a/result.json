@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2148da85-9872-4abd-877c-dc260575410a",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "b3fd1d73-2581-426d-bab2-736c8b235b23",
+  "commit": "4514fc30fbbd7034649ed4e2b329dd93db19abc5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T23:12:29.405844827Z",
+  "completed_at": "2026-07-13T23:13:42.282355491Z",
+  "duration_ms": 72876,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured leaf type; the resolved DAG shows no children. One reachable commit, `4514fc30` (`jit:b3fd1d73`), forms the footprint. Its only adopter-doc change is the CLI reference.\n\nThe reference accurately documents deterministic candidate reporting, path-specific blocker/warning codes, preview behavior, refusal to execute, and preservation of fatal infrastructure errors at [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:232). The targeted archive-candidates test passes.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-authored CLI reference accurately documents unsupported archive artifacts and their deterministic diagnostics.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue-authored CLI reference accurately documents unsupported archive artifacts and their deterministic diagnostics.",
+    "findings": []
+  }
+}

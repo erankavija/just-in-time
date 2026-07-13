@@ -7120,3 +7120,10 @@
 {"type":"issue_updated","id":"690df9a0-d443-41bc-99ad-a4490f37e74e","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:51:07.954760536Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_state_changed","id":"26097dc0-bf89-4897-8758-9461ba5afb77","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:52:17.244897812Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"e9030b84-a7e7-4b8a-8eb6-4a44097eadd1","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:52:17.247906214Z","assignee":"agent:candidate-resilience"}
+{"type":"gate_passed","id":"cf48e189-9c51-41d0-b308-4ee5bebe7978","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:09:48.517717203Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"3b8379e1-3cc0-4a05-a974-5ccf33780b02","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:12:29.383505470Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fb424a40-35a2-49bd-a5e0-da0c52776396","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:42.282759721Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"9f04470f-b0a2-4fc9-8277-0d98f722dc4e","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:42.686659155Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"b4ad9d14-53e1-4c8b-8124-1314b5a907c4","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:51.482344921Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"b84d6774-4138-4472-bc41-a0728b4ff25f","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:51.482380751Z"}
+{"type":"issue_state_changed","id":"ed19deca-978e-41ff-b684-dbebb918db67","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:13:51.577892560Z","from":"backlog","to":"ready"}

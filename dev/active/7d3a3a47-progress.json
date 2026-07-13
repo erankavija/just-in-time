@@ -60,7 +60,7 @@
     {
       "wave_number": 10,
       "issues": [
-        {"id": "b3fd1d73-2581-426d-bab2-736c8b235b23", "short_id": "b3fd1d73", "title": "Report unreadable artifacts without aborting archive candidates", "classification": "implementation", "status": "in_progress"}
+        {"id": "b3fd1d73-2581-426d-bab2-736c8b235b23", "short_id": "b3fd1d73", "title": "Report unreadable artifacts without aborting archive candidates", "classification": "implementation", "status": "completed"}
       ]
     }
   ],

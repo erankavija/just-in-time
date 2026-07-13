@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "a37d685c-d7c0-4a31-ae69-8807f073fa0e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b3fd1d73-2581-426d-bab2-736c8b235b23",
+  "commit": "4514fc30fbbd7034649ed4e2b329dd93db19abc5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T23:09:48.543134731Z",
+  "completed_at": "2026-07-13T23:12:29.383124090Z",
+  "duration_ms": 160839,
+  "exit_code": 0,
+  "stdout": "Attribution: 4514fc30 `fix: report unsupported archive artifacts (jit:b3fd1d73)`\nPolicy sources: AGENTS.md\nResolved items: @/issue/7d3a3a47/requirement/REQ-05 — markdown-first parent issue description; @/gate/cargo-ci, @/gate/doc-review, @/gate/docs-mechanical — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T23:05:41Z); code-review pending; doc-review pending; docs-mechanical pending\nTruncation recovery: Re-read relevant parent issue, gate registry, archive documentation, callers, and tests in narrower slices; unrelated broad-search hits excluded\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged archive-planning change satisfies the issue criteria with deterministic, path-specific diagnostics and coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The tagged archive-planning change satisfies the issue criteria with deterministic, path-specific diagnostics and coverage.",
+    "findings": []
+  }
+}
