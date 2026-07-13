@@ -224,6 +224,19 @@ refused while any direct or supported embedded-closure owner is non-terminal;
 a managed document with no owner remains eligible and reports `no-owner` as
 informational evidence.
 
+For a container target, the destination root is
+`<archive_root>/<container-short-id>/`, where `<archive_root>` is the
+repository-authored policy value rather than a built-in path. Execution creates
+or adopts `<archive_root>/<container-short-id>/.jit-container`; the marker
+contains the resolved full container ID followed by a newline. This binds the
+short-named directory to one exact container and detects short-prefix
+collisions. A marker naming another container blocks the plan with
+`destination-conflict`. A markerless directory with unaccounted entries also
+blocks, while accounted or otherwise adoptable layouts remain subject to the
+normal planner rules. The marker's `ArchivePublication.source` is `null`
+because it is executor-generated ownership metadata, not a copied or moved
+repository artifact.
+
 Execution stages and verifies bytes, validates supported local links in the
 proposed mirror layout, and publishes with atomic no-replace semantics. It then
 applies only the plan's unpinned reference changes and invalidates cached asset
@@ -247,8 +260,8 @@ result. Its top-level fields are `schema_version`, `target`,
 `destination_root`, `publications`, `reference_changes`, `planned_deletions`,
 `deleted_sources`, `warnings`, `event_appended`, and `reconciling`.
 `publications` reports each newly published or newly adopted destination with
-its source (or `null` for a container marker), SHA-256/byte-size identity, and
-`adopted` flag. The two deletion arrays distinguish removals recorded before
+its source, SHA-256/byte-size identity, and `adopted` flag. The two deletion
+arrays distinguish removals recorded before
 attempt from sources actually removed. `event_appended` says whether this run
 created an archive commit record; `reconciling` identifies a record that covers
 durable adopted state from an interruption or externally replaced identical
