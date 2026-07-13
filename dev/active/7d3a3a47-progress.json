@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 9,
+  "current_wave": 10,
   "waves": [
     {
       "wave_number": 1,
@@ -56,9 +56,17 @@
       "issues": [
         {"id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5", "short_id": "271dc224", "title": "Remove the legacy document-archive command", "classification": "implementation", "status": "completed"}
       ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {"id": "b3fd1d73-2581-426d-bab2-736c8b235b23", "short_id": "b3fd1d73", "title": "Report unreadable artifacts without aborting archive candidates", "classification": "implementation", "status": "in_progress"}
+      ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    "b3fd1d73-2581-426d-bab2-736c8b235b23"
+  ],
   "escalations": [
     {
       "issue_short_id": "971c67f4",

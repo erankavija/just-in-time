@@ -7112,3 +7112,11 @@
 {"type":"issue_state_changed","id":"8f02ecbc-6f56-49fa-b331-1d739c1c0252","issue_id":"271dc224-a0cf-4f49-bfdb-a8be33f9e7d5","timestamp":"2026-07-13T22:43:26.905819872Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"fe712d1f-6d49-4a51-9c25-09b0a266eb00","issue_id":"271dc224-a0cf-4f49-bfdb-a8be33f9e7d5","timestamp":"2026-07-13T22:43:26.905856332Z"}
 {"type":"issue_state_changed","id":"3ecc16c3-3edb-4639-b91d-5416da96aed7","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:43:26.987392421Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"a2b83ab0-1902-4a94-ab0b-d44ddc8b1f47","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:45:11.547642895Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"e2534163-a9df-4ef8-92b6-8b7a20ba5684","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:47:58.508955745Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"eac65e52-29b2-4f37-ba93-bafcca126ad7","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:51:02.043437207Z","title":"Report unreadable artifacts without aborting archive candidates","priority":"high"}
+{"type":"issue_updated","id":"2c194afc-7450-40a4-8ac4-0eab7bea016d","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:51:07.913057126Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"f06e5a18-e537-4c84-bfc9-6ba4ed4395a6","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:51:07.954718246Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"690df9a0-d443-41bc-99ad-a4490f37e74e","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T22:51:07.954760536Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"26097dc0-bf89-4897-8758-9461ba5afb77","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:52:17.244897812Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"e9030b84-a7e7-4b8a-8eb6-4a44097eadd1","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T22:52:17.247906214Z","assignee":"agent:candidate-resilience"}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "d6c92b30-2178-47f3-b938-82b4b2236b21",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
+  "commit": "5922310bad463dace0efa9d6c903b09e81ac0941",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T22:45:11.572209543Z",
+  "completed_at": "2026-07-13T22:47:58.508475365Z",
+  "duration_ms": 166936,
+  "exit_code": 1,
+  "stdout": "Attribution used the epic plus 11 delivered resolved descendants. All had tagged commits except `220cca3e`, for which commit-based attribution was unavailable and its issue intent was used. The combined documentation contract is otherwise well placed across README, CLI reference/grammar, configuration, and events.\n\n1. **F1 — blocking, issue-impact (high):** The reference promises that `jit archive candidates` lists and fully evaluates every eligible container, but it currently aborts with `failed to read artifact dev/active ... Is a directory` and returns no candidate report. Repair candidate planning to emit a per-plan blocker/warning for this input and continue evaluating other candidates; add coverage for the repository-wide run. [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:215)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The documented archive-candidates report currently aborts instead of producing its promised complete candidate list.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"`jit archive candidates` aborts on a directory artifact instead of listing and fully evaluating every candidate as documented.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":215}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12331 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5da7-e3d3-7200-9141-a9e85bcd7983\n--------\nuser\n--- 12318 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The documented archive-candidates report currently aborts instead of producing its promised complete candidate list.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "`jit archive candidates` aborts on a directory artifact instead of listing and fully evaluating every candidate as documented.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 215
+      }
+    ]
+  }
+}
