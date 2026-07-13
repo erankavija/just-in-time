@@ -11,9 +11,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "passed",
+      "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T01:26:48.626653511Z"
+      "updated_at": "2026-07-13T10:39:10.063985984Z"
     }
   },
   "context": {},
@@ -47,7 +47,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-12T21:36:24.520972602Z",
-  "updated_at": "2026-07-13T01:29:40.746206343Z",
+  "updated_at": "2026-07-13T10:44:11.278508570Z",
   "first_ready_at": "2026-07-12T21:36:24.520973112Z",
   "done_at": "2026-07-13T00:51:17.765768010Z"
 }

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "c102199f-d024-4dc8-b368-364e7257b3fb",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "a68782c14f438c91569417a05c71b3103dd792cb",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T10:29:54.870224460Z",
+  "completed_at": "2026-07-13T10:36:12.449739407Z",
+  "duration_ms": 377579,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required non-empty plan exists at [dev/active/7d3a3a47-plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:1) and is linked through `issue.documents` as the approved design. Both supporting documents are also linked and substantive. The planning issue has no dependencies.\n\n## Completeness against criteria\n\nThe plan explicitly addresses all six hard epic criteria in §1 and maps them to implementation tasks in §3. It preserves the owner amendments concerning categories, pinned artifacts, concurrency, and retention.\n\nScope coverage is adequate, but the internally contradictory recovery criteria described in F2 prevent the REQ-03 execution design from being considered complete and executable.\n\n## Technical soundness and architectural fit\n\nThe major architectural choices fit the codebase:\n\n- Resolved hierarchy children are the correct membership primitive in `crates/jit/src/graph/hierarchy.rs`.\n- `IssueStore` provides commit-aware byte reads and a re-entrant repository write guard.\n- Pure planning, storage-owned mutation, command orchestration, and CLI rendering follow the repository layer boundaries.\n- The plan correctly replaces shallow adapter discovery and the legacy directory-based sharing heuristic.\n\nHowever, the binding JSON schema conflicts with the repository’s required output convention (F1), and the recovery model assigns incompatible meanings to the same observable filesystem state (F2). Both defects would be expensive to resolve after independent tasks have implemented their respective hard criteria.\n\n## Decomposition and dependencies\n\nThe nine tasks are otherwise coherently ordered:\n\n- Schema, inventory, discovery, and classification form a valid planner chain.\n- The storage mutation primitive can land independently.\n- Execution joins the planner/preview and storage branches.\n- Candidate reporting depends on the completed classifier.\n- Legacy removal is correctly sequenced after replacement execution exists.\n\nThe previous advisory about exposing `--execute` between publication and recovery tasks is addressed: execution is now one coordinated task, while the preceding preview task remains non-mutating.\n\n## Risks and actionability\n\nThe risk table covers membership, ownership, policy completeness, link preservation, coordination, symlinks, and legacy removal. It does not resolve the contradictory identical-destination/residue semantics in F2. Because those semantics are expressed as conflicting hard local acceptance criteria, an implementing engineer would have to redesign the recovery rule rather than merely implement it.\n\n## Prior review feedback\n\nThe sole prior advisory is resolved as described above. The two current findings arise from the materially revised plan and proportionality amendment, not from unaddressed prior feedback.\n\n## Findings\n\n1. **F1 — Blocking, medium severity:** The binding JSON contract violates the repository list-envelope convention. The plan specifies `artifact_count` for previews and `candidate_count` for candidates at [plan §2](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:158), even calling the former the repository convention. [AGENTS.md](/home/vkaskivuo/Projects/just-in-time/AGENTS.md:161) requires list-emitting commands to use `{\"count\": N, \"<collection>\": [...]}`, matching existing response types in `crates/jit/src/output.rs`. Because LOCAL-05 freezes the complete schema and preview, candidates, and generated MCP consumers depend on it, this must be corrected or explicitly approved as a convention exception before fan-out.\n\n2. **F2 — Blocking, high severity:** The no-provenance recovery design cannot satisfy its hard deletion criteria deterministically. LOCAL-18 says a content-identical mirror makes an artifact `already_archived` with its source excluded from `pending_deletions` ([plan](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:366)), while the schema explicitly adds inverse-mapped residual sources to `pending_deletions` ([plan](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:176)) and LOCAL-32/D-18 require reruns to delete them ([plan](/home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:449)). After publication fails before any relink or event, that state is observationally identical to an unrelated pre-existing identical destination because the amended design rejects receipts and destination provenance. The plan must define one implementable precedence rule—also preserving sources needed by unselected owners—or relax either the exclusion or one-rerun convergence criterion.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The decomposition is otherwise sound, but the binding JSON envelope and identical-destination recovery rules contain blocking contradictions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The binding preview and candidate schemas use artifact_count/candidate_count instead of the repository-required count list envelope.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":163},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Content-identical destinations simultaneously exclude their sources from deletion and require inverse-mapped residue deletion without provenance to distinguish the cases.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":369}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6508 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b06-b8d7-7193-ba51-11b36c36ef0e\n--------\nuser\n--- 6495 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The decomposition is otherwise sound, but the binding JSON envelope and identical-destination recovery rules contain blocking contradictions.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The binding preview and candidate schemas use artifact_count/candidate_count instead of the repository-required count list envelope.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 163
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Content-identical destinations simultaneously exclude their sources from deletion and require inverse-mapped residue deletion without provenance to distinguish the cases.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 369
+      }
+    ]
+  }
+}

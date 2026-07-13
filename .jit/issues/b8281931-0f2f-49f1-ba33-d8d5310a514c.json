@@ -1,13 +1,11 @@
 {
   "id": "b8281931-0f2f-49f1-ba33-d8d5310a514c",
   "title": "Source-removal reconciliation and crash recovery",
-  "description": "Reconcile receipt-backed deletion intents and close partial archive operations without loss or overwrite. A source is deletion-eligible only when its exact mapping appears in a durable non-reconciliation `ArchiveExecuted.completed_publications` receipt. Immediately before quarantine, open-handle verify the current destination against the initial Started SHA-256 plus size and hold that handle through the decision. Invoke only the recorded source-adjacent same-filesystem quarantine/remove/restore primitive, inspect both source and quarantine entry on recovery, never recapture expected identity, never directly unlink or copy-delete across devices, and preserve/report mismatches. Append `ArchiveSourcesRemoved` after removal with exactly successful paths and omit it when none succeed. Reconciliation may close already-receipted work but cannot add completed publications or invent provenance. Recovery reuses original operation/instance, root, mappings, and contract; it either completes, proves referential safety then appends terminal `ArchiveAborted` with fresh execution ID, reason, and completed/reverted/residual paths, or leaves the intent open as `archive-recovery-blocked`. Matching destinations without a qualifying receipt—including external identical creation after Started before JIT publish and a crash after JIT publish before receipt—retain source, have no pending deletion, revalidate identity before selected relinks, and safely abort with reason `publication-unproven`. Ambiguous recovery mints nothing; safe duplicate terminal events are allowed; a brand-new converged no-op emits no event.\n\n## Success Criteria\n\n- [hard] REQ-01: Failure injection for partial relink, event append, deletion failure, crash after source-to-quarantine rename, source modification, pre-existing and receipted destination modification, external identical creation before publish, and crash after publish before receipt proves no artifact is lost or overwritten and no reference relies only on a missing path.\n- [hard] REQ-02: Recovery checks both source and recorded quarantine entry; mismatch is never deleted and is no-replace restored or preserved/reported; unsupported same-filesystem quarantine returns `quarantine-unavailable` with deletion pending and no cross-device fallback.\n- [hard] REQ-03: Source removal requires an exact non-reconciliation publication receipt plus current destination identity verification held through quarantine; unproven publication never creates pending deletion, retains source, revalidates before relink, and closes safely with `ArchiveAborted` reason `publication-unproven` when referential safety is proven.\n- [hard] REQ-04: `ArchiveSourcesRemoved` records exactly successful removals and is omitted when none succeed; reconciliation verifies the receipted destination and both recorded source/quarantine locations and never adds completed publications or provenance.\n- [hard] REQ-05: `ArchiveAborted` is terminal only after proven referential safety and records adopted operation/instance IDs, fresh execution ID, reason, and completed/reverted/residual paths; unsafe or ambiguous recovery remains open and mints nothing, and only completion/abort permits a fresh operation.\n- [hard] REQ-06: Tests cover crash immediately after quarantine rename, all removals failing after durable ArchiveExecuted, source/destination edits, both unreceipted publication windows, hierarchy/owner/root changes, target aliases, multiple opens, and shared-dependency nonmatches.\n\n- [hard] REQ-07: Public `--execute` dispatch remains absent or mutation-disabled while intent-selection and publication/reference support are incomplete; the same change that lands full removal, reconciliation, abort, and failure-injection coverage activates the flag only after the end-to-end recovery suite passes.",
-  "state": "backlog",
+  "description": "Superseded by the owner proportionality amendment of 2026-07-13: write-ahead intent events, publication receipts, and crash-recovery reconciliation were removed from the archival design; rerun convergence by recomputation replaces them. The replacement work lives in the coordinated plan execution task; the amended plan is dev/active/7d3a3a47-plan.md.\n\n## Success Criteria\n\n- Rejected as superseded: carries no deliverable; the replacement scope is verified through the coordinated plan execution task.",
+  "state": "archived",
   "priority": "high",
   "assignee": null,
-  "dependencies": [
-    "1e6fce38-1b61-454a-af02-8da08620cc27"
-  ],
+  "dependencies": [],
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -18,9 +16,9 @@
   "labels": [
     "type:task",
     "epic:artifact-archival",
-    "satisfies:REQ-03"
+    "resolution:superseded"
   ],
   "created_at": "2026-07-13T01:30:23.176136287Z",
-  "updated_at": "2026-07-13T01:38:00.109071987Z",
+  "updated_at": "2026-07-13T10:54:22.418184756Z",
   "first_ready_at": "2026-07-13T01:30:23.176136577Z"
 }

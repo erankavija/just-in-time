@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "2e208d93-b63a-4ab2-9d32-7fe5fa0c8e76",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "6ac63161372b3ef25624fce35ca3bdac517e75c7",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T10:39:10.063985984Z",
+  "completed_at": "2026-07-13T10:44:11.278287970Z",
+  "duration_ms": 301214,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPASS. The planning issue requires `dev/active/7d3a3a47-plan.md` and links that exact path as a design document ([planning issue](.jit/issues/1dbc72f6-c6e0-4159-9843-de9bfb68c2e2.json):4, 20–41). The document is substantive and complete.\n\n## Completeness against criteria\n\nPASS. Sections §1 and §3 address all six hard requirements:\n\n- REQ-01: inventory and recursive discovery.\n- REQ-02: edge-aware classification.\n- REQ-03: coordinated execution and storage primitives.\n- REQ-04: topology preservation and destination-edge validation.\n- REQ-05: read-only candidate reporting.\n- REQ-06: shared JSON previews and the required fixture formats.\n\nNo obvious criterion is silently narrowed. The working-tree limitation for pinned dependency closures and removal of time/category semantics are recorded owner amendments rather than unilateral scope reductions.\n\n## Technical soundness and architectural fit\n\nFAIL. The domain/document, storage, command, and CLI boundaries are otherwise well chosen, and the cited hierarchy and locking primitives match `crates/jit/src/graph/hierarchy.rs:458-560` and `crates/jit/src/storage/mod.rs:90-135`.\n\nHowever, identical-destination handling remains contradictory. Mirror recognition treats any content-identical destination as `already_archived`, skips publication, and can proceed through relinking and deletion ([plan](dev/active/7d3a3a47-plan.md):200–215, 373–378, 659–670). D-14 simultaneously requires every collision—including an identical externally created destination—to fail as `AlreadyExists`, explicitly rejecting identical-content adoption because it misattributes another writer’s file ([plan](dev/active/7d3a3a47-plan.md):623–629).\n\nWithout persisted provenance, the planner cannot distinguish a destination created by an interrupted JIT run from an identical destination that predated the operation. Durable reference changes do not solve that distinction: a fresh run can first relink references to the foreign destination and thereby manufacture the deletion precondition. The plan must choose one consistent contract.\n\n## Decomposition and dependencies\n\nFAIL against the actual repository state. The nine-task dependency graph proposed in §3 is coherent on paper, but the plan states that breakdown has not instantiated issues ([plan](dev/active/7d3a3a47-plan.md):287–298), while a completed breakdown and executable leaves already exist.\n\nThose leaves implement the superseded architecture:\n\n- `ArchiveStarted` recovery selection and publication receipts remain binding in [.jit/issues/f205aa7e-cd…json](.jit/issues/f205aa7e-dc5f-4d1f-95c4-ec76cb48538b.json):4 and [.jit/issues/1e6fce38…json](.jit/issues/1e6fce38-1b61-454a-af02-8da08620cc27.json):4.\n- Quarantine and crash-recovery machinery remain binding in [.jit/issues/67f4ded1…json](.jit/issues/67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485.json):4 and [.jit/issues/b8281931…json](.jit/issues/b8281931-0f2f-49f1-ba33-d8d5310a514c.json):4.\n- The ready plan-model task still requires `artifact_count`, and the candidate task still requires `candidate_count`, contradicting the corrected `count` envelope in §2 ([plan](dev/active/7d3a3a47-plan.md):161–169, 216–220; [.jit/issues/28fb4e6a…json](.jit/issues/28fb4e6a-89c8-4b02-ac3c-5bcf3708e674.json):4; [.jit/issues/a9f8e04d…json](.jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json):4).\n\nFan-out could therefore begin from ready tasks implementing a design the current plan expressly rejects. The breakdown and DAG must be reconciled with the current nine-task decomposition before execution.\n\n## Risks and actionability\n\nFAIL. Most material risks have concrete decisions and tests, but identical-destination provenance remains a load-bearing unresolved question. The mitigation table describes rerun convergence without acknowledging that the same evidence also matches a foreign identical destination ([plan](dev/active/7d3a3a47-plan.md):544–550). Additionally, stale ready issues make the otherwise actionable plan unsafe to execute.\n\n## Prior review feedback\n\n- Prior F1 is corrected in the plan document: target plans and candidates now use `count`. It remains unresolved in the instantiated task descriptions, as described above.\n- Prior F2 is not resolved. Reference-based deletion protects sources while references remain at them, but it cannot distinguish prior JIT publication from a foreign identical destination before the executor performs new relinks.\n\n## Findings\n\n1. **F1 — high, blocking, issue-impact:** Identical destinations are simultaneously treated as recoverable `already_archived` state and as mandatory `AlreadyExists` conflicts. With provenance explicitly excluded, fresh foreign content and interrupted JIT publication are indistinguishable, so the execution and deletion contract is not implementable as specified. File: `dev/active/7d3a3a47-plan.md:204`.\n2. **F2 — high, blocking, issue-impact:** The live completed breakdown was not reconciled with the current plan. Ready/backlog issues still mandate the superseded receipt/quarantine/recovery architecture and obsolete `artifact_count`/`candidate_count` envelopes, so current fan-out would not implement the reviewed decomposition. File: `dev/active/7d3a3a47-plan.md:287`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Identical-destination recovery remains internally contradictory, and the live breakdown still implements the superseded design and JSON envelopes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Identical destinations are both recoverable already-archived state and mandatory conflicts, with no provenance capable of distinguishing interrupted JIT publication from foreign content.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":204},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The completed live breakdown still mandates superseded receipt, quarantine, recovery, artifact_count, and candidate_count contracts instead of the current nine-task plan.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":287}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5871 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b0f-3190-7383-8ac4-e848089e52aa\n--------\nuser\n--- 5858 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Identical-destination recovery remains internally contradictory, and the live breakdown still implements the superseded design and JSON envelopes.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Identical destinations are both recoverable already-archived state and mandatory conflicts, with no provenance capable of distinguishing interrupted JIT publication from foreign content.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 204
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The completed live breakdown still mandates superseded receipt, quarantine, recovery, artifact_count, and candidate_count contracts instead of the current nine-task plan.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 287
+      }
+    ]
+  }
+}
