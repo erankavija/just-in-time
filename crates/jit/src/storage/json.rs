@@ -895,27 +895,22 @@ impl IssueStore for JsonFileStorage {
         let _lock = self.locker.lock_shared(&events_lock_path)?;
         let reader =
             BufReader::new(fs::File::open(&events_path).context("Failed to open events file")?);
+        let lines = reader
+            .lines()
+            .collect::<std::io::Result<Vec<_>>>()
+            .context("Failed to read line from events file")?;
         let mut events = Vec::new();
-        let mut skipped_torn_line = false;
-        for line in reader.lines() {
-            let line = line.context("Failed to read line from events file")?;
-            match serde_json::from_str::<Event>(&line) {
+        for line in &lines {
+            if line.trim().is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<Event>(line) {
                 Ok(event) => {
                     if matches!(event, Event::ArtifactArchiveExecuted { .. }) {
                         events.push(event);
                     }
                 }
-                Err(_)
-                    if !skipped_torn_line
-                        && line.trim_start().starts_with('{')
-                        && !line.trim_end().ends_with('}') =>
-                {
-                    // `append_event` isolates an interrupted trailing JSON
-                    // prefix on its own line before appending a retry. Skip at
-                    // most that recognizable torn record; arbitrary malformed
-                    // records remain hard errors.
-                    skipped_torn_line = true;
-                }
+                Err(error) if is_torn_event_prefix(line, &error) => {}
                 Err(error) => return Err(error).context("Failed to deserialize event"),
             }
         }
@@ -1179,6 +1174,16 @@ impl IssueStore for JsonFileStorage {
                 })
         }
     }
+}
+
+fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
+    // `append_event` repairs a non-newline tail by terminating it before the
+    // next append. Before that retry it is still the final line. Such a record
+    // is therefore recognizable as an object-shaped JSON prefix that fails
+    // only because input ended. This admits a final torn append and every
+    // number of independently isolated predecessors (including prefixes ending
+    // after a nested `}`), while syntax and shape/data corruption remain fatal.
+    line.trim_start().starts_with('{') && error.is_eof()
 }
 
 /// Thin local alias for the shared

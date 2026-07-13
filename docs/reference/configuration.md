@@ -51,7 +51,10 @@ session = "sessions"
 study = "studies"
 ```
 
-Controls document lifecycle management. Documents in `managed_paths` can be archived; documents in `permanent_paths` never archive.
+Controls document lifecycle management. Selected documents in `managed_paths`
+may move to the archive mirror. Selected documents in `permanent_paths` are
+copied to the mirror while their source remains in place; “permanent” prevents
+source deletion, not mirror publication.
 
 Dependency-aware `jit archive document` and `jit archive container` planning
 and `--execute` classify this table by authored completeness. Mutation-authorizing policy is

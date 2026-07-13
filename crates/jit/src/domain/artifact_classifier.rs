@@ -426,11 +426,23 @@ fn classify_entry(
         })
         .into_iter()
         .collect::<Vec<_>>();
-    let publication_identity = match (&action, already_archived, &location.source) {
+    let publication_identity = match (
+        &action,
+        already_archived,
+        &location.source,
+        &location.destination,
+    ) {
+        (
+            ArtifactAction::Move | ArtifactAction::Copy,
+            true,
+            _,
+            ArtifactLocation::Regular(identity),
+        ) => Some(identity.clone()),
         (
             ArtifactAction::Move | ArtifactAction::Copy,
             false,
             ArtifactLocation::Regular(identity),
+            _,
         ) => Some(identity.clone()),
         _ => deletion_identity,
     };

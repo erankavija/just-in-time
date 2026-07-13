@@ -194,6 +194,12 @@ pub trait ArchiveExecutionHooks {
     fn before_relink(&mut self, _index: usize, _issue: &str) -> Result<()> {
         Ok(())
     }
+    fn before_publish(&mut self, _index: usize, _destination: &str) -> Result<()> {
+        Ok(())
+    }
+    fn before_marker_inspect(&mut self, _destination: &str) -> Result<()> {
+        Ok(())
+    }
     fn before_event_append(&mut self) -> Result<()> {
         Ok(())
     }
@@ -218,8 +224,16 @@ struct StagedPublication {
 
 #[derive(Default)]
 struct ArchiveCoverage {
-    publications: BTreeSet<String>,
+    publications: BTreeSet<(String, String, u64)>,
     reference_changes: BTreeSet<(String, usize, String, String)>,
+}
+
+struct FailedExecutionState<'a> {
+    plan: &'a ArtifactPlan,
+    artifacts: &'a [crate::domain::artifact_plan::ArtifactPlanEntry],
+    coverage: &'a ArchiveCoverage,
+    publications: Vec<ArchivePublication>,
+    reconciling: bool,
 }
 
 impl ArchiveCoverage {
@@ -239,11 +253,15 @@ impl ArchiveCoverage {
                 _ => None,
             })
             .fold(Self::default(), |mut coverage, (publications, changes)| {
-                coverage.publications.extend(
-                    publications
-                        .iter()
-                        .map(|publication| publication.destination.clone()),
-                );
+                coverage
+                    .publications
+                    .extend(publications.iter().map(|publication| {
+                        (
+                            publication.destination.clone(),
+                            publication.content_identity.sha256().to_string(),
+                            publication.content_identity.byte_size(),
+                        )
+                    }));
                 coverage
                     .reference_changes
                     .extend(changes.iter().map(|change| {
@@ -264,6 +282,14 @@ impl ArchiveCoverage {
             change.document_index,
             change.from_path.clone(),
             change.to_path.clone(),
+        ))
+    }
+
+    fn covers_publication(&self, destination: &str, identity: &ContentIdentity) -> bool {
+        self.publications.contains(&(
+            destination.to_string(),
+            identity.sha256().to_string(),
+            identity.byte_size(),
         ))
     }
 }
@@ -344,13 +370,23 @@ impl CommandExecutor<JsonFileStorage> {
         validate_proposed_layout(&plan)?;
 
         let marker = self.prepare_container_marker(&plan, hooks, &mut stage_index)?;
+        if let Some((publication, staged_marker)) = marker.as_ref() {
+            if !publication.adopted {
+                self.storage
+                    .preflight_staged_artifact(staged_marker, &publication.destination)?;
+            }
+        }
+        for publication in &staged {
+            self.storage
+                .preflight_staged_artifact(&publication.staged, &publication.destination)?;
+        }
         let mut publications = artifacts
             .iter()
             .filter(|artifact| artifact.already_archived())
             .filter_map(|artifact| {
                 let destination = artifact.destination()?;
                 let identity = artifact.content_identity()?;
-                (!coverage.publications.contains(destination)).then(|| ArchivePublication {
+                (!coverage.covers_publication(destination, identity)).then(|| ArchivePublication {
                     source: Some(artifact.source().to_string()),
                     destination: destination.to_string(),
                     content_identity: identity.clone(),
@@ -359,32 +395,87 @@ impl CommandExecutor<JsonFileStorage> {
             })
             .collect::<Vec<_>>();
         let mut reconciling = !publications.is_empty();
+        let mut publish_index = 0;
 
         if let Some((publication, staged_marker)) = marker {
             if publication.adopted {
-                if !coverage.publications.contains(&publication.destination) {
+                if !coverage
+                    .covers_publication(&publication.destination, &publication.content_identity)
+                {
                     reconciling = true;
                     publications.push(publication);
                 }
             } else {
-                self.storage
-                    .publish_staged_artifact(staged_marker, &publication.destination)?;
+                let publish = hooks
+                    .before_publish(publish_index, &publication.destination)
+                    .and_then(|()| {
+                        self.storage
+                            .publish_staged_artifact(staged_marker, &publication.destination)
+                    });
+                publish_index += 1;
+                if let Err(cause) = publish {
+                    return Err(self.record_failed_execution_mutations(
+                        FailedExecutionState {
+                            plan: &plan,
+                            artifacts,
+                            coverage: &coverage,
+                            publications,
+                            reconciling,
+                        },
+                        hooks,
+                        cause,
+                    ));
+                }
                 publications.push(publication);
             }
         }
         for publication in staged {
-            self.storage
-                .publish_staged_artifact(publication.staged, &publication.destination)?;
-            publications.push(ArchivePublication {
+            let durable = ArchivePublication {
                 source: Some(publication.source),
                 destination: publication.destination,
                 content_identity: publication.identity,
                 adopted: false,
-            });
+            };
+            let publish = hooks
+                .before_publish(publish_index, &durable.destination)
+                .and_then(|()| {
+                    self.storage
+                        .publish_staged_artifact(publication.staged, &durable.destination)
+                });
+            publish_index += 1;
+            if let Err(cause) = publish {
+                return Err(self.record_failed_execution_mutations(
+                    FailedExecutionState {
+                        plan: &plan,
+                        artifacts,
+                        coverage: &coverage,
+                        publications,
+                        reconciling,
+                    },
+                    hooks,
+                    cause,
+                ));
+            }
+            publications.push(durable);
         }
 
         let (saved_snapshots, mut event_changes, observed_uncovered_change) =
-            self.apply_reference_changes(artifacts, &coverage, hooks)?;
+            match self.apply_reference_changes(artifacts, &coverage, hooks) {
+                Ok(applied) => applied,
+                Err(cause) => {
+                    return Err(self.record_failed_execution_mutations(
+                        FailedExecutionState {
+                            plan: &plan,
+                            artifacts,
+                            coverage: &coverage,
+                            publications,
+                            reconciling,
+                        },
+                        hooks,
+                        cause,
+                    ));
+                }
+            };
         if observed_uncovered_change {
             reconciling = true;
         }
@@ -483,12 +574,15 @@ impl CommandExecutor<JsonFileStorage> {
         let destination = format!("{}/.jit-container", plan.destination_root());
         let bytes = format!("{id}\n").into_bytes();
         let identity = ContentIdentity::from_bytes(&bytes);
-        match self.storage.read_path_bytes(&destination, None) {
-            Ok((actual, _)) if actual == bytes => {
-                let placeholder = self.storage.verify_staged_artifact(
-                    self.storage.stage_artifact_bytes(&bytes)?,
-                    &identity,
-                )?;
+        hooks.before_marker_inspect(&destination)?;
+        match self.storage.stage_artifact_if_exists(&destination)? {
+            Some(existing) => {
+                let verified = self
+                    .storage
+                    .verify_staged_artifact(existing, &identity)
+                    .with_context(|| {
+                        format!("container ownership marker changed after planning: {destination}")
+                    })?;
                 Ok(Some((
                     ArchivePublication {
                         source: None,
@@ -496,11 +590,10 @@ impl CommandExecutor<JsonFileStorage> {
                         content_identity: identity,
                         adopted: true,
                     },
-                    placeholder,
+                    verified,
                 )))
             }
-            Ok(_) => bail!("container ownership marker changed after planning: {destination}"),
-            Err(crate::storage::PathReadError::NotFound(_)) => {
+            None => {
                 hooks.before_stage(*stage_index, &destination)?;
                 *stage_index += 1;
                 let verified = self.storage.verify_staged_artifact(
@@ -517,7 +610,6 @@ impl CommandExecutor<JsonFileStorage> {
                     verified,
                 )))
             }
-            Err(error) => Err(error.into()),
         }
     }
 
@@ -605,6 +697,94 @@ impl CommandExecutor<JsonFileStorage> {
             snapshots.push(original);
         }
         Ok((snapshots, event_changes, observed_uncovered))
+    }
+
+    fn record_failed_execution_mutations<H: ArchiveExecutionHooks>(
+        &self,
+        state: FailedExecutionState<'_>,
+        hooks: &mut H,
+        cause: anyhow::Error,
+    ) -> anyhow::Error {
+        let reference_changes = match self
+            .durable_uncovered_reference_changes(state.artifacts, state.coverage)
+        {
+            Ok(changes) => changes,
+            Err(inspect) => {
+                return cause.context(format!(
+                    "archive failed after a durable mutation and residual reference inspection failed: {inspect:#}"
+                ));
+            }
+        };
+        if state.publications.is_empty() && reference_changes.is_empty() {
+            return cause;
+        }
+        let event = Event::new_artifact_archive_executed(
+            state.plan.target().clone(),
+            state.plan.destination_root().to_string(),
+            state.publications,
+            reference_changes,
+            Vec::new(),
+            state.reconciling,
+        );
+        match hooks
+            .before_event_append()
+            .and_then(|()| self.storage.append_event(&event))
+        {
+            Ok(()) => cause.context(
+                "archive aborted after durable mutations; their exact successful subset was recorded",
+            ),
+            Err(record) => cause.context(format!(
+                "archive aborted after durable mutations and recording that subset failed: {record:#}; rerun will reconcile"
+            )),
+        }
+    }
+
+    fn durable_uncovered_reference_changes(
+        &self,
+        artifacts: &[crate::domain::artifact_plan::ArtifactPlanEntry],
+        coverage: &ArchiveCoverage,
+    ) -> Result<Vec<ReferenceChange>> {
+        let mut issues = BTreeMap::new();
+        let candidates = artifacts
+            .iter()
+            .flat_map(|artifact| artifact.reference_changes())
+            .filter(|change| !coverage.covers_change(change))
+            .collect::<Vec<_>>();
+        let mut changes = Vec::new();
+        for change in candidates {
+            if !issues.contains_key(&change.issue) {
+                issues.insert(
+                    change.issue.clone(),
+                    self.storage.load_issue(&change.issue)?,
+                );
+            }
+            if issues[&change.issue]
+                .documents
+                .get(change.document_index)
+                .is_some_and(|document| {
+                    document.commit.is_none()
+                        && normalize_artifact_path(&document.path) == change.to_path
+                })
+            {
+                changes.push(change.clone());
+            }
+        }
+        changes.sort_by(|left, right| {
+            (
+                &left.issue,
+                left.document_index,
+                &left.from_path,
+                &left.to_path,
+            )
+                .cmp(&(
+                    &right.issue,
+                    right.document_index,
+                    &right.from_path,
+                    &right.to_path,
+                ))
+        });
+        changes.dedup();
+        Ok(changes)
     }
 
     fn preflight_deletions(
@@ -764,12 +944,14 @@ mod tests {
     #[derive(Default)]
     struct FaultHooks {
         fail_stage: Option<usize>,
+        fail_publish: Option<usize>,
         fail_relink: Option<usize>,
         fail_event: bool,
         fail_revert: Option<usize>,
         fail_delete: Option<usize>,
         edit_before_delete: Option<(std::path::PathBuf, Vec<u8>)>,
         torn_event_path: Option<std::path::PathBuf>,
+        marker_inspect: Option<Box<dyn FnOnce() -> Result<()>>>,
     }
 
     impl ArchiveExecutionHooks for FaultHooks {
@@ -783,6 +965,20 @@ mod tests {
         fn before_relink(&mut self, index: usize, _issue: &str) -> Result<()> {
             if self.fail_relink == Some(index) {
                 bail!("injected relink failure {index}");
+            }
+            Ok(())
+        }
+
+        fn before_publish(&mut self, index: usize, _destination: &str) -> Result<()> {
+            if self.fail_publish == Some(index) {
+                bail!("injected publication failure {index}");
+            }
+            Ok(())
+        }
+
+        fn before_marker_inspect(&mut self, _destination: &str) -> Result<()> {
+            if let Some(inspect) = self.marker_inspect.take() {
+                inspect()?;
             }
             Ok(())
         }
@@ -910,6 +1106,37 @@ mod tests {
     }
 
     #[test]
+    fn test_execute_waits_for_competing_repository_write_guard() {
+        let (_repo, executor, _) = executable_document_repo(0, "guard contention");
+        let holder_storage = executor.storage.clone();
+        let (held_sender, held_receiver) = std::sync::mpsc::channel();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel();
+        let holder = std::thread::spawn(move || {
+            let _guard = holder_storage.acquire_repo_write_lock().unwrap();
+            held_sender.send(()).unwrap();
+            release_receiver.recv().unwrap();
+        });
+        held_receiver.recv().unwrap();
+
+        let (done_sender, done_receiver) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            done_sender
+                .send(executor.execute_archive_document("fixtures/root.md"))
+                .unwrap();
+        });
+        assert!(done_receiver
+            .recv_timeout(std::time::Duration::from_millis(100))
+            .is_err());
+        release_sender.send(()).unwrap();
+        holder.join().unwrap();
+        assert!(done_receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap()
+            .is_ok());
+        worker.join().unwrap();
+    }
+
+    #[test]
     fn test_execute_document_allows_managed_zero_owner_and_refuses_active_owner() {
         let (repo, executor, _) = executable_document_repo(0, "zero owner");
         let result = executor
@@ -971,6 +1198,132 @@ mod tests {
     }
 
     #[test]
+    fn test_later_publication_failure_records_only_successful_publications_before_return() {
+        let (repo, executor, _) = executable_document_repo(1, "![asset](asset.png)\n");
+        fs::write(repo.path().join("fixtures/asset.png"), b"asset").unwrap();
+        let mut fault = FaultHooks {
+            fail_publish: Some(1),
+            ..Default::default()
+        };
+        assert!(executor
+            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
+            .is_err());
+        let first_events = executor.storage.read_artifact_archive_events().unwrap();
+        assert_eq!(first_events.len(), 1);
+        let first_publications = match &first_events[0] {
+            Event::ArtifactArchiveExecuted {
+                publications,
+                reference_changes,
+                planned_deletions,
+                ..
+            } => {
+                assert!(reference_changes.is_empty());
+                assert!(planned_deletions.is_empty());
+                publications.clone()
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(first_publications.len(), 1);
+
+        executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        let events = executor.storage.read_artifact_archive_events().unwrap();
+        assert_eq!(events.len(), 2);
+        let destinations = events
+            .iter()
+            .flat_map(|event| match event {
+                Event::ArtifactArchiveExecuted { publications, .. } => publications.as_slice(),
+                _ => &[],
+            })
+            .map(|publication| publication.destination.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(destinations.len(), 2);
+        assert_eq!(destinations.iter().collect::<BTreeSet<_>>().len(), 2);
+    }
+
+    #[test]
+    fn test_post_publication_relink_failure_records_publication_and_rerun_does_not_duplicate_it() {
+        let (_repo, executor, ids) = executable_document_repo(2, "two owners");
+        let before = ids
+            .iter()
+            .map(|id| executor.storage.load_issue(id).unwrap())
+            .collect::<Vec<_>>();
+        let mut fault = FaultHooks {
+            fail_relink: Some(1),
+            ..Default::default()
+        };
+        assert!(executor
+            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
+            .is_err());
+        for snapshot in &before {
+            assert_eq!(
+                executor.storage.load_issue(&snapshot.id).unwrap(),
+                *snapshot
+            );
+        }
+        let first_events = executor.storage.read_artifact_archive_events().unwrap();
+        assert!(matches!(
+            first_events.as_slice(),
+            [Event::ArtifactArchiveExecuted {
+                publications,
+                reference_changes,
+                planned_deletions,
+                ..
+            }] if publications.len() == 1
+                && reference_changes.is_empty()
+                && planned_deletions.is_empty()
+        ));
+
+        executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        let events = executor.storage.read_artifact_archive_events().unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(matches!(
+            &events[1],
+            Event::ArtifactArchiveExecuted {
+                publications,
+                reference_changes,
+                ..
+            } if publications.is_empty() && reference_changes.len() == 2
+        ));
+    }
+
+    #[test]
+    fn test_failed_relink_compensation_records_exact_residual_reference() {
+        let (_repo, executor, ids) = executable_document_repo(2, "two owners");
+        let mut fault = FaultHooks {
+            fail_relink: Some(1),
+            fail_revert: Some(0),
+            ..Default::default()
+        };
+        assert!(executor
+            .execute_archive_document_with_hooks("fixtures/root.md", &mut fault)
+            .is_err());
+        let destination_count = ids
+            .iter()
+            .filter(|id| {
+                executor.storage.load_issue(id).unwrap().documents[0].path
+                    == "archive/fixtures/root.md"
+            })
+            .count();
+        assert_eq!(destination_count, 1);
+        let events = executor.storage.read_artifact_archive_events().unwrap();
+        assert!(matches!(
+            events.as_slice(),
+            [Event::ArtifactArchiveExecuted {
+                publications,
+                reference_changes,
+                planned_deletions,
+                ..
+            }] if publications.len() == 1
+                && reference_changes.len() == 1
+                && planned_deletions.is_empty()
+        ));
+    }
+
+    #[test]
     fn test_event_failure_compensates_and_torn_tail_rerun_reconciles() {
         let (repo, executor, ids) = executable_document_repo(1, "event failure");
         let before = executor.storage.load_issue(&ids[0]).unwrap();
@@ -1001,6 +1354,58 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes() {
+        let (repo, executor, _) = executable_document_repo(0, "event tails");
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let nested_torn = concat!(
+            "{\"type\":\"artifact_archive_executed\",",
+            "\"target\":{\"kind\":\"document\",\"path\":\"fixtures/root.md\"}"
+        );
+        fs::write(&events_path, nested_torn).unwrap();
+        assert!(executor
+            .storage
+            .read_artifact_archive_events()
+            .unwrap()
+            .is_empty());
+
+        let valid = Event::new_artifact_archive_executed(
+            PlanTarget::Document {
+                path: "fixtures/root.md".into(),
+            },
+            "archive".into(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            true,
+        );
+        executor.storage.append_event(&valid).unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .read_artifact_archive_events()
+                .unwrap()
+                .len(),
+            1
+        );
+        let valid_json = serde_json::to_string(&valid).unwrap();
+        fs::write(
+            &events_path,
+            format!("{nested_torn}\n{{\"type\":\"issue_created\"\n{nested_torn}\n{valid_json}\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .read_artifact_archive_events()
+                .unwrap()
+                .len(),
+            1
+        );
+        fs::write(&events_path, format!("{{not-json}}\n{valid_json}\n")).unwrap();
+        assert!(executor.storage.read_artifact_archive_events().is_err());
     }
 
     #[test]
@@ -1151,6 +1556,37 @@ mod tests {
     }
 
     #[test]
+    fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
+        )
+        .unwrap();
+        fs::create_dir(repo.path().join("fixtures")).unwrap();
+        fs::create_dir(repo.path().join("shared")).unwrap();
+        fs::write(
+            repo.path().join("fixtures/root.md"),
+            "[child](child.md) [shared](/shared/global.md)",
+        )
+        .unwrap();
+        fs::write(repo.path().join("fixtures/child.md"), "child").unwrap();
+        fs::write(repo.path().join("shared/global.md"), "shared").unwrap();
+        let executor = CommandExecutor::new(storage);
+
+        let result = executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert!(result.event_appended);
+        assert!(repo.path().join("archive/fixtures/root.md").exists());
+        assert!(repo.path().join("archive/fixtures/child.md").exists());
+        assert!(repo.path().join("shared/global.md").exists());
+        assert!(!repo.path().join("archive/shared/global.md").exists());
+    }
+
+    #[test]
     fn test_preflight_refuses_deletion_until_every_selected_reference_is_durable() {
         let (repo, executor, _) = executable_document_repo(1, "still linked");
         let plan = executor
@@ -1205,6 +1641,47 @@ mod tests {
     }
 
     #[test]
+    fn test_replaced_identical_destination_uses_identity_bound_coverage_once() {
+        let (repo, executor, _) = executable_document_repo(1, "original");
+        let mut retain_source = FaultHooks {
+            fail_delete: Some(0),
+            ..Default::default()
+        };
+        executor
+            .execute_archive_document_with_hooks("fixtures/root.md", &mut retain_source)
+            .unwrap();
+        let source = repo.path().join("fixtures/root.md");
+        let destination = repo.path().join("archive/fixtures/root.md");
+        fs::remove_file(&destination).unwrap();
+        fs::write(&source, b"replacement").unwrap();
+        fs::write(&destination, b"replacement").unwrap();
+
+        let reconciled = executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert!(reconciled.reconciling);
+        assert!(reconciled.event_appended);
+        assert!(reconciled.publications.iter().any(|publication| {
+            publication.destination == "archive/fixtures/root.md"
+                && publication.adopted
+                && publication.content_identity == ContentIdentity::from_bytes(b"replacement")
+        }));
+        assert_eq!(
+            executor
+                .storage
+                .read_artifact_archive_events()
+                .unwrap()
+                .len(),
+            2
+        );
+        let stable = executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert!(!stable.event_appended);
+        assert!(stable.publications.is_empty());
+    }
+
+    #[test]
     fn test_publication_only_execution_records_one_event() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -1226,6 +1703,47 @@ mod tests {
         assert!(result.planned_deletions.is_empty());
         assert!(repo.path().join("docs/permanent.md").exists());
         assert!(repo.path().join("archive/docs/permanent.md").exists());
+        assert_eq!(
+            executor
+                .storage
+                .read_artifact_archive_events()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_preexisting_identical_permanent_copy_is_adopted_once_without_deletion() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+        )
+        .unwrap();
+        fs::create_dir_all(repo.path().join("archive/docs")).unwrap();
+        fs::create_dir(repo.path().join("docs")).unwrap();
+        fs::write(repo.path().join("docs/permanent.md"), b"permanent").unwrap();
+        fs::write(repo.path().join("archive/docs/permanent.md"), b"permanent").unwrap();
+        let executor = CommandExecutor::new(storage);
+
+        let first = executor
+            .execute_archive_document("docs/permanent.md")
+            .unwrap();
+        assert!(first.event_appended);
+        assert!(first.planned_deletions.is_empty());
+        assert!(first.deleted_sources.is_empty());
+        assert!(first.publications.iter().any(|publication| {
+            publication.destination == "archive/docs/permanent.md" && publication.adopted
+        }));
+        assert!(repo.path().join("docs/permanent.md").exists());
+        let second = executor
+            .execute_archive_document("docs/permanent.md")
+            .unwrap();
+        assert!(!second.event_appended);
+        assert!(second.publications.is_empty());
         assert_eq!(
             executor
                 .storage
@@ -1272,6 +1790,62 @@ mod tests {
                 .len(),
             event_count
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_container_marker_reinspection_rejects_leaf_and_parent_symlink_races() {
+        use std::os::unix::fs::symlink;
+
+        let (leaf_repo, leaf_executor, leaf_id) = configured_repo();
+        let leaf_root = leaf_repo.path().join("archive").join(&leaf_id[..8]);
+        fs::create_dir_all(&leaf_root).unwrap();
+        let leaf_marker = leaf_root.join(".jit-container");
+        let leaf_bytes = format!("{leaf_id}\n");
+        fs::write(&leaf_marker, &leaf_bytes).unwrap();
+        let leaf_target = leaf_repo.path().join("matching-marker");
+        fs::write(&leaf_target, &leaf_bytes).unwrap();
+        let mut leaf_race = FaultHooks {
+            marker_inspect: Some(Box::new(move || {
+                fs::remove_file(&leaf_marker)?;
+                symlink(&leaf_target, &leaf_marker)?;
+                Ok(())
+            })),
+            ..Default::default()
+        };
+        assert!(leaf_executor
+            .execute_archive_container_with_hooks(&leaf_id, &mut leaf_race)
+            .is_err());
+        assert!(leaf_executor
+            .storage
+            .read_artifact_archive_events()
+            .unwrap()
+            .is_empty());
+
+        let (parent_repo, parent_executor, parent_id) = configured_repo();
+        let parent_root = parent_repo.path().join("archive").join(&parent_id[..8]);
+        fs::create_dir_all(&parent_root).unwrap();
+        fs::write(parent_root.join(".jit-container"), format!("{parent_id}\n")).unwrap();
+        let external = parent_repo.path().join("matching-container");
+        fs::create_dir(&external).unwrap();
+        fs::write(external.join(".jit-container"), format!("{parent_id}\n")).unwrap();
+        let mut parent_race = FaultHooks {
+            marker_inspect: Some(Box::new(move || {
+                fs::remove_file(parent_root.join(".jit-container"))?;
+                fs::remove_dir(&parent_root)?;
+                symlink(&external, &parent_root)?;
+                Ok(())
+            })),
+            ..Default::default()
+        };
+        assert!(parent_executor
+            .execute_archive_container_with_hooks(&parent_id, &mut parent_race)
+            .is_err());
+        assert!(parent_executor
+            .storage
+            .read_artifact_archive_events()
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

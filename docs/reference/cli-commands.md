@@ -179,7 +179,7 @@ namespaces`, `jit label values`) — it never touches an issue's labels. See
 Under `--json`, the same hint is in `error.message` with code
 `INVALID_ARGUMENT`, exit code 2 — identical to any other usage error.
 
-## Archive previews
+## Archive planning and execution
 
 The `archive` command group previews dependency-aware plans by default and
 executes only when `--execute` is explicit:
@@ -204,7 +204,7 @@ artifacts, owners, embedded edges, reference changes, pending deletions,
 evidence, warnings, and blockers as JSON. User-facing issue identifiers are
 short IDs. JSON retains full durable IDs in owner and target records.
 
-`--json` prints the schema-version-1 artifact-plan object directly. Its top-level
+For a preview, `--json` prints the schema-version-1 artifact-plan object directly. Its top-level
 fields are `schema_version`, `target`, `destination_root`, `eligible`,
 `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
 `warnings`; it does not add a `message` field. Artifact order is deterministic
@@ -231,6 +231,9 @@ metadata for those moved references. One `artifact_archive_executed` event is
 made durable after publications and reference changes but before any source is
 deleted. A source is removed only when every selected durable reference points
 to its destination and its SHA-256 and size still match the recorded identity.
+If a later publication or reference update fails after an earlier publication
+succeeded, the failing invocation first records the exact successful durable
+subset; failed publications and uncommitted deletions are not claimed.
 
 Deletion failures and files edited after planning are non-fatal
 `deletion-failed` warnings; the source remains. Rerun the same command after an
@@ -238,6 +241,23 @@ interruption. Execution adopts identical occupied mirror content, repairs an
 unrecorded adopted state with one reconciling event, discovers residual sources
 through the inverse mirror layout, and retries only safe remaining work. A
 stable no-op rerun appends no event. Destinations are never overwritten.
+
+For execution, `--execute --json` prints a distinct schema-version-1 execution
+result. Its top-level fields are `schema_version`, `target`,
+`destination_root`, `publications`, `reference_changes`, `planned_deletions`,
+`deleted_sources`, `warnings`, `event_appended`, and `reconciling`.
+`publications` reports each newly published or newly adopted destination with
+its source (or `null` for a container marker), SHA-256/byte-size identity, and
+`adopted` flag. The two deletion arrays distinguish removals recorded before
+attempt from sources actually removed. `event_appended` says whether this run
+created an archive commit record; `reconciling` identifies a record that covers
+durable adopted state from an interruption or externally replaced identical
+content. Human execution output prints publication, reference-change, and
+deletion counts followed by one `warning:` line per warning.
+
+An ineligible `--execute` is an error: it exits non-zero and performs no
+publication, reference update, archive event, or source deletion. This differs
+from a blocked preview, which exits zero because it only reports the plan.
 
 The older `jit doc archive` command remains a separate document-lifecycle
 surface. It is not an alias for dependency-aware archive planning or execution.

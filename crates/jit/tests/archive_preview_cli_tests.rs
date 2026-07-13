@@ -400,6 +400,32 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     assert_eq!(result["schema_version"], 1);
     assert_eq!(result["target"]["kind"], "document");
     assert_eq!(result["event_appended"], true);
+    assert_eq!(result["reconciling"], false);
+    assert!(result["publications"].is_array());
+    assert!(result["reference_changes"].is_array());
+    assert!(result["planned_deletions"].is_array());
+    assert!(result["deleted_sources"].is_array());
+    assert!(result["warnings"].is_array());
+    assert_eq!(
+        result
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        [
+            "deleted_sources",
+            "destination_root",
+            "event_appended",
+            "planned_deletions",
+            "publications",
+            "reconciling",
+            "reference_changes",
+            "schema_version",
+            "target",
+            "warnings",
+        ]
+    );
     assert!(document_repo
         .path()
         .join("archive/fixtures/root.md")
@@ -473,4 +499,31 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
         .join(destination_root)
         .join("fixtures/root.md")
         .exists());
+}
+
+#[test]
+fn test_archive_execute_blocked_is_nonzero_nonmutating_and_human_reports_warnings() {
+    let blocked_repo = TempDir::new().unwrap();
+    assert_success(&jit(&blocked_repo, &["init", "--json"]));
+    fs::write(blocked_repo.path().join(".jit/config.toml"), "").unwrap();
+    fs::write(blocked_repo.path().join("root.md"), "blocked").unwrap();
+    let before = snapshot_files(blocked_repo.path());
+    let blocked = jit(
+        &blocked_repo,
+        &["archive", "document", "root.md", "--execute", "--json"],
+    );
+    assert!(!blocked.status.success());
+    assert_eq!(snapshot_files(blocked_repo.path()), before);
+    assert!(!blocked_repo.path().join("archive").exists());
+
+    let warning_repo = TempDir::new().unwrap();
+    configured_bundle(&warning_repo);
+    let human = jit(
+        &warning_repo,
+        &["archive", "document", "fixtures/root.md", "--execute"],
+    );
+    assert_success(&human);
+    let stdout = String::from_utf8(human.stdout).unwrap();
+    assert!(stdout.contains("Archive execution complete:"));
+    assert!(stdout.contains("warning: no-owner (fixtures/root.md)"));
 }

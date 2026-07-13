@@ -788,8 +788,10 @@ impl ArtifactPlanEntry {
 
         let publishes = matches!(self.action, ArtifactAction::Move | ArtifactAction::Copy)
             && !self.already_archived;
-        let requires_identity =
-            !self.version.is_pinned() && (publishes || !self.pending_deletions.is_empty());
+        let adopts = matches!(self.action, ArtifactAction::Move | ArtifactAction::Copy)
+            && self.already_archived;
+        let requires_identity = !self.version.is_pinned()
+            && (publishes || adopts || !self.pending_deletions.is_empty());
         if requires_identity && self.content_identity.is_none() {
             return Err(PlanError::MissingContentIdentity(self.source.clone()));
         }

@@ -11,7 +11,7 @@ use crate::errors::AlreadyExistsError;
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 /// A completely written repository-local staging file.
@@ -138,12 +138,25 @@ impl JsonFileStorage {
     /// completed stage with their recorded identity using
     /// [`JsonFileStorage::verify_staged_artifact`].
     pub fn stage_artifact(&self, source: &str) -> Result<StagedArtifact> {
-        let source_path = self.physical_repo_path(source)?;
-        ensure_regular_file(&source_path)?;
-        let bytes = fs::read(&source_path)
-            .with_context(|| format!("reading artifact source {}", source_path.display()))?;
+        let bytes = read_regular_artifact_no_follow(self, source)?;
 
         self.stage_artifact_bytes(&bytes)
+    }
+
+    /// Stage an existing regular artifact, or report that the path is absent.
+    ///
+    /// Both the existence check and the subsequent read reject symbolic links.
+    /// The actual read uses descriptor-relative no-follow traversal on Unix, so
+    /// replacing either a checked leaf or one of its parents cannot redirect
+    /// adoption through a symbolic link.
+    pub fn stage_artifact_if_exists(&self, source: &str) -> Result<Option<StagedArtifact>> {
+        let source_path = self.physical_repo_path(source)?;
+        match fs::symlink_metadata(&source_path) {
+            Ok(_) => self.stage_artifact(source).map(Some),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error)
+                .with_context(|| format!("inspecting artifact source {}", source_path.display())),
+        }
     }
 
     /// Write caller-supplied bytes into an opaque repository-local stage.
@@ -201,6 +214,22 @@ impl JsonFileStorage {
         ensure_stage_belongs_to_storage(self, &staged)?;
         verify_path_identity(&staged.path, expected)?;
         Ok(VerifiedArtifact { staged })
+    }
+
+    /// Verify that publication can use an atomic same-filesystem hard link.
+    ///
+    /// This read-only preflight compares the stage filesystem with the nearest
+    /// existing physical ancestor of a destination before any destination is
+    /// published. Publication repeats the check after creating missing parents,
+    /// so a mount race still fails closed.
+    pub fn preflight_staged_artifact(
+        &self,
+        verified: &VerifiedArtifact,
+        destination: &str,
+    ) -> Result<()> {
+        ensure_stage_belongs_to_storage(self, &verified.staged)?;
+        let destination_path = self.physical_destination_path(destination)?;
+        ensure_same_filesystem_with_existing_ancestor(&verified.staged.path, &destination_path)
     }
 
     /// Atomically publish a verified stage without replacing any destination.
@@ -325,6 +354,76 @@ fn ensure_regular_file(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn read_regular_artifact_no_follow(storage: &JsonFileStorage, relative: &str) -> Result<Vec<u8>> {
+    use nix::fcntl::{open, openat, OFlag};
+    use nix::sys::stat::Mode;
+
+    validate_repo_relative_path(relative).map_err(anyhow::Error::new)?;
+    let root = fs::canonicalize(repository_root(storage)?)
+        .context("canonicalizing repository root for no-follow artifact read")?;
+    let directory_flags =
+        OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW;
+    let mut directory = open(&root, directory_flags, Mode::empty())
+        .with_context(|| format!("opening repository root {}", root.display()))?;
+    let components = Path::new(relative).components().collect::<Vec<_>>();
+    let (leaf, parents) = components
+        .split_last()
+        .ok_or_else(|| crate::errors::InvalidArgumentError::new("Artifact path is empty"))?;
+    for component in parents {
+        directory = openat(
+            &directory,
+            component.as_os_str(),
+            directory_flags,
+            Mode::empty(),
+        )
+        .map_err(|error| no_follow_open_error(error, relative))?;
+    }
+    let file = openat(
+        &directory,
+        leaf.as_os_str(),
+        OFlag::O_RDONLY | OFlag::O_CLOEXEC | OFlag::O_NOFOLLOW,
+        Mode::empty(),
+    )
+    .map_err(|error| no_follow_open_error(error, relative))?;
+    let mut file = fs::File::from(file);
+    if !file
+        .metadata()
+        .with_context(|| format!("inspecting artifact file {relative}"))?
+        .is_file()
+    {
+        return Err(ArtifactMutationError::NotRegularFile {
+            path: PathBuf::from(relative),
+        }
+        .into());
+    }
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .with_context(|| format!("reading artifact source {relative}"))?;
+    Ok(bytes)
+}
+
+#[cfg(unix)]
+fn no_follow_open_error(error: nix::errno::Errno, relative: &str) -> anyhow::Error {
+    if matches!(error, nix::errno::Errno::ELOOP | nix::errno::Errno::ENOTDIR) {
+        return ArtifactMutationError::SymlinkArtifact {
+            path: PathBuf::from(relative),
+        }
+        .into();
+    }
+    anyhow::Error::new(std::io::Error::from_raw_os_error(error as i32)).context(format!(
+        "opening artifact without following links: {relative}"
+    ))
+}
+
+#[cfg(not(unix))]
+fn read_regular_artifact_no_follow(storage: &JsonFileStorage, relative: &str) -> Result<Vec<u8>> {
+    let source_path = storage.physical_repo_path(relative)?;
+    ensure_regular_file(&source_path)?;
+    fs::read(&source_path)
+        .with_context(|| format!("reading artifact source {}", source_path.display()))
+}
+
 fn ensure_stage_belongs_to_storage(
     storage: &JsonFileStorage,
     staged: &StagedArtifact,
@@ -431,10 +530,62 @@ fn ensure_same_filesystem(staged: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn ensure_same_filesystem_with_existing_ancestor(staged: &Path, destination: &Path) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
+
+    let mut ancestor = destination.parent().ok_or_else(|| {
+        anyhow::anyhow!(
+            "artifact destination has no parent: {}",
+            destination.display()
+        )
+    })?;
+    let ancestor_metadata = loop {
+        match fs::symlink_metadata(ancestor) {
+            Ok(metadata) => break metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                ancestor = ancestor.parent().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "artifact destination has no existing ancestor: {}",
+                        destination.display()
+                    )
+                })?;
+            }
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!(
+                        "inspecting artifact destination ancestor {}",
+                        ancestor.display()
+                    )
+                });
+            }
+        }
+    };
+    let staged_device = fs::metadata(staged)
+        .with_context(|| format!("inspecting staged artifact {}", staged.display()))?
+        .dev();
+    if staged_device != ancestor_metadata.dev() {
+        return Err(ArtifactMutationError::CrossFilesystem {
+            staged_path: staged.to_path_buf(),
+            destination_path: destination.to_path_buf(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
 #[cfg(not(unix))]
 fn ensure_same_filesystem(_staged: &Path, _destination: &Path) -> Result<()> {
     // std exposes no portable filesystem identity. `hard_link` remains the
     // authoritative check and its cross-volume error is mapped below.
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn ensure_same_filesystem_with_existing_ancestor(
+    _staged: &Path,
+    _destination: &Path,
+) -> Result<()> {
     Ok(())
 }
 
