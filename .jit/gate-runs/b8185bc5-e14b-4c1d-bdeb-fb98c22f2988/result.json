@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_id": "b8185bc5-e14b-4c1d-bdeb-fb98c22f2988",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "8cfd05e82c75433f1f7539caa8d27c68a9d93c82",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T10:54:44.138905331Z",
+  "completed_at": "2026-07-13T11:03:37.982676029Z",
+  "duration_ms": 533843,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists, is substantive, and is linked from the planning issue at `.jit/issues/1dbc72f6-c6e0-4159-9843-de9bfb68c2e2.json:35-40`. The planning issue has no dependencies.\n\n## Completeness against criteria\n\nPass. All six `[hard]` epic requirements are addressed individually in `dev/active/7d3a3a47-plan.md:28-35` and mapped to implementation tasks at lines 513-522. The working-tree and proportionality constraints are consistent with the amended epic notes and planning brief.\n\n## Technical soundness and architectural fit\n\nFail due to F1. The domain/storage/command separation otherwise fits the existing generic `CommandExecutor<S: IssueStore>`, hierarchy resolver, and repository write guard.\n\nThe primitive-versus-command distinction for identical destinations now resolves the previous F1: the storage primitive reports every collision, while a recomputed command plan may adopt identical content without claiming publication.\n\n## Decomposition and dependencies\n\nFail due to F2-F4. The nine active tasks now carry the amended plan rather than the superseded receipt/quarantine design, but the command-surface ordering is incomplete and the reconciliation left repository-invalid orphan records.\n\n## Risks and actionability\n\nFail due to F1. The append-failure case remains load-bearing because it is explicitly required by `LOCAL-32`, but the plan cannot meet its own event contract for copy actions without compensation or a recovery-event exception.\n\n## Prior review feedback\n\nThe prior identical-destination contradiction is addressed at `dev/active/7d3a3a47-plan.md:200-215` and `:629-638`. The active nine-task descriptions are also updated. However, the two retired tasks remain isolated issue records and currently fail repository validation, so breakdown reconciliation is incomplete.\n\n## Findings\n\n1. **F1 — Blocking, high:** The event contract cannot recover an observed append failure for copy-style executions. The plan publishes destinations and persists relinks before appending the event, requires no event for a no-op rerun, and explicitly tests event-append failure (`dev/active/7d3a3a47-plan.md:227-237`, `:461-471`). When an artifact copies because an outside owner still needs the source, append failure leaves no pending deletion; the rerun can therefore be mutation-free and must append nothing, permanently leaving the publication and relink unrecorded. This contradicts D-19’s “one archive event per mutating execution” and the risk claim at line 552. Specify compensation/retry for an observed append failure, permit a recovery audit event on an otherwise no-op rerun, or explicitly weaken the event contract.\n\n2. **F2 — Blocking, high:** `Read-only container candidate report` depends only on classification (`dev/active/7d3a3a47-plan.md:494`), while `Unified archive preview surface` is the task that introduces the new `jit archive` command group (`:419-436`). Both therefore become ready together and independently need to establish or modify the same CLI/main/schema surface. The candidate task must depend on a shared archive-command scaffold or on the preview task; as written, the leaves are not independently implementable.\n\n3. **F3 — Blocking, high:** The plan claims legacy removal is ordered last (`dev/active/7d3a3a47-plan.md:555`), but the removal task depends only on coordinated execution (`:475`). It has no dependency on the candidate-report task, even though D-9 defines candidates as part of the replacement command family and both tasks modify CLI/schema/MCP surfaces. Removal can consequently execute before or concurrently with candidate delivery. Add an ordering edge or restructure the shared command-family integration.\n\n4. **F4 — Blocking, high:** Breakdown reconciliation archived the superseded receipt and crash-recovery tasks but left both isolated with empty dependencies and the live `epic:artifact-archival` label (`.jit/issues/1e6fce38-1b61-454a-af02-8da08620cc27.json:8-19`, `.jit/issues/b8281931-0f2f-49f1-ba33-d8d5310a514c.json:8-19`). `jit validate --json` now fails on these two isolated issues, while the epic itself requires the `repo-validate` gate (`.jit/issues/7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc.json:12-19`). Delete the obsolete records or reconnect them in a validator-compliant historical structure before fan-out.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Event-append recovery and command-family task ordering remain unsound, and superseded breakdown nodes currently fail repository validation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Copy-style execution can persist publications and relinks, fail event append, and then produce a no-op rerun that is forbidden from recording the missing archive event.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":227,\"references\":[\"@/inv/event-log\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The candidate-report task lacks a dependency on the task that establishes the shared jit archive command surface, so the two leaves overlap and are not independently implementable.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":494},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Legacy command removal is claimed to run last but does not depend on candidate-report delivery and may run before or concurrently with completion of the replacement command family.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":475},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Two archived superseded artifact-archival tasks remain isolated with empty dependencies, causing jit validate to fail while the epic requires repo-validate.\",\"file\":\".jit/issues/1e6fce38-1b61-454a-af02-8da08620cc27.json\",\"line\":8}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4877 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5b1d-7258-7140-8bd3-4860c6a9939a\n--------\nuser\n--- 4864 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Event-append recovery and command-family task ordering remain unsound, and superseded breakdown nodes currently fail repository validation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Copy-style execution can persist publications and relinks, fail event append, and then produce a no-op rerun that is forbidden from recording the missing archive event.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 227,
+        "references": [
+          "@/inv/event-log"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The candidate-report task lacks a dependency on the task that establishes the shared jit archive command surface, so the two leaves overlap and are not independently implementable.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 494
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Legacy command removal is claimed to run last but does not depend on candidate-report delivery and may run before or concurrently with completion of the replacement command family.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 475
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Two archived superseded artifact-archival tasks remain isolated with empty dependencies, causing jit validate to fail while the epic requires repo-validate.",
+        "file": ".jit/issues/1e6fce38-1b61-454a-af02-8da08620cc27.json",
+        "line": 8
+      }
+    ]
+  }
+}
