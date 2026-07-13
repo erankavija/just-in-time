@@ -7071,3 +7071,5 @@
 {"type":"issue_state_changed","id":"6ba9403e-d8b7-47f5-9846-bc6dc1a975e5","issue_id":"41aa6056-ecec-4924-94a6-a2bb275350ee","timestamp":"2026-07-13T18:08:47.937582170Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"b5349b12-9b13-4341-842b-ef9a86e4adf2","issue_id":"41aa6056-ecec-4924-94a6-a2bb275350ee","timestamp":"2026-07-13T18:09:16.615330183Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"7c519a0f-dddf-4f5e-b4de-b26dae21e0be","issue_id":"41aa6056-ecec-4924-94a6-a2bb275350ee","timestamp":"2026-07-13T18:09:16.618178315Z","assignee":"agent:preview"}
+{"type":"gate_passed","id":"343b58c1-3820-4103-95b5-ce02d1e30542","issue_id":"41aa6056-ecec-4924-94a6-a2bb275350ee","timestamp":"2026-07-13T18:34:10.977632638Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"800ff45c-1bc5-4879-a425-8e6fec9159b4","issue_id":"41aa6056-ecec-4924-94a6-a2bb275350ee","timestamp":"2026-07-13T18:38:11.761116020Z","gate_key":"code-review","updated_by":"auto:executor"}

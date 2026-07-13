@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "0e051d46-37f1-4d40-8b1d-09161190c36f",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
+  "commit": "a87deba14aa9384815c959ac66d2308abb9b4d3e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T18:34:20.814984701Z",
+  "completed_at": "2026-07-13T18:38:11.760704300Z",
+  "duration_ms": 230945,
+  "exit_code": 1,
+  "stdout": "Attribution: a87deba1 (feature); 8e8c0bce (claim metadata only)\nPolicy sources: AGENTS.md\nResolved items: none (issue-scoped `jit item show` requires a lock write, unavailable in this read-only run)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending\nTruncation recovery: narrowed reads of linked-plan symlink clauses, storage read behavior, preview/test ranges, and CLI/docs patches\n\n1. **F1 — blocking, issue-impact, high.** The preview follows an in-repository symlink before classifying it as blocked. `plan_archive_target` calls recursive discovery before filesystem fact collection ([archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:52)); discovery reads through the link at [artifact_discovery.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/artifact_discovery.rs:102), and the storage read canonicalizes it. Thus a symlinked Markdown/HTML root can contribute dependencies from its referent even though the plan later reports `symlink-artifact`. This contradicts the approved no-transparent-symlink-following contract and makes the preview inventory incorrect.\n\n2. **F2 — blocking, issue-impact, high.** REQ-04’s required preview-fixture verification is incomplete. The only CLI preview test exercises an unconfigured CSV document ([archive_preview_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/archive_preview_cli_tests.rs:50)). The configured fixture test includes the six formats but only checks deterministic whole-plan equality, presence, and opaque formats ([archive.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:164)); it does not assert serialized JSON/human parity or exact artifact action/blocker results for the Markdown/HTML/CSS bundle and CSV/PNG/SVG roots. The synthetic renderer unit test cannot verify those command-generated previews.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The preview follows symlinks before blocking them, and the required end-to-end fixture/output coverage is incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recursive preview discovery follows symlink content before later reporting symlink-artifact, producing an incorrect artifact closure.\",\"file\":\"crates/jit/src/storage/artifact_discovery.rs\",\"line\":102,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Tests do not verify command-generated JSON/human parity and exact action/blocker outcomes for all required Markdown, HTML, CSS, CSV, PNG, and SVG fixtures.\",\"file\":\"crates/jit/tests/archive_preview_cli_tests.rs\",\"line\":50,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8464 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5cc2-3bd2-7f70-ac01-d52f1d888de0\n--------\nuser\n--- 8451 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The preview follows symlinks before blocking them, and the required end-to-end fixture/output coverage is incomplete.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Recursive preview discovery follows symlink content before later reporting symlink-artifact, producing an incorrect artifact closure.",
+        "file": "crates/jit/src/storage/artifact_discovery.rs",
+        "line": 102
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Tests do not verify command-generated JSON/human parity and exact action/blocker outcomes for all required Markdown, HTML, CSS, CSV, PNG, and SVG fixtures.",
+        "file": "crates/jit/tests/archive_preview_cli_tests.rs",
+        "line": 50
+      }
+    ]
+  }
+}
