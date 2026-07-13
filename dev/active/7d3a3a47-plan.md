@@ -744,7 +744,10 @@ group headers are organizational only, not issues.
 
 - **Source-removal reconciliation and crash recovery**  `type: task`  `satisfies: REQ-03`  `depends-on: Receipt-backed publication and reference commit`
   Outcome: reconcile receipt-backed deletion intents and close partial operations without
-  loss or overwrite. For each removal, require the exact durable non-reconciliation
+  loss or overwrite, then activate the public `--execute` dispatch only in this final
+  landing. The preceding intent-selection and publication/reference changes expose internal
+  command services only; no intermediate commit makes repository mutation publicly
+  reachable. For each removal, require the exact durable non-reconciliation
   completed_publications receipt, open-handle verify the current destination against the
   initial Started identity while holding that handle through the decision, then invoke the
   recorded same-filesystem quarantine/remove/restore primitive and inspect both source and
@@ -769,12 +772,15 @@ group headers are organizational only, not issues.
   destination plus both recorded source/quarantine locations, and can never add
   completed_publications or invent provenance. ArchiveAborted appends only after a proven
   referentially safe restored/retained state and records adopted operation/instance IDs,
-  fresh execution ID, reason, and completed/reverted/residual paths; safe duplicate terminal
-  events are allowed. Unclosable or ambiguous recovery stays open and blocks; only terminal
-  completion/abort permits a fresh operation. Tests cover modified destinations, both
-  unreceipted publication windows, crash immediately after quarantine rename, removal
-  failure with durable ArchiveExecuted, archive_root change, target aliases, multiple
-  matches, and shared-dependency nonmatches.`
+    fresh execution ID, reason, and completed/reverted/residual paths; safe duplicate terminal
+    events are allowed. Unclosable or ambiguous recovery stays open and blocks; only terminal
+    completion/abort permits a fresh operation. Tests cover modified destinations, both
+    unreceipted publication windows, crash immediately after quarantine rename, removal
+    failure with durable ArchiveExecuted, archive_root change, target aliases, multiple
+    matches, and shared-dependency nonmatches.` `[hard] LOCAL-50: Public `--execute`
+    dispatch is absent or mutation-disabled until this task lands the complete removal,
+    reconciliation, abort, and failure-injection paths; the same change activates the flag
+    only after the end-to-end recovery suite passes.`
   Blast radius: source quarantine/removal, ArchiveSourcesRemoved/ArchiveAborted, and the
   crash/failure-recovery test matrix.
 
