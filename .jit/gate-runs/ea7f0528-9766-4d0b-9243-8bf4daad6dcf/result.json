@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "ea7f0528-9766-4d0b-9243-8bf4daad6dcf",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b",
+  "commit": "8b25d9d61993b1486e5d30af6f470b56038453ed",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T21:50:44.849997531Z",
+  "completed_at": "2026-07-13T21:54:37.215123771Z",
+  "duration_ms": 232365,
+  "exit_code": 0,
+  "stdout": "Attribution: a6808bcd (claim metadata), 8b25d9d6 (implementation)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T21:46:27Z); code-review unrun; doc-review pending; docs-mechanical pending\nTruncation recovery: recovered implementation patch per affected path and bounded planner, inventory, renderer, test, and documentation reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the tagged archive-candidate implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No unresolved issue-impact defects found in the tagged archive-candidate implementation.",
+    "findings": []
+  }
+}
