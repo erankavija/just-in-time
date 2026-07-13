@@ -380,3 +380,97 @@ fn test_configured_archive_document_and_container_cli_are_exact_deterministic_an
     assert_eq!(snapshot_files(repo.path()), before);
     assert!(!repo.path().join("archive").exists());
 }
+
+#[test]
+fn test_archive_execute_is_explicit_and_available_for_document_and_container_targets() {
+    let document_repo = TempDir::new().unwrap();
+    configured_bundle(&document_repo);
+    let document = jit(
+        &document_repo,
+        &[
+            "archive",
+            "document",
+            "fixtures/root.md",
+            "--execute",
+            "--json",
+        ],
+    );
+    assert_success(&document);
+    let result: Value = serde_json::from_slice(&document.stdout).unwrap();
+    assert_eq!(result["schema_version"], 1);
+    assert_eq!(result["target"]["kind"], "document");
+    assert_eq!(result["event_appended"], true);
+    assert!(document_repo
+        .path()
+        .join("archive/fixtures/root.md")
+        .exists());
+
+    let container_repo = TempDir::new().unwrap();
+    assert_success(&jit(&container_repo, &["init", "--json"]));
+    let shipped = fs::read_to_string(container_repo.path().join(".jit/config.toml")).unwrap();
+    fs::write(
+        container_repo.path().join(".jit/config.toml"),
+        format!(
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n{shipped}"
+        ),
+    )
+    .unwrap();
+    fs::create_dir(container_repo.path().join("fixtures")).unwrap();
+    fs::write(container_repo.path().join("fixtures/root.md"), "container").unwrap();
+    let created = jit(
+        &container_repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Container",
+            "--type",
+            "epic",
+            "--json",
+        ],
+    );
+    assert_success(&created);
+    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_success(&jit(
+        &container_repo,
+        &[
+            "doc",
+            "add",
+            &id,
+            "fixtures/root.md",
+            "--skip-scan",
+            "--json",
+        ],
+    ));
+    assert_success(&jit(
+        &container_repo,
+        &["issue", "update", &id, "--state", "rejected", "--json"],
+    ));
+    let container = jit(
+        &container_repo,
+        &["archive", "container", &id, "--execute", "--json"],
+    );
+    assert_success(&container);
+    let result: Value = serde_json::from_slice(&container.stdout).unwrap();
+    assert_eq!(result["target"]["kind"], "container");
+    assert_eq!(result["event_appended"], true);
+    let destination_root = format!("archive/{}", &id[..8]);
+    assert_eq!(
+        fs::read_to_string(
+            container_repo
+                .path()
+                .join(&destination_root)
+                .join(".jit-container")
+        )
+        .unwrap(),
+        format!("{id}\n")
+    );
+    assert!(container_repo
+        .path()
+        .join(destination_root)
+        .join("fixtures/root.md")
+        .exists());
+}

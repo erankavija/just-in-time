@@ -8,6 +8,7 @@
 
 use crate::config::DocumentationConfig;
 use crate::domain::State;
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
@@ -20,7 +21,7 @@ use std::fmt;
 pub const ARCHIVE_PLAN_SCHEMA_VERSION: u32 = 1;
 
 /// A container or one arbitrary document selected for archival planning.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum PlanTarget {
     /// A resolved-hierarchy container, identified by its full durable id.
@@ -168,7 +169,7 @@ impl ArtifactIdentity {
 }
 
 /// Bytes identity captured from a single read.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ContentIdentity {
     sha256: String,
     byte_size: u64,
@@ -293,7 +294,7 @@ pub struct ArtifactEdge {
 }
 
 /// One durable issue-document relink selected by the plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ReferenceChange {
     /// Full durable issue id.
     pub issue: String,
@@ -306,7 +307,7 @@ pub struct ReferenceChange {
 }
 
 /// A source removal guarded by a previously recorded byte identity.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PendingDeletion {
     /// Normalized source path to remove after durable relinking and event append.
     pub source: String,

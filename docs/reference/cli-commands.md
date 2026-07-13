@@ -181,17 +181,20 @@ Under `--json`, the same hint is in `error.message` with code
 
 ## Archive previews
 
-The `archive` command group builds dependency-aware plans without changing the
-working tree, issue records, or event log:
+The `archive` command group previews dependency-aware plans by default and
+executes only when `--execute` is explicit:
 
 ```bash
 jit archive document dev/active/design.md
 jit archive document dev/active/design.md --json
 jit archive container 2f84c930
 jit archive container 2f84c930 --json
+jit archive document dev/active/design.md --execute
+jit archive container 2f84c930 --execute --json
 ```
 
-Both target forms use the same planner and are preview-only. A document target
+Both target forms use the same planner. Without `--execute`, they are read-only.
+A document target
 includes its recursively supported local bundle. A container target includes
 documents attached to the container and its resolved-hierarchy descendants;
 ordinary sequencing dependencies do not define membership.
@@ -214,8 +217,30 @@ partial table reports `"incomplete"`. Neither state silently receives defaults
 that would make the plan eligible, and the human view explicitly says archival
 execution is disabled.
 
+`--execute` never accepts a saved preview as input. It acquires the repository
+write guard, recomputes the plan from current issue and filesystem state, and
+refuses an ineligible result. Containers must be terminal. A document target is
+refused while any direct or supported embedded-closure owner is non-terminal;
+a managed document with no owner remains eligible and reports `no-owner` as
+informational evidence.
+
+Execution stages and verifies bytes, validates supported local links in the
+proposed mirror layout, and publishes with atomic no-replace semantics. It then
+applies only the plan's unpinned reference changes and invalidates cached asset
+metadata for those moved references. One `artifact_archive_executed` event is
+made durable after publications and reference changes but before any source is
+deleted. A source is removed only when every selected durable reference points
+to its destination and its SHA-256 and size still match the recorded identity.
+
+Deletion failures and files edited after planning are non-fatal
+`deletion-failed` warnings; the source remains. Rerun the same command after an
+interruption. Execution adopts identical occupied mirror content, repairs an
+unrecorded adopted state with one reconciling event, discovers residual sources
+through the inverse mirror layout, and retries only safe remaining work. A
+stable no-op rerun appends no event. Destinations are never overwritten.
+
 The older `jit doc archive` command remains a separate document-lifecycle
-surface. It is not an alias for these dependency-aware previews.
+surface. It is not an alias for dependency-aware archive planning or execution.
 
 ## MCP Tools Reference
 

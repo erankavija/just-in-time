@@ -1477,6 +1477,25 @@ pub enum Event {
         /// Number of issues updated
         issues_updated: usize,
     },
+    /// A dependency-aware archive execution reached its durable commit point.
+    ArtifactArchiveExecuted {
+        /// Event ID.
+        id: String,
+        /// When the commit point was recorded.
+        timestamp: DateTime<Utc>,
+        /// Container or document selected for archival.
+        target: crate::domain::artifact_plan::PlanTarget,
+        /// Repository-relative mirror root used by the operation.
+        destination_root: String,
+        /// New or adopted publications made durable before this record.
+        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
+        /// Exact issue-document reference changes made durable before this record.
+        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
+        /// Identity-guarded removals attempted after this record.
+        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
+        /// Whether the record reconciles durable state left by an earlier failed append.
+        reconciling: bool,
+    },
     /// Issue was updated (labels, priority, assignee, etc.)
     IssueUpdated {
         /// Event ID
@@ -1794,6 +1813,27 @@ impl Event {
         }
     }
 
+    /// Create the durable commit record for dependency-aware archival.
+    pub fn new_artifact_archive_executed(
+        target: crate::domain::artifact_plan::PlanTarget,
+        destination_root: String,
+        publications: Vec<crate::domain::artifact_execution::ArchivePublication>,
+        reference_changes: Vec<crate::domain::artifact_plan::ReferenceChange>,
+        planned_deletions: Vec<crate::domain::artifact_plan::PendingDeletion>,
+        reconciling: bool,
+    ) -> Self {
+        Event::ArtifactArchiveExecuted {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            target,
+            destination_root,
+            publications,
+            reference_changes,
+            planned_deletions,
+            reconciling,
+        }
+    }
+
     /// Create a dependency reduced event
     pub fn new_dependency_reduced(
         issue_id: String,
@@ -2033,6 +2073,7 @@ impl Event {
             Event::IssueReleased { issue_id, .. } => issue_id,
             Event::IssueUpdated { issue_id, .. } => issue_id,
             Event::DocumentArchived { .. } => "", // No associated issue
+            Event::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
             Event::DependencyReduced { issue_id, .. } => issue_id,
             Event::LocalRuleBypassed { issue_id, .. } => issue_id,
             Event::TransitionBlocked { issue_id, .. } => issue_id,

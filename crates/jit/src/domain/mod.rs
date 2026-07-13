@@ -19,6 +19,7 @@
 
 pub mod artifact_classifier;
 pub mod artifact_discovery;
+pub mod artifact_execution;
 pub mod artifact_inventory;
 pub mod artifact_plan;
 pub mod event_catalog;

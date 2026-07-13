@@ -14,6 +14,7 @@ an `issue`-scoped record names the one issue it concerns, while `registry`- and
 to shared state. The tags whose records carry no `issue_id` are exactly:
 
 - `document_archived` (repository)
+- `artifact_archive_executed` (repository)
 - `gate_definition_updated` (registry)
 - `gate_definition_created` (registry)
 - `gate_definition_removed` (registry)
@@ -35,6 +36,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `issue_released` | issue | yes | An issue was released from its assignee; the record carries the former assignee and the reason. |
 | `issue_updated` | issue | yes | An issue's fields were updated; the record names the changed fields. |
 | `document_archived` | repository | no | `jit doc archive` moved a document into the archive; the record carries the source, the destination, the archive category, and the number of issues whose references it re-pointed. |
+| `artifact_archive_executed` | repository | no | `jit archive ... --execute` durably recorded publications, exact reference changes, and identity-guarded planned deletions before deletion attempts. |
 | `dependency_reduced` | issue | yes | `jit validate --fix` removed the issue's redundant (transitively implied) dependency edges. |
 | `local_rule_bypassed` | issue | yes | `--force` overrode an enforcing validation rule's error finding on an issue write; one record per bypassed rule. |
 | `transition_blocked` | issue | yes | An enforcing graph rule refused a state transition; the record carries the target state and the rule. |

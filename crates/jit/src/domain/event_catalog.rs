@@ -135,6 +135,8 @@ pub enum EventTag {
     IssueUpdated,
     /// `document_archived`
     DocumentArchived,
+    /// `artifact_archive_executed`
+    ArtifactArchiveExecuted,
     /// `dependency_reduced`
     DependencyReduced,
     /// `local_rule_bypassed`
@@ -166,7 +168,7 @@ impl EventTag {
     ///
     /// assert!(EventTag::ALL.contains(&EventTag::IssueCreated));
     /// ```
-    pub const ALL: [EventTag; 20] = [
+    pub const ALL: [EventTag; 21] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -179,6 +181,7 @@ impl EventTag {
         EventTag::IssueReleased,
         EventTag::IssueUpdated,
         EventTag::DocumentArchived,
+        EventTag::ArtifactArchiveExecuted,
         EventTag::DependencyReduced,
         EventTag::LocalRuleBypassed,
         EventTag::TransitionBlocked,
@@ -212,6 +215,7 @@ impl EventTag {
             EventTag::IssueReleased => "issue_released",
             EventTag::IssueUpdated => "issue_updated",
             EventTag::DocumentArchived => "document_archived",
+            EventTag::ArtifactArchiveExecuted => "artifact_archive_executed",
             EventTag::DependencyReduced => "dependency_reduced",
             EventTag::LocalRuleBypassed => "local_rule_bypassed",
             EventTag::TransitionBlocked => "transition_blocked",
@@ -254,9 +258,9 @@ impl EventTag {
             EventTag::GateDefinitionUpdated
             | EventTag::GateDefinitionCreated
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
-            EventTag::DocumentArchived | EventTag::LifecycleTimestampsBackfilled => {
-                EventScope::Repository
-            }
+            EventTag::DocumentArchived
+            | EventTag::ArtifactArchiveExecuted
+            | EventTag::LifecycleTimestampsBackfilled => EventScope::Repository,
         }
     }
 
@@ -286,6 +290,10 @@ impl EventTag {
                 "`jit doc archive` moved a document into the archive; the record carries the \
                  source, the destination, the archive category, and the number of issues \
                  whose references it re-pointed."
+            }
+            EventTag::ArtifactArchiveExecuted => {
+                "`jit archive ... --execute` durably recorded publications, exact reference \
+                 changes, and identity-guarded planned deletions before deletion attempts."
             }
             EventTag::DependencyReduced => {
                 "`jit validate --fix` removed the issue's redundant (transitively implied) \
@@ -423,6 +431,18 @@ impl EventTag {
                 category: "plan".to_string(),
                 issues_updated: 1,
             },
+            EventTag::ArtifactArchiveExecuted => Event::ArtifactArchiveExecuted {
+                id,
+                timestamp,
+                target: crate::domain::artifact_plan::PlanTarget::Document {
+                    path: "dev/plan.md".to_string(),
+                },
+                destination_root: "dev/archive".to_string(),
+                publications: Vec::new(),
+                reference_changes: Vec::new(),
+                planned_deletions: Vec::new(),
+                reconciling: false,
+            },
             EventTag::DependencyReduced => Event::DependencyReduced {
                 id,
                 issue_id,
@@ -506,6 +526,7 @@ impl Event {
             Event::IssueReleased { .. } => EventTag::IssueReleased,
             Event::IssueUpdated { .. } => EventTag::IssueUpdated,
             Event::DocumentArchived { .. } => EventTag::DocumentArchived,
+            Event::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
             Event::DependencyReduced { .. } => EventTag::DependencyReduced,
             Event::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
             Event::TransitionBlocked { .. } => EventTag::TransitionBlocked,
@@ -845,7 +866,7 @@ mod tests {
         }
     }
 
-    /// REQ-02: the records without an `issue_id` are exactly `document_archived`,
+    /// REQ-02: the records without an `issue_id` are exactly the two archive records,
     /// the three gate-definition registry edits, and
     /// `lifecycle_timestamps_backfilled`. Asserted as a set equality, so a tag
     /// that joins or leaves the no-issue set fails here.
@@ -860,6 +881,7 @@ mod tests {
         assert_eq!(
             no_issue,
             BTreeSet::from([
+                "artifact_archive_executed",
                 "document_archived",
                 "gate_definition_created",
                 "gate_definition_removed",

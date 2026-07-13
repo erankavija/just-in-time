@@ -1976,13 +1976,17 @@ pub enum DocCommands {
     },
 }
 
-/// Non-mutating dependency-aware archive planning commands.
+/// Dependency-aware archive planning commands; mutation requires `--execute`.
 #[derive(Subcommand)]
 pub enum ArchiveCommands {
     /// Preview archival of one repository-relative document and its supported bundle
     Document {
         /// Repository-relative document or opaque artifact path
         path: String,
+
+        /// Recompute under the repository write guard and execute the eligible plan
+        #[arg(long)]
+        execute: bool,
 
         /// Output the binding schema-version-1 plan as JSON
         #[arg(long)]
@@ -1993,6 +1997,10 @@ pub enum ArchiveCommands {
     Container {
         /// Container issue ID or unique prefix
         id: String,
+
+        /// Recompute under the repository write guard and execute the eligible plan
+        #[arg(long)]
+        execute: bool,
 
         /// Output the binding schema-version-1 plan as JSON
         #[arg(long)]

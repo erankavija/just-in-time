@@ -15,7 +15,7 @@ use crate::storage::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -835,11 +835,27 @@ impl IssueStore for JsonFileStorage {
         let events_path = self.root.join(EVENTS_FILE);
         let mut file = OpenOptions::new()
             .create(true)
+            .read(true)
             .append(true)
             .open(&events_path)
             .context("Failed to open events file")?;
 
         let json = serde_json::to_string(event).context("Failed to serialize event")?;
+        let length = file
+            .metadata()
+            .context("Failed to inspect events file")?
+            .len();
+        if length > 0 {
+            file.seek(SeekFrom::End(-1))
+                .context("Failed to inspect events tail")?;
+            let mut tail = [0_u8; 1];
+            file.read_exact(&mut tail)
+                .context("Failed to read events tail")?;
+            if tail[0] != b'\n' {
+                file.write_all(b"\n")
+                    .context("Failed to isolate torn event tail")?;
+            }
+        }
         writeln!(file, "{}", json).context("Failed to write event")?;
         Ok(())
     }
@@ -867,6 +883,42 @@ impl IssueStore for JsonFileStorage {
             events.push(event);
         }
 
+        Ok(events)
+    }
+
+    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
+        let events_path = self.root.join(EVENTS_FILE);
+        if !events_path.exists() {
+            return Ok(Vec::new());
+        }
+        let events_lock_path = self.root.join(".events.lock");
+        let _lock = self.locker.lock_shared(&events_lock_path)?;
+        let reader =
+            BufReader::new(fs::File::open(&events_path).context("Failed to open events file")?);
+        let mut events = Vec::new();
+        let mut skipped_torn_line = false;
+        for line in reader.lines() {
+            let line = line.context("Failed to read line from events file")?;
+            match serde_json::from_str::<Event>(&line) {
+                Ok(event) => {
+                    if matches!(event, Event::ArtifactArchiveExecuted { .. }) {
+                        events.push(event);
+                    }
+                }
+                Err(_)
+                    if !skipped_torn_line
+                        && line.trim_start().starts_with('{')
+                        && !line.trim_end().ends_with('}') =>
+                {
+                    // `append_event` isolates an interrupted trailing JSON
+                    // prefix on its own line before appending a retry. Skip at
+                    // most that recognizable torn record; arbitrary malformed
+                    // records remain hard errors.
+                    skipped_torn_line = true;
+                }
+                Err(error) => return Err(error).context("Failed to deserialize event"),
+            }
+        }
         Ok(events)
     }
 

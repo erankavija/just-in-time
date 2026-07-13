@@ -48,17 +48,18 @@ form: `jit list` routes to `jit issue list`, and `jit rdeps` to
 `jit graph rdeps`. Each behaves identically to the canonical noun/verb it
 forwards to, which remains the primary spelling.
 
-**Archive preview selectors.** `archive` is a read-only noun group whose second
-token selects the kind of preview target. Its canonical forms are:
+**Archive target selectors.** `archive` is a noun group whose second token
+selects the kind of target. Its canonical forms are:
 
 - `jit archive document <path>`, where `<path>` is a repository-relative
   document path.
 - `jit archive container <id>`, where `<id>` is an issue reference resolved by
   the normal full-id, `short_id`, or unique-prefix rules below.
 
-Both forms only construct and display an archive plan. They do not move, copy,
-delete, or relink artifacts, and they do not mutate issues or the event log.
-`--json` changes only the rendering of that same preview plan.
+Both forms construct and display a read-only archive plan by default.
+`--execute` is the explicit mutation modifier; it recomputes the plan under the
+repository write guard rather than consuming preview output. `--json` changes
+only the rendering of the selected preview or execution result.
 
 ---
 

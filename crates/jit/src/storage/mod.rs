@@ -312,6 +312,18 @@ pub trait IssueStore: Clone {
     /// Returns an error if events cannot be read.
     fn read_events(&self) -> Result<Vec<Event>>;
 
+    /// Read dependency-aware archive events for reconciliation.
+    ///
+    /// File storage overrides this path so an isolated malformed torn-tail line
+    /// cannot prevent a later archive run from repairing and reconciling state.
+    fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
+        Ok(self
+            .read_events()?
+            .into_iter()
+            .filter(|event| matches!(event, Event::ArtifactArchiveExecuted { .. }))
+            .collect())
+    }
+
     /// Save a gate run result.
     ///
     /// # Errors

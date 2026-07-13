@@ -4893,21 +4893,76 @@ fn run() -> Result<()> {
                 }
             }
         },
-        Commands::Archive(archive_cmd) => {
-            let (plan, json) = match archive_cmd {
-                ArchiveCommands::Document { path, json } => {
-                    (executor.preview_archive_document(&path)?, json)
+        Commands::Archive(archive_cmd) => match archive_cmd {
+            ArchiveCommands::Document {
+                path,
+                execute,
+                json,
+            } => {
+                if execute {
+                    let result = executor.execute_archive_document(&path)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&result)?);
+                    } else {
+                        println!(
+                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
+                                result.publications.len(),
+                                result.reference_changes.len(),
+                                result.deleted_sources.len()
+                            );
+                        for warning in result.warnings {
+                            println!(
+                                "warning: {}{}",
+                                warning.code.as_str(),
+                                warning
+                                    .path
+                                    .map(|path| format!(" ({path})"))
+                                    .unwrap_or_default()
+                            );
+                        }
+                    }
+                } else {
+                    let plan = executor.preview_archive_document(&path)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&plan)?);
+                    } else {
+                        print!("{}", jit::output::render_archive_plan(&plan));
+                    }
                 }
-                ArchiveCommands::Container { id, json } => {
-                    (executor.preview_archive_container(&id)?, json)
-                }
-            };
-            if json {
-                println!("{}", serde_json::to_string_pretty(&plan)?);
-            } else {
-                print!("{}", jit::output::render_archive_plan(&plan));
             }
-        }
+            ArchiveCommands::Container { id, execute, json } => {
+                if execute {
+                    let result = executor.execute_archive_container(&id)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&result)?);
+                    } else {
+                        println!(
+                                "Archive execution complete: {} publication(s), {} reference change(s), {} source deletion(s)",
+                                result.publications.len(),
+                                result.reference_changes.len(),
+                                result.deleted_sources.len()
+                            );
+                        for warning in result.warnings {
+                            println!(
+                                "warning: {}{}",
+                                warning.code.as_str(),
+                                warning
+                                    .path
+                                    .map(|path| format!(" ({path})"))
+                                    .unwrap_or_default()
+                            );
+                        }
+                    }
+                } else {
+                    let plan = executor.preview_archive_container(&id)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&plan)?);
+                    } else {
+                        print!("{}", jit::output::render_archive_plan(&plan));
+                    }
+                }
+            }
+        },
         Commands::Query {
             subcommand,
             state: bare_state,

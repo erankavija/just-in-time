@@ -143,6 +143,15 @@ impl JsonFileStorage {
         let bytes = fs::read(&source_path)
             .with_context(|| format!("reading artifact source {}", source_path.display()))?;
 
+        self.stage_artifact_bytes(&bytes)
+    }
+
+    /// Write caller-supplied bytes into an opaque repository-local stage.
+    ///
+    /// This is used for small executor-owned records such as `.jit-container`;
+    /// publication still requires the same verify/type-state/no-replace path as
+    /// ordinary artifacts.
+    pub fn stage_artifact_bytes(&self, bytes: &[u8]) -> Result<StagedArtifact> {
         let stage_relative = format!(".jit/tmp/artifact-{}", uuid::Uuid::new_v4());
         let stage_path = self.physical_repo_path(&stage_relative)?;
         let stage_parent = stage_path.parent().ok_or_else(|| {
@@ -164,7 +173,7 @@ impl JsonFileStorage {
                 .open(&stage_path)
                 .with_context(|| format!("creating artifact stage {}", stage_path.display()))?;
             stage_file
-                .write_all(&bytes)
+                .write_all(bytes)
                 .with_context(|| format!("writing artifact stage {}", stage_path.display()))?;
             stage_file
                 .flush()
