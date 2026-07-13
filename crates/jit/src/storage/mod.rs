@@ -19,6 +19,7 @@ pub mod discovery;
 pub mod errors;
 pub mod gate_runs;
 pub mod gate_store;
+pub mod git_revision;
 pub mod gitattributes;
 pub mod heartbeat;
 pub mod json;
@@ -44,6 +45,7 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
+pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};

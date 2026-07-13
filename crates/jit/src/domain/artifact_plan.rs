@@ -684,7 +684,7 @@ impl ArtifactPlanEntry {
         &self.warnings
     }
 
-    fn normalize(&mut self) -> Result<(), PlanError> {
+    pub(crate) fn normalize(&mut self) -> Result<(), PlanError> {
         self.source = normalize_path(&self.source);
         self.destination = self.destination.take().map(|path| normalize_path(&path));
         self.provenance.sort_unstable();
@@ -1067,7 +1067,13 @@ fn normalize_target(target: PlanTarget) -> PlanTarget {
     }
 }
 
-fn normalize_path(path: &str) -> String {
+/// Normalize one repository-relative artifact path for stable identity.
+///
+/// This is lexical normalization only: it standardizes separators, removes
+/// empty and `.` components, and collapses an ordinary `segment/..` pair.
+/// Storage remains responsible for validating containment before any read or
+/// mutation.
+pub fn normalize_artifact_path(path: &str) -> String {
     let slash_normalized = path.replace('\\', "/");
     let mut components = Vec::new();
     for component in slash_normalized.split('/') {
@@ -1080,6 +1086,10 @@ fn normalize_path(path: &str) -> String {
         }
     }
     components.join("/")
+}
+
+fn normalize_path(path: &str) -> String {
+    normalize_artifact_path(path)
 }
 
 fn blocker_cmp(left: &PlanBlocker, right: &PlanBlocker) -> Ordering {
