@@ -87,10 +87,19 @@ plan-side narrowing.
   and the file stays. Reruns re-derive the expected identity from the published
   destination (which the mirror mapping locates), never from the possibly-edited source.
 
-- **Destination layout (D-12).** The destination root is `<archive_root>/` plus, for
-  container targets, `<container.id>/` (the full UUID — short-id prefixes can collide
-  across containers, full UUIDs cannot, matching `.jit/issues/<uuid>.json` naming); every
-  moved or copied artifact lands at that root plus its repository-relative source path.
+- **Destination layout (D-12, amended by owner 2026-07-13: short hashes on every
+  user-visible surface).** The destination root is `<archive_root>/` plus, for container
+  targets, `<container.short_id>/` — consistent with document filenames
+  (`<short>-plan.md`) and CLI output. The segment derives from the container's own id
+  prefix, never from the current id population, so it is deterministic. Directory
+  ownership is exact via a marker: when execution first creates the directory it writes
+  a hidden machine-record file `.jit-container` holding the full container id (machine
+  records carry full identifiers; visible names stay short); planning blocks an existing
+  directory whose marker names a different container as a target-level
+  `destination-conflict`, so short-id prefix collisions are always caught, and a
+  markerless directory (legacy or hand-made) blocks when it holds entries the plan does
+  not account for. Every moved or copied artifact lands at that root plus its
+  repository-relative source path.
   Archival takes no category input (D-21): the mirror rule alone determines every
   destination. Mirroring under one common prefix keeps every relative offset between bundle
   members invariant, keeps identical filenames from different directories distinct, and
@@ -219,6 +228,12 @@ plan-side narrowing.
     missing **embedded** target gets warning `missing-edge-target` on the referencing
     artifact: no needs-destination constraint, excluded from before/after validation (the
     edge resolves nowhere before archival, so no regression is possible), never blocking.
+  - **Id rendering (owner directive, 2026-07-13):** every user-visible surface uses short
+    hashes — destination path segments and human-rendered output identify containers and
+    issues by short id, consistent with document filenames and existing CLI output. JSON
+    envelopes and event records carry full identifiers alongside short ids per the
+    repository output conventions; full ids never surface as the primary identifier in
+    human-facing output or on-disk layout names.
   - **Candidate collection envelope:** `jit archive candidates --json` emits
     `{"schema_version": 1, "count": N, "candidates": [...]}` per the repository
     list-envelope convention; each candidate is the same target plan envelope. Every check
@@ -399,7 +414,9 @@ label directly.
   status, so dev/active-other does not match dev/active; an unmanaged selected root blocks
   as unmanaged-selected-root while an unmanaged embedded dependency copies or retains,
   never moves.` `[hard] LOCAL-18: Proposes destinations by mirroring repository-relative
-  source paths beneath the destination root (full container UUID segment); a
+  source paths beneath the destination root (container short-id segment, D-12); an
+  existing container directory whose ownership marker names a different container blocks
+  as a target-level destination-conflict; a
   differing-content occupied destination blocks as destination-conflict and a
   content-identical one classifies already_archived with publication skipped, its action
   and deletion still following the calculus and the unified D-17/D-18 precondition;
@@ -421,7 +438,10 @@ label directly.
   physical containment with no symlink traversal, and delete a caller-named source only
   after re-verifying its caller-supplied recorded identity (D-17). They neither acquire
   the operation-wide guard nor plan, relink issues, append events, or orchestrate
-  execution. A cross-filesystem destination fails with a typed error. Testable through
+  execution. A cross-filesystem destination fails with a typed error. As an interim
+  hardening, the legacy document-archive mutation section acquires the repository write
+  guard until that command's removal, so no unguarded JIT writer coexists with the
+  guarded executor. Testable through
   tempdir-backed storage (the in-memory backend performs no virtual file I/O).
   Own criteria: `[hard] LOCAL-20: Rejects an occupied destination — including a
   content-identical external creation between check and publish — with the pre-existing
@@ -459,7 +479,9 @@ label directly.
 
 - **Coordinated plan execution**  `type: task`  `satisfies: REQ-03, REQ-04`  `depends-on: Storage-owned artifact mutation primitive, Unified archive preview surface`
   Outcome: `--execute` acquires and holds `RepoWriteGuard` across the whole operation,
-  recomputes the plan (preview output is never an execution input, D-7), refuses
+  recomputes the plan (preview output is never an execution input, D-7), creates the
+  container directory with its `.jit-container` ownership marker on first use (D-12),
+  refuses
   non-terminal containers and D-15-ineligible document targets, stages and verifies
   content identities captured under the guard, validates every supported local edge in
   the proposed layout, publishes no-replace, applies exactly the planned
@@ -492,10 +514,12 @@ label directly.
   compensating revert, deletion failure, and a source edited after planning proves no
   artifact is lost, no
   destination overwritten, and no reference relying solely on a missing path; a rerun
-  after each injected failure converges — already-archived recognition, inverse-mapping
-  residue rediscovery, deletion only under the unified precondition (every selected
-  reference committed to its destination plus identity verification, so a source with any
-  reference still pointing at it is always retained), and no duplicate destination,
+  after each injected failure reaches a stable, fully reported state — already-archived
+  recognition, inverse-mapping residue rediscovery, deletion only under the unified
+  precondition (every selected reference committed to its destination plus identity
+  verification, so a source with any reference still pointing at it is always retained,
+  and an identity-mismatched edited source is retained indefinitely with its warning as
+  the correct terminal outcome), and no duplicate destination,
   reference, or event.`
   Blast radius: command-layer execution over the storage primitive and shared planner; no
   legacy-command change.
@@ -635,10 +659,14 @@ review; none is REOPEN.
   details inside a candidate**. Rejected: individual artifacts as independent archival
   candidates.
 - **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination
-  root `<archive_root>/` (+ `<container.id>/`, the full UUID, for container targets), each
+  root `<archive_root>/` (+ `<container.short_id>/` for container targets — amended by
+  owner 2026-07-13: user-visible surfaces use short hashes), each
   artifact at root + repository-relative source path, no category segment (D-21)**. The
-  full UUID is the container segment because short-id prefixes are not unique and
-  destination determinism must not depend on the current id population. Preserves every
+  segment derives from the container's own id prefix, so it is deterministic; directory
+  ownership is exact via the hidden `.jit-container` marker (full id as a machine
+  record), whose mismatch blocks as a target-level destination-conflict, catching every
+  prefix collision. Rejected within the amendment: a full-UUID segment (collision-proof
+  but inconsistent with every other user-visible id surface). Preserves every
   relative offset under a common prefix, keeps identical filenames distinct, makes
   intra-plan collisions structurally impossible, and is invertible (used by D-18). A
   cross-filesystem archive root is a typed error (owner proportionality amendment).

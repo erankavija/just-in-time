@@ -246,6 +246,21 @@ working-tree artifacts accordingly). The goal is a safe, easy archival
 convention with low maintenance burden, not adversarial filesystem
 guarantees.
 
+## Owner amendment (2026-07-13, short hashes)
+
+Every user-visible surface uses short hashes: archive destination segments
+are container short ids, and human-rendered output identifies issues by
+short id, consistent with document filenames and CLI output. Directory
+ownership stays exact through a hidden `.jit-container` marker holding the
+full id as a machine record; a marker mismatch blocks as a destination
+conflict. Full identifiers remain in machine records (JSON envelopes,
+events). This amendment was applied by the owner to the review-approved plan
+without a further review round, together with two accepted-plan
+improvements: the legacy command's mutation section holds the repository
+write guard until removal, and rerun convergence is defined as a stable
+fully reported state in which an edited source is retained with its warning
+rather than deleted.
+
 ## Reconcile the epic criteria
 
 REQ-01 through REQ-04 and REQ-06 remain aligned with the approved direction.
