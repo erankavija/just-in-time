@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "802e7db6-5eda-4995-9b4c-618736b70497",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "commit": "37ad22f3796336a62107ae4b06acd057097dc582",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T16:44:03.719489138Z",
+  "completed_at": "2026-07-13T16:48:42.212925571Z",
+  "duration_ms": 278493,
+  "exit_code": 0,
+  "stdout": "Attribution: 2f763434 (claim), 45f751f8 (implementation), ca2e97a9/1aabd9bf (prior-review evidence), 22ceb13a/37ad22f3 (follow-up fixes)\nPolicy sources: AGENTS.md\nResolved items: @/issue/971c67f4/requirement/REQ-01, REQ-02, REQ-03; @/issue/7d3a3a47/requirement/REQ-01, REQ-04 (markdown-first issue sources); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/cargo-ci, @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (recorded exit code 1, 2026-07-13T16:41:01Z); prior code-review run failed (exit 1) with F1/F2, both addressed by 37ad22f3\nTruncation recovery: split core patches and current source/test reads; replaced broad issue-label search with exact epic and dependency reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied; prior dynamic-loading findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All issue-scoped hard criteria are satisfied; prior dynamic-loading findings are addressed.",
+    "findings": []
+  }
+}

@@ -16,12 +16,12 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T16:21:58.055766267Z"
+      "updated_at": "2026-07-13T16:44:14.325473280Z"
     },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T16:25:36.828015792Z"
+      "updated_at": "2026-07-13T16:45:46.849873101Z"
     }
   },
   "context": {},
@@ -33,7 +33,7 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-13T00:59:48.563503250Z",
-  "updated_at": "2026-07-13T16:28:57.856965546Z",
+  "updated_at": "2026-07-13T16:49:09.803751175Z",
   "first_ready_at": "2026-07-13T00:59:48.563503860Z",
   "claimed_at": "2026-07-13T15:50:59.780926653Z"
 }

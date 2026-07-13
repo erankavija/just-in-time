@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "40694bf3-0250-4212-963e-b503f0fba918",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "commit": "37ad22f3796336a62107ae4b06acd057097dc582",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T16:45:46.849873101Z",
+  "completed_at": "2026-07-13T16:49:09.803475724Z",
+  "duration_ms": 202953,
+  "exit_code": 1,
+  "stdout": "Attribution: 2f763434, 45f751f8, ca2e97a9, 22ceb13a, 1aabd9bf, 37ad22f3\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/code-review (.jit/gates.toml); @/charter/D-1,D-2,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml); issue requirements read from markdown-first issue records because `jit item show` requires a write lock\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T16:44:14Z); prior code-review failed (exit 1) with two structured findings, both addressed in 37ad22f3\nTruncation recovery: narrowed truncated inventory/storage and artifact-issue searches to direct files, relevant callers, tests, and linked archival context\n\n1. [blocking][issue-impact] Bare same-directory local loader URLs are not detected. The dynamic patterns only accept `./`, `../`, or `/`, so valid local URLs such as `fetch(\"payload.json\")`, `new Worker(\"worker.js\")`, or `data-src=payload.json` produce no `dynamic-loading-suspected` warning. Static discovery itself treats bare paths as relative, so this leaves the required local-path-bearing dynamic set incomplete. `crates/jit/src/domain/artifact_discovery.rs:270` and `crates/jit/src/domain/artifact_discovery.rs:285`. References: `@/issue/971c67f4/requirement/REQ-02`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Bare relative local dynamic-loader URLs are not warned.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Dynamic-loader detection excludes bare same-directory local URLs such as fetch(\\\"payload.json\\\") and data-src=payload.json.\",\"file\":\"crates/jit/src/domain/artifact_discovery.rs\",\"line\":270,\"references\":[\"@/issue/971c67f4/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5273 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5c5e-d695-7720-9adf-866b54e68c3c\n--------\nuser\n--- 5260 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Bare relative local dynamic-loader URLs are not warned.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Dynamic-loader detection excludes bare same-directory local URLs such as fetch(\"payload.json\") and data-src=payload.json.",
+        "file": "crates/jit/src/domain/artifact_discovery.rs",
+        "line": 270,
+        "references": [
+          "@/issue/971c67f4/requirement/REQ-02"
+        ]
+      }
+    ]
+  }
+}
