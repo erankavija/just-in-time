@@ -2,7 +2,7 @@
   "id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
   "title": "Recursive supported-dependency discovery",
   "description": "Implement recursive discovery for supported local bundle dependencies of working-tree artifacts: Markdown and HTML element URLs, including script `src`, plus CSS `@import` and `url()`. Resolve paths by normalized components, distinguish relative and root-relative edges, reject repository escape, detect cycles, and retain enough edge data for before/after reachability validation. Detect the binding dynamic-loading pattern set textually — `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`, `importScripts(`, URL-bearing `data-*` attributes, and static module syntax with relative specifiers (`import`/`export ... from`/`require`) — and report matches in relocated members as warnings, never blocking and never executing or guessing JavaScript: the pattern set cannot distinguish live loaders from code examples in presentation content. Pinned roots contribute no embedded-closure scan; a pinned root whose commit read fails blocks the target, and a readable pinned root imposes no working-tree constraint. Existing snapshot-export callers remain unchanged because this is a new recursive path.\n\n## Success Criteria\n\n- [hard] REQ-01: Discovery reaches an HTML to sibling CSS to nested figure chain and recursively follows CSS `@import` and `url()` targets; script-element `src` is a supported static edge.\n- [hard] REQ-02: Cycles terminate deterministically, repository escapes are rejected, and local-path-bearing constructs from the complete binding dynamic-loading set produce the `dynamic-loading-suspected` warning by textual matching only, without blocking the target.\n- [hard] REQ-03: A pinned root whose commit read fails produces `pinned-read-failed` with no working-tree fallback; a readable pinned root yields a non-relocating historical entry with no embedded-closure scan and no working-tree constraint.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [
@@ -16,12 +16,12 @@
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T16:44:14.325473280Z"
+      "updated_at": "2026-07-13T17:34:08.929997935Z"
     },
     "code-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T16:45:46.849873101Z"
+      "updated_at": "2026-07-13T17:37:38.877644234Z"
     }
   },
   "context": {},
@@ -33,7 +33,8 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-13T00:59:48.563503250Z",
-  "updated_at": "2026-07-13T16:49:09.803751175Z",
+  "updated_at": "2026-07-13T17:40:51.002329892Z",
   "first_ready_at": "2026-07-13T00:59:48.563503860Z",
-  "claimed_at": "2026-07-13T15:50:59.780926653Z"
+  "claimed_at": "2026-07-13T15:50:59.780926653Z",
+  "done_at": "2026-07-13T17:40:51.002329302Z"
 }

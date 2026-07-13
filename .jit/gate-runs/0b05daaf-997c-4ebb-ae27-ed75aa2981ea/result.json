@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0b05daaf-997c-4ebb-ae27-ed75aa2981ea",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "commit": "c2b4d8ec009520c311b127d7d10935db06c0eb74",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T17:37:38.877644234Z",
+  "completed_at": "2026-07-13T17:40:46.001773936Z",
+  "duration_ms": 187124,
+  "exit_code": 0,
+  "stdout": "Attribution: 2f763434, 45f751f8, ca2e97a9, 22ceb13a, 1aabd9bf, 37ad22f3, b5229df6, 263c04a4, c2b4d8ec\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/cargo-ci and @/gate/code-review (.jit/gates.toml); @/charter/D-1 and D-4 (dev/vision/9db27a3a-charter.md); @/issue/971c67f4/requirement/REQ-01, REQ-02, REQ-03 and @/issue/7d3a3a47/requirement/REQ-01, REQ-04 (markdown-first issue sources)\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T17:34:08Z); latest prior code-review failed (exit 1) with F1, addressed by 263c04a4\nTruncation recovery: Split patches by commit and affected path; read current parser, storage loop, tests, inventory integration, and exact callers; issue-scoped item lookups were lock-blocked in the read-only sandbox, so configured markdown-first sources were read directly\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied and the prior dynamic-loader finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All issue-scoped hard criteria are satisfied and the prior dynamic-loader finding is addressed.",
+    "findings": []
+  }
+}

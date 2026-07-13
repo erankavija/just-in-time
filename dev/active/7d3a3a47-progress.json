@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -24,7 +24,7 @@
     {
       "wave_number": 4,
       "issues": [
-        {"id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6", "short_id": "971c67f4", "title": "Recursive supported-dependency discovery", "classification": "implementation", "status": "pending"}
+        {"id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6", "short_id": "971c67f4", "title": "Recursive supported-dependency discovery", "classification": "implementation", "status": "completed"}
       ]
     },
     {
@@ -63,14 +63,16 @@
     {
       "issue_short_id": "971c67f4",
       "kind": "rework_limit_exceeded",
-      "status": "authorized",
+      "status": "resolved",
       "root_finding": "Dynamic-loader discovery does not exhaustively recognize local path-bearing forms.",
       "latest_finding": "Bare same-directory URLs such as fetch(\"payload.json\") and data-src=payload.json are not warned.",
       "gate_commit": "37ad22f3796336a62107ae4b06acd057097dc582",
       "rework_cycles": 2,
       "recorded_at": "2026-07-13T19:49:10+03:00",
       "authorized_at": "2026-07-13T20:34:00+03:00",
-      "authorization": "User authorized an exceptional third rework cycle and requested immediate handoff."
+      "authorization": "User authorized an exceptional third rework cycle and requested immediate handoff.",
+      "resolved_at": "2026-07-13T20:40:51+03:00",
+      "resolution": "Exceptional rework commit 263c04a4 passed cargo-ci and code-review."
     }
   ],
   "rework_counts": {
