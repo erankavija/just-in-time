@@ -12,13 +12,19 @@
   "gates_required": [
     "cargo-ci",
     "code-review",
-    "doc-review"
+    "doc-review",
+    "docs-mechanical"
   ],
   "gates_status": {
     "doc-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-13T15:57:36.748078058Z"
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-13T15:58:38.945239517Z"
     }
   },
   "context": {},
@@ -30,6 +36,6 @@
     "satisfies:REQ-04"
   ],
   "created_at": "2026-07-13T00:59:48.565664932Z",
-  "updated_at": "2026-07-13T15:57:36.748137658Z",
+  "updated_at": "2026-07-13T15:58:38.945289807Z",
   "first_ready_at": "2026-07-13T00:59:48.565665172Z"
 }
