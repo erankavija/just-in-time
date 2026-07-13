@@ -18,13 +18,14 @@ command is the defect.
 
 ## Noun/verb structure
 
-The command line is `jit <noun> <verb> [arguments] [flags]`.
+The command line is `jit <noun> <verb> [arguments] [flags]`. The read-only
+`archive` noun uses a target selector in the verb slot, as specified below.
 
 - A **noun** is a subcommand group naming a domain entity or subsystem: `issue`,
   `gate`, `gate preset`, `dep`, `doc`, `graph`, `query`, `claim`, `config`,
-  `label`, `events`, `snapshot`, `worktree`, `hooks`, `item`, `invariant`,
-  `reference`, `migrate`, and `apply`'s target. Nouns are singular (`issue`, not
-  `issues`).
+  `label`, `events`, `archive`, `snapshot`, `worktree`, `hooks`, `item`,
+  `invariant`, `reference`, `migrate`, and `apply`'s target. Nouns are singular
+  (`issue`, not `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
   `add`, `remove`, `pass`, `define`, `acquire`. Verbs are imperative and shared
   across nouns where the action is the same (`list`, `show`, `add`, `remove`
@@ -47,6 +48,18 @@ form: `jit list` routes to `jit issue list`, and `jit rdeps` to
 `jit graph rdeps`. Each behaves identically to the canonical noun/verb it
 forwards to, which remains the primary spelling.
 
+**Archive preview selectors.** `archive` is a read-only noun group whose second
+token selects the kind of preview target. Its canonical forms are:
+
+- `jit archive document <path>`, where `<path>` is a repository-relative
+  document path.
+- `jit archive container <id>`, where `<id>` is an issue reference resolved by
+  the normal full-id, `short_id`, or unique-prefix rules below.
+
+Both forms only construct and display an archive plan. They do not move, copy,
+delete, or relink artifacts, and they do not mutate issues or the event log.
+`--json` changes only the rendering of that same preview plan.
+
 ---
 
 ## Positional-versus-flag conventions
@@ -61,7 +74,8 @@ Canonical rules:
   dependency endpoints, template name, preset name, and qualified item id are
   positional because the verb cannot run without them. Examples:
   `jit issue show <id>`, `jit gate evaluate <id> <gate-key>`,
-  `jit dep add <from> <to>...`, `jit doc add <id> <path>`.
+  `jit dep add <from> <to>...`, `jit doc add <id> <path>`,
+  `jit archive document <path>`, `jit archive container <id>`.
 - **Modifiers are flags.** Anything that tunes, filters, scopes, or formats is a
   flag: `--priority`, `--state`, `--label`, `--force`, `--depth`, `--json`,
   `--quiet`.
@@ -100,14 +114,16 @@ subject. The forms are fixed per identifier kind:
 
 **Consistency rule.** Every positional that names an issue (`issue show`,
 `issue update`, `gate add`, `gate evaluate`, `dep add`, `doc add`, `claim acquire`,
-`claim release`, and the rest) accepts the full UUID, the short id, and a unique
-prefix, identically — the three forms and their resolution are specified in
+`claim release`, `archive container`, and the rest) accepts the full UUID, the
+short id, and a unique prefix, identically — the three forms and their resolution
+are specified in
 [Storage Record Layout → Issue Identifiers](storage-records.md#issue-identifiers).
 Id acceptance is uniform across the issue, gate,
-claim, and doc surfaces; `jit issue show` documents the three forms as "full id,
-short id, or unique prefix", and every issue-subject command resolves them the
-same way. A command that resolved only the full UUID, or whose help omitted the
-accepted forms while a sibling documented them, would violate this rule.
+claim, doc, and archive surfaces; `jit issue show` documents the three forms as
+"full id, short id, or unique prefix", and every issue-subject command resolves
+them the same way. A command that resolved only the full UUID, or whose help
+omitted the accepted forms while a sibling documented them, would violate this
+rule.
 
 `claim release` states "short ids accepted" in its help, and that contract holds
 for every issue-subject command.
@@ -207,7 +223,7 @@ execution ÷ inspection partition is the contract the gate surface holds to.
 | Noun/verb shape | All noun groups and bare verbs |
 | Positional subject vs flag modifier | Issue/gate/path/endpoint positionals; `--json`/filters as flags |
 | Positional list vs flag list | `gate add`, `dep add`, `issue show` (positional); `--label`/`--gate` (flag) |
-| Issue-id acceptance | `issue show`, and every gate, claim, and doc issue-subject command, accept and document full id / short id / prefix uniformly |
+| Issue-id acceptance | `issue show`, `archive container`, and every gate, claim, and doc issue-subject command accept and document full id / short id / prefix uniformly |
 | `-t` = `--title` | `issue create`, `issue update`, `gate define`; `doc add` aliases `--title` to `--label`, with `--doc-type` long-only |
 | `-s` = `--state` | `issue list`, `issue search`, `query *`; `gate define`'s `--stage` is long-only |
 | Gate config ÷ execution ÷ inspection | Group boundaries follow command behavior |
