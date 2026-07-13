@@ -74,6 +74,18 @@ impl ExplicitRootInventory {
     pub fn into_plan_parts(self) -> (PlanTarget, Vec<ArtifactPlanEntry>, Vec<PlanBlocker>) {
         (self.target, self.artifacts, self.blockers)
     }
+
+    /// Consume inventory fields for the storage-owned recursive discovery pass.
+    pub(crate) fn into_discovery_parts(
+        self,
+    ) -> (
+        PlanTarget,
+        Vec<String>,
+        Vec<ArtifactPlanEntry>,
+        Vec<PlanBlocker>,
+    ) {
+        (self.target, self.member_ids, self.artifacts, self.blockers)
+    }
 }
 
 /// Failures in deterministic inventory construction itself.
