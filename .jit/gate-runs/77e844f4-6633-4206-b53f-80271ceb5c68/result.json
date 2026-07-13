@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "77e844f4-6633-4206-b53f-80271ceb5c68",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "commit": "825198ff30efc552894f8bbc00b43021e4277542",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T11:44:02.053174465Z",
+  "completed_at": "2026-07-13T11:47:09.129500443Z",
+  "duration_ms": 187076,
+  "exit_code": 0,
+  "stdout": "## Content standards\n\nAll nine task issues have clean titles, self-contained descriptions, and verifiable `## Success Criteria` sections using `[hard] REQ-NN` markers. Their `epic:artifact-archival` membership label is a valid kebab slug; no strategic label uses a JIT short ID.\n\nNo sibling IDs, prose dependency lists, or tracker mechanics appear in the task descriptions.\n\n## Coverage versus design\n\nThe breakdown matches all nine work items in design §3 ([7d3a3a47-plan.md](</home/vkaskivuo/Projects/just-in-time/dev/active/7d3a3a47-plan.md:312>)).\n\n| Design item | Issue | Matches? |\n|---|---:|---|\n| Artifact plan model and blocker taxonomy | `28fb4e6a` | Yes |\n| Target root inventory and ownership | `b45ad545` | Yes |\n| Recursive supported-dependency discovery | `971c67f4` | Yes |\n| Move/copy/retain/block classification | `0c86d83b` | Yes |\n| Storage-owned artifact mutation primitive | `67f4ded1` | Yes |\n| Unified archive preview surface | `41aa6056` | Yes |\n| Coordinated plan execution | `f205aa7e` | Yes |\n| Remove the legacy document-archive command | `271dc224` | Yes |\n| Read-only container candidate report | `a9f8e04d` | Yes |\n\nNo missing, extra, wrongly merged, or wrongly split design item was found.\n\n## Dependency DAG correctness\n\nThe implemented transitive ordering matches design §3:\n\n- `28fb4e6a → b45ad545 → 971c67f4 → 0c86d83b → 41aa6056`\n- `41aa6056` and independent root `67f4ded1` join at `f205aa7e`.\n- `a9f8e04d` follows `41aa6056`, transitively retaining its classifier prerequisite.\n- `271dc224` follows both `a9f8e04d` and `f205aa7e`.\n\nThe two work roots, `28fb4e6a` and `67f4ded1`, can begin on a fresh workspace because they extend existing domain/storage code rather than sibling-created project skeletons. No missing prerequisite or false serialization was found.\n\n## Structural integrity\n\nThe flat task tier follows the explicit rationale at design lines 314–326: each leaf is an independently landable deliverable, while conceptual groups are not artificial containers. The resolved hierarchy places every task directly under epic `7d3a3a47`; all nine are connected through the epic’s dependency spine. No isolated or dangling issue was found.\n\n## Prior review feedback\n\nBoth prior blocking findings are resolved:\n\n- F1: `a9f8e04d.description` now defines the candidate collection and states that each candidate contains the complete schema-version-1 target-plan envelope ([issue JSON](</home/vkaskivuo/Projects/just-in-time/.jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json:4>)).\n- F2: `a9f8e04d.dependencies` now names preview surface `41aa6056` ([issue JSON](</home/vkaskivuo/Projects/just-in-time/.jit/issues/a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b.json:8>)).\n\n## Findings\n\nNo blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All nine design items are present, standards-compliant, correctly ordered, structurally connected, and the prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All nine design items are present, standards-compliant, correctly ordered, structurally connected, and the prior blocking findings are resolved.",
+    "findings": []
+  }
+}
