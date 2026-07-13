@@ -4894,6 +4894,14 @@ fn run() -> Result<()> {
             }
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
+            ArchiveCommands::Candidates { json } => {
+                let report = executor.archive_candidates()?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    print!("{}", jit::output::render_archive_candidates(&report));
+                }
+            }
             ArchiveCommands::Document {
                 path,
                 execute,

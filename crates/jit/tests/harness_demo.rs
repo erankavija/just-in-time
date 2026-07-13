@@ -447,3 +447,60 @@ fn test_harness_empty_container_rollup() {
     assert_eq!(rollup.by_state.len(), State::all().len());
     assert!(rollup.by_state.iter().all(|c| c.count == 0));
 }
+
+/// Candidate reporting is an in-process read: it selects renamed non-leaf
+/// types, evaluates zero-document containers, and leaves issues/events intact.
+#[test]
+fn test_harness_archive_candidates_are_complete_and_non_mutating() {
+    use jit::domain::Issue;
+    use jit::storage::IssueStore;
+
+    let h = TestHarness::new();
+    std::fs::create_dir_all(h.storage.root()).unwrap();
+    let archive_root = format!(
+        "{}/archive",
+        h.storage.root().file_name().unwrap().to_string_lossy()
+    );
+    std::fs::write(
+        h.storage.root().join("config.toml"),
+        format!(
+            "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"{archive_root}\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
+        ),
+    )
+    .unwrap();
+    let save = |title: &str, state: State, kind: &str| {
+        let mut issue = Issue::new(title.to_string(), String::new());
+        issue.state = state;
+        issue.labels = vec![format!("type:{kind}")];
+        let id = issue.id.clone();
+        h.storage.save_issue(issue).unwrap();
+        id
+    };
+    let rejected = save("Rejected portfolio", State::Rejected, "portfolio");
+    let done = save("Done portfolio", State::Done, "portfolio");
+    save("Done leaf", State::Done, "unit");
+    save("Archived portfolio", State::Archived, "portfolio");
+    let issues_before = h.storage.list_issues().unwrap();
+    let events_before = h.storage.read_events().unwrap();
+
+    let report = h.executor.archive_candidates().unwrap();
+
+    let target_ids = report
+        .candidates()
+        .iter()
+        .map(|plan| match plan.target() {
+            jit::domain::artifact_plan::PlanTarget::Container { id } => id.clone(),
+            _ => panic!("candidate target must be a container"),
+        })
+        .collect::<Vec<_>>();
+    let mut expected = vec![done, rejected];
+    expected.sort();
+    assert_eq!(target_ids, expected);
+    assert_eq!(report.count(), 2);
+    assert!(report.candidates().iter().all(|plan| {
+        plan.count() == 0
+            && plan.policy_status() == jit::domain::artifact_plan::PolicyStatus::Configured
+    }));
+    assert_eq!(h.storage.list_issues().unwrap(), issues_before);
+    assert_eq!(h.storage.read_events().unwrap(), events_before);
+}

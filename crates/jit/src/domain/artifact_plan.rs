@@ -20,6 +20,44 @@ use std::fmt;
 /// changing an existing field or code requires a new schema version.
 pub const ARCHIVE_PLAN_SCHEMA_VERSION: u32 = 1;
 
+/// Read-only collection returned by `jit archive candidates`.
+///
+/// Each entry is the complete archive-plan envelope for one terminal container;
+/// the collection does not introduce a reduced candidate projection that could
+/// drift from preview or execution planning.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArchiveCandidates {
+    schema_version: u32,
+    count: usize,
+    candidates: Vec<ArtifactPlan>,
+}
+
+impl ArchiveCandidates {
+    /// Construct the schema-v1 list envelope from fully evaluated plans.
+    pub fn new(candidates: Vec<ArtifactPlan>) -> Self {
+        Self {
+            schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
+            count: candidates.len(),
+            candidates,
+        }
+    }
+
+    /// Candidate collection schema version.
+    pub fn schema_version(&self) -> u32 {
+        self.schema_version
+    }
+
+    /// Number of fully evaluated candidate plans.
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Canonically ordered complete archive plans.
+    pub fn candidates(&self) -> &[ArtifactPlan] {
+        &self.candidates
+    }
+}
+
 /// A container or one arbitrary document selected for archival planning.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case")]

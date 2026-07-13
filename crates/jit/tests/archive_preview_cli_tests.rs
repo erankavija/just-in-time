@@ -1,5 +1,5 @@
-use jit::domain::artifact_plan::ArtifactPlan;
-use jit::output::render_archive_plan;
+use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
+use jit::output::{render_archive_candidates, render_archive_plan};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -40,6 +40,39 @@ fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
                         .to_string(),
                     fs::read(path).unwrap(),
                 );
+            }
+        }
+    }
+    let mut result = BTreeMap::new();
+    visit(root, root, &mut result);
+    result
+}
+
+fn snapshot_tree(root: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
+    fn visit(root: &Path, current: &Path, result: &mut BTreeMap<String, Option<Vec<u8>>>) {
+        let mut entries = fs::read_dir(current)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        entries.sort_by_key(|entry| entry.path());
+        for entry in entries {
+            let path = entry.path();
+            if path
+                .extension()
+                .is_some_and(|extension| extension == "lock")
+            {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            if path.is_dir() {
+                result.insert(relative, None);
+                visit(root, &path, result);
+            } else {
+                result.insert(relative, Some(fs::read(path).unwrap()));
             }
         }
     }
@@ -257,7 +290,7 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
     assert!(jit(&repo, &["init", "--json"]).status.success());
     fs::write(repo.path().join(".jit/config.toml"), "").unwrap();
     fs::write(repo.path().join("root.csv"), "name,value\na,1\n").unwrap();
-    let before = snapshot_files(repo.path());
+    let before = snapshot_tree(repo.path());
 
     let json_output = jit(&repo, &["archive", "document", "root.csv", "--json"]);
     assert!(
@@ -304,7 +337,7 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
     assert!(human.contains(&format!("[{action}] root.csv @ working-tree")));
     assert!(human.contains("Archival execution is disabled"));
 
-    assert_eq!(snapshot_files(repo.path()), before);
+    assert_eq!(snapshot_tree(repo.path()), before);
     assert!(!repo.path().join("archive").exists());
 }
 
@@ -526,4 +559,210 @@ fn test_archive_execute_blocked_is_nonzero_nonmutating_and_human_reports_warning
     let stdout = String::from_utf8(human.stdout).unwrap();
     assert!(stdout.contains("Archive execution complete:"));
     assert!(stdout.contains("warning: no-owner (fixtures/root.md)"));
+}
+
+#[test]
+fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_parity() {
+    let repo = TempDir::new().unwrap();
+    configured_bundle(&repo);
+    let create = |title: &str, issue_type: &str| {
+        let output = jit(
+            &repo,
+            &[
+                "issue", "create", "--title", title, "--type", issue_type, "--json",
+            ],
+        );
+        assert_success(&output);
+        serde_json::from_slice::<Value>(&output.stdout).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let evaluated = create("Evaluated container", "epic");
+    assert_success(&jit(
+        &repo,
+        &[
+            "doc",
+            "add",
+            &evaluated,
+            "fixtures/root.md",
+            "--skip-scan",
+            "--json",
+        ],
+    ));
+    assert_success(&jit(
+        &repo,
+        &[
+            "issue", "update", &evaluated, "--state", "rejected", "--json",
+        ],
+    ));
+    let empty = create("Zero-document container", "epic");
+    assert_success(&jit(
+        &repo,
+        &["issue", "update", &empty, "--state", "rejected", "--json"],
+    ));
+    let _active = create("Active container", "epic");
+    let leaf = create("Terminal leaf", "task");
+    assert_success(&jit(
+        &repo,
+        &["issue", "update", &leaf, "--state", "rejected", "--json"],
+    ));
+
+    let config_path = repo.path().join(".jit/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        &config_path,
+        config.replace(
+            "managed_paths = [\"fixtures\"]",
+            "managed_paths = [\"fixtures/root.md\"]",
+        ),
+    )
+    .unwrap();
+    let occupied = repo.path().join("archive").join(&evaluated[..8]);
+    fs::create_dir_all(&occupied).unwrap();
+    fs::write(occupied.join("foreign.txt"), "unaccounted").unwrap();
+    let before = snapshot_tree(repo.path());
+
+    let first = jit(&repo, &["archive", "candidates", "--json"]);
+    let second = jit(&repo, &["archive", "candidates", "--json"]);
+    assert_success(&first);
+    assert_success(&second);
+    assert_eq!(first.stdout, second.stdout);
+    let report: Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(
+        report
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>(),
+        ["candidates", "count", "schema_version"]
+    );
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["count"], 2);
+    let candidates = report["candidates"].as_array().unwrap();
+    let ids = candidates
+        .iter()
+        .map(|candidate| candidate["target"]["id"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    let mut expected_ids = vec![empty.as_str(), evaluated.as_str()];
+    expected_ids.sort();
+    assert_eq!(ids, expected_ids);
+    for candidate in candidates {
+        assert_eq!(
+            candidate
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            [
+                "action_counts",
+                "artifacts",
+                "blockers",
+                "count",
+                "destination_root",
+                "eligible",
+                "policy_status",
+                "schema_version",
+                "target",
+                "warnings",
+            ]
+        );
+    }
+    let evaluated_plan = candidates
+        .iter()
+        .find(|candidate| candidate["target"]["id"] == evaluated)
+        .unwrap();
+    assert!(evaluated_plan["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|blocker| blocker["code"] == "destination-conflict"));
+    let unmanaged = evaluated_plan["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|artifact| {
+            artifact["evidence"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|evidence| evidence == "unmanaged-path")
+        })
+        .collect::<Vec<_>>();
+    assert!(!unmanaged.is_empty());
+    assert!(unmanaged
+        .iter()
+        .all(|artifact| matches!(artifact["action"].as_str(), Some("copy" | "retain"))));
+    assert!(evaluated_plan["blockers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|blocker| blocker["code"] != "unmanaged-selected-root"));
+
+    let human_output = jit(&repo, &["archive", "candidates"]);
+    assert_success(&human_output);
+    let human = String::from_utf8(human_output.stdout).unwrap();
+    let typed: ArchiveCandidates = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(human, render_archive_candidates(&typed));
+    for candidate in candidates {
+        let id = candidate["target"]["id"].as_str().unwrap();
+        assert!(human.contains(&id[..8]));
+        for blocker in candidate["blockers"].as_array().unwrap() {
+            assert!(human.contains(blocker["code"].as_str().unwrap()));
+        }
+    }
+    assert_eq!(snapshot_tree(repo.path()), before);
+}
+
+#[test]
+fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutation() {
+    for (config, expected) in [
+        ("", "unconfigured"),
+        ("[documentation]\nmanaged_paths = []\n", "incomplete"),
+        (
+            "[documentation]\nmanaged_paths = []\npermanent_paths = []\narchive_root = \"archive\"\n",
+            "configured",
+        ),
+    ] {
+        let repo = TempDir::new().unwrap();
+        assert_success(&jit(&repo, &["init", "--json"]));
+        let created = jit(
+            &repo,
+            &[
+                "issue", "create", "--title", "Candidate", "--type", "epic", "--json",
+            ],
+        );
+        assert_success(&created);
+        let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_success(&jit(
+            &repo,
+            &["issue", "update", &id, "--state", "rejected", "--json"],
+        ));
+        fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        let before = snapshot_tree(repo.path());
+
+        let output = jit(&repo, &["archive", "candidates", "--json"]);
+        assert_success(&output);
+        let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(report["count"], 1);
+        assert_eq!(report["candidates"][0]["policy_status"], expected);
+        let blocker = match expected {
+            "unconfigured" => Some("policy-unconfigured"),
+            "incomplete" => Some("policy-incomplete"),
+            _ => None,
+        };
+        if let Some(blocker) = blocker {
+            assert!(report["candidates"][0]["blockers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["code"] == blocker));
+        }
+        assert_eq!(snapshot_tree(repo.path()), before);
+    }
 }

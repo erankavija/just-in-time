@@ -9,10 +9,11 @@ use crate::domain::artifact_classifier::{
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_inventory::{inventory_explicit_roots, ExplicitRootTarget};
 use crate::domain::artifact_plan::{
-    normalize_artifact_path, ArtifactAction, ArtifactPlan, BlockerCode, ContentIdentity, EdgeKind,
-    EdgeResolutionMode, PendingDeletion, PlanBlocker, PlanTarget, PlanWarning, ReferenceChange,
-    WarningCode,
+    normalize_artifact_path, ArchiveCandidates, ArtifactAction, ArtifactPlan, BlockerCode,
+    ContentIdentity, EdgeKind, EdgeResolutionMode, PendingDeletion, PlanBlocker, PlanTarget,
+    PlanWarning, ReferenceChange, WarningCode,
 };
+use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_artifact_dependencies,
@@ -26,6 +27,23 @@ use std::path::Path;
 enum ArchiveTarget<'a> {
     Document(&'a str),
     Container(&'a str),
+}
+
+fn terminal_container_ids(issues: &[Issue], hierarchy: &HierarchyConfig) -> Vec<String> {
+    let leaf_level = hierarchy.types().map(|(_, level)| *level).max();
+    let mut ids = issues
+        .iter()
+        .filter(|issue| issue.state.is_terminal())
+        .filter(|issue| {
+            crate::labels::type_label_value(&issue.labels)
+                .and_then(|type_name| hierarchy.get_level(type_name))
+                .zip(leaf_level)
+                .is_some_and(|(level, leaf)| level < leaf)
+        })
+        .map(|issue| issue.id.clone())
+        .collect::<Vec<_>>();
+    ids.sort();
+    ids
 }
 
 fn remap_archived_references(issues: &mut [Issue], destination_root: &str) {
@@ -90,6 +108,17 @@ fn apply_recorded_residue_identities(
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
+    /// Fully evaluate every terminal configured non-leaf container without mutation.
+    pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let issues = self.storage.list_issues()?;
+        let plans = terminal_container_ids(&issues, &hierarchy)
+            .into_iter()
+            .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(ArchiveCandidates::new(plans))
+    }
+
     /// Build a complete non-mutating plan for one arbitrary repository document.
     pub fn preview_archive_document(&self, path: &str) -> Result<ArtifactPlan> {
         self.plan_archive_target(ArchiveTarget::Document(path))
@@ -938,6 +967,7 @@ mod tests {
     use super::*;
     use crate::domain::{DocumentReference, Issue, State};
     use crate::storage::JsonFileStorage;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
@@ -952,6 +982,38 @@ mod tests {
         edit_before_delete: Option<(std::path::PathBuf, Vec<u8>)>,
         torn_event_path: Option<std::path::PathBuf>,
         marker_inspect: Option<Box<dyn FnOnce() -> Result<()>>>,
+    }
+
+    #[test]
+    fn test_terminal_container_ids_use_live_non_leaf_levels_and_terminal_semantics() {
+        let hierarchy = HierarchyConfig::new(
+            HashMap::from([("portfolio".to_string(), 2), ("unit".to_string(), 7)]),
+            HashMap::new(),
+        )
+        .unwrap();
+        let issue = |id: &str, state: State, issue_type: Option<&str>| {
+            let mut issue = Issue::new(id.to_string(), String::new());
+            issue.id = id.to_string();
+            issue.state = state;
+            issue.labels = issue_type
+                .map(|kind| vec![format!("type:{kind}")])
+                .unwrap_or_default();
+            issue
+        };
+        let issues = vec![
+            issue("done-container", State::Done, Some("portfolio")),
+            issue("rejected-container", State::Rejected, Some("portfolio")),
+            issue("active-container", State::InProgress, Some("portfolio")),
+            issue("archived-container", State::Archived, Some("portfolio")),
+            issue("done-leaf", State::Done, Some("unit")),
+            issue("done-unknown", State::Done, Some("epic")),
+            issue("done-untyped", State::Done, None),
+        ];
+
+        assert_eq!(
+            terminal_container_ids(&issues, &hierarchy),
+            vec!["done-container", "rejected-container"]
+        );
     }
 
     impl ArchiveExecutionHooks for FaultHooks {

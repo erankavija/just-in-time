@@ -55,11 +55,16 @@ selects the kind of target. Its canonical forms are:
   document path.
 - `jit archive container <id>`, where `<id>` is an issue reference resolved by
   the normal full-id, `short_id`, or unique-prefix rules below.
+- `jit archive candidates`, which has no subject because it evaluates the
+  complete set of terminal configured non-leaf containers.
 
-Both forms construct and display a read-only archive plan by default.
+The document and container forms construct and display a read-only archive plan
+by default.
 `--execute` is the explicit mutation modifier; it recomputes the plan under the
 repository write guard rather than consuming preview output. `--json` changes
 only the rendering of the selected preview or execution result.
+`archive candidates` is always read-only and therefore accepts `--json` but not
+`--execute`, a category, or filtering modifiers.
 
 ---
 

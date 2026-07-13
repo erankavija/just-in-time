@@ -161,6 +161,27 @@ pub fn render_archive_plan(plan: &crate::domain::artifact_plan::ArtifactPlan) ->
     rendered
 }
 
+/// Render exactly the fully evaluated plans returned by `archive candidates`.
+pub fn render_archive_candidates(
+    report: &crate::domain::artifact_plan::ArchiveCandidates,
+) -> String {
+    use std::fmt::Write;
+
+    let mut rendered = String::new();
+    let _ = writeln!(rendered, "Archive candidates ({}):", report.count());
+    if report.candidates().is_empty() {
+        let _ = writeln!(rendered, "  No terminal configured non-leaf containers.");
+        return rendered;
+    }
+    for (index, plan) in report.candidates().iter().enumerate() {
+        if index > 0 {
+            rendered.push('\n');
+        }
+        rendered.push_str(&render_archive_plan(plan));
+    }
+    rendered
+}
+
 fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagnostics: &[T]) {
     use std::fmt::Write;
     if diagnostics.is_empty() {

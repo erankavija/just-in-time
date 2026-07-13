@@ -189,6 +189,8 @@ jit archive document dev/active/design.md
 jit archive document dev/active/design.md --json
 jit archive container 2f84c930
 jit archive container 2f84c930 --json
+jit archive candidates
+jit archive candidates --json
 jit archive document dev/active/design.md --execute
 jit archive container 2f84c930 --execute --json
 ```
@@ -209,6 +211,35 @@ fields are `schema_version`, `target`, `destination_root`, `eligible`,
 `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
 `warnings`; it does not add a `message` field. Artifact order is deterministic
 by normalized source path and version.
+
+`jit archive candidates` is the read-only container report. It lists every
+`Done` or `Rejected` issue whose `type:*` is configured at a non-leaf level of
+the live `[type_hierarchy]`; it does not hardcode type names. `Archived`, active,
+untyped, unknown-type, and leaf issues are excluded. Each selected container is
+fully evaluated through the same resolved-hierarchy planner as `archive
+container`, including zero-document containers and ineligible plans. Ordinary
+sequencing edges do not enlarge a candidate's resolved subtree.
+
+The JSON shape is exactly
+`{"schema_version":1,"count":N,"candidates":[...]}`. Every entry in
+`candidates` is the complete schema-version-1 target-plan object described
+above, not a summary: policy status, ownership, action counts, artifacts,
+evidence, warnings, and all blockers (including destination conflicts) remain
+available. Human output renders the identical evaluated list and retains the
+reasons an entry is ineligible. Candidate order is deterministic by full target
+ID, while the human view identifies targets by short ID.
+
+The candidates command has no age, retention, category, suggestion, or default
+target behavior, and it has no `--execute` form. It never writes artifacts,
+issue records, or events. Missing and partial documentation policy therefore
+remain `unconfigured` and `incomplete`; they are reported rather than filled by
+mutation-authorizing defaults. The shared planner also preserves its detailed
+semantics here: a selected root outside managed paths is blocked as
+`unmanaged-selected-root`, while an unmanaged embedded dependency carries
+`unmanaged-path` evidence and can only copy or retain. Sources already beneath
+the configured archive root are evaluated as already existing: direct roots
+retain, relative dependencies of relocated parents copy to the current mirror,
+and root-relative or staying-parent dependencies retain.
 
 A blocked preview is still a successful read-only command and exits zero. Check
 `eligible`, then inspect target-level and per-artifact `blockers`. In particular,

@@ -1974,6 +1974,13 @@ pub enum DocCommands {
 /// Dependency-aware archive planning commands; mutation requires `--execute`.
 #[derive(Subcommand)]
 pub enum ArchiveCommands {
+    /// Fully evaluate every terminal configured non-leaf container without mutation
+    Candidates {
+        /// Output schema version 1 with count and complete candidate plans
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Preview archival of one repository-relative document and its supported bundle
     Document {
         /// Repository-relative document or opaque artifact path
