@@ -2,9 +2,9 @@
   "id": "28fb4e6a-89c8-4b02-ac3c-5bcf3708e674",
   "title": "Artifact plan model and blocker taxonomy",
   "description": "Build a pure, serializable artifact-plan domain model that is the single input to preview rendering and execution. Schema version 1 has exactly these envelope fields: `schema_version`, `target`, `destination_root`, `eligible`, `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, `warnings` — the `count` + `artifacts` pair follows the repository list-envelope convention. Each artifact has exactly: `source`, `version`, `content_identity`, `destination`, `action`, `already_archived`, `provenance`, `format`, `owners`, `edges`, `reference_changes`, `pending_deletions`, `evidence`, `blockers`, `warnings`. Evidence codes are `permanent-path`, `outside-owner`, `active-owner`, `unmanaged-path`, `archived-source`, `pinned-historical`. Blocker codes are `policy-unconfigured`, `policy-incomplete`, `unmanaged-selected-root`, `destination-conflict`, `document-non-terminal-owner`, `pinned-read-failed`, `repository-escape`, `unresolvable-edge`, `unpreservable-layout`, `non-terminal-target`, `missing-source`, `symlink-artifact`. Warning codes are `missing-edge-target`, `external-edge`, `no-owner`, `residue-source`, `deletion-failed`, `not-selected-sibling`, `dynamic-loading-suspected`. Artifact identity is normalized path plus `working-tree` or canonical full immutable commit OID. Codes are stable and append-only under explicit schema versioning; policy defaults may be displayed but never authorize execution.\n\n## Success Criteria\n\n- [hard] REQ-01: Serializing the same plan from any permutation of equivalent inputs produces identical artifact ordering by normalized source path then version and identical blocker/warning ordering by code then path.\n- [hard] REQ-02: Preview rendering and execution accept the same plan type; neither maintains a second classification model.\n- [hard] REQ-03: Successfully resolved pinned artifacts serialize, sort, and compare only by canonical full immutable commit OID as non-relocating historical entries; failed revision resolution or commit-specific reads produce `pinned-read-failed`.\n- [hard] REQ-04: `policy_status` is `configured` only when `[documentation]` explicitly supplies `managed_paths`, `permanent_paths`, and `archive_root`; missing and partial policy serialize as `unconfigured` and `incomplete`, and accessor defaults never make either executable.\n- [hard] REQ-05: Every planned deletion and published working-tree source carries `content_identity` with a 64-character lowercase SHA-256 and exact `byte_size`, both derived from one read.\n- [hard] REQ-06: A golden schema-version-1 conformance test asserts the complete envelope/artifact field lists and evidence/blocker/warning code lists above; a missing, renamed, extra, or reclassified field/code fails unless accompanied by an explicit schema-versioning decision.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "220cca3e-ae58-425e-bbc9-e6b77106918e"
   ],
@@ -21,6 +21,7 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-13T00:59:48.559916497Z",
-  "updated_at": "2026-07-13T10:48:29.166761740Z",
-  "first_ready_at": "2026-07-13T00:59:48.559916907Z"
+  "updated_at": "2026-07-13T14:15:56.241260305Z",
+  "first_ready_at": "2026-07-13T00:59:48.559916907Z",
+  "claimed_at": "2026-07-13T14:15:56.241260195Z"
 }
