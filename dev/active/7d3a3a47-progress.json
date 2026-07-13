@@ -1,7 +1,7 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -18,7 +18,7 @@
     {
       "wave_number": 3,
       "issues": [
-        {"id": "b45ad545-01ac-4bdc-9838-facea0751c42", "short_id": "b45ad545", "title": "Target root inventory and ownership", "classification": "implementation", "status": "pending"}
+        {"id": "b45ad545-01ac-4bdc-9838-facea0751c42", "short_id": "b45ad545", "title": "Target root inventory and ownership", "classification": "implementation", "status": "completed"}
       ]
     },
     {

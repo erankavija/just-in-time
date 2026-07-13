@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "b0d33032-bc27-401d-9181-ceb10322fcfe",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "b45ad545-01ac-4bdc-9838-facea0751c42",
+  "commit": "99b6132ce09e8ccdba077c359a4edffd537c9512",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T15:46:47.649185949Z",
+  "completed_at": "2026-07-13T15:50:10.414534915Z",
+  "duration_ms": 202765,
+  "exit_code": 0,
+  "stdout": "Attribution: `6ad4043a` (claim metadata), `99b6132c` (inventory implementation)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-4` — `dev/vision/9db27a3a-charter.md`; `@/gate/cargo-ci` — `.jit/gates.toml`\nGate evidence: `cargo-ci` passed (exit 0, 2026-07-13T15:43:30Z); prior structured findings: none\nTruncation recovery: Focused rereads of the target issue, config, charter, feature paths, and tests; unrelated repository-wide issue-search output was outside the impact cone. Issue-item resolution attempted locking, so the markdown-first issue source was inspected directly.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable inventory and Git-revision implementation satisfies the issue-scoped hard criteria; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributable inventory and Git-revision implementation satisfies the issue-scoped hard criteria; no unresolved issue-impact defects found.",
+    "findings": []
+  }
+}
