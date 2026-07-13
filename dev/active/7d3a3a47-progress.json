@@ -63,18 +63,20 @@
     {
       "issue_short_id": "971c67f4",
       "kind": "rework_limit_exceeded",
-      "status": "awaiting_user_direction",
+      "status": "authorized",
       "root_finding": "Dynamic-loader discovery does not exhaustively recognize local path-bearing forms.",
       "latest_finding": "Bare same-directory URLs such as fetch(\"payload.json\") and data-src=payload.json are not warned.",
       "gate_commit": "37ad22f3796336a62107ae4b06acd057097dc582",
       "rework_cycles": 2,
-      "recorded_at": "2026-07-13T19:49:10+03:00"
+      "recorded_at": "2026-07-13T19:49:10+03:00",
+      "authorized_at": "2026-07-13T20:34:00+03:00",
+      "authorization": "User authorized an exceptional third rework cycle and requested immediate handoff."
     }
   ],
   "rework_counts": {
     "28fb4e6a": 1,
     "67f4ded1": 1,
-    "971c67f4": 2
+    "971c67f4": 3
   },
   "started_at": "2026-07-13T17:15:12+03:00"
 }
