@@ -7127,3 +7127,5 @@
 {"type":"issue_state_changed","id":"b4ad9d14-53e1-4c8b-8124-1314b5a907c4","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:51.482344921Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"b84d6774-4138-4472-bc41-a0728b4ff25f","issue_id":"b3fd1d73-2581-426d-bab2-736c8b235b23","timestamp":"2026-07-13T23:13:51.482380751Z"}
 {"type":"issue_state_changed","id":"ed19deca-978e-41ff-b684-dbebb918db67","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:13:51.577892560Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"b013afa0-a0a2-43a4-8376-cecdcd76793c","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:18:55.028915772Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"b091997a-7fbe-4c1b-91a8-5051f7b0bf03","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T23:21:06.225834266Z","gate_key":"doc-review","updated_by":"auto:executor"}

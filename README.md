@@ -192,7 +192,7 @@ jit archive document <managed-document>       # dependency-aware archival previe
 jit archive document <managed-document> --execute  # execute an eligible plan
 ```
 
-Agents discover context from previous work, understand design decisions, and maintain institutional knowledge without external systems. See the [Document Commands Reference](docs/reference/cli-commands.md#document-commands).
+Agents discover context from previous work, understand design decisions, and maintain institutional knowledge without external systems. See the [Document Commands Reference](docs/reference/cli-commands.md#document-commands) and [Archive planning and execution](docs/reference/cli-commands.md#archive-planning-and-execution).
 
 ### Organization with Labels
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "49e2182a-4051-4495-9258-219530b315ce",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
+  "commit": "93a51f244644e8140487f2e1cd416fd44c57dc63",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T23:18:55.051228119Z",
+  "completed_at": "2026-07-13T23:21:06.225347975Z",
+  "duration_ms": 131174,
+  "exit_code": 1,
+  "stdout": "Attribution used the configured hierarchy (epic is container-capable) and its 12 resolved, delivered descendants. I inspected the union of 89 individually tagged `jit:<short-id>` commits; all included issues had tagged commits. Uncommitted `.jit` state was excluded.\n\nThe archival reference is accurate, including the prior directory-artifact failure: its regression test now passes. One issue-impact discoverability defect remains.\n\n1. **F1 — blocking, issue-impact, medium:** [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:195) directs users of the newly added `jit archive` commands to `#document-commands`, but the canonical archive documentation is [Archive planning and execution](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:182), not the later document-reference section. Change the link to `docs/reference/cli-commands.md#archive-planning-and-execution` (or link both relevant sections).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The archival contract is accurate, but the README routes archive users to the wrong reference section.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"README's new archive examples link to Document Commands instead of the canonical Archive planning and execution reference.\",\"file\":\"README.md\",\"line\":195}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 32119 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5dc6-c41e-7740-8f44-5938470cb457\n--------\nuser\n--- 32106 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The archival contract is accurate, but the README routes archive users to the wrong reference section.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "README's new archive examples link to Document Commands instead of the canonical Archive planning and execution reference.",
+        "file": "README.md",
+        "line": 195
+      }
+    ]
+  }
+}
