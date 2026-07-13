@@ -2,7 +2,7 @@
   "id": "b45ad545-01ac-4bdc-9838-facea0751c42",
   "title": "Target root inventory and ownership",
   "description": "Build one version-aware explicit-root inventory for container and document archive targets. Container membership is the root plus the transitive children closure from repository-wide resolved hierarchy, never the raw dependency closure. Inventory every distinct issue-linked root, including opaque formats, and associate every repository-wide direct `DocumentReference` owner. A document target is an arbitrary normalized working-tree root even with zero owners or no text adapter. Mixed pinned and unpinned references produce a working-tree variant plus canonical pinned historical variants. Add a reusable storage/git revision resolver with `rev-parse --verify <rev>^{commit}` semantics and no working-tree fallback.\n\n## Success Criteria\n\n- [hard] REQ-01: Container membership equals the resolved-hierarchy children closure; a cross-container sequencing dependency does not become a member.\n- [hard] REQ-02: The inventory includes every distinct `DocumentReference` root in the closure, including CSV, PNG, and SVG roots without registered adapters and pinned historical versions.\n- [hard] REQ-03: Every direct issue-reference owner is collected repository-wide with deterministic document index, state, version association, and inside/outside-subtree status.\n- [hard] REQ-04: A zero-owner arbitrary CSV, PNG, or SVG path becomes a normalized explicit working-tree root with empty owners and `no-owner` evidence without requiring a text adapter.\n- [hard] REQ-05: A path with mixed pinned and unpinned owners yields one working-tree variant and one variant per distinct canonical full OID, with each direct owner attached to the correct version.\n- [hard] REQ-06: Symbolic, abbreviated, and full revision inputs resolve through storage/git to a hash-algorithm-agnostic full commit OID; unavailable git, invalid/unreachable revisions, and failed commit reads block as `pinned-read-failed`.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -21,6 +21,6 @@
     "satisfies:REQ-01"
   ],
   "created_at": "2026-07-13T00:59:48.560486598Z",
-  "updated_at": "2026-07-13T00:59:48.587132447Z",
+  "updated_at": "2026-07-13T14:54:43.036217045Z",
   "first_ready_at": "2026-07-13T00:59:48.560486888Z"
 }

@@ -1,12 +1,12 @@
 {
   "epic_id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "epic_short_id": "7d3a3a47",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "28fb4e6a-89c8-4b02-ac3c-5bcf3708e674", "short_id": "28fb4e6a", "title": "Artifact plan model and blocker taxonomy", "classification": "implementation", "status": "pending"}
+        {"id": "28fb4e6a-89c8-4b02-ac3c-5bcf3708e674", "short_id": "28fb4e6a", "title": "Artifact plan model and blocker taxonomy", "classification": "implementation", "status": "completed"}
       ]
     },
     {
