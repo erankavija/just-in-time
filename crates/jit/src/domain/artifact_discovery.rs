@@ -105,8 +105,9 @@ pub fn parse_artifact(path: &str, bytes: &[u8]) -> ParsedArtifact {
         Some("css") => css_references(&text),
         _ => Vec::new(),
     };
-    let dynamic_loading_suspected = matches!(format, Some("markdown" | "html" | "javascript"))
-        && suspects_dynamic_loading(&text);
+    let dynamic_loading_suspected =
+        matches!(format, Some("markdown" | "html" | "css" | "javascript"))
+            && suspects_dynamic_loading(&text);
 
     ParsedArtifact {
         format,
@@ -266,21 +267,22 @@ fn css_references(content: &str) -> Vec<String> {
 fn suspects_dynamic_loading(content: &str) -> bool {
     static CALL_WITH_LOCAL_PATH: LazyLock<Option<Regex>> = LazyLock::new(|| {
         Regex::new(
-            r#"(?i)\b(?:fetch|import|importScripts|require)\s*\(\s*["'](?:\.{1,2}/|/)[^"']+"#,
+            r#"(?i)\b(?:fetch|import|importScripts|require)\s*\(\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)"#,
         )
         .ok()
     });
-    static WORKER_WITH_LOCAL_PATH: LazyLock<Option<Regex>> =
-        LazyLock::new(|| Regex::new(r#"(?i)\bnew\s+Worker\s*\(\s*["'](?:\.{1,2}/|/)[^"']+"#).ok());
+    static WORKER_WITH_LOCAL_PATH: LazyLock<Option<Regex>> = LazyLock::new(|| {
+        Regex::new(r#"(?i)\bnew\s+Worker\s*\(\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)"#).ok()
+    });
     static STATIC_MODULE: LazyLock<Option<Regex>> = LazyLock::new(|| {
         Regex::new(
-            r#"(?im)\b(?:import\s*(?:["'](?:\.{1,2}/|/)[^"']+["']|[^;\n]*\bfrom\s*["'](?:\.{1,2}/|/)[^"']+["'])|export\b[^;\n]*\bfrom\s*["'](?:\.{1,2}/|/)[^"']+["'])"#,
+            r#"(?im)\b(?:import\s*(?:["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["']|[^;\n]*\bfrom\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["'])|export\b[^;\n]*\bfrom\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["'])"#,
         )
         .ok()
     });
     static DATA_ATTRIBUTE: LazyLock<Option<Regex>> = LazyLock::new(|| {
         Regex::new(
-            r#"(?i)\bdata-[a-z0-9_.:-]+\s*=\s*(?:"(?:\.{1,2}/|/)[^"]+"|'(?:\.{1,2}/|/)[^']+')"#,
+            r#"(?i)\bdata-[a-z0-9_.:-]+\s*=\s*(?:"(?:\.{1,2}/[^"]+|/[^/"][^"]*)"|'(?:\.{1,2}/[^']+|/[^/'][^']*)'|(?:\.{1,2}/[^\s"'=<>`]+|/[^/\s"'=<>`][^\s"'=<>`]*))"#,
         )
         .ok()
     });
