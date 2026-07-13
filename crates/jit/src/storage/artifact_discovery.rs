@@ -15,6 +15,9 @@ use crate::domain::artifact_plan::{
     PlanBlocker, PlanError, PlanTarget, PlanWarning, WarningCode,
 };
 use crate::domain::Issue;
+use crate::storage::artifact_planning::{
+    read_working_tree_path_without_symlinks, WorkingTreeDiscoveryRead,
+};
 use crate::storage::{IssueStore, PathReadError};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
@@ -99,8 +102,9 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
     let mut missing_paths = BTreeSet::<String>::new();
 
     while let Some(path) = graph.next_path() {
-        let bytes = match storage.read_path_bytes(&path, None) {
-            Ok((bytes, _)) => bytes,
+        let bytes = match read_working_tree_path_without_symlinks(storage, &path) {
+            Ok(WorkingTreeDiscoveryRead::Bytes(bytes)) => bytes,
+            Ok(WorkingTreeDiscoveryRead::Symlink) => continue,
             Err(PathReadError::NotFound(_)) => {
                 let entry = working
                     .get_mut(&path)
@@ -240,8 +244,9 @@ pub fn discover_repository_embedded_owners<S: IssueStore>(
             let root = crate::domain::artifact_plan::normalize_artifact_path(&document.path);
             let mut graph = DiscoveryGraph::new([root.clone()]);
             while let Some(path) = graph.next_path() {
-                let bytes = match storage.read_path_bytes(&path, None) {
-                    Ok((bytes, _)) => bytes,
+                let bytes = match read_working_tree_path_without_symlinks(storage, &path) {
+                    Ok(WorkingTreeDiscoveryRead::Bytes(bytes)) => bytes,
+                    Ok(WorkingTreeDiscoveryRead::Symlink) => continue,
                     Err(PathReadError::NotFound(_)) => continue,
                     Err(PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_)) => {
                         continue;

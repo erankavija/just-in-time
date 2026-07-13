@@ -62,21 +62,8 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 }
 
 fn inspect_location<S: IssueStore>(storage: &S, path: &str) -> Result<ArtifactLocation> {
-    validate_repo_relative_path(path)?;
-    let repo_root = repository_root(storage)?;
-    let mut candidate = repo_root.clone();
-    for component in Path::new(path).components() {
-        candidate.push(component.as_os_str());
-        match fs::symlink_metadata(&candidate) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Ok(ArtifactLocation::Symlink);
-            }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(ArtifactLocation::Missing);
-            }
-            Err(error) => return Err(error.into()),
-        }
+    if working_tree_path_has_symlink(storage, path)? {
+        return Ok(ArtifactLocation::Symlink);
     }
     match storage.read_path_bytes(path, None) {
         Ok((bytes, _)) => Ok(ArtifactLocation::Regular(ContentIdentity::from_bytes(
@@ -85,6 +72,50 @@ fn inspect_location<S: IssueStore>(storage: &S, path: &str) -> Result<ArtifactLo
         Err(PathReadError::NotFound(_)) => Ok(ArtifactLocation::Missing),
         Err(error) => Err(error.into()),
     }
+}
+
+/// Outcome of a working-tree discovery read that refuses symbolic-link paths.
+pub(crate) enum WorkingTreeDiscoveryRead {
+    /// Bytes read from a path whose existing components were all non-symlinks.
+    Bytes(Vec<u8>),
+    /// The leaf or an intermediate component is a symbolic link.
+    Symlink,
+}
+
+/// Read one repository-relative working-tree path only when no component is a
+/// symbolic link.
+///
+/// This is deliberately narrower than [`IssueStore::read_path_bytes`]: archive
+/// discovery must preserve symlink artifacts for classification without ever
+/// parsing their referents, while snapshot and other callers retain the
+/// existing general read contract.
+pub(crate) fn read_working_tree_path_without_symlinks<S: IssueStore>(
+    storage: &S,
+    path: &str,
+) -> Result<WorkingTreeDiscoveryRead, PathReadError> {
+    if working_tree_path_has_symlink(storage, path)? {
+        Ok(WorkingTreeDiscoveryRead::Symlink)
+    } else {
+        storage
+            .read_path_bytes(path, None)
+            .map(|(bytes, _)| WorkingTreeDiscoveryRead::Bytes(bytes))
+    }
+}
+
+/// Report whether any existing component of a repository-relative working-tree
+/// path is a symbolic link.
+///
+/// Recursive discovery uses this probe before reading parseable artifacts, so
+/// neither a symlink root nor a symlink reached through an embedded edge can
+/// contribute referent-derived edges to an archive plan. Classification uses
+/// the same boundary to record the artifact itself as `symlink-artifact`.
+pub(crate) fn working_tree_path_has_symlink<S: IssueStore>(
+    storage: &S,
+    path: &str,
+) -> Result<bool, PathReadError> {
+    validate_repo_relative_path(path)?;
+    let repo_root = repository_root(storage).map_err(PathReadError::Other)?;
+    path_has_symlink(&repo_root, path).map_err(PathReadError::from)
 }
 
 fn inspect_container_destination<S: IssueStore>(
@@ -140,7 +171,7 @@ fn inspect_container_destination<S: IssueStore>(
     })
 }
 
-fn path_has_symlink(repo_root: &Path, relative: &str) -> Result<bool> {
+fn path_has_symlink(repo_root: &Path, relative: &str) -> std::io::Result<bool> {
     let mut candidate = repo_root.to_path_buf();
     for component in Path::new(relative).components() {
         candidate.push(component.as_os_str());
@@ -148,7 +179,7 @@ fn path_has_symlink(repo_root: &Path, relative: &str) -> Result<bool> {
             Ok(metadata) if metadata.file_type().is_symlink() => return Ok(true),
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => return Err(error.into()),
+            Err(error) => return Err(error),
         }
     }
     Ok(false)

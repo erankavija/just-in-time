@@ -506,3 +506,112 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     assert_eq!(discovered.blockers().len(), 1);
     assert_eq!(discovered.blockers()[0].code, BlockerCode::PinnedReadFailed);
 }
+
+#[cfg(unix)]
+#[test]
+fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
+    use std::os::unix::fs::symlink;
+
+    let repo = Repo::new();
+    repo.write(
+        "referents/root.md",
+        "[referent-only child](secret/child.html)",
+    );
+    repo.write(
+        "referents/secret/child.html",
+        "<p>must not be discovered</p>",
+    );
+    fs::create_dir_all(repo.root.join("docs")).unwrap();
+    symlink(
+        repo.root.join("referents/root.md"),
+        repo.root.join("docs/root.md"),
+    )
+    .unwrap();
+
+    let discovered = repo.discover("docs/root.md");
+
+    assert_eq!(
+        discovered
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect::<Vec<_>>(),
+        ["docs/root.md"]
+    );
+    assert!(discovered.artifacts()[0].edges().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
+    use std::os::unix::fs::symlink;
+
+    let repo = Repo::new();
+    repo.write(
+        "referents/bundle/root.md",
+        "[referent-only child](secret.html)",
+    );
+    repo.write(
+        "referents/bundle/secret.html",
+        "<p>must not be discovered</p>",
+    );
+    fs::create_dir_all(repo.root.join("docs")).unwrap();
+    symlink(
+        repo.root.join("referents/bundle"),
+        repo.root.join("docs/bundle"),
+    )
+    .unwrap();
+
+    let discovered = repo.discover("docs/bundle/root.md");
+
+    assert_eq!(
+        discovered
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect::<Vec<_>>(),
+        ["docs/bundle/root.md"]
+    );
+    assert!(discovered.artifacts()[0].edges().is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_symlinked_embedded_artifact_is_not_traversed_into_referent_closure() {
+    use std::os::unix::fs::symlink;
+
+    let repo = Repo::new();
+    repo.write("docs/root.html", r#"<link href="theme.css">"#);
+    repo.write(
+        "referents/theme.css",
+        r#"@import "secret.css"; body { background: url("secret.png") }"#,
+    );
+    repo.write("referents/secret.css", "a { color: red }");
+    repo.write("referents/secret.png", "must not be discovered");
+    symlink(
+        repo.root.join("referents/theme.css"),
+        repo.root.join("docs/theme.css"),
+    )
+    .unwrap();
+
+    let discovered = repo.discover("docs/root.html");
+
+    assert_eq!(
+        discovered
+            .artifacts()
+            .iter()
+            .map(|entry| entry.source())
+            .collect::<Vec<_>>(),
+        ["docs/root.html", "docs/theme.css"]
+    );
+    let symlink = discovered
+        .artifacts()
+        .iter()
+        .find(|entry| entry.source() == "docs/theme.css")
+        .unwrap();
+    assert!(symlink.edges().is_empty());
+    assert!(!discovered
+        .artifacts()
+        .iter()
+        .any(|entry| entry.source().contains("secret")));
+}

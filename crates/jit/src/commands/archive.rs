@@ -344,7 +344,8 @@ epic = "epic"
         )
         .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
-        fs::write(repo.path().join("real.md"), "real").unwrap();
+        fs::write(repo.path().join("real.md"), "[referent](secret.html)").unwrap();
+        fs::write(repo.path().join("fixtures/secret.html"), "referent-only").unwrap();
         symlink(
             repo.path().join("real.md"),
             repo.path().join("fixtures/link.md"),
@@ -359,6 +360,8 @@ epic = "epic"
             .iter()
             .find(|artifact| artifact.source() == "fixtures/link.md")
             .unwrap();
+        assert_eq!(plan.artifacts().len(), 1);
+        assert!(artifact.edges().is_empty());
         assert_eq!(
             artifact.action(),
             crate::domain::artifact_plan::ArtifactAction::Block
@@ -391,5 +394,46 @@ epic = "epic"
             .blockers()
             .iter()
             .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
+
+        let owner_repo = TempDir::new().unwrap();
+        let owner_storage = JsonFileStorage::new(owner_repo.path().join(".jit"));
+        owner_storage.init().unwrap();
+        fs::write(
+            owner_storage.root().join("config.toml"),
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+        )
+        .unwrap();
+        fs::create_dir_all(owner_repo.path().join("docs")).unwrap();
+        fs::create_dir_all(owner_repo.path().join("fixtures")).unwrap();
+        fs::create_dir_all(owner_repo.path().join("referents")).unwrap();
+        fs::write(
+            owner_repo.path().join("referents/outside.md"),
+            "[selected](../fixtures/selected.md)",
+        )
+        .unwrap();
+        fs::write(owner_repo.path().join("fixtures/selected.md"), "selected").unwrap();
+        symlink(
+            owner_repo.path().join("referents/outside.md"),
+            owner_repo.path().join("docs/outside.md"),
+        )
+        .unwrap();
+        let mut outside = Issue::new("Active outside owner".into(), String::new());
+        outside.state = State::InProgress;
+        outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
+        owner_storage.save_issue(outside).unwrap();
+
+        let owner_plan = CommandExecutor::new(owner_storage)
+            .preview_archive_document("fixtures/selected.md")
+            .unwrap();
+        let selected = &owner_plan.artifacts()[0];
+        assert_eq!(
+            selected.action(),
+            crate::domain::artifact_plan::ArtifactAction::Move
+        );
+        assert!(!selected.evidence().iter().any(|evidence| matches!(
+            evidence,
+            crate::domain::artifact_plan::EvidenceCode::OutsideOwner
+                | crate::domain::artifact_plan::EvidenceCode::ActiveOwner
+        )));
     }
 }
