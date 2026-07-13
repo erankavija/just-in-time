@@ -120,6 +120,39 @@ fn test_archive_relinks_all_referencing_issues() {
 }
 
 #[test]
+fn test_legacy_archive_mutation_waits_for_repository_write_guard() {
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let (repo_root, executor) = executor();
+    let src = "dev/active/guarded.md";
+    std::fs::create_dir_all(repo_root.path().join("dev/active")).unwrap();
+    std::fs::write(repo_root.path().join(src), "# Guarded archive\n").unwrap();
+    seed_issue_referencing(&executor, "guarded", src);
+
+    let holder_storage = executor.storage().clone();
+    let (acquired_tx, acquired_rx) = mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        let _guard = holder_storage.acquire_repo_write_lock().unwrap();
+        acquired_tx.send(()).unwrap();
+        std::thread::sleep(Duration::from_millis(180));
+    });
+    acquired_rx.recv().unwrap();
+
+    let started = Instant::now();
+    executor
+        .archive_document(src, "design", false, false)
+        .expect("legacy archive succeeds after the competing writer releases the guard");
+    let elapsed = started.elapsed();
+    holder.join().unwrap();
+
+    assert!(
+        elapsed >= Duration::from_millis(100),
+        "legacy archive mutation did not wait for the repository write guard: {elapsed:?}"
+    );
+}
+
+#[test]
 fn test_archive_missing_source_is_typed_noop() {
     // A missing source must fail with the typed `ArchiveError::SourceMissing` and
     // make NO filesystem or `.jit` change: the reference stays put and no archive

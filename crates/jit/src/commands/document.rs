@@ -1163,6 +1163,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok((result, Vec::new()));
         }
 
+        // Interim hardening for this legacy mutation path: the replacement
+        // archive executor holds the same guard across its full operation, so
+        // the legacy writer must participate until that command is removed.
+        let _repo_write_guard = self.storage.acquire_repo_write_lock()?;
+
         // 6. Check for active issue links (unless --force)
         if !force {
             let active_issues = self.check_active_issue_links(path)?;

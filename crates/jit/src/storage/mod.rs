@@ -9,6 +9,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub mod artifact_mutation;
 pub mod atomic_write;
 pub mod claim_coordinator;
 pub mod clock;
@@ -35,6 +36,7 @@ pub mod worktree_identity;
 pub mod worktree_paths;
 
 // Re-export for convenience
+pub use artifact_mutation::{ArtifactMutationError, StagedArtifact};
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
