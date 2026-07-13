@@ -7,7 +7,8 @@ use jit::domain::artifact_plan::{
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
-const FULL_OID: &str = "0123456789abcdef0123456789abcdef01234567";
+const FULL_SHA1_OID: &str = "0123456789abcdef0123456789abcdef01234567";
+const FULL_SHA256_OID: &str = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 
 fn artifact(source: &str, version: ArtifactVersion) -> ArtifactPlanEntry {
     ArtifactPlanEntry::new(source, version, ArtifactAction::Retain)
@@ -42,7 +43,7 @@ fn object_keys(value: &Value) -> BTreeSet<&str> {
 
 #[test]
 fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
-    let pinned = ArtifactVersion::pinned(FULL_OID).unwrap();
+    let pinned = ArtifactVersion::pinned(FULL_SHA1_OID).unwrap();
     let first = configured_plan(
         vec![
             artifact("./dev//z.md", ArtifactVersion::WorkingTree),
@@ -84,15 +85,32 @@ fn test_artifact_plan_serialization_is_stable_for_permuted_inputs() {
 
 #[test]
 fn test_artifact_version_accepts_only_canonical_full_commit_oids() {
-    let version = ArtifactVersion::pinned(FULL_OID).unwrap();
-    assert_eq!(serde_json::to_value(&version).unwrap(), json!(FULL_OID));
+    let sha1 = ArtifactVersion::pinned(FULL_SHA1_OID).unwrap();
+    let sha256 = ArtifactVersion::pinned(FULL_SHA256_OID).unwrap();
+
+    assert_eq!(sha256.as_str(), FULL_SHA256_OID);
     assert_eq!(
-        serde_json::from_value::<ArtifactVersion>(json!(FULL_OID)).unwrap(),
-        version
+        serde_json::to_value(&sha256).unwrap(),
+        json!(FULL_SHA256_OID)
     );
+    assert_eq!(
+        serde_json::from_value::<ArtifactVersion>(json!(FULL_SHA256_OID)).unwrap(),
+        sha256
+    );
+
+    assert!(sha1 < sha256);
+    let mut versions = vec![sha256.clone(), sha1.clone()];
+    versions.sort();
+    assert_eq!(versions, vec![sha1, sha256]);
+
     assert!(ArtifactVersion::pinned("HEAD").is_err());
     assert!(ArtifactVersion::pinned("01234567").is_err());
-    assert!(ArtifactVersion::pinned(FULL_OID.to_uppercase()).is_err());
+    for invalid_length in [39, 41, 63, 65] {
+        assert!(ArtifactVersion::pinned("0".repeat(invalid_length)).is_err());
+    }
+    assert!(ArtifactVersion::pinned(FULL_SHA1_OID.to_uppercase()).is_err());
+    assert!(ArtifactVersion::pinned(FULL_SHA256_OID.to_uppercase()).is_err());
+    assert!(ArtifactVersion::pinned(format!("{}g", "0".repeat(63))).is_err());
     assert!(serde_json::from_value::<ArtifactVersion>(json!("main")).is_err());
 }
 
@@ -185,14 +203,14 @@ fn test_pinned_artifact_is_non_relocating_historical_entry() {
     let value = serde_json::to_value(configured_plan(
         vec![artifact(
             "dev/active/history.md",
-            ArtifactVersion::pinned(FULL_OID).unwrap(),
+            ArtifactVersion::pinned(FULL_SHA1_OID).unwrap(),
         )],
         Vec::new(),
         Vec::new(),
     ))
     .unwrap();
 
-    assert_eq!(value["artifacts"][0]["version"], FULL_OID);
+    assert_eq!(value["artifacts"][0]["version"], FULL_SHA1_OID);
     assert_eq!(value["artifacts"][0]["action"], "retain");
     assert_eq!(value["artifacts"][0]["destination"], Value::Null);
     assert_eq!(

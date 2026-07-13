@@ -79,14 +79,16 @@ impl CanonicalCommitOid {
 }
 
 impl ArtifactVersion {
-    /// Construct a historical version from a canonical full SHA-1 commit OID.
+    /// Construct a historical version from a canonical full commit OID.
     ///
-    /// Symbolic names, abbreviated hashes, and non-canonical uppercase hashes
-    /// are rejected. Revision resolution belongs at the storage boundary; only
-    /// its canonical result crosses into the plan domain.
+    /// Full lowercase OIDs from Git's SHA-1 and SHA-256 object formats are
+    /// accepted. Symbolic names, abbreviated hashes, and non-canonical
+    /// uppercase hashes are rejected. Revision resolution belongs at the
+    /// storage boundary; only its canonical result crosses into the plan
+    /// domain.
     pub fn pinned(oid: impl Into<String>) -> Result<Self, PlanError> {
         let oid = oid.into();
-        if oid.len() == 40
+        if matches!(oid.len(), 40 | 64)
             && oid
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
