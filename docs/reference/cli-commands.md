@@ -77,6 +77,39 @@ Dependency-blocked example:
 }
 ```
 
+Gate-blocked example:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Gate validation failed: Cannot transition to 'done': 1 gate(s) not passed",
+    "details": {
+      "issue_id": "work-id",
+      "requested_state": "done",
+      "actual_state": "gated",
+      "blockers": [
+        {
+          "type": "gate",
+          "key": "code-review",
+          "status": "pending"
+        }
+      ],
+      "remediation": [
+        "jit gate status-all work-id",
+        "jit gate evaluate work-id code-review",
+        "jit gate status work-id code-review --all  # run history"
+      ]
+    },
+    "suggestions": [
+      "jit gate status-all work-id",
+      "jit gate evaluate work-id code-review",
+      "jit gate status work-id code-review --all  # run history"
+    ]
+  }
+}
+```
+
 ## Command and flag aliases
 
 A few convenience aliases exist for the names agents reach for most often. They
@@ -183,39 +216,6 @@ execution is disabled.
 
 The older `jit doc archive` command remains a separate document-lifecycle
 surface. It is not an alias for these dependency-aware previews.
-
-Gate-blocked example:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_FAILED",
-    "message": "Gate validation failed: Cannot transition to 'done': 1 gate(s) not passed",
-    "details": {
-      "issue_id": "work-id",
-      "requested_state": "done",
-      "actual_state": "gated",
-      "blockers": [
-        {
-          "type": "gate",
-          "key": "code-review",
-          "status": "pending"
-        }
-      ],
-      "remediation": [
-        "jit gate status-all work-id",
-        "jit gate evaluate work-id code-review",
-        "jit gate status work-id code-review --all  # run history"
-      ]
-    },
-    "suggestions": [
-      "jit gate status-all work-id",
-      "jit gate evaluate work-id code-review",
-      "jit gate status work-id code-review --all  # run history"
-    ]
-  }
-}
-```
 
 ## MCP Tools Reference
 
