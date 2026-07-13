@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "6c95b467-ec21-4780-8395-c55b1472c124",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2",
+  "commit": "53f3550db4bd59259aaa150d63836ce96587cfc5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T01:26:48.626653511Z",
+  "completed_at": "2026-07-13T01:29:40.745995072Z",
+  "duration_ms": 172119,
+  "exit_code": 0,
+  "stdout": "## Plan document present and linked\n\nPass. The required `dev/active/7d3a3a47-plan.md` exists, is substantive, and is linked through `issue.documents` as the approved design. The investigation and owner-approved brief are also linked. The planning issue has no dependencies requiring reconciliation.\n\n## Completeness against the criteria\n\nPass. Section 1 addresses every `[hard]` requirement, and the coverage map at `dev/active/7d3a3a47-plan.md:832` assigns each requirement to concrete implementation tasks.\n\nNotable complete treatments include:\n\n- REQ-01: resolved-hierarchy membership, opaque roots, pinned versions, and recursive Markdown/HTML/CSS discovery.\n- REQ-02: deterministic move/copy/retain/block calculus with ownership, policy, and destination provenance.\n- REQ-03: no-replace publication, durable receipts, quarantine-based removal, and crash recovery.\n- REQ-04: mirror topology and proposed-layout edge validation.\n- REQ-05: terminal, container-oriented, non-mutating candidate reporting without time filtering.\n- REQ-06: binding JSON schema and Markdown/HTML/CSS/CSV/PNG/SVG fixtures.\n\nThe plan correctly incorporates the owner amendment removing categories and reconciles the amended REQ-05.\n\n## Technical soundness and architectural fit\n\nPass. The plan’s grounding matches the current code:\n\n- DAG-authoritative membership uses `resolve_hierarchy` and resolved children, which exist at `crates/jit/src/graph/hierarchy.rs:458` and `crates/jit/src/graph/hierarchy.rs:321`.\n- The proposed operation-wide coordination correctly reuses the reentrant repository guard documented at `crates/jit/src/storage/mod.rs:89`.\n- The new planner directly addresses the incomplete preview at `crates/jit/src/commands/document.rs:1153`, unsafe indiscriminate relinking at `crates/jit/src/commands/document.rs:1352`, destination conflict sequencing at `crates/jit/src/commands/document.rs:1670`, and defective post-archive validation at `crates/jit/src/commands/document.rs:1832`.\n- Pure discovery/classification, storage-owned filesystem primitives, command orchestration, and CLI rendering remain appropriately separated.\n- The no-replace publication and receipt-backed deletion design does not falsely promise cross-file transactionality.\n\n## Decomposition and dependencies\n\nPass. The eleven leaves form a coherent DAG:\n\n- Model → inventory → discovery → classification.\n- Classification → preview and candidates.\n- Storage + preview → intent/recovery selection → publication/reference commit → removal/recovery → legacy removal.\n\nThis avoids overlapping ownership of the archive CLI scaffold and keeps candidate reporting parallel to executor work. The execution split is technically coherent, although its intermediate public exposure should be clarified as noted below.\n\n## Risks and actionability\n\nPass. Material risks—including hierarchy misclassification, pinned revisions, incomplete policy, external destination races, partial publication, quarantine crashes, nested mounts, recovery identity, stale configuration, and event truthfulness—have explicit decisions, mitigations, and failure-injection criteria in Section 4.\n\nThe task descriptions contain binding schemas, code sets, local acceptance criteria, dependencies, and blast radii. No load-bearing question remains open.\n\n## Prior review feedback\n\nAddressed. The prior advisory about preview and candidate tasks sharing an archive CLI scaffold is resolved by explicit ownership and ordering in `dev/active/7d3a3a47-plan.md:477`: preview introduces the command group, the executor is a dependency chain, candidates consume the shared classifier, and legacy removal follows completed recovery support.\n\n## Findings\n\n1. **F1 — Low, advisory:** The three-task executor split does not explicitly state when `--execute` becomes externally reachable. The publication task at `dev/active/7d3a3a47-plan.md:712` intentionally persists relinks and receipts without removing sources, while complete reconciliation and crash recovery arrive in the following task at line 744. To uphold the independent-landability claim at line 479, keep mutation dispatch internal or disabled until the recovery task lands, or document the supported interim CLI behavior.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The plan is complete, technically sound, and coherently decomposed; only the intermediate exposure point for the split executor needs advisory clarification.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Clarify when --execute becomes externally reachable across the publication and recovery task split so every intermediate landing remains safe.\",\"file\":\"dev/active/7d3a3a47-plan.md\",\"line\":712}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The plan is complete, technically sound, and coherently decomposed; only the intermediate exposure point for the split executor needs advisory clarification.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Clarify when --execute becomes externally reachable across the publication and recovery task split so every intermediate landing remains safe.",
+        "file": "dev/active/7d3a3a47-plan.md",
+        "line": 712
+      }
+    ]
+  }
+}

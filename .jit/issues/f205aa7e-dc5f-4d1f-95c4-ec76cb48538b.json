@@ -1,0 +1,27 @@
+{
+  "id": "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b",
+  "title": "Archive intent and recovery selection",
+  "description": "Implement the mutation-free command-layer selection boundary for archive execution. Acquire `RepoWriteGuard` and retain it across the full execution operation; reject non-terminal containers; ignore preview/fingerprint state; scan all open `ArchiveStarted` events by stable recovery target before reading current `archive_root`; and either adopt exactly one recorded operation/root/contract, block multiple matches as `archive-recovery-ambiguous`, or compute exactly one fresh plan and mint only after prior matching intents are terminal. Container recovery identity is the full UUID. Document recovery identity is the canonical original root plus only that root's own destination aliases; embedded/shared dependency paths never match. Recovery uses original Started identities/mappings without recapture, re-evaluates current owners/references only for safety, and defers unrelated new artifacts. It recognizes `published-by-instance` only from an exact durable non-reconciliation `ArchiveExecuted.completed_publications` receipt plus current destination identity verification; Started intent or matching bytes alone are `publication-unproven` and retain source. This task selects and returns the guarded operation context but performs no publication, relink, source removal, or terminal event.\n\n## Success Criteria\n\n- [hard] REQ-01: Non-terminal containers cannot execute; otherwise the command ignores preview and expected-fingerprint state, acquires and retains `RepoWriteGuard` across the complete mutation operation, discovers recovery before fresh planning, and computes at most one fresh plan only when no open matching intent remains.\n- [hard] REQ-02: Recovery scans all open Started events before current `archive_root`, matches container full UUID or a document's canonical original root and only that root's destination aliases, excludes shared dependency aliases, adopts one recorded root/contract, and blocks multiple matches as `archive-recovery-ambiguous` without mutation or minting.\n- [hard] REQ-03: Adopted recovery never recaptures expected SHA-256/size or mappings, stays within the initial artifact/source/destination contract, re-evaluates current ownership only for safety, and defers unrelated artifacts.\n- [hard] REQ-04: Publication provenance is recognized only from an exact non-reconciliation completed-publications receipt and current destination identity verification; Started mapping plus identical content alone remains unproven and cannot authorize pending deletion.\n- [hard] REQ-05: Tests cover source/destination edits, hierarchy and owner changes, `archive_root` change, document invocation through its destination alias, multiple matching opens, and two open documents sharing a dependency without false adoption or ambiguity.\n",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "41aa6056-ecec-4924-94a6-a2bb275350ee",
+    "67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:artifact-archival",
+    "satisfies:REQ-03"
+  ],
+  "created_at": "2026-07-13T00:59:48.565664932Z",
+  "updated_at": "2026-07-13T01:30:52.233619986Z",
+  "first_ready_at": "2026-07-13T00:59:48.565665172Z"
+}

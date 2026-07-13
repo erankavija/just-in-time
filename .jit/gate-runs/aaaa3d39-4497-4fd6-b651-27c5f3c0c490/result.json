@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "aaaa3d39-4497-4fd6-b651-27c5f3c0c490",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "commit": "53f3550db4bd59259aaa150d63836ce96587cfc5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T01:31:21.346268696Z",
+  "completed_at": "2026-07-13T01:33:42.277909709Z",
+  "duration_ms": 140931,
+  "exit_code": 1,
+  "stdout": "## Content standards\n\nAll eleven task titles are clean, labels use the meaningful `epic:artifact-archival` slug, and every description contains marked, zero-padded `## Success Criteria`.\n\nBlocking defect F1: `0c86d83b` is not fully self-contained or verifiable. Its description merely says “Apply … normative missing-source evaluation,” while omitting the actual rules from design §2, “Missing/artifact semantics”:\n\n- A working-tree root missing at both its stated path and mirror must block with `missing-source`.\n- A missing embedded target must emit `missing-edge-target`, add no destination requirement, be excluded from reachability validation, and not block.\n\nNo success criterion tests either outcome.\n\nConcrete fix: append this criterion to `0c86d83b`:\n\n> - [hard] REQ-10: A working-tree root absent at both its stated path and computed mirror destination blocks with `missing-source`; a missing embedded target emits `missing-edge-target` on the referencing artifact, adds no needs-destination constraint, is excluded from before/after edge validation, and does not block the target.\n\n## Coverage vs the design\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Artifact plan model and blocker taxonomy | `28fb4e6a` | Yes |\n| Target root inventory and ownership | `b45ad545` | Yes |\n| Recursive supported-dependency discovery | `971c67f4` | Yes |\n| Move/copy/retain/block classification | `0c86d83b` | **Partial — missing-source semantics are not verifiable** |\n| Storage-owned artifact mutation primitive | `67f4ded1` | Yes |\n| Unified archive preview surface | `41aa6056` | Yes |\n| Archive intent and recovery selection | `f205aa7e` | Yes |\n| Receipt-backed publication and reference commit | `1e6fce38` | Yes |\n| Source-removal reconciliation and crash recovery | `b8281931` | Yes |\n| Remove the legacy document-archive command | `271dc224` | Yes |\n| Read-only container candidate report | `a9f8e04d` | Yes |\n\nAll eleven planned items exist, with no extra issue. The only coverage mismatch is F1.\n\n## Dependency DAG correctness\n\nThe implemented transitive ordering matches design §3:\n\n- `28fb4e6a → b45ad545 → 971c67f4 → 0c86d83b`\n- `0c86d83b → 41aa6056` and `0c86d83b → a9f8e04d`\n- `67f4ded1` remains independent of the planner chain.\n- `41aa6056 + 67f4ded1 → f205aa7e → 1e6fce38 → b8281931 → 271dc224`\n- The epic waits for both terminal branches, `a9f8e04d` and `271dc224`.\n\nThere are no missing prerequisites or false serializations. After the breakdown bracket, the two blank-workspace roots are `28fb4e6a` and `67f4ded1`; both modify existing project structures and can begin without sibling output.\n\n## Structural integrity\n\nThe plan explicitly justifies eleven top-level leaves because each is intended to be independently landable and intermediate containers would distort DAG-authoritative hierarchy. That rationale now holds: the former oversized executor has been split into `f205aa7e`, `1e6fce38`, and `b8281931`, with coherent boundaries and explicit sequencing. No created issue is isolated or dangling.\n\n## Prior review feedback\n\n- Previous F1 (`28fb4e6a` schema and taxonomy): addressed by exact field/code lists and golden-conformance criterion REQ-06.\n- Previous F2 (`41aa6056` fixtures): addressed by REQ-04 naming all six required formats.\n- Previous advisory F3 (sibling sequencing prose): addressed; the offending sequencing references were removed.\n- Previous F4 (`f205aa7e` oversized executor): addressed by the new `1e6fce38` and `b8281931` split.\n\n## Findings\n\n1. **F1 — Blocking, high:** `0c86d83b`, description and Success Criteria, omit the design’s normative behavior for missing working-tree roots and missing embedded targets. Add the exact proposed REQ-10 above so the classifier task is standalone-readable and the behavior is testable.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised inventory, DAG, and executor split match the plan, but classifier issue 0c86d83b still omits verifiable normative missing-artifact semantics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"0c86d83b mentions normative missing-source evaluation but has no self-contained or verifiable criterion for missing roots versus missing embedded targets.\",\"file\":\".jit/issues/0c86d83b-fc85-4696-94a3-65d19d934c9c.json\",\"line\":4,\"references\":[\"docs/reference/jit-content-standards.md#required-structure\",\"dev/active/7d3a3a47-plan.md#2-technical-soundness-and-architectural-fit\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2723 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5919-a829-7780-aab8-6f39982e93f8\n--------\nuser\n--- 2710 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The revised inventory, DAG, and executor split match the plan, but classifier issue 0c86d83b still omits verifiable normative missing-artifact semantics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "0c86d83b mentions normative missing-source evaluation but has no self-contained or verifiable criterion for missing roots versus missing embedded targets.",
+        "file": ".jit/issues/0c86d83b-fc85-4696-94a3-65d19d934c9c.json",
+        "line": 4,
+        "references": [
+          "docs/reference/jit-content-standards.md#required-structure",
+          "dev/active/7d3a3a47-plan.md#2-technical-soundness-and-architectural-fit"
+        ]
+      }
+    ]
+  }
+}

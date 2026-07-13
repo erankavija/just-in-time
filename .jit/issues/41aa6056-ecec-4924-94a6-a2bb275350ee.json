@@ -1,0 +1,26 @@
+{
+  "id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
+  "title": "Unified archive preview surface",
+  "description": "Add `jit archive document <path>` and `jit archive container <id>` as non-mutating preview-by-default commands backed by the shared artifact planner. Both run every execution precondition: source availability, explicit complete policy, terminal eligibility, repository-wide ownership, pinned resolution/read semantics, destination conflicts, supported-edge reachability, symlink/dynamic blockers, and action classification. Render the binding schema-version-1 envelope under `--json` and an equivalent human view.\n\n## Success Criteria\n\n- [hard] REQ-01: Preview lists every artifact, action, evidence flag, warning, and blocker while producing no filesystem, issue, or event mutation.\n- [hard] REQ-02: Document and container targets produce the same plan schema through the same planner, and human output conveys the same decisions as JSON.\n- [hard] REQ-03: Missing or partial `[documentation]` policy produces a non-mutating inventory that distinctly reports `unconfigured` or `incomplete`, explains that archival execution is disabled, and never substitutes defaults to claim eligibility.\n- [hard] REQ-04: Fixture tests for Markdown, HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews with deterministic artifact/action/blocker results, and each human rendering represents the same plan as its JSON rendering.\n",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "0c86d83b-fc85-4696-94a3-65d19d934c9c"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:artifact-archival",
+    "satisfies:REQ-06"
+  ],
+  "created_at": "2026-07-13T00:59:48.565182241Z",
+  "updated_at": "2026-07-13T01:30:11.522217632Z",
+  "first_ready_at": "2026-07-13T00:59:48.565182681Z"
+}

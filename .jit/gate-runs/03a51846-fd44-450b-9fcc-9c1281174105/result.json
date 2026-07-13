@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "03a51846-fd44-450b-9fcc-9c1281174105",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "commit": "53f3550db4bd59259aaa150d63836ce96587cfc5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T01:34:25.940299769Z",
+  "completed_at": "2026-07-13T01:36:32.741525996Z",
+  "duration_ms": 126801,
+  "exit_code": 0,
+  "stdout": "## Content standards\n\nAll 11 created tasks have clean titles, self-contained descriptions, correctly marked and verifiable `## Success Criteria`, exactly one `type:task` label, and the meaningful `epic:artifact-archival` membership label. No sibling-ID prose, ordinal/title prefixes, or duplicated dependency sections were found.\n\nPrior finding resolved: `0c86d83b` now specifies in `REQ-10` that a missing root produces `missing-source`, while a missing embedded target produces `missing-edge-target`, adds no destination constraint, and is excluded from edge validation.\n\n## Coverage vs. design\n\nThe inventory exactly matches the eleven work items in §3 of `dev/active/7d3a3a47-plan.md`. No missing, extra, merged, or wrongly split deliverables were found.\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Artifact plan model and blocker taxonomy | `28fb4e6a` | Yes |\n| Target root inventory and ownership | `b45ad545` | Yes |\n| Recursive supported-dependency discovery | `971c67f4` | Yes |\n| Move/copy/retain/block classification | `0c86d83b` | Yes |\n| Storage-owned artifact mutation primitive | `67f4ded1` | Yes |\n| Unified archive preview surface | `41aa6056` | Yes |\n| Archive intent and recovery selection | `f205aa7e` | Yes |\n| Receipt-backed publication and reference commit | `1e6fce38` | Yes |\n| Source-removal reconciliation and crash recovery | `b8281931` | Yes |\n| Remove the legacy document-archive command | `271dc224` | Yes |\n| Read-only container candidate report | `a9f8e04d` | Yes |\n\n## Dependency DAG correctness\n\nImplemented transitive ordering matches §3:\n\n- `28fb4e6a → b45ad545 → 971c67f4 → 0c86d83b`\n- `0c86d83b` fans out independently to `41aa6056` and `a9f8e04d`\n- Independent root `67f4ded1` joins `41aa6056` at `f205aa7e`\n- Executor chain: `f205aa7e → 1e6fce38 → b8281931 → 271dc224`\n\nThe omitted direct edges listed redundantly in the design are present transitively, consistent with transitive reduction. No false serialization or missing prerequisite was found. The two implementation roots, `28fb4e6a` and `67f4ded1`, can both begin on a fresh workspace because each adds to existing project structures and neither requires sibling-created scaffolding.\n\n## Structural integrity\n\nAll eleven tasks are reachable from `7d3a3a47`; none is isolated or dangling. The planning/breakdown spine remains reachable through the two implementation roots.\n\nThe flat task tier is explicitly justified in §3: each task is intended as an independently landable, green deliverable, while the formerly oversized executor was split into the three-task chain `f205aa7e`, `1e6fce38`, and `b8281931`. The instantiated scopes uphold that rationale.\n\n## Findings\n\n<ol></ol>\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All eleven planned work items are present, standards-compliant, correctly ordered, structurally reachable, and the prior classifier finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All eleven planned work items are present, standards-compliant, correctly ordered, structurally reachable, and the prior classifier finding is resolved.",
+    "findings": []
+  }
+}

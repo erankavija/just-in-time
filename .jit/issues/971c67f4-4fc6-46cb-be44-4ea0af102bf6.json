@@ -1,0 +1,27 @@
+{
+  "id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "title": "Recursive supported-dependency discovery",
+  "description": "Implement version-aware recursive discovery for supported local bundle dependencies: Markdown and HTML element URLs, including script `src`, plus CSS `@import` and `url()`. Resolve paths by normalized components, distinguish relative and root-relative edges, reject repository escape, detect cycles, and retain enough edge data for before/after reachability validation. Scan pinned roots and their supported closure from commit-resolved storage content. Detect the binding dynamic-loading set textually—`fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`, `importScripts(`, URL-bearing `data-*`, and relative static module `import`/`export ... from`/`require`—without executing or guessing JavaScript. Existing snapshot-export callers remain unchanged because this is a new recursive path.\n\n## Success Criteria\n\n- [hard] REQ-01: Discovery reaches an HTML to sibling CSS to nested figure chain and recursively follows CSS `@import` and `url()` targets; script-element `src` is a supported static edge.\n- [hard] REQ-02: Cycles terminate deterministically, repository escapes are rejected, and local-path-bearing constructs from the complete binding dynamic-loading set are reported as unsupported edges by textual matching only.\n- [hard] REQ-03: A pinned root is scanned from commit-resolved content and emits informational `(path, canonical full OID)` dependencies; `CommitNotFound` or commit-path `NotFound` for the root or a supported dependency produces `pinned-read-failed`, blocks the target, and never falls back to working-tree bytes.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "b45ad545-01ac-4bdc-9838-facea0751c42"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:artifact-archival",
+    "satisfies:REQ-01",
+    "satisfies:REQ-04"
+  ],
+  "created_at": "2026-07-13T00:59:48.563503250Z",
+  "updated_at": "2026-07-13T00:59:48.635843693Z",
+  "first_ready_at": "2026-07-13T00:59:48.563503860Z"
+}

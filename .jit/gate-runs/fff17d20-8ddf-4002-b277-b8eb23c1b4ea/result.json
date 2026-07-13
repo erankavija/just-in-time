@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "run_id": "fff17d20-8ddf-4002-b277-b8eb23c1b4ea",
+  "gate_key": "breakdown-review",
+  "stage": "postcheck",
+  "issue_id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
+  "commit": "53f3550db4bd59259aaa150d63836ce96587cfc5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T01:00:58.367659410Z",
+  "completed_at": "2026-07-13T01:03:46.259191317Z",
+  "duration_ms": 167891,
+  "exit_code": 1,
+  "stdout": "## Content standards\n\nTitles and labels are otherwise clean: all implementation leaves have unprefixed titles, and the epic owns the descriptive `epic:artifact-archival` slug. Every issue contains `## Success Criteria`.\n\nBlocking defects remain in `28fb4e6a` and `41aa6056`; `41aa6056` and `271dc224` also duplicate sequencing in prose.\n\n## Coverage vs the design\n\n| Design item | Issue | Matches? |\n|---|---|---|\n| Artifact plan model and blocker taxonomy | `28fb4e6a` | Partial — schema/taxonomy contract is not self-contained or fully verifiable (F1) |\n| Target root inventory and ownership | `b45ad545` | Yes |\n| Recursive supported-dependency discovery | `971c67f4` | Yes |\n| Move/copy/retain/block classification | `0c86d83b` | Yes |\n| Storage-owned artifact mutation primitive | `67f4ded1` | Yes |\n| Unified archive preview surface | `41aa6056` | Partial — required fixture matrix is only an action, not a success criterion (F2) |\n| Coordinated plan execution | `f205aa7e` | Functionally represented, but wrongly scoped as one flat leaf (F4) |\n| Remove the legacy document-archive command | `271dc224` | Yes, with minor prose defect (F3) |\n| Read-only container candidate report | `a9f8e04d` | Yes |\n\nThere are no extra design items or omitted issues.\n\n## Dependency DAG correctness\n\nThe implemented transitive ordering matches §3 of the approved plan:\n\n`28fb4e6a → b45ad545 → 971c67f4 → 0c86d83b`, followed by parallel `41aa6056` and `a9f8e04d`; independent `67f4ded1` joins `41aa6056` at `f205aa7e`, followed by `271dc224`.\n\nThe plan’s nominal extra prerequisites—model → discovery and inventory → classifier—are already present transitively. There is no missing prerequisite or over-constraint.\n\nThe blank-workspace roots are viable:\n\n- `28fb4e6a` adds a self-contained model module to the existing crate.\n- `67f4ded1` adds storage primitives to the existing `JsonFileStorage` implementation.\n\nNeither requires a directory, crate, or skeleton created by a sibling.\n\n## Structural integrity\n\nAll nine tasks are connected to the bracket and container spine; none is isolated or dangling. The plan explicitly permits a flat task tier only because each leaf is claimed to be “independently landable” and coherent. That rationale does not hold for `f205aa7e`, which combines multiple substantial protocols and test programs in one leaf.\n\n## Prior review feedback\n\n`run_history` is empty, so there is no earlier feedback to recheck.\n\n## Findings\n\n1. **F1 — Blocking/high: `28fb4e6a` does not carry the binding schema and taxonomy contract.** Its description says “Implement schema version 1 exactly” and “Blocker and warning codes are append-only and stable,” but it neither specifies the exact field shapes nor lists the required evidence, blocker, and warning codes from design §2. Its success criteria verify ordering and selected semantics, not conformance to the complete schema. A worker without the design document cannot determine what “exactly” means. **Fix:** add a success criterion specifying a golden schema-v1 conformance test and the exact contract: envelope fields `schema_version`, `target`, `destination_root`, `operation_id`, `operation_instance_id`, `execution_id`, `plan_fingerprint`, `eligible`, `policy_status`, `counts`, `artifact_count`, `artifacts`, `blockers`, `warnings`; artifact fields `source`, `version`, `content_identity`, `destination`, `action`, `destination_provenance`, `publication_required`, `publication_mapping`, `publication_proof`, `already_archived`, `provenance`, `format`, `owners`, `edges`, `reference_changes`, `pending_deletions`, `evidence`, `blockers`, `warnings`; evidence codes `permanent-path`, `outside-owner`, `active-owner`, `unmanaged-path`, `archived-source`, `pinned-historical`; blocker codes `policy-unconfigured`, `policy-incomplete`, `unmanaged-selected-root`, `destination-conflict`, `document-non-terminal-owner`, `pinned-read-failed`, `unsupported-dynamic-edge`, `repository-escape`, `unresolvable-edge`, `unpreservable-layout`, `non-terminal-target`, `missing-source`, `symlink-artifact`, `archive-recovery-blocked`, `quarantine-unavailable`, `archive-recovery-ambiguous`; and warning codes `missing-edge-target`, `external-edge`, `no-owner`, `residue-source`, `deletion-failed`, `not-selected-sibling`, `quarantined-foreign-file`.\n\n2. **F2 — Blocking/high: `41aa6056` lacks a verifiable criterion for the design’s required format-fixture matrix.** “Verify Markdown, HTML, CSS, CSV, PNG, and SVG roots/bundles with fixtures” is an action in the introductory prose, while none of its three success criteria requires those fixtures to pass or defines expected results. This drops an observable part of the design item. **Fix:** add: `- [hard] REQ-04: Fixture tests for Markdown, HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews with deterministic artifact/action/blocker results, and each human rendering represents the same plan as its JSON rendering.`\n\n3. **F3 — Advisory/low: `41aa6056` and `271dc224` duplicate DAG sequencing in prose.** `41aa6056` says “Keep the legacy ... until its separately ordered removal,” while `271dc224` begins “After the unified archive executor lands.” The content standard makes the DAG authoritative and prohibits sibling/sequencing restatements. **Fix:** delete the final sentence from `41aa6056`; begin `271dc224` with `Remove \\`jit doc archive\\` as a clean cut with no alias or compatibility stub.` The existing `f205aa7e → 271dc224` edge retains the ordering.\n\n4. **F4 — Blocking/high: `f205aa7e` invalidates the flat-tier rationale.** One leaf owns fresh execution, operation locking, recovery-target discovery, ambiguity handling, four event contracts, receipt-backed publication, reference relinking, asset-cache maintenance, source quarantine, reconciliation, abort semantics, eligibility rules, and a large crash/failure-injection matrix. These are several independently testable deliverables and exceed a coherent single-owner leaf. **Fix:** convert `f205aa7e` to `type:story` with `story:coordinated-archive-execution`, then create three task children: `Archive intent and recovery selection` depending on `41aa6056` and `67f4ded1` and owning current REQ-05/REQ-06; `Receipt-backed publication and reference commit` depending on that task and owning REQ-01/REQ-02/REQ-03 plus fresh `ArchiveStarted`/`ArchiveExecuted`; and `Source-removal reconciliation and crash recovery` depending on the publication task and owning REQ-04/REQ-07. Make `f205aa7e` depend on the final child; retain `271dc224` depending on `f205aa7e`.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The DAG and item inventory match the plan, but two issues omit verifiable design contracts and the coordinated executor is too broad for the approved flat-tier rationale.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"28fb4e6a does not self-contain or verify the binding schema-v1 field and code taxonomy.\",\"file\":\".jit/issues/28fb4e6a-89c8-4b02-ac3c-5bcf3708e674.json\",\"line\":4},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"41aa6056 mentions the required format fixtures only as an action and has no observable success criterion for them.\",\"file\":\".jit/issues/41aa6056-ecec-4924-94a6-a2bb275350ee.json\",\"line\":4},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"41aa6056 and 271dc224 duplicate sibling sequencing that belongs only in the DAG.\",\"file\":\".jit/issues/41aa6056-ecec-4924-94a6-a2bb275350ee.json\",\"line\":4},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"f205aa7e bundles several independently testable execution and recovery deliverables, contradicting the plan's flat-tier rationale.\",\"file\":\".jit/issues/f205aa7e-dc5f-4d1f-95c4-ec76cb48538b.json\",\"line\":4}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2173 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f58fd-d721-7840-9169-3912b57a1a4a\n--------\nuser\n--- 2160 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The DAG and item inventory match the plan, but two issues omit verifiable design contracts and the coordinated executor is too broad for the approved flat-tier rationale.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "28fb4e6a does not self-contain or verify the binding schema-v1 field and code taxonomy.",
+        "file": ".jit/issues/28fb4e6a-89c8-4b02-ac3c-5bcf3708e674.json",
+        "line": 4
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "41aa6056 mentions the required format fixtures only as an action and has no observable success criterion for them.",
+        "file": ".jit/issues/41aa6056-ecec-4924-94a6-a2bb275350ee.json",
+        "line": 4
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "41aa6056 and 271dc224 duplicate sibling sequencing that belongs only in the DAG.",
+        "file": ".jit/issues/41aa6056-ecec-4924-94a6-a2bb275350ee.json",
+        "line": 4
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "f205aa7e bundles several independently testable execution and recovery deliverables, contradicting the plan's flat-tier rationale.",
+        "file": ".jit/issues/f205aa7e-dc5f-4d1f-95c4-ec76cb48538b.json",
+        "line": 4
+      }
+    ]
+  }
+}

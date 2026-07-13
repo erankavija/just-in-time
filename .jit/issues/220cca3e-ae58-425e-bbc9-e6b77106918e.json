@@ -2,7 +2,7 @@
   "id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
   "title": "breakdown: Dependency-aware container artifact archival",
   "description": "Breakdown node bracketing Dependency-aware container artifact archival (7d3a3a47). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "coverage-preview": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T21:36:24.523803664Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-13T01:31:07.908975275Z"
     },
     "breakdown-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T21:36:24.524572154Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-13T01:34:25.940299769Z"
     }
   },
   "context": {},
@@ -34,6 +34,7 @@
     "brackets:7d3a3a47"
   ],
   "created_at": "2026-07-12T21:36:24.522654403Z",
-  "updated_at": "2026-07-13T00:51:17.827246105Z",
-  "first_ready_at": "2026-07-12T21:36:24.522654823Z"
+  "updated_at": "2026-07-13T01:36:38.891909158Z",
+  "first_ready_at": "2026-07-12T21:36:24.522654823Z",
+  "done_at": "2026-07-13T01:36:38.891908618Z"
 }

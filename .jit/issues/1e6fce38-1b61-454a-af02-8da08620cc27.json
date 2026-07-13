@@ -1,0 +1,27 @@
+{
+  "id": "1e6fce38-1b61-454a-af02-8da08620cc27",
+  "title": "Receipt-backed publication and reference commit",
+  "description": "Consume the guarded selected context and commit publications plus exact issue-reference changes without removing any source. For fresh work, capture initial SHA-256 plus byte-size identities; derive exact owner-private destination-adjacent staging and source-adjacent quarantine/deletion-intent mappings; and append `ArchiveStarted` durably before mutation with recovery target, recorded root, operation/instance/execution IDs, fingerprint, exact initial contract, identities, staging mappings, and deletion intents. Stage and verify every artifact, validate every supported local edge in the proposed layout, publish atomically no-replace, revalidate preexisting-identical destinations before selected relinks, apply exactly planned `reference_changes`, refresh or invalidate cached asset metadata, and never rewrite pinned references. Document execution requires every direct and embedded-closure owner terminal; managed zero-owner documents may execute with informational evidence. After storage reports successful no-replace publication and relinks persist, append a normal non-reconciliation `ArchiveExecuted` recording the identity triple, exact `completed_publications`, completed relinks, and receipt-backed pending deletions. That append is the sole publication proof; append failure leaves publication unproven, source retained, and source quarantine forbidden. Reconciliation cannot add completed publications or synthesize provenance.\n\n## Success Criteria\n\n- [hard] REQ-01: Before metadata commit, every staged supported local edge is validated against the proposed destination layout rather than source-resolved paths.\n- [hard] REQ-02: Document execution is refused if any owner of the explicit document or any artifact in its supported bundle closure is non-terminal; a managed zero-owner document remains executable with informational evidence.\n- [hard] REQ-03: Execution applies exactly planned `reference_changes`: pinned references are untouched; container execution relinks only unpinned terminal-inside references; document execution relinks every unpinned direct owner after the all-terminal check; every nonselected reference remains source-resolvable.\n- [hard] REQ-04: `ArchiveStarted` appends before mutation and records recovery target, recorded destination root, operation/instance/execution IDs, fingerprint, exact initial or remaining contract, initial identities, publication staging mappings, and deletion intents; initial staging must match its identity.\n- [hard] REQ-05: A normal `ArchiveExecuted` appends only after successful no-replace publications and exact relinks, records exact completed publications/relinks and pending deletions, remains durable if all later removals fail, and is the only event that can establish `published-by-instance`; no source quarantine begins before append success.\n- [hard] REQ-06: Preexisting-identical or unreceipted matching destinations always retain source and are identity-revalidated before any selected relink; publication/relink append failures leave a recoverable operation with no deletion authority.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:artifact-archival",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04"
+  ],
+  "created_at": "2026-07-13T01:30:23.175548686Z",
+  "updated_at": "2026-07-13T01:30:31.357723906Z",
+  "first_ready_at": "2026-07-13T01:30:23.175549116Z"
+}
