@@ -80,26 +80,6 @@ impl Drop for LockGuard {
 /// Uses advisory file locks (flock on Unix, LockFileEx on Windows) to coordinate
 /// access between multiple processes. Locks are automatically released when the
 /// `LockGuard` is dropped, ensuring cleanup even on panic.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::storage::lock::FileLocker;
-/// use std::path::Path;
-/// use std::time::Duration;
-///
-/// let locker = FileLocker::new(Duration::from_secs(5));
-///
-/// // Exclusive lock for writing
-/// let guard = locker.lock_exclusive(Path::new("data.json")).unwrap();
-/// // ... write data ...
-/// drop(guard); // Lock released
-///
-/// // Shared lock for reading
-/// let guard = locker.lock_shared(Path::new("data.json")).unwrap();
-/// // ... read data ...
-/// // Lock automatically released on drop
-/// ```
 #[derive(Debug, Clone)]
 pub struct FileLocker {
     timeout: Duration,

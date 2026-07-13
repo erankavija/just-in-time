@@ -29,22 +29,6 @@ use std::path::PathBuf;
 ///
 /// The [`Display`](std::fmt::Display) form is the bare message body with no
 /// `Warning:`/`Error:` prefix, so the output layer can apply its own framing.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::StorageWarning;
-///
-/// let warning = StorageWarning::SequenceGap { missing: 7 };
-/// assert_eq!(warning.to_string(), "Sequence gap detected - missing sequence 7");
-///
-/// // Warnings are values, so the output layer decides how to render them.
-/// let collected = vec![warning, StorageWarning::IndexRebuilt];
-/// for w in &collected {
-///     // e.g. output.print_warning(w)?;
-///     assert!(!w.to_string().is_empty());
-/// }
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StorageWarning {

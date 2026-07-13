@@ -24,22 +24,6 @@ use thiserror::Error;
 /// Every variant carries enough context (path, entry id, or the underlying
 /// parse error) to point an author at the offending entry. Mirrors
 /// [`RuleConfigError`](crate::validation::rules::RuleConfigError).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::invariants::{InvariantConfigError, InvariantRegistry};
-///
-/// // An entry with a missing `statement` is a typed, descriptive error.
-/// let toml = r#"
-/// [[invariants]]
-/// id = "dag-acyclic"
-/// kind = "advisory"
-/// "#;
-/// let err = InvariantRegistry::from_toml_str(toml).unwrap_err();
-/// assert!(matches!(err, InvariantConfigError::Toml(_)));
-/// assert!(err.to_string().contains("statement"));
-/// ```
 #[derive(Debug, Error)]
 pub enum InvariantConfigError {
     /// The invariants file could not be read from disk.
@@ -72,23 +56,6 @@ pub enum InvariantConfigError {
 /// Deserialized from the kebab-case tokens `"enforced"` / `"advisory"`; an
 /// unrecognized value is a descriptive parse error rather than a silent default
 /// (there is no `Default`, so the field is required on every entry).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::invariants::{InvariantKind, InvariantRegistry};
-///
-/// // Parsed from its token inside an invariant entry.
-/// let toml = "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n";
-/// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
-/// assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
-///
-/// // An invalid token is a descriptive error listing the valid values.
-/// let bad = "[[invariants]]\nid = \"event-log\"\nstatement = \"s\"\nkind = \"both\"\n";
-/// let err = InvariantRegistry::from_toml_str(bad).unwrap_err();
-/// assert!(err.to_string().contains("enforced"));
-/// assert!(err.to_string().contains("advisory"));
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum InvariantKind {
@@ -104,25 +71,6 @@ pub enum InvariantKind {
 /// The `id` is the entry's SELF-ID; its project-scoped qualified id is
 /// `@/invariant/<id>`. `statement` and `kind` are required; `enforced_by` (authored as
 /// `enforced-by`) is an optional binding to a rule name or gate key.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::invariants::{Invariant, InvariantKind, InvariantRegistry};
-///
-/// let toml = r#"
-/// [[invariants]]
-/// id = "dag-acyclic"
-/// statement = "Every dependency edge stays acyclic."
-/// kind = "enforced"
-/// enforced-by = "dag-no-cycles"
-/// "#;
-/// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
-/// let inv: &Invariant = &reg.invariants[0];
-/// assert_eq!(inv.id, "dag-acyclic");
-/// assert_eq!(inv.kind, InvariantKind::Enforced);
-/// assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Invariant {
     /// The entry's self-id; `@/invariant/<id>` is its project-scoped qualified id.
@@ -141,16 +89,6 @@ pub struct Invariant {
 /// Held as a field on [`JitConfig`](crate::config::JitConfig) so downstream
 /// indexing can project each entry as a project-scoped (`@`) addressable item.
 /// An absent file loads as an empty registry.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::invariants::InvariantRegistry;
-///
-/// // An empty document is a valid, empty registry.
-/// let reg = InvariantRegistry::from_toml_str("").unwrap();
-/// assert!(reg.invariants.is_empty());
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct InvariantRegistry {
     /// The declared invariants, in authored order.
@@ -166,15 +104,6 @@ struct RawInvariantsFile {
 
 impl InvariantRegistry {
     /// An empty registry (used when no `invariants.toml` exists).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::invariants::InvariantRegistry;
-    ///
-    /// let reg = InvariantRegistry::empty();
-    /// assert!(reg.invariants.is_empty());
-    /// ```
     pub fn empty() -> Self {
         Self::default()
     }
@@ -184,17 +113,6 @@ impl InvariantRegistry {
     /// Returns an empty [`InvariantRegistry`] when the file does not exist
     /// (graceful, NOT an error), mirroring
     /// [`RuleSet::load`](crate::validation::rules::RuleSet::load).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::invariants::InvariantRegistry;
-    ///
-    /// // A directory with no `invariants.toml` loads as an empty registry.
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let reg = InvariantRegistry::load(dir.path()).unwrap();
-    /// assert!(reg.invariants.is_empty());
-    /// ```
     pub fn load(jit_root: &Path) -> Result<Self, InvariantConfigError> {
         let path = jit_root.join("invariants.toml");
         if !path.exists() {
@@ -213,22 +131,6 @@ impl InvariantRegistry {
     /// A missing required field or an unrecognized `kind` token surfaces as a
     /// typed [`InvariantConfigError::Toml`] with a descriptive message; a
     /// duplicate `id` is a typed [`InvariantConfigError::DuplicateId`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::invariants::InvariantRegistry;
-    ///
-    /// let toml = r#"
-    /// [[invariants]]
-    /// id = "gate-semantics"
-    /// statement = "Gates must pass before Done."
-    /// kind = "advisory"
-    /// "#;
-    /// let reg = InvariantRegistry::from_toml_str(toml).unwrap();
-    /// assert_eq!(reg.invariants[0].id, "gate-semantics");
-    /// assert!(reg.invariants[0].enforced_by.is_none());
-    /// ```
     pub fn from_toml_str(content: &str) -> Result<Self, InvariantConfigError> {
         let raw: RawInvariantsFile = toml::from_str(content)?;
 

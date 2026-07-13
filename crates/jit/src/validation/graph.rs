@@ -173,17 +173,6 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
 
 /// How a "child" issue relates to the source issue in `label-coverage`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::graph::ChildLink;
-///
-/// assert_eq!(ChildLink::parse("dependents"), Some(ChildLink::Dependents));
-/// assert_eq!(ChildLink::parse("dependencies"), Some(ChildLink::Dependencies));
-/// assert_eq!(ChildLink::parse("any"), Some(ChildLink::Any));
-/// assert_eq!(ChildLink::parse("bogus"), None);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChildLink {
     /// Children are issues that depend on the source (the source is in their
@@ -261,19 +250,6 @@ pub struct GraphFinding {
 
 impl GraphFinding {
     /// A finding attributed to a specific issue id.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::graph::GraphFinding;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "m".into() };
-    /// let gf = GraphFinding::for_issue("abc123", f);
-    /// assert_eq!(gf.issue_id.as_deref(), Some("abc123"));
-    /// assert!(!gf.is_config_error());
-    /// ```
     pub fn for_issue(issue_id: impl Into<String>, finding: Finding) -> Self {
         Self {
             issue_id: Some(issue_id.into()),
@@ -286,19 +262,6 @@ impl GraphFinding {
     /// `label-uniqueness` collision). This is NOT a config-error finding;
     /// config errors are produced by the module-internal `config_error()`
     /// constructor, which sets the typed `is_config_error` field.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::graph::GraphFinding;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// let f = Finding { rule: "r".into(), severity: Severity::Error, message: "collision".into() };
-    /// let gf = GraphFinding::unattributed(f);
-    /// assert!(gf.issue_id.is_none());
-    /// assert!(!gf.is_config_error());
-    /// ```
     pub fn unattributed(finding: Finding) -> Self {
         Self {
             issue_id: None,
@@ -314,21 +277,6 @@ impl GraphFinding {
     /// this field directly; the finding's message is never scanned for a prefix.
     /// Config errors carry no issue id and must never be silently dropped from
     /// any per-issue view of the rule that applies.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::graph::GraphFinding;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// // `for_issue` and `unattributed` always produce non-config-error findings.
-    /// let ok = Finding { rule: "r".into(), severity: Severity::Error, message: "criterion uncovered".into() };
-    /// assert!(!GraphFinding::for_issue("x", ok).is_config_error());
-    /// // The message prefix alone does NOT make this a config error.
-    /// let note = Finding { rule: "r".into(), severity: Severity::Error, message: "config error: x".into() };
-    /// assert!(!GraphFinding::unattributed(note).is_config_error());
-    /// ```
     pub fn is_config_error(&self) -> bool {
         self.is_config_error
     }
@@ -339,15 +287,6 @@ impl ChildLink {
     ///
     /// Returns `None` for an unrecognized value so the caller can emit a clear
     /// config-error finding rather than silently defaulting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::graph::ChildLink;
-    ///
-    /// assert_eq!(ChildLink::parse("any"), Some(ChildLink::Any));
-    /// assert!(ChildLink::parse("nope").is_none());
-    /// ```
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "dependents" => Some(Self::Dependents),

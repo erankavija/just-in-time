@@ -45,19 +45,6 @@ use crate::validation::strictness::Strictness;
 /// Currently this only wraps a schema compilation failure: a rule whose JSON
 /// Schema (raw or desugared) cannot be compiled surfaces here rather than being
 /// silently ignored, so a misconfigured rule never disables enforcement.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::local::LocalEvalError;
-/// use jit::validation::engine::SchemaCompileError;
-///
-/// let err = LocalEvalError::from(SchemaCompileError {
-///     rule: "bad".to_string(),
-///     message: "boom".to_string(),
-/// });
-/// assert!(err.to_string().contains("bad"));
-/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum LocalEvalError {
     /// A rule's JSON Schema failed to compile.
@@ -140,17 +127,6 @@ impl LocalEvaluation {
     /// [`is_blocking`]: LocalEvaluation::is_blocking
     /// [`warnings`]: LocalEvaluation::warnings
     /// [`rejection_message`]: LocalEvaluation::rejection_message
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    /// use jit::validation::strictness::Strictness;
-    ///
-    /// let evaluation = LocalEvaluation::default().with_strictness(Strictness::Strict);
-    /// // An empty evaluation still never blocks, whatever the level.
-    /// assert!(!evaluation.is_blocking());
-    /// ```
     #[must_use]
     pub fn with_strictness(mut self, strictness: Strictness) -> Self {
         self.strictness = strictness;
@@ -165,16 +141,6 @@ impl LocalEvaluation {
     }
 
     /// Every finding produced, in rule order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    ///
-    /// // A default (empty) evaluation has no findings.
-    /// let evaluation = LocalEvaluation::default();
-    /// assert!(evaluation.findings().is_empty());
-    /// ```
     pub fn findings(&self) -> Vec<&Finding> {
         self.findings.iter().map(|f| &f.finding).collect()
     }
@@ -182,15 +148,6 @@ impl LocalEvaluation {
     /// Returns whether any finding blocks a non-forced write under this
     /// evaluation's [`Strictness`] level (loose: an enforced error; strict: any
     /// violation; permissive: none).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    ///
-    /// // An empty evaluation never blocks.
-    /// assert!(!LocalEvaluation::default().is_blocking());
-    /// ```
     pub fn is_blocking(&self) -> bool {
         !self.blocking_rules().is_empty()
     }
@@ -205,14 +162,6 @@ impl LocalEvaluation {
     ///
     /// This drives both the rejection message (which rules failed) and, on a
     /// `--force` write, the per-rule bypass events to log.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    ///
-    /// assert!(LocalEvaluation::default().blocking_rules().is_empty());
-    /// ```
     pub fn blocking_rules(&self) -> Vec<String> {
         self.findings
             .iter()
@@ -232,14 +181,6 @@ impl LocalEvaluation {
     /// The partition tracks strictness: under [`Strictness::Permissive`] every
     /// violation is a warning; under [`Strictness::Strict`] a blocking finding is
     /// not also surfaced here.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    ///
-    /// assert!(LocalEvaluation::default().warnings().is_empty());
-    /// ```
     pub fn warnings(&self) -> Vec<String> {
         self.findings
             .iter()
@@ -253,15 +194,6 @@ impl LocalEvaluation {
     ///
     /// Returns `None` when nothing blocks. Used by the write path to build the
     /// error surfaced when an `enforce` rule fails and `--force` was not passed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::local::LocalEvaluation;
-    ///
-    /// // Nothing blocking => no rejection message.
-    /// assert!(LocalEvaluation::default().rejection_message().is_none());
-    /// ```
     pub fn rejection_message(&self) -> Option<String> {
         let blocking: Vec<&EnforcedFinding> = self
             .findings

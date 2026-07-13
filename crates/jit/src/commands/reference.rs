@@ -18,26 +18,6 @@ use crate::validation::rules_gates_projection::project_rules_and_gates;
 /// Returned by [`CommandExecutor::render_rules_and_gates`] and serialized as the
 /// `--json` payload: the repo-relative `target` that was written, the `mode` used
 /// (`separate-file`|`region`), and the `rules`/`gates` counts rendered.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::RulesGatesRenderResult;
-///
-/// // The fields mirror the rendered projection (here built by hand to show the
-/// // serialized shape).
-/// let result = RulesGatesRenderResult {
-///     target: "docs/reference/rules-and-gates.md".to_string(),
-///     mode: "region".to_string(),
-///     rules: 9,
-///     gates: 3,
-/// };
-/// let json = serde_json::to_value(&result).unwrap();
-/// assert_eq!(json["target"], "docs/reference/rules-and-gates.md");
-/// assert_eq!(json["mode"], "region");
-/// assert_eq!(json["rules"], 9);
-/// assert_eq!(json["gates"], 3);
-/// ```
 #[derive(Debug, Serialize)]
 pub struct RulesGatesRenderResult {
     /// The repo-relative documentation target that was written (from config).
@@ -62,21 +42,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`project_rules_and_gates`](crate::validation::rules_gates_projection::project_rules_and_gates),
     /// which path-validates the config-driven target and writes atomically through
     /// the storage boundary. The target path comes ONLY from config.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let result = executor.render_rules_and_gates()?;
-    /// println!(
-    ///     "wrote {} rule(s) and {} gate(s) to {}",
-    ///     result.rules, result.gates, result.target
-    /// );
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn render_rules_and_gates(&self) -> Result<RulesGatesRenderResult> {
         let config = self.cached_config()?;
         let default = RulesGatesProjectionConfig::default();

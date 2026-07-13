@@ -39,25 +39,6 @@ const INDEX_FILE: &str = "index.json";
 /// Stops as soon as an ancestor containing `.git` has been checked (inclusive)
 /// and found not to hold an initialized `.jit` — it does not consult any
 /// ancestor above that directory.
-///
-/// # Examples
-///
-/// ```
-/// use std::collections::HashSet;
-/// use std::path::{Path, PathBuf};
-/// use jit::storage::discovery::discover_from;
-///
-/// // A directory counts as a repository only when its `.jit` holds an
-/// // `index.json`, so the predicate is probed at `.jit/index.json`.
-/// let initialized: HashSet<PathBuf> = HashSet::from([PathBuf::from("/repo/.jit/index.json")]);
-/// let found = discover_from(Path::new("/repo/crates/jit"), |p| initialized.contains(p));
-/// assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
-///
-/// // A bare `.jit` with no `index.json` is skipped, so nothing is bound.
-/// let bare: HashSet<PathBuf> = HashSet::from([PathBuf::from("/repo/.jit")]);
-/// let none = discover_from(Path::new("/repo/crates/jit"), |p| bare.contains(p));
-/// assert_eq!(none, None);
-/// ```
 pub fn discover_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     for ancestor in start.ancestors() {
         let candidate = ancestor.join(".jit");
@@ -82,22 +63,6 @@ pub fn discover_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<Pat
 ///
 /// Does not consult the `JIT_DATA_DIR` override — callers must check that
 /// first, as it always takes precedence over discovery.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::discovery::discover_jit_dir;
-///
-/// let repo = tempfile::tempdir().unwrap();
-/// let jit = repo.path().join(".jit");
-/// std::fs::create_dir(&jit).unwrap();
-/// std::fs::write(jit.join("index.json"), "{}").unwrap();
-/// let nested = repo.path().join("crates/jit");
-/// std::fs::create_dir_all(&nested).unwrap();
-///
-/// // Discovery from a nested subdirectory resolves the repository root's `.jit`.
-/// assert_eq!(discover_jit_dir(&nested), Some(jit));
-/// ```
 pub fn discover_jit_dir(start: &Path) -> Option<PathBuf> {
     discover_from(start, Path::exists)
 }

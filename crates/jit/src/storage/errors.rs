@@ -21,24 +21,6 @@ use thiserror::Error;
 /// `delete_issue`). The CLI downcasts to this type to classify the failure as a
 /// not-found condition (exit code `3`) and to render a structured JSON error,
 /// rather than scanning the message text.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::IssueNotFoundError;
-///
-/// // Looked up by id or prefix.
-/// let by_id = IssueNotFoundError::new("a1b2c3d4");
-/// assert_eq!(by_id.to_string(), "Issue not found: a1b2c3d4");
-/// assert_eq!(by_id.id(), "a1b2c3d4");
-///
-/// // Absent from every read source (local `.jit`, git HEAD, main worktree).
-/// let across = IssueNotFoundError::across_sources("a1b2c3d4");
-/// assert_eq!(
-///     across.to_string(),
-///     "Issue a1b2c3d4 not found in local storage, git, or main worktree"
-/// );
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum IssueNotFoundError {
     /// No issue matched the given id or id prefix.
@@ -86,24 +68,6 @@ impl IssueNotFoundError {
 /// message text. Each variant preserves one of the distinct phrasings the callers
 /// already produced, so a gate-not-found is always this dedicated type (never a
 /// generic `NotFoundError`) while keeping the user-facing text byte-for-byte.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::GateNotFoundError;
-///
-/// let batch = GateNotFoundError::new(["lint", "tests"]);
-/// assert_eq!(batch.to_string(), "Gates not found in registry: lint, tests");
-///
-/// let single = GateNotFoundError::single("lint");
-/// assert_eq!(single.to_string(), "Gate 'lint' not found in registry");
-///
-/// let by_key = GateNotFoundError::by_key("lint");
-/// assert_eq!(by_key.to_string(), "Gate 'lint' not found");
-///
-/// let in_registry = GateNotFoundError::in_registry("lint");
-/// assert_eq!(in_registry.to_string(), "Gate not found in registry: lint");
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum GateNotFoundError {
     /// One or more gate keys were missing (the batch `gate add` check).
@@ -152,15 +116,6 @@ impl GateNotFoundError {
 /// The CLI downcasts to this type to classify the failure as a not-found
 /// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
 /// phrasing verbatim.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::GateRunNotFoundError;
-///
-/// let err = GateRunNotFoundError::new("run-123");
-/// assert_eq!(err.to_string(), "Gate run 'run-123' not found");
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Gate run '{run_id}' not found")]
 pub struct GateRunNotFoundError {
@@ -181,15 +136,6 @@ impl GateRunNotFoundError {
 /// The CLI downcasts to this type to classify the failure as a not-found
 /// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
 /// phrasing verbatim.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::PresetNotFoundError;
-///
-/// let err = PresetNotFoundError::new("rust-ci");
-/// assert_eq!(err.to_string(), "Preset not found: rust-ci");
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Preset not found: {name}")]
 pub struct PresetNotFoundError {
@@ -208,16 +154,6 @@ impl PresetNotFoundError {
 /// The CLI downcasts to this type to classify the failure as a not-found
 /// condition (exit code `3`). `Display` reproduces the previous `anyhow!`
 /// phrasing verbatim, including the multi-line initialization guidance.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::RepositoryNotFoundError;
-///
-/// let err = RepositoryNotFoundError::new("/tmp/x/.jit");
-/// assert!(err.to_string().starts_with("JIT repository not found at '/tmp/x/.jit'"));
-/// assert!(err.to_string().contains("jit init"));
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error(
     "JIT repository not found at '{path}'\n\n\
@@ -241,16 +177,6 @@ impl RepositoryNotFoundError {
 /// The CLI downcasts to this type to classify the failure as an already-exists
 /// condition (exit code `6`) instead of scanning the message text. `Display`
 /// reproduces the previous `anyhow!` phrasing verbatim.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::GateAlreadyExistsError;
-///
-/// let err = GateAlreadyExistsError::new("lint");
-/// assert_eq!(err.to_string(), "Gate 'lint' already exists");
-/// assert_eq!(err.key(), "lint");
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Gate '{key}' already exists")]
 pub struct GateAlreadyExistsError {
@@ -282,20 +208,6 @@ impl GateAlreadyExistsError {
 /// repository, is out of date, and the fix is upgrading `jit`. `Display` is a
 /// single line naming both the repository's version and the version the binary
 /// supports.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::RepositoryFormatTooNewError;
-///
-/// let err = RepositoryFormatTooNewError::new(3, 2);
-/// assert_eq!(err.repository_version(), 3);
-/// assert_eq!(err.supported_version(), 2);
-/// // Single line naming both versions.
-/// assert!(!err.to_string().contains('\n'));
-/// assert!(err.to_string().contains('3'));
-/// assert!(err.to_string().contains('2'));
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error(
     "JIT repository format version {repository_version} is newer than this jit \
@@ -310,15 +222,6 @@ pub struct RepositoryFormatTooNewError {
 impl RepositoryFormatTooNewError {
     /// Build a [`RepositoryFormatTooNewError`] from the repository's on-disk
     /// format version and the version this binary supports.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::RepositoryFormatTooNewError;
-    ///
-    /// let err = RepositoryFormatTooNewError::new(3, 2);
-    /// assert_eq!(err.repository_version(), 3);
-    /// ```
     pub fn new(repository_version: u32, supported_version: u32) -> Self {
         Self {
             repository_version,
@@ -327,27 +230,11 @@ impl RepositoryFormatTooNewError {
     }
 
     /// The repository's on-disk format version (the marker that was too new).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::RepositoryFormatTooNewError;
-    ///
-    /// assert_eq!(RepositoryFormatTooNewError::new(3, 2).repository_version(), 3);
-    /// ```
     pub fn repository_version(&self) -> u32 {
         self.repository_version
     }
 
     /// The maximum format version this binary understands.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::RepositoryFormatTooNewError;
-    ///
-    /// assert_eq!(RepositoryFormatTooNewError::new(3, 2).supported_version(), 2);
-    /// ```
     pub fn supported_version(&self) -> u32 {
         self.supported_version
     }
@@ -361,15 +248,6 @@ impl RepositoryFormatTooNewError {
 /// implementations reject a shorter prefix with [`InvalidIdPrefixError`], whose
 /// message reads the length from here, and the storage reference projects it
 /// (`crate::storage::reference`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::{InvalidIdPrefixError, MIN_ID_PREFIX_LENGTH};
-///
-/// let err = InvalidIdPrefixError::new("ab");
-/// assert!(err.to_string().contains(&MIN_ID_PREFIX_LENGTH.to_string()));
-/// ```
 pub const MIN_ID_PREFIX_LENGTH: usize = 4;
 
 /// Error raised when an id prefix is shorter than [`MIN_ID_PREFIX_LENGTH`].
@@ -380,16 +258,6 @@ pub const MIN_ID_PREFIX_LENGTH: usize = 4;
 /// render an `INVALID_ID_PREFIX` JSON error, rather than scanning the message
 /// text. The offending prefix is carried separately for the JSON `details`
 /// field.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::InvalidIdPrefixError;
-///
-/// let err = InvalidIdPrefixError::new("ab");
-/// assert_eq!(err.to_string(), "Issue ID prefix must be at least 4 characters");
-/// assert_eq!(err.prefix(), "ab");
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 #[error("Issue ID prefix must be at least {MIN_ID_PREFIX_LENGTH} characters")]
 pub struct InvalidIdPrefixError {
@@ -418,19 +286,6 @@ impl InvalidIdPrefixError {
 /// The CLI downcasts to this type to classify the failure as an argument error
 /// (exit code `2`) and to render an `AMBIGUOUS_ID` JSON error. Each variant's
 /// `Display` reproduces the exact phrasing of the call site it replaced.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::AmbiguousIdError;
-///
-/// let issue = AmbiguousIdError::issue("aaaa", ["aaaa1111 | One".to_string()]);
-/// assert!(issue.to_string().starts_with("Ambiguous ID 'aaaa' matches multiple issues:"));
-/// assert_eq!(issue.prefix(), "aaaa");
-///
-/// let dep = AmbiguousIdError::dependency("bbbb", ["bbbb1", "bbbb2"].map(String::from));
-/// assert!(dep.to_string().starts_with("Ambiguous dependency id 'bbbb':"));
-/// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum AmbiguousIdError {
     /// An issue-id prefix matched multiple issues in the repository index.

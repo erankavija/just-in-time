@@ -50,6 +50,41 @@ fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
 }
 
 #[test]
+fn test_code_review_prompt_rejects_blanket_public_api_examples() {
+    let prompt = repo_file("scripts/code-review-prompt.md");
+    let agents = repo_file("AGENTS.md");
+
+    for required in [
+        "Do not require a `# Examples` section merely because an API is public",
+        "non-obvious-only standard",
+        "repetitive examples for straightforward",
+        "avoidable documentation and CI burden",
+    ] {
+        assert!(
+            prompt.contains(required),
+            "missing selective-example review policy: {required}"
+        );
+    }
+
+    for required in [
+        "Do not require an example for every public API",
+        "tautological examples",
+        "one type- or module-level walkthrough",
+    ] {
+        assert!(
+            agents.contains(required),
+            "missing selective-example repository policy: {required}"
+        );
+    }
+
+    assert!(
+        !prompt
+            .contains("All public APIs must have doc comments with description and `# Examples`"),
+        "blanket example requirement returned to the review prompt"
+    );
+}
+
+#[test]
 fn test_code_review_prompt_does_not_treat_pending_peer_review_as_a_defect() {
     let prompt = repo_file("scripts/code-review-prompt.md");
 

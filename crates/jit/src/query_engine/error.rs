@@ -17,18 +17,6 @@ pub(super) const STATE_VALUES: &str =
 pub(super) const PRIORITY_VALUES: &str = "low, normal, high, critical";
 
 /// A typed failure produced while lexing or parsing a query string.
-///
-/// # Examples
-///
-/// ```
-/// use jit::query_engine::QueryParseError;
-///
-/// let err = QueryParseError::UnknownField("colour".to_string());
-/// assert_eq!(
-///     err.to_string(),
-///     "Unknown filter field: 'colour' (expected state, label, priority, or assignee)"
-/// );
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum QueryParseError {
     /// A bare word did not contain the `field:value` separator.

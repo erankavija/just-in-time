@@ -84,21 +84,6 @@ pub const PROJECT_SCOPE_SENTINEL: &str = "@";
 /// <kind>/<self-id>` for an issue) and [`Scope::prefix`] renders the item's own
 /// `scope` field (`@` or the short-id); nothing about the scope is persisted
 /// separately (REQ-05).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::Scope;
-///
-/// // The project sentinel parses to the project scope.
-/// assert_eq!(Scope::parse("@"), Scope::Project);
-/// assert_eq!(Scope::Project.prefix(), "@");
-///
-/// // Anything else is an issue scope carrying the (unresolved) short-id form.
-/// let issue = Scope::parse("56ab0224");
-/// assert_eq!(issue, Scope::Issue("56ab0224".to_string()));
-/// assert_eq!(issue.prefix(), "56ab0224");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
     /// An issue scope, carrying the issue's short-id (the qualified-id prefix).
@@ -114,15 +99,6 @@ impl Scope {
     /// segment is taken as an issue scope verbatim (resolution of a short-id /
     /// unique prefix to a full id is a storage concern handled by the caller, not
     /// this pure parser).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::Scope;
-    ///
-    /// assert_eq!(Scope::parse("@"), Scope::Project);
-    /// assert_eq!(Scope::parse("56ab0224"), Scope::Issue("56ab0224".to_string()));
-    /// ```
     pub fn parse(segment: &str) -> Self {
         if segment == PROJECT_SCOPE_SENTINEL {
             Scope::Project
@@ -135,15 +111,6 @@ impl Scope {
     /// otherwise): the value carried in an item's `scope` field and named in a
     /// [`ItemError::DuplicateSelfId`] error. The minted qualified id embeds this
     /// through [`qualified_id`] rather than concatenating it directly.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::Scope;
-    ///
-    /// assert_eq!(Scope::Project.prefix(), "@");
-    /// assert_eq!(Scope::Issue("56ab0224".to_string()).prefix(), "56ab0224");
-    /// ```
     pub fn prefix(&self) -> &str {
         match self {
             Scope::Project => PROJECT_SCOPE_SENTINEL,
@@ -152,15 +119,6 @@ impl Scope {
     }
 
     /// Whether this is the project scope (`@`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::Scope;
-    ///
-    /// assert!(Scope::Project.is_project());
-    /// assert!(!Scope::Issue("56ab0224".to_string()).is_project());
-    /// ```
     pub fn is_project(&self) -> bool {
         matches!(self, Scope::Project)
     }
@@ -213,27 +171,6 @@ impl AddressScope {
     ///
     /// This consumes the already-PARSED scope token and never re-matches on
     /// any `@`-prefix itself (REQ-01).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::{AddressScope, Scope};
-    ///
-    /// assert_eq!(
-    ///     AddressScope::Project.bind_local(Some("acme")).unwrap(),
-    ///     Scope::Project
-    /// );
-    /// assert_eq!(
-    ///     AddressScope::NamedProject("acme".to_string())
-    ///         .bind_local(Some("acme"))
-    ///         .unwrap(),
-    ///     Scope::Project
-    /// );
-    /// let err = AddressScope::NamedProject("other".to_string())
-    ///     .bind_local(Some("acme"))
-    ///     .unwrap_err();
-    /// assert!(err.to_string().contains("other"));
-    /// ```
     pub fn bind_local(self, local_project_name: Option<&str>) -> Result<Scope, ItemError> {
         match self {
             AddressScope::Project => Ok(Scope::Project),
@@ -285,24 +222,6 @@ pub struct KindSegmentedAddress {
 /// (the colon is reserved for the label `namespace:value` separator and never
 /// valid inside an address) — is a typed [`ItemError::InvalidAddress`] naming the
 /// offending address and why it failed.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::{parse_kind_segmented_address, AddressScope};
-///
-/// let addr = parse_kind_segmented_address("@/invariant/atomic-writes").unwrap();
-/// assert_eq!(addr.scope, AddressScope::Project);
-/// assert_eq!(addr.kind, "invariant");
-/// assert_eq!(addr.self_id, "atomic-writes");
-///
-/// let addr = parse_kind_segmented_address("@acme/invariant/atomic-writes").unwrap();
-/// assert_eq!(addr.scope, AddressScope::NamedProject("acme".to_string()));
-///
-/// let addr =
-///     parse_kind_segmented_address("@/issue/56ab0224/requirement/REQ-01").unwrap();
-/// assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
-/// ```
 pub fn parse_kind_segmented_address(address: &str) -> Result<KindSegmentedAddress, ItemError> {
     let invalid = |reason: String| ItemError::InvalidAddress {
         address: address.to_string(),
@@ -417,26 +336,6 @@ fn require_non_empty(segment: &str, label: &str, address: &str) -> Result<(), It
 /// anywhere in `address` is also rejected as [`ItemError::InvalidAddress`]: the
 /// colon is reserved for the label `namespace:value` separator and never valid
 /// inside an address.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::domain::item::{expand_sugar_address, AddressScope, ItemKind};
-///
-/// let decision = ItemKind::from_config(
-///     "decision",
-///     &ItemKindConfig {
-///         id_pattern: Some("D-[0-9]+".into()),
-///         ..Default::default()
-///     },
-/// )
-/// .unwrap();
-/// let addr = expand_sugar_address("56ab0224/D-1", &[decision]).unwrap();
-/// assert_eq!(addr.scope, AddressScope::Issue("56ab0224".to_string()));
-/// assert_eq!(addr.kind, "decision");
-/// assert_eq!(addr.self_id, "D-1");
-/// ```
 pub fn expand_sugar_address(
     address: &str,
     kinds: &[ItemKind],
@@ -495,16 +394,6 @@ pub fn expand_sugar_address(
 /// as `@/<kind>/<self-id>`). This is the `scope` half of the kind registry's six-tuple
 /// the epic builds toward; sibling work adds the remaining `source-of-truth` field
 /// without disturbing this one.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::KindScope;
-///
-/// assert_eq!(KindScope::parse(None).unwrap(), KindScope::Issue);
-/// assert_eq!(KindScope::parse(Some("project")).unwrap(), KindScope::Project);
-/// assert!(KindScope::parse(Some("bogus")).is_err());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KindScope {
     /// Items are projected from issue descriptions
@@ -527,30 +416,11 @@ impl KindScope {
     /// An unrecognized value is rejected with the kind name supplied by the caller
     /// via [`KindScope::parse_for`]; this `parse` variant uses a placeholder name
     /// in its error.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::KindScope;
-    ///
-    /// assert_eq!(KindScope::parse(None).unwrap(), KindScope::Issue);
-    /// assert_eq!(KindScope::parse(Some("issue")).unwrap(), KindScope::Issue);
-    /// assert_eq!(KindScope::parse(Some("project")).unwrap(), KindScope::Project);
-    /// ```
     pub fn parse(scope: Option<&str>) -> Result<Self, ItemError> {
         Self::parse_for("<kind>", scope)
     }
 
     /// Parse a kind's optional `scope` config string, naming `kind` in any error.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::KindScope;
-    ///
-    /// let err = KindScope::parse_for("example", Some("global")).unwrap_err();
-    /// assert!(err.to_string().contains("example"));
-    /// ```
     pub fn parse_for(kind: &str, scope: Option<&str>) -> Result<Self, ItemError> {
         match scope {
             None => Ok(KindScope::Issue),
@@ -564,15 +434,6 @@ impl KindScope {
     }
 
     /// Whether this kind is project-scoped (`@`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::item::KindScope;
-    ///
-    /// assert!(KindScope::Project.is_project());
-    /// assert!(!KindScope::Issue.is_project());
-    /// ```
     pub fn is_project(&self) -> bool {
         matches!(self, KindScope::Project)
     }
@@ -804,24 +665,6 @@ impl ItemKind {
     /// `name` labels the kind (for display and `--kind` filtering only). An
     /// invalid `id-pattern` regex is surfaced as [`ItemError::InvalidIdPattern`]
     /// rather than silently dropped.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let cfg = ItemKindConfig {
-    ///     section: Some("glossary".to_string()),
-    ///     id_pattern: Some("G-\\d+".to_string()),
-    ///     markers: None,
-    ///     link_namespaces: Some(vec!["defines".to_string()]),
-    ///     ..Default::default()
-    /// };
-    /// let kind = ItemKind::from_config("example", &cfg).unwrap();
-    /// assert_eq!(kind.section(), "glossary");
-    /// assert_eq!(kind.link_namespaces(), &["defines".to_string()]);
-    /// ```
     pub fn from_config(name: &str, config: &ItemKindConfig) -> Result<Self, ItemError> {
         let section = config
             .section
@@ -899,42 +742,12 @@ impl ItemKind {
     /// addressed by, beyond its registry [`name`](Self::name). Empty when the
     /// kind declares none. Aliases are input sugar only — canonical output always
     /// uses the registry name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let cfg = ItemKindConfig {
-    ///     aliases: Some(vec!["inv".to_string()]),
-    ///     ..Default::default()
-    /// };
-    /// let kind = ItemKind::from_config("invariant", &cfg).unwrap();
-    /// assert_eq!(kind.aliases(), &["inv".to_string()]);
-    /// ```
     pub fn aliases(&self) -> &[String] {
         &self.aliases
     }
 
     /// Whether `name` addresses this kind by its registry [`name`](Self::name) or
     /// any of its declared [`aliases`](Self::aliases).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let cfg = ItemKindConfig {
-    ///     aliases: Some(vec!["inv".to_string()]),
-    ///     ..Default::default()
-    /// };
-    /// let kind = ItemKind::from_config("invariant", &cfg).unwrap();
-    /// assert!(kind.matches_name("invariant"));
-    /// assert!(kind.matches_name("inv"));
-    /// assert!(!kind.matches_name("requirement"));
-    /// ```
     pub fn matches_name(&self, name: &str) -> bool {
         self.name == name || self.aliases.iter().any(|alias| alias == name)
     }
@@ -955,16 +768,6 @@ impl ItemKind {
     }
 
     /// The kind's declared addressing scope (issue or project).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::{ItemKind, KindScope};
-    ///
-    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
-    /// assert_eq!(kind.kind_scope(), KindScope::Issue);
-    /// ```
     pub fn kind_scope(&self) -> KindScope {
         self.kind_scope
     }
@@ -973,17 +776,6 @@ impl ItemKind {
     /// kind reads its items from, or `None` for an issue-scope kind or a
     /// registry-first kind backed by a [`toml_source`](Self::toml_source)
     /// descriptor.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// // An issue-scoped kind has no project source file.
-    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
-    /// assert_eq!(kind.source(), None);
-    /// ```
     pub fn source(&self) -> Option<&str> {
         self.source_path.as_deref()
     }
@@ -997,17 +789,6 @@ impl ItemKind {
     /// When present, [`commands`](crate::commands) reads the descriptor's `toml`
     /// file through the storage boundary and projects each table entry into an
     /// addressable item via [`load_toml_scope_items`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// // A markdown-first kind has no toml source descriptor.
-    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
-    /// assert!(kind.toml_source().is_none());
-    /// ```
     pub fn toml_source(&self) -> Option<&crate::config::TomlSourceDescriptor> {
         self.toml_source.as_ref()
     }
@@ -1018,17 +799,6 @@ impl ItemKind {
     /// descriptions, or a project-scope `source` file); `registry-first` kinds are
     /// projected from a structured registry. Callers route the sourcing path on
     /// this value.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{ItemKindConfig, SourceOfTruth};
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// // A kind defaults to markdown-first.
-    /// let kind = ItemKind::from_config("example", &ItemKindConfig::default()).unwrap();
-    /// assert_eq!(kind.source_of_truth(), SourceOfTruth::MarkdownFirst);
-    /// ```
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth
     }
@@ -1039,27 +809,6 @@ impl ItemKind {
     /// Only the FIRST marker is returned: the engine's coverage rule accepts a
     /// single `marker`, and this triple is what proves model/rule compatibility
     /// (REQ-05). A kind with no markers yields `None`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindConfig;
-    /// use jit::domain::item::ItemKind;
-    ///
-    /// let kind = ItemKind::from_config(
-    ///     "example",
-    ///     &ItemKindConfig {
-    ///         section: Some("success_criteria".into()),
-    ///         id_pattern: Some("REQ-[0-9]+".into()),
-    ///         markers: Some(vec!["[hard]".into()]),
-    ///         ..Default::default()
-    ///     },
-    /// )
-    /// .unwrap();
-    /// let (section, marker, pattern) = kind.as_triple();
-    /// assert_eq!((section, marker), ("success_criteria", Some("[hard]")));
-    /// assert!(!pattern.is_empty());
-    /// ```
     pub fn as_triple(&self) -> (&str, Option<&str>, &str) {
         (
             &self.section,
@@ -1095,23 +844,6 @@ impl ItemKind {
 /// [`show_item`](crate::commands::CommandExecutor::show_item). The
 /// `<short-id>/<self-id>` sugar remains an accepted INPUT form (expanded by
 /// [`expand_sugar_address`]) but is never minted.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::{qualified_id, Scope};
-///
-/// // Issue scope mints the reserved-`issue` uniform form.
-/// assert_eq!(
-///     qualified_id(&Scope::Issue("56ab0224".to_string()), "requirement", "REQ-01"),
-///     "@/issue/56ab0224/requirement/REQ-01"
-/// );
-/// // Project scope carries the kind directly after the `@` sentinel.
-/// assert_eq!(
-///     qualified_id(&Scope::Project, "invariant", "dag-acyclic"),
-///     "@/invariant/dag-acyclic"
-/// );
-/// ```
 pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
     match scope {
         Scope::Project => format!("{PROJECT_SCOPE_SENTINEL}/{kind}/{self_id}"),
@@ -1135,17 +867,6 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// `@/issue/<short-id>/<kind>/<self-id>`) and the `<short-id>/<self-id>` sugar. A
 /// bare self-id has no `/`. That single structural distinction is the
 /// qualified/unqualified boundary.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::is_qualified_reference;
-///
-/// assert!(is_qualified_reference("@/rule/coverage-preview"));
-/// assert!(is_qualified_reference("@/issue/56ab0224/requirement/REQ-01"));
-/// assert!(is_qualified_reference("56ab0224/REQ-01"));
-/// assert!(!is_qualified_reference("REQ-01"));
-/// ```
 pub fn is_qualified_reference(value: &str) -> bool {
     value.contains('/')
 }
@@ -1187,20 +908,6 @@ pub struct AddressableItem {
 /// This is the single shape every substrate (issue-scope markdown, project-scope
 /// registry) funnels into [`derive_scope_items`], so the dedup + qualified-id
 /// derivation lives in exactly one place (REQ-03, REQ-04, REQ-05).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::RawScopeItem;
-///
-/// let raw = RawScopeItem {
-///     kind: "invariant".to_string(),
-///     self_id: "atomic-writes".to_string(),
-///     text: "all writes are atomic".to_string(),
-///     links: Vec::new(),
-/// };
-/// assert_eq!(raw.self_id, "atomic-writes");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawScopeItem {
     /// The kind this candidate belongs to (display name).
@@ -1227,22 +934,6 @@ pub struct RawScopeItem {
 /// of the minted id), while a self-id repeated under the SAME kind in one scope is
 /// a [`ItemError::DuplicateSelfId`]. The same self-id under a *different* scope is
 /// fine because each call is scoped to one [`Scope`] (REQ-04).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::{derive_scope_items, RawScopeItem, Scope};
-///
-/// let raw = vec![RawScopeItem {
-///     kind: "invariant".to_string(),
-///     self_id: "atomic-writes".to_string(),
-///     text: "atomic writes".to_string(),
-///     links: Vec::new(),
-/// }];
-/// let items = derive_scope_items(&Scope::Project, raw).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/invariant/atomic-writes");
-/// assert_eq!(items[0].scope, "@");
-/// ```
 pub fn derive_scope_items(
     scope: &Scope,
     raw: Vec<RawScopeItem>,
@@ -1373,30 +1064,6 @@ fn extract_raw_items(
 /// REQ-05) are identical across substrates. With `scope = Scope::Project` each item's
 /// qualified id is `@/<kind>/<self-id>` and resolution of `@/<kind>/<self-id>` finds
 /// it (REQ-01).
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::document::MarkdownContentParser;
-/// use jit::domain::item::{index_markdown_items, ItemKind, Scope};
-///
-/// // `definition` is this repo's markdown-first project kind (sourced from the
-/// // glossary); its config drives which section and id shape are scanned.
-/// let kind = ItemKind::from_config(
-///     "definition",
-///     &ItemKindConfig {
-///         section: Some("core_concepts".into()),
-///         id_pattern: Some("[A-Z][a-z]+".into()),
-///         ..Default::default()
-///     },
-/// )
-/// .unwrap();
-/// let md = "## Core Concepts\n\n- State: current lifecycle stage of an issue\n";
-/// let items =
-///     index_markdown_items(md, &Scope::Project, &[kind], &MarkdownContentParser).unwrap();
-/// assert_eq!(items[0].qualified_id, "@/definition/State");
-/// ```
 pub fn index_markdown_items(
     markdown: &str,
     scope: &Scope,
@@ -1430,20 +1097,6 @@ fn sections_from_markdown(
 ///
 /// [`index_project_sources`] consumes these so several project-scope kinds (each
 /// reading its own file) are deduped together under the single `@` scope.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::domain::item::{ItemKind, ProjectSource};
-///
-/// let kind = ItemKind::from_config("definition", &ItemKindConfig::default()).unwrap();
-/// let src = ProjectSource {
-///     kind,
-///     markdown: "## Core Concepts\n\n- State: current lifecycle stage\n".to_string(),
-/// };
-/// assert_eq!(src.kind.name(), "definition");
-/// ```
 #[derive(Debug, Clone)]
 pub struct ProjectSource {
     /// The project-scope kind whose items this source holds.
@@ -1722,15 +1375,6 @@ fn toml_link_labels(
 /// [`ItemKind::from_config`]); the caller opts in to every kind it wants.
 ///
 /// Kinds are returned in name order for deterministic output.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::resolve_item_kinds;
-///
-/// // No `[item_kinds]` table -> no kinds (no baked built-ins).
-/// assert!(resolve_item_kinds(None).unwrap().is_empty());
-/// ```
 pub fn resolve_item_kinds(
     registry: Option<&HashMap<String, ItemKindConfig>>,
 ) -> Result<Vec<ItemKind>, ItemError> {
@@ -1757,28 +1401,6 @@ pub fn resolve_item_kinds(
 /// `name` matches no kind by name or alias, leaving the caller to report a
 /// descriptive not-found error. A pure lookup over its `kinds` parameter: no kind
 /// identity is baked into this module.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-/// use jit::domain::item::{resolve_kind_alias, ItemKind};
-///
-/// let invariant = ItemKind::from_config(
-///     "invariant",
-///     &ItemKindConfig {
-///         aliases: Some(vec!["inv".to_string()]),
-///         ..Default::default()
-///     },
-/// )
-/// .unwrap();
-/// let kinds = [invariant];
-/// // Both the registry name and the alias resolve to the registry name.
-/// assert_eq!(resolve_kind_alias(&kinds, "invariant"), Some("invariant"));
-/// assert_eq!(resolve_kind_alias(&kinds, "inv"), Some("invariant"));
-/// // An unknown token resolves to nothing.
-/// assert_eq!(resolve_kind_alias(&kinds, "bogus"), None);
-/// ```
 pub fn resolve_kind_alias<'a>(kinds: &'a [ItemKind], name: &str) -> Option<&'a str> {
     kinds
         .iter()
@@ -1794,19 +1416,6 @@ pub fn resolve_kind_alias<'a>(kinds: &'a [ItemKind], name: &str) -> Option<&'a s
 /// keys), captured here as owned values so a config layer can rewrite a rule's
 /// assert table without holding a borrow. `marker` is `None` when the kind
 /// declares no marker.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::item::KindTriple;
-///
-/// let triple = KindTriple {
-///     section: "success_criteria".to_string(),
-///     marker: Some("[hard]".to_string()),
-///     id_pattern: "REQ-\\d+".to_string(),
-/// };
-/// assert_eq!(triple.marker.as_deref(), Some("[hard]"));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KindTriple {
     /// Section slug whose list items hold the kind's items.

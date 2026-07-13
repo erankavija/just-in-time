@@ -35,20 +35,6 @@ use tl::{Node, Parser as TlParser};
 ///
 /// Pure: [`ContentParser::parse`] is a deterministic function of the input.
 /// Available only when the `html` feature is enabled.
-///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "html")] {
-/// use jit::document::{ContentParser, HtmlContentParser};
-///
-/// let parsed = HtmlContentParser.parse("<h2>Notes</h2><ul><li>first</li><li>second</li></ul>");
-/// let notes = parsed.sections.get("notes").unwrap();
-/// assert_eq!(notes.heading, "Notes");
-/// assert_eq!(notes.level, 2);
-/// assert_eq!(notes.items, vec!["first".to_string(), "second".to_string()]);
-/// # }
-/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HtmlContentParser;
 

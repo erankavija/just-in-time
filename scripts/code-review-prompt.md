@@ -47,6 +47,13 @@ Executable CI or validation gate evidence may support a blocking finding when it
 
 Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists.
 
+Do not require a `# Examples` section merely because an API is public. Apply the
+repository's non-obvious-only standard: an example is warranted when it teaches
+a meaningful workflow or clarifies a material contract that prose and focused
+tests do not already make clear. Treat repetitive examples for straightforward
+accessors, constants, constructors, predicates, and direct field mappings as
+avoidable documentation and CI burden, not as missing-coverage remedies.
+
 If `run_history` is non-empty, use its one latest run: structured findings, verdict, and metadata are authoritative; stdout exists only as a compatibility fallback for an unstructured legacy run. Verify that prior blocking findings have been addressed.
 
 ## Finding and verdict policy

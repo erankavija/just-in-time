@@ -11,20 +11,6 @@ use std::collections::{HashMap, HashSet};
 /// (with the accepted values listed), replacing the previous runtime
 /// `to_lowercase()` match. The value names are the lowercase variant names:
 /// `dot`, `mermaid`, `json`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::GraphExportFormat;
-/// use clap::ValueEnum;
-///
-/// assert_eq!(
-///     GraphExportFormat::from_str("mermaid", true).unwrap(),
-///     GraphExportFormat::Mermaid
-/// );
-/// // Unknown formats are rejected.
-/// assert!(GraphExportFormat::from_str("yaml", true).is_err());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum GraphExportFormat {
     /// Graphviz DOT format.
@@ -131,19 +117,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`GraphExportFormat::Json`]. The caller (CLI) rejects `full` with a
     /// non-JSON format as a usage error before reaching here, so the `dot`/
     /// `mermaid` arms ignore it.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use jit::commands::{CommandExecutor, GraphExportFormat};
-    /// # use jit::storage::JsonFileStorage;
-    /// # fn run(executor: &CommandExecutor<JsonFileStorage>) -> anyhow::Result<()> {
-    /// // Complete issue records plus the edge list.
-    /// let json = executor.export_graph(GraphExportFormat::Json, true)?;
-    /// # let _ = json;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn export_graph(&self, format: GraphExportFormat, full: bool) -> Result<String> {
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();

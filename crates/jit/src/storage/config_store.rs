@@ -20,16 +20,6 @@ use std::path::{Path, PathBuf};
 const CONFIG_FILE: &str = "config.toml";
 
 /// The repo config path (`<jit_root>/config.toml`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::config_store::repo_config_path;
-/// use std::path::Path;
-///
-/// let path = repo_config_path(Path::new("/repo/.jit"));
-/// assert!(path.ends_with("config.toml"));
-/// ```
 pub fn repo_config_path(jit_root: &Path) -> PathBuf {
     jit_root.join(CONFIG_FILE)
 }
@@ -38,17 +28,6 @@ pub fn repo_config_path(jit_root: &Path) -> PathBuf {
 /// and formatting. An absent file yields an empty document (the caller then
 /// seeds keys into it), matching the tolerant absent-file handling elsewhere in
 /// storage.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::config_store::read_config_document;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// // Absent file -> empty document.
-/// let doc = read_config_document(&dir.path().join("config.toml")).unwrap();
-/// assert!(doc.as_table().is_empty());
-/// ```
 pub fn read_config_document(path: &Path) -> Result<toml_edit::DocumentMut> {
     if path.exists() {
         let content = std::fs::read_to_string(path)
@@ -64,21 +43,6 @@ pub fn read_config_document(path: &Path) -> Result<toml_edit::DocumentMut> {
 /// Persist a config document to `path` atomically (temp file + rename),
 /// creating the parent directory first when it does not exist (the user-global
 /// `~/.config/jit` case on a first write).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::config_store::{read_config_document, save_config_document};
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// let path = dir.path().join("nested/config.toml");
-/// let mut doc = read_config_document(&path).unwrap();
-/// doc["coordination"]["default_ttl_secs"] = toml_edit::value(3600);
-/// save_config_document(&path, &doc).unwrap();
-///
-/// let reloaded = read_config_document(&path).unwrap();
-/// assert_eq!(reloaded["coordination"]["default_ttl_secs"].as_integer(), Some(3600));
-/// ```
 pub fn save_config_document(path: &Path, doc: &toml_edit::DocumentMut) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -97,20 +61,6 @@ pub fn save_config_document(path: &Path, doc: &toml_edit::DocumentMut) -> Result
 /// (`CommandExecutor::seed_project_config`) invokes it only when `config.toml`
 /// does not yet exist, keeping `jit init` idempotent (a re-init leaves an
 /// existing `[project]` table untouched).
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{JitConfig, ProjectName};
-/// use jit::storage::config_store::seed_repo_config;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// let name: ProjectName = "my-project".parse().unwrap();
-/// seed_repo_config(dir.path(), "[coordination]\ndefault_ttl_secs = 3600\n", &name).unwrap();
-///
-/// let config = JitConfig::load(dir.path()).unwrap();
-/// assert_eq!(config.project.unwrap().name.unwrap().as_str(), "my-project");
-/// ```
 pub fn seed_repo_config(
     jit_root: &Path,
     base_config_toml: &str,

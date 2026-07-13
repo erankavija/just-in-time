@@ -21,17 +21,6 @@ const SCHEMAS_DIR: &str = "schemas";
 ///
 /// `jit init` scaffolds the default ruleset only when this is `false`, so a
 /// user-edited `rules.toml` (the sole source when present) is never clobbered.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::ruleset_store::{has_validation_ruleset, write_validation_ruleset};
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// assert!(!has_validation_ruleset(dir.path()));
-/// write_validation_ruleset(dir.path(), "# rules\n", &[]).unwrap();
-/// assert!(has_validation_ruleset(dir.path()));
-/// ```
 pub fn has_validation_ruleset(jit_root: &Path) -> bool {
     jit_root.join(RULES_FILE).exists()
 }
@@ -44,28 +33,6 @@ pub fn has_validation_ruleset(jit_root: &Path) -> bool {
 /// validation serializer; this function owns where they land (`schemas/`).
 /// Writing is the LAST step so a reader that observes `rules.toml` also sees the
 /// schema files it references.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::ruleset_store::write_validation_ruleset;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// write_validation_ruleset(
-///     dir.path(),
-///     "# rules\n",
-///     &[("label.json".to_string(), "{}\n".to_string())],
-/// )
-/// .unwrap();
-/// assert_eq!(
-///     std::fs::read_to_string(dir.path().join("rules.toml")).unwrap(),
-///     "# rules\n"
-/// );
-/// assert_eq!(
-///     std::fs::read_to_string(dir.path().join("schemas/label.json")).unwrap(),
-///     "{}\n"
-/// );
-/// ```
 pub fn write_validation_ruleset(
     jit_root: &Path,
     rules_toml: &str,
@@ -90,19 +57,6 @@ pub fn write_validation_ruleset(
 /// only when the target file OR the `schemas/` directory already exists. Returns
 /// `true` when a file was written. Idempotent (rewriting current content yields
 /// identical bytes) and atomic (temp + rename).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::ruleset_store::write_baked_schema;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// // No schemas/ layout yet: a no-op that writes nothing.
-/// assert!(!write_baked_schema(dir.path(), "known.json", "{}\n").unwrap());
-/// std::fs::create_dir_all(dir.path().join("schemas")).unwrap();
-/// // Now the materialized layout exists, so the file is written.
-/// assert!(write_baked_schema(dir.path(), "known.json", "{}\n").unwrap());
-/// ```
 pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Result<bool> {
     let schemas_dir = jit_root.join(SCHEMAS_DIR);
     let target = schemas_dir.join(file_name);

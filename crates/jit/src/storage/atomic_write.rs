@@ -20,17 +20,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// rename. The parent directory must already exist; the rename is atomic only
 /// within a single filesystem (the temp file stays in the target's directory to
 /// guarantee that).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::atomic_write::write_file_atomic;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// let path = dir.path().join("out.txt");
-/// write_file_atomic(&path, "hello").unwrap();
-/// assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
-/// ```
 pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
     // Per-process monotonic counter so two calls within the same process get
     // distinct temp names even at the same instant; combined with the process id

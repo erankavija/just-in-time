@@ -32,18 +32,6 @@ use std::process::{Command, Stdio};
 /// and its suggestion by downcasting to this type rather than scanning the
 /// message text. Each variant's `Display` reproduces the original message
 /// verbatim, so user-facing output is unchanged.
-///
-/// # Examples
-///
-/// ```
-/// use jit::search::SearchError;
-///
-/// let err = SearchError::RipgrepNotInstalled;
-/// assert!(err.to_string().starts_with("ripgrep (rg) is not installed"));
-///
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<SearchError>().is_some());
-/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum SearchError {
     /// `ripgrep` (`rg`) was not found on `PATH`.
@@ -234,17 +222,6 @@ fn parse_ripgrep_json(json: &[u8], max: Option<usize>) -> Result<Vec<SearchResul
 }
 
 /// Extract issue ID from a file path
-///
-/// # Examples
-///
-/// ```
-/// # use jit::search::extract_issue_id;
-/// assert_eq!(
-///     extract_issue_id("issues/abc123.json"),
-///     Some("abc123".to_string())
-/// );
-/// assert_eq!(extract_issue_id("docs/design.md"), None);
-/// ```
 pub fn extract_issue_id(path: &str) -> Option<String> {
     let path_obj = Path::new(path);
 

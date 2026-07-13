@@ -370,27 +370,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 4. Delegate to `IssueStore::read_path_bytes` with the resolved path and commit.
     ///
     /// Note: Part of public API used by jit-server.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let storage = JsonFileStorage::new(".jit");
-    /// let executor = CommandExecutor::new(storage);
-    ///
-    /// // Read working-tree bytes for a document linked to issue "abc123":
-    /// let (bytes, label) = executor
-    ///     .read_document_bytes("abc123", "docs/spec.md", None)
-    ///     .unwrap();
-    /// assert_eq!(label, "working-tree");
-    ///
-    /// // Read bytes at a specific git commit:
-    /// // let (bytes, hash) = executor
-    /// //     .read_document_bytes("abc123", "docs/spec.md", Some("HEAD"))
-    /// //     .unwrap();
-    /// ```
     #[allow(dead_code)]
     pub fn read_document_bytes(
         &self,
@@ -578,23 +557,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Used by the server's raw document endpoints to serve binary-faithful
     /// content without UTF-8 conversion.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::InMemoryStorage;
-    ///
-    /// let storage = InMemoryStorage::new();
-    /// let executor = CommandExecutor::new(storage);
-    ///
-    /// // Read a file from the working tree:
-    /// let (bytes, commit) = executor.read_path_bytes("/path/to/file.md", None).unwrap();
-    /// assert_eq!(commit, "working-tree");
-    ///
-    /// // Read a file at a specific git commit:
-    /// // let (bytes, short_hash) = executor.read_path_bytes("README.md", Some("HEAD")).unwrap();
-    /// ```
     pub fn read_path_bytes(
         &self,
         path: &str,
@@ -1083,20 +1045,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns (result, warnings) tuple where result contains archival details and
     /// warnings contains any non-fatal issues encountered.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::{ArchiveError, CommandExecutor};
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // Archiving a missing source is a typed no-op error.
-    /// let err = executor
-    ///     .archive_document("dev/active/missing.md", "design", false, false)
-    ///     .unwrap_err();
-    /// assert!(err.downcast_ref::<ArchiveError>().is_some());
-    /// ```
     pub fn archive_document(
         &self,
         path: &str,

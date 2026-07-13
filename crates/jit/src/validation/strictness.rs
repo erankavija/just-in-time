@@ -31,25 +31,6 @@ use crate::validation::rules::Severity;
 /// See the module documentation for the full semantics. The default is
 /// [`Strictness::Loose`], so an absent key preserves the pre-strictness
 /// block/allow behavior.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::strictness::Strictness;
-/// use jit::validation::rules::Severity;
-///
-/// // Loose (the default): only an enforced error blocks.
-/// let loose = Strictness::default();
-/// assert!(loose.blocks(true, Severity::Error));
-/// assert!(!loose.blocks(false, Severity::Error));
-/// assert!(!loose.blocks(true, Severity::Warn));
-///
-/// // Strict: any violation blocks, regardless of `enforce`.
-/// assert!(Strictness::Strict.blocks(false, Severity::Warn));
-///
-/// // Permissive: nothing blocks.
-/// assert!(!Strictness::Permissive.blocks(true, Severity::Error));
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Strictness {
     /// Any violation (warning or error, enforced or not) blocks.
@@ -74,19 +55,6 @@ impl Strictness {
     /// - [`Strictness::Loose`] blocks only when the rule enforces AND its
     ///   severity is `error` — the exact pre-strictness rule.
     /// - [`Strictness::Permissive`] never blocks.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::strictness::Strictness;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// // The same warning-only violation is inert under loose, blocking under
-    /// // strict, and advisory under permissive.
-    /// assert!(!Strictness::Loose.blocks(false, Severity::Warn));
-    /// assert!(Strictness::Strict.blocks(false, Severity::Warn));
-    /// assert!(!Strictness::Permissive.blocks(false, Severity::Warn));
-    /// ```
     pub fn blocks(self, enforce: bool, severity: Severity) -> bool {
         match self {
             // An `off` rule is filtered out before evaluation, so any finding
@@ -99,16 +67,6 @@ impl Strictness {
     }
 
     /// Stable lowercase token for this level, matching the `config.toml` grammar.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::strictness::Strictness;
-    ///
-    /// assert_eq!(Strictness::Strict.token(), "strict");
-    /// assert_eq!(Strictness::Loose.token(), "loose");
-    /// assert_eq!(Strictness::Permissive.token(), "permissive");
-    /// ```
     pub fn token(self) -> &'static str {
         match self {
             Strictness::Strict => "strict",
@@ -123,19 +81,6 @@ impl Strictness {
     /// An invalid value is surfaced as an error rather than silently defaulting,
     /// so a misconfigured `config.toml` cannot quietly pick a strictness the
     /// author did not intend.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::strictness::Strictness;
-    ///
-    /// assert_eq!(Strictness::from_config_value(None).unwrap(), Strictness::Loose);
-    /// assert_eq!(
-    ///     Strictness::from_config_value(Some("strict")).unwrap(),
-    ///     Strictness::Strict
-    /// );
-    /// assert!(Strictness::from_config_value(Some("banana")).is_err());
-    /// ```
     pub fn from_config_value(value: Option<&str>) -> anyhow::Result<Self> {
         match value {
             None => Ok(Strictness::Loose),

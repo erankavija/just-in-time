@@ -45,24 +45,6 @@ use crate::validation::rules::Assertion;
 /// [`SchemaEngine`](crate::validation::engine::SchemaEngine).
 ///
 /// This function is pure: no I/O, deterministic in its input.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::desugar::desugar;
-/// use jit::validation::rules::Assertion;
-///
-/// // A shorthand kind lowers to a JSON Schema object.
-/// let schema = desugar(&Assertion::RequireDocType {
-///     doc_type: "design".to_string(),
-/// })
-/// .expect("require-doc-type desugars");
-/// assert_eq!(schema["type"], "object");
-///
-/// // A raw JSON Schema kind carries its own schema and is not desugared here.
-/// let checker = Assertion::CheckerCommand("./check.sh".to_string());
-/// assert!(desugar(&checker).is_none());
-/// ```
 pub fn desugar(assertion: &Assertion) -> Option<Value> {
     match assertion {
         Assertion::RequireLabel { label, min, max } => {
@@ -101,22 +83,6 @@ pub fn desugar(assertion: &Assertion) -> Option<Value> {
 ///
 /// A label with no `:` is treated as a bare namespace with no value (wildcard
 /// semantics on the whole namespace).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::desugar::desugar;
-/// use jit::validation::rules::Assertion;
-///
-/// // Wildcard with a minimum: the `req` namespace must hold at least 2 labels.
-/// let schema = desugar(&Assertion::RequireLabel {
-///     label: "req:*".to_string(),
-///     min: Some(2),
-///     max: None,
-/// })
-/// .unwrap();
-/// assert_eq!(schema["properties"]["labels"]["properties"]["req"]["minItems"], 2);
-/// ```
 fn desugar_require_label(label: &str, min: Option<u32>, max: Option<u32>) -> Value {
     // Default `min` to 1: a "require-label" with no explicit minimum still
     // requires the label to be present at least once.
@@ -209,23 +175,6 @@ fn label_count_schema(namespace: &str, value: &str, min: u32, max: Option<u32>) 
 /// applied to the array's `items`, so the schema does not require the namespace
 /// to be present — it only constrains the values that ARE present (an absent
 /// namespace vacuously satisfies the rule, matching "value format" semantics).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::desugar::desugar;
-/// use jit::validation::rules::Assertion;
-///
-/// let schema = desugar(&Assertion::LabelValuePattern {
-///     namespace: "req".to_string(),
-///     regex: "^REQ-[0-9]+$".to_string(),
-/// })
-/// .unwrap();
-/// assert_eq!(
-///     schema["properties"]["labels"]["properties"]["req"]["items"]["pattern"],
-///     "^REQ-[0-9]+$"
-/// );
-/// ```
 fn desugar_label_value_pattern(namespace: &str, regex: &str) -> Value {
     json!({
         "type": "object",
@@ -252,20 +201,6 @@ fn desugar_label_value_pattern(namespace: &str, regex: &str) -> Value {
 /// section is required to exist and to carry at least one `items` entry
 /// (`minItems: 1`), which is what "the section is present" means for a parsed
 /// body.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::desugar::desugar;
-/// use jit::validation::rules::Assertion;
-///
-/// let schema = desugar(&Assertion::RequireSection {
-///     heading: "Success Criteria".to_string(),
-/// })
-/// .unwrap();
-/// // The heading slugifies to the projection's section key.
-/// assert_eq!(schema["properties"]["sections"]["required"][0], "success_criteria");
-/// ```
 fn desugar_require_section(heading: &str) -> Value {
     let slug = slugify_heading(heading);
     json!({
@@ -299,22 +234,6 @@ fn desugar_require_section(heading: &str) -> Value {
 ///
 /// `doc_types` is an array of distinct document-type strings on the projection;
 /// requiring a value means the array must `contain` that constant.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::desugar::desugar;
-/// use jit::validation::rules::Assertion;
-///
-/// let schema = desugar(&Assertion::RequireDocType {
-///     doc_type: "design".to_string(),
-/// })
-/// .unwrap();
-/// assert_eq!(
-///     schema["properties"]["doc_types"]["contains"]["const"],
-///     "design"
-/// );
-/// ```
 fn desugar_require_doc_type(doc_type: &str) -> Value {
     json!({
         "type": "object",

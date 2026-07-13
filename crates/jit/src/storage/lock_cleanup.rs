@@ -64,19 +64,6 @@ pub fn process_exists(_pid: u32) -> bool {
 /// # Errors
 ///
 /// Returns error if lock directory cannot be read
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::storage::lock_cleanup::cleanup_stale_locks;
-/// use std::path::Path;
-///
-/// let warnings = cleanup_stale_locks(Path::new(".jit/locks"))?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn cleanup_stale_locks(lock_dir: &Path) -> Result<Vec<StorageWarning>> {
     use crate::storage::lock::LockMetadata;
     use chrono::Utc;

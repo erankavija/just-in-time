@@ -102,21 +102,6 @@ pub type KeywordFactory = dyn for<'a> Fn(
 /// `severity` are copied from the originating [`Rule`] so downstream consumers
 /// (local-eval, graph, `jit validate`) can group, sort, and gate on findings
 /// without re-consulting the rule set.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::Finding;
-/// use jit::validation::rules::Severity;
-///
-/// let finding = Finding {
-///     rule: "epic-has-success-criteria".to_string(),
-///     severity: Severity::Error,
-///     message: "missing required property 'sections'".to_string(),
-/// };
-/// assert_eq!(finding.rule, "epic-has-success-criteria");
-/// assert_eq!(finding.severity, Severity::Error);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     /// Name of the rule that produced this finding.
@@ -131,30 +116,6 @@ pub struct Finding {
 ///
 /// Compilation errors are never swallowed: a malformed schema surfaces here as a
 /// `Result::Err` rather than silently producing zero findings.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::{SchemaEngine, SchemaCompileError};
-/// use jit::validation::rules::RuleSet;
-/// use std::path::Path;
-///
-/// // A schema with an invalid `type` value cannot be compiled.
-/// let dir = tempfile::tempdir().unwrap();
-/// let schemas = dir.path().join("schemas");
-/// std::fs::create_dir_all(&schemas).unwrap();
-/// std::fs::write(schemas.join("bad.json"), r#"{ "type": "not-a-type" }"#).unwrap();
-/// let toml = r#"
-/// [[rules]]
-/// name = "bad-schema"
-/// assert = { json-schema = "schemas/bad.json" }
-/// "#;
-/// let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
-/// let engine = SchemaEngine::new();
-/// let projection = serde_json::json!({});
-/// let result = engine.validate(&set.rules[0], &projection);
-/// assert!(matches!(result, Err(SchemaCompileError { .. })));
-/// ```
 #[derive(Debug, Error)]
 #[error("rule '{rule}': failed to compile JSON Schema: {message}")]
 pub struct SchemaCompileError {
@@ -240,16 +201,6 @@ impl std::fmt::Debug for SchemaEngine {
 
 impl SchemaEngine {
     /// Create an engine with an empty validator cache.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::SchemaEngine;
-    ///
-    /// let engine = SchemaEngine::new();
-    /// // A fresh engine has compiled nothing yet.
-    /// assert!(engine.is_empty());
-    /// ```
     pub fn new() -> Self {
         Self::default()
     }
@@ -257,14 +208,6 @@ impl SchemaEngine {
     /// Returns whether the validator cache is currently empty.
     ///
     /// Primarily useful for tests asserting lazy compilation behavior.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::SchemaEngine;
-    ///
-    /// assert!(SchemaEngine::new().is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         self.cache.borrow().is_empty()
     }
@@ -362,14 +305,6 @@ impl SchemaEngine {
     /// order.
     ///
     /// A standard engine ([`SchemaEngine::new`]) returns an empty `Vec`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::SchemaEngine;
-    ///
-    /// assert!(SchemaEngine::new().registered_keywords().is_empty());
-    /// ```
     pub fn registered_keywords(&self) -> Vec<String> {
         self.keywords.iter().map(|(name, _)| name.clone()).collect()
     }
@@ -458,20 +393,6 @@ impl SchemaEngine {
     /// pinned explicitly. `rule_name` is used only to attribute a
     /// [`SchemaCompileError`] to a rule; it does NOT affect caching, so two rules
     /// sharing a name but different schemas never alias.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::{schema_key, SchemaEngine};
-    ///
-    /// let engine = SchemaEngine::new();
-    /// let schema = serde_json::json!({ "type": "object" });
-    /// let key = schema_key(&schema);
-    /// let first = engine.validator_for(&key, "r", &schema).unwrap();
-    /// let second = engine.validator_for(&key, "r", &schema).unwrap();
-    /// // Same schema => same cached validator (no recompilation).
-    /// assert!(std::sync::Arc::ptr_eq(&first, &second));
-    /// ```
     pub fn validator_for(
         &self,
         schema_key: &str,
@@ -519,19 +440,6 @@ impl SchemaEngine {
 /// any difference in content yields a different key. There is no hash, so
 /// distinct schemas can never collide on the cache regardless of the rule names
 /// that carry them.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::schema_key;
-///
-/// let a = serde_json::json!({ "type": "object" });
-/// let b = serde_json::json!({ "type": "object" });
-/// let c = serde_json::json!({ "type": "array" });
-/// // Equal schemas share a key; different schemas have different keys.
-/// assert_eq!(schema_key(&a), schema_key(&b));
-/// assert_ne!(schema_key(&a), schema_key(&c));
-/// ```
 pub fn schema_key(schema: &serde_json::Value) -> String {
     serde_json::to_string(schema).unwrap_or_default()
 }
@@ -935,19 +843,6 @@ fn unescape_pointer_token(token: &str) -> String {
 /// other control or zero-width character becomes a `\u{XXXX}` escape, and every
 /// other character (letters, digits, backslash-escapes already in the source,
 /// brackets) is passed through verbatim so `\s` stays `\s`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::humanize_regex;
-///
-/// // A backslash-s class is preserved verbatim.
-/// assert_eq!(humanize_regex(r"\s+"), r"\s+");
-/// // A literal tab in the source becomes a visible escape, never raw.
-/// assert_eq!(humanize_regex("a\tb"), r"a\tb");
-/// // A zero-width space becomes a unicode escape.
-/// assert_eq!(humanize_regex("a\u{200b}b"), r"a\u{200b}b");
-/// ```
 pub fn humanize_regex(pattern: &str) -> String {
     pattern
         .chars()

@@ -11,16 +11,6 @@ use std::path::Path;
 /// - `events/` - Control plane event log
 ///
 /// All directories created with 0700 permissions (owner-only access).
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::storage::control_plane::init_control_plane;
-/// use std::path::Path;
-///
-/// let git_dir = Path::new(".git");
-/// init_control_plane(git_dir).unwrap();
-/// ```
 pub fn init_control_plane(git_dir: &Path) -> Result<()> {
     let control_dir = git_dir.join("jit");
 

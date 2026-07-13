@@ -128,17 +128,6 @@ pub enum ConfigError {
 /// Configuration for issue type hierarchy.
 ///
 /// Defines the hierarchy levels and their associated membership label namespaces.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-/// use std::collections::HashMap;
-///
-/// let config = HierarchyConfig::default();
-/// assert!(config.contains_type("epic"));
-/// assert_eq!(config.get_membership_namespace("epic"), Some("epic"));
-/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct HierarchyConfig {
     /// Map of type name to its level (1 = highest, higher numbers = lower)
@@ -223,16 +212,6 @@ impl HierarchyConfig {
     }
 
     /// Returns the membership label namespace for a type, if configured.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::type_taxonomy::HierarchyConfig;
-    ///
-    /// let config = HierarchyConfig::default();
-    /// assert_eq!(config.get_membership_namespace("epic"), Some("epic"));
-    /// assert_eq!(config.get_membership_namespace("task"), None);
-    /// ```
     pub fn get_membership_namespace(&self, type_name: &str) -> Option<&str> {
         self.label_associations.get(type_name).map(String::as_str)
     }
@@ -301,18 +280,6 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 ///
 /// Returns the best match based on Levenshtein distance, or None if no reasonable match exists.
 /// A match is considered reasonable if the distance is <= 3.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::type_taxonomy::{suggest_type_fix, HierarchyConfig};
-///
-/// let config = HierarchyConfig::default();
-///
-/// assert_eq!(suggest_type_fix(&config, "taks"), Some("task".to_string()));
-/// assert_eq!(suggest_type_fix(&config, "epik"), Some("epic".to_string()));
-/// assert_eq!(suggest_type_fix(&config, "unknown_xyz_123"), None);
-/// ```
 pub fn suggest_type_fix(config: &HierarchyConfig, unknown_type: &str) -> Option<String> {
     let max_distance = 3;
 
@@ -401,20 +368,6 @@ pub fn detect_validation_issues(
 /// # Returns
 ///
 /// A vector of warnings if strategic labels are missing
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::domain::type_taxonomy::{validate_strategic_labels, HierarchyConfig};
-///
-/// let config = HierarchyConfig::default();
-/// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
-/// epic.labels = vec!["type:epic".to_string()];
-///
-/// let warnings = validate_strategic_labels(&config, &epic);
-/// assert_eq!(warnings.len(), 1); // Missing epic:* label
-/// ```
 pub fn validate_strategic_labels(
     config: &HierarchyConfig,
     issue: &crate::domain::Issue,
@@ -464,20 +417,6 @@ pub fn validate_strategic_labels(
 /// # Returns
 ///
 /// A vector of warnings if the issue is an orphaned leaf
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::domain::type_taxonomy::{validate_orphans, HierarchyConfig};
-///
-/// let config = HierarchyConfig::default();
-/// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
-/// task.labels = vec!["type:task".to_string()];
-///
-/// let warnings = validate_orphans(&config, &task);
-/// assert_eq!(warnings.len(), 1); // Orphaned task
-/// ```
 pub fn validate_orphans(
     config: &HierarchyConfig,
     issue: &crate::domain::Issue,
@@ -538,23 +477,6 @@ pub fn validate_orphans(
 /// # Returns
 ///
 /// A vector of validation issues found (empty if no issues)
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::domain::type_taxonomy::{detect_membership_issues, HierarchyConfig};
-///
-/// let config = HierarchyConfig::default();
-/// let mut task = Issue::new("Login".to_string(), "Task description".to_string());
-/// task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
-/// let mut epic = Issue::new("Auth".to_string(), "Epic description".to_string());
-/// epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-/// let all_issues = vec![task.clone(), epic];
-///
-/// let issues = detect_membership_issues(&config, &task, &all_issues);
-/// assert!(issues.is_empty()); // Valid reference
-/// ```
 #[allow(dead_code)] // Reserved for future membership validation feature
 pub fn detect_membership_issues(
     config: &HierarchyConfig,

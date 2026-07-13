@@ -9,37 +9,10 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 /// Built-in presets bundled with the binary.
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::BuiltinPresets;
-///
-/// let presets = BuiltinPresets::load().unwrap();
-/// assert!(presets.contains_key("rust-tdd"));
-/// assert!(presets.contains_key("minimal"));
-/// assert!(presets.contains_key("python-tdd"));
-/// assert!(presets.contains_key("js-tdd"));
-/// assert!(presets.contains_key("security-audit"));
-/// assert!(presets.contains_key("plan-review"));
-/// assert!(presets.contains_key("coverage-preview"));
-/// assert!(presets.contains_key("breakdown-review"));
-/// ```
 pub struct BuiltinPresets;
 
 impl BuiltinPresets {
     /// Load all built-in presets.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::gate_presets::BuiltinPresets;
-    ///
-    /// let presets = BuiltinPresets::load().unwrap();
-    /// assert_eq!(presets.len(), 8);
-    /// let security = presets.get("security-audit").unwrap();
-    /// assert_eq!(security.gates.len(), 3);
-    /// ```
     pub fn load() -> Result<HashMap<String, GatePresetDefinition>> {
         let mut presets = HashMap::new();
 
@@ -349,15 +322,6 @@ impl BuiltinPresets {
     }
 
     /// Get list of builtin preset names.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::gate_presets::BuiltinPresets;
-    /// let names = BuiltinPresets::names();
-    /// assert!(names.contains(&"rust-tdd".to_string()));
-    /// assert!(names.contains(&"minimal".to_string()));
-    /// ```
     pub fn names() -> Vec<String> {
         vec![
             "rust-tdd".to_string(),

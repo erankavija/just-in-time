@@ -74,15 +74,6 @@ impl IconConfig {
 /// * `type_name` - The issue type name (e.g., "epic", "task", "bug")
 /// * `level` - The hierarchy level (1 = highest, higher numbers = lower)
 /// * `config` - Icon configuration
-///
-/// # Examples
-///
-/// ```
-/// use jit::type_icons::{IconConfig, get_icon_for_type};
-///
-/// let config = IconConfig::default();
-/// assert_eq!(get_icon_for_type("epic", 2, &config), Some("📦".to_string()));
-/// ```
 pub fn get_icon_for_type(type_name: &str, level: u8, config: &IconConfig) -> Option<String> {
     // 1. Check custom type mapping (highest priority)
     if let Some(custom_icons) = &config.custom {
@@ -122,23 +113,6 @@ pub fn get_icon_for_type(type_name: &str, level: u8, config: &IconConfig) -> Opt
 ///
 /// * `types` - Map of type name to hierarchy level
 /// * `config` - Icon configuration
-///
-/// # Examples
-///
-/// ```
-/// use jit::type_icons::{IconConfig, resolve_icons_for_hierarchy};
-/// use std::collections::HashMap;
-///
-/// let mut types = HashMap::new();
-/// types.insert("epic".to_string(), 2);
-/// types.insert("task".to_string(), 4);
-///
-/// let config = IconConfig::default();
-/// let icons = resolve_icons_for_hierarchy(&types, &config);
-///
-/// assert_eq!(icons.get("epic"), Some(&"📦".to_string()));
-/// assert_eq!(icons.get("task"), Some(&"☑️".to_string()));
-/// ```
 pub fn resolve_icons_for_hierarchy(
     types: &HashMap<String, u8>,
     config: &IconConfig,

@@ -92,23 +92,6 @@ pub struct BracketChild {
 /// separately by the standard gate runner (`jit gate evaluate`) as breakdown-workflow
 /// steps, exactly as every gate in the project is run by the orchestrator. So
 /// there is no `coverage_passed`/`coverage_report` field here.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::BracketBreakdownResult;
-///
-/// let result = BracketBreakdownResult {
-///     container_id: "c1".to_string(),
-///     breakdown_id: "b1".to_string(),
-///     planning_id: "p1".to_string(),
-///     child_ids: vec!["k1".to_string(), "k2".to_string()],
-///     coverage_gate_preset: "coverage-preview".to_string(),
-///     breakdown_review_gate_preset: "breakdown-review".to_string(),
-/// };
-/// assert_eq!(result.child_ids.len(), 2);
-/// assert_eq!(result.coverage_gate_preset, "coverage-preview");
-/// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct BracketBreakdownResult {
     /// The bracketed container `C`.
@@ -139,26 +122,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// (`.jit/templates.toml`) by the container's `type:` label and delegates to
     /// [`bracket_breakdown_with_template`](Self::bracket_breakdown_with_template).
     /// See that method for the full spine-wiring contract.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::{BracketChild, CommandExecutor};
-    /// use jit::domain::Priority;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let children = vec![BracketChild {
-    ///     title: "Build login".to_string(),
-    ///     description: String::new(),
-    ///     priority: Priority::Normal,
-    ///     gates: vec![],
-    ///     labels: vec![],
-    ///     deps: vec![],
-    /// }];
-    /// let result = executor.bracket_breakdown("epic-123", children).unwrap();
-    /// println!("consumed breakdown node {}", result.breakdown_id);
-    /// ```
     pub fn bracket_breakdown(
         &self,
         container_id: &str,

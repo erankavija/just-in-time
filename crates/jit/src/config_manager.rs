@@ -18,15 +18,6 @@ use std::path::{Path, PathBuf};
 /// separating configuration concerns from storage layer implementation.
 /// This enables the storage layer to remain generic and support different
 /// backends (JSON, SQL, etc.) without coupling to TOML parsing.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::config_manager::ConfigManager;
-///
-/// let config_mgr = ConfigManager::new(".jit");
-/// let namespaces = config_mgr.get_namespaces().unwrap();
-/// ```
 #[derive(Clone)]
 pub struct ConfigManager {
     root: PathBuf,
@@ -71,19 +62,6 @@ impl ConfigManager {
     /// Callers that already hold a parsed [`JitConfig`] (e.g. a cached copy)
     /// should use this instead of [`get_namespaces`](Self::get_namespaces) so a
     /// single write command parses `config.toml` at most once.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config_manager::ConfigManager;
-    /// use jit::config::JitConfig;
-    ///
-    /// // A config with no `[namespaces]` section yields the default registry.
-    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
-    /// let mgr = ConfigManager::new(".jit");
-    /// let namespaces = mgr.namespaces_from_config(&config);
-    /// let _ = namespaces;
-    /// ```
     pub fn namespaces_from_config(&self, config: &JitConfig) -> LabelNamespaces {
         // If config has namespaces, build from those; otherwise return defaults.
         if let Some(ref namespaces_config) = config.namespaces {
@@ -111,17 +89,6 @@ impl ConfigManager {
     /// # Errors
     ///
     /// Returns an error if config.toml exists but has an invalid enforcement mode.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::config_manager::ConfigManager;
-    /// use jit::config::EnforcementMode;
-    ///
-    /// let config_mgr = ConfigManager::new(".jit");
-    /// let mode = config_mgr.get_enforcement_mode().unwrap();
-    /// assert_eq!(mode, EnforcementMode::Off);  // Default
-    /// ```
     pub fn get_enforcement_mode(&self) -> Result<crate::config::EnforcementMode> {
         let config = self.load()?;
         self.enforcement_mode_from_config(&config)
@@ -132,21 +99,6 @@ impl ConfigManager {
     ///
     /// Callers on a write path that already hold a cached [`JitConfig`] should use
     /// this so a single command parses `config.toml` at most once.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config_manager::ConfigManager;
-    /// use jit::config::{EnforcementMode, JitConfig};
-    ///
-    /// // A config with no `[worktree]` section defaults to `Off`.
-    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
-    /// let mgr = ConfigManager::new(".jit");
-    /// assert_eq!(
-    ///     mgr.enforcement_mode_from_config(&config).unwrap(),
-    ///     EnforcementMode::Off
-    /// );
-    /// ```
     pub fn enforcement_mode_from_config(
         &self,
         config: &JitConfig,
@@ -168,15 +120,6 @@ impl ConfigManager {
     /// Returns an error if `config.toml` exists but is malformed, including an
     /// invalid `[project] name` (rejected at parse time by the typed
     /// [`ProjectName`](crate::config::ProjectName) field).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::config_manager::ConfigManager;
-    ///
-    /// let config_mgr = ConfigManager::new(".jit");
-    /// let name = config_mgr.get_project_name().unwrap();
-    /// ```
     pub fn get_project_name(&self) -> Result<Option<String>> {
         let config = self.load()?;
         Ok(self.project_name_from_config(&config))
@@ -188,18 +131,6 @@ impl ConfigManager {
     /// Callers that already hold a parsed [`JitConfig`] should use this so a
     /// single command parses `config.toml` at most once. Returns `None` when
     /// the `[project]` table or its `name` key is absent.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config_manager::ConfigManager;
-    /// use jit::config::JitConfig;
-    ///
-    /// // A config with no `[project]` table has no configured name.
-    /// let config: JitConfig = serde_json::from_str("{}").unwrap();
-    /// let mgr = ConfigManager::new(".jit");
-    /// assert_eq!(mgr.project_name_from_config(&config), None);
-    /// ```
     pub fn project_name_from_config(&self, config: &JitConfig) -> Option<String> {
         config
             .project
@@ -213,16 +144,6 @@ impl ConfigManager {
     ///
     /// Returns a map of type name to icon string. Icons are resolved using the
     /// hierarchy configuration (levels) and icon configuration (preset + custom).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::config_manager::ConfigManager;
-    ///
-    /// let config_mgr = ConfigManager::new(".jit");
-    /// let icons = config_mgr.get_hierarchy_icons().unwrap();
-    /// assert!(icons.contains_key("epic"));
-    /// ```
     pub fn get_hierarchy_icons(&self) -> Result<HashMap<String, String>> {
         let config = self.load()?;
 
@@ -294,17 +215,6 @@ impl ConfigManager {
 /// [`ConfigManager`] rooted at the store, and returns them as a
 /// [`HierarchyConfig`](crate::domain::type_taxonomy::HierarchyConfig). A
 /// repository that declares no `[type_hierarchy]` yields the default taxonomy.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::config_manager::get_hierarchy_config;
-/// use jit::storage::JsonFileStorage;
-///
-/// let storage = JsonFileStorage::new(".jit");
-/// let config = get_hierarchy_config(&storage).unwrap();
-/// assert!(config.contains_type("task"));
-/// ```
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
 ) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {

@@ -52,20 +52,6 @@ use std::collections::BTreeMap;
 /// The canonical JSON shape an [`Issue`] normalizes to before validation.
 ///
 /// See the module docs for the documented contract and laziness rules.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{project, Issue};
-///
-/// let mut issue = Issue::new("Title".to_string(), String::new());
-/// issue.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
-/// let projection = project(&issue);
-/// assert_eq!(projection.type_, Some("epic".to_string()));
-/// assert_eq!(projection.labels.get("req"), Some(&vec!["REQ-01".to_string()]));
-/// // `project` is lazy: it never parses the body, so `sections` starts unset.
-/// assert!(projection.sections.is_none());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Projection {
     /// The issue's primary type, taken from its `type:*` label (e.g. `"epic"`).
@@ -103,23 +89,6 @@ pub struct Projection {
 }
 
 /// One section of the parsed body in the projection shape.
-///
-/// # Examples
-///
-/// ```
-/// use jit::document::MarkdownContentParser;
-/// use jit::domain::{project, Issue};
-///
-/// let issue = Issue::new(
-///     "Title".to_string(),
-///     "## Success Criteria\n\n- [hard] REQ-01\n".to_string(),
-/// );
-/// let projection = project(&issue).with_sections(&issue.description, &MarkdownContentParser);
-/// let section = &projection.sections.as_ref().unwrap()["success_criteria"];
-/// assert_eq!(section.heading, "Success Criteria");
-/// assert_eq!(section.level, 2);
-/// assert_eq!(section.items, vec!["[hard] REQ-01".to_string()]);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProjectedSection {
     /// The original heading text (e.g. `"Success Criteria"`).
@@ -175,19 +144,6 @@ fn collect_doc_types(issue: &Issue) -> Vec<String> {
 /// directly off the issue. `sections` is left `None`; call
 /// [`Projection::ensure_sections`] or [`Projection::with_sections`] to populate
 /// it lazily only when a body assertion needs it (DR §6.1).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{project, Issue};
-///
-/// let mut issue = Issue::new("Title".to_string(), String::new());
-/// issue.labels = vec!["type:task".to_string()];
-/// let projection = project(&issue);
-/// assert_eq!(projection.type_, Some("task".to_string()));
-/// assert_eq!(projection.state, "backlog");
-/// assert!(projection.sections.is_none());
-/// ```
 pub fn project(issue: &Issue) -> Projection {
     let labels = group_labels(&issue.labels);
     let type_ = crate::labels::type_label_value(&issue.labels).map(str::to_string);

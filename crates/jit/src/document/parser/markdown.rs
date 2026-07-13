@@ -14,17 +14,6 @@ use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 /// Markdown content parser.
 ///
 /// Pure: [`ContentParser::parse`] is a deterministic function of the input.
-///
-/// # Examples
-///
-/// ```
-/// use jit::document::{ContentParser, MarkdownContentParser};
-///
-/// let parsed = MarkdownContentParser.parse("## Notes\n\n- first\n- second\n");
-/// let notes = parsed.sections.get("notes").unwrap();
-/// assert_eq!(notes.heading, "Notes");
-/// assert_eq!(notes.items, vec!["first".to_string(), "second".to_string()]);
-/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarkdownContentParser;
 

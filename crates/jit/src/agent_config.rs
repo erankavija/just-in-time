@@ -110,16 +110,6 @@ impl AgentConfig {
 /// # Errors
 ///
 /// Returns an error if no agent identity is configured or if the format is invalid.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::agent_config::resolve_agent_id;
-///
-/// // With CLI flag (highest priority)
-/// let agent_id = resolve_agent_id(Some("agent:cli-override".to_string())).unwrap();
-/// assert_eq!(agent_id, "agent:cli-override");
-/// ```
 pub fn resolve_agent_id(cli_flag: Option<String>) -> Result<String> {
     // Priority 1: CLI flag
     if let Some(id) = cli_flag {

@@ -34,18 +34,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Issues predating event coverage (no relevant events) keep `None` for the
     /// missing fields — the timestamps are unrecoverable, not defaulted.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use jit::commands::CommandExecutor;
-    /// # use jit::storage::JsonFileStorage;
-    /// # fn run(executor: &CommandExecutor<JsonFileStorage>) -> anyhow::Result<()> {
-    /// let result = executor.backfill_lifecycle_timestamps()?;
-    /// println!("updated {} of {} issues", result.issues_updated, result.issues_scanned);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn backfill_lifecycle_timestamps(&self) -> Result<LifecycleBackfillResult> {
         let events = self.storage.read_events()?;
         let issues = self.storage.list_issues()?;

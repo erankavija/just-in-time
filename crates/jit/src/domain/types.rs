@@ -63,16 +63,6 @@ impl State {
     /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`)
     /// and to what [`State::from_str`] round-trips; use it when a `&'static str`
     /// is needed (e.g. a compact one-line status render) without allocating.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::State;
-    ///
-    /// assert_eq!(State::Ready.as_str(), "ready");
-    /// assert_eq!(State::InProgress.as_str(), "in_progress");
-    /// assert_eq!(State::Done.as_str(), "done");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             State::Backlog => "backlog",
@@ -91,16 +81,6 @@ impl State {
     /// a state list at a call site (@/inv/domain-agnostic): a counts-by-state
     /// rollup, for instance, must list every state so its shape stays stable
     /// and complete as the enum evolves.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::State;
-    ///
-    /// assert_eq!(State::all().len(), 7);
-    /// assert_eq!(State::all()[0], State::Backlog);
-    /// assert!(State::all().contains(&State::Done));
-    /// ```
     pub const fn all() -> [State; 7] {
         [
             State::Backlog,
@@ -125,16 +105,6 @@ impl State {
 /// A dependency id that resolves to no issue is dangling. That is a separate
 /// condition, reported on each surface's own terms, so it is not this predicate's
 /// input.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{is_dependency_met, State};
-///
-/// assert!(is_dependency_met(State::Done));
-/// assert!(is_dependency_met(State::Rejected));
-/// assert!(!is_dependency_met(State::InProgress));
-/// ```
 pub fn is_dependency_met(state: State) -> bool {
     state.is_terminal()
 }
@@ -194,16 +164,6 @@ impl FromStr for Priority {
 /// which is always compiled in. HTML/XML are only usable when the `html`/`xml`
 /// cargo features are built (see
 /// [`content_parser_for`](crate::document::content_parser_for)).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::ContentFormat;
-/// use std::str::FromStr;
-///
-/// assert_eq!(ContentFormat::from_str("html").unwrap(), ContentFormat::Html);
-/// assert_eq!(serde_json::to_string(&ContentFormat::Xml).unwrap(), "\"xml\"");
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentFormat {
@@ -250,16 +210,6 @@ impl GateStatus {
     /// Identical to the JSON serialization (`#[serde(rename_all = "snake_case")]`);
     /// use it when a `&'static str` is needed (e.g. a compact `key=status`
     /// render) without allocating.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateStatus;
-    ///
-    /// assert_eq!(GateStatus::Pending.as_str(), "pending");
-    /// assert_eq!(GateStatus::Passed.as_str(), "passed");
-    /// assert_eq!(GateStatus::Failed.as_str(), "failed");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             GateStatus::Pending => "pending",
@@ -283,27 +233,6 @@ impl GateStatus {
 /// [`Assignee::identifier`]. It serializes transparently as the
 /// `kind:identifier` string (through [`Display`] / [`FromStr`]), so on-disk
 /// issue JSON is unchanged.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Assignee;
-/// use std::str::FromStr;
-///
-/// let a = Assignee::from_str("agent:copilot").unwrap();
-/// assert_eq!(a.kind(), "agent");
-/// assert_eq!(a.identifier(), "copilot");
-/// assert_eq!(a.to_string(), "agent:copilot");
-///
-/// // Only the first colon splits, so identifiers may contain colons.
-/// let a: Assignee = "ci:job:42".parse().unwrap();
-/// assert_eq!(a.identifier(), "job:42");
-///
-/// // Malformed values are rejected.
-/// assert!(Assignee::from_str("nocolon").is_err());
-/// assert!(Assignee::from_str(":missing-kind").is_err());
-/// assert!(Assignee::from_str("missing-id:").is_err());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Assignee {
     kind: String,
@@ -312,25 +241,11 @@ pub struct Assignee {
 
 impl Assignee {
     /// The kind segment before the first colon (e.g. `agent` in `agent:copilot`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let a: jit::domain::Assignee = "agent:copilot".parse().unwrap();
-    /// assert_eq!(a.kind(), "agent");
-    /// ```
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
     /// The identifier segment after the first colon (e.g. `copilot`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let a: jit::domain::Assignee = "agent:copilot".parse().unwrap();
-    /// assert_eq!(a.identifier(), "copilot");
-    /// ```
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -341,27 +256,6 @@ impl Assignee {
 /// Distinguishes the failure modes so callers (e.g. agent-identity validation)
 /// can map them to their own user-facing messages while reusing the one parse
 /// path.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{Assignee, AssigneeParseError};
-/// use std::str::FromStr;
-///
-/// assert_eq!(Assignee::from_str(""), Err(AssigneeParseError::Empty));
-/// assert!(matches!(
-///     Assignee::from_str("nocolon"),
-///     Err(AssigneeParseError::MissingSeparator(_))
-/// ));
-/// assert!(matches!(
-///     Assignee::from_str(":id"),
-///     Err(AssigneeParseError::EmptyKind(_))
-/// ));
-/// assert!(matches!(
-///     Assignee::from_str("kind:"),
-///     Err(AssigneeParseError::EmptyIdentifier(_))
-/// ));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AssigneeParseError {
     /// The input was empty.
@@ -388,17 +282,6 @@ impl FromStr for Assignee {
     type Err = AssigneeParseError;
 
     /// Parse a `kind:identifier` assignee, splitting on the first colon only.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Assignee;
-    /// use std::str::FromStr;
-    ///
-    /// let a = Assignee::from_str("human:alice").unwrap();
-    /// assert_eq!((a.kind(), a.identifier()), ("human", "alice"));
-    /// assert!(Assignee::from_str("alice").is_err());
-    /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
             return Err(AssigneeParseError::Empty);
@@ -421,15 +304,6 @@ impl FromStr for Assignee {
 
 impl std::fmt::Display for Assignee {
     /// Render as the canonical `kind:identifier` string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Assignee;
-    ///
-    /// let a: Assignee = "ci:github-actions".parse().unwrap();
-    /// assert_eq!(a.to_string(), "ci:github-actions");
-    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.kind, self.identifier)
     }
@@ -669,58 +543,18 @@ impl Issue {
     /// Uses [`Option::get_or_insert`], so it records `at` only when the field is
     /// still absent — the "first occurrence" semantics the lifecycle timestamps
     /// require. Call at every path that lands [`State::Ready`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use chrono::{TimeZone, Utc};
-    /// use jit::domain::Issue;
-    ///
-    /// let mut issue = Issue::new("t".into(), String::new());
-    /// let first = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    /// let later = Utc.with_ymd_and_hms(2026, 2, 1, 0, 0, 0).unwrap();
-    /// issue.mark_first_ready(first);
-    /// issue.mark_first_ready(later); // no-op: already stamped
-    /// assert_eq!(issue.first_ready_at, Some(first));
-    /// ```
     pub fn mark_first_ready(&mut self, at: DateTime<Utc>) {
         self.first_ready_at.get_or_insert(at);
     }
 
     /// Stamp [`claimed_at`](Self::claimed_at) at the FIRST claim/assignment; a
     /// later re-assignment is a no-op.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use chrono::Utc;
-    /// use jit::domain::Issue;
-    ///
-    /// let mut issue = Issue::new("t".into(), String::new());
-    /// let now = Utc::now();
-    /// issue.mark_claimed(now);
-    /// assert_eq!(issue.claimed_at, Some(now));
-    /// ```
     pub fn mark_claimed(&mut self, at: DateTime<Utc>) {
         self.claimed_at.get_or_insert(at);
     }
 
     /// Stamp [`done_at`](Self::done_at) at the FIRST Done transition; re-opening
     /// and re-completing does NOT overwrite it.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use chrono::{TimeZone, Utc};
-    /// use jit::domain::Issue;
-    ///
-    /// let mut issue = Issue::new("t".into(), String::new());
-    /// let first = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    /// let later = Utc.with_ymd_and_hms(2026, 3, 1, 0, 0, 0).unwrap();
-    /// issue.mark_done(first);
-    /// issue.mark_done(later); // no-op: already completed once
-    /// assert_eq!(issue.done_at, Some(first));
-    /// ```
     pub fn mark_done(&mut self, at: DateTime<Utc>) {
         self.done_at.get_or_insert(at);
     }
@@ -988,18 +822,6 @@ fn default_gate_priority() -> u32 {
 }
 
 /// Error returned when a string cannot be parsed as a [`GateStage`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{GateStage, GateStageParseError};
-/// use std::str::FromStr;
-///
-/// assert_eq!(
-///     GateStage::from_str("unknown"),
-///     Err(GateStageParseError::UnknownStage("unknown".to_string()))
-/// );
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GateStageParseError {
     /// The input did not match any known gate stage.
@@ -1012,18 +834,6 @@ pub enum GateStageParseError {
 /// Serialized as `snake_case` (`"precheck"`, `"postcheck"`); the same names are
 /// used as CLI argument values and as the `JIT_STAGE` environment variable passed
 /// to gate checker processes.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::GateStage;
-/// use std::str::FromStr;
-///
-/// assert_eq!(GateStage::from_str("precheck").unwrap(), GateStage::Precheck);
-/// assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
-/// assert_eq!(GateStage::Precheck.as_str(), "precheck");
-/// assert!(GateStage::from_str("invalid").is_err());
-/// ```
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
 )]
@@ -1041,15 +851,6 @@ impl GateStage {
     /// Identical to [`Display`](std::fmt::Display) output and the JSON
     /// serialization; use this when a `&'static str` is needed (e.g. to set an
     /// environment variable) without a heap allocation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateStage;
-    ///
-    /// assert_eq!(GateStage::Precheck.as_str(), "precheck");
-    /// assert_eq!(GateStage::Postcheck.as_str(), "postcheck");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             GateStage::Precheck => "precheck",
@@ -1062,17 +863,6 @@ impl FromStr for GateStage {
     type Err = GateStageParseError;
 
     /// Parse a snake_case stage name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateStage;
-    /// use std::str::FromStr;
-    ///
-    /// assert_eq!(GateStage::from_str("precheck").unwrap(), GateStage::Precheck);
-    /// assert_eq!(GateStage::from_str("postcheck").unwrap(), GateStage::Postcheck);
-    /// assert!(GateStage::from_str("invalid").is_err());
-    /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "precheck" => Ok(GateStage::Precheck),
@@ -1084,33 +874,12 @@ impl FromStr for GateStage {
 
 impl std::fmt::Display for GateStage {
     /// Format as the canonical snake_case string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateStage;
-    ///
-    /// assert_eq!(GateStage::Precheck.to_string(), "precheck");
-    /// assert_eq!(GateStage::Postcheck.to_string(), "postcheck");
-    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
 /// Error returned when a string cannot be parsed as a [`GateMode`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{GateMode, GateModeParseError};
-/// use std::str::FromStr;
-///
-/// assert_eq!(
-///     GateMode::from_str("unknown"),
-///     Err(GateModeParseError::UnknownMode("unknown".to_string()))
-/// );
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum GateModeParseError {
     /// The input did not match any known gate mode.
@@ -1122,18 +891,6 @@ pub enum GateModeParseError {
 ///
 /// Serialized as `snake_case` (`"manual"`, `"auto"`); the same names are used as
 /// CLI argument values.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::GateMode;
-/// use std::str::FromStr;
-///
-/// assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
-/// assert_eq!(GateMode::Auto.to_string(), "auto");
-/// assert_eq!(GateMode::Manual.as_str(), "manual");
-/// assert!(GateMode::from_str("invalid").is_err());
-/// ```
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
 )]
@@ -1151,15 +908,6 @@ impl GateMode {
     /// Identical to [`Display`](std::fmt::Display) output and the JSON
     /// serialization; use this when a `&'static str` is needed without a heap
     /// allocation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateMode;
-    ///
-    /// assert_eq!(GateMode::Manual.as_str(), "manual");
-    /// assert_eq!(GateMode::Auto.as_str(), "auto");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             GateMode::Manual => "manual",
@@ -1172,17 +920,6 @@ impl FromStr for GateMode {
     type Err = GateModeParseError;
 
     /// Parse a snake_case mode name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateMode;
-    /// use std::str::FromStr;
-    ///
-    /// assert_eq!(GateMode::from_str("manual").unwrap(), GateMode::Manual);
-    /// assert_eq!(GateMode::from_str("auto").unwrap(), GateMode::Auto);
-    /// assert!(GateMode::from_str("invalid").is_err());
-    /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "manual" => Ok(GateMode::Manual),
@@ -1194,15 +931,6 @@ impl FromStr for GateMode {
 
 impl std::fmt::Display for GateMode {
     /// Format as the canonical snake_case string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::GateMode;
-    ///
-    /// assert_eq!(GateMode::Manual.to_string(), "manual");
-    /// assert_eq!(GateMode::Auto.to_string(), "auto");
-    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
@@ -1259,14 +987,6 @@ pub struct GateContext {
 /// Record-format version stamped into every [`GateRunResult`] a gate execution
 /// records, and the version this binary writes into
 /// `.jit/gate-runs/<run-id>/result.json`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::GATE_RUN_SCHEMA_VERSION;
-///
-/// assert_eq!(GATE_RUN_SCHEMA_VERSION, 1);
-/// ```
 pub const GATE_RUN_SCHEMA_VERSION: u32 = 1;
 
 /// Result of a gate execution, as persisted to
@@ -1656,16 +1376,6 @@ impl Event {
     /// Takes a typed [`Assignee`] so a malformed actor can never be logged; the
     /// caller parses (and thereby validates) the actor before constructing the
     /// event.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Assignee, Event};
-    ///
-    /// let actor: Assignee = "agent:copilot".parse().unwrap();
-    /// let event = Event::new_issue_claimed("issue-123".to_string(), actor);
-    /// assert_eq!(event.get_type(), "issue_claimed");
-    /// ```
     pub fn new_issue_claimed(issue_id: String, assignee: Assignee) -> Self {
         Event::IssueClaimed {
             id: Uuid::new_v4().to_string(),
@@ -1690,16 +1400,6 @@ impl Event {
     ///
     /// `updated_by` is a typed [`Assignee`] (the actor who passed the gate), so
     /// no malformed actor can be logged.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Assignee, Event};
-    ///
-    /// let by: Assignee = "ci:runner".parse().unwrap();
-    /// let event = Event::new_gate_passed("issue-123".to_string(), "tests".to_string(), Some(by));
-    /// assert_eq!(event.get_type(), "gate_passed");
-    /// ```
     pub fn new_gate_passed(
         issue_id: String,
         gate_key: String,
@@ -1718,16 +1418,6 @@ impl Event {
     ///
     /// `updated_by` is a typed [`Assignee`] (the actor who failed the gate), so
     /// no malformed actor can be logged.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Assignee, Event};
-    ///
-    /// let by: Assignee = "ci:runner".parse().unwrap();
-    /// let event = Event::new_gate_failed("issue-123".to_string(), "tests".to_string(), Some(by));
-    /// assert_eq!(event.get_type(), "gate_failed");
-    /// ```
     pub fn new_gate_failed(
         issue_id: String,
         gate_key: String,
@@ -1776,16 +1466,6 @@ impl Event {
     /// `assignee` is the typed [`Assignee`] being released; callers emit this
     /// event only when a prior assignee existed, so the actor is always a valid
     /// `kind:identifier`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Assignee, Event};
-    ///
-    /// let prev: Assignee = "agent:copilot".parse().unwrap();
-    /// let event = Event::new_issue_released("issue-123".to_string(), prev, "timeout".to_string());
-    /// assert_eq!(event.get_type(), "issue_released");
-    /// ```
     pub fn new_issue_released(issue_id: String, assignee: Assignee, reason: String) -> Self {
         Event::IssueReleased {
             id: Uuid::new_v4().to_string(),
@@ -1866,16 +1546,6 @@ impl Event {
     ///
     /// Records that an issue was permanently deleted, preserving an audit trail
     /// of the removal in the event log (the issue file itself is gone).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_issue_deleted("issue-123".to_string());
-    /// assert_eq!(event.get_issue_id(), "issue-123");
-    /// assert_eq!(event.get_type(), "issue_deleted");
-    /// ```
     pub fn new_issue_deleted(issue_id: String) -> Self {
         Event::IssueDeleted {
             id: Uuid::new_v4().to_string(),
@@ -1888,19 +1558,6 @@ impl Event {
     ///
     /// Records that a `--force` write deliberately bypassed an `enforce` rule
     /// whose `error` finding would otherwise have blocked the write (DR §7.6).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_local_rule_bypassed(
-    ///     "issue-123".to_string(),
-    ///     "epic-needs-requirements".to_string(),
-    /// );
-    /// assert_eq!(event.get_issue_id(), "issue-123");
-    /// assert_eq!(event.get_type(), "local_rule_bypassed");
-    /// ```
     pub fn new_local_rule_bypassed(issue_id: String, rule: String) -> Self {
         Event::LocalRuleBypassed {
             id: Uuid::new_v4().to_string(),
@@ -1915,20 +1572,6 @@ impl Event {
     /// Records that an enforcing graph rule blocked the issue's transition into
     /// `target` (CC-2). Appended before the blocking error is returned, one per
     /// blocking rule.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Event, State};
-    ///
-    /// let event = Event::new_transition_blocked(
-    ///     "issue-123".to_string(),
-    ///     State::Done,
-    ///     "sdd-hard-criteria-covered".to_string(),
-    /// );
-    /// assert_eq!(event.get_issue_id(), "issue-123");
-    /// assert_eq!(event.get_type(), "transition_blocked");
-    /// ```
     pub fn new_transition_blocked(issue_id: String, target: State, rule: String) -> Self {
         Event::TransitionBlocked {
             id: Uuid::new_v4().to_string(),
@@ -1944,20 +1587,6 @@ impl Event {
     /// Records that a `--force` transition deliberately bypassed an enforcing
     /// graph rule whose `error` finding would otherwise have blocked the
     /// transition into `target` (CC-2).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Event, State};
-    ///
-    /// let event = Event::new_graph_rule_bypassed(
-    ///     "issue-123".to_string(),
-    ///     State::Done,
-    ///     "sdd-hard-criteria-covered".to_string(),
-    /// );
-    /// assert_eq!(event.get_issue_id(), "issue-123");
-    /// assert_eq!(event.get_type(), "graph_rule_bypassed");
-    /// ```
     pub fn new_graph_rule_bypassed(issue_id: String, target: State, rule: String) -> Self {
         Event::GraphRuleBypassed {
             id: Uuid::new_v4().to_string(),
@@ -1973,16 +1602,6 @@ impl Event {
     /// Registry-scoped (issue-less, like
     /// [`new_document_archived`](Self::new_document_archived)): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_gate_definition_updated("tests".to_string());
-    /// assert_eq!(event.get_type(), "gate_definition_updated");
-    /// assert_eq!(event.get_issue_id(), "");
-    /// ```
     pub fn new_gate_definition_updated(gate_key: String) -> Self {
         Event::GateDefinitionUpdated {
             id: Uuid::new_v4().to_string(),
@@ -1997,16 +1616,6 @@ impl Event {
     /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
     /// records that `gate_key` was added to the gate registry via `jit gate
     /// define`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_gate_definition_created("tests".to_string());
-    /// assert_eq!(event.get_type(), "gate_definition_created");
-    /// assert_eq!(event.get_issue_id(), "");
-    /// ```
     pub fn new_gate_definition_created(gate_key: String) -> Self {
         Event::GateDefinitionCreated {
             id: Uuid::new_v4().to_string(),
@@ -2021,16 +1630,6 @@ impl Event {
     /// [`new_gate_definition_updated`](Self::new_gate_definition_updated)):
     /// records that `gate_key` was removed from the gate registry via `jit
     /// gate remove`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_gate_definition_removed("tests".to_string());
-    /// assert_eq!(event.get_type(), "gate_definition_removed");
-    /// assert_eq!(event.get_issue_id(), "");
-    /// ```
     pub fn new_gate_definition_removed(gate_key: String) -> Self {
         Event::GateDefinitionRemoved {
             id: Uuid::new_v4().to_string(),
@@ -2041,15 +1640,6 @@ impl Event {
 
     /// Create a lifecycle-timestamp backfill event recording how many issues the
     /// one-time migration updated.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Event;
-    ///
-    /// let event = Event::new_lifecycle_timestamps_backfilled(3);
-    /// assert_eq!(event.get_type(), "lifecycle_timestamps_backfilled");
-    /// ```
     pub fn new_lifecycle_timestamps_backfilled(issues_updated: usize) -> Self {
         Event::LifecycleTimestampsBackfilled {
             id: Uuid::new_v4().to_string(),

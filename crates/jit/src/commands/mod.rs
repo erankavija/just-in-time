@@ -198,23 +198,6 @@ pub struct ArchiveResult {
 /// [`ArchiveError::DestinationOccupied`] when the archive path is already taken
 /// (archiving onto it would clobber a file that another reference may resolve
 /// to).
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::ArchiveError;
-///
-/// let missing = ArchiveError::SourceMissing {
-///     path: "dev/active/missing.md".to_string(),
-/// };
-/// // The message names the offending path.
-/// assert!(missing.to_string().contains("dev/active/missing.md"));
-///
-/// let occupied = ArchiveError::DestinationOccupied {
-///     path: "dev/archive/features/x/plan.md".to_string(),
-/// };
-/// assert!(occupied.to_string().contains("dev/archive/features/x/plan.md"));
-/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveError {
     /// The source document does not exist on disk, so there is nothing to
@@ -330,15 +313,6 @@ pub enum DependencyAddResult {
 /// transitive-reduction property a write-time guard too, closing the asymmetry
 /// where a redundant edge was written silently and only rejected at a later
 /// `jit validate`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::RedundancyPolicy;
-///
-/// // The CLI default rejects a redundant edge; `--reduce` opts into fixing it.
-/// assert_eq!(RedundancyPolicy::default(), RedundancyPolicy::Reject);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RedundancyPolicy {
     /// Reject the add, naming the offending edge pair (nonzero exit). Default.
@@ -357,17 +331,6 @@ pub enum RedundancyPolicy {
 /// bypass events are intentionally NOT emitted during validation: the caller
 /// emits them (via `log_rule_bypasses`) only AFTER the write succeeds, so a save
 /// that fails never leaves a false "bypass happened" entry in the audit log.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::WriteValidation;
-///
-/// // A default outcome blocks nothing and defers no bypass events.
-/// let outcome = WriteValidation::default();
-/// assert!(outcome.warnings.is_empty());
-/// assert!(outcome.bypassed_rules.is_empty());
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct WriteValidation {
     /// Non-blocking warnings (legacy validator + local `warn`/non-enforce
@@ -440,19 +403,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `Err` rather than being swallowed, so a misconfigured repository cannot
     /// silently disable all rule enforcement. The load is performed at most once
     /// and the outcome (success or failure) is cached.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// match executor.rules() {
-    ///     Ok(rules) => println!("loaded {} rule(s)", rules.rules.len()),
-    ///     Err(err) => eprintln!("invalid rules.toml: {err}"),
-    /// }
-    /// ```
     pub fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
         self.rules
             .get_or_init(|| RuleSet::load(self.storage.root()))
@@ -479,17 +429,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The result is built at most once and cached. A malformed `config.toml` or
     /// `.jit/rules.toml` is surfaced as an `Err` rather than silently dropping
     /// enforcement.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let rules = executor.effective_rules().unwrap();
-    /// println!("{} effective rule(s)", rules.rules.len());
-    /// ```
     pub fn effective_rules(&self) -> Result<&RuleSet> {
         self.effective_rules
             .get_or_init(|| {

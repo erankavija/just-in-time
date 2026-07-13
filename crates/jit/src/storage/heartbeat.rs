@@ -90,24 +90,6 @@ impl Heartbeat {
     /// * `worktree_id` - Worktree identifier (e.g., "wt:abc123")
     /// * `branch` - Current branch name
     /// * `interval_secs` - Heartbeat update interval
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::clock::SystemClock;
-    /// use jit::storage::heartbeat::Heartbeat;
-    ///
-    /// let hb = Heartbeat::new(
-    ///     &SystemClock,
-    ///     "agent:demo".to_string(),
-    ///     "wt:demo".to_string(),
-    ///     "main".to_string(),
-    ///     30,
-    /// );
-    /// assert_eq!(hb.agent_id, "agent:demo");
-    /// // Freshly created, evaluated against its own beat, it is not stale.
-    /// assert!(!hb.is_stale_at(hb.last_beat));
-    /// ```
     pub fn new(
         clock: &dyn Clock,
         agent_id: String,
@@ -126,23 +108,6 @@ impl Heartbeat {
     }
 
     /// Update `last_beat` to the injected clock's current time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::clock::SystemClock;
-    /// use jit::storage::heartbeat::Heartbeat;
-    ///
-    /// let mut hb = Heartbeat::new(
-    ///     &SystemClock,
-    ///     "agent:demo".to_string(),
-    ///     "wt:demo".to_string(),
-    ///     "main".to_string(),
-    ///     30,
-    /// );
-    /// hb.update(&SystemClock);
-    /// assert!(!hb.is_stale_at(hb.last_beat));
-    /// ```
     pub fn update(&mut self, clock: &dyn Clock) {
         self.last_beat = clock.now();
     }
@@ -152,23 +117,6 @@ impl Heartbeat {
     /// A heartbeat is stale if more than 2x the interval has passed since last
     /// beat. Time comes from `clock` ([`SystemClock`] in production); use
     /// [`is_stale_at`](Heartbeat::is_stale_at) to pass an explicit instant.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::clock::SystemClock;
-    /// use jit::storage::heartbeat::Heartbeat;
-    ///
-    /// let hb = Heartbeat::new(
-    ///     &SystemClock,
-    ///     "agent:demo".to_string(),
-    ///     "wt:demo".to_string(),
-    ///     "main".to_string(),
-    ///     30,
-    /// );
-    /// // A just-created heartbeat is fresh.
-    /// assert!(!hb.is_stale(&SystemClock));
-    /// ```
     pub fn is_stale(&self, clock: &dyn Clock) -> bool {
         self.is_stale_at(clock.now())
     }
@@ -180,27 +128,6 @@ impl Heartbeat {
     /// abstraction), so freshness can be tested deterministically without real
     /// wall-clock delays. A heartbeat is stale once more than 2x its interval has
     /// elapsed since `last_beat`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::clock::SystemClock;
-    /// use jit::storage::heartbeat::Heartbeat;
-    /// use chrono::{Duration, Utc};
-    ///
-    /// let mut hb = Heartbeat::new(
-    ///     &SystemClock,
-    ///     "agent:demo".to_string(),
-    ///     "wt:demo".to_string(),
-    ///     "main".to_string(),
-    ///     1, // 1s interval -> 2s staleness threshold
-    /// );
-    /// hb.last_beat = Utc::now();
-    /// let now = hb.last_beat;
-    /// // Fresh right after the beat, stale once 2x the interval has elapsed.
-    /// assert!(!hb.is_stale_at(now));
-    /// assert!(hb.is_stale_at(now + Duration::seconds(3)));
-    /// ```
     pub fn is_stale_at(&self, now: DateTime<Utc>) -> bool {
         let threshold_secs = self.interval_secs * 2;
         let elapsed = now

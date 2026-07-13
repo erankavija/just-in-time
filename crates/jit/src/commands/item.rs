@@ -114,18 +114,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// is accepted and resolved to the registry name first ([`resolve_kind_alias`]),
     /// so `--kind inv` filters the same items as `--kind invariant`. An unknown
     /// kind name yields an empty result (not an error) so callers can probe freely.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let all = executor.list_items(None)?;
-    /// println!("{} addressable item(s)", all.count);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn list_items(&self, kind_filter: Option<&str>) -> Result<ItemListResult> {
         // Resolve a kind alias in the filter to the canonical registry name so both
         // the kind-set filter and the item filter compare against canonical names
@@ -179,18 +167,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// An empty `query` matches every item, so the `kind_filter` can be used
     /// alone. Builds on [`list_items`](Self::list_items) so the same indexing path
     /// serves both.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let hits = executor.search_items("atomic", None)?;
-    /// println!("{} item(s) mention 'atomic'", hits.count);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn search_items(&self, query: &str, kind_filter: Option<&str>) -> Result<ItemListResult> {
         let q = query.to_lowercase();
         let all = self.list_items(kind_filter)?;
@@ -347,18 +323,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// self-id in that scope is a descriptive not-found error, never a fallback to a
     /// different kind's item. An unresolvable scope or an unknown self-id is a
     /// descriptive error rather than a silent miss.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let shown = executor.show_item("56ab0224/REQ-01")?;
-    /// assert_eq!(shown.item.self_id, "REQ-01");
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
         match self.resolve_item_address(qualified)? {
             // Project scope: sourced from a config-declared file, no owning issue
@@ -553,20 +517,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// shape) — those are not generic qualified references and the caller may
     /// handle them by the existing unqualified rules. A namespace that DOES match
     /// but whose qualified id cannot be resolved is an `Err`.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // A qualified `satisfies:` reference resolves to the addressed item.
-    /// if let Some(resolved) = executor.resolve_link_label("satisfies:56ab0224/REQ-01")? {
-    ///     assert_eq!(resolved.item.self_id, "REQ-01");
-    /// }
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn resolve_link_label(&self, label: &str) -> Result<Option<ItemShowResult>> {
         let Some((namespace, value)) = label.split_once(':') else {
             return Ok(None);

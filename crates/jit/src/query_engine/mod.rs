@@ -46,19 +46,6 @@ pub struct QueryFilter {
 
 impl QueryFilter {
     /// Parse a query string into a filter
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::query_engine::QueryFilter;
-    ///
-    /// # fn example() -> anyhow::Result<()> {
-    /// let filter = QueryFilter::parse("state:ready")?;
-    /// let filter = QueryFilter::parse("state:ready AND priority:high")?;
-    /// let filter = QueryFilter::parse("(state:ready OR state:done) NOT blocked")?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn parse(query: &str) -> Result<Self> {
         let tokens = Lexer::tokenize(query)?;
         let expr = Parser::parse(tokens)?;

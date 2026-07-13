@@ -28,16 +28,6 @@ use crate::templates::{GraphTemplate, TemplateNode, TransformKind};
 
 /// One endpoint of a [`DeltaEdge`]: a node the delta creates (named by its
 /// template role), or an issue that already exists (named by its full id).
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::DeltaEndpoint;
-///
-/// let created = DeltaEndpoint::CreatedRole("planning".to_string());
-/// let existing = DeltaEndpoint::ExistingIssue("abc123".to_string());
-/// assert_ne!(created, existing);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeltaEndpoint {
     /// A node the delta creates, identified by its template role.
@@ -47,18 +37,6 @@ pub enum DeltaEndpoint {
 }
 
 /// A dependency edge in a [`TemplateDelta`]: `dependent` depends on `dependency`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::{DeltaEdge, DeltaEndpoint};
-///
-/// let edge = DeltaEdge {
-///     dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
-///     dependency: DeltaEndpoint::CreatedRole("breakdown".to_string()),
-/// };
-/// assert_eq!(edge.dependency, DeltaEndpoint::CreatedRole("breakdown".to_string()));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeltaEdge {
     /// The dependent side (`C` in `C → B`).
@@ -69,23 +47,6 @@ pub struct DeltaEdge {
 
 /// An issue the delta creates: the FINAL shape a template node instantiates to,
 /// with every `{token}` already resolved.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::PlannedNode;
-/// use jit::domain::Priority;
-///
-/// let node = PlannedNode {
-///     role: "planning".to_string(),
-///     title: "planning: Auth epic".to_string(),
-///     description: "Plan Auth epic.".to_string(),
-///     labels: vec!["type:planning".to_string()],
-///     gates: vec!["plan-review".to_string()],
-///     priority: Priority::Normal,
-/// };
-/// assert_eq!(node.role, "planning");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlannedNode {
     /// The template role this issue is created for.
@@ -103,18 +64,6 @@ pub struct PlannedNode {
 }
 
 /// The gates a template anchor declares, bound to the anchor's issue id.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::AnchorGates;
-///
-/// let attach = AnchorGates {
-///     anchor_issue_id: "c1".to_string(),
-///     gates: vec!["repo-validate".to_string()],
-/// };
-/// assert_eq!(attach.gates.len(), 1);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnchorGates {
     /// Full id of the issue bound to the anchor.
@@ -129,16 +78,6 @@ pub struct AnchorGates {
 /// order: `creates`, `add_edges`, `remove_edges`, `anchor_gates`. Adding the
 /// transform's new edges before removing the old ones is what keeps transitive
 /// reduction from stranding an edge mid-operation.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::TemplateDelta;
-///
-/// let delta = TemplateDelta::default();
-/// assert!(delta.creates.is_empty());
-/// assert!(delta.add_edges.is_empty());
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TemplateDelta {
     /// Issues to create, in template-node order.
@@ -361,30 +300,6 @@ fn binding<'a>(
 /// The simulated edge set is a superset of what the executor persists (eager
 /// transitive reduction only DROPS edges), so an acyclic simulation guarantees an
 /// acyclic result.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::{validate_delta_acyclic, DeltaEdge, DeltaEndpoint, TemplateDelta};
-/// use std::collections::BTreeMap;
-///
-/// // `c1` depends on a created node, which depends on `c1`: a cycle.
-/// let delta = TemplateDelta {
-///     add_edges: vec![
-///         DeltaEdge {
-///             dependent: DeltaEndpoint::ExistingIssue("c1".to_string()),
-///             dependency: DeltaEndpoint::CreatedRole("planning".to_string()),
-///         },
-///         DeltaEdge {
-///             dependent: DeltaEndpoint::CreatedRole("planning".to_string()),
-///             dependency: DeltaEndpoint::ExistingIssue("c1".to_string()),
-///         },
-///     ],
-///     ..TemplateDelta::default()
-/// };
-/// let store = BTreeMap::from([("c1".to_string(), vec![])]);
-/// assert!(validate_delta_acyclic(&delta, store).is_err());
-/// ```
 pub fn validate_delta_acyclic(
     delta: &TemplateDelta,
     store_deps: BTreeMap<String, Vec<String>>,

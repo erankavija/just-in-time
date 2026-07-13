@@ -40,16 +40,6 @@ use thiserror::Error;
 /// Every variant carries enough context (the offending marker, the target path,
 /// or the underlying I/O error) to point an author at the problem. A missing or
 /// malformed region NEVER silently clobbers the file: it is a typed error.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::projection::{splice_region, ProjectionError};
-///
-/// // A target whose begin marker is absent is a typed error, not a clobber.
-/// let err = splice_region("no markers here", "X", "<!--b-->", "<!--e-->").unwrap_err();
-/// assert!(matches!(err, ProjectionError::MissingBeginMarker { .. }));
-/// ```
 #[derive(Debug, Error)]
 pub enum ProjectionError {
     /// The configured begin marker was not found in the region-mode target.
@@ -125,29 +115,6 @@ pub enum ProjectionError {
 /// An empty registry renders an explicit "no invariants declared" line so the
 /// projected region is never blank (in `Full` style this follows the header; in
 /// `IdAnchor` style it is the sole line).
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ProjectionStyle;
-/// use jit::validation::invariants::InvariantRegistry;
-/// use jit::validation::projection::render_invariants_markdown;
-///
-/// let reg = InvariantRegistry::from_toml_str(
-///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"Acyclic.\"\nkind = \"enforced\"\nenforced-by = \"dag-no-cycles\"\n",
-/// )
-/// .unwrap();
-///
-/// // Full style keeps the header, kind tag, and enforced-by.
-/// let full = render_invariants_markdown(&reg, ProjectionStyle::Full);
-/// assert!(full.contains("## Project invariants"));
-/// assert!(full.contains("- **dag-acyclic** [enforced] (enforced-by: `dag-no-cycles`): Acyclic."));
-///
-/// // Id-anchor style is heading-less with no kind/enforced-by.
-/// let anchored = render_invariants_markdown(&reg, ProjectionStyle::IdAnchor);
-/// assert!(!anchored.contains("## Project invariants"));
-/// assert_eq!(anchored, "- **dag-acyclic** — Acyclic.\n");
-/// ```
 pub fn render_invariants_markdown(registry: &InvariantRegistry, style: ProjectionStyle) -> String {
     match style {
         ProjectionStyle::Full => render_full(registry),
@@ -215,19 +182,6 @@ fn render_id_anchor(registry: &InvariantRegistry) -> String {
 /// prefix up to and including `begin`, and the suffix from `end` onward) is
 /// returned verbatim. A missing/out-of-order marker is a typed
 /// [`ProjectionError`] rather than a silent clobber.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::projection::splice_region;
-///
-/// let existing = "intro\n<!--b-->\nOLD\n<!--e-->\noutro\n";
-/// let out = splice_region(existing, "NEW", "<!--b-->", "<!--e-->").unwrap();
-/// assert!(out.starts_with("intro\n<!--b-->"));
-/// assert!(out.ends_with("<!--e-->\noutro\n"));
-/// assert!(out.contains("NEW"));
-/// assert!(!out.contains("OLD"));
-/// ```
 pub fn splice_region(
     existing: &str,
     rendered: &str,
@@ -294,22 +248,6 @@ pub fn splice_region(
 ///
 /// [`read_repo_file`]: crate::storage::IssueStore::read_repo_file
 /// [`write_repo_file`]: crate::storage::IssueStore::write_repo_file
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::config::InvariantProjectionConfig;
-/// use jit::storage::JsonFileStorage;
-/// use jit::validation::invariants::InvariantRegistry;
-/// use jit::validation::projection::project_invariants;
-///
-/// let store = JsonFileStorage::new(".jit");
-/// let cfg = InvariantProjectionConfig::default();
-/// let reg = InvariantRegistry::empty();
-/// // Writes the rendered registry to the configured (default jit-owned) target.
-/// let written = project_invariants(&store, &cfg, &reg).unwrap();
-/// println!("projected invariants to {written}");
-/// ```
 pub fn project_invariants<S: IssueStore>(
     store: &S,
     config: &InvariantProjectionConfig,

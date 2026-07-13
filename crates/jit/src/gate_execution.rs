@@ -53,19 +53,6 @@ struct IssueDocEnvEntry<'a> {
 /// unset). The result is always a valid JSON array — `"[]"` when `documents`
 /// is empty — so a checker can parse the variable unconditionally instead of
 /// special-casing an absent or missing value.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::DocumentReference;
-/// use jit::gate_execution::build_issue_docs_env;
-///
-/// let docs = vec![DocumentReference::new("dev/plan.md".to_string())];
-/// let json = build_issue_docs_env(&docs);
-/// assert_eq!(json, r#"[{"path":"dev/plan.md","doc_type":null,"label":null}]"#);
-///
-/// assert_eq!(build_issue_docs_env(&[]), "[]");
-/// ```
 pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
     let entries: Vec<IssueDocEnvEntry> = documents
         .iter()

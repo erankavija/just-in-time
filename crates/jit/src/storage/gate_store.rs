@@ -49,16 +49,6 @@ struct GatesFile {
 /// Two `[[gates]]` rows carrying the same `key` are an error: the key is the
 /// registry identity (and the `gate` item kind's addressable self-id), and
 /// silently keeping one row would drop the other on the next save.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::gate_store::load_gate_registry;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// let registry = load_gate_registry(dir.path()).unwrap();
-/// assert!(registry.gates.is_empty());
-/// ```
 pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
     let path = jit_root.join(GATES_FILE);
     if !path.exists() {

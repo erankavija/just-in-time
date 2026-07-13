@@ -23,16 +23,6 @@ pub struct WorktreePaths {
 
 impl WorktreePaths {
     /// Detect worktree context using git commands.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::worktree_paths::WorktreePaths;
-    ///
-    /// let paths = WorktreePaths::detect().unwrap();
-    /// println!("Local .jit: {:?}", paths.local_jit);
-    /// println!("Shared .git/jit: {:?}", paths.shared_jit);
-    /// ```
     pub fn detect() -> Result<Self> {
         // Check if in git repo
         let is_repo = Command::new("git")

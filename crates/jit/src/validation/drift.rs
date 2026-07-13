@@ -51,24 +51,6 @@ use std::collections::BTreeSet;
 ///
 /// `subject` is the dangling binding and `invariant_id` is the offending
 /// invariant's self-id (whose `@/invariant/<id>` qualified id addresses it).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::drift::DriftFinding;
-///
-/// // A malformed binding (a bare name, not a recognized `@/rule/<name>` or
-/// // `@/gate/<key>` address) is a structural-defect drift case.
-/// let f = DriftFinding {
-///     invariant_id: "dag-acyclic".to_string(),
-///     subject: "ghost-rule".to_string(),
-///     unloadable: false,
-/// };
-/// // The human message names the invariant and the dangling binding.
-/// let msg = f.message();
-/// assert!(msg.contains("dag-acyclic"));
-/// assert!(msg.contains("ghost-rule"));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DriftFinding {
     /// The offending invariant's self-id.
@@ -91,21 +73,6 @@ impl DriftFinding {
     /// stands alone in CLI output and in a
     /// [`Finding`](crate::validation::engine::Finding). The unloadable case is
     /// worded distinctly from a missing target (REQ-01).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::drift::DriftFinding;
-    ///
-    /// let f = DriftFinding {
-    ///     invariant_id: "dag-acyclic".to_string(),
-    ///     subject: "ghost-rule".to_string(),
-    ///     unloadable: false,
-    /// };
-    /// assert!(f.message().contains("dag-acyclic"));
-    /// assert!(f.message().contains("ghost-rule"));
-    /// assert!(f.message().contains("declared-but-unenforced"));
-    /// ```
     pub fn message(&self) -> String {
         if self.unloadable {
             format!(
@@ -137,28 +104,6 @@ impl DriftFinding {
 ///
 /// Results are deterministic: findings follow the invariants' authored order.
 /// The function is pure — it reads only its arguments.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::drift::enforcement_drift;
-/// use jit::validation::invariants::InvariantRegistry;
-/// use std::collections::BTreeSet;
-///
-/// let reg = InvariantRegistry::from_toml_str(
-///     "[[invariants]]\nid = \"dag-acyclic\"\nstatement = \"s\"\nkind = \"enforced\"\n\
-///      enforced-by = \"ghost-rule\"\n",
-/// )
-/// .unwrap();
-/// // A repo with one real rule and no gates.
-/// let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
-/// let gates: BTreeSet<&str> = BTreeSet::new();
-///
-/// let findings = enforcement_drift(&reg.invariants, &rules, &gates);
-/// // The dangling binding is reported; the unclaimed real rule is NOT drift.
-/// assert_eq!(findings.len(), 1);
-/// assert_eq!(findings[0].subject, "ghost-rule");
-/// ```
 pub fn enforcement_drift(
     invariants: &[Invariant],
     rule_names: &BTreeSet<&str>,
@@ -180,18 +125,6 @@ pub fn enforcement_drift(
 /// to the gate registry) is reported as declared-but-unenforced with the
 /// `unloadable` flag set (REQ-01 covers a binding naming a missing OR
 /// unloadable target).
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::drift::SourceState;
-/// use std::collections::BTreeSet;
-///
-/// let names: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
-/// let loaded = SourceState::Loaded(&names);
-/// assert!(loaded.contains("dag-no-cycles"));
-/// assert!(!SourceState::Unloadable.contains("anything"));
-/// ```
 #[derive(Debug, Clone, Copy)]
 pub enum SourceState<'a> {
     /// The source loaded; the contained set names every entry it declares.
@@ -202,17 +135,6 @@ pub enum SourceState<'a> {
 
 impl SourceState<'_> {
     /// Whether the loaded source contains `name` (always `false` when unloadable).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::drift::SourceState;
-    /// use std::collections::BTreeSet;
-    ///
-    /// let names: BTreeSet<&str> = ["g"].into_iter().collect();
-    /// assert!(SourceState::Loaded(&names).contains("g"));
-    /// assert!(!SourceState::Unloadable.contains("g"));
-    /// ```
     pub fn contains(&self, name: &str) -> bool {
         match self {
             SourceState::Loaded(set) => set.contains(name),

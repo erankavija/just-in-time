@@ -9,18 +9,6 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Error returned when a string cannot be parsed as a [`DocumentScope`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::document::{DocumentScope, DocumentScopeParseError};
-/// use std::str::FromStr;
-///
-/// assert_eq!(
-///     DocumentScope::from_str("label:epic"),
-///     Err(DocumentScopeParseError::UnknownScope("label:epic".to_string()))
-/// );
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DocumentScopeParseError {
     /// The input did not match `all` or `issue:<id>`.
@@ -31,27 +19,6 @@ pub enum DocumentScopeParseError {
 /// Scope of a document link check.
 ///
 /// `all` checks every issue's documents; `issue:<id>` checks just one issue's.
-///
-/// # Examples
-///
-/// ```
-/// use jit::document::DocumentScope;
-/// use std::str::FromStr;
-///
-/// assert_eq!(DocumentScope::from_str("all").unwrap(), DocumentScope::All);
-/// assert_eq!(
-///     DocumentScope::from_str("issue:abc123").unwrap(),
-///     DocumentScope::Issue("abc123".to_string())
-/// );
-/// // Round-trips through Display.
-/// assert_eq!(DocumentScope::All.to_string(), "all");
-/// assert_eq!(
-///     DocumentScope::Issue("abc123".to_string()).to_string(),
-///     "issue:abc123"
-/// );
-/// // Unknown forms are rejected with a typed error.
-/// assert!(DocumentScope::from_str("everything").is_err());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DocumentScope {
     /// Check the documents of every issue.

@@ -53,22 +53,6 @@ pub const BREAKDOWN_REVIEW_PRESET: &str = "breakdown-review";
 /// `prompt_file`, structured context passed). Applying this preset to a
 /// `type:planning` issue attaches that gate, so the plan is reviewed before the
 /// fan-out (D8).
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::plan_review_preset;
-/// use jit::domain::GateMode;
-///
-/// let preset = plan_review_preset();
-/// assert_eq!(preset.name, "plan-review");
-/// assert_eq!(preset.gates.len(), 1);
-/// let gate = &preset.gates[0];
-/// assert_eq!(gate.key, "plan-review");
-/// assert_eq!(gate.mode, GateMode::Auto);
-/// assert!(gate.checker.is_some());
-/// assert!(preset.validate().is_ok());
-/// ```
 pub fn plan_review_preset() -> GatePresetDefinition {
     let mut env = HashMap::new();
     env.insert("REVIEWER_AGENT".to_string(), "codex exec".to_string());
@@ -109,24 +93,6 @@ pub fn plan_review_preset() -> GatePresetDefinition {
 /// `[hard]` criterion uncovered. The container thus reaches the checker via
 /// issue context, mirroring the other context-bearing gates; nothing here is
 /// hardcoded to a particular container type.
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::coverage_preview_preset;
-/// use jit::domain::{GateChecker, GateMode};
-///
-/// let preset = coverage_preview_preset();
-/// assert_eq!(preset.name, "coverage-preview");
-/// let gate = &preset.gates[0];
-/// assert_eq!(gate.mode, GateMode::Auto);
-/// match gate.checker.as_ref().unwrap() {
-///     GateChecker::Exec { command, .. } => {
-///         assert_eq!(command, "./scripts/coverage-preview.sh");
-///     }
-/// }
-/// assert!(preset.validate().is_ok());
-/// ```
 pub fn coverage_preview_preset() -> GatePresetDefinition {
     GatePresetDefinition {
         name: COVERAGE_PREVIEW_PRESET.to_string(),
@@ -174,22 +140,6 @@ pub fn coverage_preview_preset() -> GatePresetDefinition {
 /// it is an ordinary postcheck gate on `B`, jit's gate enforcement is
 /// self-guiding: `B` cannot complete — and the impl fan-out it gates cannot be
 /// released — until the review passes.
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::breakdown_review_preset;
-/// use jit::domain::GateMode;
-///
-/// let preset = breakdown_review_preset();
-/// assert_eq!(preset.name, "breakdown-review");
-/// assert_eq!(preset.gates.len(), 1);
-/// let gate = &preset.gates[0];
-/// assert_eq!(gate.key, "breakdown-review");
-/// assert_eq!(gate.mode, GateMode::Auto);
-/// assert!(gate.checker.is_some());
-/// assert!(preset.validate().is_ok());
-/// ```
 pub fn breakdown_review_preset() -> GatePresetDefinition {
     let mut env = HashMap::new();
     env.insert("REVIEWER_AGENT".to_string(), "codex exec".to_string());

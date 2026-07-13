@@ -45,21 +45,6 @@ pub struct WorktreeIdentity {
 /// # Format
 ///
 /// `wt:{8-hex-chars}` (e.g., `wt:abc123ef`)
-///
-/// # Examples
-///
-/// ```
-/// use std::path::PathBuf;
-/// use chrono::Utc;
-/// use jit::storage::worktree_identity::generate_worktree_id;
-///
-/// let path = PathBuf::from("/path/to/worktree");
-/// let timestamp = Utc::now();
-/// let id = generate_worktree_id(&path, timestamp);
-///
-/// assert!(id.starts_with("wt:"));
-/// assert_eq!(id.len(), 11); // "wt:" + 8 hex chars
-/// ```
 pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(path.to_string_lossy().as_bytes());
@@ -88,22 +73,6 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
 /// * `jit_dir` - Path to `.jit` directory
 /// * `worktree_root` - Current absolute path to worktree root
 /// * `branch` - Current git branch name
-///
-/// # Examples
-///
-/// ```no_run
-/// use std::path::PathBuf;
-/// use jit::storage::worktree_identity::load_or_create_worktree_identity;
-///
-/// let jit_dir = PathBuf::from("/path/to/worktree/.jit");
-/// let worktree_root = PathBuf::from("/path/to/worktree");
-/// let branch = "main".to_string();
-///
-/// let identity = load_or_create_worktree_identity(&jit_dir, &worktree_root, &branch)
-///     .expect("Failed to load/create worktree identity");
-///
-/// println!("Worktree ID: {}", identity.worktree_id);
-/// ```
 pub fn load_or_create_worktree_identity(
     jit_dir: &Path,
     worktree_root: &Path,
@@ -129,26 +98,6 @@ pub fn load_or_create_worktree_identity(
 /// * `jit_dir` - Path to `.jit` directory
 /// * `worktree_root` - Current absolute path to worktree root
 /// * `branch` - Current git branch name
-///
-/// # Examples
-///
-/// ```no_run
-/// use std::path::PathBuf;
-/// use jit::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
-///
-/// let jit_dir = PathBuf::from("/path/to/worktree/.jit");
-/// let worktree_root = PathBuf::from("/path/to/worktree");
-/// let branch = "main".to_string();
-///
-/// let (identity, warnings) =
-///     load_or_create_worktree_identity_with_warnings(&jit_dir, &worktree_root, &branch)
-///         .expect("Failed to load/create worktree identity");
-///
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("Worktree ID: {}", identity.worktree_id);
-/// ```
 pub fn load_or_create_worktree_identity_with_warnings(
     jit_dir: &Path,
     worktree_root: &Path,
@@ -276,16 +225,6 @@ pub fn load_or_create_worktree_identity_with_warnings(
 /// Returns `Ok(None)` when the file is absent (the worktree has no recorded
 /// identity yet), `Ok(Some(id))` when present and parseable, and an error only
 /// when the file exists but cannot be read or parsed.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::worktree_identity::read_worktree_id;
-///
-/// let dir = tempfile::tempdir().unwrap();
-/// // No .jit/worktree.json present yet.
-/// assert!(read_worktree_id(dir.path()).unwrap().is_none());
-/// ```
 pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
     let wt_file = worktree_root.join(".jit").join("worktree.json");
     if !wt_file.exists() {

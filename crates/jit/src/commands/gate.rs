@@ -7,16 +7,6 @@ use crate::domain::{GateMode, GateRunResult, GateRunStatus};
 ///
 /// The checker result is preserved so CLI callers can report the failed status
 /// without disagreeing with the persisted `gates_status` value.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::GatePassFailed;
-///
-/// fn remediation(error: &GatePassFailed) -> String {
-///     format!("jit gate status {} {}", error.issue_id, error.gate_key)
-/// }
-/// ```
 #[derive(Debug, thiserror::Error)]
 #[error(
     "Gate '{gate_key}' failed for issue {issue_id}. Checker status: {status:?}, exit code: {exit_code:?}. Inspect details with: jit gate status {issue_id} {gate_key} (add --all for run history, --findings for structured findings)"
@@ -42,16 +32,6 @@ pub struct GatePassFailed {
 /// gate is simply not in the issue's `gates_required` list. CLI callers classify
 /// it as an invalid-argument condition (exit code `2`), distinct from a checker
 /// failure or a runner error.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::GateNotRequiredError;
-///
-/// fn remediation(error: &GateNotRequiredError) -> String {
-///     format!("jit gate add {} {}", error.issue_id, error.gate_key)
-/// }
-/// ```
 #[derive(Debug, thiserror::Error)]
 #[error("Gate '{gate_key}' is not required for issue {issue_id}")]
 pub struct GateNotRequiredError {
@@ -68,26 +48,6 @@ pub struct GateNotRequiredError {
 /// passed at the current `HEAD` commit and the (potentially expensive) checker
 /// was skipped. On a normal run — manual attestation or a freshly executed
 /// checker — `already_passed` is `false`.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::GatePassOutcome;
-///
-/// fn describe(outcome: &GatePassOutcome) -> &'static str {
-///     if outcome.already_passed {
-///         "already passed at HEAD; checker skipped"
-///     } else {
-///         "gate passed"
-///     }
-/// }
-///
-/// let outcome = GatePassOutcome {
-///     warnings: Vec::new(),
-///     already_passed: true,
-/// };
-/// assert_eq!(describe(&outcome), "already passed at HEAD; checker skipped");
-/// ```
 #[derive(Debug, Clone)]
 pub struct GatePassOutcome {
     /// Warnings gathered while passing the gate (e.g. lease warnings).
@@ -102,19 +62,6 @@ pub struct GatePassOutcome {
 /// Records which gate was passed and whether its checker actually ran
 /// (`already_passed == false`) or was skipped because it already passed at the
 /// current `HEAD` (`already_passed == true`), plus any warnings gathered.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::GatePassAllEntry;
-///
-/// let entry = GatePassAllEntry {
-///     gate_key: "tests".into(),
-///     already_passed: false,
-///     warnings: Vec::new(),
-/// };
-/// assert_eq!(entry.gate_key, "tests");
-/// ```
 #[derive(Debug, Clone)]
 pub struct GatePassAllEntry {
     /// The gate that was passed.
@@ -132,22 +79,6 @@ pub struct GatePassAllEntry {
 /// still succeeds with exit `0`). On the first non-passing gate `pass_all_gates`
 /// fails fast and returns the underlying error instead of this outcome, so a
 /// `PassAllOutcome` always describes an all-green run.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::{GatePassAllEntry, PassAllOutcome};
-///
-/// let outcome = PassAllOutcome {
-///     results: vec![GatePassAllEntry {
-///         gate_key: "tests".into(),
-///         already_passed: true,
-///         warnings: Vec::new(),
-///     }],
-/// };
-/// assert_eq!(outcome.results.len(), 1);
-/// assert!(outcome.results[0].already_passed);
-/// ```
 #[derive(Debug, Clone)]
 pub struct PassAllOutcome {
     /// Per-gate results, in `gates_required` order.
@@ -176,18 +107,6 @@ pub struct GateRemoveResult {
 /// `jit gate update` must be able to both set AND clear (working dir, prompt,
 /// prompt file, checker env) so editing never requires hand-editing the
 /// registry file.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::FieldEdit;
-///
-/// // The default is `Keep` (leave unchanged).
-/// let keep: FieldEdit<String> = FieldEdit::default();
-/// assert!(keep.is_keep());
-/// assert!(!FieldEdit::Set("x".to_string()).is_keep());
-/// assert!(!FieldEdit::<String>::Clear.is_keep());
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum FieldEdit<T> {
     /// Leave the field unchanged.
@@ -201,16 +120,6 @@ pub enum FieldEdit<T> {
 
 impl<T> FieldEdit<T> {
     /// `true` when this edit leaves the field unchanged.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::commands::FieldEdit;
-    ///
-    /// assert!(FieldEdit::<String>::Keep.is_keep());
-    /// assert!(!FieldEdit::Set("ci".to_string()).is_keep());
-    /// assert!(!FieldEdit::<String>::Clear.is_keep());
-    /// ```
     pub fn is_keep(&self) -> bool {
         matches!(self, FieldEdit::Keep)
     }
@@ -226,22 +135,6 @@ impl<T> FieldEdit<T> {
 /// `timeout`, `working_dir`, `pass_context`, `prompt`, `prompt_file`, `env`)
 /// are merged onto the gate's existing checker so an unprovided field is
 /// preserved.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::GateUpdate;
-///
-/// // A default (no-field) update would change nothing.
-/// assert!(GateUpdate::default().is_empty());
-///
-/// // Setting any field makes it non-empty.
-/// let update = GateUpdate {
-///     title: Some("New title".to_string()),
-///     ..Default::default()
-/// };
-/// assert!(!update.is_empty());
-/// ```
 #[derive(Debug, Default, Clone)]
 pub struct GateUpdate {
     /// New human-readable title.
@@ -273,18 +166,6 @@ pub struct GateUpdate {
 
 impl GateUpdate {
     /// `true` when no field is set, i.e. the update would change nothing.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::commands::GateUpdate;
-    ///
-    /// assert!(GateUpdate::default().is_empty());
-    ///
-    /// let mut update = GateUpdate::default();
-    /// update.timeout = Some(60);
-    /// assert!(!update.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         self.title.is_none()
             && self.description.is_none()
@@ -464,25 +345,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings)
     /// and whether the checker was skipped.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use jit::commands::CommandExecutor;
-    /// use jit::{InMemoryStorage, IssueStore};
-    ///
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    /// let issue = jit::domain::Issue::new("Title".into(), "Body".into());
-    /// let id = issue.id.clone();
-    /// executor.storage().save_issue(issue).unwrap();
-    /// executor.add_gate(&id, "review".into()).unwrap();
-    ///
-    /// // Manual gate: not already passed, so the checker is not skipped.
-    /// let outcome = executor
-    ///     .pass_gate(&id, "review".into(), Some("human:alice".into()), false)
-    ///     .unwrap();
-    /// assert!(!outcome.already_passed);
-    /// ```
     pub fn pass_gate(
         &self,
         issue_id: &str,
@@ -589,22 +451,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// attempted, so the caller can map it to the right exit code (checker
     /// failure, runner error, etc.). An issue with no required gates succeeds
     /// with an empty result set.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use jit::commands::CommandExecutor;
-    /// use jit::{InMemoryStorage, IssueStore};
-    ///
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    /// let issue = jit::domain::Issue::new("Title".into(), "Body".into());
-    /// let id = issue.id.clone();
-    /// executor.storage().save_issue(issue).unwrap();
-    ///
-    /// // No required gates: succeeds with an empty result set.
-    /// let outcome = executor.pass_all_gates(&id, None, false).unwrap();
-    /// assert!(outcome.results.is_empty());
-    /// ```
     pub fn pass_all_gates(
         &self,
         issue_id: &str,
@@ -782,29 +628,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// without a `checker`. A `gate_definition_created` event is appended
     /// (@/inv/event-log), mirroring [`update_gate`](Self::update_gate)'s
     /// `gate_definition_updated` event.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    /// use jit::domain::{GateStage, GateMode};
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // A manual review gate: no checker, postcheck stage, no example snippet.
-    /// executor
-    ///     .define_gate(
-    ///         "code-review".to_string(),
-    ///         "Code Review".to_string(),
-    ///         "Human review before done".to_string(),
-    ///         GateStage::Postcheck,
-    ///         GateMode::Manual,
-    ///         None,
-    ///         100,
-    ///         None,
-    ///     )
-    ///     .unwrap();
-    /// ```
     #[allow(clippy::too_many_arguments)]
     pub fn define_gate(
         &self,

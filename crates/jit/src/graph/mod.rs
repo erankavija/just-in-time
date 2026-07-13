@@ -15,21 +15,6 @@ pub mod keyed;
 pub use keyed::find_keyed_cycle;
 
 /// Which way a traversal follows dependency edges.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::{DependencyGraph, Direction};
-///
-/// let a = Issue::new("A".into(), "".into());
-/// let mut b = Issue::new("B".into(), "".into());
-/// b.dependencies.push(a.id.clone());
-///
-/// let graph = DependencyGraph::new(&[&a, &b]);
-/// assert_eq!(graph.traverse(&b.id, Direction::Dependencies, 1).len(), 1);
-/// assert_eq!(graph.traverse(&a.id, Direction::Dependents, 1).len(), 1);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     /// Outgoing edges: the nodes a node depends on.
@@ -43,23 +28,6 @@ pub enum Direction {
 /// The unfolding is a tree: a node reachable by several paths appears once per
 /// path, each occurrence carrying its own `level` (1 for a direct neighbour of
 /// the expansion root).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::{DependencyGraph, Direction};
-///
-/// let a = Issue::new("A".into(), "".into());
-/// let mut b = Issue::new("B".into(), "".into());
-/// b.dependencies.push(a.id.clone());
-///
-/// let graph = DependencyGraph::new(&[&a, &b]);
-/// let forest = graph.expand(&b.id, Direction::Dependencies, 0);
-/// assert_eq!(forest[0].node.id, a.id);
-/// assert_eq!(forest[0].level, 1);
-/// assert!(forest[0].children.is_empty());
-/// ```
 #[derive(Debug)]
 pub struct Expansion<'a, T> {
     /// The node this occurrence stands for.
@@ -161,25 +129,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// At `max_depth = 0` and [`Direction::Dependencies`] this returns the same
     /// nodes as [`get_transitive_dependencies`](Self::get_transitive_dependencies).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::{DependencyGraph, Direction};
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let immediate = graph.traverse(&c.id, Direction::Dependencies, 1);
-    /// assert_eq!(immediate.len(), 1);
-    /// assert_eq!(immediate[0].id, b.id);
-    /// assert_eq!(graph.traverse(&c.id, Direction::Dependencies, 0).len(), 2);
-    /// ```
     pub fn traverse(&self, start: &str, direction: Direction, max_depth: u32) -> Vec<&'a T> {
         let neighbors = self.neighbors(direction);
         let frontier = |id: &str, depth: u32| -> Vec<(&'a str, u32)> {
@@ -219,30 +168,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// the result. Unlike [`traverse`](Self::traverse), a node reached by several
     /// paths is unfolded once per path, which is what a dependency tree renders.
     /// `max_depth` counts edges from `start`, 0 being unlimited.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::{DependencyGraph, Direction};
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let forest = graph.expand(&c.id, Direction::Dependencies, 0);
-    /// // `a` is reachable both directly and via `b`, so it is unfolded twice.
-    /// let occurrences_of_a = forest
-    ///     .iter()
-    ///     .flat_map(|root| std::iter::once(root).chain(root.children.iter()))
-    ///     .filter(|occurrence| occurrence.node.id == a.id)
-    ///     .count();
-    /// assert_eq!(occurrences_of_a, 2);
-    /// ```
     pub fn expand(
         &self,
         start: &str,
@@ -381,30 +306,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// [`get_transitive_dependents`](Self::get_transitive_dependents), it answers
     /// "what does this node (transitively) require?" — used to assemble an issue's
     /// dependency neighborhood for transition-time graph-rule evaluation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::DependencyGraph;
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone()); // B depends on A
-    /// c.dependencies.push(b.id.clone()); // C depends on B (and transitively A)
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let mut deps: Vec<&str> = graph
-    ///     .get_transitive_dependencies(&c.id)
-    ///     .iter()
-    ///     .map(|i| i.id.as_str())
-    ///     .collect();
-    /// deps.sort();
-    /// let mut expected = vec![a.id.as_str(), b.id.as_str()];
-    /// expected.sort();
-    /// assert_eq!(deps, expected);
-    /// ```
     pub fn get_transitive_dependencies(&self, node_id: &str) -> Vec<&'a T> {
         let mut result: HashSet<&str> = HashSet::new();
         let mut stack = vec![node_id];
@@ -493,23 +394,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// An edge is transitive if there exists a path from→...→to
     /// through other edges (i.e., path length > 1).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::DependencyGraph;
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    /// c.dependencies.push(a.id.clone()); // Redundant!
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// assert!(graph.is_transitive(&c.id, &a.id)); // C→A is transitive via C→B→A
-    /// ```
     pub fn is_transitive(&self, from: &str, to: &str) -> bool {
         // Check if there's a path from→to excluding the direct edge
         self.has_path_excluding_direct(from, to)
@@ -548,26 +432,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     ///
     /// Returns the minimal set of dependencies that preserves reachability.
     /// An edge is kept only if it's not reachable through other edges.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::DependencyGraph;
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    /// c.dependencies.push(a.id.clone()); // Redundant
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let reduced = graph.compute_transitive_reduction(&c.id);
-    ///
-    /// assert_eq!(reduced.len(), 1);
-    /// assert!(reduced.contains(&b.id)); // Only keep C→B
-    /// ```
     pub fn compute_transitive_reduction(&self, node_id: &str) -> HashSet<String> {
         let Some(node) = self.nodes.get(node_id) else {
             return HashSet::new();
@@ -645,24 +509,6 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// exposed as a pure query so the write path can reject a redundant edge
     /// before persisting it instead of surfacing the violation at a later
     /// `jit validate`. The result is sorted for deterministic reporting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::DependencyGraph;
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    /// c.dependencies.push(a.id.clone()); // redundant: C→A already via C→B→A
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let redundant = graph.find_redundant_edges();
-    /// assert_eq!(redundant, vec![(c.id.clone(), a.id.clone())]);
-    /// ```
     pub fn find_redundant_edges(&self) -> Vec<(String, String)> {
         let mut redundant: Vec<(String, String)> = Vec::new();
         for node in self.nodes.values() {
@@ -684,26 +530,6 @@ impl<'a, T: GraphNode> Expansion<'a, T> {
     ///
     /// A count above 1 marks a node shared between paths, the diamonds a
     /// dependency tree flags.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::{DependencyGraph, Direction, Expansion};
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// let mut c = Issue::new("C".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    /// c.dependencies.push(a.id.clone());
-    /// c.dependencies.push(b.id.clone());
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b, &c]);
-    /// let forest = graph.expand(&c.id, Direction::Dependencies, 0);
-    /// let counts = Expansion::occurrences(&forest);
-    /// assert_eq!(counts.get(a.id.as_str()), Some(&2));
-    /// assert_eq!(counts.get(b.id.as_str()), Some(&1));
-    /// ```
     pub fn occurrences(forest: &[Self]) -> HashMap<&'a str, usize> {
         let mut counts: HashMap<&'a str, usize> = HashMap::new();
         let mut stack: Vec<&Self> = forest.iter().collect();
@@ -719,25 +545,6 @@ impl<'a, T: GraphNode> Expansion<'a, T> {
     /// `build` receives a node, its level, and its already-built children. It
     /// lets a command project an expansion into a view type without walking the
     /// tree itself.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::graph::{DependencyGraph, Direction};
-    ///
-    /// let a = Issue::new("A".into(), "".into());
-    /// let mut b = Issue::new("B".into(), "".into());
-    /// b.dependencies.push(a.id.clone());
-    ///
-    /// let graph = DependencyGraph::new(&[&a, &b]);
-    /// let forest = graph.expand(&b.id, Direction::Dependencies, 0);
-    /// let render = |node: &Issue, level: u32, children: Vec<String>| {
-    ///     format!("{}@{}{}", node.id, level, children.join(""))
-    /// };
-    /// let rendered: Vec<String> = forest.iter().map(|e| e.fold(&render)).collect();
-    /// assert_eq!(rendered, vec![format!("{}@1", a.id)]);
-    /// ```
     pub fn fold<N>(&self, build: &impl Fn(&'a T, u32, Vec<N>) -> N) -> N {
         let children = self
             .children

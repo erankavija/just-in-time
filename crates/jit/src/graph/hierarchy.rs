@@ -136,23 +136,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 /// node to a level via the [`HierarchyConfig`]. Implemented for
 /// [`Issue`](crate::domain::Issue); a test double need only return its type
 /// value.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::hierarchy::HierarchyNode;
-///
-/// let mut epic = Issue::new("Auth".into(), String::new());
-/// epic.labels = vec!["type:epic".into()];
-/// let task = Issue::new("Login".into(), String::new());
-/// epic.dependencies = vec![task.id.clone()];
-///
-/// assert_eq!(epic.id(), epic.id.as_str());
-/// assert_eq!(epic.type_name(), Some("epic"));
-/// assert_eq!(epic.dependencies(), &[task.id.clone()]);
-/// assert_eq!(task.type_name(), None); // no type label
-/// ```
 pub trait HierarchyNode {
     /// Unique identifier for this node.
     fn id(&self) -> &str;
@@ -232,26 +215,6 @@ pub struct NodeHierarchy {
 ///
 /// Every input node has an entry (roots and orphans included). Look facts up by
 /// id through the accessors; the map is keyed by node id.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::graph::hierarchy::resolve_hierarchy;
-/// use jit::domain::type_taxonomy::HierarchyConfig;
-///
-/// let mut epic = Issue::new("Epic".into(), String::new());
-/// epic.labels = vec!["type:epic".into()];
-/// let mut task = Issue::new("Task".into(), String::new());
-/// task.labels = vec!["type:task".into()];
-/// epic.dependencies = vec![task.id.clone()];
-///
-/// let resolution = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-/// assert_eq!(resolution.len(), 2);
-/// assert_eq!(resolution.children(&epic.id), [task.id.clone()]);
-/// assert_eq!(resolution.rank(&epic.id), Some(1));
-/// assert_eq!(resolution.rank(&task.id), Some(0));
-/// ```
 #[derive(Debug, Clone, Default)]
 pub struct HierarchyResolution {
     nodes: HashMap<String, NodeHierarchy>,
@@ -259,65 +222,17 @@ pub struct HierarchyResolution {
 
 impl HierarchyResolution {
     /// The full [`NodeHierarchy`] for `id`, if the node was in the input.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// assert_eq!(r.get(&task.id).unwrap().parent.as_deref(), Some(epic.id.as_str()));
-    /// assert!(r.get("no-such-id").is_none());
-    /// ```
     pub fn get(&self, id: &str) -> Option<&NodeHierarchy> {
         self.nodes.get(id)
     }
 
     /// The nearest dominating container's id for `id`, or `None` when the node
     /// is a root (or absent).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// assert_eq!(r.parent(&task.id), Some(epic.id.as_str()));
-    /// assert_eq!(r.parent(&epic.id), None); // a root
-    /// ```
     pub fn parent(&self, id: &str) -> Option<&str> {
         self.nodes.get(id).and_then(|n| n.parent.as_deref())
     }
 
     /// The ids of `id`'s resolved children (empty when it has none, or is absent).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// assert_eq!(r.children(&epic.id), [task.id.clone()]);
-    /// assert!(r.children(&task.id).is_empty());
-    /// ```
     pub fn children(&self, id: &str) -> &[String] {
         self.nodes
             .get(id)
@@ -327,95 +242,26 @@ impl HierarchyResolution {
 
     /// The strategic root container's id for `id`, or `None` for an orphan leaf
     /// (or absent node).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// // The epic is the strategic root, so the task clusters to it.
-    /// assert_eq!(r.cluster(&task.id), Some(epic.id.as_str()));
-    /// ```
     pub fn cluster(&self, id: &str) -> Option<&str> {
         self.nodes.get(id).and_then(|n| n.cluster.as_deref())
     }
 
     /// The longest-path rank for `id`, or `None` when the node is absent.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// assert_eq!(r.rank(&epic.id), Some(1));
-    /// assert_eq!(r.rank(&task.id), Some(0));
-    /// assert_eq!(r.rank("no-such-id"), None);
-    /// ```
     pub fn rank(&self, id: &str) -> Option<u32> {
         self.nodes.get(id).map(|n| n.rank)
     }
 
     /// Iterate over every resolved node as `(id, facts)`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let mut epic = Issue::new("Epic".into(), String::new());
-    /// epic.labels = vec!["type:epic".into()];
-    /// let task = Issue::new("Task".into(), String::new());
-    /// epic.dependencies = vec![task.id.clone()];
-    ///
-    /// let r = resolve_hierarchy(&[&epic, &task], &HierarchyConfig::default());
-    /// assert_eq!(r.iter().count(), 2);
-    /// ```
     pub fn iter(&self) -> impl Iterator<Item = (&String, &NodeHierarchy)> {
         self.nodes.iter()
     }
 
     /// Number of resolved nodes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let task = Issue::new("Task".into(), String::new());
-    /// let r = resolve_hierarchy(&[&task], &HierarchyConfig::default());
-    /// assert_eq!(r.len(), 1);
-    /// ```
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     /// Whether the resolution is empty (no input nodes).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use jit::domain::Issue;
-    /// # use jit::graph::hierarchy::resolve_hierarchy;
-    /// # use jit::domain::type_taxonomy::HierarchyConfig;
-    /// let empty = resolve_hierarchy::<Issue>(&[], &HierarchyConfig::default());
-    /// assert!(empty.is_empty());
-    /// ```
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }

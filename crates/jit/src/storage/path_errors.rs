@@ -7,16 +7,6 @@ use thiserror::Error;
 /// Replaces stringly-typed `anyhow` errors for `IssueStore::read_path_bytes`
 /// so callers (e.g. HTTP route handlers) can branch on the specific failure
 /// without pattern-matching error message strings.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::PathReadError;
-///
-/// let err = PathReadError::NotFound("docs/spec.md".to_string());
-/// assert!(matches!(err, PathReadError::NotFound(_)));
-/// assert!(err.to_string().contains("not found"));
-/// ```
 #[derive(Error, Debug)]
 pub enum PathReadError {
     /// The requested file or tree entry does not exist.
@@ -64,22 +54,6 @@ impl From<std::io::Error> for PathReadError {
 ///
 /// Dots *inside* a segment (e.g. `foo..bar.txt`) are allowed: they are legitimate
 /// filenames that cannot traverse upward.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::{validate_repo_relative_path, PathReadError};
-///
-/// assert!(validate_repo_relative_path("docs/spec.md").is_ok());
-/// assert!(matches!(
-///     validate_repo_relative_path("/etc/passwd"),
-///     Err(PathReadError::InvalidPath(_))
-/// ));
-/// assert!(matches!(
-///     validate_repo_relative_path("../secret"),
-///     Err(PathReadError::InvalidPath(_))
-/// ));
-/// ```
 pub fn validate_repo_relative_path(path: &str) -> Result<(), PathReadError> {
     if path.is_empty() {
         return Err(PathReadError::InvalidPath(

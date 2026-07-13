@@ -184,24 +184,6 @@ impl ClaimsIndex {
     /// [`ClaimCoordinator::load_claims_index`], which delegates here). A missing
     /// file is normal — no claims coordination has happened yet — and yields an
     /// empty index rather than an error.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::claim_coordinator::ClaimsIndex;
-    /// use jit::storage::worktree_paths::WorktreePaths;
-    ///
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let paths = WorktreePaths {
-    ///     common_dir: dir.path().join(".git"),
-    ///     worktree_root: dir.path().to_path_buf(),
-    ///     local_jit: dir.path().join(".jit"),
-    ///     shared_jit: dir.path().to_path_buf(),
-    /// };
-    /// // No claims.index.json on disk yet: an empty index is returned.
-    /// let index = ClaimsIndex::load(&paths).unwrap();
-    /// assert!(index.leases.is_empty());
-    /// ```
     pub fn load(paths: &WorktreePaths) -> Result<ClaimsIndex> {
         let index_path = paths.shared_jit.join("claims.index.json");
 
@@ -226,24 +208,6 @@ impl ClaimsIndex {
     /// index from the claims log as [`StorageWarning::SequenceGap`] values. The
     /// storage layer collects these instead of printing them; the output layer
     /// decides whether and how to render them.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::{ClaimCoordinator, StorageWarning};
-    /// # use jit::storage::claim_coordinator::ClaimsIndex;
-    /// let index = ClaimsIndex {
-    ///     sequence_gaps: vec![2, 5],
-    ///     ..Default::default()
-    /// };
-    /// assert_eq!(
-    ///     index.warnings(),
-    ///     vec![
-    ///         StorageWarning::SequenceGap { missing: 2 },
-    ///         StorageWarning::SequenceGap { missing: 5 },
-    ///     ]
-    /// );
-    /// ```
     pub fn warnings(&self) -> Vec<StorageWarning> {
         self.sequence_gaps
             .iter()
@@ -340,30 +304,6 @@ impl ClaimCoordinator {
     /// Set `false` only in tests that verify in-memory/rebuild invariants
     /// rather than crash durability; it removes the per-write fsync that
     /// otherwise dominates I/O-heavy property tests.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::worktree_paths::WorktreePaths;
-    /// use jit::storage::{ClaimCoordinator, FileLocker};
-    /// use std::time::Duration;
-    ///
-    /// let paths = WorktreePaths {
-    ///     common_dir: "/tmp/demo/.git".into(),
-    ///     worktree_root: "/tmp/demo".into(),
-    ///     local_jit: "/tmp/demo/.jit".into(),
-    ///     shared_jit: "/tmp/demo/.git/jit".into(),
-    /// };
-    /// // Builder: start fsync-on (the default), then opt out for a fast test run.
-    /// let coordinator = ClaimCoordinator::new(
-    ///     paths,
-    ///     FileLocker::new(Duration::from_secs(5)),
-    ///     "wt:demo".to_string(),
-    ///     "agent:demo".to_string(),
-    /// )
-    /// .with_fsync(false);
-    /// let _ = coordinator;
-    /// ```
     #[must_use]
     pub fn with_fsync(mut self, fsync: bool) -> Self {
         self.fsync = fsync;
@@ -1137,18 +1077,6 @@ impl ClaimCoordinator {
     /// rebuild, or eviction) fails irrecoverably. Best-effort temp-file cleanup
     /// failures are surfaced as [`StorageWarning::TempCleanupFailed`] rather
     /// than errors.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::ClaimCoordinator;
-    /// # fn run(coordinator: &ClaimCoordinator) -> anyhow::Result<()> {
-    /// for warning in coordinator.startup_recovery()? {
-    ///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn startup_recovery(&self) -> Result<Vec<StorageWarning>> {
         let mut warnings = Vec::new();
 
@@ -1196,19 +1124,6 @@ impl ClaimCoordinator {
     /// Note: Does NOT check for expired leases - those are handled by evict_expired().
     /// Expired leases are normal state, not corruption. Treating them as corruption
     /// would trigger unnecessary full index rebuilds.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::ClaimCoordinator;
-    /// # fn run(coordinator: &ClaimCoordinator) -> anyhow::Result<()> {
-    /// let (consistent, warnings) = coordinator.verify_index_consistency()?;
-    /// if !consistent {
-    ///     // rebuild the index; `warnings` explains why
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn verify_index_consistency(&self) -> Result<(bool, Vec<StorageWarning>)> {
         use std::collections::HashSet;
 

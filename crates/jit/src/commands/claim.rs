@@ -69,22 +69,6 @@ fn get_current_branch() -> Result<String> {
 ///
 /// Returns an error if the issue cannot be resolved or loaded, or if the lease
 /// cannot be acquired (e.g. it is already held by another agent).
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_acquire;
-/// use jit::storage::JsonFileStorage;
-///
-/// let storage = JsonFileStorage::new(".jit");
-/// let (lease_id, warnings) =
-///     execute_claim_acquire(&storage, "abc123", 600, None, None)?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("acquired lease {}", lease_id);
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_acquire<S: IssueStore>(
     storage: &S,
     issue_id: &str,
@@ -185,18 +169,6 @@ pub fn execute_claim_acquire<S: IssueStore>(
 ///
 /// Returns an error if worktree context cannot be detected or the heartbeat
 /// cannot be recorded (e.g. the lease does not exist).
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_heartbeat;
-///
-/// let warnings = execute_claim_heartbeat("lease-uuid")?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
     use crate::agent_config::resolve_agent_id;
 
@@ -234,21 +206,6 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
 /// Returned by [`execute_claim_release_by_issue`] so the caller can report which
 /// lease was released, on which issue, and which identity performed the release
 /// (the actor recorded in the audit trail).
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::claim::ReleasedLeaseInfo;
-///
-/// let info = ReleasedLeaseInfo {
-///     lease_id: "00914031-7aeb-4d42-b3b3-bdb0d3d16134".to_string(),
-///     issue_id: "f7a0ad17-8baf-41f3-a0b2-34edc650c409".to_string(),
-///     previous_owner: "agent:owner".to_string(),
-///     actor: "agent:stranger".to_string(),
-/// };
-/// assert_eq!(info.previous_owner, "agent:owner");
-/// assert_eq!(info.actor, "agent:stranger");
-/// ```
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ReleasedLeaseInfo {
     /// The lease ID that was released (resolved from the issue, not supplied by the user).
@@ -323,18 +280,6 @@ fn resolve_release_actor() -> Result<String> {
 /// Returns an error if the issue id cannot be resolved, if the issue has no
 /// active lease (see [`crate::errors::no_active_lease`]), or if the underlying
 /// eviction fails.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_release_by_issue;
-/// use jit::storage::JsonFileStorage;
-///
-/// let storage = JsonFileStorage::new(".jit");
-/// // Release whatever lease is active on issue `abc123`, regardless of owner.
-/// let (released, _warnings) = execute_claim_release_by_issue(&storage, "abc123").unwrap();
-/// println!("released {} on {} by {}", released.lease_id, released.issue_id, released.actor);
-/// ```
 pub fn execute_claim_release_by_issue<S: IssueStore>(
     storage: &S,
     issue_id: &str,
@@ -431,20 +376,6 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 ///
 /// Returns an error if worktree context cannot be detected or the lease cannot
 /// be renewed (e.g. it does not exist).
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_renew;
-/// use jit::storage::JsonFileStorage;
-///
-/// let (lease, warnings) = execute_claim_renew::<JsonFileStorage>("lease-uuid", 600)?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("renewed lease on {}", lease.issue_id);
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_renew<S: IssueStore>(
     lease_id: &str,
     extension_secs: u64,
@@ -502,20 +433,6 @@ pub fn execute_claim_renew<S: IssueStore>(
 ///
 /// Returns an error if worktree context cannot be detected or the leases cannot
 /// be read.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_status;
-/// use jit::storage::JsonFileStorage;
-///
-/// let (leases, warnings) = execute_claim_status::<JsonFileStorage>(None, None)?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("{} active lease(s)", leases.len());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_status<S: IssueStore>(
     issue_id: Option<&str>,
     agent_id: Option<&str>,
@@ -578,19 +495,6 @@ pub fn execute_claim_status<S: IssueStore>(
 ///
 /// Returns an error if worktree context cannot be detected or the leases cannot
 /// be read.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_list;
-///
-/// let (leases, warnings) = execute_claim_list()?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("{} active lease(s)", leases.len());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
@@ -706,19 +610,6 @@ pub fn check_issue_lease(
 ///
 /// Returns an error if worktree context cannot be detected or the lease cannot
 /// be evicted.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::claim::execute_claim_force_evict;
-/// use jit::storage::JsonFileStorage;
-///
-/// let warnings = execute_claim_force_evict::<JsonFileStorage>("lease-uuid", "stale")?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_claim_force_evict<S: IssueStore>(
     lease_id: &str,
     reason: &str,

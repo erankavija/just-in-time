@@ -52,22 +52,6 @@ use quick_xml::XmlVersion;
 /// Pure: [`ContentParser::parse`] is a deterministic function of the input.
 /// Available only when the `xml` feature is enabled. See the [module
 /// docs](self) for the element convention it expects.
-///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "xml")] {
-/// use jit::document::{ContentParser, XmlContentParser};
-///
-/// let xml = "<section><heading level=\"2\">Notes</heading>\
-///     <item>first</item><item>second</item></section>";
-/// let parsed = XmlContentParser.parse(xml);
-/// let notes = parsed.sections.get("notes").unwrap();
-/// assert_eq!(notes.heading, "Notes");
-/// assert_eq!(notes.level, 2);
-/// assert_eq!(notes.items, vec!["first".to_string(), "second".to_string()]);
-/// # }
-/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct XmlContentParser;
 

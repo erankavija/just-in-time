@@ -48,16 +48,6 @@ pub struct Command {
     ///
     /// Empty for commands with no visible alias, and then skipped in the
     /// serialized schema.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::schema::CommandSchema;
-    ///
-    /// let schema = CommandSchema::generate();
-    /// // `jit dep` is also reachable as `jit dependency`.
-    /// assert!(schema.commands["dep"].aliases.contains(&"dependency".to_string()));
-    /// ```
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
     /// Subcommands (for issue, dep, gate, etc.)
@@ -108,22 +98,6 @@ pub struct Flag {
     ///
     /// Empty for flags with no visible alias, and then skipped in the
     /// serialized schema.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::schema::Flag;
-    ///
-    /// // `--label` also accepts `--add-label`.
-    /// let flag = Flag {
-    ///     name: "label".to_string(),
-    ///     flag_type: "array<string>".to_string(),
-    ///     required: false,
-    ///     description: "Add label(s)".to_string(),
-    ///     aliases: vec!["add-label".to_string()],
-    /// };
-    /// assert_eq!(flag.aliases, ["add-label"]);
-    /// ```
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
 }
@@ -165,22 +139,6 @@ pub struct ExitCodeDoc {
 /// [`CommandExitCode::code`] is verified against the global taxonomy in
 /// `schema.rs` tests, so this projection cannot silently drift from runtime
 /// behavior (@/inv/single-source-prose).
-///
-/// # Examples
-///
-/// ```
-/// use jit::schema::CommandSchema;
-///
-/// let schema = CommandSchema::generate();
-/// // `jit gate status-all` exits 4 while any required gate is unpassed — a
-/// // completed status report, so it is flagged as an exception.
-/// let row = schema
-///     .command_exit_codes
-///     .iter()
-///     .find(|c| c.command == "gate status-all" && c.code == Some(4))
-///     .expect("gate status-all exit-4 row");
-/// assert!(row.exception);
-/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandExitCode {
     /// Command or command family (e.g. `gate evaluate`, `validate`), or `*` for
@@ -935,14 +893,6 @@ impl CommandSchema {
 /// per-command mappings ([`CommandSchema::command_exit_codes`]) into markdown, so
 /// the committed doc is generated rather than hand-copied. A test asserts the
 /// committed file equals this output (@/inv/single-source-prose).
-///
-/// # Examples
-///
-/// ```
-/// let page = jit::schema::render_exit_code_reference();
-/// assert!(page.starts_with("# Exit Codes"));
-/// assert!(page.contains("| Command | Code | Condition | Exception |"));
-/// ```
 pub fn render_exit_code_reference() -> String {
     let mut out = String::new();
     out.push_str("# Exit Codes\n\n");

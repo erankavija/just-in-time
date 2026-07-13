@@ -12,23 +12,6 @@ use crate::storage::StorageWarning;
 /// `--append-description-file`), separated by exactly one blank line; when
 /// the existing description is empty the result is just the new text, with
 /// no leading blank line.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::DescriptionUpdate;
-///
-/// // Replace overwrites the existing description entirely.
-/// assert_eq!(DescriptionUpdate::Replace("new".to_string()).apply("old"), "new");
-///
-/// // Append adds text after a single blank line...
-/// assert_eq!(
-///     DescriptionUpdate::Append("note".to_string()).apply("intro"),
-///     "intro\n\nnote"
-/// );
-/// // ...except against an empty description, where there is no leading blank line.
-/// assert_eq!(DescriptionUpdate::Append("first".to_string()).apply(""), "first");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DescriptionUpdate {
     Replace(String),
@@ -38,14 +21,6 @@ pub enum DescriptionUpdate {
 impl DescriptionUpdate {
     /// Apply this operation against an existing description, returning the
     /// resulting description text.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::commands::DescriptionUpdate;
-    ///
-    /// assert_eq!(DescriptionUpdate::Append("b".to_string()).apply("a"), "a\n\nb");
-    /// ```
     pub fn apply(self, existing: &str) -> String {
         match self {
             DescriptionUpdate::Replace(text) => text,

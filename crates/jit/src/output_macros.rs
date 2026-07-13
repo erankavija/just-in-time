@@ -2,12 +2,6 @@
 
 /// Output a simple message: either JSON-wrapped or plain text
 /// Respects --quiet flag to suppress non-essential output
-///
-/// # Examples
-///
-/// ```ignore
-/// output_message!(quiet, json, "issue create", "Created issue: {}", id);
-/// ```
 #[macro_export]
 macro_rules! output_message {
     ($quiet:expr, $json:expr, $command:expr, $($arg:tt)*) => {
@@ -25,19 +19,6 @@ macro_rules! output_message {
 
 /// Output data as JSON or custom human-readable format
 /// Data output is preserved in quiet mode (essential output)
-///
-/// # Examples
-///
-/// ```ignore
-/// output_data!(quiet, json, "issue show", issue, {
-///     println!("ID: {}", issue.id);
-///     println!("Title: {}", issue.title);
-/// });
-/// // With message:
-/// output_data!(quiet, json, "issue show", issue, "Issue found", {
-///     println!("ID: {}", issue.id);
-/// });
-/// ```
 #[macro_export]
 macro_rules! output_data {
     ($quiet:expr, $json:expr, $command:expr, $data:expr, $msg:expr, $human_block:block) => {
@@ -62,17 +43,6 @@ macro_rules! output_data {
 
 /// Output structured JSON data with custom human formatting
 /// Human output preserved in quiet mode (essential data)
-///
-/// # Examples
-///
-/// ```ignore
-/// output_json!(quiet, json, "query ready", json!({
-///     "issues": issues,
-///     "count": issues.len()
-/// }), {
-///     println!("Found {} issues", issues.len());
-/// });
-/// ```
 #[macro_export]
 macro_rules! output_json {
     ($quiet:expr, $json:expr, $command:expr, $json_data:expr, $msg:expr, $human_block:block) => {
@@ -96,15 +66,6 @@ macro_rules! output_json {
 }
 
 /// Handle error with appropriate exit code when using --json
-///
-/// # Examples
-///
-/// ```ignore
-/// match executor.show_issue(&id) {
-///     Ok(issue) => output_data!(json, issue, { /* human format */ }),
-///     Err(e) => handle_json_error!(json, e, JsonError::issue_not_found(&id)),
-/// }
-/// ```
 #[macro_export]
 macro_rules! handle_json_error {
     ($json:expr, $err:expr, $json_error:expr) => {

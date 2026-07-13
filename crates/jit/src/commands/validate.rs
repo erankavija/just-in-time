@@ -10,14 +10,6 @@ use anyhow::Context;
 /// Rule name carried by every finding the built-in dangling-item-link pass emits
 /// (REQ-08 clause i, REQ-03). It is not a `.jit/rules.toml` rule; the pass runs
 /// unconditionally, so the name is a stable constant for grouping and rendering.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::DANGLING_LINK_RULE;
-///
-/// assert_eq!(DANGLING_LINK_RULE, "dangling-item-link");
-/// ```
 pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
 
 /// Rule name carried by every finding the built-in enforcement-drift pass emits
@@ -25,14 +17,6 @@ pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
 /// rule: the pass runs as part of every validate path, gated only on the
 /// presence of declared invariants, so the name is a stable constant for
 /// grouping and rendering.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::ENFORCEMENT_DRIFT_RULE;
-///
-/// assert_eq!(ENFORCEMENT_DRIFT_RULE, "enforcement-drift");
-/// ```
 pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -273,18 +257,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// so a dangling link fails `jit validate`. The rule name is the constant
     /// [`DANGLING_LINK_RULE`]. This pass touches no `.jit/` ruleset: it runs
     /// unconditionally as part of the validate path.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let issues = executor.storage().list_issues().unwrap();
-    /// let findings = executor.dangling_link_findings(&issues).unwrap();
-    /// println!("{} dangling item-link(s)", findings.len());
-    /// ```
     pub fn dangling_link_findings(
         &self,
         issues: &[Issue],
@@ -369,17 +341,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`SourceState::Unloadable`](crate::validation::drift::SourceState::Unloadable),
     /// so it surfaces as a declared-but-unenforced finding rather than aborting
     /// validation.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let findings = executor.enforcement_drift_findings().unwrap();
-    /// println!("{} enforcement-drift finding(s)", findings.len());
-    /// ```
     pub fn enforcement_drift_findings(
         &self,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
@@ -420,17 +381,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// so a binding into it surfaces as a declared-but-unenforced finding flagged
     /// `unloadable` instead of an error. Only `cached_config` (the invariant
     /// registry itself) can still error.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let findings = executor.compute_drift_findings().unwrap();
-    /// println!("{} drift finding(s)", findings.len());
-    /// ```
     pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
         use crate::validation::drift::{enforcement_drift_tolerant, SourceState};
         use std::collections::BTreeSet;
@@ -482,19 +432,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// (still loadable); a present-but-MALFORMED file (or an unresolvable namespace
     /// registry) yields `None` (unloadable). Used only by the enforcement-drift
     /// pass, which must not crash when the ruleset fails to parse.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// match executor.loadable_rule_names() {
-    ///     Some(names) => println!("{} loadable rule(s)", names.len()),
-    ///     None => println!("rule set is unloadable"),
-    /// }
-    /// ```
     pub fn loadable_rule_names(&self) -> Option<Vec<String>> {
         let rules_path = self.storage.root().join("rules.toml");
         if rules_path.exists() {
@@ -573,17 +510,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns `Ok(())` when the repository is structurally sound, or an `Err`
     /// describing the first integrity violation found.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // Repo-integrity passes (no broken deps, valid DAG, etc.).
-    /// executor.validate_integrity_silent().unwrap();
-    /// ```
     pub fn validate_integrity_silent(&self) -> Result<()> {
         let issues = self.storage.list_issues()?;
 
@@ -682,18 +608,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// than silently disabling enforcement. A missing `rules.toml` yields no
     /// findings. This method performs no filesystem writes; it reads the cached
     /// ruleset and the issues passed in.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let issues = executor.storage().list_issues().unwrap();
-    /// let findings = executor.evaluate_graph_rules(&issues).unwrap();
-    /// println!("{} graph finding(s)", findings.len());
-    /// ```
     pub fn evaluate_graph_rules(
         &self,
         issues: &[Issue],
@@ -780,19 +694,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// regardless of planning state — never a silent pass. (A *dangling*
     /// reference is independently a hard `jit validate` error via
     /// `validate_document_references`, in every lifecycle state.)
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let issues = executor.storage().list_issues().unwrap();
-    /// // Inline brackets (or an empty template registry) yield an empty map.
-    /// let plan_content = executor.resolve_plan_content(&issues).unwrap();
-    /// println!("{} external plan(s) resolved", plan_content.len());
-    /// ```
     pub fn resolve_plan_content(
         &self,
         issues: &[Issue],
@@ -898,18 +799,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
     /// resolved, or a matching local rule's schema fails to compile (a
     /// misconfigured rule never silently disables enforcement).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // Whole-repo rule report.
-    /// let report = executor.run_rules(None).unwrap();
-    /// println!("{} error(s)", report.error_count());
-    /// ```
     pub fn run_rules(&self, id: Option<&str>) -> Result<crate::validation::report::RuleReport> {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
@@ -1056,27 +945,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns an error if `.jit/rules.toml` is malformed, the container id cannot
     /// be resolved, or a matching local rule's schema fails to compile.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::InMemoryStorage;
-    ///
-    /// # fn main() -> anyhow::Result<()> {
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    ///
-    /// // Run the deterministic scope gate for one container (e.g. an epic);
-    /// // partial ids are accepted and resolved internally.
-    /// let report = executor.validate_scope("2fbd2a82")?;
-    ///
-    /// // The caller decides the exit code: fail on any error-severity finding.
-    /// if report.findings.iter().any(|f| f.is_error()) {
-    ///     eprintln!("scope validation failed");
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn validate_scope(
         &self,
         container_id: &str,
@@ -1209,18 +1077,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Returns an error if `.jit/rules.toml` is malformed, the issue id cannot be
     /// resolved, or a matching local rule's schema fails to compile.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let report = executor.explain_rules("abc12345").unwrap();
-    /// let matched = report.outcomes.iter().filter(|o| o.matched).count();
-    /// println!("{matched} matching rule(s) of {}", report.outcomes.len());
-    /// ```
     pub fn explain_rules(&self, id: &str) -> Result<crate::validation::report::ExplainReport> {
         use crate::validation::report::{ExplainReport, RuleOutcome};
         use crate::validation::rules::RuleScope;

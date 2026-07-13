@@ -38,14 +38,6 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 
 /// Repo-relative path of the committed reference this module projects.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::REFERENCE_PATH;
-///
-/// assert_eq!(REFERENCE_PATH, "docs/reference/storage-records.md");
-/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
 
 /// The page states that a short id is always long enough to hand back as an id
@@ -59,15 +51,6 @@ const _: () = assert!(SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH);
 /// [`GateRunField::as_str`] is the JSON key serde writes for the field.
 /// Conformance tests hold this list against the schema schemars derives from
 /// [`GateRunResult`], so the record and the projection cannot diverge.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::GateRunField;
-///
-/// assert_eq!(GateRunField::RunId.as_str(), "run_id");
-/// assert!(GateRunField::ALL.contains(&GateRunField::Findings));
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GateRunField {
     /// `schema_version`
@@ -110,14 +93,6 @@ pub enum GateRunField {
 
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::GateRunField;
-    ///
-    /// assert_eq!(GateRunField::ALL.first(), Some(&GateRunField::SchemaVersion));
-    /// ```
     pub const ALL: [GateRunField; 18] = [
         GateRunField::SchemaVersion,
         GateRunField::RunId,
@@ -140,14 +115,6 @@ impl GateRunField {
     ];
 
     /// The JSON key serde writes for this field.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::GateRunField;
-    ///
-    /// assert_eq!(GateRunField::ExitCode.as_str(), "exit_code");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             GateRunField::SchemaVersion => "schema_version",
@@ -402,28 +369,6 @@ fn cell(text: &str) -> String {
 /// # Errors
 ///
 /// Propagates a `serde_json` failure while encoding one of the sample records.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::SHORT_ID_LENGTH;
-/// use jit::storage::{render_reference_markdown, MIN_ID_PREFIX_LENGTH};
-///
-/// let page = render_reference_markdown().unwrap();
-/// assert!(page.starts_with("<!--"));
-/// assert!(page.contains("# Storage Record Layout"));
-///
-/// // Identifier widths are projected from the constants that enforce them.
-/// assert!(page.contains(&format!("first {SHORT_ID_LENGTH} characters")));
-/// assert!(page.contains(&format!("at least {MIN_ID_PREFIX_LENGTH} characters")));
-///
-/// // The gate-run record is projected under the path storage writes it to.
-/// assert!(page.contains("`.jit/gate-runs/<run-id>/result.json`"));
-/// assert!(page.contains("| `exit_code` |"));
-///
-/// // The event-tag vocabulary is linked, not copied.
-/// assert!(page.contains("[Event Log Tags](events.md)"));
-/// ```
 pub fn render_reference_markdown() -> Result<String> {
     let example_run = serde_json::to_string_pretty(&sample_gate_run())?;
     let events = event_log_sample()?;

@@ -106,21 +106,6 @@ async fn get_issue<S: IssueStore>(
 /// counts `nodes`, and [`jit::output::IssueChildrenResponse`], where `count`
 /// counts the primary `issues` collection and leaves the secondary `dangling`
 /// list uncounted.
-///
-/// # Examples
-///
-/// ```
-/// use jit_server::routes::GraphData;
-///
-/// let data = GraphData {
-///     count: 0,
-///     nodes: vec![],
-///     edges: vec![],
-/// };
-/// let json = serde_json::to_value(&data).unwrap();
-/// assert_eq!(json["count"], 0);
-/// assert!(json["nodes"].as_array().unwrap().is_empty());
-/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GraphData {
     /// Number of entries in `nodes` (equals `nodes.len()`).

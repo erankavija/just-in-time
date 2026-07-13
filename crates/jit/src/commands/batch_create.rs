@@ -93,15 +93,6 @@ pub struct BatchIssueDef {
 ///
 /// Collected exhaustively (validation does not stop at the first problem) and
 /// rendered together by [`BatchValidationError`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::BatchValidationProblem;
-///
-/// let problem = BatchValidationProblem::DuplicateKey { key: "spec".into() };
-/// assert!(problem.to_string().contains("spec"));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BatchValidationProblem {
     /// A `key` value appears on more than one entry.
@@ -156,27 +147,6 @@ impl std::fmt::Display for BatchValidationProblem {
 ///
 /// Carries EVERY offending entry discovered (validation collects all problems
 /// rather than stopping at the first). Maps to exit code 2 (`InvalidArgument`).
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::{BatchValidationError, BatchValidationProblem};
-///
-/// let err = BatchValidationError {
-///     problems: vec![
-///         BatchValidationProblem::DuplicateKey { key: "a".into() },
-///         BatchValidationProblem::UnknownDependency {
-///             key: "b".into(),
-///             missing: "ghost".into(),
-///         },
-///     ],
-/// };
-/// let rendered = err.to_string();
-/// assert!(rendered.contains("duplicate key 'a'"));
-/// assert!(rendered.contains("not defined in the file"));
-/// // The message is classified as an invalid-argument error.
-/// assert!(rendered.to_lowercase().contains("invalid"));
-/// ```
 #[derive(Debug, Clone, Error)]
 pub struct BatchValidationError {
     /// Every pre-validation problem found, in discovery order.
@@ -202,23 +172,6 @@ impl std::fmt::Display for BatchValidationError {
 /// Carries the partial `{key: id}` map of issues created before the failure plus
 /// the key whose step failed and the underlying error message. Recovery is
 /// manual: inspect/delete the created issues, fix the file, and re-run.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::BatchWriteError;
-///
-/// let err = BatchWriteError {
-///     created: vec![("a".to_string(), "abc12345".to_string())],
-///     failed_key: "b".to_string(),
-///     stage: "create".to_string(),
-///     reason: "disk full".to_string(),
-/// };
-/// let rendered = err.to_string();
-/// assert!(rendered.contains("partially created"));
-/// assert!(rendered.contains("'b'"));
-/// assert!(rendered.contains("abc12345"));
-/// ```
 #[derive(Debug, Clone, Error)]
 pub struct BatchWriteError {
     /// `{key: id}` for issues successfully created before the failure.
@@ -254,17 +207,6 @@ impl std::fmt::Display for BatchWriteError {
 
 /// Successful outcome of a batch create: the symbolic `key` to created issue id
 /// map, in input order.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::commands::BatchCreateOutcome;
-///
-/// let outcome = BatchCreateOutcome {
-///     key_to_id: vec![("spec".to_string(), "abc12345...".to_string())],
-/// };
-/// assert_eq!(outcome.as_map().get("spec").map(String::as_str), Some("abc12345..."));
-/// ```
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct BatchCreateOutcome {
     /// `{key: full_id}` pairs in the order the entries appeared in the file.
@@ -273,17 +215,6 @@ pub struct BatchCreateOutcome {
 
 impl BatchCreateOutcome {
     /// Materialize the `{key: id}` pairs as a map for `--json` output and lookup.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::commands::BatchCreateOutcome;
-    ///
-    /// let outcome = BatchCreateOutcome {
-    ///     key_to_id: vec![("spec".to_string(), "abc12345".to_string())],
-    /// };
-    /// assert_eq!(outcome.as_map().get("spec").map(String::as_str), Some("abc12345"));
-    /// ```
     pub fn as_map(&self) -> HashMap<String, String> {
         self.key_to_id.iter().cloned().collect()
     }

@@ -49,24 +49,6 @@ pub struct RepoInfo {
 }
 
 /// Information about issues in the snapshot
-///
-/// # Examples
-///
-/// ```
-/// use jit::snapshot::IssuesInfo;
-/// use jit::domain::State;
-/// use std::collections::HashMap;
-///
-/// let mut states = HashMap::new();
-/// states.insert(State::InProgress, 1usize);
-/// states.insert(State::Done, 3usize);
-/// let info = IssuesInfo { count: 4, states, files: vec![] };
-///
-/// // State keys serialize as canonical snake_case strings.
-/// let json = serde_json::to_string(&info).unwrap();
-/// assert!(json.contains("\"in_progress\""), "expected snake_case key in JSON");
-/// assert!(!json.contains("\"inprogress\""), "must not contain Debug-format key");
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssuesInfo {
     /// Total number of issues

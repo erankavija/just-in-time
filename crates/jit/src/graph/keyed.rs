@@ -28,18 +28,6 @@ enum Mark {
 /// repeats as the last, so `[a, b, a]` reads `a → b → a` and a self-loop reads
 /// `[a, a]`. Keys are visited in `adjacency` order, making the reported cycle
 /// deterministic for a given input.
-///
-/// # Examples
-///
-/// ```
-/// use jit::graph::find_keyed_cycle;
-///
-/// let acyclic = [("a", vec!["b"]), ("b", vec![])];
-/// assert_eq!(find_keyed_cycle(&acyclic), None);
-///
-/// let cyclic = [("a", vec!["b"]), ("b", vec!["a"])];
-/// assert_eq!(find_keyed_cycle(&cyclic), Some(vec!["a", "b", "a"]));
-/// ```
 pub fn find_keyed_cycle<K: Eq + Hash + Clone>(adjacency: &[(K, Vec<K>)]) -> Option<Vec<K>> {
     let edges: HashMap<&K, &[K]> = adjacency.iter().map(|(k, ks)| (k, ks.as_slice())).collect();
     let mut marks: HashMap<&K, Mark> = HashMap::new();

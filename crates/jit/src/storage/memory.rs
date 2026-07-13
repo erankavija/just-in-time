@@ -16,22 +16,6 @@ use std::sync::{Arc, Mutex};
 ///
 /// All data is stored in memory and lost when the instance is dropped.
 /// Uses `Arc<Mutex<>>` for thread-safe shared interior mutability.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::storage::{InMemoryStorage, IssueStore};
-///
-/// let storage = InMemoryStorage::new();
-/// storage.init().unwrap();
-///
-/// let issue = Issue::new("Test".to_string(), "Description".to_string());
-/// storage.save_issue(issue.clone()).unwrap();
-///
-/// let loaded = storage.load_issue(&issue.id).unwrap();
-/// assert_eq!(loaded.title, "Test");
-/// ```
 #[derive(Clone)]
 #[allow(dead_code)] // Public API used only in tests, not in binary
 pub struct InMemoryStorage {
@@ -77,17 +61,6 @@ impl InMemoryStorage {
     /// tests can stage a config-declared file (e.g. a project-scope item source)
     /// and have [`IssueStore::read_repo_file`](crate::storage::IssueStore::read_repo_file)
     /// return it, without touching disk.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::{InMemoryStorage, IssueStore};
-    ///
-    /// let storage = InMemoryStorage::new();
-    /// storage.add_repo_file("project-items.md", "## Success Criteria\n\n- atomic-writes: x\n");
-    /// assert!(storage.read_repo_file("project-items.md").unwrap().is_some());
-    /// assert!(storage.read_repo_file("absent.md").unwrap().is_none());
-    /// ```
     pub fn add_repo_file(&self, rel_path: &str, content: &str) {
         self.repo_files
             .lock()

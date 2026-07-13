@@ -41,15 +41,6 @@ pub enum GitattributesOutcome {
 
 /// Set up `.gitattributes` with merge drivers for jit files.
 /// Only runs if we're in a git repository.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::storage::gitattributes::setup_gitattributes;
-///
-/// let outcome = setup_gitattributes().unwrap();
-/// println!("{:?}", outcome);
-/// ```
 pub fn setup_gitattributes() -> Result<GitattributesOutcome> {
     // Check if we're in a git repository
     let output = Command::new("git")

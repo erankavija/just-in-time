@@ -34,17 +34,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// transitively reduced, which internal callers (templates, breakdown,
     /// batch-create) rely on. Returns `(result, warnings)` where `warnings`
     /// carries any lease warning.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::InMemoryStorage;
-    ///
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    /// let (_result, _warnings) = executor.add_dependency("epic-1", "task-2")?;
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn add_dependency(
         &self,
         issue_id: &str,
@@ -68,17 +57,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///   edge is dropped in the same operation, leaving the graph reduced.
     ///
     /// A non-redundant edge is added normally under either policy.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::{CommandExecutor, RedundancyPolicy};
-    /// use jit::storage::InMemoryStorage;
-    ///
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    /// let result = executor.add_dependency_with_policy("b", "c", RedundancyPolicy::Reject);
-    /// # let _ = result;
-    /// ```
     pub fn add_dependency_with_policy(
         &self,
         issue_id: &str,
@@ -318,18 +296,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// violation that only emerges from the COMBINATION of two edges in the
     /// same call — e.g. two sibling edges that are each fine alone but jointly
     /// make one of them transitively redundant.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::{CommandExecutor, RedundancyPolicy};
-    /// use jit::storage::InMemoryStorage;
-    ///
-    /// let executor = CommandExecutor::new(InMemoryStorage::new());
-    /// let deps = vec!["task-2".to_string()];
-    /// let result = executor.add_dependencies_with_policy("epic-1", &deps, RedundancyPolicy::Reduce);
-    /// # let _ = result;
-    /// ```
     pub fn add_dependencies_with_policy(
         &self,
         issue_id: &str,

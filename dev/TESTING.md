@@ -210,8 +210,10 @@ Two environment behaviors matter when writing tests:
   repository: the branch-drift check against main history (`enforce_main_only_operations`) and the
   claims-index validation inside `jit validate`. `TestHarness::new()` sets it. Integration
   tests that call these paths set it explicitly.
-- **Doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`. They are
-  part of the contract, so an example that constructs a `CommandExecutor` must keep working.
+- **Selected doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`.
+  Keep them for non-obvious workflows and material contracts, not as one-per-public-API
+  coverage: each snippet carries a separate rustdoc compilation cost. When an example is
+  warranted, it is part of the contract and must keep working.
 
 ## Running Tests
 

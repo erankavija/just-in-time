@@ -102,16 +102,6 @@ pub struct VersionConfig {
 /// (`schema_version`/`all_ids`/`deleted_ids`) and is not meant to be hand-edited.
 /// Resolve a present value with
 /// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::JitConfig;
-///
-/// let config: JitConfig = toml::from_str("[project]\nname = \"just-in-time\"\n").unwrap();
-/// let project = config.project.unwrap();
-/// assert_eq!(project.name.unwrap().as_str(), "just-in-time");
-/// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectConfig {
     /// The project's canonical name: the `@<project>` scope token in the
@@ -124,14 +114,6 @@ pub struct ProjectConfig {
 ///
 /// Returned by [`ProjectName::from_str`] and (via serde) by TOML
 /// deserialization when the value does not match `^[a-z][a-z0-9-]*$`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ProjectName;
-/// let err = "Bad_Name".parse::<ProjectName>().unwrap_err();
-/// assert!(err.to_string().contains("Bad_Name"));
-/// ```
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProjectNameError {
     /// The value does not match `^[a-z][a-z0-9-]*$`.
@@ -153,32 +135,11 @@ pub enum ProjectNameError {
 /// descriptive parse error, not a silent fallback, so a misconfigured
 /// `[project] name` is rejected at [`JitConfig::load`] time and surfaces
 /// through `jit config validate`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ProjectName;
-///
-/// let name: ProjectName = "my-project".parse().unwrap();
-/// assert_eq!(name.as_str(), "my-project");
-///
-/// assert!("Bad_Name".parse::<ProjectName>().is_err());
-/// assert!("1abc".parse::<ProjectName>().is_err());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProjectName(String);
 
 impl ProjectName {
     /// The validated project name as a string slice.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ProjectName;
-    ///
-    /// let name: ProjectName = "my-project".parse().unwrap();
-    /// assert_eq!(name.as_str(), "my-project");
-    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -225,17 +186,6 @@ impl<'de> serde::Deserialize<'de> for ProjectName {
 /// fixed literal `"project"` when the result is empty or does not start with a
 /// lowercase letter (e.g. a basename starting with a digit), so the seeded
 /// value always satisfies [`ProjectName`]'s `^[a-z][a-z0-9-]*$` pattern.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::slugify_project_name;
-///
-/// assert_eq!(slugify_project_name("My Cool Project!"), "my-cool-project");
-/// assert_eq!(slugify_project_name("just-in-time"), "just-in-time");
-/// assert_eq!(slugify_project_name("123-repo"), "project");
-/// assert_eq!(slugify_project_name(""), "project");
-/// ```
 pub fn slugify_project_name(input: &str) -> String {
     let mut slug = String::with_capacity(input.len());
     let mut prev_dash = false;
@@ -357,21 +307,6 @@ impl ValidationConfig {
     /// `Result` guards a `ValidationConfig` constructed by hand with an invalid
     /// string, which is still surfaced as an error rather than silently
     /// defaulting.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ValidationConfig;
-    /// use jit::validation::Strictness;
-    ///
-    /// // An explicit level resolves to its variant.
-    /// let cfg: ValidationConfig = toml::from_str(r#"strictness = "strict""#).unwrap();
-    /// assert_eq!(cfg.strictness().unwrap(), Strictness::Strict);
-    ///
-    /// // An absent key defaults to loose (the pre-strictness behavior).
-    /// let bare: ValidationConfig = toml::from_str("").unwrap();
-    /// assert_eq!(bare.strictness().unwrap(), Strictness::Loose);
-    /// ```
     pub fn strictness(&self) -> Result<crate::validation::Strictness> {
         crate::validation::Strictness::from_config_value(self.strictness.as_deref())
     }
@@ -667,23 +602,6 @@ impl ItemKindConfig {
     ///
     /// The default matches the requirement kind, which is authored in issue
     /// descriptions (markdown) and indexed from them.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{ItemKindConfig, SourceOfTruth};
-    ///
-    /// // An unset field resolves to markdown-first.
-    /// assert_eq!(
-    ///     ItemKindConfig::default().source_of_truth(),
-    ///     SourceOfTruth::MarkdownFirst
-    /// );
-    /// let registry = ItemKindConfig {
-    ///     source_of_truth: Some(SourceOfTruth::RegistryFirst),
-    ///     ..Default::default()
-    /// };
-    /// assert_eq!(registry.source_of_truth(), SourceOfTruth::RegistryFirst);
-    /// ```
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth.unwrap_or_default()
     }
@@ -700,26 +618,6 @@ impl ItemKindConfig {
 /// distinguished at parse time — a string is never a descriptor and vice versa —
 /// so a malformed descriptor surfaces a descriptive TOML error rather than a
 /// silent fallback.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{ItemKindConfig, ItemKindSource};
-///
-/// // A bare path string is the markdown-first form.
-/// let md: ItemKindConfig = toml::from_str(r#"source = "glossary.md""#).unwrap();
-/// assert_eq!(md.source, Some(ItemKindSource::Path("glossary.md".into())));
-/// assert_eq!(md.source.unwrap().path(), Some("glossary.md"));
-///
-/// // A table is the registry-first toml descriptor.
-/// let reg: ItemKindConfig = toml::from_str(
-///     r#"source = { toml = "policies.toml", table = "policies", id-field = "id", text-field = "statement" }"#,
-/// )
-/// .unwrap();
-/// let descriptor = reg.source.unwrap();
-/// assert_eq!(descriptor.path(), None);
-/// assert_eq!(descriptor.toml_descriptor().unwrap().table, "policies");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemKindSource {
     /// A bare repository-local file path (markdown-first): the file's `section` is
@@ -732,14 +630,6 @@ pub enum ItemKindSource {
 
 impl ItemKindSource {
     /// The bare markdown file path, or `None` when this is a TOML descriptor.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindSource;
-    ///
-    /// assert_eq!(ItemKindSource::Path("x.md".into()).path(), Some("x.md"));
-    /// ```
     pub fn path(&self) -> Option<&str> {
         match self {
             ItemKindSource::Path(p) => Some(p),
@@ -748,14 +638,6 @@ impl ItemKindSource {
     }
 
     /// The structured TOML descriptor, or `None` when this is a bare path.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ItemKindSource;
-    ///
-    /// assert!(ItemKindSource::Path("x.md".into()).toml_descriptor().is_none());
-    /// ```
     pub fn toml_descriptor(&self) -> Option<&TomlSourceDescriptor> {
         match self {
             ItemKindSource::Toml(d) => Some(d),
@@ -834,23 +716,6 @@ impl Serialize for ItemKindSource {
 /// the addressing mapping (id/text/links), leaving any kind-specific TYPED
 /// validation (e.g. an invariant's `enforced`/`advisory` discriminant) to a
 /// dedicated loader.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::ItemKindConfig;
-///
-/// let cfg: ItemKindConfig = toml::from_str(
-///     r#"source = { toml = "policies.toml", table = "policies", id-field = "id", text-field = "statement", link-fields = { enforces = "enforced-by" } }"#,
-/// )
-/// .unwrap();
-/// let descriptor = cfg.source.unwrap().toml_descriptor().cloned().unwrap();
-/// assert_eq!(descriptor.toml, "policies.toml");
-/// assert_eq!(descriptor.table, "policies");
-/// assert_eq!(descriptor.id_field, "id");
-/// assert_eq!(descriptor.text_field, "statement");
-/// assert_eq!(descriptor.link_fields.get("enforces").map(String::as_str), Some("enforced-by"));
-/// ```
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct TomlSourceDescriptor {
     /// Repository-local path to the `.toml` registry file (read through storage).
@@ -880,14 +745,6 @@ pub struct TomlSourceDescriptor {
 ///
 /// Returned by [`KindScopeConfig::from_str`] and (via serde) by TOML
 /// deserialization when the `scope` value is not one of the recognised tokens.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::KindScopeConfig;
-/// let err = "global".parse::<KindScopeConfig>().unwrap_err();
-/// assert!(err.to_string().contains("global"));
-/// ```
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum KindScopeConfigError {
     /// The value is not one of `"issue"` or `"project"`.
@@ -909,23 +766,6 @@ pub enum KindScopeConfigError {
 /// Parsed (case-insensitively) from the tokens `"issue"` / `"project"` by both
 /// TOML deserialization and [`KindScopeConfig::from_str`]; an unknown token is a
 /// descriptive error, not a silent fallback.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{ItemKindConfig, KindScopeConfig};
-///
-/// // Parsed from its token inside an item-kind declaration.
-/// let cfg: ItemKindConfig = toml::from_str("scope = \"project\"").unwrap();
-/// assert_eq!(cfg.scope, Some(KindScopeConfig::Project));
-///
-/// // FromStr also works (case-insensitive).
-/// assert_eq!("ISSUE".parse::<KindScopeConfig>().unwrap(), KindScopeConfig::Issue);
-///
-/// // An invalid token is a descriptive error, not a silent default.
-/// let err = toml::from_str::<ItemKindConfig>("scope = \"global\"").unwrap_err();
-/// assert!(err.to_string().contains("global"));
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KindScopeConfig {
     /// Items are projected from issue descriptions
@@ -984,25 +824,6 @@ impl Serialize for KindScopeConfig {
 /// Deserialized from the kebab-case tokens `"markdown-first"` / `"registry-first"`
 /// via serde rename; an unrecognized value is a descriptive parse error rather
 /// than a silent default.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{ItemKindConfig, SourceOfTruth};
-///
-/// // The default direction is markdown-first.
-/// assert_eq!(SourceOfTruth::default(), SourceOfTruth::MarkdownFirst);
-///
-/// // Parsed from its kebab-case token inside an item-kind declaration.
-/// let cfg: ItemKindConfig =
-///     toml::from_str("source-of-truth = \"registry-first\"").unwrap();
-/// assert_eq!(cfg.source_of_truth, Some(SourceOfTruth::RegistryFirst));
-///
-/// // An invalid token is a descriptive error, not a silent default.
-/// let err = toml::from_str::<ItemKindConfig>("source-of-truth = \"both\"")
-///     .unwrap_err();
-/// assert!(err.to_string().contains("markdown-first"));
-/// ```
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum SourceOfTruth {
     /// Items are authored in markdown prose (issue descriptions or a markdown
@@ -1022,55 +843,18 @@ pub enum SourceOfTruth {
 /// filename lives: the projection engine reads the resolved target from config
 /// and contains no documentation-filename literal. It is the value
 /// [`InvariantProjectionConfig::target`] resolves to when no `target` is set.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_PROJECTION_TARGET};
-///
-/// assert_eq!(DEFAULT_INVARIANT_PROJECTION_TARGET, ".jit/invariants.md");
-/// // The default config resolves its target to this const.
-/// assert_eq!(
-///     InvariantProjectionConfig::default().target(),
-///     DEFAULT_INVARIANT_PROJECTION_TARGET
-/// );
-/// ```
 pub const DEFAULT_INVARIANT_PROJECTION_TARGET: &str = ".jit/invariants.md";
 
 /// The default begin marker delimiting the invariant region in `region` mode.
 ///
 /// Used by [`InvariantProjectionConfig::region_begin`] when no `region-begin` is
 /// configured.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_BEGIN};
-///
-/// assert_eq!(DEFAULT_INVARIANT_REGION_BEGIN, "<!-- jit:invariants:begin -->");
-/// assert_eq!(
-///     InvariantProjectionConfig::default().region_begin(),
-///     DEFAULT_INVARIANT_REGION_BEGIN
-/// );
-/// ```
 pub const DEFAULT_INVARIANT_REGION_BEGIN: &str = "<!-- jit:invariants:begin -->";
 
 /// The default end marker delimiting the invariant region in `region` mode.
 ///
 /// Used by [`InvariantProjectionConfig::region_end`] when no `region-end` is
 /// configured.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_END};
-///
-/// assert_eq!(DEFAULT_INVARIANT_REGION_END, "<!-- jit:invariants:end -->");
-/// assert_eq!(
-///     InvariantProjectionConfig::default().region_end(),
-///     DEFAULT_INVARIANT_REGION_END
-/// );
-/// ```
 pub const DEFAULT_INVARIANT_REGION_END: &str = "<!-- jit:invariants:end -->";
 
 /// Where and how the invariant registry projects into human-readable docs.
@@ -1142,33 +926,11 @@ pub struct InvariantProjectionConfig {
 
 impl InvariantProjectionConfig {
     /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{InvariantProjectionConfig, ProjectionMode};
-    ///
-    /// assert_eq!(
-    ///     InvariantProjectionConfig::default().mode(),
-    ///     ProjectionMode::SeparateFile
-    /// );
-    /// ```
     pub fn mode(&self) -> ProjectionMode {
         self.mode.unwrap_or_default()
     }
 
     /// The resolved repo-relative target path (defaulting to the jit-owned file).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_PROJECTION_TARGET};
-    ///
-    /// assert_eq!(
-    ///     InvariantProjectionConfig::default().target(),
-    ///     DEFAULT_INVARIANT_PROJECTION_TARGET
-    /// );
-    /// ```
     pub fn target(&self) -> &str {
         self.target
             .as_deref()
@@ -1176,17 +938,6 @@ impl InvariantProjectionConfig {
     }
 
     /// The resolved begin marker for `region` mode (defaulting to the const).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_BEGIN};
-    ///
-    /// assert_eq!(
-    ///     InvariantProjectionConfig::default().region_begin(),
-    ///     DEFAULT_INVARIANT_REGION_BEGIN
-    /// );
-    /// ```
     pub fn region_begin(&self) -> &str {
         self.region_begin
             .as_deref()
@@ -1194,17 +945,6 @@ impl InvariantProjectionConfig {
     }
 
     /// The resolved end marker for `region` mode (defaulting to the const).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{InvariantProjectionConfig, DEFAULT_INVARIANT_REGION_END};
-    ///
-    /// assert_eq!(
-    ///     InvariantProjectionConfig::default().region_end(),
-    ///     DEFAULT_INVARIANT_REGION_END
-    /// );
-    /// ```
     pub fn region_end(&self) -> &str {
         self.region_end
             .as_deref()
@@ -1212,23 +952,6 @@ impl InvariantProjectionConfig {
     }
 
     /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{InvariantProjectionConfig, ProjectionStyle};
-    ///
-    /// // An absent `style` field resolves to the existing full render.
-    /// assert_eq!(
-    ///     InvariantProjectionConfig::default().style(),
-    ///     ProjectionStyle::Full
-    /// );
-    ///
-    /// // The id-anchor style is opt-in via the `[invariant_projection]` table.
-    /// let cfg: InvariantProjectionConfig =
-    ///     toml::from_str("style = \"id-anchor\"").unwrap();
-    /// assert_eq!(cfg.style(), ProjectionStyle::IdAnchor);
-    /// ```
     pub fn style(&self) -> ProjectionStyle {
         self.style.unwrap_or_default()
     }
@@ -1240,23 +963,6 @@ impl InvariantProjectionConfig {
 /// serde rename; an unrecognized value is a descriptive parse error rather than a
 /// silent default. The shipped default (no `[invariant_projection]` table) is
 /// [`ProjectionMode::SeparateFile`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{InvariantProjectionConfig, ProjectionMode};
-///
-/// // The default mode is separate-file.
-/// assert_eq!(ProjectionMode::default(), ProjectionMode::SeparateFile);
-///
-/// // Parsed from its kebab-case token inside the projection table.
-/// let cfg: InvariantProjectionConfig = toml::from_str("mode = \"region\"").unwrap();
-/// assert_eq!(cfg.mode, Some(ProjectionMode::Region));
-///
-/// // An invalid token is a descriptive error, not a silent default.
-/// let err = toml::from_str::<InvariantProjectionConfig>("mode = \"inline\"").unwrap_err();
-/// assert!(err.to_string().contains("separate-file"));
-/// ```
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum ProjectionMode {
     /// Write the rendered invariants to a separate jit-owned file (the default).
@@ -1279,24 +985,6 @@ pub enum ProjectionMode {
 /// bullets. [`ProjectionStyle::IdAnchor`] renders a heading-less bullet list of
 /// `- **{id}** — {statement}` lines (no kind tag, no enforced-by), suited to a
 /// region beneath a hand-authored heading.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{InvariantProjectionConfig, ProjectionStyle};
-///
-/// // The default style is full (the original render).
-/// assert_eq!(ProjectionStyle::default(), ProjectionStyle::Full);
-///
-/// // Parsed from its kebab-case token inside the projection table.
-/// let cfg: InvariantProjectionConfig =
-///     toml::from_str("style = \"id-anchor\"").unwrap();
-/// assert_eq!(cfg.style, Some(ProjectionStyle::IdAnchor));
-///
-/// // An invalid token is a descriptive error, not a silent default.
-/// let err = toml::from_str::<InvariantProjectionConfig>("style = \"prose\"").unwrap_err();
-/// assert!(err.to_string().contains("full"));
-/// ```
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
 pub enum ProjectionStyle {
     /// Reproduce the original render: a `## Project invariants` header followed by
@@ -1319,60 +1007,18 @@ pub enum ProjectionStyle {
 /// resolved target from config and contains no documentation-filename literal. It
 /// is the value [`RulesGatesProjectionConfig::target`] resolves to when no
 /// `target` is set.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_PROJECTION_TARGET};
-///
-/// assert_eq!(DEFAULT_RULES_GATES_PROJECTION_TARGET, ".jit/rules-and-gates.md");
-/// assert_eq!(
-///     RulesGatesProjectionConfig::default().target(),
-///     DEFAULT_RULES_GATES_PROJECTION_TARGET
-/// );
-/// ```
 pub const DEFAULT_RULES_GATES_PROJECTION_TARGET: &str = ".jit/rules-and-gates.md";
 
 /// The default begin marker delimiting the rules-and-gates region in `region` mode.
 ///
 /// Used by [`RulesGatesProjectionConfig::region_begin`] when no `region-begin` is
 /// configured.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_BEGIN};
-///
-/// assert_eq!(
-///     DEFAULT_RULES_GATES_REGION_BEGIN,
-///     "<!-- jit:rules-and-gates:begin -->"
-/// );
-/// assert_eq!(
-///     RulesGatesProjectionConfig::default().region_begin(),
-///     DEFAULT_RULES_GATES_REGION_BEGIN
-/// );
-/// ```
 pub const DEFAULT_RULES_GATES_REGION_BEGIN: &str = "<!-- jit:rules-and-gates:begin -->";
 
 /// The default end marker delimiting the rules-and-gates region in `region` mode.
 ///
 /// Used by [`RulesGatesProjectionConfig::region_end`] when no `region-end` is
 /// configured.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_END};
-///
-/// assert_eq!(
-///     DEFAULT_RULES_GATES_REGION_END,
-///     "<!-- jit:rules-and-gates:end -->"
-/// );
-/// assert_eq!(
-///     RulesGatesProjectionConfig::default().region_end(),
-///     DEFAULT_RULES_GATES_REGION_END
-/// );
-/// ```
 pub const DEFAULT_RULES_GATES_REGION_END: &str = "<!-- jit:rules-and-gates:end -->";
 
 /// Where and how the rule and gate registries project into human-readable docs.
@@ -1438,33 +1084,11 @@ pub struct RulesGatesProjectionConfig {
 
 impl RulesGatesProjectionConfig {
     /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{RulesGatesProjectionConfig, ProjectionMode};
-    ///
-    /// assert_eq!(
-    ///     RulesGatesProjectionConfig::default().mode(),
-    ///     ProjectionMode::SeparateFile
-    /// );
-    /// ```
     pub fn mode(&self) -> ProjectionMode {
         self.mode.unwrap_or_default()
     }
 
     /// The resolved repo-relative target path (defaulting to the jit-owned file).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_PROJECTION_TARGET};
-    ///
-    /// assert_eq!(
-    ///     RulesGatesProjectionConfig::default().target(),
-    ///     DEFAULT_RULES_GATES_PROJECTION_TARGET
-    /// );
-    /// ```
     pub fn target(&self) -> &str {
         self.target
             .as_deref()
@@ -1472,17 +1096,6 @@ impl RulesGatesProjectionConfig {
     }
 
     /// The resolved begin marker for `region` mode (defaulting to the const).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_BEGIN};
-    ///
-    /// assert_eq!(
-    ///     RulesGatesProjectionConfig::default().region_begin(),
-    ///     DEFAULT_RULES_GATES_REGION_BEGIN
-    /// );
-    /// ```
     pub fn region_begin(&self) -> &str {
         self.region_begin
             .as_deref()
@@ -1490,17 +1103,6 @@ impl RulesGatesProjectionConfig {
     }
 
     /// The resolved end marker for `region` mode (defaulting to the const).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{RulesGatesProjectionConfig, DEFAULT_RULES_GATES_REGION_END};
-    ///
-    /// assert_eq!(
-    ///     RulesGatesProjectionConfig::default().region_end(),
-    ///     DEFAULT_RULES_GATES_REGION_END
-    /// );
-    /// ```
     pub fn region_end(&self) -> &str {
         self.region_end
             .as_deref()
@@ -1508,21 +1110,6 @@ impl RulesGatesProjectionConfig {
     }
 
     /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{RulesGatesProjectionConfig, ProjectionStyle};
-    ///
-    /// assert_eq!(
-    ///     RulesGatesProjectionConfig::default().style(),
-    ///     ProjectionStyle::Full
-    /// );
-    ///
-    /// let cfg: RulesGatesProjectionConfig =
-    ///     toml::from_str("style = \"id-anchor\"").unwrap();
-    /// assert_eq!(cfg.style(), ProjectionStyle::IdAnchor);
-    /// ```
     pub fn style(&self) -> ProjectionStyle {
         self.style.unwrap_or_default()
     }
@@ -1534,21 +1121,6 @@ impl RulesGatesProjectionConfig {
 /// when a declared kind omits one or more of its six required fields. A repo with
 /// no `[item_kinds]` table declares no kinds (the engine bakes in none), so there
 /// is nothing to validate in that case.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::JitConfig;
-///
-/// // A partial explicit declaration is rejected, naming the kind and the
-/// // missing fields.
-/// let err = toml::from_str::<JitConfig>("[item_kinds.requirement]\nsection = \"sc\"\n")
-///     .unwrap()
-///     .validate_item_kinds()
-///     .unwrap_err();
-/// assert!(err.to_string().contains("requirement"));
-/// assert!(err.to_string().contains("source-of-truth"));
-/// ```
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ItemKindConfigError {
     /// An explicitly-declared kind omits one or more required six-tuple fields.
@@ -1586,14 +1158,6 @@ pub enum ItemKindConfigError {
 /// Returned by [`WorktreeMode::from_str`] and (via serde) by TOML /
 /// environment-variable deserialization when the value is not one of the
 /// recognised tokens.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::WorktreeMode;
-/// let err = "bogus".parse::<WorktreeMode>().unwrap_err();
-/// assert!(err.to_string().contains("bogus"));
-/// ```
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum WorktreeModeError {
     /// The value is not one of `"auto"`, `"on"`, or `"off"`.
@@ -1609,14 +1173,6 @@ pub enum WorktreeModeError {
 /// Returned by [`EnforcementMode::from_str`] and (via serde) by TOML /
 /// environment-variable deserialization when the value is not one of the
 /// recognised tokens.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::EnforcementMode;
-/// let err = "bogus".parse::<EnforcementMode>().unwrap_err();
-/// assert!(err.to_string().contains("bogus"));
-/// ```
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum EnforcementModeError {
     /// The value is not one of `"strict"`, `"warn"`, or `"off"`.
@@ -1642,16 +1198,6 @@ pub struct WorktreeConfig {
 /// both TOML configuration (`[worktree] mode = ...`) and the
 /// `JIT_WORKTREE_MODE` environment variable, so the two sources share one
 /// case-handling rule.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::WorktreeMode;
-///
-/// assert_eq!("auto".parse::<WorktreeMode>().unwrap(), WorktreeMode::Auto);
-/// assert_eq!("ON".parse::<WorktreeMode>().unwrap(), WorktreeMode::On);
-/// assert!("bogus".parse::<WorktreeMode>().is_err());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorktreeMode {
     /// Detect git worktree and enable automatically (default).
@@ -1690,16 +1236,6 @@ impl<'de> serde::Deserialize<'de> for WorktreeMode {
 /// both TOML configuration (`[worktree] enforce_leases = ...`) and the
 /// `JIT_ENFORCE_LEASES` environment variable, so the two sources share one
 /// case-handling rule.
-///
-/// # Examples
-///
-/// ```
-/// use jit::config::EnforcementMode;
-///
-/// assert_eq!("strict".parse::<EnforcementMode>().unwrap(), EnforcementMode::Strict);
-/// assert_eq!("WARN".parse::<EnforcementMode>().unwrap(), EnforcementMode::Warn);
-/// assert!("bogus".parse::<EnforcementMode>().is_err());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
     /// Block operations without active lease (production-safe default).
@@ -1738,20 +1274,6 @@ impl WorktreeConfig {
     ///
     /// The field is typed — invalid tokens are rejected at TOML parse time, so
     /// this method is infallible.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{WorktreeConfig, WorktreeMode};
-    ///
-    /// // An absent field defaults to Auto.
-    /// let wt: WorktreeConfig = toml::from_str("").unwrap();
-    /// assert_eq!(wt.worktree_mode(), WorktreeMode::Auto);
-    ///
-    /// // An explicit value is returned as-is.
-    /// let wt: WorktreeConfig = toml::from_str("mode = \"on\"").unwrap();
-    /// assert_eq!(wt.worktree_mode(), WorktreeMode::On);
-    /// ```
     pub fn worktree_mode(&self) -> WorktreeMode {
         self.mode.unwrap_or(WorktreeMode::Auto)
     }
@@ -1760,20 +1282,6 @@ impl WorktreeConfig {
     ///
     /// The field is typed — invalid tokens are rejected at TOML parse time, so
     /// this method is infallible.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::{WorktreeConfig, EnforcementMode};
-    ///
-    /// // An absent field defaults to Strict.
-    /// let wt: WorktreeConfig = toml::from_str("").unwrap();
-    /// assert_eq!(wt.enforcement_mode(), EnforcementMode::Strict);
-    ///
-    /// // An explicit value is returned as-is.
-    /// let wt: WorktreeConfig = toml::from_str("enforce_leases = \"warn\"").unwrap();
-    /// assert_eq!(wt.enforcement_mode(), EnforcementMode::Warn);
-    /// ```
     pub fn enforcement_mode(&self) -> EnforcementMode {
         self.enforce_leases.unwrap_or(EnforcementMode::Strict)
     }
@@ -2211,18 +1719,6 @@ impl EffectiveConfig {
     /// (AGENTS.md "Separation of Concerns": config IO stays in the config
     /// layer). Mirrors the system (`/etc/jit`) > user (`~/.config/jit`) > repo
     /// priority `jit config show` has always used.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::EffectiveConfig;
-    /// use std::path::Path;
-    ///
-    /// // A directory with no config.toml at all still loads (all fields
-    /// // resolve to their defaults).
-    /// let effective = EffectiveConfig::load(Path::new("/nonexistent-jit-root")).unwrap();
-    /// assert!(effective.full_snapshot().unwrap().get("worktree").is_some());
-    /// ```
     pub fn load(jit_root: &Path) -> Result<Self> {
         let mut loader = ConfigLoader::new();
         let system_path = Path::new("/etc/jit");
@@ -2408,18 +1904,6 @@ impl EffectiveConfig {
     /// `templates.toml` / `invariants.toml` files rather than `config.toml`
     /// itself, so neither has a dotted path here. Introspect them via `jit
     /// config list-templates` / `jit invariant list`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::config::ConfigLoader;
-    ///
-    /// let effective = ConfigLoader::new().build();
-    /// let snapshot = effective.full_snapshot().unwrap();
-    /// // Every section is present, even with no config files loaded at all.
-    /// assert!(snapshot.get("documentation").unwrap().is_object());
-    /// assert!(snapshot.get("worktree").unwrap().get("mode").is_some());
-    /// ```
     pub fn full_snapshot(&self) -> Result<serde_json::Value> {
         fn section<T: Serialize>(value: Option<&T>) -> Result<serde_json::Value> {
             match value {

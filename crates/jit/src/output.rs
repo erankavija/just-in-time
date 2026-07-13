@@ -399,18 +399,6 @@ impl<T: Serialize> JsonOutput<T> {
     /// The message is injected as a top-level `"message"` field in the
     /// serialized JSON object. If the data serializes to a non-object
     /// (e.g. an array), the message is silently dropped.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::output::JsonOutput;
-    /// use serde_json::json;
-    ///
-    /// let output = JsonOutput::success(json!({"id": "abc"}), "issue create")
-    ///     .with_message("Created issue abc");
-    /// let json_str = output.to_json_string().unwrap();
-    /// assert!(json_str.contains("\"message\": \"Created issue abc\""));
-    /// ```
     pub fn with_message(mut self, msg: impl Into<String>) -> Self {
         self.message = Some(msg.into());
         self
@@ -507,18 +495,6 @@ pub struct ErrorDetail {
 ///
 /// These codes follow Unix conventions and provide consistent error reporting
 /// for automation and scripting.
-///
-/// # Examples
-///
-/// ```rust
-/// use jit::ExitCode;
-///
-/// // Success case
-/// std::process::exit(ExitCode::Success.code());
-///
-/// // Error case
-/// std::process::exit(ExitCode::NotFound.code());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 #[allow(dead_code)] // Part of public API
@@ -667,24 +643,6 @@ impl ErrorCode {
 /// (`AMBIGUOUS_ID` / `INVALID_ID_PREFIX`, exit code 2) carrying the offending
 /// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::{refine_id_error, ErrorCode, JsonError};
-/// use jit::storage::InvalidIdPrefixError;
-///
-/// let err: anyhow::Error = InvalidIdPrefixError::new("ab").into();
-/// let fallback = JsonError::new(ErrorCode::ISSUE_NOT_FOUND, "Issue not found: ab", "issue show");
-/// let refined = refine_id_error(&err, fallback);
-/// assert_eq!(refined.exit_code(), jit::ExitCode::InvalidArgument);
-///
-/// // A non-prefix error keeps the fallback untouched.
-/// let other = anyhow::anyhow!("something else");
-/// let fallback = JsonError::new(ErrorCode::ISSUE_NOT_FOUND, "Issue not found", "issue show");
-/// let kept = refine_id_error(&other, fallback);
-/// assert_eq!(kept.exit_code(), jit::ExitCode::NotFound);
-/// ```
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
     if let Some(prefix_error) = error.downcast_ref::<crate::storage::InvalidIdPrefixError>() {
         return JsonError::new(
@@ -796,13 +754,6 @@ impl JsonError {
     ///
     /// This keeps machine-readable error shaping in the output layer while the
     /// command layer returns typed blocker data.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let error = JsonError::transition_blocked(&blocked, "issue update");
-    /// assert_eq!(error.exit_code().code(), 4);
-    /// ```
     pub fn transition_blocked(
         blocked: &TransitionBlockedError,
         command: impl Into<String>,
@@ -1048,23 +999,6 @@ pub struct GraphDepsTreeResponse {
 }
 
 /// Summary statistics for dependencies
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::DependencySummary;
-/// use jit::domain::State;
-/// use std::collections::HashMap;
-///
-/// let mut by_state = HashMap::new();
-/// by_state.insert(State::Done, 2usize);
-/// by_state.insert(State::Ready, 1usize);
-/// let summary = DependencySummary { total: 3, by_state };
-///
-/// // Keys serialize as snake_case JSON strings.
-/// let json = serde_json::to_string(&summary).unwrap();
-/// assert!(json.contains("\"done\":2") || json.contains("\"done\": 2"));
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DependencySummary {
     /// Total number of unique dependencies
@@ -1174,24 +1108,6 @@ pub struct GraphTreeResponse {
 }
 
 /// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::DivergenceView;
-///
-/// let view = DivergenceView {
-///     id: "task-1234".into(),
-///     short_id: "task-123".into(),
-///     title: "Stray task".into(),
-///     label: "epic:auth".into(),
-///     namespace: "epic".into(),
-///     value: "auth".into(),
-/// };
-/// let json = serde_json::to_value(&view).unwrap();
-/// assert_eq!(json["label"], "epic:auth");
-/// assert_eq!(json["namespace"], "epic");
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceView {
     /// Full id of the issue carrying the unsupported membership label.
@@ -1213,27 +1129,6 @@ pub struct DivergenceView {
 /// List envelope: `count` is the number of entries in `divergences`. Each entry
 /// is a membership label whose claim the dependency DAG does not back (the issue
 /// carries the label but is not in the closure of the container that owns it).
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::{DivergenceResponse, DivergenceView};
-///
-/// let response = DivergenceResponse {
-///     count: 1,
-///     divergences: vec![DivergenceView {
-///         id: "task-1234".into(),
-///         short_id: "task-123".into(),
-///         title: "Stray task".into(),
-///         label: "epic:auth".into(),
-///         namespace: "epic".into(),
-///         value: "auth".into(),
-///     }],
-/// };
-/// let json = serde_json::to_value(&response).unwrap();
-/// assert_eq!(json["count"], 1);
-/// assert_eq!(json["divergences"][0]["label"], "epic:auth");
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct DivergenceResponse {
     /// Number of entries in `divergences`.
@@ -1253,24 +1148,6 @@ pub struct DivergenceResponse {
 /// `exit_code` come from the gate's latest [`GateRunResult`] and are both
 /// `null` when no run has been recorded (required-but-never-run, or a manual
 /// gate attested without a run).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::output::IssueShowResponse;
-///
-/// // A required-but-never-run gate surfaces as a pending `GateView` with both
-/// // run fields absent.
-/// let mut issue = Issue::new("Title".into(), "Body".into());
-/// issue.gates_required = vec!["tests".into()];
-/// let response = IssueShowResponse::from_issue(issue, vec![], &[]);
-///
-/// let gate = &response.gates[0];
-/// assert_eq!(gate.key, "tests");
-/// assert!(gate.last_run_at.is_none());
-/// assert!(gate.exit_code.is_none());
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateView {
     /// Gate key.
@@ -1317,22 +1194,6 @@ impl GateView {
 /// unblocks its dependents, so it is never listed here. The shape is a subset of
 /// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
 /// carrying only what an orchestrator needs to see what is still blocking work.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{Issue, MinimalIssue, State};
-/// use jit::output::UnmetDependency;
-///
-/// let mut dep = Issue::new("Upstream".into(), String::new());
-/// dep.state = State::InProgress;
-/// let minimal = MinimalIssue::from(&dep);
-///
-/// let unmet = UnmetDependency::from(&minimal);
-/// assert_eq!(unmet.id, dep.id);
-/// assert_eq!(unmet.state, State::InProgress);
-/// assert_eq!(unmet.short_id, dep.id[..8]);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct UnmetDependency {
     pub id: String,
@@ -1418,28 +1279,6 @@ impl IssueShowResponse {
     /// against `issue.dependencies` and reports it via
     /// `dangling_dependency_ids` instead of dropping it silently
     /// (jit:f847df3f).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::output::IssueShowResponse;
-    ///
-    /// let issue = Issue::new("Refactor".into(), "Body".into());
-    /// // No required gates and no runs -> an empty `gates` array.
-    /// let response = IssueShowResponse::from_issue(issue.clone(), vec![], &[]);
-    /// assert_eq!(response.id, issue.id);
-    /// assert!(response.gates.is_empty());
-    /// assert!(response.dangling_dependency_ids.is_empty());
-    ///
-    /// // A stored dependency id that isn't among `enriched_deps` (e.g. its
-    /// // target no longer exists) surfaces in `dangling_dependency_ids`
-    /// // rather than being silently dropped.
-    /// let mut orphaned = Issue::new("Parent".into(), "".into());
-    /// orphaned.dependencies = vec!["missing-id".to_string()];
-    /// let response = IssueShowResponse::from_issue(orphaned, vec![], &[]);
-    /// assert_eq!(response.dangling_dependency_ids, vec!["missing-id".to_string()]);
-    /// ```
     pub fn from_issue(
         issue: crate::domain::Issue,
         enriched_deps: Vec<MinimalIssue>,
@@ -1609,18 +1448,6 @@ impl IssueStatusResponse {
 ///
 /// Every [`State`] variant is represented, so `count` is `0` for a state with
 /// no issues rather than the entry being omitted (see [`StateRollup`]).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::State;
-/// use jit::output::StateCount;
-///
-/// let bucket = StateCount { state: State::Done, count: 3 };
-/// let json = serde_json::to_value(&bucket).unwrap();
-/// assert_eq!(json["state"], "done");
-/// assert_eq!(json["count"], 3);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StateCount {
     /// The lifecycle state this bucket counts.
@@ -1644,27 +1471,6 @@ pub struct StateCount {
 /// (`total − done − rejected`, so `Archived` — which is not terminal — counts
 /// as open). The `done`/`total` ratio and `percent` (rounded, `0` when `total`
 /// is `0`) measure delivery, i.e. `done` against `total`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{Issue, State};
-/// use jit::output::StateRollup;
-///
-/// let mut done = Issue::new("Shipped".into(), String::new());
-/// done.state = State::Done;
-/// let mut rejected = Issue::new("Dropped".into(), String::new());
-/// rejected.state = State::Rejected;
-/// let open = Issue::new("Todo".into(), String::new()); // Backlog: non-terminal
-///
-/// let rollup = StateRollup::from_issues(&[done, rejected, open]);
-/// assert_eq!(rollup.total, 3);
-/// assert_eq!(rollup.done, 1);
-/// assert_eq!(rollup.rejected, 1);
-/// assert_eq!(rollup.open, 1);
-/// assert_eq!(rollup.percent, 33); // round(100 * 1 / 3)
-/// assert_eq!(rollup.count, State::all().len());
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StateRollup {
     /// Length of `by_state` (list-envelope count); equals the number of
@@ -1690,28 +1496,6 @@ impl StateRollup {
     /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
     /// (every variant, zero-count states kept); `done`/`rejected`/`open` and
     /// `percent` follow the terminal-state semantics documented on the type.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Issue, State};
-    /// use jit::output::StateRollup;
-    ///
-    /// let mut done = Issue::new("Shipped".into(), String::new());
-    /// done.state = State::Done;
-    /// let todo = Issue::new("Todo".into(), String::new()); // Backlog
-    ///
-    /// let rollup = StateRollup::from_issues(&[done, todo]);
-    /// assert_eq!(rollup.total, 2);
-    /// assert_eq!(rollup.done, 1);
-    /// assert_eq!(rollup.open, 1); // the Backlog issue is non-terminal
-    /// assert_eq!(rollup.percent, 50);
-    /// // An empty slice is well-defined: total 0, percent 0, all buckets 0.
-    /// let empty = StateRollup::from_issues(&[]);
-    /// assert_eq!(empty.total, 0);
-    /// assert_eq!(empty.percent, 0);
-    /// assert!(empty.by_state.iter().all(|b| b.count == 0));
-    /// ```
     pub fn from_issues(issues: &[Issue]) -> Self {
         let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
             .into_iter()
@@ -1749,22 +1533,6 @@ impl StateRollup {
     /// The `by state:` line lists every state as `<state>=<count>` in canonical
     /// order (states enumerated from the domain, not hardcoded), so its columns
     /// are fixed regardless of which states are populated.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Issue, State};
-    /// use jit::output::StateRollup;
-    ///
-    /// let mut done = Issue::new("Shipped".into(), String::new());
-    /// done.state = State::Done;
-    /// let lines = StateRollup::from_issues(&[done]).to_lines();
-    ///
-    /// assert_eq!(lines.len(), 2);
-    /// assert!(lines[0].starts_with("by state: "));
-    /// assert!(lines[0].contains("done=1"));
-    /// assert_eq!(lines[1], "done 1/1 (100%)  open 0  rejected 0");
-    /// ```
     pub fn to_lines(&self) -> Vec<String> {
         let by_state = self
             .by_state
@@ -1785,21 +1553,6 @@ impl StateRollup {
 /// Compact container header — `{short_id, title, state}` — carried at the top of
 /// `jit issue children` and `jit issue progress` JSON so a consumer sees which
 /// container the child listing or rollup is for without a second lookup.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{Issue, State};
-/// use jit::output::ContainerHeader;
-///
-/// let mut epic = Issue::new("Auth epic".into(), String::new());
-/// epic.state = State::InProgress;
-/// let header = ContainerHeader::from(&epic);
-///
-/// assert_eq!(header.short_id, epic.id[..8]);
-/// assert_eq!(header.title, "Auth epic");
-/// assert_eq!(header.state, State::InProgress);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ContainerHeader {
     /// Short ID (first 8 chars of the full UUID).
@@ -1831,21 +1584,6 @@ impl From<&Issue> for ContainerHeader {
 /// that points at no stored issue is surfaced here rather than silently dropped,
 /// and is omitted from the JSON when empty. Children are ordered by ascending
 /// short id (stored dependency order is set-derived and not meaningful).
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::{ContainerHeader, IssueChildrenResponse};
-/// use jit::domain::{Issue, State};
-///
-/// let container = ContainerHeader::from(&Issue::new("Epic".into(), String::new()));
-/// let response = IssueChildrenResponse { container, count: 0, issues: vec![], dangling: vec![] };
-/// let json = serde_json::to_value(&response).unwrap();
-/// assert_eq!(json["count"], 0);
-/// assert!(json["issues"].as_array().unwrap().is_empty());
-/// // An empty `dangling` list is omitted from the JSON.
-/// assert!(json.get("dangling").is_none());
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueChildrenResponse {
     /// `{short_id, title, state}` of the queried container.
@@ -1871,30 +1609,6 @@ pub struct IssueChildrenResponse {
 /// count are over **resolvable** children only; a dependency id resolving to no
 /// stored issue is surfaced in `dangling` (the [`IssueShowResponse`] precedent)
 /// rather than counted or dropped.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::{ContainerHeader, ContainerProgressResponse, StateRollup};
-/// use jit::domain::{Issue, State};
-///
-/// let mut done = Issue::new("Child".into(), String::new());
-/// done.state = State::Done;
-/// let container = ContainerHeader::from(&Issue::new("Epic".into(), String::new()));
-/// let response = ContainerProgressResponse {
-///     container,
-///     rollup: StateRollup::from_issues(&[done]),
-///     dangling: vec![],
-/// };
-///
-/// let json = serde_json::to_value(&response).unwrap();
-/// // Rollup fields are flattened alongside `container`.
-/// assert_eq!(json["total"], 1);
-/// assert_eq!(json["done"], 1);
-/// assert_eq!(json["percent"], 100);
-/// assert_eq!(json["container"]["title"], "Epic");
-/// assert!(json.get("dangling").is_none());
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ContainerProgressResponse {
     /// `{short_id, title, state}` of the queried container.
@@ -1917,23 +1631,6 @@ pub struct ContainerProgressResponse {
 /// scalar fields (number/bool/null) as their textual value; array and object
 /// fields fall back to compact JSON, since a plain-text rendering of those is
 /// ambiguous. An unknown key returns `None` so callers can signal a usage error.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::output::{project_field, IssueShowResponse};
-///
-/// let issue = Issue::new("My Title".into(), "Body".into());
-/// let value = serde_json::to_value(IssueShowResponse::from_issue(issue, vec![], &[])).unwrap();
-///
-/// // String field -> raw, unquoted.
-/// assert_eq!(project_field(&value, "title").unwrap(), "My Title");
-/// // Array field -> compact JSON.
-/// assert_eq!(project_field(&value, "labels").unwrap(), "[]");
-/// // Unknown field -> None.
-/// assert!(project_field(&value, "bogus").is_none());
-/// ```
 pub fn project_field(value: &Value, name: &str) -> Option<String> {
     value.get(name).map(|field| match field {
         Value::String(s) => s.clone(),
@@ -1946,16 +1643,6 @@ pub fn project_field(value: &Value, name: &str) -> Option<String> {
 
 /// Error returned when a requested projection field is not a known top-level
 /// field of the serialized issue. Carries the offending field name.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::UnknownFieldError;
-///
-/// let err = UnknownFieldError("bogus".into());
-/// assert_eq!(err.to_string(), "unknown field 'bogus'");
-/// assert_eq!(err.0, "bogus");
-/// ```
 #[derive(Debug, Error, PartialEq)]
 #[error("unknown field '{0}'")]
 pub struct UnknownFieldError(pub String);
@@ -1969,25 +1656,6 @@ pub struct UnknownFieldError(pub String);
 /// can signal a usage error; otherwise the result is a compact object
 /// `{"a":...,"b":...}` whose keys keep the requested order (so the output is
 /// stable regardless of the `serde_json` map-ordering feature).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::output::{project_fields, IssueShowResponse, UnknownFieldError};
-///
-/// let issue = Issue::new("My Title".into(), "Body".into());
-/// let value = serde_json::to_value(IssueShowResponse::from_issue(issue, vec![], &[])).unwrap();
-///
-/// let out = project_fields(&value, &["title".into(), "state".into()]).unwrap();
-/// assert_eq!(out, r#"{"title":"My Title","state":"backlog"}"#);
-///
-/// // Unknown field reports its name.
-/// assert_eq!(
-///     project_fields(&value, &["bogus".into()]).unwrap_err(),
-///     UnknownFieldError("bogus".into()),
-/// );
-/// ```
 pub fn project_fields(value: &Value, names: &[String]) -> Result<String, UnknownFieldError> {
     let pairs = names
         .iter()
@@ -2020,21 +1688,6 @@ pub fn project_fields(value: &Value, names: &[String]) -> Result<String, Unknown
 /// PRETTY-printed JSON (unlike [`project_field`]'s compact fallback): a
 /// config section is read by a human at a terminal far more often than
 /// parsed by a script, and scripts should pass `--json` anyway.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::render_config_get_value;
-/// use serde_json::json;
-///
-/// assert_eq!(render_config_get_value(&json!("dev")), "dev");
-/// assert_eq!(render_config_get_value(&json!(600)), "600");
-/// assert_eq!(render_config_get_value(&json!(null)), "null");
-/// assert_eq!(
-///     render_config_get_value(&json!({"a": 1})),
-///     "{\n  \"a\": 1\n}"
-/// );
-/// ```
 pub fn render_config_get_value(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
@@ -2053,18 +1706,6 @@ pub fn render_config_get_value(value: &Value) -> String {
 ///
 /// Mutating an issue does not need to echo the full body back; agents that
 /// need it can call `jit issue show`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::output::IssueUpdateResponse;
-///
-/// let issue = Issue::new("Refactor".into(), "Body".into());
-/// let response = IssueUpdateResponse::from(&issue);
-/// assert_eq!(response.id, issue.id);
-/// assert_eq!(response.short_id.len(), 8);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueUpdateResponse {
     pub id: String,
@@ -2088,19 +1729,6 @@ impl From<&Issue> for IssueUpdateResponse {
 ///
 /// Carries the `MinimalIssue` fields plus `gates_status`, but omits the
 /// description and enriched dependency list.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::Issue;
-/// use jit::output::IssueShowSummaryResponse;
-///
-/// let issue = Issue::new("Title".into(), "Long description body".into());
-/// let summary = IssueShowSummaryResponse::from(&issue);
-/// // Description is intentionally absent from the summary shape.
-/// let json = serde_json::to_string(&summary).unwrap();
-/// assert!(!json.contains("Long description body"));
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
     pub id: String,
@@ -2273,23 +1901,6 @@ pub struct GateStatusEntry {
 /// List envelope: `count` is the length of the `gates` collection (one
 /// entry per required gate). It equals `total` whenever every required gate has
 /// a status entry; `total`/`passed` remain the readiness tallies.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::GateCheckAllResponse;
-///
-/// let payload = GateCheckAllResponse {
-///     count: 0,
-///     results: vec![],
-///     passed: 0,
-///     total: 2,
-///     not_run: vec!["tests".into(), "clippy".into()],
-///     gates: vec![],
-///     all_passed: false,
-/// };
-/// assert_eq!(payload.not_run.len(), 2);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateCheckAllResponse {
     /// Length of `gates` (list envelope `count`).
@@ -2308,18 +1919,6 @@ pub struct GateCheckAllResponse {
 /// any `--gate` / `--status` filtering and `--limit` capping. Each summary is the
 /// full form (stdout/stderr included) so history inspection never loses report
 /// text. `count` is `results.len()` (the number returned, after filtering).
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::GateRunHistoryResponse;
-///
-/// let payload = GateRunHistoryResponse {
-///     results: vec![],
-///     count: 0,
-/// };
-/// assert_eq!(payload.count, 0);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateRunHistoryResponse {
     pub results: Vec<GateRunSummary>,
@@ -2333,20 +1932,6 @@ pub struct GateRunHistoryResponse {
 /// already tail-trimmed when `--tail <N>` was supplied. `stdout` / `stderr` are
 /// present only for the streams the caller asked for, so the JSON mirrors the
 /// plain verbatim output exactly.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::GateFlatReportResponse;
-///
-/// let payload = GateFlatReportResponse {
-///     key: "tests".into(),
-///     run_id: "r1".into(),
-///     stdout: Some("the report text".into()),
-///     stderr: None,
-/// };
-/// assert_eq!(payload.stderr, None);
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFlatReportResponse {
     pub key: String,
@@ -2366,23 +1951,6 @@ pub struct GateFlatReportResponse {
 /// checker (no block emitted) so a consumer can distinguish "ran, no structured
 /// findings" from "no findings recorded", without inspecting the optional
 /// fields.
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::GateFindingsResponse;
-///
-/// let payload = GateFindingsResponse {
-///     key: "code-review".into(),
-///     run_id: "r1".into(),
-///     has_findings: false,
-///     verdict: None,
-///     summary: None,
-///     findings: vec![],
-/// };
-/// assert!(!payload.has_findings);
-/// assert!(payload.findings.is_empty());
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateFindingsResponse {
     pub key: String,
@@ -2415,26 +1983,6 @@ pub struct GateListResponse {
 /// Serialized as snake_case JSON; `stage` and `mode` are typed enums so the
 /// serialized form is always well-formed and identical to the registry storage
 /// format (`"precheck"` / `"postcheck"` / `"manual"` / `"auto"`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::output::GateDefinition;
-/// use jit::domain::{GateMode, GateStage};
-///
-/// let def = GateDefinition {
-///     key: "tests".to_string(),
-///     title: "Tests".to_string(),
-///     description: "Run test suite".to_string(),
-///     auto: true,
-///     example_integration: None,
-///     stage: GateStage::Postcheck,
-///     mode: GateMode::Auto,
-/// };
-/// let json = serde_json::to_value(&def).unwrap();
-/// assert_eq!(json["stage"], "postcheck");
-/// assert_eq!(json["mode"], "auto");
-/// ```
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateDefinition {
     pub key: String,

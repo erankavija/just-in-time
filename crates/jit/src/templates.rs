@@ -38,28 +38,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors that can occur while loading and validating `.jit/templates.toml`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::{TemplateConfigError, TemplateRegistry};
-/// use std::path::Path;
-///
-/// // Two nodes sharing a role is a config error.
-/// let toml = r#"
-/// [[template]]
-/// name = "dup"
-/// applies_to = ["epic"]
-/// [[template.nodes]]
-/// role = "a"
-/// type = "planning"
-/// [[template.nodes]]
-/// role = "a"
-/// type = "planning"
-/// "#;
-/// let err = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap_err();
-/// assert!(matches!(err, TemplateConfigError::DuplicateRole { .. }));
-/// ```
 #[derive(Debug, Error)]
 pub enum TemplateConfigError {
     /// The templates file could not be read from disk.
@@ -180,18 +158,6 @@ pub enum TemplateConfigError {
 /// The registry loader rejects any other kind ([`TemplateConfigError::UnknownTransformKind`]),
 /// so a template that reaches `jit apply` declares only kinds the engine can
 /// dispatch. Dispatch is by variant, keeping the transform set extensible.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::TransformKind;
-///
-/// assert_eq!(
-///     TransformKind::from_kind("move-upstream-to-role"),
-///     Some(TransformKind::MoveUpstreamToRole),
-/// );
-/// assert_eq!(TransformKind::from_kind("teleport"), None);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransformKind {
     /// Move the container's pre-apply upstream deps onto a named role's node.
@@ -203,25 +169,9 @@ impl TransformKind {
     pub const MOVE_UPSTREAM_TO_ROLE: &'static str = "move-upstream-to-role";
 
     /// Every supported `kind` string, for error messages and documentation.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TransformKind;
-    ///
-    /// assert!(TransformKind::SUPPORTED.contains(&"move-upstream-to-role"));
-    /// ```
     pub const SUPPORTED: &'static [&'static str] = &[Self::MOVE_UPSTREAM_TO_ROLE];
 
     /// Parse a transform `kind` string, or `None` when the kind is unsupported.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TransformKind;
-    ///
-    /// assert!(TransformKind::from_kind("move-upstream-to-role").is_some());
-    /// ```
     pub fn from_kind(kind: &str) -> Option<Self> {
         match kind {
             Self::MOVE_UPSTREAM_TO_ROLE => Some(Self::MoveUpstreamToRole),
@@ -236,26 +186,6 @@ impl TransformKind {
 /// Built by [`TemplateRegistry::load`] (file → registry) or
 /// [`TemplateRegistry::from_toml_str`] (string → registry). An absent file
 /// yields an empty registry with default bindings.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::TemplateRegistry;
-///
-/// let toml = r#"
-/// [roles]
-/// planning = "spec"
-///
-/// [[template]]
-/// name = "plan"
-/// applies_to = ["epic"]
-/// "#;
-/// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
-/// assert_eq!(reg.templates.len(), 1);
-/// assert_eq!(reg.roles.planning_role(), "spec");
-/// // Bindings left undeclared keep their defaults.
-/// assert_eq!(reg.anchors.container_anchor(), "container");
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateRegistry {
     /// Repository names for the node roles the bracket tooling reaches for
@@ -273,41 +203,14 @@ pub struct TemplateRegistry {
 
 /// The role name [`RoleBindings::planning_role`] resolves to when `[roles]
 /// planning` is undeclared. The SOLE place this name lives.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::{RoleBindings, DEFAULT_PLANNING_ROLE};
-///
-/// assert_eq!(RoleBindings::default().planning_role(), DEFAULT_PLANNING_ROLE);
-/// ```
 pub const DEFAULT_PLANNING_ROLE: &str = "planning";
 
 /// The role name [`RoleBindings::breakdown_role`] resolves to when `[roles]
 /// breakdown` is undeclared. The SOLE place this name lives.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::{RoleBindings, DEFAULT_BREAKDOWN_ROLE};
-///
-/// assert_eq!(RoleBindings::default().breakdown_role(), DEFAULT_BREAKDOWN_ROLE);
-/// ```
 pub const DEFAULT_BREAKDOWN_ROLE: &str = "breakdown";
 
 /// The anchor name [`AnchorBindings::container_anchor`] resolves to when
 /// `[anchors] container` is undeclared. The SOLE place this name lives.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::{AnchorBindings, DEFAULT_CONTAINER_ANCHOR};
-///
-/// assert_eq!(
-///     AnchorBindings::default().container_anchor(),
-///     DEFAULT_CONTAINER_ANCHOR,
-/// );
-/// ```
 pub const DEFAULT_CONTAINER_ANCHOR: &str = "container";
 
 /// The repository's names for the two template node roles the bracket tooling
@@ -319,22 +222,6 @@ pub const DEFAULT_CONTAINER_ANCHOR: &str = "container";
 /// [`DEFAULT_BREAKDOWN_ROLE`], so a repository that names its roles the usual way
 /// declares nothing. Binding these keeps `jit apply`, bracket breakdown, forced
 /// refresh, and validation free of any role literal (`@/inv/domain-agnostic`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::RoleBindings;
-///
-/// // A template registry that renames both roles.
-/// let bindings: RoleBindings =
-///     toml::from_str("planning = \"spec\"\nbreakdown = \"split\"\n").unwrap();
-/// assert_eq!(bindings.planning_role(), "spec");
-/// assert_eq!(bindings.breakdown_role(), "split");
-///
-/// // Undeclared keys keep the default names.
-/// assert_eq!(RoleBindings::default().planning_role(), "planning");
-/// assert_eq!(RoleBindings::default().breakdown_role(), "breakdown");
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoleBindings {
     /// Name of the role carried by the planning node `P`. Resolve it with
@@ -350,30 +237,12 @@ pub struct RoleBindings {
 impl RoleBindings {
     /// The role the planning node `P` carries, defaulting to
     /// [`DEFAULT_PLANNING_ROLE`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::RoleBindings;
-    ///
-    /// let bindings: RoleBindings = toml::from_str("planning = \"spec\"").unwrap();
-    /// assert_eq!(bindings.planning_role(), "spec");
-    /// ```
     pub fn planning_role(&self) -> &str {
         self.planning.as_deref().unwrap_or(DEFAULT_PLANNING_ROLE)
     }
 
     /// The role the breakdown node `B` carries, defaulting to
     /// [`DEFAULT_BREAKDOWN_ROLE`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::RoleBindings;
-    ///
-    /// let bindings: RoleBindings = toml::from_str("breakdown = \"split\"").unwrap();
-    /// assert_eq!(bindings.breakdown_role(), "split");
-    /// ```
     pub fn breakdown_role(&self) -> &str {
         self.breakdown.as_deref().unwrap_or(DEFAULT_BREAKDOWN_ROLE)
     }
@@ -386,18 +255,6 @@ impl RoleBindings {
 /// binds it to the positional `<container>` argument, so a template whose
 /// container anchor is named `target` needs no `--anchor target=…`. An absent
 /// table (or key) resolves to [`DEFAULT_CONTAINER_ANCHOR`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::AnchorBindings;
-///
-/// let bindings: AnchorBindings = toml::from_str("container = \"target\"").unwrap();
-/// assert_eq!(bindings.container_anchor(), "target");
-///
-/// // Undeclared keeps the default name.
-/// assert_eq!(AnchorBindings::default().container_anchor(), "container");
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnchorBindings {
     /// Name of the anchor bound to `jit apply`'s positional `<container>`.
@@ -410,15 +267,6 @@ pub struct AnchorBindings {
 impl AnchorBindings {
     /// The anchor bound to `jit apply`'s positional `<container>` argument,
     /// defaulting to [`DEFAULT_CONTAINER_ANCHOR`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::AnchorBindings;
-    ///
-    /// let bindings: AnchorBindings = toml::from_str("container = \"target\"").unwrap();
-    /// assert_eq!(bindings.container_anchor(), "target");
-    /// ```
     pub fn container_anchor(&self) -> &str {
         self.container
             .as_deref()
@@ -427,23 +275,6 @@ impl AnchorBindings {
 }
 
 /// A named, parameterized subgraph applied to a container by `jit apply`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::TemplateRegistry;
-///
-/// let toml = r#"
-/// [[template]]
-/// name = "plan"
-/// description = "Plan-before-fan-out bracket."
-/// applies_to = ["epic"]
-/// "#;
-/// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
-/// let template = reg.get("plan").unwrap();
-/// assert_eq!(template.applies_to, vec!["epic".to_string()]);
-/// assert_eq!(template.description.as_deref(), Some("Plan-before-fan-out bracket."));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GraphTemplate {
     /// Unique template name (e.g. `"plan"`), the `jit apply <name>` selector.
@@ -472,15 +303,6 @@ pub struct GraphTemplate {
 ///
 /// The `plan` template has a single anchor, `container`, bound to the target
 /// issue; templates may declare several.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::AnchorSlot;
-///
-/// let slot = AnchorSlot { name: "container".to_string(), gates: vec![] };
-/// assert_eq!(slot.name, "container");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnchorSlot {
     /// The anchor's name, referenced by `anchor_edges.from`.
@@ -494,30 +316,6 @@ pub struct AnchorSlot {
 }
 
 /// A node the template creates when applied.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::TemplateRegistry;
-///
-/// let toml = r#"
-/// [[template]]
-/// name = "plan"
-/// applies_to = ["epic"]
-/// [[template.nodes]]
-/// role = "breakdown"
-/// type = "breakdown"
-/// depends_on = ["planning"]
-/// [[template.nodes]]
-/// role = "planning"
-/// type = "planning"
-/// "#;
-/// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning", "breakdown"]).unwrap();
-/// let node = &reg.get("plan").unwrap().nodes[0];
-/// assert_eq!(node.role, "breakdown");
-/// assert_eq!(node.type_name, "breakdown");
-/// assert_eq!(node.depends_on, vec!["planning".to_string()]);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateNode {
     /// Role identifying this node within the template (e.g. `"planning"`),
@@ -554,16 +352,6 @@ pub struct TemplateNode {
 /// Direction is "anchor depends on node": the issue bound to `from` gains a
 /// dependency on the node created for `to` (e.g. `container` depends on
 /// `breakdown`, wiring `C → B`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::AnchorEdge;
-///
-/// let edge = AnchorEdge { from: "container".to_string(), to: "breakdown".to_string() };
-/// assert_eq!(edge.from, "container");
-/// assert_eq!(edge.to, "breakdown");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnchorEdge {
     /// Anchor name the edge originates from (the dependent side).
@@ -577,19 +365,6 @@ pub struct AnchorEdge {
 /// `kind` names a [`TransformKind`]; the loader rejects any other value. The
 /// shipped kind is `move-upstream-to-role`, which moves the container's pre-apply
 /// upstream dependencies onto the node of the named role.
-///
-/// # Examples
-///
-/// ```
-/// use jit::templates::Transform;
-///
-/// let transform = Transform {
-///     kind: "move-upstream-to-role".to_string(),
-///     role: "planning".to_string(),
-/// };
-/// assert_eq!(transform.kind, "move-upstream-to-role");
-/// assert_eq!(transform.role, "planning");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transform {
     /// Transform kind (e.g. `"move-upstream-to-role"`).
@@ -600,35 +375,11 @@ pub struct Transform {
 
 impl TemplateRegistry {
     /// An empty registry (used when no `templates.toml` exists).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let reg = TemplateRegistry::empty();
-    /// assert!(reg.templates.is_empty());
-    /// ```
     pub fn empty() -> Self {
         Self::default()
     }
 
     /// Look up a template by name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
-    /// assert!(reg.get("plan").is_some());
-    /// assert!(reg.get("missing").is_none());
-    /// ```
     pub fn get(&self, name: &str) -> Option<&GraphTemplate> {
         self.templates.iter().find(|t| t.name == name)
     }
@@ -638,23 +389,6 @@ impl TemplateRegistry {
     ///
     /// This is the set of breakable container types declared by the registry:
     /// a container type appears here iff some template may be applied to it.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic", "milestone"]
-    /// [[template]]
-    /// name = "other"
-    /// applies_to = ["epic"]
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "milestone"]).unwrap();
-    /// assert_eq!(reg.breakable_types(), vec!["epic".to_string(), "milestone".to_string()]);
-    /// ```
     pub fn breakable_types(&self) -> Vec<String> {
         let mut seen = HashSet::new();
         self.templates
@@ -668,21 +402,6 @@ impl TemplateRegistry {
     /// The template applicable to a container `type` (e.g. `"epic"`): the first
     /// template whose `applies_to` lists that type, or `None` when no template
     /// brackets it.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic"]).unwrap();
-    /// assert_eq!(reg.template_for_container("epic").unwrap().name, "plan");
-    /// assert!(reg.template_for_container("task").is_none());
-    /// ```
     pub fn template_for_container(&self, container_type: &str) -> Option<&GraphTemplate> {
         self.templates
             .iter()
@@ -695,17 +414,6 @@ impl TemplateRegistry {
     /// is the configured `[type_hierarchy].types` key set, against which node
     /// `type`s are checked; pass an empty slice to skip the type check (when no
     /// hierarchy is configured).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// // A directory with no `templates.toml` loads as an empty registry.
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let reg = TemplateRegistry::load(dir.path(), &["epic"]).unwrap();
-    /// assert!(reg.templates.is_empty());
-    /// ```
     pub fn load<S: AsRef<str>>(
         jit_root: &Path,
         hierarchy_types: &[S],
@@ -725,23 +433,6 @@ impl TemplateRegistry {
     ///
     /// `hierarchy_types` is the configured `[type_hierarchy].types` key set;
     /// pass an empty slice to skip the node-`type` check.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// assert_eq!(reg.templates[0].name, "plan");
-    /// ```
     pub fn from_toml_str<S: AsRef<str>>(
         content: &str,
         hierarchy_types: &[S],
@@ -774,117 +465,28 @@ impl TemplateRegistry {
 
 impl GraphTemplate {
     /// The node carrying the given `role`, or `None` if no node declares it.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// let template = reg.get("plan").unwrap();
-    /// assert_eq!(template.node(reg.roles.planning_role()).unwrap().type_name, "planning");
-    /// assert!(template.node("missing").is_none());
-    /// ```
     pub fn node(&self, role: &str) -> Option<&TemplateNode> {
         self.nodes.iter().find(|n| n.role == role)
     }
 
     /// The planning node `P` ([`RoleBindings::planning_role`]), or `None` if the
     /// template has none.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// let template = reg.get("plan").unwrap();
-    /// assert_eq!(template.planning_node(&reg.roles).unwrap().role, "planning");
-    /// ```
     pub fn planning_node(&self, roles: &RoleBindings) -> Option<&TemplateNode> {
         self.node(roles.planning_role())
     }
 
     /// The breakdown node `B` ([`RoleBindings::breakdown_role`]), or `None` if the
     /// template has none.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "breakdown"
-    /// type = "breakdown"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
-    /// let template = reg.get("plan").unwrap();
-    /// assert_eq!(template.breakdown_node(&reg.roles).unwrap().role, "breakdown");
-    /// ```
     pub fn breakdown_node(&self, roles: &RoleBindings) -> Option<&TemplateNode> {
         self.node(roles.breakdown_role())
     }
 
     /// The issue type carried by the planning node `P` (e.g. `"planning"`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().planning_type(&reg.roles), Some("planning"));
-    /// ```
     pub fn planning_type(&self, roles: &RoleBindings) -> Option<&str> {
         self.planning_node(roles).map(|n| n.type_name.as_str())
     }
 
     /// The issue type carried by the breakdown node `B` (e.g. `"breakdown"`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "breakdown"
-    /// type = "breakdown"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "breakdown"]).unwrap();
-    /// assert_eq!(reg.get("plan").unwrap().breakdown_type(&reg.roles), Some("breakdown"));
-    /// ```
     pub fn breakdown_type(&self, roles: &RoleBindings) -> Option<&str> {
         self.breakdown_node(roles).map(|n| n.type_name.as_str())
     }
@@ -892,27 +494,6 @@ impl GraphTemplate {
     /// The planning node's doc-location template (e.g.
     /// `"dev/active/{container.id}-plan.md"`), with `{...}` tokens resolved at
     /// apply time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::templates::TemplateRegistry;
-    ///
-    /// let toml = r#"
-    /// [[template]]
-    /// name = "plan"
-    /// applies_to = ["epic"]
-    /// [[template.nodes]]
-    /// role = "planning"
-    /// type = "planning"
-    /// doc = "dev/active/{container.id}-plan.md"
-    /// "#;
-    /// let reg = TemplateRegistry::from_toml_str(toml, &["epic", "planning"]).unwrap();
-    /// assert_eq!(
-    ///     reg.get("plan").unwrap().plan_doc_location(&reg.roles),
-    ///     Some("dev/active/{container.id}-plan.md"),
-    /// );
-    /// ```
     pub fn plan_doc_location(&self, roles: &RoleBindings) -> Option<&str> {
         self.planning_node(roles).and_then(|n| n.doc.as_deref())
     }

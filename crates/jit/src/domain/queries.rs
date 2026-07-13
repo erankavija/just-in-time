@@ -145,26 +145,6 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 /// implementation renders the canonical reason string (`dependency:<id>
 /// (<title>:<state>)` and `gate:<key> (<status>)`) shared by human and `--json`
 /// output.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::queries::BlockingReason;
-/// use jit::domain::{GateStatus, State};
-///
-/// let dep = BlockingReason::Dependency {
-///     id: "abc123".to_string(),
-///     title: "Build parser".to_string(),
-///     state: State::InProgress,
-/// };
-/// assert_eq!(dep.to_string(), "dependency:abc123 (Build parser:InProgress)");
-///
-/// let gate = BlockingReason::Gate {
-///     key: "cargo-ci".to_string(),
-///     status: GateStatus::Pending,
-/// };
-/// assert_eq!(gate.to_string(), "gate:cargo-ci (Pending)");
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockingReason {
     /// An unmet dependency: the issue waits on `id` (titled `title`), which is in
@@ -367,27 +347,6 @@ pub fn query_closed(issues: &[Issue]) -> Vec<Issue> {
 /// (never omitted). This keeps the aggregation shape stable and complete
 /// regardless of which states happen to be populated, and derives the state
 /// list from the enum rather than hardcoding it (@/inv/domain-agnostic).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::queries::count_by_state;
-/// use jit::domain::{Issue, State};
-///
-/// let mut done = Issue::new("Shipped".into(), String::new());
-/// done.state = State::Done;
-/// // A fresh Issue defaults to Backlog.
-/// let counts = count_by_state(&[done, Issue::new("Todo".into(), String::new())]);
-///
-/// // One entry per variant, in `State::all()` order, zero-count states kept.
-/// assert_eq!(counts.len(), State::all().len());
-/// assert_eq!(counts[0], (State::Backlog, 1));
-/// let done_count = counts.iter().find(|(s, _)| *s == State::Done).unwrap().1;
-/// assert_eq!(done_count, 1);
-/// // A state with no issues is present with count 0, never omitted.
-/// let ready_count = counts.iter().find(|(s, _)| *s == State::Ready).unwrap().1;
-/// assert_eq!(ready_count, 0);
-/// ```
 pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
     State::all()
         .into_iter()

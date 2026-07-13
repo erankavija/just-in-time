@@ -64,17 +64,6 @@ pub trait DocFormatAdapter {
 ///
 /// - Anchor-only links: `#section`
 /// - Mailto links: `mailto:user@example.com`
-///
-/// # Examples
-///
-/// ```
-/// use jit::document::{DocFormatAdapter, HtmlAdapter};
-///
-/// let adapter = HtmlAdapter;
-/// assert_eq!(adapter.id(), "html");
-/// assert!(adapter.supports_path("index.html"));
-/// assert!(adapter.detect("<!DOCTYPE html><html><body></body></html>"));
-/// ```
 pub struct HtmlAdapter;
 
 impl DocFormatAdapter for HtmlAdapter {

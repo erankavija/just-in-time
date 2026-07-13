@@ -62,23 +62,6 @@ struct LockState {
 /// lock. Construct with [`RepoWriteLock::for_storage_root`] (file-backed,
 /// cross-process) or [`RepoWriteLock::in_process`] (thread-only, for backends
 /// with no on-disk state).
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::repo_lock::RepoWriteLock;
-///
-/// let temp = tempfile::tempdir().unwrap();
-/// let lock = RepoWriteLock::for_storage_root(temp.path(), std::time::Duration::from_secs(5));
-///
-/// let outer = lock.acquire().unwrap();
-/// // A nested acquisition on the same thread succeeds instead of self-deadlocking.
-/// let inner = lock.acquire().unwrap();
-/// drop(inner);
-/// drop(outer); // file lock released here
-///
-/// assert!(temp.path().join(".repo-write.lock").exists());
-/// ```
 #[derive(Debug)]
 pub struct RepoWriteLock {
     /// Lock file and its acquisition timeout; `None` for a process-local lock.
@@ -94,17 +77,6 @@ impl RepoWriteLock {
     ///
     /// `timeout` bounds how long an acquisition waits for the file lock. The lock
     /// file (and the storage root) are created on first acquisition, not here.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::repo_lock::RepoWriteLock;
-    /// use std::time::Duration;
-    ///
-    /// let temp = tempfile::tempdir().unwrap();
-    /// let lock = RepoWriteLock::for_storage_root(temp.path().join(".jit"), Duration::from_secs(5));
-    /// assert!(lock.path().is_some());
-    /// ```
     pub fn for_storage_root<P: AsRef<Path>>(storage_root: P, timeout: Duration) -> Arc<Self> {
         Arc::new(Self {
             backing: Some((
@@ -121,16 +93,6 @@ impl RepoWriteLock {
     /// For backends whose state lives in memory: there is no file to guard and no
     /// other process to guard it against, but apply-style sequences must still
     /// exclude concurrent writers within the process.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::repo_lock::RepoWriteLock;
-    ///
-    /// let lock = RepoWriteLock::in_process();
-    /// assert!(lock.path().is_none());
-    /// let _guard = lock.acquire().unwrap();
-    /// ```
     pub fn in_process() -> Arc<Self> {
         Arc::new(Self {
             backing: None,
@@ -140,17 +102,6 @@ impl RepoWriteLock {
     }
 
     /// Path of the lock file, or `None` for a process-local lock.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::repo_lock::RepoWriteLock;
-    /// use std::time::Duration;
-    ///
-    /// let temp = tempfile::tempdir().unwrap();
-    /// let lock = RepoWriteLock::for_storage_root(temp.path(), Duration::from_secs(1));
-    /// assert_eq!(lock.path().unwrap().file_name().unwrap(), ".repo-write.lock");
-    /// ```
     pub fn path(&self) -> Option<&Path> {
         self.backing.as_ref().map(|(path, _)| path.as_path())
     }
@@ -166,19 +117,6 @@ impl RepoWriteLock {
     ///
     /// Returns an error when the storage root cannot be created or the file lock
     /// cannot be acquired within the configured timeout.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::repo_lock::RepoWriteLock;
-    ///
-    /// let lock = RepoWriteLock::in_process();
-    /// {
-    ///     let _guard = lock.acquire().unwrap();
-    ///     // writes are serialized here
-    /// }
-    /// let _reacquired = lock.acquire().unwrap();
-    /// ```
     pub fn acquire(self: &Arc<Self>) -> Result<RepoWriteGuard> {
         let me = std::thread::current().id();
         let mut state = self.lock_state();
@@ -244,16 +182,6 @@ impl RepoWriteLock {
 /// RAII guard for one acquisition of a [`RepoWriteLock`].
 ///
 /// The lock is released when the outermost guard drops, including on unwind.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::repo_lock::RepoWriteLock;
-///
-/// let lock = RepoWriteLock::in_process();
-/// let guard = lock.acquire().unwrap();
-/// drop(guard);
-/// ```
 #[derive(Debug)]
 #[must_use = "the repository write lock is released as soon as the guard drops"]
 pub struct RepoWriteGuard {

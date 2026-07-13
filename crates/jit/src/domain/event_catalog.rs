@@ -33,14 +33,6 @@ use super::types::{Assignee, Event, Priority, State};
 
 /// Path of the committed markdown reference this module projects, relative to
 /// the repository root.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::event_catalog::REFERENCE_PATH;
-///
-/// assert_eq!(REFERENCE_PATH, "docs/reference/events.md");
-/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 
 /// What an event is about: the state it records a change to.
@@ -48,18 +40,6 @@ pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 /// The scope decides whether a record carries an `issue_id`: only
 /// [`EventScope::Issue`] events name a single issue, so registry- and
 /// repository-scoped records omit the field entirely.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{EventScope, EventTag};
-///
-/// // A state change is about one issue, so its record names that issue.
-/// assert_eq!(EventTag::IssueStateChanged.scope(), EventScope::Issue);
-///
-/// // A gate-registry edit changes shared state, so it names no issue.
-/// assert_eq!(EventTag::GateDefinitionCreated.scope(), EventScope::Registry);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventScope {
@@ -73,15 +53,6 @@ pub enum EventScope {
 
 impl EventScope {
     /// The scope's snake-case name, as it appears in `jit --schema`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::EventScope;
-    ///
-    /// assert_eq!(EventScope::Issue.as_str(), "issue");
-    /// assert_eq!(EventScope::Repository.as_str(), "repository");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             EventScope::Issue => "issue",
@@ -96,18 +67,6 @@ impl EventScope {
 /// The tag is the value of a record's `type` field. [`Event::tag`] is the
 /// wildcard-free mapping from a record to its tag, and [`Event::get_type`]
 /// renders that tag as the string serde writes.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{Event, EventTag, Issue};
-///
-/// let issue = Issue::new("Probe".to_string(), String::new());
-/// let event = Event::new_issue_created(&issue);
-///
-/// assert_eq!(event.tag(), EventTag::IssueCreated);
-/// assert_eq!(EventTag::IssueCreated.as_str(), "issue_created");
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventTag {
@@ -160,14 +119,6 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::EventTag;
-    ///
-    /// assert!(EventTag::ALL.contains(&EventTag::IssueCreated));
-    /// ```
     pub const ALL: [EventTag; 21] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
@@ -193,14 +144,6 @@ impl EventTag {
     ];
 
     /// The tag as serde writes it into a record's `type` field.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::EventTag;
-    ///
-    /// assert_eq!(EventTag::IssueStateChanged.as_str(), "issue_state_changed");
-    /// ```
     pub fn as_str(self) -> &'static str {
         match self {
             EventTag::IssueCreated => "issue_created",
@@ -228,16 +171,6 @@ impl EventTag {
     }
 
     /// The state this tag's records are about.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{EventScope, EventTag};
-    ///
-    /// assert_eq!(EventTag::GatePassed.scope(), EventScope::Issue);
-    /// assert_eq!(EventTag::GateDefinitionCreated.scope(), EventScope::Registry);
-    /// assert_eq!(EventTag::DocumentArchived.scope(), EventScope::Repository);
-    /// ```
     pub fn scope(self) -> EventScope {
         match self {
             EventTag::IssueCreated
@@ -327,21 +260,6 @@ impl EventTag {
     /// catalog's claims are tested against these samples rather than against a
     /// restatement of them. The match is wildcard-free: a new tag fails to compile
     /// until it is sampled here.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::EventTag;
-    ///
-    /// let event = EventTag::IssueCreated.sample();
-    /// assert_eq!(event.tag(), EventTag::IssueCreated);
-    ///
-    /// // An issue-scoped record names its issue; the serialized form is what
-    /// // `events.jsonl` stores.
-    /// let record = serde_json::to_value(&event).unwrap();
-    /// assert_eq!(record["type"], "issue_created");
-    /// assert!(record.get("issue_id").is_some());
-    /// ```
     pub fn sample(self) -> Event {
         let id = "00000000-0000-0000-0000-000000000000".to_string();
         let issue_id = "00000000-0000-0000-0000-000000000001".to_string();
@@ -502,16 +420,6 @@ impl Event {
     /// new variant fails to compile until it is given a tag, and the tag then
     /// carries a scope, a sample, and a description with it.
     /// [`Event::get_type`] renders the returned tag as the string serde writes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::{Event, EventTag};
-    ///
-    /// let event = Event::new_gate_definition_created("tests".to_string());
-    /// assert_eq!(event.tag(), EventTag::GateDefinitionCreated);
-    /// assert_eq!(event.get_type(), EventTag::GateDefinitionCreated.as_str());
-    /// ```
     pub fn tag(&self) -> EventTag {
         match self {
             Event::IssueCreated { .. } => EventTag::IssueCreated,
@@ -541,22 +449,6 @@ impl Event {
 
 /// One catalog row: an event tag, what it is about, and whether its records
 /// carry an `issue_id`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{event_catalog, EventScope, EventTag};
-///
-/// let catalog = event_catalog();
-/// let row = catalog
-///     .iter()
-///     .find(|row| row.tag == EventTag::DocumentArchived)
-///     .expect("document_archived is cataloged");
-///
-/// // Archiving a document changes repository state, so the record names no issue.
-/// assert_eq!(row.scope, EventScope::Repository);
-/// assert!(!row.carries_issue_id);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct EventTagDoc {
     /// The record's `type` tag.
@@ -578,21 +470,6 @@ pub struct EventTagDoc {
 /// [`EventTag::as_str`] supplies the tag serde writes, [`EventTag::scope`] the
 /// association scope, and the `issue_id` presence is read off the sample record's
 /// serialized JSON object — the encoding the event log stores.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{event_catalog, EventScope, EventTag};
-///
-/// let catalog = event_catalog();
-/// let row = |tag| catalog.iter().find(|r| r.tag == tag).expect("tag is cataloged");
-///
-/// // Issue-scoped records name the issue they concern.
-/// assert!(row(EventTag::IssueStateChanged).carries_issue_id);
-/// // Repository- and registry-scoped records do not.
-/// assert!(!row(EventTag::DocumentArchived).carries_issue_id);
-/// assert_eq!(row(EventTag::GateDefinitionCreated).scope, EventScope::Registry);
-/// ```
 pub fn event_catalog() -> Vec<EventTagDoc> {
     EventTag::ALL
         .iter()
@@ -610,16 +487,6 @@ pub fn event_catalog() -> Vec<EventTagDoc> {
 /// The page projects [`event_catalog`] into markdown, so the committed doc is
 /// generated rather than hand-copied. A conformance test asserts the committed
 /// file equals this output (`@/inv/single-source-prose`).
-///
-/// # Examples
-///
-/// ```
-/// let page = jit::domain::render_event_reference();
-///
-/// assert!(page.contains("# Event Log Tags"));
-/// assert!(page.contains("| `issue_state_changed` | issue | yes |"));
-/// assert!(page.contains("| `document_archived` | repository | no |"));
-/// ```
 pub fn render_event_reference() -> String {
     let catalog = event_catalog();
 

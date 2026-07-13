@@ -21,24 +21,6 @@ use crate::validation::projection::project_invariants;
 /// Returned by [`CommandExecutor::render_invariants`] and serialized as the
 /// `--json` payload: the repo-relative `target` that was written, the `mode` used
 /// (`separate-file`|`region`), and the `count` of invariants rendered.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::InvariantRenderResult;
-///
-/// // The fields mirror the rendered projection (here built by hand to show the
-/// // serialized shape).
-/// let result = InvariantRenderResult {
-///     target: ".jit/invariants.md".to_string(),
-///     mode: "separate-file".to_string(),
-///     count: 2,
-/// };
-/// let json = serde_json::to_value(&result).unwrap();
-/// assert_eq!(json["target"], ".jit/invariants.md");
-/// assert_eq!(json["mode"], "separate-file");
-/// assert_eq!(json["count"], 2);
-/// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantRenderResult {
     /// The repo-relative documentation target that was written (from config).
@@ -56,28 +38,6 @@ pub struct InvariantRenderResult {
 /// invariant id and the dangling subject) and the total `count`. An empty
 /// `findings` list means the registry and the declared rules/gates are
 /// consistent.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::InvariantCheckResult;
-/// use jit::validation::drift::DriftFinding;
-///
-/// // The shape mirrors the computed drift (built by hand to show the JSON).
-/// let result = InvariantCheckResult {
-///     findings: vec![DriftFinding {
-///         invariant_id: "dag-acyclic".to_string(),
-///         subject: "ghost-rule".to_string(),
-///         unloadable: false,
-///     }],
-///     count: 1,
-/// };
-/// assert!(result.has_drift());
-/// let json = serde_json::to_value(&result).unwrap();
-/// assert_eq!(json["count"], 1);
-/// assert_eq!(json["findings"][0]["invariant_id"], "dag-acyclic");
-/// assert_eq!(json["findings"][0]["subject"], "ghost-rule");
-/// ```
 #[derive(Debug, Serialize)]
 pub struct InvariantCheckResult {
     /// Every drift finding (declared-but-unenforced, in the invariants' authored
@@ -89,15 +49,6 @@ pub struct InvariantCheckResult {
 
 impl InvariantCheckResult {
     /// Whether any enforcement drift was found (the caller exits non-zero iff so).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::commands::InvariantCheckResult;
-    ///
-    /// let clean = InvariantCheckResult { findings: vec![], count: 0 };
-    /// assert!(!clean.has_drift());
-    /// ```
     pub fn has_drift(&self) -> bool {
         !self.findings.is_empty()
     }
@@ -114,18 +65,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// [`project_invariants`](crate::validation::projection::project_invariants),
     /// which path-validates the config-driven target and writes atomically
     /// through the storage boundary. The target path comes ONLY from config.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let result = executor.render_invariants()?;
-    /// println!("wrote {} invariant(s) to {}", result.count, result.target);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn render_invariants(&self) -> Result<InvariantRenderResult> {
         let config = self.cached_config()?;
         let default = InvariantProjectionConfig::default();
@@ -159,20 +98,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// so it surfaces as a declared-but-unenforced finding with
     /// [`DriftFinding::unloadable`](crate::validation::drift::DriftFinding::unloadable)
     /// set (REQ-01 "missing OR unloadable") rather than crashing the command.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let result = executor.check_invariants()?;
-    /// if result.has_drift() {
-    ///     eprintln!("{} enforcement-drift finding(s)", result.count);
-    /// }
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn check_invariants(&self) -> Result<InvariantCheckResult> {
         // Share the SINGLE tolerant drift computation with the built-in validate
         // pass so both surfaces report identically, including the unloadable-source

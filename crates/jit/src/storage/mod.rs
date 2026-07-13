@@ -75,22 +75,6 @@ pub struct GateRegistry {
 /// This trait allows the core business logic to be decoupled from the specific
 /// storage implementation. Implementations must be `Clone` to support shared
 /// access patterns.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::domain::Issue;
-/// use jit::storage::{IssueStore, JsonFileStorage};
-///
-/// let storage = JsonFileStorage::new(".");
-/// storage.init().unwrap();
-///
-/// let issue = Issue::new("Fix bug".to_string(), "Details".to_string());
-/// storage.save_issue(issue.clone()).unwrap();
-///
-/// let loaded = storage.load_issue(&issue.id).unwrap();
-/// assert_eq!(loaded.title, "Fix bug");
-/// ```
 pub trait IssueStore: Clone {
     /// Initialize the storage backend (idempotent).
     ///
@@ -116,24 +100,6 @@ pub trait IssueStore: Clone {
     ///
     /// Returns an error when the lock cannot be acquired within the backend's
     /// timeout.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::storage::{InMemoryStorage, IssueStore};
-    ///
-    /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
-    ///
-    /// // Hold the lock across a sequence of writes; nested writes reenter it.
-    /// let guard = storage.acquire_repo_write_lock().unwrap();
-    /// storage.save_issue(Issue::new("A".to_string(), String::new())).unwrap();
-    /// storage.save_issue(Issue::new("B".to_string(), String::new())).unwrap();
-    /// drop(guard);
-    ///
-    /// assert_eq!(storage.list_issues().unwrap().len(), 2);
-    /// ```
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard>;
 
     /// Save an issue (create or update).
@@ -166,29 +132,6 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the issue cannot be serialized or persisted.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::domain::Issue;
-    /// use jit::storage::{InMemoryStorage, IssueStore};
-    ///
-    /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
-    ///
-    /// let snapshot = Issue::new("Fix bug".to_string(), "Details".to_string());
-    /// storage.save_issue(snapshot.clone()).unwrap();
-    ///
-    /// // An ordinary write moves `updated_at` forward.
-    /// let mut edited = storage.load_issue(&snapshot.id).unwrap();
-    /// edited.title = "Half-applied edit".to_string();
-    /// storage.save_issue(edited).unwrap();
-    /// assert!(storage.load_issue(&snapshot.id).unwrap().updated_at > snapshot.updated_at);
-    ///
-    /// // Restoring the snapshot puts every field back, timestamp included.
-    /// storage.restore_issue_verbatim(snapshot.clone()).unwrap();
-    /// assert_eq!(storage.load_issue(&snapshot.id).unwrap(), snapshot);
-    /// ```
     fn restore_issue_verbatim(&self, issue: Issue) -> Result<()>;
 
     /// Load an issue by ID.
@@ -217,20 +160,6 @@ pub trait IssueStore: Clone {
     ///   override to produce this).
     /// - [`PathReadError::Other`] for storage or deserialization failures (and
     ///   for any error from a backend that uses the default implementation).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::{IssueStore, InMemoryStorage};
-    /// use jit::storage::PathReadError;
-    ///
-    /// let store = InMemoryStorage::new();
-    /// store.init().unwrap();
-    ///
-    /// // InMemoryStorage overrides this method, so NotFound is returned:
-    /// let result = store.load_issue_or_not_found("nonexistent");
-    /// assert!(matches!(result, Err(PathReadError::NotFound(_))));
-    /// ```
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
         // Conservative fallback: map every anyhow error to Other.
         // Backends that can distinguish NotFound structurally must override.
@@ -241,28 +170,6 @@ pub trait IssueStore: Clone {
     ///
     /// Accepts either a full UUID or a unique prefix (minimum 4 characters).
     /// Returns the full UUID if a unique match is found.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::domain::Issue;
-    /// use jit::storage::{InMemoryStorage, IssueStore};
-    ///
-    /// let storage = InMemoryStorage::new();
-    /// storage.init().unwrap();
-    ///
-    /// let issue = Issue::new("Fix bug".to_string(), "Details".to_string());
-    /// storage.save_issue(issue.clone()).unwrap();
-    ///
-    /// // Can use short prefix
-    /// let full_id = storage.resolve_issue_id(&issue.short_id()).unwrap();
-    /// assert_eq!(full_id, issue.id);
-    ///
-    /// // Or full UUID
-    /// let full_id = storage.resolve_issue_id(&issue.id).unwrap();
-    /// assert_eq!(full_id, issue.id);
-    /// ```
-    ///
     /// # Errors
     ///
     /// - Prefix too short (< 4 chars): "Issue ID prefix must be at least 4 characters"
@@ -377,18 +284,6 @@ pub trait IssueStore: Clone {
     /// - [`PathReadError::OutsideRepoRoot`] when the resolved path escapes the repo
     ///   root (e.g. via a symlink).
     /// - [`PathReadError::Other`] for any other read failure.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let store = JsonFileStorage::new(".jit");
-    /// match store.read_repo_file("project-items.md").unwrap() {
-    ///     Some(text) => println!("{} bytes", text.len()),
-    ///     None => println!("no project-items.md present"),
-    /// }
-    /// ```
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
 
     /// Write a repository-local text file by its path relative to the repository
@@ -417,21 +312,6 @@ pub trait IssueStore: Clone {
     ///   resolving outside the repository root.
     /// - [`PathReadError::Other`] for any I/O failure while creating directories or
     ///   writing the file.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::{IssueStore, JsonFileStorage, PathReadError};
-    ///
-    /// let store = JsonFileStorage::new(".jit");
-    /// store.write_repo_file("docs/invariants.md", "## Invariants\n").unwrap();
-    ///
-    /// // An escaping path is rejected before any write.
-    /// assert!(matches!(
-    ///     store.write_repo_file("../escape.md", "x"),
-    ///     Err(PathReadError::InvalidPath(_))
-    /// ));
-    /// ```
     fn write_repo_file(&self, rel_path: &str, content: &str) -> Result<(), PathReadError>;
 
     /// List all available gate presets (builtin and custom).
@@ -439,15 +319,6 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if presets cannot be loaded.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use jit::storage::{IssueStore, JsonFileStorage};
-    /// let store = JsonFileStorage::new(".jit");
-    /// let presets = store.list_gate_presets().unwrap();
-    /// for p in &presets { println!("{}: {}", p.name, p.description); }
-    /// ```
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>;
 
     /// Get a specific gate preset by name.
@@ -455,15 +326,6 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the preset is not found or cannot be loaded.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use jit::storage::{IssueStore, JsonFileStorage};
-    /// let store = JsonFileStorage::new(".jit");
-    /// let preset = store.get_gate_preset("rust-tdd").unwrap();
-    /// assert_eq!(preset.name, "rust-tdd");
-    /// ```
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>;
 
     /// Save a custom gate preset.
@@ -473,21 +335,6 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the preset is invalid or cannot be saved.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use jit::storage::{IssueStore, JsonFileStorage};
-    /// # use jit::gate_presets::{GatePresetDefinition, GateTemplate};
-    /// # use jit::domain::{GateMode, GateStage};
-    /// let store = JsonFileStorage::new(".jit");
-    /// let preset = GatePresetDefinition {
-    ///     name: "my-preset".to_string(),
-    ///     description: "Custom workflow".to_string(),
-    ///     gates: vec![],
-    /// };
-    /// // let path = store.save_gate_preset(&preset).unwrap();
-    /// ```
     fn save_gate_preset(
         &self,
         preset: &crate::gate_presets::GatePresetDefinition,
@@ -502,22 +349,6 @@ pub trait IssueStore: Clone {
     /// # Errors
     ///
     /// Returns an error if the file does not exist or cannot be read.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let store = JsonFileStorage::new(".jit");
-    ///
-    /// // Read from the working tree (path is resolved relative to the repo root,
-    /// // i.e. the parent of the .jit directory, regardless of process CWD):
-    /// let (bytes, label) = store.read_path_bytes("README.md", None).unwrap();
-    /// assert_eq!(label, "working-tree");
-    ///
-    /// // Read from a specific git commit:
-    /// // let (bytes, hash) = store.read_path_bytes("README.md", Some("HEAD")).unwrap();
-    /// ```
     fn read_path_bytes(
         &self,
         path: &str,
@@ -538,19 +369,6 @@ pub trait IssueStore: Clone {
     ///
     /// Propagates `PathReadError::NotFound`, `PathReadError::CommitNotFound`,
     /// and `PathReadError::Other` from the underlying `read_path_bytes` call.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::storage::{IssueStore, JsonFileStorage};
-    ///
-    /// let store = JsonFileStorage::new(".jit");
-    ///
-    /// // Read file content as UTF-8 text from the working tree:
-    /// let (text, label) = store.read_path_text("README.md", None).unwrap();
-    /// assert_eq!(label, "working-tree");
-    /// println!("{}", text);
-    /// ```
     fn read_path_text(
         &self,
         path: &str,

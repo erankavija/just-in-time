@@ -164,19 +164,6 @@ fn count_claims_for_worktree(
 ///
 /// Returns an error if worktree context cannot be detected (e.g. not in a git
 /// repository) or the identity cannot be loaded or created.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::worktree::execute_worktree_info;
-///
-/// let (info, warnings) = execute_worktree_info()?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("worktree {} on {}", info.worktree_id, info.branch);
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
     // Detect worktree context
     let paths = WorktreePaths::detect()
@@ -222,19 +209,6 @@ pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
 ///
 /// Returns an error if worktree context cannot be detected, `git worktree list`
 /// fails, or a present `.jit` identity cannot be read.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::worktree::execute_worktree_list;
-///
-/// let (entries, warnings) = execute_worktree_list()?;
-/// for warning in &warnings {
-///     eprintln!("Warning: {}", warning); // rendering is the caller's choice
-/// }
-/// println!("{} worktree(s)", entries.len());
-/// # Ok::<(), anyhow::Error>(())
-/// ```
 pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
     // Get worktree paths to access shared control plane
     let paths = WorktreePaths::detect()

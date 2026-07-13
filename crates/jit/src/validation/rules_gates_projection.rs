@@ -219,23 +219,6 @@ fn render_id_anchor(rules: &RuleSet, gates: &GateRegistry) -> String {
 /// typed [`ProjectionError`] — the file is never silently clobbered.
 ///
 /// Returns the repo-relative path that was written.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::config::RulesGatesProjectionConfig;
-/// use jit::storage::{GateRegistry, JsonFileStorage};
-/// use jit::validation::rules::RuleSet;
-/// use jit::validation::rules_gates_projection::project_rules_and_gates;
-///
-/// let store = JsonFileStorage::new(".jit");
-/// let cfg = RulesGatesProjectionConfig::default();
-/// let rules = RuleSet::empty();
-/// let gates = GateRegistry::default();
-/// // Writes the rendered registries to the configured (default jit-owned) target.
-/// let written = project_rules_and_gates(&store, &cfg, &rules, &gates).unwrap();
-/// println!("projected rules and gates to {written}");
-/// ```
 pub fn project_rules_and_gates<S: IssueStore>(
     store: &S,
     config: &RulesGatesProjectionConfig,

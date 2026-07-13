@@ -157,7 +157,7 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **No unsafe code** — `#![deny(unsafe_code)]` enforced.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
-- **Public API documentation** — Public APIs have doc comments describing their purpose and material contracts, including errors or invariants where relevant. Add examples when usage or behavior is non-obvious.
+- **Public API documentation** — Public APIs have doc comments describing their purpose and material contracts, including errors or invariants where relevant. Add an example only when it materially clarifies non-obvious usage or behavior. Do not require an example for every public API; tautological examples for accessors, constants, constructors, or direct field mappings are maintenance and CI cost, not documentation value. Prefer one type- or module-level walkthrough over repetitive per-method examples.
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 

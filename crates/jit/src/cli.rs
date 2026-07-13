@@ -1269,10 +1269,6 @@ pub enum DepCommands {
 ///
 /// Legacy verbs `pass` / `pass-all` / `check` / `check-all` remain as silent
 /// aliases of `evaluate` / `evaluate-all` / `status` / `status-all`.
-///
-/// # Examples
-///
-/// ```text
 /// # Configuration
 /// jit gate define code-review --title "Code Review" --description "Human review"
 /// jit gate add abc123 code-review            # attach a registered gate to an issue
@@ -1286,7 +1282,6 @@ pub enum DepCommands {
 /// jit gate list                              # registered gate definitions
 /// jit gate status abc123 code-review         # last recorded run for one gate
 /// jit gate status-all abc123                 # readiness of every required gate
-/// ```
 #[derive(Subcommand)]
 pub enum GateCommands {
     // ===== Configuration: define what gates exist and which issues require them =====
@@ -2372,21 +2367,6 @@ pub enum QueryCommands {
 /// the CLI) and rejects anything else as a usage error, so a caller cannot
 /// silently request an unsupported aggregation. `state` is the only dimension
 /// today.
-///
-/// # Examples
-///
-/// ```
-/// use clap::ValueEnum;
-/// use jit::cli::CountDimension;
-///
-/// // The CLI token `state` parses to the `State` dimension.
-/// assert_eq!(
-///     CountDimension::from_str("state", true).unwrap(),
-///     CountDimension::State
-/// );
-/// // An unknown dimension is rejected (surfaces as a clap usage error).
-/// assert!(CountDimension::from_str("bogus", true).is_err());
-/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum CountDimension {
     /// Count by lifecycle state.

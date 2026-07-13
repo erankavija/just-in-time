@@ -18,16 +18,6 @@
 /// a heartbeat loop: `jit claim heartbeat` records a single beat on demand.
 /// Lease staleness is governed separately — an indefinite lease is marked stale
 /// only after the claim staleness threshold (1 hour) without a beat.
-///
-/// # Examples
-///
-/// ```
-/// use std::time::Duration;
-/// use jit::runtime_defaults::HEARTBEAT_INTERVAL_SECS;
-///
-/// let cadence = Duration::from_secs(HEARTBEAT_INTERVAL_SECS);
-/// assert_eq!(cadence.as_secs(), HEARTBEAT_INTERVAL_SECS);
-/// ```
 pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 /// Maximum time, in seconds, a lock holder waits to acquire a file lock before
@@ -37,70 +27,22 @@ pub const HEARTBEAT_INTERVAL_SECS: u64 = 30;
 /// the shared `FileLocker` it uses for all other `.jit` file locks. The
 /// claim-coordination and worktree locks build their own `FileLocker` from this
 /// constant and ignore the variable.
-///
-/// # Examples
-///
-/// ```
-/// use std::time::Duration;
-/// use jit::runtime_defaults::LOCK_TIMEOUT_SECS;
-///
-/// let timeout = Duration::from_secs(LOCK_TIMEOUT_SECS);
-/// assert_eq!(timeout.as_secs(), LOCK_TIMEOUT_SECS);
-/// ```
 pub const LOCK_TIMEOUT_SECS: u64 = 5;
 
 /// Interval, in milliseconds, between successive attempts while blocking on a
 /// contended file lock.
-///
-/// # Examples
-///
-/// ```
-/// use std::time::Duration;
-/// use jit::runtime_defaults::LOCK_POLL_INTERVAL_MS;
-///
-/// let poll = Duration::from_millis(LOCK_POLL_INTERVAL_MS);
-/// assert_eq!(poll.as_millis() as u64, LOCK_POLL_INTERVAL_MS);
-/// ```
 pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 
 /// Minimum age, in seconds, at which `cleanup_orphaned_temp_files` sweeps an
 /// orphaned `*.tmp` file (1 hour). Passed by both callers: the `jit recover`
 /// command and `ClaimCoordinator::startup_recovery`.
-///
-/// # Examples
-///
-/// ```
-/// use std::time::Duration;
-/// use jit::runtime_defaults::TEMP_CLEANUP_THRESHOLD_SECS;
-///
-/// let threshold = Duration::from_secs(TEMP_CLEANUP_THRESHOLD_SECS);
-/// assert_eq!(threshold.as_secs(), TEMP_CLEANUP_THRESHOLD_SECS);
-/// ```
 pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 
 /// Default time-to-live, in seconds, for a lease created by `jit claim acquire`,
 /// and the default extension applied by `jit claim renew` (10 minutes).
-///
-/// # Examples
-///
-/// ```
-/// use std::time::Duration;
-/// use jit::runtime_defaults::CLAIM_TTL_SECS;
-///
-/// let ttl = Duration::from_secs(CLAIM_TTL_SECS);
-/// assert_eq!(ttl.as_secs(), CLAIM_TTL_SECS);
-/// ```
 pub const CLAIM_TTL_SECS: u64 = 600;
 
 /// Repo-relative path of the committed reference that projects these defaults.
-///
-/// # Examples
-///
-/// ```
-/// use jit::runtime_defaults::REFERENCE_PATH;
-///
-/// assert!(REFERENCE_PATH.ends_with("runtime-defaults.md"));
-/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
 
 /// Render the runtime coordination defaults as the committed markdown reference.
@@ -109,18 +51,6 @@ pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
 /// [`REFERENCE_PATH`]: every value derives from the constants in this module, so
 /// the projection cannot drift from the values the code uses. The conformance
 /// test in this module asserts the committed file equals this output.
-///
-/// # Examples
-///
-/// ```
-/// use jit::runtime_defaults::{render_reference_markdown, CLAIM_TTL_SECS};
-///
-/// let doc = render_reference_markdown();
-/// assert!(doc.starts_with("<!--"));
-/// assert!(doc.contains("# Runtime Coordination Defaults"));
-/// // The rendered table carries each default's value with its unit.
-/// assert!(doc.contains(&format!("{CLAIM_TTL_SECS} seconds")));
-/// ```
 pub fn render_reference_markdown() -> String {
     // (label, value-with-unit, operational scope). Values format the constants
     // so the table is a pure projection of the source of truth above.

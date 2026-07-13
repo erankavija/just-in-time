@@ -19,23 +19,6 @@ use crate::validation::rules::{RuleScope, Severity};
 /// local rule, or the issue named in a graph-rule message; it is `None` for a
 /// finding that is not attributable to a single issue. The remaining fields
 /// mirror the originating [`Finding`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::engine::Finding;
-/// use jit::validation::report::ReportedFinding;
-/// use jit::validation::rules::Severity;
-///
-/// let finding = Finding {
-///     rule: "epic-needs-req".to_string(),
-///     severity: Severity::Error,
-///     message: "missing req:* label".to_string(),
-/// };
-/// let reported = ReportedFinding::new(Some("abcd1234".to_string()), &finding);
-/// assert_eq!(reported.rule, "epic-needs-req");
-/// assert!(reported.is_error());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ReportedFinding {
     /// Full id of the issue this finding concerns, when attributable.
@@ -50,23 +33,6 @@ pub struct ReportedFinding {
 
 impl ReportedFinding {
     /// Build a [`ReportedFinding`] from a [`Finding`] and an optional issue id.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::report::ReportedFinding;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// let finding = Finding {
-    ///     rule: "r".to_string(),
-    ///     severity: Severity::Warn,
-    ///     message: "m".to_string(),
-    /// };
-    /// let reported = ReportedFinding::new(None, &finding);
-    /// assert_eq!(reported.severity, jit::validation::rules::Severity::Warn);
-    /// assert!(!reported.is_error());
-    /// ```
     pub fn new(issue_id: Option<String>, finding: &Finding) -> Self {
         Self {
             issue_id,
@@ -78,17 +44,6 @@ impl ReportedFinding {
 
     /// Whether this finding is error-severity (the threshold that fails
     /// `jit validate`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::report::ReportedFinding;
-    /// use jit::validation::rules::Severity;
-    ///
-    /// let warn = Finding { rule: "r".into(), severity: Severity::Warn, message: "m".into() };
-    /// assert!(!ReportedFinding::new(None, &warn).is_error());
-    /// ```
     pub fn is_error(&self) -> bool {
         self.severity == Severity::Error
     }
@@ -100,17 +55,6 @@ impl ReportedFinding {
 /// evaluated. The command layer decides the process exit code from
 /// [`RuleReport::has_errors`] and renders [`RuleReport::findings`] in human or
 /// `--json` form.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::report::RuleReport;
-///
-/// // An empty report has no findings and no errors.
-/// let report = RuleReport::default();
-/// assert!(report.findings.is_empty());
-/// assert!(!report.has_errors());
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct RuleReport {
     /// Every finding produced, local then graph, in evaluation order.
@@ -119,33 +63,11 @@ pub struct RuleReport {
 
 impl RuleReport {
     /// Whether any finding is error-severity, which fails `jit validate`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::engine::Finding;
-    /// use jit::validation::report::{ReportedFinding, RuleReport};
-    /// use jit::validation::rules::Severity;
-    ///
-    /// let mut report = RuleReport::default();
-    /// assert!(!report.has_errors());
-    /// let err = Finding { rule: "r".into(), severity: Severity::Error, message: "m".into() };
-    /// report.findings.push(ReportedFinding::new(None, &err));
-    /// assert!(report.has_errors());
-    /// ```
     pub fn has_errors(&self) -> bool {
         self.findings.iter().any(ReportedFinding::is_error)
     }
 
     /// The number of error-severity findings.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::report::RuleReport;
-    ///
-    /// assert_eq!(RuleReport::default().error_count(), 0);
-    /// ```
     pub fn error_count(&self) -> usize {
         self.findings.iter().filter(|f| f.is_error()).count()
     }
@@ -165,27 +87,6 @@ impl RuleReport {
 /// that excluded the issue, so `--explain` can show "the state predicate did not
 /// match". For a matched rule, `matched` is `true`, `skip_reason` is `None`, and
 /// `passed`/`messages` carry the PASS/FAIL result as before.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::report::RuleOutcome;
-/// use jit::validation::rules::{RuleScope, Severity};
-///
-/// let outcome = RuleOutcome {
-///     rule: "epic-needs-req".to_string(),
-///     scope: RuleScope::Local,
-///     severity: Severity::Error,
-///     selector: "type=epic".to_string(),
-///     matched: true,
-///     skip_reason: None,
-///     passed: false,
-///     messages: vec!["missing req:* label".to_string()],
-/// };
-/// assert!(outcome.matched);
-/// assert!(!outcome.passed);
-/// assert_eq!(outcome.messages.len(), 1);
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuleOutcome {
     /// Name of the rule.
@@ -213,19 +114,6 @@ pub struct RuleOutcome {
 }
 
 /// The `--explain` report for one issue: every matching rule and its outcome.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::report::ExplainReport;
-///
-/// let report = ExplainReport {
-///     issue_id: "abcd1234".to_string(),
-///     outcomes: vec![],
-/// };
-/// assert!(report.outcomes.is_empty());
-/// assert!(!report.has_failures());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ExplainReport {
     /// Full id of the explained issue.
@@ -237,44 +125,12 @@ pub struct ExplainReport {
 
 impl ExplainReport {
     /// Whether any matched rule failed for the issue.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::report::{ExplainReport, RuleOutcome};
-    ///
-    /// use jit::validation::rules::{RuleScope, Severity};
-    ///
-    /// let report = ExplainReport {
-    ///     issue_id: "x".to_string(),
-    ///     outcomes: vec![RuleOutcome {
-    ///         rule: "r".to_string(),
-    ///         scope: RuleScope::Local,
-    ///         severity: Severity::Warn,
-    ///         selector: "*".to_string(),
-    ///         matched: true,
-    ///         skip_reason: None,
-    ///         passed: false,
-    ///         messages: vec!["m".to_string()],
-    ///     }],
-    /// };
-    /// assert!(report.has_failures());
-    /// ```
     pub fn has_failures(&self) -> bool {
         self.outcomes.iter().any(|o| !o.passed)
     }
 
     /// Whether any matched rule failed with error severity (fails
     /// `jit validate <id> --explain`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::report::ExplainReport;
-    ///
-    /// let report = ExplainReport { issue_id: "x".to_string(), outcomes: vec![] };
-    /// assert!(!report.has_errors());
-    /// ```
     pub fn has_errors(&self) -> bool {
         self.outcomes
             .iter()

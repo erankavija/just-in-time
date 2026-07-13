@@ -31,26 +31,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `label_filters` are ANDed: an issue is kept only when it carries every
     /// requested label. The priority, state, and assignee filters each keep an
     /// issue only when it matches exactly.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    ///
-    /// // No text query: match all, then keep only issues labelled `type:epic`.
-    /// let epics = executor.search_issues_with_filters(
-    ///     "",
-    ///     None,
-    ///     None,
-    ///     None,
-    ///     &["type:epic".to_string()],
-    /// )?;
-    /// assert!(epics.iter().all(|i| i.labels.contains(&"type:epic".to_string())));
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn search_issues_with_filters(
         &self,
         query: &str,

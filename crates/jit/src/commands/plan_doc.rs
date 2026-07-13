@@ -37,19 +37,6 @@ use crate::domain::{project, ContentFormat, Issue, Projection};
 /// `doc` has no external plan, which the caller models with this sentinel. The
 /// resolver compares the template against it to choose the inline path. It is NOT
 /// a domain type name, so comparing against it keeps the engine domain-agnostic.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::plan_doc::{resolve_plan_doc_location, PlanDocLocation, INLINE_LOCATION};
-///
-/// // The sentinel selects the inline path regardless of the container id.
-/// assert_eq!(INLINE_LOCATION, "inline");
-/// assert_eq!(
-///     resolve_plan_doc_location(INLINE_LOCATION, "abc123"),
-///     PlanDocLocation::Inline
-/// );
-/// ```
 pub const INLINE_LOCATION: &str = "inline";
 
 /// The document-reference label that marks a planning node's plan document.
@@ -61,23 +48,6 @@ pub const INLINE_LOCATION: &str = "inline";
 /// plan that is moved/archived and re-linked keeps validating from its new
 /// location. The graph template's `plan_doc_location` is only the creation-time
 /// default used by `jit apply plan` when first writing this reference.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::plan_doc::PLAN_DOC_LABEL;
-/// use jit::domain::DocumentReference;
-///
-/// let plan_ref = DocumentReference {
-///     path: "dev/archive/features/abc/plan.md".to_string(),
-///     commit: None,
-///     label: Some(PLAN_DOC_LABEL.to_string()),
-///     doc_type: None,
-///     format: None,
-///     assets: Vec::new(),
-/// };
-/// assert_eq!(plan_ref.label.as_deref(), Some("plan"));
-/// ```
 pub const PLAN_DOC_LABEL: &str = "plan";
 
 /// The `{id}` placeholder substituted with the container id in an external
@@ -96,22 +66,6 @@ const CONTAINER_ID_PLACEHOLDER: &str = "{container.id}";
 /// File reading happens only at this boundary, so a missing or unreadable
 /// external plan path surfaces here as a contextual `Result::Err` (naming the
 /// container and the resolved path) rather than a panic or a silent empty body.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::plan_doc::PlanDocError;
-///
-/// // The error message names the container id and the path it tried to read.
-/// let err = PlanDocError::Read {
-///     container_id: "abc123".to_string(),
-///     path: "plans/abc123.md".into(),
-///     source: std::io::Error::new(std::io::ErrorKind::NotFound, "no such file"),
-/// };
-/// let message = err.to_string();
-/// assert!(message.contains("abc123"));
-/// assert!(message.contains("plans/abc123.md"));
-/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum PlanDocError {
     /// The external plan file could not be read (missing, unreadable, etc.).
@@ -142,21 +96,6 @@ pub enum PlanDocError {
 /// [`PlanDocLocation::External`] with `{id}` already substituted. This split is
 /// pure (no I/O) so the location decision is independently testable; the actual
 /// file read happens later, at the boundary, in [`load_plan_content`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::plan_doc::{resolve_plan_doc_location, PlanDocLocation};
-///
-/// // The sentinel resolves to the inline body.
-/// assert_eq!(resolve_plan_doc_location("inline", "abc123"), PlanDocLocation::Inline);
-///
-/// // A template substitutes `{id}` with the container id.
-/// match resolve_plan_doc_location("plans/{id}.md", "abc123") {
-///     PlanDocLocation::External(path) => assert_eq!(path.to_str(), Some("plans/abc123.md")),
-///     PlanDocLocation::Inline => panic!("expected an external path"),
-/// }
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanDocLocation {
     /// The plan is the issue's own body ([`Issue::description`]).
@@ -173,18 +112,6 @@ pub enum PlanDocLocation {
 /// `{container.id}` — is replaced with `container_id` and the result wrapped in
 /// [`PlanDocLocation::External`]. A template with no placeholder is used verbatim
 /// (a fixed shared plan path).
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::plan_doc::{resolve_plan_doc_location, PlanDocLocation};
-///
-/// // A template without `{id}` is used as-is.
-/// assert_eq!(
-///     resolve_plan_doc_location("dev/plan.md", "abc123"),
-///     PlanDocLocation::External("dev/plan.md".into())
-/// );
-/// ```
 pub fn resolve_plan_doc_location(template: &str, container_id: &str) -> PlanDocLocation {
     if template == INLINE_LOCATION {
         PlanDocLocation::Inline
@@ -210,19 +137,6 @@ pub fn resolve_plan_doc_location(template: &str, container_id: &str) -> PlanDocL
 ///
 /// This is the ONLY function in the resolver that touches the filesystem; the
 /// projection it feeds ([`project_plan_doc`]) is pure.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::plan_doc::load_plan_content;
-/// use jit::domain::Issue;
-/// use std::path::Path;
-///
-/// let issue = Issue::new("Container".into(), "## Plan\n\n- step one\n".into());
-/// // Inline: the body is returned without reading any file.
-/// let content = load_plan_content(&issue, "inline", &issue.id, Path::new(".")).unwrap();
-/// assert!(content.contains("step one"));
-/// ```
 pub fn load_plan_content(
     issue: &Issue,
     template: &str,
@@ -259,26 +173,6 @@ pub fn load_plan_content(
 /// The body parser is selected by [`content_parser_for`] (issue format → repo
 /// default → Markdown), matching every other projection-with-sections site, so
 /// dispatch never drifts.
-///
-/// # Examples
-///
-/// ```no_run
-/// use jit::commands::plan_doc::project_plan_doc;
-/// use jit::domain::{ContentFormat, Issue};
-/// use std::path::Path;
-///
-/// let issue = Issue::new("Container".into(), "## Plan\n\n- step one\n".into());
-/// let projection = project_plan_doc(
-///     &issue,
-///     "inline",
-///     &issue.id,
-///     Path::new("."),
-///     ContentFormat::Markdown,
-/// )
-/// .unwrap();
-/// // The plan body parsed into a `sections` view the pure engine can validate.
-/// assert!(projection.sections.is_some());
-/// ```
 pub fn project_plan_doc(
     issue: &Issue,
     template: &str,

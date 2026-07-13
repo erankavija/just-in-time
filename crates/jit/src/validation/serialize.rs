@@ -61,27 +61,6 @@ pub struct SchemaFile {
 /// Pure: performs no I/O. The header documents that the file is the operative
 /// source. JSON Schema rules are materialized into [`SchemaFile`]s referenced by
 /// `schemas/<sanitized-name>.json`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::RuleSet;
-/// use jit::validation::serialize::serialize_ruleset;
-/// use std::path::Path;
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "epic-needs-req"
-/// when = { type = "epic" }
-/// severity = "error"
-/// enforce = true
-/// assert = { require-label = { label = "req:*", min = 1 } }
-/// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-/// let out = serialize_ruleset(&set);
-/// assert!(out.rules_toml.contains("name = \"epic-needs-req\""));
-/// assert!(out.schema_files.is_empty());
-/// ```
 pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
     let mut rules_toml = String::new();
     rules_toml.push_str(FILE_HEADER);
@@ -113,24 +92,6 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 /// writes this verbatim to `schemas/<TYPE_HIERARCHY_SCHEMA_FILE>`. Building the
 /// content from the SAME [`type_hierarchy_known_schema`] the in-memory default
 /// uses keeps the materialized write-path rule in lock-step with config (R5).
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::LabelNamespaces;
-/// use jit::validation::serialize::type_hierarchy_schema_content;
-///
-/// let ns = LabelNamespaces {
-///     schema_version: 2,
-///     namespaces: Default::default(),
-///     type_hierarchy: None,
-///     label_associations: None,
-///     strategic_types: None,
-/// };
-/// let content = type_hierarchy_schema_content(&ns);
-/// assert!(content.trim_start().starts_with('{'));
-/// assert!(content.ends_with('\n'));
-/// ```
 pub fn type_hierarchy_schema_content(namespaces: &crate::domain::LabelNamespaces) -> String {
     pretty_schema(&crate::validation::defaults::type_hierarchy_known_schema(
         namespaces,

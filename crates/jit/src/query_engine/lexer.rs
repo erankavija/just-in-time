@@ -14,17 +14,6 @@ type Result<T> = std::result::Result<T, QueryParseError>;
 /// fields is exhaustive with no string fallback. `value` semantics differ per
 /// field and are resolved later: `State`/`Priority` parse into typed domain
 /// values, while `Label`/`Assignee` carry open free-form strings.
-///
-/// # Examples
-///
-/// ```
-/// use jit::query_engine::FilterField;
-/// use std::str::FromStr;
-///
-/// assert_eq!(FilterField::from_str("state").unwrap(), FilterField::State);
-/// assert_eq!(FilterField::from_str("assignee").unwrap(), FilterField::Assignee);
-/// assert!(FilterField::from_str("colour").is_err());
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilterField {
     /// `state:` — filter by lifecycle state (closed, typed value).

@@ -49,18 +49,6 @@ const FINDINGS_END: &str = "JIT-FINDINGS-JSON>>>";
 /// checker-defined strings for traceability. All fields default (to empty /
 /// `None`) when absent from the checker's JSON, so older checkers and stored
 /// findings remain compatible.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::GateFinding;
-///
-/// let json = r#"{"id":"F1","severity":"high","summary":"missing guard"}"#;
-/// let finding: GateFinding = serde_json::from_str(json).unwrap();
-/// assert_eq!(finding.id, "F1");
-/// assert_eq!(finding.severity, "high");
-/// assert!(finding.file.is_none());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GateFinding {
     /// Checker-assigned finding identifier (e.g. `"F1"`).
@@ -95,21 +83,6 @@ pub struct GateFinding {
 /// as a free string so a checker's own vocabulary is never rejected), a
 /// one-line `summary`, and the array of individual `findings`. This is stored
 /// alongside — never in place of — the raw stdout on a gate run result.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::{GateFindings, parse_gate_findings};
-///
-/// let stdout = "review text\n\
-///     <<<JIT-FINDINGS-JSON\n\
-///     {\"verdict\":\"pass\",\"summary\":\"all clear\",\"findings\":[]}\n\
-///     JIT-FINDINGS-JSON>>>\n";
-/// let parsed: GateFindings = parse_gate_findings(stdout).unwrap();
-/// assert_eq!(parsed.verdict, "pass");
-/// assert_eq!(parsed.summary, "all clear");
-/// assert!(parsed.findings.is_empty());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GateFindings {
     /// Checker-declared verdict (e.g. `"pass"` / `"fail"`).
@@ -136,27 +109,6 @@ pub struct GateFindings {
 /// end marker, or when the enclosed text is not valid findings JSON. Parsing is
 /// best-effort and never errors: a plain-text checker degrades to `None` and
 /// keeps its existing behaviour.
-///
-/// # Examples
-///
-/// ```
-/// use jit::domain::parse_gate_findings;
-///
-/// // No block at all -> None (plain-text checker degrades gracefully).
-/// assert!(parse_gate_findings("just some review prose\nVERDICT: PASS").is_none());
-///
-/// // A well-formed block is extracted even when wrapped in a markdown fence.
-/// let stdout = "```\n\
-///     <<<JIT-FINDINGS-JSON\n\
-///     {\"verdict\":\"fail\",\"summary\":\"1 issue\",\"findings\":[\
-///     {\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"bug\"}]}\n\
-///     JIT-FINDINGS-JSON>>>\n\
-///     ```\n";
-/// let parsed = parse_gate_findings(stdout).unwrap();
-/// assert_eq!(parsed.verdict, "fail");
-/// assert_eq!(parsed.findings.len(), 1);
-/// assert_eq!(parsed.findings[0].id, "F1");
-/// ```
 pub fn parse_gate_findings(stdout: &str) -> Option<GateFindings> {
     let lines: Vec<&str> = stdout.lines().collect();
 

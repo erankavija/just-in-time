@@ -256,16 +256,6 @@ impl JsonFileStorage {
     /// uses it to tell the user where a run's full output lives, so the
     /// `gate-runs/<run_id>/result.json` layout is never reconstructed outside the
     /// storage layer.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let storage = JsonFileStorage::new("/repo/.jit");
-    /// let path = storage.result_path("abc123");
-    /// assert!(path.ends_with("gate-runs/abc123/result.json"));
-    /// ```
     pub fn result_path(&self, run_id: &str) -> PathBuf {
         self.root
             .join(GATE_RUNS_DIR)

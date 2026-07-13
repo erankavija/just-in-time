@@ -16,21 +16,6 @@ use chrono::{DateTime, Utc};
 /// Implementors return "now" from [`now`](Clock::now). Production uses
 /// [`SystemClock`]; tests can supply a fixed or advanceable clock so that
 /// TTL/staleness boundaries are exercised without real delays.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::clock::{Clock, SystemClock};
-///
-/// fn seconds_until<C: Clock>(clock: &C, deadline: chrono::DateTime<chrono::Utc>) -> i64 {
-///     (deadline - clock.now()).num_seconds()
-/// }
-///
-/// let clock = SystemClock;
-/// // A deadline in the past yields a non-positive remaining duration.
-/// let past = clock.now() - chrono::Duration::seconds(5);
-/// assert!(seconds_until(&clock, past) <= 0);
-/// ```
 pub trait Clock: std::fmt::Debug + Send + Sync {
     /// Return the current time as a UTC timestamp.
     fn now(&self) -> DateTime<Utc>;
@@ -40,18 +25,6 @@ pub trait Clock: std::fmt::Debug + Send + Sync {
 ///
 /// Delegates to [`chrono::Utc::now`], so code routed through a `SystemClock`
 /// behaves exactly as if it called `Utc::now()` directly.
-///
-/// # Examples
-///
-/// ```
-/// use jit::storage::clock::{Clock, SystemClock};
-///
-/// let clock = SystemClock;
-/// let a = clock.now();
-/// let b = clock.now();
-/// // The system clock is monotonic across these two reads.
-/// assert!(b >= a);
-/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemClock;
 

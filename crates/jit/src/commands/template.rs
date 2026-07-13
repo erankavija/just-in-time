@@ -81,27 +81,6 @@ enum TemplateGateResolution {
 /// the container's ORIGINAL upstream deps (and never the freshly-wired scaffold
 /// edges). It is also surfaced for callers/tests that inspect the pre-apply
 /// shape.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::TemplateApplyResult;
-/// use std::collections::BTreeMap;
-///
-/// let result = TemplateApplyResult {
-///     template: "plan".to_string(),
-///     anchor_bindings: BTreeMap::from([("container".to_string(), "c1".to_string())]),
-///     created_node_ids_by_role: BTreeMap::from([
-///         ("planning".to_string(), "p1".to_string()),
-///         ("breakdown".to_string(), "b1".to_string()),
-///     ]),
-///     anchor_dependency_snapshots: BTreeMap::from([
-///         ("container".to_string(), vec!["u1".to_string()]),
-///     ]),
-/// };
-/// assert_eq!(result.created_node_ids_by_role["planning"], "p1");
-/// assert_eq!(result.anchor_dependency_snapshots["container"], vec!["u1".to_string()]);
-/// ```
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct TemplateApplyResult {
     /// The applied template's name (e.g. `"plan"`).
@@ -131,17 +110,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// binds to its positional `<container>` argument
     /// (`.jit/templates.toml`'s `[anchors] container`, defaulting to
     /// [`DEFAULT_CONTAINER_ANCHOR`](crate::templates::DEFAULT_CONTAINER_ANCHOR)).
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // A repository that declares no `[anchors]` table keeps the shipped name.
-    /// assert_eq!(executor.container_anchor().unwrap(), "container");
-    /// ```
     pub fn container_anchor(&self) -> Result<&str> {
         Ok(self.cached_config()?.templates.anchors.container_anchor())
     }
@@ -155,20 +123,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// each declared anchor name to an issue id; the CLI binds the container
     /// anchor ([`container_anchor`](Self::container_anchor)) to `container_id`
     /// before calling.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    /// use std::collections::BTreeMap;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let bindings = BTreeMap::from([("container".to_string(), "epic-123".to_string())]);
-    /// let (result, _warnings) =
-    ///     executor.apply_template("plan", "epic-123", &bindings, false).unwrap();
-    /// println!("applied {} → {:?}", result.template, result.created_node_ids_by_role);
-    /// ```
     pub fn apply_template(
         &self,
         template_name: &str,

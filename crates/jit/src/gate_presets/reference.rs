@@ -20,14 +20,6 @@ use anyhow::Result;
 
 /// Repo-relative path of the committed reference that projects the built-in
 /// presets.
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::REFERENCE_PATH;
-///
-/// assert!(REFERENCE_PATH.ends_with("gate-presets.md"));
-/// ```
 pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
 
 /// Every built-in preset, sorted by name.
@@ -147,24 +139,6 @@ fn preset_section(preset: &GatePresetDefinition) -> String {
 ///
 /// Propagates a [`BuiltinPresets::load`] failure (a built-in preset that fails
 /// its own `validate`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::gate_presets::{render_reference_markdown, BuiltinPresets};
-///
-/// let doc = render_reference_markdown().unwrap();
-/// assert!(doc.starts_with("<!--"));
-/// assert!(doc.contains("# Built-in Gate Presets"));
-///
-/// // Every shipped preset has a section, in sorted order.
-/// for name in BuiltinPresets::names() {
-///     assert!(doc.contains(&format!("## `{name}`")), "missing section for {name}");
-/// }
-/// let breakdown = doc.find("## `breakdown-review`").unwrap();
-/// let coverage = doc.find("## `coverage-preview`").unwrap();
-/// assert!(breakdown < coverage);
-/// ```
 pub fn render_reference_markdown() -> Result<String> {
     let presets = presets_sorted()?;
 

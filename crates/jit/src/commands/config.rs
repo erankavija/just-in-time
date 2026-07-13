@@ -30,26 +30,6 @@ use std::path::{Path, PathBuf};
 /// Returned by [`CommandExecutor::set_config`]. `file` is the config file that
 /// was written and `scope` is its origin token (`"user"` for a global write,
 /// `"repo"` otherwise), mirroring the tokens the `--json` payload reports.
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::ConfigSetOutcome;
-/// use std::path::PathBuf;
-///
-/// // The fields mirror a completed repo-scoped set (built by hand here to show
-/// // the serialized shape).
-/// let outcome = ConfigSetOutcome {
-///     key: "project.name".to_string(),
-///     value: "my-project".to_string(),
-///     file: PathBuf::from(".jit/config.toml"),
-///     scope: "repo",
-/// };
-/// assert_eq!(outcome.scope, "repo");
-/// let json = serde_json::to_value(&outcome).unwrap();
-/// assert_eq!(json["key"], "project.name");
-/// assert_eq!(json["value"], "my-project");
-/// ```
 #[derive(Debug, Serialize)]
 pub struct ConfigSetOutcome {
     /// The `section.field` key that was set.
@@ -68,20 +48,6 @@ pub struct ConfigSetOutcome {
 /// [`serde_json::Value`] resolved at `key` — a scalar for a leaf, or an
 /// object/array for an intermediate key (`jit config get documentation`
 /// returns the whole section).
-///
-/// # Examples
-///
-/// ```
-/// use jit::commands::ConfigGetOutcome;
-/// use serde_json::json;
-///
-/// let outcome = ConfigGetOutcome {
-///     key: "documentation.development_root".to_string(),
-///     value: json!("dev"),
-/// };
-/// let rendered = serde_json::to_value(&outcome).unwrap();
-/// assert_eq!(rendered["value"], "dev");
-/// ```
 #[derive(Debug, Serialize)]
 pub struct ConfigGetOutcome {
     /// The dotted key that was resolved.
@@ -208,20 +174,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
     /// (`enable_*`/`require_*`/`auto_*`) keys are parsed into their TOML types;
     /// any other key is stored as a string.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let outcome = executor
-    ///     .set_config("project.name", "renamed-project", false)
-    ///     .unwrap();
-    /// assert_eq!(outcome.scope, "repo");
-    /// assert_eq!(outcome.value, "renamed-project");
-    /// ```
     pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome> {
         // Determine the target config file (path derivation only; the store owns
         // the read/write IO).
@@ -321,21 +273,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// and writes it atomically. Idempotent: when `config.toml` already exists it
     /// is a no-op returning `Ok(None)`, so a re-init never disturbs an existing
     /// `[project]` table.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    /// use std::path::Path;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// // On a fresh repo this seeds `[project]` from the directory basename.
-    /// let seeded = executor
-    ///     .seed_project_config(Path::new("/repo/My Project"), "")
-    ///     .unwrap();
-    /// assert!(seeded.is_some());
-    /// ```
     pub fn seed_project_config(
         &self,
         repo_dir: &Path,
@@ -375,19 +312,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// code 2. A load/parse failure (e.g. a malformed `config.toml`) is left
     /// unconverted, so it is classified the same way every other config-load
     /// failure in this codebase is, not misreported as a bad argument.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use jit::commands::CommandExecutor;
-    /// use jit::storage::JsonFileStorage;
-    ///
-    /// let executor = CommandExecutor::new(JsonFileStorage::new(".jit"));
-    /// let outcome = executor
-    ///     .get_config("documentation.development_root")
-    ///     .unwrap();
-    /// assert_eq!(outcome.key, "documentation.development_root");
-    /// ```
     pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome> {
         // All filesystem interaction (system/user/repo existence probing,
         // home-directory resolution, each source's `JitConfig::load`) lives

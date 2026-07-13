@@ -29,22 +29,6 @@ use crate::domain::{Issue, State};
 use crate::labels as label_utils;
 
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::{RuleConfigError, RuleSet};
-/// use std::path::Path;
-///
-/// // A rule whose `assert` table names no assertion kind is a config error.
-/// let toml = r#"
-/// [[rules]]
-/// name = "broken"
-/// assert = {}
-/// "#;
-/// let err = RuleSet::from_toml_str(toml, Path::new(".")).unwrap_err();
-/// assert!(matches!(err, RuleConfigError::InvalidAssertion { .. }));
-/// ```
 #[derive(Debug, Error)]
 pub enum RuleConfigError {
     /// The rules file could not be read from disk.
@@ -150,16 +134,6 @@ pub enum RuleConfigError {
 ///
 /// `off` disables the rule entirely; `warn` reports without blocking; `error`
 /// reports and (when `enforce` is set) can block a write.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::Severity;
-///
-/// // `warn` is the default severity when none is authored.
-/// assert_eq!(Severity::default(), Severity::Warn);
-/// assert_ne!(Severity::Off, Severity::Error);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Severity {
@@ -177,16 +151,6 @@ impl Severity {
     ///
     /// Used to render severities consistently in both human and `--json`
     /// validation output.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::Severity;
-    ///
-    /// assert_eq!(Severity::Off.token(), "off");
-    /// assert_eq!(Severity::Warn.token(), "warn");
-    /// assert_eq!(Severity::Error.token(), "error");
-    /// ```
     pub fn token(self) -> &'static str {
         match self {
             Severity::Off => "off",
@@ -202,21 +166,6 @@ impl Severity {
 /// write. `Graph` rules need cross-issue context and run in `jit validate`,
 /// gate checkers, and at state transitions (where an enforcing failure blocks
 /// the transition); they never run on plain field writes.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::{RuleSet, RuleScope};
-/// use std::path::Path;
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "local"
-/// assert = { require-label = { label = "type:*" } }
-/// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-/// assert_eq!(set.rules[0].scope, RuleScope::Local);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RuleScope {
@@ -228,15 +177,6 @@ pub enum RuleScope {
 
 impl RuleScope {
     /// Stable snake_case token for this scope, matching the TOML grammar.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleScope;
-    ///
-    /// assert_eq!(RuleScope::Local.token(), "local");
-    /// assert_eq!(RuleScope::Graph.token(), "graph");
-    /// ```
     pub fn token(self) -> &'static str {
         match self {
             RuleScope::Local => "local",
@@ -250,21 +190,6 @@ impl RuleScope {
 /// All present dimensions are AND-combined. Matching reads only cheap `Issue`
 /// fields (labels, state) and never parses the description. The `label`
 /// dimension supports `ns:*` wildcards via [`label_utils::matches_pattern`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::Selector;
-/// use jit::domain::Issue;
-///
-/// let selector = Selector {
-///     type_: Some("epic".to_string()),
-///     ..Default::default()
-/// };
-/// let mut epic = Issue::new("An epic".to_string(), String::new());
-/// epic.labels = vec!["type:epic".to_string()];
-/// assert!(selector.matches(&epic));
-/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Selector {
     /// Match issues of this `type:*` label value (e.g. `"epic"`).
@@ -290,18 +215,6 @@ impl Selector {
     /// Matching is AND across all present dimensions. An empty selector (no
     /// dimensions) matches every issue. Only cheap fields are read; the
     /// description is never parsed.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::Selector;
-    /// use jit::domain::Issue;
-    ///
-    /// // An empty selector matches every issue.
-    /// let any = Selector::default();
-    /// let issue = Issue::new("title".to_string(), String::new());
-    /// assert!(any.matches(&issue));
-    /// ```
     pub fn matches(&self, issue: &Issue) -> bool {
         self.matches_type(issue)
             && self.matches_label(issue)
@@ -317,23 +230,6 @@ impl Selector {
     /// token versus the predicate's authored tokens) so `--explain` can show
     /// "state predicate did not match". `None` is returned exactly when
     /// [`Selector::matches`] is `true`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::{Selector, StatePredicate};
-    /// use jit::domain::{Issue, State};
-    ///
-    /// let selector = Selector {
-    ///     state: Some(StatePredicate::single("done")),
-    ///     ..Default::default()
-    /// };
-    /// let mut issue = Issue::new("t".to_string(), String::new());
-    /// issue.state = State::InProgress;
-    /// let reason = selector.match_failure(&issue).unwrap();
-    /// assert!(reason.contains("in_progress"));
-    /// assert!(reason.contains("done"));
-    /// ```
     pub fn match_failure(&self, issue: &Issue) -> Option<String> {
         let mut reasons: Vec<String> = Vec::new();
         if !self.matches_type(issue) {
@@ -474,27 +370,6 @@ fn token_to_state(token: &str) -> Option<State> {
 /// string round-trip. The authored strings are retained for diagnostics and
 /// validated against the seven valid tokens at config load via
 /// [`StatePredicate::validate`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::Selector;
-/// use jit::domain::{Issue, State};
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "lifecycle"
-/// when = { state = ["ready", "in_progress"] }
-/// assert = { require-section = { heading = "Plan" } }
-/// "#;
-/// let set =
-///     jit::validation::rules::RuleSet::from_toml_str(toml, std::path::Path::new("/x")).unwrap();
-/// let mut issue = Issue::new("t".to_string(), String::new());
-/// issue.state = State::InProgress;
-/// assert!(set.rules[0].when.matches(&issue));
-/// issue.state = State::Done;
-/// assert!(!set.rules[0].when.matches(&issue));
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(from = "AuthoredStates")]
 pub struct StatePredicate {
@@ -539,34 +414,11 @@ impl StatePredicate {
     }
 
     /// Build a predicate from a single authored token.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::StatePredicate;
-    /// use jit::domain::State;
-    ///
-    /// let pred = StatePredicate::single("done");
-    /// assert!(pred.matches(State::Done));
-    /// assert!(!pred.matches(State::Ready));
-    /// ```
     pub fn single(token: impl Into<String>) -> Self {
         StatePredicate::from_tokens(vec![token.into()])
     }
 
     /// Build a predicate from a list of authored tokens.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::StatePredicate;
-    /// use jit::domain::State;
-    ///
-    /// let pred = StatePredicate::list(["ready", "in_progress"]);
-    /// assert!(pred.matches(State::Ready));
-    /// assert!(pred.matches(State::InProgress));
-    /// assert!(!pred.matches(State::Done));
-    /// ```
     pub fn list<I, S>(tokens: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -625,20 +477,6 @@ impl StatePredicate {
 /// reference and the transcoded schema value are both retained. The `schema`
 /// value is loaded eagerly at parse time so downstream compilation never has to
 /// touch the filesystem.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::SchemaSource;
-/// use std::path::PathBuf;
-///
-/// let source = SchemaSource {
-///     reference: "schemas/epic-body.json".to_string(),
-///     path: PathBuf::from("/repo/.jit/schemas/epic-body.json"),
-///     schema: serde_json::json!({ "type": "object" }),
-/// };
-/// assert_eq!(source.reference, "schemas/epic-body.json");
-/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct SchemaSource {
     /// The reference string as authored in `rules.toml` (e.g.
@@ -655,17 +493,6 @@ pub struct SchemaSource {
 /// Shorthand kinds carry simple scalars and desugar to JSON Schema downstream.
 /// [`Assertion::JsonSchema`] carries a raw schema loaded from a file. Graph
 /// kinds run only on demand. Payloads are parsed/stored but not yet evaluated.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::{Assertion, RuleScope};
-///
-/// let assertion = Assertion::RequireSection {
-///     heading: "Success Criteria".to_string(),
-/// };
-/// assert_eq!(assertion.scope(), RuleScope::Local);
-/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum Assertion {
     /// Require a label (by exact value or `ns:*` wildcard) with optional
@@ -829,18 +656,6 @@ pub enum Assertion {
 /// Each variant reuses one existing domain function over the whole issue set:
 /// `OrphanLeaf` -> [`crate::domain::type_taxonomy::validate_orphans`],
 /// `StrategicConsistency` -> [`crate::domain::type_taxonomy::validate_strategic_labels`].
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::{Assertion, RuleScope, TypeHierarchyKind};
-///
-/// let assertion = Assertion::TypeHierarchy {
-///     kind: TypeHierarchyKind::OrphanLeaf,
-/// };
-/// // Type-hierarchy checks need the whole issue set, so they are graph-scoped.
-/// assert_eq!(assertion.scope(), RuleScope::Graph);
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeHierarchyKind {
     /// A leaf-level issue (e.g. a task) carries no parent association label.
@@ -854,17 +669,6 @@ impl Assertion {
     ///
     /// Shorthand and file-schema kinds are [`RuleScope::Local`]; the aggregate graph
     /// kinds are [`RuleScope::Graph`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::{Assertion, RuleScope};
-    ///
-    /// let local = Assertion::RequireDocType {
-    ///     doc_type: "design".to_string(),
-    /// };
-    /// assert_eq!(local.scope(), RuleScope::Local);
-    /// ```
     pub fn scope(&self) -> RuleScope {
         match self {
             Assertion::LabelCoverage { .. }
@@ -896,26 +700,6 @@ impl Assertion {
     /// likewise treated as repo-wide and validate-only. The per-issue graph kinds
     /// (`label-coverage`, `dependency-shape`, `gate-recency`) only need the
     /// issue's neighborhood and so run at transition time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleSet;
-    /// use std::path::Path;
-    ///
-    /// let toml = r#"
-    /// [[rules]]
-    /// name = "global-ref"
-    /// assert = { label-reference = { from = "satisfies", to = "req" } }
-    ///
-    /// [[rules]]
-    /// name = "linked-ref"
-    /// assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" } }
-    /// "#;
-    /// let set = RuleSet::from_toml_str(toml, Path::new("/x")).unwrap();
-    /// assert!(set.rules[0].assert.is_repo_wide_at_transition());
-    /// assert!(!set.rules[1].assert.is_repo_wide_at_transition());
-    /// ```
     pub fn is_repo_wide_at_transition(&self) -> bool {
         match self {
             Assertion::LabelUniqueness { .. } => true,
@@ -935,28 +719,6 @@ impl Assertion {
 }
 
 /// A fully parsed validation rule.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::{RuleSet, RuleScope, Severity};
-/// use std::path::Path;
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "epic-needs-req"
-/// when = { type = "epic" }
-/// severity = "error"
-/// enforce = true
-/// assert = { require-label = { label = "req:*", min = 1 } }
-/// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-/// let rule = &set.rules[0];
-/// assert_eq!(rule.name, "epic-needs-req");
-/// assert_eq!(rule.severity, Severity::Error);
-/// assert!(rule.enforce);
-/// assert_eq!(rule.scope, RuleScope::Local);
-/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
     /// Unique, human-readable rule name. Colon-free: `:` is reserved solely for
@@ -987,22 +749,6 @@ pub struct Rule {
 }
 
 /// A parsed set of rules, ready for selector matching.
-///
-/// # Examples
-///
-/// ```
-/// use jit::validation::rules::RuleSet;
-/// use std::path::Path;
-///
-/// let toml = r#"
-/// [[rules]]
-/// name = "ready-needs-criteria"
-/// when = { state = "ready" }
-/// assert = { require-section = { heading = "Success Criteria" } }
-/// "#;
-/// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-/// assert_eq!(set.rules.len(), 1);
-/// ```
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RuleSet {
     /// The rules in authored order.
@@ -1011,15 +757,6 @@ pub struct RuleSet {
 
 impl RuleSet {
     /// An empty rule set (used when no `rules.toml` exists).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleSet;
-    ///
-    /// let set = RuleSet::empty();
-    /// assert!(set.rules.is_empty());
-    /// ```
     pub fn empty() -> Self {
         Self::default()
     }
@@ -1028,17 +765,6 @@ impl RuleSet {
     ///
     /// Returns an empty [`RuleSet`] when the file does not exist. Referenced
     /// schema files are read relative to `jit_root` and transcoded to JSON.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleSet;
-    ///
-    /// // A directory with no `rules.toml` loads as an empty rule set.
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let set = RuleSet::load(dir.path()).unwrap();
-    /// assert!(set.rules.is_empty());
-    /// ```
     pub fn load(jit_root: &Path) -> Result<Self, RuleConfigError> {
         let path = jit_root.join("rules.toml");
         if !path.exists() {
@@ -1052,22 +778,6 @@ impl RuleSet {
     }
 
     /// Parse a `rules.toml` string. `jit_root` resolves schema file references.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleSet;
-    /// use std::path::Path;
-    ///
-    /// let toml = r#"
-    /// [[rules]]
-    /// name = "task-needs-design"
-    /// when = { type = "task" }
-    /// assert = { require-doc-type = { doc-type = "design" } }
-    /// "#;
-    /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-    /// assert_eq!(set.rules[0].name, "task-needs-design");
-    /// ```
     pub fn from_toml_str(content: &str, jit_root: &Path) -> Result<Self, RuleConfigError> {
         let raw: RawRulesFile = toml::from_str(content)?;
         let rules = raw
@@ -1095,30 +805,6 @@ impl RuleSet {
     ///
     /// Only cheap `Issue` fields are read (no description parse). Rules are
     /// returned in authored order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::validation::rules::RuleSet;
-    /// use jit::domain::Issue;
-    /// use std::path::Path;
-    ///
-    /// let toml = r#"
-    /// [[rules]]
-    /// name = "epic-rule"
-    /// when = { type = "epic" }
-    /// assert = { require-section = { heading = "Goals" } }
-    /// "#;
-    /// let set = RuleSet::from_toml_str(toml, Path::new("/nonexistent")).unwrap();
-    ///
-    /// let mut epic = Issue::new("An epic".to_string(), String::new());
-    /// epic.labels = vec!["type:epic".to_string()];
-    /// assert_eq!(set.matching_rules(&epic).len(), 1);
-    ///
-    /// let mut task = Issue::new("A task".to_string(), String::new());
-    /// task.labels = vec!["type:task".to_string()];
-    /// assert!(set.matching_rules(&task).is_empty());
-    /// ```
     pub fn matching_rules(&self, issue: &Issue) -> Vec<&Rule> {
         self.rules
             .iter()

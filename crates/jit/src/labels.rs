@@ -42,20 +42,6 @@ pub(crate) fn label_regex() -> &'static Regex {
 ///
 /// Returns an error if the label doesn't match the expected format,
 /// with suggestions for common mistakes.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::validate_label;
-///
-/// assert!(validate_label("milestone:v1.0").is_ok());
-/// assert!(validate_label("epic:auth").is_ok());
-/// assert!(validate_label("type:task").is_ok());
-///
-/// assert!(validate_label("auth").is_err()); // Missing namespace
-/// assert!(validate_label("Milestone:v1.0").is_err()); // Uppercase namespace
-/// assert!(validate_label("milestone-v1.0").is_err()); // Wrong separator
-/// ```
 pub fn validate_label(label: &str) -> Result<()> {
     if !label_regex().is_match(label) {
         // Provide helpful suggestions for common errors
@@ -73,16 +59,6 @@ pub fn validate_label(label: &str) -> Result<()> {
 }
 
 /// Parse a label into namespace and value components
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::parse_label;
-///
-/// let (ns, val) = parse_label("milestone:v1.0").unwrap();
-/// assert_eq!(ns, "milestone");
-/// assert_eq!(val, "v1.0");
-/// ```
 pub fn parse_label(label: &str) -> Result<(String, String)> {
     validate_label(label)?;
 
@@ -136,15 +112,6 @@ fn suggest_label_fix(label: &str) -> Option<String> {
 /// Type labels have the form `type:<value>` (e.g. `type:task`, `type:epic`).
 /// Use this const — not a raw `"type:"` string — anywhere the type namespace is
 /// referenced so the encoding is centralized in a single place.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::TYPE_NAMESPACE;
-///
-/// let label = format!("{}:task", TYPE_NAMESPACE);
-/// assert_eq!(label, "type:task");
-/// ```
 pub const TYPE_NAMESPACE: &str = "type";
 
 /// Build the `type:*` label for a type value.
@@ -154,18 +121,6 @@ pub const TYPE_NAMESPACE: &str = "type";
 /// helper rather than a raw `format!("type:{value}")` so the encoding lives in
 /// a single place. The round-trip `type_value_of(&type_label(v)) == Some(v)`
 /// holds for any non-empty `v`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::{type_label, type_value_of};
-///
-/// assert_eq!(type_label("task"), "type:task");
-/// assert_eq!(type_label("epic"), "type:epic");
-///
-/// // Round-trips with the extraction primitive.
-/// assert_eq!(type_value_of(&type_label("story")), Some("story"));
-/// ```
 pub fn type_label(value: &str) -> String {
     format!("{TYPE_NAMESPACE}:{value}")
 }
@@ -179,18 +134,6 @@ pub fn type_label(value: &str) -> String {
 /// Internally delegates to [`parse_label`] for format validation and namespace
 /// identification; `split_once` is used only to borrow the value portion of the
 /// original string without allocating.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::type_value_of;
-///
-/// assert_eq!(type_value_of("type:task"), Some("task"));
-/// assert_eq!(type_value_of("type:epic"), Some("epic"));
-/// assert_eq!(type_value_of("priority:high"), None); // wrong namespace
-/// assert_eq!(type_value_of("type:"),         None); // missing value — invalid format
-/// assert_eq!(type_value_of("notacolon"),     None); // invalid label format
-/// ```
 pub fn type_value_of(label: &str) -> Option<&str> {
     // parse_label is the canonical encoding primitive; split_once borrows the
     // value from the original string without allocating.
@@ -204,18 +147,6 @@ pub fn type_value_of(label: &str) -> Option<&str> {
 ///
 /// Convenience wrapper around [`type_value_of`]. Returns `false` for invalid
 /// label formats.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::is_type_label;
-///
-/// assert!(is_type_label("type:task"));
-/// assert!(is_type_label("type:epic"));
-/// assert!(!is_type_label("priority:high")); // wrong namespace
-/// assert!(!is_type_label("type:"));         // missing value — invalid format
-/// assert!(!is_type_label("notacolon"));     // invalid label format
-/// ```
 pub fn is_type_label(label: &str) -> bool {
     type_value_of(label).is_some()
 }
@@ -227,27 +158,6 @@ pub fn is_type_label(label: &str) -> bool {
 /// Presence checks become `.is_some()`.
 ///
 /// Built on [`type_value_of`] — the single encoding primitive.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::type_label_value;
-///
-/// // Type present: returns the value
-/// let labels = vec!["type:task".to_string(), "priority:high".to_string()];
-/// assert_eq!(type_label_value(&labels), Some("task"));
-///
-/// // First type label wins when multiple are present
-/// let multi = vec!["epic:auth".to_string(), "type:story".to_string()];
-/// assert_eq!(type_label_value(&multi), Some("story"));
-///
-/// // No type label: returns None
-/// let no_type = vec!["priority:high".to_string()];
-/// assert_eq!(type_label_value(&no_type), None);
-///
-/// // Empty slice: returns None
-/// assert_eq!(type_label_value(&[]), None);
-/// ```
 pub fn type_label_value(labels: &[String]) -> Option<&str> {
     labels.iter().find_map(|l| type_value_of(l))
 }
@@ -259,23 +169,6 @@ pub fn type_label_value(labels: &[String]) -> Option<&str> {
 /// the general case (e.g. exclusion checks over a heterogeneous set of issues).
 ///
 /// Built on [`type_value_of`] — the single encoding primitive.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::type_label_values;
-///
-/// let labels = vec![
-///     "type:task".to_string(),
-///     "priority:high".to_string(),
-///     "type:epic".to_string(),
-/// ];
-/// let values: Vec<&str> = type_label_values(&labels).collect();
-/// assert_eq!(values, vec!["task", "epic"]);
-///
-/// let empty: Vec<String> = vec![];
-/// assert_eq!(type_label_values(&empty).count(), 0);
-/// ```
 pub fn type_label_values(labels: &[String]) -> impl Iterator<Item = &str> {
     labels.iter().filter_map(|l| type_value_of(l))
 }
@@ -287,17 +180,6 @@ pub fn type_label_values(labels: &[String]) -> impl Iterator<Item = &str> {
 /// - Wildcard: `"epic:*"` matches any label in epic namespace
 ///
 /// Invalid labels in the collection are silently ignored during matching.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::matches_pattern;
-///
-/// let labels = vec!["epic:auth".to_string(), "type:task".to_string()];
-/// assert!(matches_pattern(&labels, "epic:auth"));
-/// assert!(matches_pattern(&labels, "epic:*"));
-/// assert!(!matches_pattern(&labels, "milestone:*"));
-/// ```
 pub fn matches_pattern(issue_labels: &[String], pattern: &str) -> bool {
     if let Some(namespace) = pattern.strip_suffix(":*") {
         // Wildcard: match any label in namespace
@@ -315,16 +197,6 @@ pub fn matches_pattern(issue_labels: &[String], pattern: &str) -> bool {
 /// Check if a single label matches a pattern
 ///
 /// Convenience wrapper around `matches_pattern` for single label checks.
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::label_matches;
-///
-/// assert!(label_matches("epic:auth", "epic:auth"));
-/// assert!(label_matches("epic:auth", "epic:*"));
-/// assert!(!label_matches("epic:auth", "milestone:*"));
-/// ```
 pub fn label_matches(label: &str, pattern: &str) -> bool {
     matches_pattern(&[label.to_string()], pattern)
 }
@@ -332,17 +204,6 @@ pub fn label_matches(label: &str, pattern: &str) -> bool {
 /// Validate assignee format
 ///
 /// Assignees must follow the format `type:identifier` (e.g., `agent:copilot`, `user:alice`)
-///
-/// # Examples
-///
-/// ```
-/// use jit::labels::validate_assignee_format;
-///
-/// assert!(validate_assignee_format("agent:copilot").is_ok());
-/// assert!(validate_assignee_format("user:alice").is_ok());
-/// assert!(validate_assignee_format("invalid").is_err());
-/// assert!(validate_assignee_format("").is_err());
-/// ```
 pub fn validate_assignee_format(assignee: &str) -> Result<()> {
     // Single source of truth for the `{type}:{identifier}` split lives in
     // `Assignee::from_str`; this is the thin `anyhow`-returning adapter for

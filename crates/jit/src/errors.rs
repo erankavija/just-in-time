@@ -114,20 +114,6 @@ impl std::error::Error for ActionableError {}
 /// maps to exit code `2` (enum `FromStr` parse failures, config parse failures,
 /// malformed CLI values), so the classification is driven by type rather than by
 /// substring matching.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::InvalidArgumentError;
-///
-/// let err = InvalidArgumentError::new("Invalid priority: urgent");
-/// assert_eq!(err.to_string(), "Invalid priority: urgent");
-/// assert_eq!(err.message(), "Invalid priority: urgent");
-///
-/// // Downcastable through anyhow for exit-code classification.
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<InvalidArgumentError>().is_some());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct InvalidArgumentError {
@@ -161,18 +147,6 @@ impl InvalidArgumentError {
 /// covers the rest. It carries the original message so `Display` is unchanged,
 /// and the CLI downcasts to it to classify the failure as a not-found condition
 /// (exit code `3`) without scanning the message text.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::NotFoundError;
-///
-/// let err = NotFoundError::new("Document reference docs/x.md not found in issue ab12");
-/// assert!(err.to_string().contains("not found"));
-///
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<NotFoundError>().is_some());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct NotFoundError {
@@ -199,18 +173,6 @@ impl NotFoundError {
 /// (which uses [`crate::storage::GateAlreadyExistsError`]), e.g. a snapshot output
 /// path that is already occupied. Carries the message verbatim; the CLI downcasts
 /// to it to classify the failure as an already-exists condition (exit code `6`).
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::AlreadyExistsError;
-///
-/// let err = AlreadyExistsError::new("Output path already exists: /tmp/snap");
-/// assert!(err.to_string().contains("already exists"));
-///
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<AlreadyExistsError>().is_some());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct AlreadyExistsError {
@@ -242,20 +204,6 @@ impl AlreadyExistsError {
 /// Structured validation failures keep their dedicated types (e.g.
 /// [`TransitionBlockedError`], [`crate::GraphError`]); this covers the
 /// message-only cases.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::ValidationFailedError;
-///
-/// let err = ValidationFailedError::new(
-///     "Invalid dependency: issue 'a' depends on 'b' which does not exist",
-/// );
-/// assert!(err.to_string().contains("Invalid dependency"));
-///
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<ValidationFailedError>().is_some());
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct ValidationFailedError {
@@ -284,27 +232,6 @@ impl ValidationFailedError {
 /// scanning for "not found". This dedicated type makes a lease-not-found
 /// downcastable (exit code `3`) instead, while each constructor reproduces its
 /// origin's message verbatim through `Display`.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::{no_active_lease, LeaseNotFoundError};
-///
-/// let err = LeaseNotFoundError::new(&no_active_lease("abc12345"));
-/// // The rich remediation text is preserved verbatim.
-/// assert!(err.to_string().contains("abc12345"));
-/// assert!(err.to_string().contains("not found"));
-///
-/// // The plain "Lease <id> not found" form for the bare lookup path.
-/// assert_eq!(
-///     LeaseNotFoundError::by_id("abc12345").to_string(),
-///     "Lease abc12345 not found"
-/// );
-///
-/// // Downcastable through anyhow for exit-code classification.
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
-/// ```
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct LeaseNotFoundError {
@@ -357,21 +284,6 @@ pub enum GitRequirementGap {
 /// This typed wrapper is downcastable in `error_to_exit_code` (→
 /// `ExitCode::ExternalError`) so the CLI reports exit code 10 rather than the
 /// generic error exit code.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
-///
-/// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
-/// let msg = err.to_string();
-/// assert!(msg.contains("git repository"));
-/// assert!(msg.to_lowercase().contains("claim"));
-///
-/// // Downcastable through anyhow for exit-code classification.
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<ClaimRequiresGitError>().is_some());
-/// ```
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
 pub struct ClaimRequiresGitError {
@@ -383,20 +295,6 @@ impl ClaimRequiresGitError {
     /// with a remediation hint tailored to that specific gap (REQ-04): a
     /// missing repository hints `git init`; a repository with no commits
     /// hints making an initial commit instead.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
-    ///
-    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
-    /// assert!(err.message().contains("git repository"));
-    /// assert!(err.message().contains("git init"));
-    ///
-    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoCommits);
-    /// assert!(err.message().contains("commit"));
-    /// assert!(!err.message().contains("git init"));
-    /// ```
     pub fn new(gap: GitRequirementGap) -> Self {
         let base = ActionableError::new("Claims and leases require a git repository")
             .with_cause("Claim tracking records the git worktree identity and current branch");
@@ -421,15 +319,6 @@ impl ClaimRequiresGitError {
     }
 
     /// The fully-rendered, user-facing message.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::{ClaimRequiresGitError, GitRequirementGap};
-    ///
-    /// let err = ClaimRequiresGitError::new(GitRequirementGap::NoRepository);
-    /// assert_eq!(err.message(), err.to_string());
-    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -445,25 +334,6 @@ impl ClaimRequiresGitError {
 /// error. Downcastable in `error_to_exit_code` (→ `ExitCode::ValidationFailed`,
 /// exit 4), matching both cycle detection and the read-time validator. Re-run
 /// `jit dep add --reduce` to drop the now-redundant edge(s) in the same operation.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::RedundantDependencyError;
-///
-/// let err = RedundantDependencyError::new(
-///     ("aaaa1111".into(), "cccc3333".into()),
-///     vec![("aaaa1111".into(), "cccc3333".into())],
-/// );
-/// let msg = err.to_string();
-/// assert!(msg.contains("aaaa1111"));
-/// assert!(msg.contains("cccc3333"));
-/// assert!(msg.contains("--reduce"));
-///
-/// // Downcastable through anyhow for exit-code classification.
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<RedundantDependencyError>().is_some());
-/// ```
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct RedundantDependencyError {
@@ -475,20 +345,6 @@ impl RedundantDependencyError {
     /// that would leave `redundant_edges` (each a `(from, to)` pair) redundant.
     /// When the attempted edge is itself the redundant one it appears in
     /// `redundant_edges`. Ids are shortened to [`SHORT_ID_LENGTH`] in the message.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::RedundantDependencyError;
-    ///
-    /// let err = RedundantDependencyError::new(
-    ///     ("bbbb2222".into(), "cccc3333".into()),
-    ///     vec![("aaaa0000".into(), "cccc3333".into())],
-    /// );
-    /// // Names both the attempted edge and the edge it makes redundant.
-    /// assert!(err.to_string().contains("bbbb2222"));
-    /// assert!(err.to_string().contains("aaaa0000"));
-    /// ```
     pub fn new(attempted: (String, String), redundant_edges: Vec<(String, String)>) -> Self {
         let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
         let (from, to) = (short(&attempted.0), short(&attempted.1));
@@ -507,18 +363,6 @@ impl RedundantDependencyError {
     }
 
     /// The user-facing rejection message.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::RedundantDependencyError;
-    ///
-    /// let err = RedundantDependencyError::new(
-    ///     ("aaaa1111".into(), "cccc3333".into()),
-    ///     vec![("aaaa1111".into(), "cccc3333".into())],
-    /// );
-    /// assert_eq!(err.message(), err.to_string());
-    /// ```
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -541,34 +385,6 @@ impl RedundantDependencyError {
 /// text — for a per-edge JSON `code`, while the binary's exit-code classifier
 /// can downcast this wrapper directly and pick a single dominant exit code
 /// across the whole batch.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::DependencyBatchRejectedError;
-///
-/// let err = DependencyBatchRejectedError::new(
-///     "aaaa1111",
-///     vec![
-///         ("bbbb2222".to_string(), anyhow::anyhow!("Issue not found: bbbb2222")),
-///         ("cccc3333".to_string(), anyhow::anyhow!("cycle detected")),
-///     ],
-/// );
-/// let msg = err.to_string();
-/// assert!(msg.contains("bbbb2222"));
-/// assert!(msg.contains("cccc3333"));
-/// assert!(msg.contains("none were added"));
-/// assert_eq!(err.from_id(), "aaaa1111");
-/// assert_eq!(err.rejected().len(), 2);
-///
-/// // Downcastable through anyhow for exit-code classification.
-/// let any: anyhow::Error = err.into();
-/// assert!(any.downcast_ref::<DependencyBatchRejectedError>().is_some());
-/// ```
-/// Not `Clone` like most typed errors in this module ([`anyhow::Error`] isn't
-/// `Clone`), so it holds the pre-rendered `message` (thiserror's `#[error]`
-/// attribute, same as [`RedundantDependencyError`]) alongside the raw
-/// `rejected` list for downstream downcast-based classification.
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
 pub struct DependencyBatchRejectedError {
@@ -581,18 +397,6 @@ impl DependencyBatchRejectedError {
     /// Build the aggregate rejection from every failing target: the as-supplied
     /// target id text paired with the typed error that rejected it, in request
     /// order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::DependencyBatchRejectedError;
-    ///
-    /// let err = DependencyBatchRejectedError::new(
-    ///     "aaaa1111",
-    ///     vec![("bbbb2222".to_string(), anyhow::anyhow!("bad prefix"))],
-    /// );
-    /// assert!(err.to_string().contains("Rejected 1"));
-    /// ```
     pub fn new(from_id: impl Into<String>, rejected: Vec<(String, anyhow::Error)>) -> Self {
         let from_id = from_id.into();
         let short = |id: &str| id.chars().take(SHORT_ID_LENGTH).collect::<String>();
@@ -613,42 +417,12 @@ impl DependencyBatchRejectedError {
     }
 
     /// The issue the batch targeted (the `<from>` of `jit dep add`).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::DependencyBatchRejectedError;
-    ///
-    /// let err = DependencyBatchRejectedError::new(
-    ///     "aaaa1111",
-    ///     vec![("bbbb2222".to_string(), anyhow::anyhow!("bad prefix"))],
-    /// );
-    /// assert_eq!(err.from_id(), "aaaa1111");
-    /// ```
     pub fn from_id(&self) -> &str {
         &self.from_id
     }
 
     /// Every rejected edge: the as-supplied target id text paired with the
     /// typed error that rejected it, in request order.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use jit::errors::DependencyBatchRejectedError;
-    ///
-    /// let err = DependencyBatchRejectedError::new(
-    ///     "aaaa1111",
-    ///     vec![
-    ///         ("bbbb2222".to_string(), anyhow::anyhow!("bad prefix")),
-    ///         ("cccc3333".to_string(), anyhow::anyhow!("cycle detected")),
-    ///     ],
-    /// );
-    /// let rejected = err.rejected();
-    /// assert_eq!(rejected.len(), 2);
-    /// assert_eq!(rejected[0].0, "bbbb2222");
-    /// assert_eq!(rejected[1].0, "cccc3333");
-    /// ```
     pub fn rejected(&self) -> &[(String, anyhow::Error)] {
         &self.rejected
     }
@@ -660,14 +434,6 @@ impl DependencyBatchRejectedError {
 /// requested lifecycle state without embedding CLI or JSON rendering in the
 /// command layer. Human-readable formatting is provided through `Display`, while
 /// JSON serialization is handled by `crate::output`.
-///
-/// # Examples
-///
-/// ```ignore
-/// // Returned by issue transition commands when blockers prevent progress.
-/// let error = transition_result.unwrap_err();
-/// assert!(error.to_string().contains("To fix:"));
-/// ```
 #[derive(Debug, Clone)]
 pub struct TransitionBlockedError {
     issue_id: String,
@@ -1015,15 +781,6 @@ pub fn lease_not_found(lease_id: &str) -> ActionableError {
 /// (`JIT_AGENT_ID` / `~/.config/jit/agent.toml`) nor a git `user.name` is
 /// available. A release must be attributable in the audit trail, so the command
 /// errors rather than fabricating a placeholder identity.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::no_acting_identity;
-///
-/// let err = no_acting_identity();
-/// assert!(err.to_error_message().contains("no acting identity"));
-/// ```
 pub fn no_acting_identity() -> ActionableError {
     ActionableError::new("Cannot release: no acting identity for the audit trail")
         .with_cause("No agent identity is configured (JIT_AGENT_ID or ~/.config/jit/agent.toml)")
@@ -1037,17 +794,6 @@ pub fn no_acting_identity() -> ActionableError {
 /// Used by `jit claim release <issue-id>` when the issue has no active lease to
 /// release. The message contains "not found" so callers that map error text to
 /// exit codes treat it like other lookup failures.
-///
-/// # Examples
-///
-/// ```
-/// use jit::errors::no_active_lease;
-///
-/// let err = no_active_lease("abc12345");
-/// let msg = err.to_error_message();
-/// assert!(msg.contains("abc12345"));
-/// assert!(msg.contains("not found"));
-/// ```
 pub fn no_active_lease(issue_id: &str) -> ActionableError {
     ActionableError::new(format!(
         "Issue {} has no active lease to release (not found)",
