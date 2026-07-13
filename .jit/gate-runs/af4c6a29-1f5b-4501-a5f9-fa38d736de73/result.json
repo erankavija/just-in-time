@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "af4c6a29-1f5b-4501-a5f9-fa38d736de73",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "commit": "45f751f88dea27319f82d1830a3a7fbd03602a56",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T16:10:49.254394120Z",
+  "completed_at": "2026-07-13T16:14:12.890427849Z",
+  "duration_ms": 203636,
+  "exit_code": 1,
+  "stdout": "Attribution: 2f763434 (claim metadata), 45f751f8 (implementation)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml), @/gate/code-review (.jit/gates.toml), @/charter/D-4 (dev/vision/9db27a3a-charter.md), @/invariant/domain-agnostic (.jit/invariants.toml), issue requirements (markdown-first issue descriptions)\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T16:07:45Z); code-review has no prior recorded run\nTruncation recovery: Recovered broad-search truncation with targeted issue, artifact-plan, parser, and test reads; issue-scoped `jit item show` could not create its lock in the read-only sandbox, so its configured markdown-first sources were read directly.\n\n1. [blocking][issue-impact] `STATIC_MODULE` requires `from`, so valid static side-effect imports such as `import './relative.js'` produce no `dynamic-loading-suspected` warning. This omits part of the required static-module pattern set. `crates/jit/src/domain/artifact_discovery.rs:276`.\n\n2. [blocking][issue-impact] Dynamic-loader scanning is restricted to HTML and JavaScript. A relocated Markdown artifact containing a textual local-path loader example is not warned, despite Markdown being supported and the requirement applying textual detection to relocated members. `crates/jit/src/domain/artifact_discovery.rs:108`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two required dynamic-loading warning cases are not detected.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Static side-effect imports such as import './relative.js' are not detected because the regex requires from.\",\"file\":\"crates/jit/src/domain/artifact_discovery.rs\",\"line\":276,\"references\":[\"@/issue/971c67f4/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Markdown relocated members are excluded from textual dynamic-loading warnings.\",\"file\":\"crates/jit/src/domain/artifact_discovery.rs\",\"line\":108,\"references\":[\"@/issue/971c67f4/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 9948 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5c3e-d724-7dd0-99ac-8fbb6b78a9ed\n--------\nuser\n--- 9935 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two required dynamic-loading warning cases are not detected.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Static side-effect imports such as import './relative.js' are not detected because the regex requires from.",
+        "file": "crates/jit/src/domain/artifact_discovery.rs",
+        "line": 276,
+        "references": [
+          "@/issue/971c67f4/requirement/REQ-02"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Markdown relocated members are excluded from textual dynamic-loading warnings.",
+        "file": "crates/jit/src/domain/artifact_discovery.rs",
+        "line": 108,
+        "references": [
+          "@/issue/971c67f4/requirement/REQ-02"
+        ]
+      }
+    ]
+  }
+}
