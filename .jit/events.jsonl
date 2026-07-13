@@ -7062,3 +7062,5 @@
 {"type":"issue_state_changed","id":"a643129a-00c8-4747-b62b-01d7fd75205f","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T17:40:51.002504562Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"0d31ba90-ead3-428d-9e41-7f406b1b7376","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T17:40:51.002533972Z"}
 {"type":"issue_state_changed","id":"7fc9e423-534c-43ae-b435-f6d0dfba00c8","issue_id":"0c86d83b-fc85-4696-94a3-65d19d934c9c","timestamp":"2026-07-13T17:40:51.045913364Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"1f1cd7d4-68f7-4494-a02d-abadaa9cc0b3","issue_id":"0c86d83b-fc85-4696-94a3-65d19d934c9c","timestamp":"2026-07-13T17:42:05.655866049Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"54453c7e-754c-4327-bd4e-4b63a5ddc87a","issue_id":"0c86d83b-fc85-4696-94a3-65d19d934c9c","timestamp":"2026-07-13T17:42:05.658738931Z","assignee":"agent:classifier"}
