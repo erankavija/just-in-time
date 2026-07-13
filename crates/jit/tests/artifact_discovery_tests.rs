@@ -286,12 +286,62 @@ fn test_every_binding_family_warns_without_blocking() {
 }
 
 #[test]
+fn test_url_resolving_loaders_warn_for_bare_same_directory_urls() {
+    let cases = [
+        ("runtime/bare-fetch.js", "fetch('payload.json')"),
+        ("runtime/bare-fetch-route.js", "fetch('api/v1')"),
+        (
+            "runtime/bare-import-scripts.js",
+            "importScripts('bootstrap.js')",
+        ),
+        ("runtime/bare-worker.js", "new Worker('worker.js')"),
+        ("runtime/bare-worker-route.js", "new Worker('workers/main')"),
+    ];
+
+    for (path, content) in cases {
+        assert_dynamic_loading_warning(path, content);
+    }
+}
+
+#[test]
+fn test_loader_external_and_non_path_literals_do_not_warn() {
+    let cases = [
+        ("runtime/http.js", "fetch('https://example.test/data.json')"),
+        (
+            "runtime/protocol-relative.js",
+            "fetch('//cdn.test/data.json')",
+        ),
+        (
+            "runtime/data-uri.js",
+            "fetch('data:application/json,%7B%7D')",
+        ),
+        ("runtime/fragment.js", "fetch('#payload')"),
+        ("runtime/query.js", "fetch('?payload=1')"),
+        ("runtime/variable.js", "fetch(payloadUrl)"),
+        ("runtime/template.js", "fetch(`${base}/payload.json`)"),
+        (
+            "runtime/external-worker.js",
+            "new Worker('https://example.test/worker.js')",
+        ),
+        ("runtime/package-import.js", "import('package-name')"),
+        ("runtime/package-require.js", "require('package-name')"),
+        ("runtime/package-static.js", "import 'package-name'"),
+    ];
+
+    for (path, content) in cases {
+        assert_no_dynamic_loading_warning(path, content);
+    }
+}
+
+#[test]
 fn test_data_attribute_quote_and_local_path_matrix_warns() {
     let quote_modes = [("double", "\""), ("single", "'"), ("unquoted", "")];
     let path_modes = [
         ("dot-relative", "./payload.json"),
         ("parent-relative", "../payload.json"),
         ("root-relative", "/payload.json"),
+        ("bare-file", "payload.json"),
+        ("bare-nested", "assets/payload"),
     ];
 
     for (quote_name, quote) in quote_modes {
@@ -318,6 +368,18 @@ fn test_data_attribute_external_url_matrix_does_not_warn() {
             let content = format!("<div data-source={quote}{value}{quote}></div>");
             assert_no_dynamic_loading_warning(&artifact_path, &content);
         }
+    }
+}
+
+#[test]
+fn test_data_attribute_non_path_bare_values_do_not_warn() {
+    for content in [
+        "<div data-mode=dark></div>",
+        "<div data-enabled=true></div>",
+        "<div data-target=#dialog></div>",
+        "<div data-query='?mode=compact'></div>",
+    ] {
+        assert_no_dynamic_loading_warning("data/non-path.html", content);
     }
 }
 

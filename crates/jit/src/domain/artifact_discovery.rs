@@ -265,41 +265,89 @@ fn css_references(content: &str) -> Vec<String> {
 }
 
 fn suspects_dynamic_loading(content: &str) -> bool {
-    static CALL_WITH_LOCAL_PATH: LazyLock<Option<Regex>> = LazyLock::new(|| {
-        Regex::new(
-            r#"(?i)\b(?:fetch|import|importScripts|require)\s*\(\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)"#,
-        )
-        .ok()
+    static CALL: LazyLock<Option<Regex>> = LazyLock::new(|| {
+        Regex::new(r#"(?i)\b(fetch|import|importScripts|require)\s*\(\s*(?:"([^"]*)"|'([^']*)')"#)
+            .ok()
     });
-    static WORKER_WITH_LOCAL_PATH: LazyLock<Option<Regex>> = LazyLock::new(|| {
-        Regex::new(r#"(?i)\bnew\s+Worker\s*\(\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)"#).ok()
-    });
+    static WORKER: LazyLock<Option<Regex>> =
+        LazyLock::new(|| Regex::new(r#"(?i)\bnew\s+Worker\s*\(\s*(?:"([^"]*)"|'([^']*)')"#).ok());
     static STATIC_MODULE: LazyLock<Option<Regex>> = LazyLock::new(|| {
         Regex::new(
-            r#"(?im)\b(?:import\s*(?:["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["']|[^;\n]*\bfrom\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["'])|export\b[^;\n]*\bfrom\s*["'](?:\.{1,2}/[^"']+|/[^/"'][^"']*)["'])"#,
+            r#"(?im)\b(?:import\s*(?:["']([^"']+)["']|[^;\n]*\bfrom\s*["']([^"']+)["'])|export\b[^;\n]*\bfrom\s*["']([^"']+)["'])"#,
         )
         .ok()
     });
     static DATA_ATTRIBUTE: LazyLock<Option<Regex>> = LazyLock::new(|| {
-        Regex::new(
-            r#"(?i)\bdata-[a-z0-9_.:-]+\s*=\s*(?:"(?:\.{1,2}/[^"]+|/[^/"][^"]*)"|'(?:\.{1,2}/[^']+|/[^/'][^']*)'|(?:\.{1,2}/[^\s"'=<>`]+|/[^/\s"'=<>`][^\s"'=<>`]*))"#,
-        )
-        .ok()
+        Regex::new(r#"(?i)\bdata-[a-z0-9_.:-]+\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))"#).ok()
     });
 
     content.contains("XMLHttpRequest")
-        || CALL_WITH_LOCAL_PATH
-            .as_ref()
-            .is_some_and(|regex| regex.is_match(content))
-        || WORKER_WITH_LOCAL_PATH
-            .as_ref()
-            .is_some_and(|regex| regex.is_match(content))
-        || STATIC_MODULE
-            .as_ref()
-            .is_some_and(|regex| regex.is_match(content))
-        || DATA_ATTRIBUTE
-            .as_ref()
-            .is_some_and(|regex| regex.is_match(content))
+        || CALL.as_ref().is_some_and(|regex| {
+            regex.captures_iter(content).any(|captures| {
+                let function = &captures[1];
+                capture_alternative(&captures, &[2, 3]).is_some_and(|reference| {
+                    if function.eq_ignore_ascii_case("fetch")
+                        || function.eq_ignore_ascii_case("importScripts")
+                    {
+                        is_local_url(reference)
+                    } else {
+                        is_explicit_local_path(reference)
+                    }
+                })
+            })
+        })
+        || WORKER.as_ref().is_some_and(|regex| {
+            regex
+                .captures_iter(content)
+                .any(|captures| capture_alternative(&captures, &[1, 2]).is_some_and(is_local_url))
+        })
+        || STATIC_MODULE.as_ref().is_some_and(|regex| {
+            regex.captures_iter(content).any(|captures| {
+                capture_alternative(&captures, &[1, 2, 3]).is_some_and(is_explicit_local_path)
+            })
+        })
+        || DATA_ATTRIBUTE.as_ref().is_some_and(|regex| {
+            regex.captures_iter(content).any(|captures| {
+                capture_alternative(&captures, &[1, 2, 3]).is_some_and(is_local_path_like_value)
+            })
+        })
+}
+
+fn is_local_url(reference: &str) -> bool {
+    local_reference_path(reference).is_some()
+}
+
+fn is_explicit_local_path(reference: &str) -> bool {
+    local_reference_path(reference).is_some_and(|path| {
+        path.starts_with("./")
+            || path.starts_with("../")
+            || (path.starts_with('/') && !path.starts_with("//"))
+    })
+}
+
+fn is_local_path_like_value(reference: &str) -> bool {
+    local_reference_path(reference).is_some_and(|path| {
+        is_explicit_local_path(path)
+            || path.contains('/')
+            || path
+                .rsplit_once('.')
+                .is_some_and(|(stem, extension)| !stem.is_empty() && !extension.is_empty())
+    })
+}
+
+fn local_reference_path(reference: &str) -> Option<&str> {
+    let trimmed = reference.trim();
+    if trimmed.is_empty()
+        || trimmed.starts_with(['#', '?'])
+        || trimmed.starts_with("//")
+        || is_external(trimmed)
+        || trimmed.chars().any(char::is_whitespace)
+    {
+        return None;
+    }
+
+    let path = trimmed.split(['?', '#']).next().unwrap_or_default();
+    (!path.is_empty() && !matches!(path, "." | "..")).then_some(path)
 }
 
 fn is_external(reference: &str) -> bool {
