@@ -2,7 +2,7 @@
   "id": "7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc",
   "title": "Dependency-aware container artifact archival",
   "description": "Create a safe, dependency-aware workflow for archiving every artifact associated with a completed container. The workflow must handle issue-linked files, embedded local dependencies, shared artifacts, and active references without losing files or leaving dangling metadata.\n\n## Background\n\nJIT currently archives one document at a time. Recent hardening makes that operation referentially consistent, but real repositories contain container-scoped artifact bundles: Markdown plans, HTML presentations with sibling styles and figures, CSV evidence, and files shared across several issues. The JIT repository and gf2 both retain substantial terminal-issue material in active locations, making container-level planning and archival a demonstrated need.\n\nThis epic replaces the obsolete Documentation Lifecycle Phase 2 proposal. It carries forward only evidence-backed archival work. Scheduled automation, speculative format adapters, parallel execution, and literal multi-file transactionality are outside its scope.\n\n## Success Criteria\n\n- [hard] REQ-01: Produces a deterministic archive plan containing every issue-linked artifact in a container subtree and every supported embedded local dependency of its working-tree artifacts.\n- [hard] REQ-02: Classifies each artifact as move, copy, retain, or blocked using active references, sharing, managed-path policy, and destination conflicts.\n- [hard] REQ-03: Archives an eligible container without losing files, overwriting destinations, or leaving dangling issue document references.\n- [hard] REQ-04: Preserves functional relative links for supported bundles, including HTML presentations with sibling CSS, theme files, and figures.\n- [hard] REQ-05: Reports container-oriented archival candidates using current terminal state, configured documentation policy, artifact ownership, and plan blockers without mutating the repository.\n- [hard] REQ-06: Supports structured JSON previews and is verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures representative of JIT and gf2.\n\n## Notes\n\nThe safety contract is referential consistency rather than literal atomicity across filesystem files, issue JSON records, and the append-only event log. Safety guarantees hold under the repository write guard against concurrent JIT writers and detect benign concurrent modification before destructive steps; concurrent external mutation of the working tree during an archival operation is out of contract, with git history as the recovery channel in versioned repositories. Pinned document references are historical: they are never relocated or rewritten, and their commit-resolved content is outside relocation scope. Implementations should preserve bundle topology before considering link rewriting. Time-based retention is out of scope: candidate reporting uses current terminal state and policy eligibility, never `done_at` or reconstructed timestamps. Git LFS policy work and generalized link rewriting remain separate follow-ups.",
-  "state": "backlog",
+  "state": "ready",
   "priority": "high",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
@@ -14,15 +14,15 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-13T15:57:36.771380965Z"
-    },
     "repo-validate": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-12T21:36:24.580319165Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-13T15:57:36.771380965Z"
     },
     "docs-mechanical": {
       "status": "pending",
@@ -54,7 +54,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-11T19:05:24.051555195Z",
-  "updated_at": "2026-07-13T15:58:38.968392134Z",
+  "updated_at": "2026-07-13T22:43:26.985745450Z",
   "first_ready_at": "2026-07-11T19:05:24.051567025Z",
   "claimed_at": "2026-07-13T14:14:32.605213567Z"
 }

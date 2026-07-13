@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "26fa336e-32ea-4b1e-9d32-7013ccd94f0f",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5",
+  "commit": "8b22337e626992d2a977d1224efa36bf837dc154",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T22:41:03.806175243Z",
+  "completed_at": "2026-07-13T22:43:05.800985595Z",
+  "duration_ms": 121994,
+  "exit_code": 0,
+  "stdout": "Attribution: `271dc224` is a leaf task with no resolved children. I reviewed its two tagged commits individually; `ffd2dcbf` is claim metadata only, and `8b22337` contains the removal and documentation updates. No prior review run exists.\n\nDocumentation impact: the legacy command, category configuration, event, and exit-code references are removed from the affected adopter docs. The replacement `jit archive` contract is accurately discoverable in the README and canonical CLI/configuration references. Live CLI schema and MCP curation contain no legacy tool.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue cleanly removes legacy document-archive documentation and accurately retains the canonical archive workflow.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue cleanly removes legacy document-archive documentation and accurately retains the canonical archive workflow.",
+    "findings": []
+  }
+}

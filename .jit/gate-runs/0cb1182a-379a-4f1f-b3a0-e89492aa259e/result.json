@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0cb1182a-379a-4f1f-b3a0-e89492aa259e",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5",
+  "commit": "8b22337e626992d2a977d1224efa36bf837dc154",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-13T22:36:46.363085997Z",
+  "completed_at": "2026-07-13T22:40:51.966751454Z",
+  "duration_ms": 245603,
+  "exit_code": 0,
+  "stdout": "Attribution: `ffd2dcbf` (claim metadata), `8b22337e` (legacy archive removal) tagged `jit:271dc224`\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/domain-agnostic` (`.jit/invariants.toml`); `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/charter/D-6` (`dev/vision/9db27a3a-charter.md`)\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit 0); code-review unrun; doc-review pending; docs-mechanical pending\nTruncation recovery: none; all patch reads were path-bounded and complete\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed clean-cut removal meets the issue’s hard criterion; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributed clean-cut removal meets the issue’s hard criterion; no unresolved issue-impact defects found.",
+    "findings": []
+  }
+}

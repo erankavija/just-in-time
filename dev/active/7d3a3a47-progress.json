@@ -54,7 +54,7 @@
     {
       "wave_number": 9,
       "issues": [
-        {"id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5", "short_id": "271dc224", "title": "Remove the legacy document-archive command", "classification": "implementation", "status": "pending"}
+        {"id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5", "short_id": "271dc224", "title": "Remove the legacy document-archive command", "classification": "implementation", "status": "completed"}
       ]
     }
   ],
