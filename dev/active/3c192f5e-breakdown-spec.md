@@ -151,8 +151,8 @@ First-class log, consumed by review and breakdown. Provisional entries flagged.
   scattered state REQ-06 targets).
 - **D4 — Vision/charter storage:** chosen **`permanent_paths = ["docs/"]`** (never
   auto-archived). Rejected: a `managed_paths` location under `dev/active` (would be archived by
-  `jit doc archive` on issue completion, wrong for a never-terminal milestone vision); adding a
-  new `[documentation.categories]` entry (larger config change, out of proportion to need).
+  the retired category-based archiver on issue completion, wrong for a never-terminal milestone
+  vision); adding another category entry (larger config change, out of proportion to need).
 - **D5 — Eval verifiability scope:** chosen **a thin documented run-and-record procedure plus
   minimal machinery** to make "pass their evals" checkable. Rejected: build a general eval
   framework (scope creep beyond REQ-07); leave evals unrunnable (REQ-07 stays unverifiable).

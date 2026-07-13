@@ -13,14 +13,6 @@ managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 archive_root = "dev/archive"
 permanent_paths = ["docs/"]
 
-# Archive categories
-[documentation.categories]
-design = "features"
-analysis = "bug-fixes"
-refactor = "refactorings"
-session = "sessions"
-study = "studies"
-
 [type_hierarchy]
 # Type name to hierarchy level mapping (lower = more strategic)
 # planning/breakdown: bracket-infrastructure types (children of a breakable container).

@@ -99,9 +99,9 @@ jit query available
 
 Lease commands need a Git repository with a resolvable `HEAD` for worktree
 identity and branch tracking. This does not disable filesystem-backed document
-operations: `jit doc add`, `jit doc list`, `jit doc archive`, and working-tree
-document reads work without Git. Document history, diffs, and commit-specific
-reads require Git.
+operations: `jit doc add`, `jit doc list`, dependency-aware `jit archive`, and
+working-tree document reads work without Git. Document history, diffs, and
+commit-specific reads require Git.
 
 ### Failure modes
 

@@ -212,7 +212,12 @@ pub trait IssueStore: Clone {
     /// Returns an error if the event cannot be appended.
     fn append_event(&self, event: &Event) -> Result<()>;
 
-    /// Read all events from the event log.
+    /// Read all events whose tag is in the current event vocabulary.
+    ///
+    /// File storage skips structurally valid records with retired or otherwise
+    /// unknown string tags so append-only history remains readable after a tag
+    /// is removed. Malformed JSON and malformed records for known tags remain
+    /// errors.
     ///
     /// # Errors
     ///

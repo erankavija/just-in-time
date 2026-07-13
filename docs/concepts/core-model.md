@@ -178,7 +178,9 @@ List of design documents, notes, and artifacts linked to this issue.
 ]
 ```
 
-Documents can be versioned via git, archived explicitly with `jit doc archive`, and validated for broken links.
+Documents can be versioned via git, included in dependency-aware archival with
+`jit archive document` or `jit archive container`, and validated for broken
+links.
 
 #### Context - Agent Metadata
 

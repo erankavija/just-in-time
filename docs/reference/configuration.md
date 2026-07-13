@@ -44,11 +44,6 @@ development_root = "dev"
 managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 archive_root = "dev/archive"
 permanent_paths = ["docs/"]
-
-[documentation.categories]
-design = "features"
-session = "sessions"
-study = "studies"
 ```
 
 Controls document lifecycle management. Selected documents in `managed_paths`
@@ -76,10 +71,9 @@ plan ineligible and make `--execute` refuse mutation. Explicit empty
 arrays still count as authored fields; their policy meaning is deliberately
 different from an omitted key.
 
-The `DocumentationConfig` accessors retain fallback values for older display and
-document-lifecycle callers, but archive planning and execution never use those
-fallbacks to claim eligibility. This prevents a partial policy from silently
-authorizing mutation.
+The `DocumentationConfig` accessors retain fallback values for display callers,
+but archive planning and execution never use those fallbacks to claim
+eligibility. This prevents a partial policy from silently authorizing mutation.
 
 The values above are an adopter-facing example, not universal engine constants.
 Repositories choose their own component-aware paths. For example, this

@@ -303,9 +303,6 @@ An ineligible `--execute` is an error: it exits non-zero and performs no
 publication, reference update, archive event, or source deletion. This differs
 from a blocked preview, which exits zero because it only reports the plan.
 
-The older `jit doc archive` command remains a separate document-lifecycle
-surface. It is not an alias for dependency-aware archive planning or execution.
-
 ## MCP Tools Reference
 
 jit ships an MCP (Model Context Protocol) server under
@@ -2326,20 +2323,6 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` when every
 document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
 reports `valid`, `errors`, `warnings`, and a `summary`.
-
-### `jit doc archive`
-
-Move a document and its assets into a configured archive category.
-
-```bash
-jit doc archive <PATH> --type <CATEGORY> [--dry-run] [--force] [--json]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--type <CATEGORY>` | Archive category. Must be configured in `config.toml`. |
-| `--dry-run` | Print the archival plan (source, destination, assets to move) and change nothing. |
-| `--force` | Archive even when the document is linked to an active issue. |
 
 ## Graph Commands
 

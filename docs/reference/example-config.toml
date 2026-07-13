@@ -16,23 +16,15 @@ schema = 2
 # Root directory for development documentation
 development_root = "dev"
 
-# Paths whose documents `jit doc archive` may move to the archive root (archival
-# is always an explicit command; nothing archives automatically)
+# Component roots whose selected artifacts `jit archive` may move to the archive
+# mirror (archival is always explicit; nothing archives automatically)
 managed_paths = ["dev/active", "dev/studies", "dev/sessions"]
 
 # Where archived documents go
 archive_root = "dev/archive"
 
-# Paths that never archive (permanent documentation)
+# Paths copied to the archive mirror while their source remains in place
 permanent_paths = ["docs/"]
-
-# Archive category mappings (doc-type → archive subdirectory)
-[documentation.categories]
-design = "features"
-analysis = "bug-fixes"
-refactor = "refactorings"
-session = "sessions"
-study = "studies"
 
 # =============================================================================
 # TYPE HIERARCHY

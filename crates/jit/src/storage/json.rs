@@ -6,7 +6,7 @@
 //! layout). The directory location can be overridden with the `JIT_DATA_DIR`
 //! environment variable.
 
-use crate::domain::{Event, Issue};
+use crate::domain::{Event, EventTag, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
     IssueNotFoundError, IssueStore, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
@@ -868,9 +868,18 @@ impl IssueStore for JsonFileStorage {
             if line.trim().is_empty() {
                 continue;
             }
-            let event: Event =
+            let value: serde_json::Value =
                 serde_json::from_str(&line).context("Failed to deserialize event")?;
-            events.push(event);
+            let event_type = value
+                .as_object()
+                .and_then(|object| object.get("type"))
+                .and_then(serde_json::Value::as_str)
+                .context("Event record is missing a string type")?;
+            if EventTag::ALL.iter().any(|tag| tag.as_str() == event_type) {
+                events.push(
+                    serde_json::from_value(value).context("Failed to deserialize known event")?,
+                );
+            }
         }
 
         Ok(events)
@@ -894,9 +903,16 @@ impl IssueStore for JsonFileStorage {
             if line.trim().is_empty() {
                 continue;
             }
-            match serde_json::from_str::<Event>(line) {
-                Ok(event) => {
-                    if matches!(event, Event::ArtifactArchiveExecuted { .. }) {
+            match serde_json::from_str::<serde_json::Value>(line) {
+                Ok(value) => {
+                    let event_type = value
+                        .as_object()
+                        .and_then(|object| object.get("type"))
+                        .and_then(serde_json::Value::as_str)
+                        .context("Event record is missing a string type")?;
+                    if event_type == "artifact_archive_executed" {
+                        let event = serde_json::from_value::<Event>(value)
+                            .context("Failed to deserialize artifact archive event")?;
                         events.push(event);
                     }
                 }
@@ -1233,6 +1249,41 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp_dir.path());
         (temp_dir, storage)
+    }
+
+    #[test]
+    fn test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records() {
+        let (_temp, storage) = setup_storage();
+        storage.init().unwrap();
+        let known = Event::IssueCreated {
+            id: "known-event".to_string(),
+            issue_id: "issue-id".to_string(),
+            timestamp: chrono::Utc::now(),
+            title: "Known".to_string(),
+            priority: crate::domain::Priority::Normal,
+        };
+        let unknown = concat!(
+            "{\"type\":\"retired_",
+            "event\",\"id\":\"historical\",",
+            "\"timestamp\":\"2025-01-01T00:00:00Z\"}"
+        );
+        fs::write(
+            storage.root.join(EVENTS_FILE),
+            format!("{unknown}\n{}\n", serde_json::to_string(&known).unwrap()),
+        )
+        .unwrap();
+
+        assert_eq!(storage.read_events().unwrap(), vec![known]);
+
+        fs::write(
+            storage.root.join(EVENTS_FILE),
+            "{\"type\":\"issue_created\"}\n",
+        )
+        .unwrap();
+        assert!(storage.read_events().is_err());
+
+        fs::write(storage.root.join(EVENTS_FILE), "{not-json}\n").unwrap();
+        assert!(storage.read_events().is_err());
     }
 
     #[test]

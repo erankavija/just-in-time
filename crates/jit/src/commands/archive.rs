@@ -1468,6 +1468,38 @@ mod tests {
         );
         fs::write(&events_path, format!("{{not-json}}\n{valid_json}\n")).unwrap();
         assert!(executor.storage.read_artifact_archive_events().is_err());
+
+        let retired_document_event = concat!(
+            "{\"type\":\"document_",
+            "archived\",\"id\":\"historical\",",
+            "\"timestamp\":\"2025-01-01T00:00:00Z\",",
+            "\"source\":\"dev/old.md\",\"destination\":\"dev/archive/old.md\",",
+            "\"category\":\"design\",\"issues_updated\":1}"
+        );
+        fs::write(
+            &events_path,
+            format!("{retired_document_event}\n{valid_json}\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            executor
+                .storage
+                .read_artifact_archive_events()
+                .unwrap()
+                .len(),
+            1,
+            "unrelated historical event variants must not block archive recovery"
+        );
+
+        fs::write(
+            &events_path,
+            format!("{{\"type\":\"artifact_archive_executed\"}}\n{valid_json}\n"),
+        )
+        .unwrap();
+        assert!(executor.storage.read_artifact_archive_events().is_err());
+
+        fs::write(&events_path, format!("{{}}\n{valid_json}\n")).unwrap();
+        assert!(executor.storage.read_artifact_archive_events().is_err());
     }
 
     #[test]

@@ -291,6 +291,15 @@ await runTest('generateTools matches real schema without errors', () => {
   }
 });
 
+await runTest('real schema exposes only dependency-aware archive tools', () => {
+  const names = new Set(generateTools(realSchema).map(tool => tool.name));
+  const retiredTool = ['jit_doc', 'archive'].join('_');
+  assert.ok(!names.has(retiredTool), 'retired document archive tool must not be generated');
+  for (const name of ['jit_archive_document', 'jit_archive_container', 'jit_archive_candidates']) {
+    assert.ok(names.has(name), `replacement archive tool must remain generated: ${name}`);
+  }
+});
+
 await runTest('curation manifest decides every generated tool exactly once', () => {
 
   const { uncurated, stale } = curationCoverage(realSchema);

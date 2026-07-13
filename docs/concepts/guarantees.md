@@ -178,7 +178,7 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 ✅ Dependency management  
 ✅ Quality gates (automated and manual)  
 ✅ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`)  
-✅ `jit doc archive` (subject to the repository's documentation configuration and archive checks)<br>
+✅ `jit archive document` / `jit archive container` (subject to the repository's documentation policy and archive checks)<br>
 ✅ Event logging and queries  
 ✅ Status and visualization  
 
@@ -194,9 +194,9 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 When git is unavailable:
 
 - **Document operations:** Fall back to working tree only
-- **Filesystem-backed documents:** `jit doc add`, `jit doc list`, `jit doc archive`,
-  and `jit doc show` without a commit reference remain available; history, diff,
-  and commit-specific reads require git
+- **Filesystem-backed documents:** `jit doc add`, `jit doc list`, dependency-aware
+  `jit archive`, and `jit doc show` without a commit reference remain available;
+  history, diff, and commit-specific reads require git
 - **Snapshot export:** Export from current working tree
 - **History commands:** Return error with helpful message
 - **Advisory leases:** Fail outright with `ClaimRequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative

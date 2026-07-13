@@ -36,8 +36,6 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
 | `issue batch-create` | `10` | A write failed after some issues were already created. |  |
 | `snapshot export` | `6` | The snapshot output path already exists. |  |
-| `doc archive` | `3` | The source document to archive does not exist. |  |
-| `doc archive` | `6` | The archive destination path is already occupied. |  |
 | `claim` | `10` | A lease subcommand was run outside a git repository (leases require git for worktree identity). |  |
 | `gate evaluate, gate evaluate-all` | `4` | A checker ran and its verdict was fail. | yes |
 | `gate evaluate, gate evaluate-all` | `10` | A checker could not run to a verdict (timeout, crash, or command not found). | yes |

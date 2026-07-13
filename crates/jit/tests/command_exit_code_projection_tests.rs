@@ -643,72 +643,6 @@ fn test_command_exit_codes_batch_create_prevalidation_emits_2() {
     documented_row("issue batch-create", Some(2), false);
 }
 
-/// Enable `[documentation]` so `jit doc archive` can resolve an archive
-/// destination, and return the managed source path it archives from.
-fn enable_doc_archive(temp: &TempDir) -> std::path::PathBuf {
-    let config = temp.path().join(".jit/config.toml");
-    let mut toml = fs::read_to_string(&config).unwrap();
-    toml.push_str(
-        "\n[documentation]\ndevelopment_root = \"dev\"\n\
-         archive_root = \"dev/archive\"\n\
-         [documentation.categories]\nsession = \"sessions\"\n",
-    );
-    fs::write(&config, toml).unwrap();
-    fs::create_dir_all(temp.path().join("dev/active")).unwrap();
-    temp.path().join("dev/active/note.md")
-}
-
-/// `jit doc archive` exits 3 when the source is missing and 6 when the archive
-/// destination is occupied — matching the two `doc archive` rows.
-#[test]
-fn test_command_exit_codes_doc_archive_emits_3_and_6() {
-    let temp = setup();
-    let source = enable_doc_archive(&temp);
-
-    // Missing source -> 3.
-    let missing = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args([
-            "doc",
-            "archive",
-            "dev/active/absent.md",
-            "--type",
-            "session",
-        ])
-        .output()
-        .unwrap();
-    assert_eq!(
-        missing.status.code(),
-        Some(3),
-        "stderr: {}",
-        String::from_utf8_lossy(&missing.stderr)
-    );
-    documented_row("doc archive", Some(3), false);
-
-    // Archive once, recreate the source, archive again -> destination occupied -> 6.
-    fs::write(&source, "# Note\n").unwrap();
-    assert!(Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "archive", "dev/active/note.md", "--type", "session"])
-        .status()
-        .unwrap()
-        .success());
-    fs::write(&source, "# Note, again\n").unwrap();
-
-    let occupied = Command::new(jit_binary())
-        .current_dir(&temp)
-        .args(["doc", "archive", "dev/active/note.md", "--type", "session"])
-        .output()
-        .unwrap();
-    assert_eq!(
-        occupied.status.code(),
-        Some(6),
-        "stderr: {}",
-        String::from_utf8_lossy(&occupied.stderr)
-    );
-    documented_row("doc archive", Some(6), false);
-}
-
 /// `jit snapshot export` exits 6 when the output path is already occupied —
 /// matching `snapshot export`/6.
 #[test]
@@ -778,8 +712,6 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("gate define", Some(6)),
         ("issue batch-create", Some(2)),
         ("snapshot export", Some(6)),
-        ("doc archive", Some(3)),
-        ("doc archive", Some(6)),
         ("claim", Some(10)),
         ("validate", Some(4)),
         ("validate", Some(1)),

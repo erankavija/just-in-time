@@ -277,7 +277,6 @@ source-of-truth = "registry-first"
 # managed_paths = ["dev/active", "dev/sessions"]
 # permanent_paths = ["docs/"]         # never archived
 # archive_root = "dev/archive"
-# [documentation.categories]          # doc-type → archive subdirectory
 # design = "features"
 # session = "sessions"
 

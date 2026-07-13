@@ -1,5 +1,10 @@
 # Implementation Guide: jit doc archive with assets
 
+> **Historical and superseded.** This pre-replacement implementation guide
+> records the retired category-based archival design. It is not a current CLI,
+> configuration, or contributor contract; use `jit archive document|container`
+> and the live reference documentation instead.
+
 **Issue:** 896ff7df-e5b0-48b6-a3b0-a5745ff683b7  
 **Task:** Implement jit doc archive with assets  
 **Status:** Ready to start (dependency check-links completed)  

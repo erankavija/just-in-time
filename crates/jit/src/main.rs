@@ -210,15 +210,6 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         };
     }
 
-    // Archive command errors are typed: a missing source document is a not-found
-    // condition (3); an occupied destination is already-exists (6).
-    if let Some(archive_error) = error.downcast_ref::<jit::commands::ArchiveError>() {
-        return match archive_error {
-            jit::commands::ArchiveError::SourceMissing { .. } => ExitCode::NotFound,
-            jit::commands::ArchiveError::DestinationOccupied { .. } => ExitCode::AlreadyExists,
-        };
-    }
-
     // A missing/unreadable plan document is a not-found condition (3); a missing
     // content-parser cargo feature is a generic failure.
     if let Some(plan_error) = error.downcast_ref::<jit::commands::plan_doc::PlanDocError>() {
@@ -4841,57 +4832,6 @@ fn run() -> Result<()> {
 
                 std::process::exit(result.exit_code);
             }
-            DocCommands::Archive {
-                path,
-                category,
-                dry_run,
-                force,
-                json,
-            } => {
-                use jit::output::JsonOutput;
-
-                let output_ctx = OutputContext::new(quiet, json);
-                let (result, warnings) =
-                    executor.archive_document(&path, &category, dry_run, force)?;
-
-                // Print warnings
-                for warning in warnings {
-                    output_ctx.print_warning(&warning)?;
-                }
-
-                if json {
-                    let msg = if result.dry_run {
-                        "Archival plan (dry run)".to_string()
-                    } else {
-                        format!("Archived {} to {}", result.source_path, result.dest_path)
-                    };
-                    let output = JsonOutput::success(result, "doc archive").with_message(msg);
-                    println!("{}", output.to_json_string()?);
-                } else if result.dry_run {
-                    println!("✓ Archival plan (--dry-run)\n");
-                    println!("  Document:");
-                    println!("    📄 {}", result.source_path);
-                    println!("       → {}", result.dest_path);
-                    println!("\n  Category: {}", result.category);
-
-                    if result.assets_moved > 0 {
-                        println!("\n  Assets to move: {}", result.assets_moved);
-                    } else {
-                        println!("\n  No per-doc assets found");
-                    }
-
-                    println!("\n  Run without --dry-run to execute.");
-                } else {
-                    println!("✓ Archived successfully");
-                    println!("  {} → {}", result.source_path, result.dest_path);
-                    if result.assets_moved > 0 {
-                        println!("  Moved {} asset(s)", result.assets_moved);
-                    }
-                    if !result.updated_issues.is_empty() {
-                        println!("  Updated {} issue(s)", result.updated_issues.len());
-                    }
-                }
-            }
         },
         Commands::Archive(archive_cmd) => match archive_cmd {
             ArchiveCommands::Candidates { json } => {
@@ -7519,22 +7459,6 @@ mod exit_code_projection_tests {
                 .into(),
                 10,
                 "issue batch-create",
-            ),
-            (
-                jit::commands::ArchiveError::SourceMissing {
-                    path: "dev/active/missing.md".to_string(),
-                }
-                .into(),
-                3,
-                "doc archive",
-            ),
-            (
-                jit::commands::ArchiveError::DestinationOccupied {
-                    path: "dev/archive/sessions/note.md".to_string(),
-                }
-                .into(),
-                6,
-                "doc archive",
             ),
             (
                 jit::errors::ClaimRequiresGitError::new(

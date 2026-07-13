@@ -92,8 +92,6 @@ pub enum EventTag {
     IssueReleased,
     /// `issue_updated`
     IssueUpdated,
-    /// `document_archived`
-    DocumentArchived,
     /// `artifact_archive_executed`
     ArtifactArchiveExecuted,
     /// `dependency_reduced`
@@ -119,7 +117,7 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 21] = [
+    pub const ALL: [EventTag; 20] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -131,7 +129,6 @@ impl EventTag {
         EventTag::IssueDeleted,
         EventTag::IssueReleased,
         EventTag::IssueUpdated,
-        EventTag::DocumentArchived,
         EventTag::ArtifactArchiveExecuted,
         EventTag::DependencyReduced,
         EventTag::LocalRuleBypassed,
@@ -157,7 +154,6 @@ impl EventTag {
             EventTag::IssueDeleted => "issue_deleted",
             EventTag::IssueReleased => "issue_released",
             EventTag::IssueUpdated => "issue_updated",
-            EventTag::DocumentArchived => "document_archived",
             EventTag::ArtifactArchiveExecuted => "artifact_archive_executed",
             EventTag::DependencyReduced => "dependency_reduced",
             EventTag::LocalRuleBypassed => "local_rule_bypassed",
@@ -191,9 +187,9 @@ impl EventTag {
             EventTag::GateDefinitionUpdated
             | EventTag::GateDefinitionCreated
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
-            EventTag::DocumentArchived
-            | EventTag::ArtifactArchiveExecuted
-            | EventTag::LifecycleTimestampsBackfilled => EventScope::Repository,
+            EventTag::ArtifactArchiveExecuted | EventTag::LifecycleTimestampsBackfilled => {
+                EventScope::Repository
+            }
         }
     }
 
@@ -218,11 +214,6 @@ impl EventTag {
             }
             EventTag::IssueUpdated => {
                 "An issue's fields were updated; the record names the changed fields."
-            }
-            EventTag::DocumentArchived => {
-                "`jit doc archive` moved a document into the archive; the record carries the \
-                 source, the destination, the archive category, and the number of issues \
-                 whose references it re-pointed."
             }
             EventTag::ArtifactArchiveExecuted => {
                 "`jit archive ... --execute` durably recorded publications, exact reference \
@@ -341,14 +332,6 @@ impl EventTag {
                 updated_by: "agent:worker-1".to_string(),
                 fields: vec!["priority".to_string()],
             },
-            EventTag::DocumentArchived => Event::DocumentArchived {
-                id,
-                timestamp,
-                source: "dev/plan.md".to_string(),
-                destination: "dev/archive/plan.md".to_string(),
-                category: "plan".to_string(),
-                issues_updated: 1,
-            },
             EventTag::ArtifactArchiveExecuted => Event::ArtifactArchiveExecuted {
                 id,
                 timestamp,
@@ -433,7 +416,6 @@ impl Event {
             Event::IssueDeleted { .. } => EventTag::IssueDeleted,
             Event::IssueReleased { .. } => EventTag::IssueReleased,
             Event::IssueUpdated { .. } => EventTag::IssueUpdated,
-            Event::DocumentArchived { .. } => EventTag::DocumentArchived,
             Event::ArtifactArchiveExecuted { .. } => EventTag::ArtifactArchiveExecuted,
             Event::DependencyReduced { .. } => EventTag::DependencyReduced,
             Event::LocalRuleBypassed { .. } => EventTag::LocalRuleBypassed,
@@ -733,7 +715,7 @@ mod tests {
         }
     }
 
-    /// REQ-02: the records without an `issue_id` are exactly the two archive records,
+    /// REQ-02: the records without an `issue_id` are exactly the archive execution record,
     /// the three gate-definition registry edits, and
     /// `lifecycle_timestamps_backfilled`. Asserted as a set equality, so a tag
     /// that joins or leaves the no-issue set fails here.
@@ -749,7 +731,6 @@ mod tests {
             no_issue,
             BTreeSet::from([
                 "artifact_archive_executed",
-                "document_archived",
                 "gate_definition_created",
                 "gate_definition_removed",
                 "gate_definition_updated",

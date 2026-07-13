@@ -1182,21 +1182,6 @@ pub enum Event {
         /// Reason for release
         reason: String,
     },
-    /// Document was archived
-    DocumentArchived {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
-        /// Source path
-        source: String,
-        /// Destination path
-        destination: String,
-        /// Archive category
-        category: String,
-        /// Number of issues updated
-        issues_updated: usize,
-    },
     /// A dependency-aware archive execution reached its durable commit point.
     ArtifactArchiveExecuted {
         /// Event ID.
@@ -1305,7 +1290,7 @@ pub enum Event {
     },
     /// A gate definition in the registry was edited (`jit gate update`).
     ///
-    /// Registry-scoped, like [`Event::DocumentArchived`]: it carries no issue id
+    /// Registry-scoped: it carries no issue id
     /// because it mutates the shared gate registry rather than a single issue.
     GateDefinitionUpdated {
         /// Event ID
@@ -1344,7 +1329,7 @@ pub enum Event {
     /// The one-time lifecycle-timestamp backfill migration ran
     /// (`jit migrate lifecycle-timestamps`).
     ///
-    /// Repository-scoped, like [`Event::DocumentArchived`]: it carries no issue
+    /// Repository-scoped, like [`Event::ArtifactArchiveExecuted`]: it carries no issue
     /// id because it records a whole-repository migration rather than a single
     /// issue's change. `issues_updated` is the number of issue files the run
     /// wrote (issues that gained at least one derived timestamp); a re-run over an
@@ -1476,23 +1461,6 @@ impl Event {
         }
     }
 
-    /// Create a document archived event
-    pub fn new_document_archived(
-        source: String,
-        destination: String,
-        category: String,
-        issues_updated: usize,
-    ) -> Self {
-        Event::DocumentArchived {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
-            source,
-            destination,
-            category,
-            issues_updated,
-        }
-    }
-
     /// Create the durable commit record for dependency-aware archival.
     pub fn new_artifact_archive_executed(
         target: crate::domain::artifact_plan::PlanTarget,
@@ -1599,8 +1567,7 @@ impl Event {
 
     /// Create a gate-definition-updated event.
     ///
-    /// Registry-scoped (issue-less, like
-    /// [`new_document_archived`](Self::new_document_archived)): records that the
+    /// Registry-scoped (issue-less): records that the
     /// gate registry entry `gate_key` was edited via `jit gate update`.
     pub fn new_gate_definition_updated(gate_key: String) -> Self {
         Event::GateDefinitionUpdated {
@@ -1662,7 +1629,6 @@ impl Event {
             Event::IssueDeleted { issue_id, .. } => issue_id,
             Event::IssueReleased { issue_id, .. } => issue_id,
             Event::IssueUpdated { issue_id, .. } => issue_id,
-            Event::DocumentArchived { .. } => "", // No associated issue
             Event::ArtifactArchiveExecuted { .. } => "", // Repository-scoped
             Event::DependencyReduced { issue_id, .. } => issue_id,
             Event::LocalRuleBypassed { issue_id, .. } => issue_id,

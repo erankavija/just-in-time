@@ -56,6 +56,35 @@ fn test_schema_has_all_commands() {
 }
 
 #[test]
+fn test_schema_exposes_only_dependency_aware_archive_family() {
+    let output = cmd!().arg("--schema").output().unwrap();
+    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+
+    let document_commands = parsed["commands"]["doc"]["subcommands"]
+        .as_object()
+        .unwrap();
+    assert!(
+        !document_commands.contains_key("archive"),
+        "the retired document subcommand must not remain in the schema"
+    );
+
+    let archive_commands = parsed["commands"]["archive"]["subcommands"]
+        .as_object()
+        .unwrap();
+    assert_eq!(
+        archive_commands
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>(),
+        std::collections::BTreeSet::from([
+            "candidates".to_string(),
+            "container".to_string(),
+            "document".to_string(),
+        ])
+    );
+}
+
+#[test]
 fn test_schema_issue_create_details() {
     let output = cmd!().arg("--schema").output().unwrap();
     let json_str = String::from_utf8(output.stdout).unwrap();

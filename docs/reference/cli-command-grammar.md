@@ -151,9 +151,9 @@ of its human label `--label` (`-l`), and its type selector is `--doc-type`,
 long-only, so `-t` stays free of it.
 
 **Type selectors are long-only.** Every type-selecting flag is spelled without a
-short flag: `issue create` and `issue update` take `--type`, `doc add` takes
-`--doc-type`, and `doc archive` takes `--type`. Keeping type selectors long-only
-is what makes `-t` unambiguously `--title` across the whole CLI.
+short flag: `issue create` and `issue update` take `--type`, while `doc add`
+takes `--doc-type`. Keeping type selectors long-only is what makes `-t`
+unambiguously `--title` across the whole CLI.
 
 ### Other short flags governed by the same rule
 

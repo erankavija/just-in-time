@@ -260,43 +260,28 @@ For automation and scripting:
 
 ## Integration with Archival Workflow
 
-### Automated Archival
-
-The `jit doc archive` command integrates validation:
+The dependency-aware archive family previews a complete artifact plan before it
+mutates the repository:
 
 ```bash
-# Validate and archive in one operation
-jit doc archive dev/active/feature-x.md --type features
+# Preview one document and its statically reachable bundle
+jit archive document dev/active/feature-x.md
 
-# Preview without executing
-jit doc archive dev/active/feature-x.md --type features --dry-run
+# Execute only when the recomputed plan is eligible
+jit archive document dev/active/feature-x.md --execute
 
-# Force archival despite warnings
-jit doc archive dev/active/feature-x.md --type features --force
+# Evaluate all artifacts owned by a terminal container
+jit archive container <container-id>
 ```
 
-**Archival process:**
-1. Validates links automatically (`check-links`)
-2. Fails if errors found (exit code 1)
-3. Warns if risky patterns detected (exit code 2)
-4. Co-moves per-doc assets with documents
-5. Updates issue metadata with new paths
-6. Preserves shared assets in original location
-
-### Archive Categories
-
-Categories are configured in `.jit/config.toml`:
-
-```toml
-[documentation.categories]
-features = "Feature designs and implementation plans"
-bug-fixes = "Bug analyses and resolutions"
-refactorings = "Code improvement documentation"
-studies = "Research and investigations"
-sessions = "Development session notes"
-```
-
-Categories are domain-agnostic and can be customized per project.
+The planner discovers supported Markdown, HTML, and CSS dependencies, classifies
+move/copy/retain decisions from reference ownership, and reports blockers and
+warnings. Destinations always mirror repository-relative source paths below the
+configured `archive_root`; archival has no category input. Execution rechecks
+the plan under the repository write guard, publishes without overwriting,
+updates exact issue references, records the durable archive event, and only then
+attempts identity-guarded source deletion. Permanent-path artifacts are copied
+to the mirror and retained at their source.
 
 ## Examples
 
@@ -403,7 +388,8 @@ Use issue-scoped validation when archiving specific features or epics.
 1. **Validate links:** `jit doc check-links --scope issue:<id>`
 2. **Fix errors** if exit code 1
 3. **Review warnings** if exit code 2
-4. **Archive with confidence:** `jit doc archive <path> --type <category>`
+4. **Review the plan:** `jit archive document <path> --json`
+5. **Execute an eligible plan:** `jit archive document <path> --execute`
 
 ### CI/CD Integration
 

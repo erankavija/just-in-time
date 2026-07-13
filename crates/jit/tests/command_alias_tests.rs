@@ -96,6 +96,27 @@ fn test_document_alias_behaves_like_doc_list() {
 }
 
 #[test]
+fn test_retired_document_archive_has_no_alias_or_stub() {
+    let temp = setup_test_repo();
+    let output = Command::new(jit_binary())
+        .args(["doc", "archive", "dev/active/old.md"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unrecognized subcommand 'archive'"),
+        "{stderr}"
+    );
+    assert!(
+        !stderr.contains("jit archive document"),
+        "the clean cut must not retain a migration hint or compatibility stub: {stderr}"
+    );
+}
+
+#[test]
 fn test_add_label_alias_on_issue_update() {
     let temp = setup_test_repo();
     let jit = jit_binary();

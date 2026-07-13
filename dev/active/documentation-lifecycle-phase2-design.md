@@ -1,5 +1,9 @@
 # Documentation Lifecycle Phase 2: Ergonomics & Automation
 
+> **Historical and superseded.** The command examples below describe an earlier
+> archival proposal and are not a current CLI contract. Use the dependency-aware
+> `jit archive` reference in `docs/reference/cli-commands.md`.
+
 ## Overview
 
 Phase 2 builds on the asset management foundations from Phase 1, adding automation, link rewriting, and quality-of-life improvements. This phase transforms the documentation lifecycle from a manual process requiring careful validation into a streamlined, automated system that handles common scenarios with minimal user intervention.

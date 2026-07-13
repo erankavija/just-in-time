@@ -126,7 +126,6 @@ fn test_policy_status_preserves_three_explicitness_states() {
         managed_paths: Some(vec!["dev/active".to_string()]),
         archive_root: None,
         permanent_paths: Some(vec!["docs".to_string()]),
-        categories: None,
     };
     assert_eq!(
         PolicyStatus::from_documentation(Some(&partial)),

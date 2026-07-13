@@ -321,10 +321,9 @@ pub struct DocumentationConfig {
     pub managed_paths: Option<Vec<String>>,
     /// Where archived docs are stored (default: "dev/archive").
     pub archive_root: Option<String>,
-    /// Paths that never archive (default: ["docs/"]).
+    /// Paths whose artifacts archive by copy while the source is retained
+    /// (default: ["docs/"]).
     pub permanent_paths: Option<Vec<String>>,
-    /// Archive category mappings (e.g., design -> features).
-    pub categories: Option<HashMap<String, String>>,
 }
 
 impl DocumentationConfig {
@@ -358,11 +357,6 @@ impl DocumentationConfig {
         self.permanent_paths
             .clone()
             .unwrap_or_else(|| vec!["docs/".to_string()])
-    }
-
-    /// Get category mapping (key: category ID, value: archive subdirectory).
-    pub fn categories(&self) -> HashMap<String, String> {
-        self.categories.clone().unwrap_or_default()
     }
 }
 

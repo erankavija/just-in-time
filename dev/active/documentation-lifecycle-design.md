@@ -1,5 +1,10 @@
 # Documentation Lifecycle and Knowledge Capture — Design Plan
 
+> **Historical and superseded.** This early design records proposals for the
+> retired category-based archival workflow. It is not normative; the current
+> dependency-aware mirror policy and command surface are documented in
+> `docs/reference/cli-commands.md` and `docs/reference/configuration.md`.
+
 **Note:** This design was created before the documentation reorganization (Issue 165cf162). References to paths have been updated to reflect the current implementation.
 
 This document consolidates and extends the existing strategy for documentation lifecycle management in JIT, adds first‑class support for binary assets, and generalizes document processing so projects are not limited to Markdown.

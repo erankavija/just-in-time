@@ -237,7 +237,6 @@ impl CommandSchema {
             "config_show",
             "config_show-hierarchy",
             "config_validate",
-            "doc_archive",
             "doc_assets_list",
             "doc_check-links",
             "doc_diff",
@@ -755,18 +754,6 @@ impl CommandSchema {
                 "snapshot export",
                 6,
                 "The snapshot output path already exists.",
-                false,
-            ),
-            row(
-                "doc archive",
-                3,
-                "The source document to archive does not exist.",
-                false,
-            ),
-            row(
-                "doc archive",
-                6,
-                "The archive destination path is already occupied.",
                 false,
             ),
             row(

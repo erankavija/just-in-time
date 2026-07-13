@@ -159,9 +159,9 @@ Source: `crates/jit/src/schema.rs:520-556`; `crates/jit/src/main.rs:33-247`;
 - **Recommended filing:** `type:task`, priority `normal`
 - **Labels:** `type:task`, `epic:documentation-contract-followups`, `milestone:v1.0`, `component:core`
 - **Verified source citations:**
-  - `crates/jit/src/domain/types.rs:1305-1581` declares the serialized event
-    variants and makes clear that `DocumentArchived`, gate-definition events,
-    and lifecycle-timestamp backfill omit `issue_id`.
+  - `crates/jit/src/domain/types.rs` declares the serialized event variants and
+    makes clear that `ArtifactArchiveExecuted`, gate-definition events, and
+    lifecycle-timestamp backfill omit `issue_id`.
   - `crates/jit/src/domain/types.rs:1981-2031` is the exact tag catalog and
     maps the no-issue variants to an empty association.
   - `crates/jit/src/storage/json.rs:735-775` serializes and reads the event
@@ -191,9 +191,9 @@ Source: `crates/jit/src/domain/types.rs:1305-1581,1981-2031` and
 - [hard] REQ-01: The projection lists every currently emitted event tag and
   identifies its source-defined association scope (issue, registry, or
   repository), including whether an `issue_id` field is present.
-- [hard] REQ-02: The no-issue event set includes `document_archived`, the three
-  gate-definition tags, and `lifecycle_timestamps_backfilled`, and no
-  issue-scoped event is mislabeled.
+- [hard] REQ-02: The no-issue event set includes
+  `artifact_archive_executed`, the three gate-definition tags, and
+  `lifecycle_timestamps_backfilled`, and no issue-scoped event is mislabeled.
 - [hard] REQ-03: Automated coverage makes additions or changes to the `Event`
   enum fail until the projected catalog is updated or regenerated.
 

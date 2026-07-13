@@ -1,5 +1,9 @@
 # Configuration Consolidation Plan
 
+> **Historical and superseded where it discusses archive categories.** The
+> category table recorded below was retired with the old archival workflow and
+> is not part of the current configuration contract.
+
 **Status**: Active  
 **Epic**: Production Stability  
 **Category**: Design  

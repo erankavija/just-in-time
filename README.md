@@ -188,7 +188,8 @@ Preserve context and decisions alongside issues.
 jit doc add <issue> design.md --label "Design Document"
 jit doc list <issue>                          # discover linked context
 jit doc check-links --scope issue:<issue>     # validate references
-jit doc archive <managed-document> --type <configured-category>  # safe archival with assets
+jit archive document <managed-document>       # dependency-aware archival preview
+jit archive document <managed-document> --execute  # execute an eligible plan
 ```
 
 Agents discover context from previous work, understand design decisions, and maintain institutional knowledge without external systems. See the [Document Commands Reference](docs/reference/cli-commands.md#document-commands).
@@ -222,7 +223,7 @@ JIT is configurable via `.jit/config.toml`:
 - **Issue hierarchies**: Type levels (e.g. milestone → epic → story → task) drive strategic queries and hierarchy resolution
 - **Validation rules**: Enforce or relax organizational requirements
 - **Gates and templates**: Gate registry (`gates.toml`) and graph templates (`templates.toml`) live beside the config
-- **Documentation lifecycle**: Archival paths and categories
+- **Documentation lifecycle**: Managed, permanent, and archive-mirror paths
 
 ```toml
 [version]
