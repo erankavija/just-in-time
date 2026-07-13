@@ -105,8 +105,8 @@ pub fn parse_artifact(path: &str, bytes: &[u8]) -> ParsedArtifact {
         Some("css") => css_references(&text),
         _ => Vec::new(),
     };
-    let dynamic_loading_suspected =
-        matches!(format, Some("html" | "javascript")) && suspects_dynamic_loading(&text);
+    let dynamic_loading_suspected = matches!(format, Some("markdown" | "html" | "javascript"))
+        && suspects_dynamic_loading(&text);
 
     ParsedArtifact {
         format,
@@ -273,7 +273,10 @@ fn suspects_dynamic_loading(content: &str) -> bool {
     static WORKER_WITH_LOCAL_PATH: LazyLock<Option<Regex>> =
         LazyLock::new(|| Regex::new(r#"(?i)\bnew\s+Worker\s*\(\s*["'](?:\.{1,2}/|/)[^"']+"#).ok());
     static STATIC_MODULE: LazyLock<Option<Regex>> = LazyLock::new(|| {
-        Regex::new(r#"(?im)\b(?:import|export)\b[^;\n]*\bfrom\s*["']\.{1,2}/[^"']+["']"#).ok()
+        Regex::new(
+            r#"(?im)\b(?:import\s*(?:["'](?:\.{1,2}/|/)[^"']+["']|[^;\n]*\bfrom\s*["'](?:\.{1,2}/|/)[^"']+["'])|export\b[^;\n]*\bfrom\s*["'](?:\.{1,2}/|/)[^"']+["'])"#,
+        )
+        .ok()
     });
     static DATA_ATTRIBUTE: LazyLock<Option<Regex>> = LazyLock::new(|| {
         Regex::new(

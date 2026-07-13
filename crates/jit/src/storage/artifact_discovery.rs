@@ -93,6 +93,8 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
         .collect::<BTreeMap<_, _>>();
     let explicit_paths = working.keys().cloned().collect::<BTreeSet<_>>();
     let mut graph = DiscoveryGraph::new(explicit_paths.iter().cloned());
+    let mut referencing_paths = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut missing_paths = BTreeSet::<String>::new();
 
     while let Some(path) = graph.next_path() {
         let bytes = match storage.read_path_bytes(&path, None) {
@@ -107,10 +109,17 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
                         PlanBlocker::new(BlockerCode::MissingSource, Some(&path)),
                     )?;
                 } else {
-                    append_warning(
-                        entry,
-                        PlanWarning::new(WarningCode::MissingEdgeTarget, Some(&path)),
-                    )?;
+                    missing_paths.insert(path.clone());
+                    let parents = referencing_paths.get(&path).cloned().unwrap_or_default();
+                    for parent in parents {
+                        let parent_entry = working.get_mut(&parent).ok_or_else(|| {
+                            ArtifactDiscoveryError::MissingGraphEntry(parent.clone())
+                        })?;
+                        append_warning(
+                            parent_entry,
+                            PlanWarning::new(WarningCode::MissingEdgeTarget, Some(&path)),
+                        )?;
+                    }
                 }
                 continue;
             }
@@ -153,6 +162,16 @@ pub fn discover_artifact_dependencies<S: IssueStore>(
                 }
                 ReferenceResolution::Local { edge, target } => {
                     edges.push(edge);
+                    referencing_paths
+                        .entry(target.clone())
+                        .or_default()
+                        .insert(path.clone());
+                    if missing_paths.contains(&target) {
+                        entry_warnings.push(PlanWarning::new(
+                            WarningCode::MissingEdgeTarget,
+                            Some(&target),
+                        ));
+                    }
                     if !working.contains_key(&target) {
                         working.insert(
                             target.clone(),

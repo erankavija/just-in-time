@@ -205,10 +205,20 @@ fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
         .iter()
         .find(|entry| entry.source() == "docs/missing.png")
         .unwrap();
-    assert!(missing
+    assert!(root.warnings().iter().any(|warning| {
+        warning.code == WarningCode::MissingEdgeTarget
+            && warning.path.as_deref() == Some("docs/missing.png")
+    }));
+    assert!(!missing
         .warnings()
         .iter()
         .any(|warning| warning.code == WarningCode::MissingEdgeTarget));
+    assert_eq!(missing.destination(), None);
+    assert!(root.edges().iter().any(|edge| {
+        edge.reference == "missing.png"
+            && edge.target.as_deref() == Some("docs/missing.png")
+            && edge.resolution_mode == EdgeResolutionMode::Relative
+    }));
 }
 
 #[test]
@@ -220,6 +230,11 @@ fn test_every_binding_dynamic_loading_text_pattern_warns_without_blocking() {
         ("runtime/worker.js", "new Worker('./worker.js')"),
         ("runtime/import-scripts.js", "importScripts('./one.js')"),
         ("runtime/static-import.js", "import value from './value.js'"),
+        ("runtime/static-side-effect.js", "import './register.js'"),
+        (
+            "runtime/static-root-side-effect.js",
+            "import '/register.js'",
+        ),
         (
             "runtime/static-export.js",
             "export { value } from './value.js'",
@@ -248,6 +263,40 @@ fn test_every_binding_dynamic_loading_text_pattern_warns_without_blocking() {
             discovered.artifacts().len(),
             1,
             "guessed a target for {path}"
+        );
+    }
+}
+
+#[test]
+fn test_markdown_code_and_prose_dynamic_loading_patterns_warn_textually() {
+    let cases = [
+        (
+            "notes/code-example.md",
+            "```js\nconst payload = fetch('./payload.json');\n```",
+        ),
+        (
+            "notes/prose-example.md",
+            "For local setup, use `import './register.js'` before startup.",
+        ),
+    ];
+
+    for (path, content) in cases {
+        let repo = Repo::new();
+        repo.write(path, content);
+        let discovered = repo.discover(path);
+        let entry = &discovered.artifacts()[0];
+        assert!(
+            entry
+                .warnings()
+                .iter()
+                .any(|warning| warning.code == WarningCode::DynamicLoadingSuspected),
+            "missing textual Markdown warning for {path}: {content}"
+        );
+        assert!(entry.blockers().is_empty(), "pattern blocked {path}");
+        assert_eq!(
+            discovered.artifacts().len(),
+            1,
+            "guessed a target from Markdown text for {path}"
         );
     }
 }
