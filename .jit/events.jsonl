@@ -7011,3 +7011,4 @@
 {"type":"issue_updated","id":"802d5825-012e-48aa-8bc2-fa002bbb8def","issue_id":"f205aa7e-dc5f-4d1f-95c4-ec76cb48538b","timestamp":"2026-07-13T13:56:04.568317869Z","updated_by":"issue-update","fields":["description"]}
 {"type":"issue_updated","id":"549630d7-c1d0-48de-83f7-dbbf5b9bab69","issue_id":"67f4ded1-ee2c-4eb9-9d3c-f83cad7d7485","timestamp":"2026-07-13T13:56:04.608611169Z","updated_by":"issue-update","fields":["description"]}
 {"type":"gate_passed","id":"b443e494-1fcf-4985-9c0d-19540a1856b3","issue_id":"220cca3e-ae58-425e-bbc9-e6b77106918e","timestamp":"2026-07-13T13:56:17.591371279Z","gate_key":"coverage-preview","updated_by":"auto:executor"}
+{"type":"issue_claimed","id":"073b4ffe-edc2-4976-b772-c808665142a6","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T14:14:32.605442697Z","assignee":"agent:jit-execution-lead"}
