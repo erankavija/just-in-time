@@ -7050,3 +7050,5 @@
 {"type":"gate_added","id":"8b817909-54fa-473c-84d8-bfb7c1cc7a9c","issue_id":"7d3a3a47-c03c-473d-b1c2-c89eefcc9bbc","timestamp":"2026-07-13T15:58:38.968334134Z","gate_key":"docs-mechanical"}
 {"type":"gate_passed","id":"a7d730bb-ec1c-409c-b408-9ec1dee6543b","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T16:10:49.228454411Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"95fb89f8-48bb-4876-a8ef-85c1230de934","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T16:14:12.890890700Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6b0c0833-aacd-49c2-8f57-fea84ef1c3e9","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T16:25:36.805084926Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"3bab5023-8452-460d-903d-2fd126ff1d62","issue_id":"971c67f4-4fc6-46cb-be44-4ea0af102bf6","timestamp":"2026-07-13T16:28:57.857166086Z","gate_key":"code-review","updated_by":"auto:executor"}

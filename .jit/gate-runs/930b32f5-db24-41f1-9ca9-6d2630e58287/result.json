@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "930b32f5-db24-41f1-9ca9-6d2630e58287",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "971c67f4-4fc6-46cb-be44-4ea0af102bf6",
+  "commit": "22ceb13a6a17e75fa0ff4bd9feca0ba857ab8d21",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-13T16:25:36.828015792Z",
+  "completed_at": "2026-07-13T16:28:57.856773256Z",
+  "duration_ms": 201028,
+  "exit_code": 1,
+  "stdout": "Attribution: 2f763434 (claim), 45f751f8 (implementation), ca2e97a9 (prior findings), 22ceb13a (follow-up fix)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); issue requirements (markdown-first .jit/issues records; item resolver locking is unavailable read-only)\nGate evidence: cargo-ci passed (exit 0, 2026-07-13T16:21:58Z)\nTruncation recovery: Narrowed caller, plan-model, pinned-contract, and governing-epic reads after truncated broader searches; no relevant omission remained.\n\n1. [blocking][issue-impact] CSS relocated members never receive `dynamic-loading-suspected`: the format gate excludes `css`, so textual matches such as `/* fetch('./payload.json') */` are silently ignored even though CSS is a supported recursively relocated member. `crates/jit/src/domain/artifact_discovery.rs:108`. References: `@/issue/971c67f4/requirement/REQ-02`.\n\n2. [blocking][issue-impact] The `data-*` detector accepts only quoted attributes. Valid local URL-bearing HTML such as `data-src=./payload.json` is not warned, leaving the required complete dynamic-loading pattern set incomplete. `crates/jit/src/domain/artifact_discovery.rs:283`. References: `@/issue/971c67f4/requirement/REQ-02`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two required dynamic-loading warning cases remain undetected.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CSS relocated members are excluded from textual dynamic-loading warnings.\",\"file\":\"crates/jit/src/domain/artifact_discovery.rs\",\"line\":108,\"references\":[\"@/issue/971c67f4/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Unquoted local URL-bearing data-* attributes are not detected.\",\"file\":\"crates/jit/src/domain/artifact_discovery.rs\",\"line\":283,\"references\":[\"@/issue/971c67f4/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5676 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f5c4c-60f8-7b43-b32e-7997176a9496\n--------\nuser\n--- 5663 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two required dynamic-loading warning cases remain undetected.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "CSS relocated members are excluded from textual dynamic-loading warnings.",
+        "file": "crates/jit/src/domain/artifact_discovery.rs",
+        "line": 108,
+        "references": [
+          "@/issue/971c67f4/requirement/REQ-02"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Unquoted local URL-bearing data-* attributes are not detected.",
+        "file": "crates/jit/src/domain/artifact_discovery.rs",
+        "line": 283,
+        "references": [
+          "@/issue/971c67f4/requirement/REQ-02"
+        ]
+      }
+    ]
+  }
+}
