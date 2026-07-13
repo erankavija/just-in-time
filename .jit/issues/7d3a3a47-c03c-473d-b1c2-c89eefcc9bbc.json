@@ -9,9 +9,15 @@
     "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5"
   ],
   "gates_required": [
-    "repo-validate"
+    "repo-validate",
+    "doc-review"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-13T15:57:36.771380965Z"
+    },
     "repo-validate": {
       "status": "pending",
       "updated_by": null,
@@ -42,7 +48,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-11T19:05:24.051555195Z",
-  "updated_at": "2026-07-13T14:14:32.605213997Z",
+  "updated_at": "2026-07-13T15:57:36.771420655Z",
   "first_ready_at": "2026-07-11T19:05:24.051567025Z",
   "claimed_at": "2026-07-13T14:14:32.605213567Z"
 }

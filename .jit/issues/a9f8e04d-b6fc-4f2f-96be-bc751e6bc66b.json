@@ -10,9 +10,16 @@
   ],
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-13T15:57:36.755939694Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -21,6 +28,6 @@
     "satisfies:REQ-05"
   ],
   "created_at": "2026-07-13T00:59:48.566649412Z",
-  "updated_at": "2026-07-13T11:44:01.722863225Z",
+  "updated_at": "2026-07-13T15:57:36.755987994Z",
   "first_ready_at": "2026-07-13T00:59:48.566649832Z"
 }
