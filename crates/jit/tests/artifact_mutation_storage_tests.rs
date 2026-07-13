@@ -46,12 +46,13 @@ fn test_stage_and_verify_use_caller_supplied_identity() {
     fs::create_dir(repo.path().join("docs")).unwrap();
     fs::write(repo.path().join("docs/source.bin"), b"recorded bytes").unwrap();
 
-    let staged = storage.stage_artifact("docs/source.bin").unwrap();
     let recorded = ContentIdentity::from_bytes(b"recorded bytes");
-    storage.verify_staged_artifact(&staged, &recorded).unwrap();
+    let staged = storage.stage_artifact("docs/source.bin").unwrap();
+    storage.verify_staged_artifact(staged, &recorded).unwrap();
 
     let wrong = ContentIdentity::from_bytes(b"different bytes");
-    let error = storage.verify_staged_artifact(&staged, &wrong).unwrap_err();
+    let staged = storage.stage_artifact("docs/source.bin").unwrap();
+    let error = storage.verify_staged_artifact(staged, &wrong).unwrap_err();
     assert!(matches!(
         error.downcast_ref::<ArtifactMutationError>(),
         Some(ArtifactMutationError::IdentityMismatch { .. })
@@ -64,12 +65,14 @@ fn test_publish_staged_artifact_atomically_creates_destination() {
     fs::create_dir(repo.path().join("docs")).unwrap();
     fs::write(repo.path().join("docs/source.md"), b"publish me").unwrap();
 
-    let staged = storage.stage_artifact("docs/source.md").unwrap();
-    storage
-        .verify_staged_artifact(&staged, &ContentIdentity::from_bytes(b"publish me"))
+    let verified = storage
+        .verify_staged_artifact(
+            storage.stage_artifact("docs/source.md").unwrap(),
+            &ContentIdentity::from_bytes(b"publish me"),
+        )
         .unwrap();
     storage
-        .publish_staged_artifact(staged, "archive/nested/source.md")
+        .publish_staged_artifact(verified, "archive/nested/source.md")
         .unwrap();
 
     assert_eq!(
@@ -92,9 +95,14 @@ fn test_publish_rejects_every_occupied_destination_and_preserves_bytes() {
         fs::write(repo.path().join("docs/source.md"), b"staged bytes").unwrap();
         fs::write(repo.path().join("archive/source.md"), occupied_bytes).unwrap();
 
-        let staged = storage.stage_artifact("docs/source.md").unwrap();
+        let verified = storage
+            .verify_staged_artifact(
+                storage.stage_artifact("docs/source.md").unwrap(),
+                &ContentIdentity::from_bytes(b"staged bytes"),
+            )
+            .unwrap();
         let error = storage
-            .publish_staged_artifact(staged, "archive/source.md")
+            .publish_staged_artifact(verified, "archive/source.md")
             .unwrap_err();
 
         assert!(error.downcast_ref::<AlreadyExistsError>().is_some());
@@ -114,20 +122,79 @@ fn test_publish_loses_race_to_external_destination_without_overwrite() {
 
     // Planning/staging observed a free destination. An external writer then
     // occupies it before finalization; publish must not use check-then-rename.
-    let staged = storage.stage_artifact("docs/source.md").unwrap();
-    storage
-        .verify_staged_artifact(&staged, &ContentIdentity::from_bytes(b"planned bytes"))
+    let verified = storage
+        .verify_staged_artifact(
+            storage.stage_artifact("docs/source.md").unwrap(),
+            &ContentIdentity::from_bytes(b"planned bytes"),
+        )
         .unwrap();
     fs::write(repo.path().join("archive/source.md"), b"race winner").unwrap();
 
     let error = storage
-        .publish_staged_artifact(staged, "archive/source.md")
+        .publish_staged_artifact(verified, "archive/source.md")
         .unwrap_err();
     assert!(error.downcast_ref::<AlreadyExistsError>().is_some());
     assert_eq!(
         fs::read(repo.path().join("archive/source.md")).unwrap(),
         b"race winner"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_publish_classifies_occupied_symlink_leaf_as_already_exists() {
+    let (repo, storage) = storage();
+    fs::create_dir_all(repo.path().join("docs")).unwrap();
+    fs::create_dir_all(repo.path().join("archive")).unwrap();
+    fs::write(repo.path().join("docs/source.md"), b"staged bytes").unwrap();
+    fs::write(repo.path().join("archive/target.md"), b"target bytes").unwrap();
+    std::os::unix::fs::symlink("target.md", repo.path().join("archive/source.md")).unwrap();
+
+    let verified = storage
+        .verify_staged_artifact(
+            storage.stage_artifact("docs/source.md").unwrap(),
+            &ContentIdentity::from_bytes(b"staged bytes"),
+        )
+        .unwrap();
+    let error = storage
+        .publish_staged_artifact(verified, "archive/source.md")
+        .unwrap_err();
+
+    assert!(error.downcast_ref::<AlreadyExistsError>().is_some());
+    assert_eq!(
+        fs::read(repo.path().join("archive/target.md")).unwrap(),
+        b"target bytes"
+    );
+    assert!(fs::symlink_metadata(repo.path().join("archive/source.md"))
+        .unwrap()
+        .file_type()
+        .is_symlink());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_publish_rejects_symlinked_parent_before_destination_leaf() {
+    let (repo, storage) = storage();
+    fs::create_dir_all(repo.path().join("docs")).unwrap();
+    fs::create_dir_all(repo.path().join("real-archive")).unwrap();
+    fs::write(repo.path().join("docs/source.md"), b"staged bytes").unwrap();
+    std::os::unix::fs::symlink("real-archive", repo.path().join("archive")).unwrap();
+
+    let verified = storage
+        .verify_staged_artifact(
+            storage.stage_artifact("docs/source.md").unwrap(),
+            &ContentIdentity::from_bytes(b"staged bytes"),
+        )
+        .unwrap();
+    let error = storage
+        .publish_staged_artifact(verified, "archive/source.md")
+        .unwrap_err();
+
+    assert!(matches!(
+        error.downcast_ref::<ArtifactMutationError>(),
+        Some(ArtifactMutationError::SymlinkArtifact { .. })
+    ));
+    assert!(!repo.path().join("real-archive/source.md").exists());
 }
 
 #[test]

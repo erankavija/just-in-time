@@ -36,7 +36,7 @@ pub mod worktree_identity;
 pub mod worktree_paths;
 
 // Re-export for convenience
-pub use artifact_mutation::{ArtifactMutationError, StagedArtifact};
+pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{

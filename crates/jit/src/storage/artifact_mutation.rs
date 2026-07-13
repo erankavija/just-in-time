@@ -30,6 +30,17 @@ impl Drop for StagedArtifact {
     }
 }
 
+/// A staging file whose completed bytes matched a recorded content identity.
+///
+/// Values can only be produced by
+/// [`JsonFileStorage::verify_staged_artifact`], making verification a required
+/// type-state transition before publication. Dropping the handle removes the
+/// unpublished stage file best-effort through its owned staging handle.
+#[derive(Debug)]
+pub struct VerifiedArtifact {
+    staged: StagedArtifact,
+}
+
 /// Typed failures specific to storage-owned artifact mutations.
 #[derive(Debug, thiserror::Error)]
 pub enum ArtifactMutationError {
@@ -169,15 +180,18 @@ impl JsonFileStorage {
 
     /// Verify completed staged bytes against a caller-supplied recorded identity.
     ///
-    /// A mismatch is typed and leaves the stage available for caller diagnostics
-    /// until its handle is dropped.
+    /// A successful check consumes the staging handle and returns the only
+    /// capability accepted by [`JsonFileStorage::publish_staged_artifact`]. A
+    /// mismatch is typed and removes the failed stage best-effort when the
+    /// consumed handle is dropped.
     pub fn verify_staged_artifact(
         &self,
-        staged: &StagedArtifact,
+        staged: StagedArtifact,
         expected: &ContentIdentity,
-    ) -> Result<()> {
-        ensure_stage_belongs_to_storage(self, staged)?;
-        verify_path_identity(&staged.path, expected)
+    ) -> Result<VerifiedArtifact> {
+        ensure_stage_belongs_to_storage(self, &staged)?;
+        verify_path_identity(&staged.path, expected)?;
+        Ok(VerifiedArtifact { staged })
     }
 
     /// Atomically publish a verified stage without replacing any destination.
@@ -188,9 +202,14 @@ impl JsonFileStorage {
     /// bytes, returns [`AlreadyExistsError`]. A destination on another
     /// filesystem returns [`ArtifactMutationError::CrossFilesystem`] naming
     /// both paths; there is no copy fallback.
-    pub fn publish_staged_artifact(&self, staged: StagedArtifact, destination: &str) -> Result<()> {
+    pub fn publish_staged_artifact(
+        &self,
+        verified: VerifiedArtifact,
+        destination: &str,
+    ) -> Result<()> {
+        let staged = verified.staged;
         ensure_stage_belongs_to_storage(self, &staged)?;
-        let destination_path = self.physical_repo_path(destination)?;
+        let destination_path = self.physical_destination_path(destination)?;
 
         if fs::symlink_metadata(&destination_path).is_ok() {
             return Err(already_exists(&destination_path));
@@ -208,7 +227,7 @@ impl JsonFileStorage {
                 destination_parent.display()
             )
         })?;
-        let destination_path = self.physical_repo_path(destination)?;
+        let destination_path = self.physical_destination_path(destination)?;
 
         // Preserve collision precedence after parent creation, before the
         // filesystem check. A pre-existing destination is always AlreadyExists.
@@ -237,6 +256,33 @@ impl JsonFileStorage {
                 )
             }),
         }
+    }
+
+    /// Resolve a destination after validating all parent components physically.
+    ///
+    /// Unlike [`JsonFileStorage::physical_repo_path`], this deliberately does
+    /// not inspect the leaf: publication must classify every occupied leaf,
+    /// including a symlink, as [`AlreadyExistsError`]. Parent symlinks are still
+    /// rejected before the leaf is inspected, so collision classification never
+    /// follows a symlinked directory.
+    fn physical_destination_path(&self, relative: &str) -> Result<PathBuf> {
+        validate_repo_relative_path(relative).map_err(anyhow::Error::new)?;
+        let relative_path = Path::new(relative);
+        let file_name = relative_path.file_name().ok_or_else(|| {
+            crate::errors::InvalidArgumentError::new("Artifact destination has no file name")
+        })?;
+        let parent = relative_path.parent().ok_or_else(|| {
+            crate::errors::InvalidArgumentError::new("Artifact destination has no parent")
+        })?;
+        let physical_parent = if parent.as_os_str().is_empty() {
+            repository_root(self)?
+        } else {
+            let parent = parent.to_str().ok_or_else(|| {
+                crate::errors::InvalidArgumentError::new("Artifact destination is not UTF-8")
+            })?;
+            self.physical_repo_path(parent)?
+        };
+        Ok(physical_parent.join(file_name))
     }
 
     /// Delete a caller-named source only if its current bytes still match the
