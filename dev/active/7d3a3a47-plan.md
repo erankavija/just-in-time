@@ -6,9 +6,19 @@ This plan builds a pure artifact-plan domain capability and a unified `jit archi
 command family that consumes it. It grounds every claim in
 `dev/active/7d3a3a47-investigation.md` (citations re-verified against live code) and
 carries the owner-approved decisions from `dev/active/7d3a3a47-planning-brief.md` (D-1
-through D-11, with the 2026-07-13 owner amendment scrapping document categorization) as
-binding. The safety guarantee is **referential consistency, not atomicity** across
-filesystem files, issue JSON, and the append-only event log.
+through D-11 plus both 2026-07-13 owner amendments: document categorization is scrapped,
+and the concurrency/crash contract is scoped for proportionality) as binding.
+
+**The safety contract (binding, from the epic and the proportionality amendment):**
+referential consistency, not atomicity, across filesystem files, issue JSON, and the
+append-only event log. Guarantees hold under the repository write guard against concurrent
+JIT writers, and benign concurrent modification is detected before destructive steps
+(no-replace publication, verify-recorded-hash-then-delete). Concurrent external mutation of
+the working tree during an archival operation is out of contract; git history is the
+recovery channel in versioned repositories. This deliberately excludes write-ahead intent
+events, publication receipts, destination-provenance tracking, quarantine protocols, and
+crash-recovery state machines — the operation is short, occasional, recomputable, and its
+subjects are git-recoverable; rerun convergence by recomputation is the recovery story.
 
 ## 1. Completeness vs criteria
 
@@ -17,377 +27,201 @@ in the §3 coverage map.
 
 | Criterion | Approach (how it is met) | Notes / open gap |
 |---|---|---|
-| REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency | Resolve the container root through normal storage id semantics, enumerate the root plus its **resolved-hierarchy descendants** (the DAG-authoritative membership relation, `graph/hierarchy.rs:458`, `:321` — not the raw dependency closure, which absorbs cross-container sequencing edges; D-25), collect every distinct `DocumentReference` on those issues as **(path, version)** artifacts (D-26) including opaque/binary roots, canonicalize every supplied pinned revision through git to its full immutable commit object ID, then recursively discover supported local dependencies (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object with destinations computed by the D-12 mirror rule. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. Pinned versions serialize, order, and hash only the canonical full OID; resolution failure blocks (D-26). |
-| REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | Destination provenance is binding. A content-identical destination that predates the instance is `already_archived`/`preexisting-identical` and always supplies needs-source: no publication is needed, selected references may relink only after destination revalidation, and source copy/retain semantics forbid pending deletion. `ArchiveStarted.publication_mapping` is intent only. `published-by-instance` requires an exact `completed_publications` mapping in a durable, non-reconciliation `ArchiveExecuted` receipt written after storage reports successful no-replace publication. The existing archive-root, per-reference, managed/permanent, and edge calculus then applies. | Pre-existing identical, unproven publication intent, and receipted instance publication are never conflated. |
-| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Source quarantine is forbidden until the non-reconciliation `ArchiveExecuted.completed_publications` receipt append succeeds. Immediately before quarantine, execution open-handle verifies that receipted destination against the initial content_identity and holds the handle through the decision. Mismatch means no removal: restore/retain source and safely abort/block. Recovery repeats verification without recapture and cannot synthesize publication provenance. Started intent without the receipt is downgraded to `preexisting-identical`/publication-unproven, retains source, and closes safely through `ArchiveAborted`. | Failure injection covers external identical creation after Started, crash after successful publication but before its receipt, and modified pre-existing/newly published destinations; source remains. The residual verified-handle/path-rebinding race is bounded by D-24, not denied. |
-| REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`. D-16 puts every relative-edge target at the current mirror: an archive-root dependency is copied there while retained at its archived source; root-relative and staying-parent edges keep using the source. Execution validates every supported edge before metadata commit, fixing the current verifier's source/destination mismatch (`document.rs:1832-1858`). | Detected JavaScript/runtime loading blocks per D-23. Archive-root sources are never moved/deleted. |
-| REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers (container-ness from the configured type hierarchy, D-20; membership per D-25), each with the three-state documentation-policy status (`configured`, `incomplete`, or `unconfigured`), repository-wide ownership evidence, artifact counts, target-specific blockers, and move/copy/retain summaries. Candidate details distinguish the `unmanaged-selected-root` blocker from `unmanaged-path` evidence on embedded dependencies, whose actions are only copy or retain. It consumes the same plan model, always evaluates fully where policy inputs are explicit, and performs no filesystem, issue, or event mutation. | Defaults may support display but never authorize mutation; incomplete/unconfigured policy remains ineligible. No time/retention semantics (D-6). |
-| REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | Fixtures additionally cover (a) an initially identical pre-existing destination modified after Started, (b) a receipted instance-published destination modified before deletion/retry, (c) an external identical create after Started but before JIT publish, and (d) crash after JIT publish succeeds but before the non-reconciliation `ArchiveExecuted` receipt; every unproven/mismatched case retains source and aborts/blocks safely. Existing format, quarantine-crash, nested-mount, recovery-target, ownership, and cycle cases remain. | Preview is informational; execute ignores it and recomputes/recoveries under the held guard (D-7). |
+| REQ-01: deterministic plan of every issue-linked artifact in a container subtree plus every supported embedded local dependency of its working-tree artifacts | Resolve the container root through normal storage id semantics, enumerate the root plus its **resolved-hierarchy descendants** (the DAG-authoritative membership relation, `graph/hierarchy.rs:458`, `:321` — not the raw dependency closure, which absorbs cross-container sequencing edges; D-25), collect every distinct `DocumentReference` on those issues as **(path, version)** artifacts (D-26) including opaque/binary roots, canonicalize every supplied pinned revision to its full immutable commit object ID, then recursively discover supported local dependencies of **working-tree** artifacts (Markdown/HTML element URLs and CSS `url()`/`@import`) with cycle detection and deterministic ordering. Output is one stable, fully enumerated plan object with destinations computed by the D-12 mirror rule. | Opaque roots (CSV/PNG/SVG) are inventoried without an adapter; parsing support gates only embedded-edge discovery, not root eligibility. Pinned versions are enumerated as non-relocating historical entries; per the amended REQ-01 their commit-resolved closures are outside relocation scope and not enumerated (D-26). |
+| REQ-02: classify each artifact move/copy/retain/blocked using active references, sharing, managed-path policy, destination conflicts | A pure classifier computes an action per working-tree artifact through the D-16 edge-aware calculus from all reference owners (repository-wide, direct and embedded; D-13), per-reference selection, current lifecycle state, component-aware managed/permanent policy with explicit three-state completeness, archive-root precedence, destination occupancy, and pinned semantics (D-26). Ownership and policy facts are evidence feeding copy/retain; blockers are structural (conflicts, unpreservable edges, symlinks, missing sources, failed pinned reads, ineligible targets). | Replaces the two inconsistent directory-heuristic notions of "shared" (`document.rs:1463-1495`, `assets.rs:185-233`) with one repository-wide reference analysis. |
+| REQ-03: archive an eligible container without losing files, overwriting destinations, or leaving dangling issue references | Execution recomputes the plan under the held repository write guard, stages and verifies content, validates every supported local edge at its proposed destination, publishes no-replace (a collision — even content-identical — is `AlreadyExists`, never silent success; D-14), applies exactly the planned reference changes, appends one archive event, then deletes each planned source only after re-verifying its recorded content identity (D-17). Failed deletions are reported warnings; rerunning converges by recomputation (D-18): content-identical destinations classify already-archived, residual sources are rediscovered through the inverse mirror mapping and removed after the same verification. Within the amended contract no step loses a file, overwrites a destination, or leaves a reference relying solely on a missing path. | Only Done/Rejected containers execute (D-8); document targets follow D-15; non-terminal targets preview only. |
+| REQ-04: preserve functional relative links for supported bundles (HTML with sibling CSS, theme files, figures) | Recursive discovery follows HTML→CSS→nested figure/font edges and CSS `@import`/`url()`. The D-16 calculus puts every relative-edge target of a relocated parent at the mirror (an archive-root dependency is copied there while its archived source is retained); root-relative and staying-parent edges keep resolving at source. Execution validates every supported edge in the proposed layout before metadata commit, fixing the current verifier's source/destination path-set mismatch (`document.rs:1832-1858`). | Detected dynamic or module loading in a relocated member warns (`dynamic-loading-suspected`, D-23); an actually unpreservable supported edge still blocks (`unpreservable-layout`). |
+| REQ-05: report container-oriented candidates using current terminal state, policy, ownership, and blockers without mutation | A read-only `jit archive candidates` lists terminal containers (container-ness from the configured type hierarchy, D-20; membership per D-25), each with three-state documentation-policy status (`configured`/`incomplete`/`unconfigured`), repository-wide ownership evidence, artifact counts, blockers, and move/copy/retain summaries. It consumes the same plan model, always evaluates fully (archival takes no category input, D-21), and performs no filesystem, issue, or event mutation. | Accessor defaults may support display but never authorize mutation; incomplete/unconfigured policy is ineligible. No time/retention semantics (D-6). |
+| REQ-06: structured JSON previews verified against Markdown, HTML, CSS, CSV, PNG, and SVG fixtures | The plan model serializes to the binding §2 schema; preview is the non-mutating default for both `jit archive document` and `jit archive container`. A representative fixture corpus (Markdown links; HTML→sibling CSS→nested theme image/font; CSS `@import`/`url()`; direct CSV/PNG/SVG roots; permanent shared figures; active outside consumers; identical filenames; missing edges; pinned commits; a dependency cycle; occupied destinations; a partial-deletion rerun) exercises discovery, classification, preview, and execution. | Preview is informational; `--execute` recomputes and revalidates under the held guard rather than trusting preview output (D-7). |
 
-No criterion is silently narrowed or dropped. No missing criterion surfaced during
-planning.
+No criterion is silently narrowed or dropped. The REQ-01 working-tree scoping and the
+concurrency contract are owner amendments recorded in the epic Notes and the brief, not
+plan-side narrowing.
 
 ## 2. Technical soundness and architectural fit
 
 - **Approach.** Introduce a pure artifact-plan model in the domain/document layers: inputs
   are the shared target-root inventory (resolved container subtree roots or an arbitrary
-  normalized document root with repo-wide owners/version variants), documentation policy, and
-  extracted dependency edges; output is one deterministic, serializable plan. Container
-  traversal uses the resolved-hierarchy membership relation (D-25). The command layer loads
-  inputs, calls the pure planner, renders preview, and executes an accepted plan; it does not
-  duplicate decision logic between preview and execution. A storage-owned artifact mutation
-  primitive centralizes staging, containment, no-replace finalization (D-14), quarantine
-  deletion (D-17), and collision semantics so the command layer stops issuing raw `std::fs`
-  calls (`document.rs:1637-1787`). Candidates, preview, and execution are all consumers of
-  the one plan model (formal-planning obligation 5).
+  normalized document root with repo-wide owners and version variants), documentation
+  policy, and extracted dependency edges; output is one deterministic, serializable plan.
+  The command layer loads inputs, calls the pure planner, renders preview, and executes a
+  recomputed plan under the write guard; it does not duplicate decision logic between
+  preview and execution. A storage-owned artifact mutation primitive centralizes staging,
+  containment, no-replace publication (D-14), and verified deletion (D-17) so the command
+  layer stops issuing raw `std::fs` calls (`document.rs:1637-1787`). Candidates, preview,
+  and execution are all consumers of the one plan model (formal-planning obligation 5).
 
 - **Container membership (D-25).** The archival subtree is the container plus its
   resolved-hierarchy descendants: the repository-wide hierarchy resolution
   (`graph/hierarchy.rs:458` `resolve_hierarchy`) assigns each node its parent and children
-  (`:300`, `:321`), and membership is the transitive `children` closure of the root. The raw
-  dependency closure (`DependencyGraph::get_transitive_dependencies`, used for tree *scoping*
-  in `graph.rs:206-233`) is **not** membership: it absorbs sequencing edges onto issues that
-  belong to other containers, and archiving those would relocate another container's
-  artifacts (violating D-2).
+  (`:300`, `:321`), and membership is the transitive `children` closure of the root. The
+  raw dependency closure (`DependencyGraph::get_transitive_dependencies`, used for tree
+  *scoping* in `graph.rs:206-233`) is **not** membership: it absorbs sequencing edges onto
+  issues that belong to other containers, and archiving those would relocate another
+  container's artifacts (violating D-2).
 
 - **Artifact identity (D-26).** An artifact is **(path, version)** with version
-  `working-tree` or a canonical full immutable commit object ID. Every supplied pinned
-  revision string (symbolic name, abbreviation, or full ID) first passes through a
-  storage/git resolver with `rev-parse --verify <rev>^{commit}` semantics. The resolver
-  returns the repository's hash-algorithm-agnostic full OID; only that value is serialized,
-  ordered, fingerprinted, and used in identity comparisons—never the symbolic input or the
-  current seven-character display value. Working-tree versions are the archival subjects. A
-  pinned reference then reads through the storage layer at that canonical commit
-  (`document.rs:349-357` — effective commit precedes working-tree; `storage/mod.rs:531`
-  `read_path_text(path, canonical_oid)`), i.e. from git history: relocating or deleting the
-  working-tree file does not break a git-resolvable pinned read, and per D-3 pinned
-  references are never rewritten. Therefore a pinned reference imposes **no** working-tree
-  retention constraint when revision canonicalization and every commit-specific read
-  succeed. If revision canonicalization fails, git is unavailable, the commit is unreachable
-  (`CommitNotFound`), or the referenced root or supported dependency is
-  absent at a reachable commit (`NotFound`), planning records `pinned-read-failed` and makes
-  the whole target ineligible for execution. There is no warning-plus-retention treatment and
-  no working-tree fallback; D-3 remains intact because the pinned reference is untouched.
-  Pinned versions appear in the plan as
-  informational non-relocating entries with evidence `pinned-historical`, **including their
-  commit-specific supported dependency closures**: the adapters are pure text extractors,
-  so discovery runs them over commit-resolved content (`read_path_text(path, canonical_oid)`,
-  `storage/mod.rs:531`) exactly as over working-tree content, producing (path, full OID)
-  dependency entries that are likewise informational and non-relocating — REQ-01's
-  "every supported embedded local dependency" is met for pinned roots deterministically,
-  with nothing to move because history serves every pinned reader.
+  `working-tree` or a canonical full immutable commit object ID: every supplied pinned
+  revision (symbolic, abbreviated, or full) is canonicalized through a storage/git resolver
+  with `rev-parse --verify <rev>^{commit}` semantics, and only the canonical OID is
+  serialized, ordered, and compared. Working-tree versions are the archival subjects. A
+  pinned reference reads through the storage layer at its commit (`document.rs:349-357`,
+  `storage/mod.rs:531` `read_path_text(path, commit)`), i.e. from git history: relocating
+  the working-tree file does not break a git-resolvable pinned read, and per D-3 pinned
+  references are never rewritten. A reachable pin therefore imposes no working-tree
+  constraint. Failed canonicalization, missing git, `CommitNotFound`, or a commit-path
+  `NotFound` for the pinned root emits the target-level `pinned-read-failed` blocker; there
+  is no read fallback and no warning-plus-retention half-state. Pinned versions appear as
+  informational non-relocating `pinned-historical` entries; per the amended REQ-01 their
+  commit-resolved dependency closures are outside relocation scope and are not enumerated —
+  nothing about them moves, and history serves every pinned reader.
 
-- **Durable content identity.** Every working-tree source that will be published or appears
-  in planned deletions carries `content_identity = {sha256, byte_size}`, with both values
-  derived from the same byte buffer/read so a concurrent edit cannot create a torn identity.
-  SHA-256 follows the
-  existing asset convention (`document/assets.rs:269-276`); byte size makes the comparison
-  explicit. While holding `RepoWriteGuard`, the command reads these identities before
-  `ArchiveStarted`, and Started persists each identity beside its exact source, destination,
-  selected reference changes, and deletion intent. Initial staging must match the recorded
-  digest+size before publication. Retry/reconciliation always uses the initial Started
-  identity and never recaptures an expected identity from the current source. Every removal
-  uses D-17 quarantine then open-handle verification against that recorded identity; mismatch
-  is never deleted, is restored no-replace or remains quarantined/reported, and forces a safe
-  abort or leaves recovery open with a blocker.
+- **Content identity for deletions (D-17 input).** Every working-tree source that a plan
+  will delete carries `content_identity = {sha256, byte_size}` captured from one read while
+  the guard is held (SHA-256 follows the existing asset convention,
+  `document/assets.rs:269-276`). Deletion re-verifies the file against this recorded
+  identity immediately before removal; mismatch skips the deletion with a `deletion-failed`
+  warning and the file stays. Reruns re-derive the expected identity from the published
+  destination (which the mirror mapping locates), never from the possibly-edited source.
 
 - **Destination layout (D-12).** The destination root is `<archive_root>/` plus, for
-  container targets, `<container.id>/` (the full UUID — short-id prefixes can collide across
-  containers, full UUIDs cannot, matching `.jit/issues/<uuid>.json` naming); every moved or
-  copied artifact lands at that root plus its repository-relative source path. Archival
-  takes no category input (D-21): the mirror rule alone determines every destination.
-  Mirroring under one common prefix keeps every relative offset between bundle members
-  invariant, keeps identical filenames from different directories distinct, and makes
-  intra-plan destination collisions impossible. The mapping is invertible, which retry
-  convergence exploits (D-18).
+  container targets, `<container.id>/` (the full UUID — short-id prefixes can collide
+  across containers, full UUIDs cannot, matching `.jit/issues/<uuid>.json` naming); every
+  moved or copied artifact lands at that root plus its repository-relative source path.
+  Archival takes no category input (D-21): the mirror rule alone determines every
+  destination. Mirroring under one common prefix keeps every relative offset between bundle
+  members invariant, keeps identical filenames from different directories distinct, and
+  makes intra-plan destination collisions impossible. The mapping is invertible, which
+  rerun convergence exploits (D-18). An `archive_root` on a different filesystem from the
+  repository fails with a typed error naming the paths; there is no cross-device staging
+  design (owner proportionality amendment).
 
-- **Destination-local staging (D-14).** Publication never assumes repository root and a
-  nested destination share a device. Resolve the normalized intended destination through
-  its nearest safe existing ancestor (never `canonicalize` the not-yet-created path), then
-  create missing destination parents after Started. Before Started, derive/persist a unique
-  hidden owner-private staging directory+entry adjacent to each destination from
-  operation_instance_id plus SHA-256 of canonical destination path; both paths must be absent and
-  component/symlink-safe (`0700` directory on POSIX, platform-equivalent owner-only access).
-  After Started, create it, write the source bytes, verify Started
-  identity, then no-replace publish on that destination filesystem. The command appends the
-  successful publication receipt before staging cleanup or any source quarantine. Cleanup is best-effort
-  and removes only the recorded verified entry and an empty recorded directory; it never
-  erases a nonempty/unverified entry. Started also records destination-adjacent quarantine
-  mappings for conditional rollback removals.
-
-- **Destination provenance and deletion authority.** `preexisting-identical` means matching
-  content occupied the destination before this operation instance. It is already_archived
-  evidence and satisfies needs-destination without publication, but always adds needs-source:
-  source is retained, never enters pending_deletions, and selected references relink only
-  after revalidating destination against the planned identity. A Started
-  `publication_mapping` records intent only and never proves who created the destination.
-  `published-by-instance` exists only when storage returned successful no-replace publication
-  and the command then durably appended that exact mapping in a **non-reconciliation**
-  `ArchiveExecuted.completed_publications` receipt. Only that receipt-backed provenance can
-  authorize source deletion. Immediately before
-  quarantine, open the recorded destination, verify initial Started SHA-256+size, and hold
-  the verified handle through the source-quarantine decision; recovery repeats this without
-  recapture. Mismatch retains/restores source and safely aborts or blocks.
-
-- **Archive-root evidence and precedence.** For fresh planning, before managed/permanent or
-  selected-root classification, normalize every working-tree path and test component
-  containment under configured `archive_root`. A match supplies `archived-source` and
-  already-existing evidence plus needs-source, bypasses `unmanaged-selected-root`, and can
-  never move or enter `pending_deletions`. A selected/direct root retains at its existing
-  source with `already_archived: true`, `action: retain`, `destination: null`, and empty
-  `reference_changes`. An embedded archive-root dependency instead remains edge-aware: a
-  relative edge from a relocated parent supplies needs-destination, so it copies to the
-  current target mirror while its original remains; root-relative or staying-parent edges
-  retain. Retired `dev/archive/features/...` and another container segment follow the same
-  rule. Recovery uses the Started event's recorded root, not current configuration.
+- **Archive-root precedence.** Before managed/permanent or selected-root classification,
+  normalize every working-tree path and test component containment under the configured
+  `archive_root`. A match supplies `archived-source` evidence plus needs-source and bypasses
+  `unmanaged-selected-root`: a selected/direct root already under the archive root retains
+  in place with `already_archived: true`, null destination, and no reference change; an
+  embedded archive-root dependency stays edge-aware (a relative edge from a relocated
+  parent copies it to the current mirror while the original remains; root-relative or
+  staying-parent edges retain). No archive-root source is ever moved or deleted.
 
 - **Ownership universe (D-13).** Repository-wide ownership is computed over every
   `DocumentReference` across all issues plus the recursive supported embedded closure of
-  each (Markdown/HTML/CSS edges); an artifact referenced directly or through an embedded
-  edge from outside the selected subtree is outside-owned and never moved (D-2). Files
-  unreachable from any issue reference are outside JIT's referential contract: reported as
-  informational not-selected entries when they sit beside bundle members (D-10), never
-  silently relocated, never counted as owners. The inventory task records direct owners; the
-  classifier — ordered after discovery — completes the embedded half.
+  each working-tree document (Markdown/HTML/CSS edges); an artifact referenced directly or
+  through an embedded edge from outside the selected subtree is outside-owned and never
+  moved (D-2). Files unreachable from any issue reference are outside JIT's referential
+  contract: reported as informational not-selected entries when they sit beside bundle
+  members (D-10), never silently relocated, never counted as owners. The inventory task
+  records direct owners; the classifier — ordered after discovery — completes the embedded
+  half.
 
 - **Per-reference selection (before D-16).** The planner classifies each direct
-  `DocumentReference` independently before deriving its artifact action. Pinned references
-  are historical and never selected for relink (D-3/D-26). For a container target, select
+  `DocumentReference` independently (with a deterministic `document_index` within its
+  issue's documents) before deriving its artifact's action. Pinned references are
+  historical and never selected for relink (D-3/D-26). For a container target, select
   exactly the unpinned references owned by terminal issues inside the selected resolved
   subtree; references outside the subtree or on non-terminal owners stay at source. For a
-  document target, D-15 first requires all direct and embedded-closure owners to be terminal,
-  then every unpinned direct owner is selected. Embedded edges are not issue metadata and
-  never become `reference_changes`; copy/move topology preserves them. Every unpinned
-  reference not selected for relink contributes needs-source. `reference_changes` is exactly
-  the selected set (issue, old path, mirror path), and no other issue reference is rewritten.
+  document target, D-15 first requires all direct and embedded-closure owners to be
+  terminal, then every unpinned direct owner is selected. Embedded edges are not issue
+  metadata and never become `reference_changes`; copy/move topology preserves them. Every
+  unpinned reference not selected for relink contributes needs-source. `reference_changes`
+  is exactly the selected set (issue, document_index, old path, mirror path); no other
+  issue reference is rewritten.
 
 - **Edge-aware action calculus (D-16).** The action per working-tree artifact derives from
   two computed constraints. *Needs-destination* holds when the artifact is a selected
-  explicit root **unless it is an archived-source direct root**, or a relocated (moved or copied) parent references it through a
-  **relative** edge — the mirror layout preserves that edge only if the dependency exists at
-  its mirrored path. *Needs-source* holds when the artifact has an owner outside the
-  subtree, an active owner, has any unpinned direct reference not selected for relink, lies
-  on a permanent path, has a preexisting-identical destination, is an embedded dependency outside
-  every explicitly configured managed path, or any document that stays in place references
-  it — including **root-relative**
-  edges, which resolve from the repository root regardless of the referencing document's
-  location (`assets.rs:151-162`). Then: move = needs-destination ∧ ¬needs-source; copy =
+  explicit root (unless it is an archived-source direct root), or a relocated (moved or
+  copied) parent references it through a **relative** edge — the mirror layout preserves
+  that edge only if the dependency exists at its mirrored path. *Needs-source* holds when
+  the artifact has an owner outside the subtree, an active owner, any unpinned direct
+  reference not selected for relink, lies on a permanent path, sits under the archive root,
+  is an embedded dependency outside every explicitly configured managed path, or any
+  document that stays in place references it — including **root-relative** edges, which
+  resolve from the repository root regardless of the referencing document's location
+  (`assets.rs:151-162`). Then: move = needs-destination ∧ ¬needs-source; copy =
   needs-destination ∧ needs-source; retain = ¬needs-destination ∧ needs-source (and for
-  unselected artifacts); block = destination conflict, detected dynamic loading in a
-  relocated member (D-23), symlink involvement (D-22), repository escape, or any edge whose
-  resolution the layout cannot preserve. Move is therefore possible only when every
-  source-dependent unpinned reference is selected and no other needs-source constraint
-  holds. A selected root outside every managed path blocks
-  the target as `unmanaged-selected-root` before this calculus. For an unmanaged embedded
-  dependency, `unmanaged-path` is evidence that always supplies needs-source: it copies when
-  needs-destination also holds and otherwise retains, never moves. Permanent-path,
-  outside-owner, active-owner, and unmanaged-path are
-  **evidence/constraint flags**, not blocker codes: for a container they normally produce
-  copy or retain through needs-source. For a document target, any non-terminal direct or
-  embedded-closure owner is instead a target-level `document-non-terminal-owner` blocker
-  (D-15). `unpreservable-layout` is emitted only when the required source/destination
-  combination cannot preserve a supported edge; it is not an alias for ownership evidence.
-  `archived-source` likewise always supplies needs-source: direct roots retain, relative-edge
-  dependencies copy when their relocated parent supplies needs-destination, and other edges
-  retain. No archive-root source is ever moved or deleted.
-  Copy satisfies both constraint kinds, so the
-  calculus is total and deterministic; execution's before/after validation then checks every
-  supported edge in the final layout: relative edges at the mirror, root-relative edges at
-  the repository root.
+  unselected artifacts); block = differing-content destination conflict, repository escape,
+  symlink involvement (D-22), or any supported edge whose resolution the layout cannot
+  preserve (`unpreservable-layout`). Move is possible only when every source-dependent
+  unpinned reference is selected and no other needs-source constraint holds. A selected
+  root outside every managed path blocks the target as `unmanaged-selected-root` before the
+  calculus; an unmanaged embedded dependency carries `unmanaged-path` evidence, always
+  needs-source, and copies or retains, never moves. `permanent-path`, `outside-owner`,
+  `active-owner`, `unmanaged-path`, and `archived-source` are **evidence/constraint
+  flags**, not blockers: they normally produce copy or retain. For a document target, a
+  non-terminal direct or embedded-closure owner is the target-level
+  `document-non-terminal-owner` blocker (D-15). Copy satisfies both constraint kinds, so
+  the calculus is total and deterministic; execution's before/after validation then checks
+  every supported edge in the final layout: relative edges at the mirror, root-relative
+  edges at the repository root.
 
 - **Archive-plan JSON schema and blocker taxonomy (binding for the plan-model task):**
-  - **Envelope:** `schema_version` (starts at 1; codes are append-only and never change
-    meaning), `target` (`{"kind": "container"|"document", "id"|"path": …}`),
-    `destination_root`, `operation_id` (initial **definition key**, not the recovery lookup:
-    hash of target,
-    destination root, and the sorted canonical initial source-path set; an archive-root
-    already-archived artifact contributes its existing path; D-19),
-    `operation_instance_id` (UUID delimiting one logical operation by the D-19
-    adopt-or-mint rule; null in previews/candidate reports), `execution_id` (fresh UUID for
-    each execute attempt that emits Started or reconciliation completion, recorded in its
-    events and `--execute` output; **null in previews and candidate reports**),
-    `plan_fingerprint` (informational hash of the canonical plan serialization excluding
-    volatile fields; expected to change as repository state changes, never an execution
-    comparison input), `eligible` (bool), `policy_status`
-    (`configured`|`incomplete`|`unconfigured`),
-    `counts` (one integer per action plus `already_archived` and `pending_deletions`),
-    `artifact_count` + `artifacts` (the repository list-envelope convention; entries
-    deterministically ordered by normalized source path, then version), and plan-level
-    `blockers`/`warnings` (each sorted by code, then path).
-  - **Artifact entry:** `source`, `version` (`working-tree` or the canonical full immutable
-    commit object ID returned by the D-26 resolver; never a symbolic/abbreviated revision),
-    `content_identity` (`{"sha256": <64-lower-hex>, "byte_size": N}`; required for every
-    working-tree publication source or planned deletion, null otherwise),
-    `destination` (null when retained or historical), `action` (`move|copy|retain|block`),
-    `destination_provenance` (`none|preexisting-identical|publication-unproven|published-by-instance`) and
-    `publication_required` (bool),
-    `publication_mapping` (null unless publishing; exact `destination`, hidden adjacent
-    `staging_dir`, `staging_entry`, content_identity, and conditional rollback-deletion
-    quarantine mapping for that destination; this is intent, never provenance proof),
-    `publication_proof` (null unless `published-by-instance`; exact
-    `{operation_instance_id, execution_id, reconciliation:false, completed_publication}` identifying a durable
-    non-reconciliation `ArchiveExecuted.completed_publications` receipt whose mapping and
-    initial content_identity equal Started),
-    `already_archived` (bool true for pre-existing identical destination/source evidence;
-    it never by itself grants deletion authority), `provenance` (a flag set — `["explicit"]`, `["embedded"]`,
-    or both), `format`, `owners` (issue id, deterministic `document_index` within that
-    issue's documents, state, `inside_subtree`, `pinned`, `selected_for_relink`), `edges`
-    (`supported` / `unsupported` / `external`, each with resolution mode),
-    `reference_changes` (exactly the selected unpinned direct references, each with issue,
-    document_index, from-path, to-path), `pending_deletions` (exact `{source,
-    quarantine_dir, quarantine_entry, content_identity}` for each path this
-    plan will remove — allowed only when the exact non-reconciliation completion receipt
-    above exists and destination provenance becomes published-by-instance; otherwise
-    the source is excluded — or a residue left by an earlier
-    partial execution — each removed only through the D-17 quarantine protocol; residue
-    cleanup is an executable plan operation, not an out-of-band effect), and per-artifact
-    `evidence`, `blockers`, `warnings`.
-  - **Policy completeness (binding):** `configured` requires the `[documentation]` table and
-    explicit values for all three post-category policy inputs: `managed_paths`,
-    `permanent_paths`, and `archive_root`. A missing table is `unconfigured`; a present table
-    missing any one or more fields is `incomplete`. `policy-unconfigured` and
-    `policy-incomplete` make execution ineligible. Accessor defaults may be shown as preview
-    context but **never** supply delegation or authorize mutation.
+  - **Envelope:** `schema_version` (starts at 1; fields and codes are append-only and never
+    change meaning), `target` (`{"kind": "container"|"document", "id"|"path": …}`),
+    `destination_root`, `eligible` (bool), `policy_status`
+    (`configured`|`incomplete`|`unconfigured`), `counts` (one integer per action plus
+    `already_archived` and `pending_deletions`), `artifact_count` + `artifacts` (the
+    repository list-envelope convention; entries deterministically ordered by normalized
+    source path, then version), and plan-level `blockers`/`warnings` (each sorted by code,
+    then path).
+  - **Artifact entry:** `source`, `version` (`working-tree` or the canonical full commit
+    OID; never a symbolic/abbreviated revision), `content_identity`
+    (`{"sha256": <64-lower-hex>, "byte_size": N}`; required for every planned deletion and
+    published source, null otherwise), `destination` (null when retained or historical),
+    `action` (`move|copy|retain|block`), `already_archived` (bool), `provenance` (a flag
+    set — `["explicit"]`, `["embedded"]`, or both), `format`, `owners` (issue id,
+    deterministic `document_index`, state, `inside_subtree`, `pinned`,
+    `selected_for_relink`), `edges` (`supported`/`unsupported`/`external`, each with
+    resolution mode), `reference_changes` (exactly the selected unpinned direct references:
+    issue, document_index, from-path, to-path), `pending_deletions` (the source paths this
+    plan will remove, each carrying its recorded `content_identity`; a residual source
+    rediscovered by a rerun through the inverse mirror mapping appears here too, so residue
+    cleanup is an executable plan operation), and per-artifact `evidence`, `blockers`,
+    `warnings`.
+  - **Policy completeness (binding):** `configured` requires the `[documentation]` table
+    with explicit `managed_paths`, `permanent_paths`, and `archive_root`. A missing table
+    is `unconfigured`; a present table missing any field is `incomplete`. Both are
+    target-level blockers (`policy-unconfigured`, `policy-incomplete`) that make execution
+    ineligible; accessor defaults may support preview display but never authorize mutation
+    (D-1).
   - **Evidence/constraint flags (stable kebab-case, not blockers):** `permanent-path`,
     `outside-owner`, `active-owner`, `unmanaged-path`, `archived-source`,
-    `pinned-historical`. The first five
-    feed needs-source and normally yield `copy`/`retain` for container planning;
-    explicit/embedded origin stays in the separate `provenance` field.
+    `pinned-historical`.
   - **Blocker codes (stable kebab-case):** `policy-unconfigured`, `policy-incomplete`,
     `unmanaged-selected-root`, `destination-conflict`, `document-non-terminal-owner`,
-    `pinned-read-failed`, `unsupported-dynamic-edge`, `repository-escape`,
-    `unresolvable-edge`, `unpreservable-layout`, `non-terminal-target`,
-    `missing-source`, `symlink-artifact`, `archive-recovery-blocked`,
-    `quarantine-unavailable`,
-    `archive-recovery-ambiguous`.
-    `document-non-terminal-owner` is target-specific
-    to document execution; `unpreservable-layout` requires a concrete supported edge whose
-    needs-source/needs-destination obligations cannot both be materialized.
-  - **Blocker applicability (normative):** policy blockers are target-level and apply to
-    document and container execution; `unmanaged-selected-root` applies when any selected
-    working-tree root is outside every explicitly configured managed path. Every embedded
-    working-tree dependency is also checked: unmanaged status contributes `unmanaged-path`
-    evidence and needs-source under D-16, never a blocker by that name.
-    `destination-conflict` applies to a differing-content occupied destination;
-    `document-non-terminal-owner` applies only to
-    document execution; `pinned-read-failed` is target-level after failed revision
-    canonicalization or any failed commit-specific root/dependency read;
-    `unsupported-dynamic-edge`, `repository-escape`,
-    `unresolvable-edge`, and `unpreservable-layout` identify the concrete artifact/edge;
-    `non-terminal-target` applies to container execution; `archive-recovery-ambiguous`
-    means stable target identity matched multiple open intents across roots and forbids
-    recovery/minting; `archive-recovery-blocked` means
-    an adopted prior target intent cannot yet be completed or safely aborted and
-    forbids a competing instance; `quarantine-unavailable` means the recorded adjacent
-    same-filesystem quarantine cannot be prepared/used and leaves deletion pending without
-    cross-device fallback; `missing-source` follows the working-tree rule below; and
-    `symlink-artifact` follows D-22. No evidence flag makes `eligible=false` by itself.
+    `pinned-read-failed`, `repository-escape`, `unresolvable-edge`, `unpreservable-layout`,
+    `non-terminal-target`, `missing-source`, `symlink-artifact`.
   - **Warning codes:** `missing-edge-target`, `external-edge`, `no-owner`,
-    `residue-source`, `deletion-failed`, `not-selected-sibling`,
-    `quarantined-foreign-file`.
-  - **Missing/artifact semantics (evaluation order is normative):** for fresh planning,
-    component containment beneath configured `archive_root` runs before managed-path/root
-    classification and supplies `archived-source`, already-existing, and needs-source while
-    bypassing `unmanaged-selected-root`. A selected/direct root retains in place with null
-    destination and no reference change. An embedded dependency copies to the current mirror
-    only for a relative edge from a relocated parent; otherwise it retains. Neither action
-    deletes the archived source. For pinned versions, revision canonicalization runs first; its failure, or any
-    `CommitNotFound` or commit-path `NotFound` for the resulting canonical full OID, emits
-    `pinned-read-failed`; the working-tree
-    rules below cannot downgrade or replace that blocker. (1) **Retry mirror recognition:**
-    a working-tree reference whose stated source path maps through D-12 to content-identical
-    existing content is `already_archived`. Without a qualifying non-reconciliation
-    `ArchiveExecuted.completed_publications` receipt it is `preexisting-identical` or
-    `publication-unproven`: publication_required=false, needs-source=true, no pending
-    deletion, even when Started records the exact publication_mapping. Recovery establishes
-    `published-by-instance` only from that durable receipt plus current destination identity
-    verification; it never infers publication from Started intent or content equality.
-    (2) **`missing-source`:** only a
-    working-tree root absent at both its stated location and its mirror image blocks — a
-    genuinely dangling reference that must be resolved (or removed) before execution, never
-    silently entrenched or skipped. A missing **embedded** target gets warning
-    `missing-edge-target` on the referencing artifact: it contributes no needs-destination
-    constraint, is excluded from before/after edge validation (the edge resolves nowhere
-    before archival, so no regression is possible), and never blocks.
+    `deletion-failed`, `not-selected-sibling`, `residue-source`,
+    `dynamic-loading-suspected`.
+  - **Missing/already-archived semantics (evaluation order is normative):** archive-root
+    precedence runs first (above). For pinned versions, revision canonicalization runs
+    next; its failure or a failed commit read emits `pinned-read-failed`, which the
+    working-tree rules below cannot downgrade. Then, per working-tree root: (1)
+    **mirror recognition** — a root whose stated source path maps through D-12 to
+    content-identical existing content classifies `already_archived` (a root moved by a
+    prior partial execution can never read as missing on rerun); (2) **`missing-source`** —
+    only a root absent at both its stated location and its mirror image blocks, a genuinely
+    dangling reference to resolve or remove, never silently entrenched or skipped. A
+    missing **embedded** target gets warning `missing-edge-target` on the referencing
+    artifact: no needs-destination constraint, excluded from before/after validation (the
+    edge resolves nowhere before archival, so no regression is possible), never blocking.
   - **Candidate collection envelope:** `jit archive candidates --json` emits
     `{"schema_version": 1, "candidate_count": N, "candidates": [...]}`; each candidate is
-    the same target plan envelope above. Every check whose explicit inputs exist is
-    evaluated. An incomplete/unconfigured policy reports its distinct blocker and does not
-    substitute defaults to claim eligibility.
-  - **Event contract (binding; four event kinds):** before computing or minting a fresh
-    source-set operation—and before reading/applying current archive-root policy—scan **all**
-    open `ArchiveStarted` events by stable target identity across recorded destination roots.
-    Started's explicit `recovery_target` is
-    `{"kind":"container","issue_id":<full-uuid>}` or
-    `{"kind":"document","canonical_original":<target-root>,"destination_aliases":[...]}`
-    with **only that root's own planned destination alias(es)**;
-    embedded/shared dependency paths are excluded. A document invocation matches only those
-    root aliases. One match recovers using that event's recorded destination root and contract,
-    regardless current config. Multiple matches return `archive-recovery-ambiguous` and mint
-    nothing. With no match (all prior target intents terminal), current policy may choose a
-    fresh root and `ArchiveStarted` appends before the first
-    mutation; under the held guard the command mints operation_instance_id, computes
-    content_identity, and derives unique paths: hidden owner-private staging adjacent to each
-    destination and hidden owner-private quarantine adjacent to each deletion source. Names
-    derive from instance ID plus SHA-256 of canonical destination/source path. Every directory and
-    entry must be absent and component/symlink-safe before append. Started then contains
-    recovery_target, recorded destination root,
-    new operation/instance/execution IDs, fingerprint, and sorted
-    full publication/relink contract with exact staging mappings, and `deletion_intents`
-    containing each exact `{source, quarantine_dir, quarantine_entry, content_identity}`, including conditional
-    rollback deletion mappings for published destinations. Pre-existing identical
-    destinations are recorded separately as such, with no publication_mapping or pending
-    deletion; before applying their selected relinks, revalidate destination against Started
-    identity or safely abort without relinking. Append failure means no mutation.
-    Here “durable” is the repository's process-level append contract: `append_event` has
-    returned success and the record is visible to a subsequent process; this plan does not
-    invent stronger power-loss/fsync or exactly-once semantics beyond `@/inv/event-log`.
-    Recovery adopts the open event's original operation/instance, recorded root, identities,
-    staging/quarantine mappings, and initial
-    artifact/source/destination contract. It re-evaluates current owners/references for
-    safety but mutates only that contract; newly discovered unrelated artifacts wait for a
-    later fresh operation. Before new recovery mutation, append a Started attempt with the
-    adopted IDs, fresh execution ID, and remaining original-contract work. Normal execution
-    calls storage's no-replace publish and requires its success return, then appends a
-    non-reconciliation `ArchiveExecuted` with the exact successful mappings in
-    `completed_publications`; source quarantine is forbidden until that append returns
-    success. `ArchiveExecuted` also records relinks;
-    `ArchiveSourcesRemoved` normally records removals successful in that attempt, while a
-    reconciliation event records a deletion only after checking **both** recorded source and
-    recorded quarantine entry. Reconciliation may report or close already-receipted work but
-    can never add `completed_publications`, synthesize a publication receipt, or otherwise
-    invent provenance. Only a destination backed by the exact durable non-reconciliation
-    receipt for this instance can authorize deletion. Immediately before quarantine, open that
-    destination, verify initial Started identity, and hold the handle through the quarantine
-    decision; recovery does the same without recapture. Destination mismatch retains/restores
-    source and forces safe abort/block. If Started has a matching destination but no qualifying
-    receipt—including external identical creation before JIT's no-replace publish, or a crash
-    after successful publish but before the receipt append—recovery downgrades it to
-    publication-unproven/preexisting-identical, retains the source with no pending deletion,
-    revalidates identity before any selected relinks, and closes through a safe
-    `ArchiveAborted` reason `publication-unproven`; it never emits reconciliation
-    `ArchiveExecuted` to bless the destination. After Started, create the
-    recorded quarantine directory, atomically rename source to its recorded entry on the same
-    parent filesystem, open relative to that directory handle, and verify Started digest+size.
-    Match may unlink; mismatch never does and is no-replace restored or remains at the
-    recorded quarantine path/reported, forcing safe abort/open recovery. Crash after rename
-    is recoverable from the mapping. Source-present/entry-absent retries the rename;
-    source-absent/entry-present resumes handle verification; both absent is completed; both
-    present never overwrites either and requires verification/reporting before safe closure.
-    Empty-dir cleanup is best-effort and never removes a
-    nonempty/unverified entry. Inability to prepare/use same-filesystem quarantine returns
-    `quarantine-unavailable`, leaves deletion pending, and never copy-deletes. Both carry
-    `reconciliation: true|false`.
-    `ArchiveAborted` is the fourth, terminal event. It may append only after recovery proves
-    referential safety by restoring/retaining sources and references as current ownership
-    requires, and carries the adopted operation/instance IDs, fresh execution ID, reason,
-    and completed, reverted, and safe residual paths. Safe
-    duplicate abort/completion events are permitted. If recovery can neither complete nor
-    prove a safe abort, leave the intent open, return `archive-recovery-blocked`, and never
-    mint a competing instance. An instance closes when cumulative completion events cover
-    the initial Started contract or a safe ArchiveAborted terminates it; later Started
-    attempts never redefine that contract. Only then may a fresh current-source-set operation
-    mint. A brand-new already-converged invocation with no open Started appends no event.
+    the same target plan envelope. Every check with explicit inputs is evaluated; an
+    incomplete/unconfigured policy reports its distinct blocker and never substitutes
+    defaults to claim eligibility.
+  - **Event contract (binding; one event kind).** A mutating execution appends one archive
+    event after publications and reference relinks persist and before source deletions,
+    recording the target, destination root, published artifacts, applied reference changes,
+    and the planned deletions with their recorded identities. Deletions then run under
+    D-17 verification; failures surface as `deletion-failed` warnings in the command
+    result. A rerun that performs mutations (including residue deletions) appends its own
+    event; a rerun that mutates nothing appends nothing. "Durable" means the repository's
+    process-level append contract (`append_event` returned success); this plan does not
+    add power-loss or exactly-once semantics beyond `@/inv/event-log`. A crash between
+    mutation and append leaves state that the next rerun recomputes and reports; that
+    window is within the amended contract.
   - **Symlink semantics (D-22):** an explicit root or embedded target that is a symbolic
     link, or whose repository-relative path traverses one, classifies as `block` with
     blocker `symlink-artifact`; the mutation primitive resolves paths physically, verifies
@@ -395,16 +229,16 @@ planning.
     Richer symlink relocation is a follow-up.
   - **Dynamic-loading detection contract (D-23):** `<script src="…">` is a static supported
     edge (the script file is a bundle dependency like any other). The
-    `unsupported-dynamic-edge` blocker fires when a relocated HTML or script bundle member
-    textually contains a local-path-bearing loading construct from the binding initial
-    set — runtime loaders `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`,
-    `importScripts(`, a URL-bearing `data-*` attribute (e.g. reveal.js `data-markdown`,
-    lazy-load `data-src`), or **static module syntax with a relative specifier**
+    `dynamic-loading-suspected` **warning** fires when a relocated HTML or script bundle
+    member textually contains a local-path-bearing loading construct from the initial set —
+    runtime loaders `fetch(`, `import(`, `XMLHttpRequest`, `new Worker(`, `importScripts(`,
+    a URL-bearing `data-*` attribute, or static module syntax with a relative specifier
     (`import … from './…'`, `export … from './…'`, `require('./…')`) — detected by pattern
-    match over the content, never by execution or guessing (D-5). JIT has no JavaScript
-    adapter, so a script whose content declares local dependencies is never relocated
-    silently: it blocks until resolved by hand. Constructs outside the set are outside the
-    contract; the set is append-only under `schema_version`.
+    match only, never by execution (D-5). It warns rather than blocks (owner
+    proportionality amendment): the pattern set cannot distinguish live loaders from code
+    examples in presentation content, so it informs the preview reader instead of gating
+    them. A supported edge the layout genuinely cannot preserve still blocks via
+    `unpreservable-layout`. The set is append-only under `schema_version`.
 
 - **Reuses / integrates with:**
   - Hierarchy membership: `crates/jit/src/graph/hierarchy.rs:458` (`resolve_hierarchy`),
@@ -413,378 +247,215 @@ planning.
     for pinned resolution), `:498` (`read_path_bytes`, enables opaque binary roots without
     an adapter), `:126` (`acquire_repo_write_lock`, re-entrant `RepoWriteGuard` for the
     multi-write sequence).
-  - Sequencing/rollback principles and occupied-destination no-op:
+  - Sequencing principles and occupied-destination no-op:
     `crates/jit/src/commands/document.rs:1637-1787`, `:1670-1683`, `:1391-1435`, with
     failure-injection coverage in `crates/jit/tests/archive_integrity_tests.rs:203-396`.
-  - Domain records: `crates/jit/src/domain/types.rs:877` (`DocumentReference`; `path` :879,
-    `commit` :881, `assets` :891), `:50` (`State::is_terminal` = Done|Rejected only),
-    `:1466` (`Event::DocumentArchived`, superseded by the D-19 event family).
+  - Domain records: `crates/jit/src/domain/types.rs:877` (`DocumentReference`; `path`
+    :879, `commit` :881, `assets` :891), `:50` (`State::is_terminal` = Done|Rejected only),
+    `:1466` (`Event::DocumentArchived`, whose family the container event extends).
   - Adapters/scanner: `crates/jit/src/document/adapter.rs` (Markdown/HTML built-ins),
-    `crates/jit/src/document/assets.rs:16` (`Asset`; `resolved_path` :20, root-relative
-    resolution :151-162, supplied-map classifier limitation :189).
+    `crates/jit/src/document/assets.rs:16` (`Asset`; root-relative resolution :151-162,
+    supplied-map classifier limitation :189, SHA-256 convention :269-276).
 
-- **Grounding (from investigation, re-verified):**
-  - Container membership primitive exists (hierarchy resolution) → **valid-and-open**:
-    archive accepts only one path (`cli.rs:1950-1969`); no container consumer. The
-    investigation's suggestion to enumerate via the transitive dependency closure is
-    **corrected** here (D-25): the dependency closure absorbs cross-container sequencing
-    edges; membership is the resolved `children` closure.
-  - Referentially-consistent single-doc sequence → **already-done**: copy/relink/event/delete
-    with occupied-destination no-op, failure-injection tested
-    (`document.rs:1043-1082`, `archive_integrity_tests.rs:74-396`). Reuse principles; do not
-    wrap `archive_document`.
-  - Dry-run incompleteness → **valid-and-open**: returns before active-reference and
-    destination-occupancy checks (`document.rs:1153-1176`, `:1670-1683`).
-  - Directory-heuristic sharing → **valid-and-open**: `is_shared` ignored by archive;
-    movability is folder placement (`document.rs:1463-1495`); the reference-count classifier
-    has no archive consumer (`assets.rs:185-233`).
-  - Shallow one-level discovery → **valid-and-open**: HTML sees only `src`/`href`, no
-    recursion (`document/adapter.rs:101-146`).
-  - Opaque roots blocked → **valid-and-open**: asset scan requires a text adapter; only
-    Markdown/HTML registered (`document/assets.rs:92-111`, `adapter.rs:177-209`).
-  - Pinned relink unsafe → **valid-and-open**: relink changes only `path`; reads prefer the
-    pinned `commit` (`document.rs:1352-1375`, `:349-357`). Resolved by D-3 + D-26: pinned
-    references are never rewritten; a storage/git resolver canonicalizes every supplied
-    revision to its full commit OID, and every commit-specific read must succeed, while
-    resolution failure, `CommitNotFound`, or commit-path `NotFound` blocks execution.
-  - Post-archive verifier defect → **valid-and-open**: compares destination-resolved against
-    source-resolved paths, so the check is normally skipped (`document.rs:1832-1858`).
-  - Coordination too narrow → **valid-and-open**: no write guard held across
-    plan/copy/saves/event (`document.rs`); guard available (`storage/mod.rs:126`).
-  - String-prefix policy matching → **valid-and-open**: `starts_with` matches
-    `dev/active-other` against `dev/active` (`document.rs:1243-1267`); use component-aware
-    normalization.
-  - Atomic batch execution → **invalid as stated**: true cross-surface atomicity is
-    unavailable; the contract is referential consistency (`document.rs:1050-1074`).
-    Preserve; do not strengthen.
+- **Grounding (from investigation, re-verified):** unchanged from the reviewed baseline —
+  container membership primitive exists but has no archive consumer (`cli.rs:1950-1969`);
+  the referentially-consistent single-doc sequence is done and its principles are reused,
+  not wrapped (`document.rs:1043-1082`, `archive_integrity_tests.rs:74-396`); dry-run
+  incompleteness (`document.rs:1153-1176`, `:1670-1683`), directory-heuristic sharing
+  (`document.rs:1463-1495`, `assets.rs:185-233`), shallow discovery
+  (`adapter.rs:101-146`), opaque-root exclusion (`assets.rs:92-111`), pinned-relink
+  unsafety (`document.rs:1352-1375`, `:349-357`), verifier defect (`document.rs:1832-1858`),
+  missing coordination (`storage/mod.rs:126`), and string-prefix policy matching
+  (`document.rs:1243-1267`) are all valid-and-open and addressed above; literal atomic
+  batch execution remains invalid as stated (`document.rs:1050-1074`).
 
 Layer boundaries (per AGENTS.md, obligation 3): artifact-graph construction and action
-classification are pure domain/document logic, free of I/O; storage exposes commit
-canonicalization, atomic persistence, and narrowly scoped filesystem primitives for stage,
-no-replace publish, quarantine/remove/restore, and physical containment. The command layer
-acquires and retains `RepoWriteGuard` while it recomputes the plan and orchestrates storage
-primitives, issue relinks/saves, event appends, and rollback; CLI/output stay
-user-facing. Managed/permanent paths, archive root, and container-ness come from repository
-configuration, never hardcoded (`@/inv/domain-agnostic`). The plan model is a versionable
-list envelope with stable ordering. Existing replacing persistence continues to respect
-`@/inv/atomic-writes`; D-14's atomic no-replace publication is a distinct new-file
-operation, so its task must first amend the registry-first invariant wording (and render its
-projection) to cover both temp-file + atomic-rename replacement and staged atomic no-replace
-publication. `ArchiveStarted` makes the intended state change durable before mutation, and
-every subsequent state change is represented by completion or safely-proven abort events;
-an unclosable recovery remains durably open, respecting `@/inv/event-log` across retries.
+classification are pure domain/document logic, free of I/O; storage owns persistence, the
+mutation primitive, and verified deletion; commands orchestrate under the guard; CLI/output
+stay user-facing. Categories, managed/permanent paths, archive root, and container-ness
+come from repository configuration, never hardcoded (`@/inv/domain-agnostic`). No-replace
+publication requires amending the registry-first `@/inv/atomic-writes` invariant and its
+rendered projection before implementation diverges from its current wording.
 
 ## 3. Decomposition sketch (near-ready; jit-breakdown instantiates — no issues created here)
 
-Three conceptual groups organize eleven top-level task leaves under the epic. Every task is
-independently landable and green at its boundary. The former monolithic executor is an
-explicit three-task dependency chain: intent/recovery selection, receipt-backed
-publication/reference commit, and source-removal reconciliation/crash recovery.
-Ordering is expressed only through `depends-on`. Group A is the pure foundation; Groups B
-and C consume it where needed (preview and candidates depend on the classifier); the
-filesystem-only storage primitive is independent, and Archive intent and recovery selection
-joins it with the preview/planner surface. Groups B and C can
-proceed independently after A. The plan schema and blocker taxonomy land first, before any
-CLI fan-out (obligation 4). Coverage is enforced at the task tier: each
-requirement-bearing task carries its `satisfies: REQ-*` label directly. The clean-cut legacy
-migration is a support task, credits no container requirement, and is explicitly exempt;
-group headers are organizational only, not issues.
+Three conceptual groups organize nine top-level task leaves under the epic; group headers
+are organizational only, not issues (keeping every leaf directly under the epic also keeps
+the dependency-derived hierarchy from absorbing the storage primitive or preview surface
+into an intermediate container). Every task is independently landable and green at its
+boundary. Ordering is expressed only through `depends-on`. Group A is the pure foundation;
+the filesystem-only storage primitive is independent; coordinated execution joins it with
+the preview/planner surface; Groups B and C proceed independently after A. The plan schema
+and blocker taxonomy land first, before any CLI fan-out (obligation 4). Coverage is
+enforced at the task tier: each requirement-bearing task carries its `satisfies: REQ-*`
+label directly.
 
 ### Group A: Artifact plan model and resolver — covers REQ-01, REQ-02, REQ-04
 
 - **Artifact plan model and blocker taxonomy**  `type: task`  `satisfies: REQ-01`  `depends-on: —`
   Outcome: a serializable artifact-plan type implementing schema version 1 as a
-  deterministically ordered JSON envelope. Envelope fields are exactly `schema_version`,
-  `target`, `destination_root`, `operation_id`, `operation_instance_id`, `execution_id`,
-  `plan_fingerprint`, `eligible`, `policy_status`, `counts`, `artifact_count`, `artifacts`,
-  `blockers`, and `warnings`. Artifact fields are exactly `source`, `version`,
-  `content_identity`, `destination`, `action`, `destination_provenance`,
-  `publication_required`, `publication_mapping`, `publication_proof`, `already_archived`,
-  `provenance`, `format`, `owners`, `edges`, `reference_changes`, `pending_deletions`,
-  `evidence`, `blockers`, and `warnings`. Evidence codes are `permanent-path`,
-  `outside-owner`, `active-owner`, `unmanaged-path`, `archived-source`, and
-  `pinned-historical`; blocker codes are `policy-unconfigured`, `policy-incomplete`,
-  `unmanaged-selected-root`, `destination-conflict`, `document-non-terminal-owner`,
-  `pinned-read-failed`, `unsupported-dynamic-edge`, `repository-escape`,
-  `unresolvable-edge`, `unpreservable-layout`, `non-terminal-target`, `missing-source`,
-  `symlink-artifact`, `archive-recovery-blocked`, `quarantine-unavailable`, and
-  `archive-recovery-ambiguous`; warning codes are `missing-edge-target`, `external-edge`,
-  `no-owner`, `residue-source`, `deletion-failed`, `not-selected-sibling`, and
-  `quarantined-foreign-file`. These field and code sets are binding and append-only under
-  schema versioning.
+  deterministically ordered JSON envelope, with exactly the §2 envelope fields, artifact
+  fields, evidence codes, blocker codes, and warning codes; the sets are binding and
+  append-only under schema versioning.
   Own criteria: `[hard] LOCAL-01: Serializes a plan with stable artifact and blocker
-  ordering independent of input order.` `[hard] LOCAL-02: The same plan object is the input
-  to both preview rendering and execution.` `[hard] LOCAL-03: Artifact identity is
-  (path, version); successfully resolved pinned versions serialize, order, and fingerprint
-  only by the canonical full immutable commit OID as non-relocating historical entries,
-  while failed resolution or commit-specific reads serialize pinned-read-failed blockers.`
-  `[hard] LOCAL-34: Policy status is configured only when managed_paths, permanent_paths,
-  and archive_root are all explicit; partial and absent policy serialize distinctly and
-  defaults never make either executable.` `[hard] LOCAL-45: Every working-tree publication
-  or deletion serializes content_identity as lowercase SHA-256 plus byte_size, and Started
-  binds that identity to the exact source/destination/reference/deletion entries.`
-  `[hard] LOCAL-47: A golden schema-version-1 conformance test asserts the complete envelope
-  and artifact field lists and complete evidence, blocker, and warning code lists above;
-  missing, renamed, or silently reclassified fields/codes fail, and extra codes require an
+  ordering independent of input order.` `[hard] LOCAL-02: The same plan object is the
+  input to both preview rendering and execution.` `[hard] LOCAL-03: Artifact identity is
+  (path, version); resolved pinned versions serialize and order only by canonical full
+  commit OID as non-relocating historical entries.` `[hard] LOCAL-04: Policy status is
+  configured only when managed_paths, permanent_paths, and archive_root are all explicit;
+  partial and absent policy serialize distinctly and neither is executable.`
+  `[hard] LOCAL-05: A golden schema-version-1 conformance test asserts the complete field
+  and code lists; missing, renamed, or reclassified entries fail, and additions require an
   explicit schema-versioning decision.`
   Blast radius: self-contained new module; no existing consumer changes.
 
 - **Target root inventory and ownership**  `type: task`  `satisfies: REQ-01`  `depends-on: Artifact plan model and blocker taxonomy`
   Outcome: one versioned explicit-root inventory for both target kinds. A container yields
-  its resolved-hierarchy subtree (D-25) and every distinct issue-linked root on those issues.
-  A document target normalizes its arbitrary path as an explicit working-tree root even when
-  opaque or zero-owner, looks up every direct owner repository-wide, and adds canonical
-  pinned historical variants for matching references alongside the unpinned working-tree
-  variant. Policy eligibility and zero-owner execution semantics are applied later.
-  Own criteria: `[hard] LOCAL-04: Membership is the resolved-hierarchy children closure; a
-  cross-container sequencing dependency contributes no member.` `[hard] LOCAL-05:
+  its resolved-hierarchy subtree (D-25) and every distinct issue-linked root on those
+  issues; a document target normalizes its arbitrary path as an explicit working-tree root
+  even when opaque or zero-owner, looks up every direct owner repository-wide, and adds
+  canonical pinned historical variants beside the working-tree variant.
+  Own criteria: `[hard] LOCAL-06: Membership is the resolved-hierarchy children closure; a
+  cross-container sequencing dependency contributes no member.` `[hard] LOCAL-07:
   Inventories every distinct DocumentReference in the closure, including CSV/PNG/SVG roots
-  with no registered adapter and pinned versions as historical entries.` `[hard] LOCAL-06:
+  with no registered adapter and pinned versions as historical entries.` `[hard] LOCAL-08:
   Records every direct issue-reference owner of each artifact repository-wide, flagging
-  owners outside the subtree.` `[hard] LOCAL-43: A zero-owner arbitrary CSV/PNG/SVG document
-  path becomes a normalized explicit working-tree root with empty owners/no-owner evidence,
-  without requiring a text adapter.` `[hard] LOCAL-44: A document path with mixed
-  pinned/unpinned owners yields one working-tree variant plus canonical full-OID historical
-  variants, with every direct owner associated to the correct version.` `[hard] LOCAL-38: Canonicalizes each supplied pinned revision
-  through the storage/git resolver to the hash-algorithm-agnostic full commit OID (including
-  symbolic and abbreviated inputs), and blocks a failed resolution.`
-  Blast radius: adds the reusable storage/git canonical-revision resolver and otherwise
+  owners outside the subtree.` `[hard] LOCAL-09: Canonicalizes each supplied pinned
+  revision (symbolic, abbreviated, or full) to the full commit OID and emits
+  pinned-read-failed on failed resolution.` `[hard] LOCAL-10: A zero-owner arbitrary
+  CSV/PNG/SVG document path becomes a normalized explicit working-tree root with no-owner
+  evidence, without requiring a text adapter.`
+  Blast radius: adds the reusable storage/git canonical-revision resolver; otherwise
   reuses `hierarchy.rs:458` and `storage/mod.rs:498`.
 
 - **Recursive supported-dependency discovery**  `type: task`  `satisfies: REQ-01, REQ-04`  `depends-on: Artifact plan model and blocker taxonomy, Target root inventory and ownership`
-  Outcome: recursive discovery of supported local dependencies — Markdown/HTML element URLs
-  and CSS `@import`/`url()` — with cycle detection, normalized component-aware path
-  resolution, before/after edge reachability, repository-escape rejection, and the D-23
-  detection contract for dynamic and module-loading constructs. Discovery is version-aware
-  (D-26): pinned roots are scanned over commit-resolved content through the storage layer's
-  commit-aware reads, yielding informational (path, canonical full OID) dependency entries.
-  Own criteria: `[hard] LOCAL-07: Discovers an HTML→sibling-CSS→nested-figure chain and CSS
-  @import/url() targets to full depth, treating script-element src URLs as static supported
-  edges.` `[hard] LOCAL-08: Terminates on dependency cycles and reports local-path-bearing
-  constructs from the binding D-23 set as unsupported edges, by textual pattern match only.`
-  `[hard] LOCAL-33: Discovers a pinned root's supported closure from its commit-resolved
-  content, emitting non-relocating (path, canonical full OID) entries; CommitNotFound and NotFound for
-  either root or supported commit-path dependency emit pinned-read-failed and block the
-  target, with no working-tree fallback.`
+  Outcome: recursive discovery of supported local dependencies of working-tree artifacts —
+  Markdown/HTML element URLs and CSS `@import`/`url()` — with cycle detection, normalized
+  component-aware path resolution, before/after edge reachability, repository-escape
+  rejection, and the D-23 textual detection set emitted as warnings.
+  Own criteria: `[hard] LOCAL-11: Discovers an HTML→sibling-CSS→nested-figure chain and
+  CSS @import/url() targets to full depth, treating script-element src URLs as static
+  supported edges.` `[hard] LOCAL-12: Terminates on dependency cycles and emits
+  dynamic-loading-suspected warnings for local-path-bearing constructs from the binding
+  D-23 set, by textual pattern match only, without blocking.` `[hard] LOCAL-13: A pinned
+  root whose commit read fails emits pinned-read-failed; reachable pinned roots contribute
+  no working-tree constraints and no embedded-closure scan.`
   Blast radius: extends the document adapter/scanner surface; existing Markdown/HTML
   callers (snapshot export) are unaffected because discovery is a new recursive path.
 
 - **Move/copy/retain/block classification**  `type: task`  `satisfies: REQ-02, REQ-04`  `depends-on: Target root inventory and ownership, Recursive supported-dependency discovery`
   Outcome: a pure classifier assigning each working-tree artifact move, copy, retain, or
-  block through the D-16 edge-aware calculus, completing the D-13 ownership universe by
-  extending direct owners with the supported embedded closure over every issue-linked
-  document repository-wide, proposing destinations by the D-12 mirror rule, and applying
-  the D-26 pinned model, per-reference selection, archive-root precedence, explicit policy
-  completeness, and the normative missing/already-archived evaluation order.
-  Own criteria: `[hard] LOCAL-09: Ownership incorporates supported embedded references
-  reachable from any issue-linked document repository-wide, flagging outside owners.`
-  `[hard] LOCAL-10: Classifies deterministically per the calculus — a figure shared by a
-  terminal and an active issue copies when a relocated parent references it relatively and
-  retains otherwise, never force-relinking the active consumer; permanent-path,
-  outside-owner, and active-owner are evidence rather than blockers; a successfully read
-  pin imposes no working-tree constraint while a failed commit-specific read blocks the
-  target.`
-  `[hard] LOCAL-11: Every supported edge's resolution mode (relative vs root-relative)
-  drives the decision, and the classifier never emits a layout in which a relocated
-  parent's supported edge lacks its target; specifically, a relocated parent's relative
-  edge into archive_root copies that dependency to the current mirror while retaining the
-  archived source.` `[hard] LOCAL-12: Uses path-component
-  containment to evaluate managed/permanent status for every working-tree artifact, so
-  dev/active-other does not match dev/active.` `[hard] LOCAL-36: An unmanaged selected root
-  emits the target blocker unmanaged-selected-root; an unmanaged embedded dependency emits
-  unmanaged-path evidence, always needs-source, copies when its relocated parent needs a
-  destination copy and otherwise retains, and never moves.` `[hard] LOCAL-13: Proposes destinations by mirroring repository-relative
-  source paths beneath the destination root (full container UUID segment), keeping
-  identical filenames distinct.` `[hard] LOCAL-14: Classifies a differing-content occupied
-  destination as blocked; a content-identical pre-existing or unreceipted one as already_archived/
-  preexisting-identical with publication_required=false and needs-source=true, excluding its
-  source from pending_deletions; a Started publication_mapping is intent only, and only an
-  exact durable non-reconciliation ArchiveExecuted.completed_publications receipt can yield
-  published-by-instance deletion authority. Symlink paths block with the symlink code.`
-  `[hard] LOCAL-39: Before managed/root classification, marks every path beneath archive_root
-  (including dev/archive/features/... and another container segment) archived-source,
-  already-existing, needs-source, and exempt from unmanaged-selected-root: selected/direct
-  roots retain with null destination/no relink; relative-edge dependencies of relocated
-  parents copy to the mirror; root-relative/staying edges retain; none move/delete.`
-  `[hard] LOCAL-40: Computes
-  reference_changes per reference: pinned never; container only unpinned terminal-inside;
-  document all unpinned direct owners after D-15; every unselected unpinned reference forces
-  needs-source, so mixed-owner artifacts copy/retain and move only when all source-dependent
-  unpinned references are selected.`
+  block through the D-16 calculus, completing the D-13 ownership universe with the
+  supported embedded closure over every issue-linked working-tree document, applying
+  per-reference selection, archive-root precedence, explicit policy completeness, the
+  D-26 pinned model, D-12 mirror destinations, and the normative
+  missing/already-archived evaluation order.
+  Own criteria: `[hard] LOCAL-14: Ownership incorporates supported embedded references
+  reachable from any issue-linked working-tree document repository-wide, flagging outside
+  owners.` `[hard] LOCAL-15: Classifies deterministically per the calculus — a figure
+  shared by a terminal and an active issue copies when a relocated parent references it
+  relatively and retains otherwise, never force-relinking the active consumer;
+  permanent-path, outside-owner, active-owner, unmanaged-path, and archived-source are
+  evidence, not blockers.` `[hard] LOCAL-16: Every supported edge's resolution mode
+  (relative vs root-relative) drives the decision; the classifier never emits a layout in
+  which a relocated parent's supported edge lacks its target, and a relative edge into
+  archive_root copies that dependency to the mirror while the archived source is
+  retained.` `[hard] LOCAL-17: Uses path-component containment for managed/permanent
+  status, so dev/active-other does not match dev/active; an unmanaged selected root blocks
+  as unmanaged-selected-root while an unmanaged embedded dependency copies or retains,
+  never moves.` `[hard] LOCAL-18: Proposes destinations by mirroring repository-relative
+  source paths beneath the destination root (full container UUID segment); a
+  differing-content occupied destination blocks as destination-conflict and a
+  content-identical one classifies already_archived with its source excluded from
+  pending_deletions; symlink paths block.` `[hard] LOCAL-19: Computes reference_changes
+  per reference: pinned never; container targets select only unpinned terminal-inside
+  references; document targets select all unpinned direct owners after D-15; every
+  unselected unpinned reference forces needs-source, so mixed-owner artifacts copy or
+  retain and move only when every source-dependent unpinned reference is selected.`
   Blast radius: self-contained; supersedes the archive-time directory heuristic without
   touching the legacy command until Group B.
 
 ### Group B: Unified archive CLI and safe executor — covers REQ-03, REQ-04, REQ-06
 
 - **Storage-owned artifact mutation primitive**  `type: task`  `satisfies: REQ-03`  `depends-on: —`
-  Outcome: narrowly scoped filesystem primitives that stage bytes in recorded hidden
-  owner-private locations adjacent to each destination,
-  verify staged bytes against caller-supplied SHA-256+size before publishing new
-  destinations atomically with no replacement and return an explicit success result only
-  when this call created the destination (D-14), physically validate
-  containment/no-symlink traversal, and quarantine/remove/restore sources through D-17.
-  They neither acquire the operation-wide guard nor plan, relink/save issues, append events,
-  or orchestrate rollback; those responsibilities belong to the three-task execution chain.
-  Testable through tempdir-backed storage (the in-memory backend performs no virtual file
-  I/O, so filesystem assertions run against `JsonFileStorage` at a tempdir).
-  Own criteria: `[hard] LOCAL-15: Rejects an occupied destination with the pre-existing
-  file preserved byte-for-byte and, before introducing no-replace publication, amends the
-  registry-first atomic-writes invariant plus rendered projection to explicitly cover
-  staged atomic no-replace publication alongside temp-file + atomic-rename replacement.`
-  `[hard] LOCAL-16: Exposes only filesystem stage, atomic no-replace publish,
-  quarantine/remove/restore, and physical-containment operations using caller-supplied exact
-  mappings; publish returns success only for a completed no-replace creation and a collision,
-  including an identical external file, returns AlreadyExists rather than success; it performs no issue save,
-  event append, planning, operation-wide locking, expected-identity recapture, or rollback
-  orchestration.` `[hard] LOCAL-17: A destination created by an
-  external writer between planning and finalization fails that artifact's finalization
-  without overwriting the foreign file, verified by a race-focused test.` `[hard] LOCAL-18:
-  Never unlinks a path directly: every removal runs the D-17 directory-handle-anchored
-  sequence at the caller-supplied adjacent quarantine mapping using Started digest+size
-  (same-filesystem rename in,
-  openat-verify on the handle, unlinkat only on match; no-replace restore or
-  quarantined-and-reported on mismatch), never recapturing expected identity, race-tested;
-  platforms without the required directory-handle operations return quarantine-unavailable;
-  recovery
-  checks both recorded source and quarantine entry, including crash immediately after
-  rename. The primitive itself never derives deletion authority from Started intent: command
-  orchestration must supply a receipt-backed published-by-instance destination, which it
-  opens/verifies against initial identity and holds through the quarantine decision;
-  mismatch never removes source. Failure injection modifies a pre-existing identical
-  destination and a receipted instance-published destination after Started; both retain source.`
-  `[hard] LOCAL-46: Staging/quarantine dirs and entries are hidden, owner-private,
-  adjacent to destination/source respectively, absent and symlink/component-safe before
-  use; cleanup removes only a verified recorded entry and empty dir, and quarantine has no
-  cross-device copy-delete fallback.`
-  Blast radius: new storage API plus the authoritative `.jit/invariants.toml` entry and its
-  rendered AGENTS.md projection; the legacy command keeps its inline `std::fs` path until it
-  is removed.
+  Outcome: narrowly scoped filesystem primitives that stage bytes, verify staged bytes
+  against caller-supplied SHA-256+size, publish new destinations atomically with no
+  replacement — returning success only when this call created the destination, and
+  `AlreadyExists` for any collision including a content-identical one (D-14) — validate
+  physical containment with no symlink traversal, and delete a caller-named source only
+  after re-verifying its caller-supplied recorded identity (D-17). They neither acquire
+  the operation-wide guard nor plan, relink issues, append events, or orchestrate
+  execution. A cross-filesystem destination fails with a typed error. Testable through
+  tempdir-backed storage (the in-memory backend performs no virtual file I/O).
+  Own criteria: `[hard] LOCAL-20: Rejects an occupied destination — including a
+  content-identical external creation between check and publish — with the pre-existing
+  file preserved byte-for-byte, verified by a race-focused test.` `[hard] LOCAL-21:
+  Before introducing no-replace publication, amends the registry-first atomic-writes
+  invariant and its rendered projection to cover staged no-replace publication alongside
+  temp-file + atomic-rename replacement.` `[hard] LOCAL-22: Deletes a source only after
+  re-verifying the caller-supplied recorded content identity; mismatch performs no
+  removal and reports it.` `[hard] LOCAL-23: Exposes only stage, no-replace publish,
+  verified delete, and physical-containment operations; it performs no issue save, event
+  append, planning, or operation-wide locking, and a cross-filesystem archive root is a
+  typed error, not a fallback.`
+  Blast radius: new storage API plus the authoritative `.jit/invariants.toml` entry and
+  its rendered AGENTS.md projection; the legacy command keeps its inline `std::fs` path
+  until removed.
 
 - **Unified archive preview surface**  `type: task`  `satisfies: REQ-06`  `depends-on: Move/copy/retain/block classification`
   Outcome: `jit archive document <path>` and `jit archive container <id>` produce a
   complete non-mutating plan by default, running every precondition execution relies on
-  (source availability, explicit complete policy, terminal eligibility, outside owners, pinned
-  semantics, destination conflicts, before/after reachability), rendered as both the
-  binding JSON envelope and human output, and verified against the
+  (source availability, explicit complete policy, terminal eligibility, outside owners,
+  pinned semantics, destination conflicts, before/after reachability), rendered as both
+  the binding JSON envelope and human output, and verified against the
   Markdown/HTML/CSS/CSV/PNG/SVG fixture corpus.
-  Own criteria: `[hard] LOCAL-19: Preview enumerates every artifact, action, evidence flag,
-  and blocker and mutates nothing.` `[hard] LOCAL-20: Document and container targets
-  produce the same plan schema from the shared planner.` `[hard] LOCAL-21: In a repository
-  with absent or partial documentation policy, preview returns a non-mutating inventory
-  distinguishing unconfigured from incomplete, explaining that archival is disabled, and
-  execution is refused without substituting defaults.` `[hard] LOCAL-48: Fixture tests for
-  Markdown, HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews
-  with deterministic artifact/action/blocker results, and each human rendering represents
-  the same plan as its JSON rendering.`
-  Blast radius: adds a new `archive` command group; MCP tools regenerate from the CLI schema
-  automatically.
+  Own criteria: `[hard] LOCAL-24: Preview enumerates every artifact, action, evidence
+  flag, and blocker and mutates nothing.` `[hard] LOCAL-25: Document and container targets
+  produce the same plan schema from the shared planner.` `[hard] LOCAL-26: With absent or
+  partial documentation policy, preview returns a non-mutating inventory distinguishing
+  unconfigured from incomplete and explaining that archival is disabled, and execution is
+  refused without substituting defaults.` `[hard] LOCAL-27: Fixture tests for Markdown,
+  HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews with
+  deterministic artifact/action/blocker results, and each human rendering represents the
+  same plan as its JSON rendering.`
+  Blast radius: adds a new `archive` command group; MCP tools regenerate from the CLI
+  schema automatically.
 
-- **Archive intent and recovery selection**  `type: task`  `satisfies: REQ-03`  `depends-on: Storage-owned artifact mutation primitive, Unified archive preview surface`
-  Outcome: establish the command-layer execution context without filesystem or metadata
-  mutation. Acquire and retain `RepoWriteGuard` across the full execution operation; reject
-  a non-terminal container; ignore preview/fingerprint state; scan every open Started intent
-  by stable recovery target before reading current `archive_root`; adopt exactly one
-  recorded operation/root/contract, return `archive-recovery-ambiguous` for multiple
-  matches, or compute exactly one fresh plan and mint only after prior matching intents are
-  terminal. Container matching uses full UUID. Document matching uses canonical original
-  root plus only that root's own destination aliases, never embedded/shared dependencies.
-  Recovery retains original identities and mappings without recapture, re-evaluates
-  current ownership/references only for safety, and defers unrelated new artifacts.
-  Own criteria: `[hard] LOCAL-25: Refuses execution on a non-terminal container;
-  otherwise ignores preview state, acquires and retains RepoWriteGuard across the complete
-  mutation operation, discovers recovery first, and recovers the recorded contract or
-  computes exactly one fresh plan; no prior preview or expected fingerprint is an execution
-  input.` `[hard] LOCAL-26: Before current archive_root is read/applied or a fresh key
-  computed, scans all opens by recovery_target: full container UUID, or document canonical
-  original root/that root's own destination aliases only. Shared/embedded dependency paths
-  never match. One match adopts its recorded root/contract; multiple return
-  archive-recovery-ambiguous; no match permits fresh planning only after prior target
-  intents are terminal. Recovery uses initial Started digest+size and durable event history
-  without recapture, recognizes published-by-instance only from an exact
-  non-reconciliation completed_publications receipt subject to current identity
-  revalidation, and classifies Started mapping plus matching identity alone as
-  publication-unproven with source retained. Tests cover source/destination edits,
-  hierarchy/owner/archive_root changes, document invocation by destination alias, multiple
-  opens, and two open documents sharing a dependency without false adoption/ambiguity.`
-  Blast radius: introduces the guarded recovery-selection/execution-context boundary; no
-  publication, relink, removal, or terminal event occurs here.
+- **Coordinated plan execution**  `type: task`  `satisfies: REQ-03, REQ-04`  `depends-on: Storage-owned artifact mutation primitive, Unified archive preview surface`
+  Outcome: `--execute` acquires and holds `RepoWriteGuard` across the whole operation,
+  recomputes the plan (preview output is never an execution input, D-7), refuses
+  non-terminal containers and D-15-ineligible document targets, stages and verifies
+  content identities captured under the guard, validates every supported local edge in
+  the proposed layout, publishes no-replace, applies exactly the planned
+  `reference_changes` (pinned references untouched), refreshes or invalidates cached
+  asset metadata on moved references, appends one archive event recording publications,
+  relinks, and planned deletions, then deletes each planned source under recorded-identity
+  verification, reporting failures as `deletion-failed` warnings. Rerunning after any
+  partial failure converges by recomputation: content-identical destinations classify
+  already-archived, residual sources are rediscovered through the inverse mirror mapping
+  and deleted under the same verification, and a run that mutates nothing appends no
+  event.
+  Own criteria: `[hard] LOCAL-28: Validates every staged supported local edge against the
+  proposed destination layout, not source-resolved paths, before metadata commit.`
+  `[hard] LOCAL-29: Refuses execution on a non-terminal container; refuses document-target
+  execution while any direct or embedded-closure owner is non-terminal, while a managed
+  zero-owner document executes with informational evidence.` `[hard] LOCAL-30: Applies
+  exactly reference_changes — pinned references untouched, container targets relink only
+  unpinned terminal-inside references, document targets relink every unpinned direct
+  owner, unselected references remain source-resolvable — and holds one write guard from
+  recomputation through the final deletion attempt.` `[hard] LOCAL-31: Appends one archive
+  event after publications and relinks and before deletions, recording publications,
+  reference changes, and planned deletions; a rerun that mutates nothing appends no
+  event.` `[hard] LOCAL-32: Failure injection for partial relink, event-append failure,
+  deletion failure, and a source edited after planning proves no artifact is lost, no
+  destination overwritten, and no reference relying solely on a missing path; a rerun
+  after each injected failure converges — already-archived recognition, inverse-mapping
+  residue rediscovery and verified deletion, no duplicate destination, reference, or
+  event.`
+  Blast radius: command-layer execution over the storage primitive and shared planner; no
+  legacy-command change.
 
-- **Receipt-backed publication and reference commit**  `type: task`  `satisfies: REQ-03, REQ-04`  `depends-on: Archive intent and recovery selection`
-  Outcome: consume the selected context under its held guard and commit publications plus
-  exact issue-reference changes, but never remove a source. For fresh work, capture initial
-  SHA-256+byte-size identities, derive exact destination-adjacent staging and
-  source-adjacent quarantine/deletion-intent mappings, and durably append ArchiveStarted
-  before mutation. Stage and verify every artifact, validate all supported edges in the
-  proposed layout, publish no-replace, revalidate preexisting-identical destinations before
-  selected relinks, apply exactly `reference_changes`, refresh/invalidate cached asset
-  metadata, and leave pinned references untouched. After storage returns publication
-  success and relinks persist, append a normal non-reconciliation ArchiveExecuted with the
-  identity triple, exact completed_publications/relinks, and receipt-backed pending
-  deletions; append failure leaves the publication unproven and forbids source quarantine.
-  Document execution requires every direct and embedded-closure owner terminal; a managed
-  zero-owner document remains executable with informational evidence.
-  Own criteria: `[hard] LOCAL-22: Validates every staged local edge in the proposed layout,
-  not against source-resolved paths, before metadata commit.` `[hard] LOCAL-23: Refuses
-  document-target execution while any owner of the document or its bundle artifacts is
-  non-terminal, while a managed zero-owner target may execute with informational evidence.`
-  `[hard] LOCAL-41: Applies exactly reference_changes: pinned references are untouched;
-  container execution relinks only unpinned terminal-inside references; document execution
-  relinks every unpinned direct owner after D-15; mixed nonselected references remain
-  source-resolvable.` `[hard] LOCAL-49: ArchiveStarted records recovery_target, recorded
-  destination root, operation/instance/execution IDs, fingerprint, exact initial or
-  remaining contract, identities, publication staging mappings, and deletion_intents and
-  appends before mutation. Initial staging matches the Started identity. A normal
-  non-reconciliation ArchiveExecuted appends only after successful no-replace publications
-  and relinks, records exact completed_publications/relinks plus receipt-backed pending
-  deletions, remains durable if every later removal fails, and is the only event that can
-  establish published-by-instance; Started intent and reconciliation never can. No source
-  quarantine begins before that append succeeds.`
-  Blast radius: command-layer publication, issue-save, cache, and Started/Executed event
-  paths; source names remain untouched.
-
-- **Source-removal reconciliation and crash recovery**  `type: task`  `satisfies: REQ-03`  `depends-on: Receipt-backed publication and reference commit`
-  Outcome: reconcile receipt-backed deletion intents and close partial operations without
-  loss or overwrite, then activate the public `--execute` dispatch only in this final
-  landing. The preceding intent-selection and publication/reference changes expose internal
-  command services only; no intermediate commit makes repository mutation publicly
-  reachable. For each removal, require the exact durable non-reconciliation
-  completed_publications receipt, open-handle verify the current destination against the
-  initial Started identity while holding that handle through the decision, then invoke the
-  recorded same-filesystem quarantine/remove/restore primitive and inspect both source and
-  quarantine entry. Append ArchiveSourcesRemoved with exactly successful removals and omit
-  it when none succeed. Recovery reuses the original mappings/identity, never invents
-  publication provenance, and either completes, proves referential safety then appends
-  ArchiveAborted with reason/completed/reverted/residual paths, or leaves the intent open as
-  archive-recovery-blocked. Unreceipted matching destinations retain source, revalidate
-  before selected relinks, and safely abort `publication-unproven`; ambiguous intents mint
-  nothing, and a brand-new converged no-op emits no events.
-  Own criteria: `[hard] LOCAL-24: Failure injection for partial relink, event append,
-  deletion, crash after source-to-quarantine rename, source modification, modification of
-  pre-existing or receipted destinations, external identical creation after Started before
-  JIT publish, and crash after JIT publish before receipt proves no artifact is lost or
-  overwritten and no reference relies only on a missing path. Recovery checks source and
-  recorded entry; mismatch is never deleted and is no-replace restored or retained and
-  reported. Unproven publication has no pending deletion, retains source, revalidates
-  identity before any selected relink, and safely ArchiveAborted(reason=
-  publication-unproven) when applicable.` `[hard] LOCAL-27: ArchiveSourcesRemoved appends
-  after removals with exactly successfully removed paths and is omitted when zero succeed.
-  Reconciliation can consume only previously receipted completed_publications, verifies
-  destination plus both recorded source/quarantine locations, and can never add
-  completed_publications or invent provenance. ArchiveAborted appends only after a proven
-  referentially safe restored/retained state and records adopted operation/instance IDs,
-    fresh execution ID, reason, and completed/reverted/residual paths; safe duplicate terminal
-    events are allowed. Unclosable or ambiguous recovery stays open and blocks; only terminal
-    completion/abort permits a fresh operation. Tests cover modified destinations, both
-    unreceipted publication windows, crash immediately after quarantine rename, removal
-    failure with durable ArchiveExecuted, archive_root change, target aliases, multiple
-    matches, and shared-dependency nonmatches.` `[hard] LOCAL-50: Public `--execute`
-    dispatch is absent or mutation-disabled until this task lands the complete removal,
-    reconciliation, abort, and failure-injection paths; the same change activates the flag
-    only after the end-to-end recovery suite passes.`
-  Blast radius: source quarantine/removal, ArchiveSourcesRemoved/ArchiveAborted, and the
-  crash/failure-recovery test matrix.
-
-- **Remove the legacy document-archive command**  `type: task`  `satisfies: —`  `depends-on: Source-removal reconciliation and crash recovery`
+- **Remove the legacy document-archive command**  `type: task`  `satisfies: —`  `depends-on: Coordinated plan execution`
   Outcome: `jit doc archive` is removed completely as a clean-cut migration with no alias
   or stub, and all consumers (CLI/main dispatch, `ArchiveResult`, event catalog/schema
   references, integration and unit tests, fixtures, docs, README, and the auto-generated
@@ -793,8 +464,8 @@ group headers are organizational only, not issues.
   with it (D-21): its loader field, docs, and this repository's config entries go in the
   same change.
   Coverage: migration support only; it carries no container requirement and is exempt from
-  `satisfies:` coverage rather than claiming credit already borne by the replacement tasks.
-  Own criteria: `[hard] LOCAL-28: A tree-wide search for the legacy surface (the strings
+  `satisfies:` coverage rather than claiming credit borne by the replacement tasks.
+  Own criteria: `[hard] LOCAL-33: A tree-wide search for the legacy surface (the strings
   "doc archive", "archive_document", "ArchiveResult") across crates/, mcp-server/, web/,
   docs/, and dev/ returns no live production or test reference; only historical dev/
   records may mention it.`
@@ -807,32 +478,19 @@ group headers are organizational only, not issues.
   Outcome: `jit archive candidates` lists terminal containers using the shared planner —
   container-ness derives from the configured type hierarchy (any type at a non-leaf level
   of `[type_hierarchy]`, D-20), membership from the resolved hierarchy (D-25), never from
-  hardcoded type names — each with documentation-policy status, managed/permanent path
-  status, repository-wide artifact ownership, artifact counts,
-  outside-subtree/active/permanent/unmanaged evidence plus unmanaged-selected-root,
-  pinned-read/missing/unsupported/conflict blockers, and a
-  move/copy/retain summary, in both human and JSON form, with no filesystem, issue, or
-  event mutation and no age or retention filtering. Archive-root sources are reported as
-  already-existing and never unmanaged: direct roots retain, relocated-parent relative
-  dependencies copy with original retained, and other edges retain.
-  Every candidate is evaluated fully:
-  archival takes no category input (D-21), so the D-12 mirror rule determines each
-  destination and no check is deferred or guessed.
-  Own criteria: `[hard] LOCAL-29: Lists terminal containers with policy status, ownership,
-  counts, and blockers, explaining exclusions rather than omitting them.` `[hard] LOCAL-30:
-  Emits identical human and JSON results while mutating nothing, and applies no
-  time/retention filter.` `[hard] LOCAL-31: Derives candidate container-ness from the
-  configured type hierarchy's non-leaf levels and resolved-hierarchy membership, with no
-  hardcoded type names.` `[hard] LOCAL-32: Evaluates every candidate fully — including
-  destination conflicts under the mirror rule — with no category input, suggestion, or
-  deferred check.` `[hard] LOCAL-35: JSON uses the candidate_count + candidates collection
-  envelope and preserves configured/incomplete/unconfigured policy status per candidate.`
-  `[hard] LOCAL-37: Candidate details distinguish unmanaged-selected-root blockers from
-  unmanaged-path evidence on embedded dependencies and summarize the latter only as copy or
-  retain, never move.` `[hard] LOCAL-42: Candidate details mark archive-root sources as
-  already-existing: selected/direct roots retain at existing paths; relative-edge
-  dependencies of relocated parents copy to the mirror with originals retained; other edges
-  retain—including retired dev/archive/features/... layouts.`
+  hardcoded type names — each with three-state documentation-policy status,
+  managed/permanent path status, repository-wide artifact ownership, artifact counts,
+  blockers, and a move/copy/retain summary, in both human and JSON form, with no
+  filesystem, issue, or event mutation and no age or retention filtering. Every candidate
+  is evaluated fully: archival takes no category input (D-21), so the D-12 mirror rule
+  determines each destination and no check is deferred or guessed.
+  Own criteria: `[hard] LOCAL-34: Lists terminal containers with policy status, ownership,
+  counts, and blockers, explaining exclusions rather than omitting them.`
+  `[hard] LOCAL-35: Emits identical human and JSON results while mutating nothing, and
+  applies no time/retention filter.` `[hard] LOCAL-36: Derives candidate container-ness
+  from the configured type hierarchy's non-leaf levels and resolved-hierarchy membership,
+  with no hardcoded type names, and evaluates every candidate fully with no category
+  input.`
   Blast radius: self-contained new read-only command consuming Group A.
 
 **Coverage map** (single source for criterion→item; every `[hard]` criterion → ≥1 item):
@@ -841,51 +499,44 @@ group headers are organizational only, not issues.
 |---|---|
 | REQ-01 | Artifact plan model and blocker taxonomy; Target root inventory and ownership; Recursive supported-dependency discovery |
 | REQ-02 | Move/copy/retain/block classification |
-| REQ-03 | Storage-owned artifact mutation primitive; Archive intent and recovery selection; Receipt-backed publication and reference commit; Source-removal reconciliation and crash recovery |
-| REQ-04 | Recursive supported-dependency discovery; Move/copy/retain/block classification; Receipt-backed publication and reference commit |
+| REQ-03 | Storage-owned artifact mutation primitive; Coordinated plan execution |
+| REQ-04 | Recursive supported-dependency discovery; Move/copy/retain/block classification; Coordinated plan execution |
 | REQ-05 | Read-only container candidate report |
 | REQ-06 | Unified archive preview surface |
 
-> **Removal acceptance check (D-9, clean cut, no alias).** Acceptance is a tree-wide search
-> across `crates/`, `mcp-server/`,
+> **Removal acceptance check (D-9, clean cut, no alias).** The removal task depends on
+> Coordinated plan execution, so the old `jit doc archive` and the new `jit archive`
+> family coexist through every intermediate wave and no wave breaks a consumer before its
+> replacement exists. Acceptance is a tree-wide search across `crates/`, `mcp-server/`,
 > `web/`, `docs/`, and `dev/` for `doc archive`, `archive_document`, and `ArchiveResult`,
 > which must return no live production or test reference (historical `dev/` records
 > excepted). The pre-plan sweep of that exact pattern reported **103 matches across 33
 > files**; the live production Rust consumers are `crates/jit/src/{cli.rs, main.rs,
 > commands/document.rs, commands/mod.rs, schema.rs, domain/event_catalog.rs}`; the test
 > consumers are `crates/jit/tests/{doc_archive_tests.rs, archive_integrity_tests.rs,
-> command_exit_code_projection_tests.rs}`; the rest are docs/ and dev/ prose. The MCP tool
-> set is auto-generated from the CLI schema, so removing the subcommand drops it on
+> command_exit_code_projection_tests.rs}`; the rest are docs/ and dev/ prose. The MCP
+> tool set is auto-generated from the CLI schema, so removing the subcommand drops it on
 > regeneration. `crates/server` and `web` carry no live consumer.
 
 ## 4. Risks and actionability
 
 | Risk / open question | Severity | Mitigation or decision |
 |---|---|---|
-| Generalized safe execution weakens the current referential-consistency guarantee | High | Reuse the proven sequencing/rollback (`document.rs:1391-1435`) and its failure-injection suite (`archive_integrity_tests.rs:203-396`); execution carries partial-failure criteria (LOCAL-24). Contract stays referential consistency, never atomicity. |
-| Membership drawn from the wrong relation relocates another container's artifacts | High | D-25: membership is the resolved-hierarchy children closure (`hierarchy.rs:458`, `:321`), never the raw dependency closure; a sequencing edge contributes no member (LOCAL-04). |
-| An intermediate container absorbs storage/preview prerequisites through the dependency-derived hierarchy | High | The execution split uses three top-level task leaves. Their prerequisite chain remains DAG-authoritative without creating a deeper container whose dependency closure would capture Storage-owned artifact mutation primitive or Unified archive preview surface. All eleven leaves resolve directly under the epic. |
-| Symbolic or abbreviated pinned revisions make identity/fingerprints nondeterministic | High | D-26: the storage/git resolver canonicalizes every supplied revision to the hash-algorithm-agnostic full immutable commit OID; only that OID is serialized, ordered, and hashed. Resolution failure, `CommitNotFound`, and commit-path `NotFound` block with no fallback (LOCAL-03, LOCAL-33, LOCAL-38). |
-| A partial documentation table silently authorizes default policy | High | D-1: only explicit managed_paths, permanent_paths, and archive_root produce `configured`; absent and incomplete policy remain distinct, previewable, and non-executable (LOCAL-34, LOCAL-21). |
-| Archive-root dependency is moved/deleted or a relocated relative edge loses its target | High | `archived-source` always supplies needs-source and bypasses unmanaged blocking. Direct roots retain; a relative-edge dependency of a relocated parent copies to the current mirror; root-relative/staying edges retain. Original `dev/archive/features/...` or other archive-root paths never move/delete (LOCAL-11, LOCAL-39, LOCAL-42). |
-| Recursive discovery moves an embedded dependency outside delegated managed paths | High | Managed status is computed for every working-tree artifact. An unmanaged selected root blocks as `unmanaged-selected-root`; an unmanaged embedded dependency carries `unmanaged-path`, always needs-source, and therefore copies when its relocated parent needs a destination or otherwise retains—never moves (D-1, D-2, D-16, LOCAL-36). |
-| Mixed owners cause the wrong issue references to relink or lose their source | High | Per-reference selection precedes D-16: pinned never relink; container selects only unpinned terminal-inside refs; document selects all unpinned direct refs after D-15; every unselected unpinned ref forces needs-source. `reference_changes` is exactly that set (LOCAL-40, LOCAL-41). |
-| A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination; root-relative edges force source retention; the classifier never emits an unpreservable layout (LOCAL-11) and execution re-validates every edge (LOCAL-22). |
-| Retry deletes a source edited after Started by recapturing its new identity | High | Under the guard, fresh execution records SHA-256+byte-size per publication/deletion in Started. Staging and every retry/quarantine compare against that durable identity, never recapture it; mismatch is restored/quarantined and forces safe abort/open blocker (LOCAL-18/24/26/27, D-17–D-19). |
-| Pre-existing or receipted instance-published destination changes after Started, then source is deleted | High | Preexisting-identical always needs-source and never enters pending_deletions. Instance-published deletion requires an exact durable non-reconciliation `ArchiveExecuted.completed_publications` receipt plus open-handle destination verification against initial identity held through quarantine decision; mismatch retains source and aborts/blocks. Both races are injected (LOCAL-14/18/24/26/27). |
-| Started publication intent is mistaken for proof after an external identical create or crash between publish and receipt | High | Storage success proves only the live call; the command durably records its exact mapping in non-reconciliation ArchiveExecuted before any deletion. Without that receipt, recovery classifies the matching destination as publication-unproven/preexisting-identical, retains source, revalidates before selected relinks, and safely aborts `publication-unproven`; reconciliation cannot manufacture the receipt. Both timing windows are injected (LOCAL-14/16/24/26/27, D-14/D-18/D-19). |
-| Crash after source→quarantine rename strands content or falsely marks deletion complete | High | Started records unique adjacent same-filesystem quarantine mapping per deletion. Recovery checks both source and entry; match may unlink, mismatch restores/remains reported; empty-dir cleanup cannot erase nonempty/unverified entries. Crash-after-rename is injected (LOCAL-18/24/27). |
-| Nested mounts make repo-local staging/quarantine cross-device | High | Staging is hidden/adjacent to each destination; quarantine hidden/adjacent to each source. Paths are absent/private/symlink-safe. Quarantine-unavailable leaves deletion pending; no copy-delete fallback (LOCAL-46, D-14/D-17). |
-| Removing `jit doc archive` breaks docs/tests/MCP mid-flight | Medium | The removal task depends on Source-removal reconciliation and crash recovery; consumer migration remains one clean-cut change, with acceptance by the tree-wide search above (LOCAL-28). |
-| Recursive CSS/HTML discovery mis-scopes a shared theme or figure | Medium | Repository-wide reference-count classification over the D-13 universe (LOCAL-09, LOCAL-10), not directory heuristics; shared-but-active artifacts copy/retain, never force-relink (D-2, D-10). |
-| An artifact embedded by an outside document misclassified as unshared and moved | High | D-13's universe includes the supported embedded closure of every issue-linked document; the supplied-map limitation of the existing classifier (`assets.rs:189`) is superseded (LOCAL-09). |
-| Post-archive verification defect masks broken links | Medium | Executor validates each edge in the proposed layout, not against source-resolved paths (LOCAL-22); replaces `document.rs:1832-1858`. |
-| Storage primitives and command orchestration overlap or leave a coordination gap | High | Storage only stages/publishes/quarantines/restores and checks containment (LOCAL-16); command holds `RepoWriteGuard` across recovery discovery, recorded-contract recovery or one fresh plan, events, filesystem calls, relinks/saves, and rollback (LOCAL-25/27, `storage/mod.rs:126`). |
-| archive_root/config changes strand intent, or shared dependency adopts wrong document operation | High | recovery_target is full container UUID or only document canonical target root + its own destination aliases; dependency paths are excluded. Cross-root scan adopts one, blocks multiple true target matches, and tests shared-dependency nonmatches (LOCAL-26/27, D-18/D-19). |
-| Archive events misreport completion, abort, or residual state | Medium | D-19's four-event family keeps Started open until cumulative completion or a safe terminal ArchiveAborted. Abort records reason and completed/reverted/residual paths only after referential safety is proven; safe duplicates are permitted by append-only recovery truth (LOCAL-27, `@/inv/event-log`). |
-| No-replace publication diverges from the current atomic-writes invariant wording | Medium | The storage task first amends the registry-first invariant and renders its projection to cover staged atomic no-replace publication while retaining temp-file + atomic-rename for replacement writes; implementation and tests then target the amended contract (LOCAL-15). |
-| Document-target execution on a path with mixed-state owners dangles an active reference | Medium | D-15: all direct and embedded-closure owners must be terminal; active owners block execution while preview still reports; zero-owner managed-path documents execute with an informational note (LOCAL-23). |
-| Arbitrary zero-owner or opaque document target has no shared-planner root | High | Target root inventory normalizes every document path as an explicit working-tree root, looks up all owners/versions, and needs no adapter for CSV/PNG/SVG; policy and zero-owner semantics remain later classification/execution concerns (LOCAL-43/44, `storage/mod.rs:498`). |
+| Membership drawn from the wrong relation relocates another container's artifacts | High | D-25: membership is the resolved-hierarchy children closure (`hierarchy.rs:458`, `:321`), never the raw dependency closure; a sequencing edge contributes no member (LOCAL-06). |
+| An intermediate container absorbs storage/preview prerequisites through the dependency-derived hierarchy | High | All nine leaves resolve directly under the epic; group headers are prose only, so no dependency-derived container captures the primitive or preview. |
+| A retained dependency leaves a relocated parent's relative link without its target | High | D-16's calculus is total: a relative edge from a relocated parent forces needs-destination; root-relative edges force source retention; the classifier never emits an unpreservable layout (LOCAL-16) and execution re-validates every edge (LOCAL-28). |
+| An artifact embedded by an outside document misclassified as unshared and moved | High | D-13's universe includes the supported embedded closure of every issue-linked working-tree document; the supplied-map limitation of the existing classifier (`assets.rs:189`) is superseded (LOCAL-14). |
+| Mixed owners cause the wrong issue references to relink or lose their source | High | Per-reference selection precedes D-16: pinned never relink; container targets select only unpinned terminal-inside refs; document targets select all unpinned direct refs after D-15; every unselected unpinned ref forces needs-source (LOCAL-19, LOCAL-30). |
+| Symbolic or abbreviated pinned revisions make identity nondeterministic | Medium | D-26: canonicalize every revision to the full commit OID; failed resolution or reads block as pinned-read-failed with no fallback (LOCAL-09, LOCAL-13). |
+| A partial documentation table silently authorizes default policy | High | D-1: only explicit managed_paths, permanent_paths, and archive_root produce `configured`; absent and incomplete remain distinct, previewable, and non-executable (LOCAL-04, LOCAL-26). |
+| Archive-root sources move or delete when a new container references them | Medium | Archive-root precedence: `archived-source` always supplies needs-source; direct roots retain, relative-edge dependencies copy to the current mirror, nothing under archive_root moves or deletes (LOCAL-16, LOCAL-18). |
+| A source edited between planning and deletion is destroyed | Medium | Content identities are captured under the held guard and re-verified immediately before each deletion; mismatch skips with deletion-failed and the file stays (D-17, LOCAL-22, LOCAL-32). Broader external interference is out of contract per the owner amendment; git history recovers versioned repositories. |
+| Post-archive verification defect masks broken links | Medium | Executor validates each edge in the proposed layout, not against source-resolved paths (LOCAL-28); replaces `document.rs:1832-1858`. |
+| A crash or failure mid-execution leaves a half-archived container | Medium | D-18: rerun recomputes and converges — already-archived recognition, inverse-mapping residue rediscovery, verified deletion, no duplicate destinations/references/events (LOCAL-32). The event appends before deletions, so the audit trail exists for every published state. |
+| No-replace publication diverges from the atomic-writes invariant wording | Medium | The storage task first amends the registry-first invariant and its rendered projection (LOCAL-21); implementation targets the amended contract. |
+| The D-23 pattern set misfires on code examples in presentations | Low | Downgraded to the dynamic-loading-suspected warning (owner amendment): preview surfaces it, nothing blocks on content mentions; genuinely unpreservable supported edges still block (LOCAL-12). |
+| Removing `jit doc archive` breaks docs/tests/MCP mid-flight | Medium | Removal ordered last; consumer migration in one clean-cut change; acceptance by the tree-wide search (LOCAL-33). |
+| Storage primitives and command orchestration overlap or leave a coordination gap | Medium | Storage only stages/publishes/verifies/deletes and checks containment (LOCAL-23); the command holds `RepoWriteGuard` from recomputation through the final deletion attempt (LOCAL-30, `storage/mod.rs:126`). |
 
 Every load-bearing question is resolved or owned. Each sketch item is executable from its
 description plus the cited grounding without re-deriving the design.
@@ -893,374 +544,185 @@ description plus the cited grounding without re-deriving the design.
 ## Decisions
 
 Carried from the owner-approved brief (`dev/active/7d3a3a47-planning-brief.md`), binding,
-including its 2026-07-13 owner amendment. Plan-level decisions D-12 onward resolve
-specification gaps surfaced during planning and review; none is REOPEN.
+including both 2026-07-13 owner amendments (categories scrapped; proportionality scope).
+Plan-level decisions D-12 onward resolve specification gaps surfaced during planning and
+review; none is REOPEN.
 
-- **D-1 — Archival is explicit opt-in:** chosen **`configured` requires an explicit
-  `[documentation]` table with explicit `managed_paths`, `permanent_paths`, and
-  `archive_root`; a missing table is `unconfigured`, a partial table is `incomplete`, and
-  neither may execute**. Accessor defaults may aid preview display but never delegate
-  mutation authority. Managed-path authority is checked per working-tree artifact: an
-  archive-root-contained path first gains archived-source/needs-source and bypasses
-  unmanaged blocking (direct roots retain; relocated-parent relative dependencies copy with
-  original retained); otherwise an unmanaged
-  selected root blocks, while an unmanaged embedded dependency may be copied to
-  satisfy a relocated edge only if its original remains untouched (D-2, D-16). Rejected:
-  moving any unmanaged artifact; treating table presence or defaulted accessors as
-  configured (moves evidence never delegated to JIT).
+- **D-1 — Archival is explicit opt-in:** chosen **require configured documentation policy,
+  with explicit three-state completeness (configured/incomplete/unconfigured); defaults
+  never authorize mutation**. Rejected: silently use default paths (moves evidence never
+  delegated to JIT).
 - **D-2 — Do not relocate another container's artifacts:** chosen **never relocate an
-  artifact referenced outside the subtree; for container archival relink only unpinned
-  references on terminal issues inside the resolved subtree, leave all other references at
-  source, and copy if the selected bundle also needs a destination**. Rejected:
-  global relink; a general force option.
-- **D-3 — Pinned references remain historical:** chosen **never rewrite a pinned reference;
-  keep its historical source path resolvable, copy content into the bundle when needed,
-  and block execution when any commit-specific root/dependency read fails**.
-  Rejected: path-only relink; implicit conversion to working-tree provenance. Refined by
-  D-26.
+  artifact referenced outside the subtree; copy if required, block if ambiguous**.
+  Rejected: global relink; a general force option.
+- **D-3 — Pinned references remain historical:** chosen **never rewrite a pinned
+  reference; keep its historical source path resolvable, copy content into the bundle when
+  needed**. Rejected: path-only relink; implicit conversion to working-tree provenance.
+  Refined by D-26.
 - **D-4 — One container-owned destination (amended by owner, 2026-07-13):** chosen
   **destination is a container-owned directory preserving internal topology; the brief's
   category-selection clause is superseded — archival takes no category input (D-21)**.
-  Rejected: category-per-artifact placement (fragments bundles); caller-selected categories
-  (legacy taxonomy scrapped by the owner in favor of the pure mirror rule).
+  Rejected: category-per-artifact placement (fragments bundles); caller-selected
+  categories (legacy taxonomy scrapped in favor of the pure mirror rule).
 - **D-5 — Initial recursive discovery is static:** chosen **follow Markdown/HTML/CSS local
-  references incl CSS `url()`/`@import`; block on detected local JavaScript/runtime
-  loading**. Rejected: guessing dynamic dependencies. Made precise by D-23.
+  references incl CSS `url()`/`@import`; never execute or guess dynamic dependencies**.
+  Made precise by D-23 (suspected dynamic loading warns; unpreservable supported edges
+  block). Rejected: guessing dynamic dependencies.
 - **D-6 — Time-based archival deferred:** chosen **no retention periods, age filters,
   scheduled sweeps, or lifecycle triggers; candidates use current terminal state and
-  policy**. Rejected: first-done, updated, or reconstructed timestamps. (Live REQ-05
-  already amended.)
+  policy**. Rejected: first-done, updated, or reconstructed timestamps.
 - **D-7 — Preview defaults, execution explicit:** chosen **complete non-mutating plan by
-  default; mutation requires `--execute`, which ignores preview output, acquires the write
-  guard, performs stable-identity recovery discovery before current policy, then either
-  recovers the recorded contract or recomputes exactly one fresh current plan**. The fingerprint remains
-  informational; no expected-fingerprint input or comparison protocol exists. Rejected:
-  applying preview data as an execution plan.
+  default; mutation requires `--execute`, which recomputes and revalidates under the held
+  guard; preview output is never an execution input**. Rejected: applying stale preview
+  data.
 - **D-8 — Only terminal containers execute:** chosen **Done/Rejected may execute;
   non-terminal may preview only, no force override**. Rejected: force execution of active
   containers.
 - **D-9 — One unified archive command family (amended by owner, 2026-07-13):** chosen
-  **`jit archive document|container|candidates` on one planner/schema/policy/coordination/
-  executor, with no category flag; remove `jit doc archive` completely as a clean-cut
-  pre-v1.0 migration**. Rejected: retaining an alias or migration stub.
+  **`jit archive document|container|candidates` on one planner/schema/policy/executor,
+  with no category flag; remove `jit doc archive` completely as a clean-cut pre-v1.0
+  migration**. Rejected: retaining an alias or migration stub.
 - **D-10 — Reachability defines a bundle:** chosen **explicit issue-linked artifacts plus
   recursively reachable supported static dependencies; unreferenced siblings reported as
   informational, not moved**. Rejected: sweeping an entire source directory implicitly.
 - **D-11 — Candidates are container-oriented:** chosen **list terminal containers with
-  policy status, artifact counts, blockers, and summaries; individual artifacts are details
-  inside a candidate**. Rejected: individual artifacts as independent archival candidates.
+  policy status, artifact counts, blockers, and summaries; individual artifacts are
+  details inside a candidate**. Rejected: individual artifacts as independent archival
+  candidates.
 - **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination
   root `<archive_root>/` (+ `<container.id>/`, the full UUID, for container targets), each
-  artifact at root + repository-relative source path, with no category segment (D-21)**.
-  The full UUID is the container segment because short-id prefixes are not unique across
-  containers, and destination determinism must not depend on the current id population.
-  Preserves every relative offset under a common prefix, keeps identical filenames
-  distinct, makes intra-plan collisions structurally impossible, and is invertible (used by
-  D-18). Rejected: stripping the managed prefix per artifact (the current single-doc rule,
-  `document.rs:1284-1319`) — artifacts from different managed roots could collide and
-  cross-directory relative links would break; content-addressed layout — destroys
-  human-navigable topology; short-id segments — prefix collisions.
-  **Archive-root precedence is edge-aware:** containment supplies archived-source,
-  already-existing, and needs-source while bypassing unmanaged-selected-root. A direct root
-  retains at its exact path with no relink; an embedded target of a relocated relative edge
-  copies to this target's mirror while the archived original remains; root-relative/staying
-  edges retain. Archive-root originals are never moved or deleted.
+  artifact at root + repository-relative source path, no category segment (D-21)**. The
+  full UUID is the container segment because short-id prefixes are not unique and
+  destination determinism must not depend on the current id population. Preserves every
+  relative offset under a common prefix, keeps identical filenames distinct, makes
+  intra-plan collisions structurally impossible, and is invertible (used by D-18). A
+  cross-filesystem archive root is a typed error (owner proportionality amendment).
+  Rejected: stripping the managed prefix per artifact (the current single-doc rule,
+  `document.rs:1284-1319` — cross-root collisions, broken cross-directory links);
+  content-addressed layout (destroys navigable topology); short-id segments (prefix
+  collisions); destination-adjacent staging designs for nested mounts (complexity without
+  a demonstrated case).
 - **D-13 — Ownership universe is the issue-linked closure:** chosen **all
-  `DocumentReference`s across all issues plus each one's recursive supported embedded
-  closure; outside owners (direct or embedded) forbid a move**. Files unreachable from any
-  issue reference are outside JIT's referential contract: reported informationally near
-  bundles (D-10), never counted as owners, never relocated. Rejected: scanning the entire
-  working tree for arbitrary referencing files — unbounded, and JIT's guarantee is scoped
-  to issue references.
-- **D-14 — Finalization is atomic no-replace:** chosen **hard-link from same-filesystem
-  destination-adjacent staging then unlink staging; the storage call returns success only
-  when it created the destination, while `AlreadyExists` (including identical content)
-  aborts that artifact's finalization and triggers source-retaining recovery. Before Started,
-  derive/persist a unique hidden
-  owner-private staging dir/entry adjacent to each destination from instance ID + SHA-256 of
-  canonical destination path; require absent, component/symlink-safe paths. Create after Started,
-  verify staged bytes against Started identity, publish no-replace on the same destination
-  filesystem, return success, durably append the command-owned non-reconciliation receipt,
-  then best-effort clean only the recorded verified entry and empty dir. This
-  never assumes repository root and a nested destination share a device. Because
-  `@/inv/atomic-writes` currently names only temp-file + atomic
-  rename, the same storage task must first amend the registry-first invariant (and render
-  its projection) to define staged atomic no-replace publication for new files while
-  retaining temp-file + atomic rename for replacing writes; compliance is claimed only
-  against that amended contract. A content-identical destination that predates Started is
-  preexisting-identical, not publication: it needs no write but always retains source and
-  cannot enter pending_deletions. Started publication_mapping is intent only. After storage
-  returns successful no-replace publication, the command must durably append that exact
-  mapping in non-reconciliation `ArchiveExecuted.completed_publications`; only this receipt
-  can become published-by-instance, and cleanup/deletion cannot precede its successful
-  append**. Rejected: silently treating hard-link publication as
-  covered by the current literal wording; treating an identical pre-existing destination as
-  this instance's publication (could delete source after destination mutation);
-  repository-global staging (nested destination may
-  be another device); check-then-`rename` — `rename` replaces a destination
-  created after the check, and the repository write guard cannot exclude external
-  filesystem writers (`storage/mod.rs:90`).
+  `DocumentReference`s across all issues plus each working-tree one's recursive supported
+  embedded closure; outside owners (direct or embedded) forbid a move**. Files unreachable
+  from any issue reference are outside JIT's referential contract: reported
+  informationally near bundles (D-10), never counted as owners, never relocated. Rejected:
+  scanning the entire working tree for arbitrary referencing files (unbounded; JIT's
+  guarantee is scoped to issue references).
+- **D-14 — Publication is atomic no-replace:** chosen **stage, verify staged bytes against
+  the captured identity, then publish so that success is returned only when this call
+  created the destination; any collision — including a content-identical external
+  creation — is `AlreadyExists`, never silent success**. Requires amending the
+  registry-first `@/inv/atomic-writes` invariant and its projection before implementation
+  (LOCAL-21). Rejected: check-then-`rename` (replaces a destination created after the
+  check); treating identical content as success (misattributes another writer's file).
 - **D-15 — Document-target execution requires all-terminal owners:** chosen **`jit archive
   document --execute` requires every direct or embedded-closure owner of the document and
-  its bundle artifacts to be terminal; active owners block with
-  `document-non-terminal-owner` (preview still reports); a
-  zero-owner managed-path document executes with an informational note. After that check,
-  every unpinned direct owner is selected for relink; pinned owners never are, and embedded
-  edges have no issue metadata. Target inventory is path-first, so a zero-owner opaque
-  document still exists as an explicit working-tree root before these later checks**. Rejected:
+  its bundle artifacts to be terminal; active owners block (preview still reports); a
+  zero-owner managed-path document executes with an informational note**. Rejected:
   selecting an owning container implicitly (ambiguous with several owners); a force
   override (mirrors the rejected D-8 force path).
-- **D-16 — Edge-aware action calculus:** chosen **derive each action from needs-destination
-  (selected root except archived-source direct roots, or relative edge from a relocated
-  parent) × needs-source (outside owner,
-  active owner, permanent path, preexisting-identical destination, unmanaged embedded
-  dependency, archived-source, or inbound
-  root-relative/staying-document edge, or any unpinned reference not selected for relink):
-  move / copy / retain, with conflicts and
-  unpreservable edges blocking**. Copy creates the mirrored destination and retains the
-  source, satisfying both constraints, so every supported edge — relative at the mirror,
-  root-relative at the repository root — resolves in the final layout. Rejected: a free
+- **D-16 — Edge-aware action calculus:** chosen **derive each action from
+  needs-destination (selected root, or relative edge from a relocated parent) ×
+  needs-source (outside owner, active owner, unselected unpinned reference, permanent
+  path, archive-root containment, unmanaged embedded dependency, or inbound
+  root-relative/staying-document edge): move / copy / retain, with structural conflicts
+  blocking**. Copy creates the mirrored destination and retains the source, satisfying
+  both constraints, so every supported edge resolves in the final layout. Rejected: a free
   copy-or-retain choice (leaves a relocated parent's relative edge without its target);
-  treating root-relative edges like relative ones (their resolution ignores the referencing
-  document's location, `assets.rs:151-162`). A selected root outside all managed paths is
-  excluded before the calculus by `unmanaged-selected-root`; an unmanaged embedded
-  dependency carries `unmanaged-path`, always needs-source, and therefore copies when
-  needs-destination holds or retains otherwise, never moves. Permanent-path, outside-owner,
-  active-owner, unmanaged-path, and archived-source are evidence flags, not blockers; for document execution
-  D-15 separately maps any non-terminal owner to `document-non-terminal-owner`. A supported edge whose combined
-  constraints cannot be materialized emits `unpreservable-layout` with that edge.
-  Archive-root recognition precedes unmanaged/reference classification but remains in the
-  edge calculus: direct roots retain; a relative-edge dependency of a relocated parent
-  copies to its mirror; root-relative/staying edges retain; none move/delete. Otherwise
-  per-reference selection proceeds: pinned never relink; container selects only
-  unpinned terminal-inside references; document selects all unpinned direct owners after
-  D-15. `reference_changes` is exactly this set, and move is allowed only when every
-  source-dependent unpinned reference is selected. A preexisting-identical destination
-  satisfies needs-destination but always adds needs-source and cannot schedule deletion;
-  only published-by-instance backed by an exact durable non-reconciliation
-  `ArchiveExecuted.completed_publications` receipt can.
-- **D-17 — Every removal is a directory-handle-anchored quarantine sequence:** chosen
-  **every publication/deletion source has a SHA-256+byte-size identity recorded in the
-  initial Started event before mutation (reusing `document/assets.rs:269-276` SHA-256).
-  Before Started, each deletion gets an exact `{source, quarantine_dir, quarantine_entry,
-  content_identity}` mapping: hidden owner-private quarantine adjacent to the source, unique
-  from operation_instance_id + SHA-256 of canonical source path; dir/entry must be absent and
-  component/symlink-safe, with POSIX `0700`/platform-equivalent directory access. Deletion
-  requires this instance's exact non-reconciliation `ArchiveExecuted.completed_publications`
-  receipt; a Started mapping alone is insufficient. Immediately before quarantine,
-  open/verify its recorded destination against initial Started identity and hold that handle
-  through the quarantine decision. Mismatch restores/retains source and aborts/blocks. No path
-  is unlinked directly. After Started, a removal (1) creates
-  and opens the recorded quarantine directory, (2) atomically same-filesystem renames source
-  to the recorded entry, (3) opens the entry **relative to
-  that directory handle** via the safe `openat` wrapper in `nix` — already a direct
-  dependency of `crates/jit` (`Cargo.toml:41`); this adds the `fs` feature, not a new
-  crate, and keeps `#![deny(unsafe_code)]` intact because the unsafety lives inside the
-  dependency — (4) verifies the open handle against the initial Started digest+size—never a
-  recaptured current-source identity—and (5) unlinks the entry by name **relative to the same directory handle**
-  (`unlinkat`) on match — or restores it no-replace on mismatch, leaving it quarantined
-  with a `quarantined-foreign-file` warning if restore is impossible. A mismatch is never
-  deleted and forces safe abort or leaves recovery open. Recovery checks both recorded
-  source and entry before declaring deletion complete, so crash after rename is recoverable.
-  Empty-dir cleanup is best-effort and never erases a nonempty/unverified entry.
-  `quarantine-unavailable` leaves deletion pending; cross-device copy-delete is forbidden.** The claim is
-  stated exactly: `unlinkat` acts on the *name*, whose binding to the verified inode can
-  change between steps 4 and 5 only through a write inside the just-created, unpredictably
-  named, private quarantine directory. That residual race is **bounded, not denied**: the
-  capability it requires already suffices to delete any repository file directly, so JIT's
-  removal adds no destructive power the interferer lacks (D-24). Rename preserves whatever
-  file is present at capture time, so nothing is overwritten at any step. Applies to ordinary move-source deletions, residue cleanup, and rollback of
-  finalized destinations alike; platforms without required directory-handle semantics return
-  `quarantine-unavailable` and leave deletion pending. Rejected:
-  recapturing expected identity from a retry's current source (could authorize deletion of a
-  later edit);
-  fixed `.jit/tmp` quarantine or cross-device copy-delete (not atomic/recoverable);
-  verify-then-unlink at the original path (a substitution between verification and unlink
-  destroys the substitute); unverified cleanup (deletes foreign files); global filesystem
-  locking (unavailable against arbitrary external writers).
-- **D-18 — Retry converges by recomputation:** chosen **a rerun after any partial failure
-  first scans all open Started intents across roots by stable target identity, before current
-  archive_root is read/applied. `recovery_target` is container full UUID or document
-  canonical original target root + only that root's planned destination aliases; shared/
-  embedded dependency paths are excluded. One match adopts its recorded
-  root plus original operation/instance and initial
-  artifact/source/destination contract, re-evaluates current owners/references, and defers
-  new unrelated artifacts; multiple matches block as archive-recovery-ambiguous**. It may complete/reconcile the original contract, or restore/
-  retain sources and references then safely abort it; if neither is automatically safe the
-  intent remains open and blocks. Only after all prior target intents complete/abort may
-  current config choose a fresh root and mint. Archive-root evidence and
-  preexisting-identical destinations prevent nesting but always retain source. The initial
-  Started contract recovers intent, original paths, adjacent staging/quarantine mappings,
-  and expected digest+size, but never distinguishes actual publication. Only an exact durable
-  non-reconciliation ArchiveExecuted completed_publications receipt does so. Without it, a
-  matching destination is publication-unproven/preexisting-identical: retry retains source,
-  removes any effective pending deletion, revalidates identity before selected relinks, and
-  appends safe ArchiveAborted reason publication-unproven. It never synthesizes provenance
-  through reconciliation. Retry verifies each receipted destination before any deletion,
-  checks both source/quarantine entry, and never recaptures identity. Rejected: a separate
-  mutable resumable journal (the append-only Started event is the durable intent); treating
-  every occupied destination as a blocker (would make every partial failure permanent).
-- **D-19 — Durable intent, three-level identity, and four event kinds:** chosen
-  **`operation_id` = hash of
-  (target, destination root, sorted canonical initial source-path set; archive-root
-  already-archived artifacts contribute their existing paths): the definition key.
-  `operation_instance_id` delimits one logical operation by durable adopt-or-mint. Before
-  current archive-root policy or a fresh key is read/computed, history is searched across
-  roots by recovery_target: full container UUID, or document canonical original root plus
-  only its own planned destination aliases; dependency paths never match. One open match adopts its recorded root/IDs/contract;
-  multiple matches return archive-recovery-ambiguous and mint nothing. Only with all prior
-  target intents terminal may current config choose a fresh root. Before any mutation, a
-  new operation computes SHA-256+byte-size under the command-held guard and mints the
-  instance UUID. It derives absent, safe hidden adjacent staging/quarantine paths from that
-  ID plus SHA-256 canonical-path hashes and must append `ArchiveStarted` with recovery_target,
-  recorded root, operation/instance/execution IDs, fingerprint, exact destination intent and
-  preexisting classification,
-  staging mappings, and `deletion_intents` with exact
-  `{source, quarantine_dir, quarantine_entry, content_identity}` mappings. Append
-  failure means no mutation. Preexisting-identical records have no publication_mapping or
-  pending source deletion and always needs-source. Started publication mappings are intent
-  only. Initial destination-adjacent staging verifies bytes before publish; storage must
-  report successful no-replace creation, after which the command durably appends a normal,
-  non-reconciliation `ArchiveExecuted` with exact `completed_publications`. No source deletion
-  begins before that append succeeds. A recovery
-  attempt is constrained to that initial set, rechecks current ownership/reference safety,
-  reuses initial Started mappings/identities without recapture. Only its exact durable
-  non-reconciliation completed_publications receipt may justify deletion; immediately
-  beforehand recovery open-handle verifies that
-  destination against Started identity and holds the handle through the quarantine decision,
-  then checks source and quarantine entry. It defers unrelated new artifacts and appends Started with adopted IDs plus remaining work
-  before new mutation. Normal `ArchiveExecuted` appends after finalization/relinks and before
-  deletions, recording exact completed_publications, completed mutations, and pending
-  deletions; normal
-  `ArchiveSourcesRemoved` records exactly removals successful in that attempt and is omitted
-  when zero succeed, while reconciliation SourcesRemoved records deletion only after both
-  recorded locations establish completion. Reconciliation ArchiveExecuted may close other
-  already-proven converged work but cannot contain completed_publications or establish
-  publication provenance. Completion events carry a reconciliation marker. The instance remains open
-  until cumulative completion events cover the initial Started event's full
-  publication/relink/deletion sets; later Started attempts record remaining work without
-  redefining that contract, and failed deletions remain pending. `ArchiveAborted` is the
-  fourth terminal event and appends only after sources/references are restored or retained
-  into a proven referentially safe state; it records adopted operation/instance IDs, fresh
-  execution ID, reason, completed, reverted, and safe residual paths. Safe duplicate terminal events are allowed. If safe automatic closure
-  is impossible, return archive-recovery-blocked and leave the intent open—never mint a
-  competing instance. If a matching destination lacks the qualifying receipt—whether an
-  external writer created identical bytes after Started before JIT publish, or JIT published
-  then crashed before receipt—recovery retains source, revalidates before selected relinks,
-  and closes with ArchiveAborted reason publication-unproven; it never appends reconciliation
-  ArchiveExecuted as a substitute receipt. If a crash leaves an open Started whose other,
-  already-proven work is converged, retry may append missing reconciliation
-  `ArchiveExecuted` and/or `ArchiveSourcesRemoved` without new mutation to close that work.
-  A brand-new already-converged
-  invocation with no open Started appends no events. Only a completed or aborted old intent
-  permits a fresh current-set operation.** A crash can
-  leave a duplicate completion event or an unrecorded removal of an already-safe path —
-  both within the established referential-consistency contract (`document.rs:1050-1074`).
-  Rejected: the plan fingerprint as retry identity (recomputation changes it); literal
-  exactly-once completion semantics (unachievable across a crash between mutation and its
-  append-only completion event); event-only post-mutation identity (loses a minted UUID when
-  append fails); same-key-only lookup (strands intent when owners/hierarchy change);
-  treating embedded/shared dependency paths as document recovery aliases (false adoption);
-  per-artifact events without an operation id (cannot audit a
-  multi-artifact action).
-- **D-20 — Container-ness derives from the type hierarchy:** chosen **a candidate container
-  is a terminal issue whose configured type sits at a non-leaf level of
+  treating root-relative edges like relative ones (their resolution ignores the
+  referencing document's location, `assets.rs:151-162`); ownership facts as blockers
+  (the calculus resolves them to copy/retain).
+- **D-17 — Deletions are verify-then-delete against recorded identity:** chosen **capture
+  `{sha256, byte_size}` per planned deletion under the held guard; re-verify the file
+  against that recorded identity immediately before removal; mismatch skips with
+  `deletion-failed` and the file stays; reruns re-derive expected identity from the
+  published destination, never from the possibly-edited source**. Rejected (owner
+  proportionality amendment): quarantine protocols, directory-handle-anchored unlink
+  sequences, and adversarial-substitution defenses — the interference they defend against
+  is out of contract, and git history recovers versioned repositories; unverified deletion
+  (destroys benign concurrent edits detectably avoidable at one hash's cost).
+- **D-18 — Rerun converges by recomputation:** chosen **a rerun after any partial failure
+  recomputes the plan against current state, treats content-identical occupied
+  destinations as already archived, rediscovers residual sources through the inverse D-12
+  mapping, applies only the remaining mutations under D-17 verification, and appends no
+  event when nothing mutates**. Repository-relative destination derivation makes nesting
+  impossible on rerun. Rejected: persisted write-ahead intent journals and receipts (owner
+  proportionality amendment — recovery state machines for a short, recomputable,
+  git-recoverable operation); treating every occupied destination as a blocker (makes
+  every partial failure permanent).
+- **D-19 — One archive event per mutating execution:** chosen **append one event after
+  publications and reference relinks persist and before deletions, recording target,
+  destination root, publications, applied reference changes, and planned deletions;
+  deletion failures are command-result warnings; a mutating rerun appends its own event
+  and a no-op rerun appends none**. Durability is the existing process-level
+  `append_event` contract (`@/inv/event-log`); a crash between mutation and append is
+  within the amended contract and the next rerun recomputes and reports. Rejected (owner
+  proportionality amendment): the four-event Started/Executed/SourcesRemoved/Aborted
+  family, operation/instance/execution identity triples, and publication receipts —
+  audit-grade provenance for a threat model the epic no longer carries; exactly-once
+  event semantics (unachievable across a crash with an append-only log).
+- **D-20 — Container-ness derives from the type hierarchy:** chosen **a candidate
+  container is a terminal issue whose configured type sits at a non-leaf level of
   `[type_hierarchy]`**. Engine code names no type; the boundary comes from repository
-  configuration (`@/inv/domain-agnostic`). Rejected: hardcoding strategic type names
-  (epic/milestone); treating every issue with DAG children as a container (an incidental
-  dependency fan-in is not a container).
+  configuration (`@/inv/domain-agnostic`). Rejected: hardcoding strategic type names;
+  treating every issue with DAG children as a container.
 - **D-21 — Document categorization is scrapped (owner, 2026-07-13):** chosen **archival
   takes no category input anywhere in the command family; the D-12 mirror rule alone
   determines destinations, candidates always evaluate fully, and the legacy
-  `[documentation.categories]` table retires with the legacy command**. The category
-  taxonomy was a legacy idea; the mirror rule already yields unambiguous, human-navigable,
-  collision-free destinations without it. Rejected: caller-selected categories (an extra
-  input that adds a failure mode and no information the path does not already carry);
-  doc_type-derived category inference (no doc_type→category mapping exists in the
-  configuration model — `doc_type` is a free-form optional string, `types.rs:885` — so any
-  inference would be guessing).
+  `[documentation.categories]` table retires with the legacy command**. Rejected:
+  caller-selected categories (an extra input adding a failure mode and no information the
+  path does not already carry); doc_type-derived inference (no doc_type→category mapping
+  exists in the configuration model — `doc_type` is a free-form optional string,
+  `types.rs:885`).
 - **D-22 — Symlinks block in v1:** chosen **a symlink root or embedded target, or a path
   traversing one, classifies `block` with `symlink-artifact`; the mutation primitive
   resolves paths physically, verifies containment on resolved targets, and never moves,
   copies, or deletes through a link**. Rejected: transparent symlink following (relocation
-  through a link silently changes what other referents resolve to); rewriting links
-  (out-of-scope link mutation). Richer symlink relocation is a follow-up.
-- **D-23 — Dynamic-loading detection is an enumerated textual contract:** chosen
-  **`<script src>` is a static supported edge; a relocated HTML or script member containing
-  a local-path-bearing construct from the binding set — `fetch(`, `import(`,
-  `XMLHttpRequest`, `new Worker(`, `importScripts(`, URL-bearing `data-*` attributes, or
-  static module syntax with a relative specifier (`import`/`export … from './…'`,
-  `require('./…')`) — blocks with `unsupported-dynamic-edge`; detection is pattern match
-  only, and the set is append-only under `schema_version`**. JIT has no JavaScript adapter,
-  so a script declaring local dependencies never relocates silently. Rejected: executing or
-  parsing JavaScript to resolve its dependencies (guessing, D-5); ignoring script content
-  (silently breaks relocated bundles).
-- **D-24 — The safety bound is stated, provable, and maximal for the platform:** chosen
-  **two claims, each verifiable. (1) JIT never overwrites: every finalization and restore
-  is no-replace (D-14, D-17). (2) Source deletion requires an exact durable
-  non-reconciliation `ArchiveExecuted.completed_publications` receipt for successful
-  no-replace creation; Started intent or reconciliation never suffices. JIT open-handle
-  verifies the receipted destination against initial identity and
-  holds that handle through the quarantine decision, then unlinks a source name only after verifying the inode bound
-  to it inside the directory-handle-anchored quarantine sequence (D-17); rebinding that
-  name between verification and unlink requires write access to the quarantine directory
-  JIT just created — a capability that already suffices to delete any repository file
-  without JIT's involvement, so JIT's removals add no destructive power an interfering
-  writer does not independently possess. A destination pathname can still be rebound after
-  its handle is verified while the verified inode remains held; defeating path resolution
-  requires the same external write capability. Both destination path-rebinding and
-  quarantine name-rebinding residual races are bounded by this capability argument, not
-  denied.** This is the
-  strongest no-loss statement a path-based filesystem admits (POSIX has no unlink-by-handle),
-  and it is how REQ-03 is satisfied: benign concurrent modification is detected and
-  preserved (quarantine/restore/report), and adversarial loss is attributable only to the
-  adversary's own pre-existing access, never to JIT's operations. Concurrent JIT writers
-  are excluded outright by the repository write guard. Rejected: claiming unconditional
-  no-loss under adversarial substitution (unprovable — and vacuous, since such an adversary
-  can delete files directly); claiming adversarial liveness (an interferer can always force
-  a failure or reported residue; only safety is guaranteed); global filesystem locking
-  (unavailable against arbitrary external writers).
+  through a link silently changes what other referents resolve to); rewriting links.
+- **D-23 — Dynamic-loading detection is an enumerated textual warning (amended by owner,
+  2026-07-13):** chosen **`<script src>` is a static supported edge; a relocated HTML or
+  script member containing a local-path-bearing construct from the binding set (runtime
+  loaders, URL-bearing `data-*` attributes, static module syntax with relative
+  specifiers) gets the `dynamic-loading-suspected` warning — pattern match only, never
+  execution, never a block**. The pattern set cannot distinguish live loaders from code
+  examples in presentation content, so blocking on it would fire falsely on exactly the
+  target corpus; genuinely unpreservable supported edges still block via
+  `unpreservable-layout`. Rejected: blocking on content mentions (false-positive
+  hand-resolution burden defeats the easy-convention goal); executing or parsing
+  JavaScript (guessing, D-5); ignoring script content entirely (no signal at all).
+- **D-24 — The concurrency contract is scoped, not maximal (owner, 2026-07-13):** chosen
+  **guarantees hold under the repository write guard against concurrent JIT writers;
+  benign concurrent modification is detected before destructive steps (no-replace
+  publication, verify-recorded-hash-then-delete); concurrent external mutation during an
+  archival operation is out of contract, with git history as the recovery channel in
+  versioned repositories**. Rejected: adversarial-filesystem defenses (quarantine,
+  handle-anchored removal, receipts) — an adversary with repository write access can
+  delete files directly, so those defenses purchase no real capability bound at permanent
+  complexity cost; claiming unconditional no-loss (unprovable on a path-based
+  filesystem).
 - **D-25 — Container membership is the resolved-hierarchy subtree:** chosen **the archival
   membership of a container is the root plus the transitive `children` closure of the
   repository-wide hierarchy resolution (`hierarchy.rs:458`, `:321`)** — the same
   DAG-authoritative relation the tree and divergence surfaces use. Rejected: the raw
-  transitive dependency closure (absorbs cross-container sequencing edges and would
-  relocate other containers' artifacts, violating D-2); label-based membership (labels are
-  hints; the DAG is authoritative).
-- **D-26 — Artifact identity is (path, version); pinned versions are historical:** chosen
-  **artifacts are keyed by path plus version (`working-tree` or the canonical full immutable
-  commit object ID). Every supplied symbolic, abbreviated, or full revision is first
-  resolved by a storage/git primitive with `rev-parse --verify <rev>^{commit}` semantics to
-  the repository's hash-algorithm-agnostic full OID. Only that canonical OID is serialized,
-  ordered, fingerprinted, or compared; the supplied string and current seven-character
-  display hash never participate in identity. Working-tree versions are the archival
-  subjects; pinned versions resolve through the storage layer's
-  commit-aware reads (`document.rs:349-357`, `storage/mod.rs:531`) from git history, are
-  never relocated or rewritten, appear in plans as informational `pinned-historical`
-  entries, and impose no working-tree retention constraint while their commit is
-  reachable and canonicalization plus every commit-specific read succeeds. Failed revision
-  resolution, unavailable git, or an unreachable commit surfaces `CommitNotFound`; where a root or supported dependency path is absent at
-  a reachable commit, storage surfaces `NotFound`. Either produces `pinned-read-failed` and
-  blocks execution of the target. No fallback, warning-plus-retention, or relink is allowed;
-  D-3 remains unchanged. Pinned roots' **commit-specific
-  supported dependency closures are discovered**: the adapters are pure text extractors
-  run over commit-resolved content (`read_path_text(path, canonical_oid)`, `storage/mod.rs:531`),
-  yielding informational, non-relocating (path, canonical full OID) entries (LOCAL-33), so REQ-01's
-  enumeration is complete for pinned roots with nothing to move — history serves every
-  pinned reader.** Rejected: path-only identity (cannot represent two versions of one
-  path); symbolic input or abbreviated display hash as identity (mutable or
-  collision-prone); treating every pinned reference as a working-tree retention constraint
-  (needlessly blocks archival of files whose history serves all pinned readers); rewriting
-  pinned references (D-3); inventing a read fallback for unreachable commits (storage has
-  none; planning must not assume semantics the code does not implement).
-- **Assumptions:** Coverage is enforced at the top-level executable task tier: each
-  requirement-bearing task is a direct epic leaf and carries its own `satisfies: REQ-*`
-  label. Archive intent and recovery selection retains the execution chain's external
-  Storage-owned artifact mutation primitive and Unified archive preview prerequisites;
-  Receipt-backed publication and reference commit depends on intent selection; Source-removal
-  reconciliation and crash recovery depends on receipt commit. No intermediate container tier is
-  introduced, so DAG-derived hierarchy cannot absorb the storage or preview leaves. The
-  legacy-command migration support task is intentionally exempt and credits no requirement;
-  the A/B/C group headers are conceptual only. The result is eleven independently executable
-  top-level tasks, preserving Group C parallelism and the independent storage root while
-  giving the multi-protocol executor explicit ownership boundaries.
+  transitive dependency closure (absorbs cross-container sequencing edges, violating D-2);
+  label-based membership (labels are hints; the DAG is authoritative).
+- **D-26 — Artifact identity is (path, version); pinned versions are historical and
+  unenumerated (amended by owner, 2026-07-13):** chosen **artifacts are keyed by path plus
+  version (`working-tree` or a canonical full commit OID via the rev-parse resolver);
+  working-tree versions are the archival subjects; pinned versions are informational
+  `pinned-historical` entries that are never relocated or rewritten and impose no
+  working-tree constraint while readable; failed canonicalization or commit reads block
+  the target as `pinned-read-failed` with no fallback; commit-resolved dependency closures
+  are outside relocation scope and not enumerated (REQ-01 is scoped to working-tree
+  artifacts accordingly)**. Rejected: path-only identity (cannot represent two versions of
+  one path); warning-plus-retention for unreachable pins (retention cannot make a broken
+  pinned read resolvable; ineligibility is honest); commit-closure enumeration (git-read
+  plumbing and fixtures for entries that never move — report padding at maintenance
+  cost).
+- **Assumptions:** Coverage is enforced at the task tier: each of the nine task-tier items
+  is a direct child of the epic and carries its own `satisfies: REQ-*` label (the legacy
+  removal task is deliberate migration support without one); the A/B/C group headers are
+  conceptual only. This assumes a single breakdown pass produces executable leaves rather
+  than an intermediate story tier; risk if wrong is a coverage-gate reshuffle, not a
+  design change.

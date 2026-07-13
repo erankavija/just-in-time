@@ -226,6 +226,26 @@ reporting suggests no category, and the `[documentation.categories]` table
 retires with the legacy command. The container-owned-destination and
 unified-command-family halves of D-4/D-9 stand unchanged.
 
+## Owner amendment (2026-07-13, proportionality)
+
+The concurrency and crash contract is scoped explicitly: safety guarantees
+hold under the repository write guard against concurrent JIT writers and
+detect benign concurrent modification before destructive steps; concurrent
+external mutation of the working tree during an archival operation is out of
+contract, with git history as the recovery channel in versioned repositories.
+Consequences, all owner-approved: no write-ahead intent events, publication
+receipts, or destination-provenance tracking; a single archive event per
+mutating execution; deletion safety is verify-recorded-hash-then-delete under
+the held guard; rerun convergence by recomputation replaces crash-recovery
+protocols; a cross-filesystem archive root is a clean error rather than a
+staging design. Detected dynamic or module loading in relocated bundle
+members warns rather than blocks. Pinned references remain untouched and
+commit-canonicalized, but their commit-resolved dependency closures are
+outside relocation scope and are not enumerated (REQ-01 is scoped to
+working-tree artifacts accordingly). The goal is a safe, easy archival
+convention with low maintenance burden, not adversarial filesystem
+guarantees.
+
 ## Reconcile the epic criteria
 
 REQ-01 through REQ-04 and REQ-06 remain aligned with the approved direction.
