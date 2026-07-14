@@ -706,8 +706,9 @@ impl CommandSchema {
             row(
                 "*",
                 10,
-                "The repository's on-disk format is newer than this binary, or a \
-                 filesystem/subprocess I/O operation failed.",
+                "The repository's on-disk format is newer than this binary, a gate \
+                 checker refused to run because the binary predates the repository \
+                 under review, or a filesystem/subprocess I/O operation failed.",
                 false,
             ),
             // Command-family classification (standard taxonomy meaning).

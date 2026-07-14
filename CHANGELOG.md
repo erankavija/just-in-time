@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
+  path that runs an automated checker: `gate pass`, `gate pass-all`, and a
+  state transition's pre/postchecks) now refuses to run a checker when the
+  running binary's build commit is a known commit in the repository under
+  review but no longer matches its current `HEAD` (or the build was dirty) —
+  a gate verdict from a binary that predates the tree under review is not
+  evidence about that tree. The refusal is a typed, exit-code-10 error naming
+  the build commit and the fix (`cargo install --path crates/jit`); no gate
+  run is ever recorded from a refused, stale-binary check. Silent for an
+  ordinary installed release validating an unrelated repository, and requires
+  no git beyond what the repository already uses.
+
 - **Help cross-references from mutation/inspection commands to the reporting
   commands that answer "what happened".** `jit issue show --help` now names
   `jit issue status` (compact one-line view), `jit gate status-all`/`jit gate
