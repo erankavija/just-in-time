@@ -435,9 +435,13 @@ fn claim_json_error(
 /// `fail`) or a runner error (`IO_ERROR`, exit 10, verdict `error`) per the
 /// carried [`GateRunStatus`](jit::domain::GateRunStatus); `GateNotRequiredError`
 /// becomes `INVALID_ARGUMENT` (exit 2); an unresolved id becomes
-/// `ISSUE_NOT_FOUND` (exit 3); anything else `GATE_ERROR`. In non-JSON mode it
-/// surfaces any gate-failure warnings and returns `Err(e)` so the top-level
-/// handler maps the exit code via [`error_to_exit_code`].
+/// `ISSUE_NOT_FOUND` (exit 3); [`StaleBinaryError`](jit::errors::StaleBinaryError)
+/// becomes `STALE_BINARY` (exit 10) — a PRE-verdict refusal, so, like
+/// `GateNotRequiredError`, it carries no `verdict` field and no gate run was
+/// ever recorded; anything else `GATE_ERROR`. In non-JSON mode it surfaces any
+/// gate-failure warnings and returns `Err(e)` so the top-level handler maps the
+/// exit code via [`error_to_exit_code`] — which classifies `StaleBinaryError`
+/// to the same `ExitCode::ExternalError`, so both output modes agree.
 fn render_gate_pass_error(
     e: anyhow::Error,
     id: &str,
@@ -502,6 +506,31 @@ fn render_gate_pass_error(
     {
         // Pre-verdict lookup error: issue id did not resolve.
         JsonError::issue_not_found(id, command)
+    } else if let Some(stale) = e.downcast_ref::<jit::errors::StaleBinaryError>() {
+        // Pre-verdict refusal (jit:7446af34): the checker never spawned, so —
+        // like `GateNotRequiredError` above, and unlike `GatePassFailed` — this
+        // carries no `verdict` field. `STALE_BINARY` maps to exit code 10
+        // (`ErrorCode::to_exit_code`), matching the non-JSON path's
+        // `ExitCode::ExternalError` classification of the same typed error in
+        // `error_to_exit_code`.
+        use jit::domain::build_provenance::StaleBinaryReason;
+        let (reason_code, built_from) = match stale.reason() {
+            StaleBinaryReason::CommitMismatch { built_from, .. } => {
+                ("commit_mismatch", built_from.clone())
+            }
+            StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
+        };
+        JsonError::new(jit::output::ErrorCode::STALE_BINARY, e.to_string(), command)
+            .with_details(serde_json::json!({
+                "issue_id": stale.issue_id(),
+                "key": stale.gate_key(),
+                "reason": reason_code,
+                "built_from": built_from,
+            }))
+            .with_suggestion("Rebuild and reinstall: cargo install --path crates/jit")
+            .with_suggestion(format!(
+                "Verify with: jit --version (should show commit {built_from})"
+            ))
     } else {
         JsonError::new("GATE_ERROR", e.to_string(), command)
     };
