@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "8db0e3ad-9ae6-4b5a-b9b2-11754e70b997",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "af4c901a-c7f2-434e-9abb-0887542d5b7f",
+  "commit": "bfe7700b4989507d9753aa48e837ff432cd47ff1",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T18:58:08.707807889Z",
+  "completed_at": "2026-07-14T19:00:02.751008079Z",
+  "duration_ms": 114043,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf (level 4), so I reviewed only its 14 reachable `jit:af4c901a` commits individually, with rename detection; uncommitted gate/issue artifacts were excluded.\n\nThe adopter docs accurately describe config-derived default rules, projection-only schemas, and immediate recognition of registry edits. The issue-scoped link check passes.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Default-rule documentation accurately reflects config-derived validation and projection-only schemas.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Default-rule documentation accurately reflects config-derived validation and projection-only schemas.",
+    "findings": []
+  }
+}

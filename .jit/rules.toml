@@ -58,6 +58,14 @@ enforce = true
 assert = { require-label = { label = "type:*", min = 0, max = 1 } }
 
 [[rules]]
+name = "namespace-unique-brackets"
+origin = "default"
+description = "At most one `brackets:` label per issue: `brackets` is a unique namespace. Blocks the write and fails validation."
+severity = "error"
+enforce = true
+assert = { require-label = { label = "brackets:*", min = 0, max = 1 } }
+
+[[rules]]
 name = "coverage-preview"
 origin = "bracket"
 description = "On a breakdown node, assert every [hard] REQ-id in the bracketed container's Success Criteria is credited by some issue in its dependency closure via a satisfies:<id> label. A plan-time coverage preview; fires once breakdown is underway."

@@ -139,19 +139,21 @@ fn test_hand_declared_namespace_validates_without_regeneration() {
         "precondition: baked registry projection is stale: {baked}"
     );
 
-    // A FRESH executor so the config cache reflects the hand edit.
-    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
-    let rules = exec.effective_rules().unwrap();
-    let eval = evaluate_local(
-        &issue_with_label("enforces:gate-semantics"),
-        rules,
-        ContentFormat::Markdown,
-    )
-    .unwrap();
+    // Store a real issue carrying the label and run it through the same rule
+    // path `jit validate <id>` uses (`run_rules`), on a FRESH executor so the
+    // config cache reflects the hand edit — REQ-04's literal scenario.
+    let storage = JsonFileStorage::new(&jit_dir);
+    let issue = issue_with_label("enforces:gate-semantics");
+    let id = issue.id.clone();
+    storage.save_issue(issue).unwrap();
+
+    let exec = CommandExecutor::new(storage);
+    let report = exec.run_rules(Some(&id)).unwrap();
     assert!(
-        eval.findings().is_empty(),
-        "a hand-declared namespace must validate clean at load, got {:?}",
-        eval.findings()
+        !report.has_errors(),
+        "`jit validate` must pass for a hand-declared namespace with no \
+         regeneration step, got {:?}",
+        report.findings
     );
 }
 

@@ -141,11 +141,13 @@ source-of-truth = "registry-first"
 # item as `@/invariant/<self-id>`.
 aliases = ["inv"]
 
-# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source); the rule kind projects each entry's `name` as its self-id and its
-# optional `description` as its display text (falling back to the `name` when a
-# rule has no description), addressed at `@/rule/<name>` (e.g.
-# `@/rule/coverage-preview`).
+# Rules are colon-free-named entries in `.jit/rules.toml` (the ruleset
+# declaration; default-origin rules derive their assertion and
+# namespace-unique-* membership from the `[namespaces]`/`[type_hierarchy]`
+# registry above at load); the rule kind projects each entry's `name` as its
+# self-id and its optional `description` as its display text (falling back to
+# the `name` when a rule has no description), addressed at `@/rule/<name>`
+# (e.g. `@/rule/coverage-preview`).
 [item_kinds.rule]
 section = "success_criteria"
 id-pattern = "[a-z][a-z0-9-]*"

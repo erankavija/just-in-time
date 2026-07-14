@@ -184,6 +184,14 @@
           "model": "opus",
           "status": "pending",
           "note": "filed 2026-07-14 from 45e1b7e8 REQ-04 split"
+        },
+        {
+          "short_id": "d74a9ed1",
+          "title": "Write default-rule membership through to rules.toml on config-driven refresh",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "filed 2026-07-14 from af4c901a integration"
         }
       ]
     }
@@ -192,6 +200,10 @@
     {
       "short_id": "554ad07f",
       "note": "Record working-tree cleanliness in gate-run evidence; split from 45e1b7e8 REQ-04 (aspirational) per worker recommendation; wired under epic; slotted into wave 5"
+    },
+    {
+      "short_id": "d74a9ed1",
+      "note": "Write default-rule membership through to rules.toml on config refresh; split from af4c901a round-3 (dangling @/rule/namespace-unique-brackets); slotted into wave 6 (former wave 5)"
     }
   ],
   "escalations": [],
@@ -199,7 +211,7 @@
     "950256ae": 1,
     "45e1b7e8": 2,
     "7446af34": 2,
-    "af4c901a": 2
+    "af4c901a": 3
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
