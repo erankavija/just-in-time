@@ -1,10 +1,14 @@
 //! Declarative validation engine (driven by `.jit/rules.toml` + built-in defaults).
 //!
 //! All issue/label validation flows through ONE declarative engine; there is no
-//! longer any hard-coded `IssueValidator`. `.jit/rules.toml` is the SOLE source of
-//! truth (DR §8.2/§8.4): `jit init` materializes the FIXED [`defaults`] ruleset
-//! into the file, and [`effective_rules`](crate::commands::CommandExecutor) builds
-//! the same defaults IN MEMORY when the file is absent (no write on the read path).
+//! longer any hard-coded `IssueValidator`. `.jit/rules.toml` declares the
+//! operative ruleset (DR §8.2/§8.4): `jit init` materializes the FIXED
+//! [`defaults`] ruleset into the file, and
+//! [`effective_rules`](crate::commands::CommandExecutor) builds the same defaults
+//! IN MEMORY when the file is absent (no write on the read path). A scaffolded
+//! file's `origin = "default"` rules are reconciled against the `config.toml`
+//! registry at load, so their assertion and `namespace-unique-*` membership never
+//! lag a hand edit of the registry.
 //!
 //! Submodules:
 //! - [`rules`] — the rule data model and `.jit/rules.toml` loader;
