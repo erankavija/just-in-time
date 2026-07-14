@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "33a45e50-6445-47cf-ad03-284520f3c5c2",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "950256ae-069c-4537-9379-06b457604fbc",
+  "commit": "2a8173d972d692e5df069f993d3ac463b381025c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T12:53:48.368651792Z",
+  "completed_at": "2026-07-14T12:55:32.854157922Z",
+  "duration_ms": 104485,
+  "exit_code": 0,
+  "stdout": "Documentation impact: pass. `bug` is a leaf type (level 4) and its resolved DAG node has no children. I inspected the five reachable `jit:950256ae` commits individually; their union adds `mcp-ci`, scopes `npm-ci`, and updates the repository-local gate projection. Current configuration runs `cd mcp-server && npm test`; the projection explicitly identifies itself as this repository’s live local configuration and accurately exposes both scopes in [rules-and-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:47). No additional adopter documentation is required for this repo-local gate configuration. The prior passing doc review had no unresolved blocking findings.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The repo-local Node workspace gate coverage and its rendered reference are accurate, scoped, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The repo-local Node workspace gate coverage and its rendered reference are accurate, scoped, and discoverable.",
+    "findings": []
+  }
+}

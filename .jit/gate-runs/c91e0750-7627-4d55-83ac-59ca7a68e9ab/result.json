@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "c91e0750-7627-4d55-83ac-59ca7a68e9ab",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "950256ae-069c-4537-9379-06b457604fbc",
+  "commit": "a728be5a50c2b8ad125e6aab60738305c862d09a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T12:49:51.287179792Z",
+  "completed_at": "2026-07-14T12:52:34.034012038Z",
+  "duration_ms": 162746,
+  "exit_code": 1,
+  "stdout": "Attribution: 78cba087, 6fd9b667, 031f8741, a728be5a (all reachable `jit:950256ae` commits)\nPolicy sources: AGENTS.md\nResolved items: @/gate/mcp-ci, @/gate/npm-ci, @/gate/jit-validate (.jit/gates.toml); @/invariant/gate-semantics, @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-2, @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: jit-validate passed (0, 2026-07-14T12:48:15Z); doc-review passed (0, 2026-07-14T12:48:31Z); docs-mechanical passed (0, 2026-07-14T12:48:15Z); mcp-ci passed (0, 2026-07-14T12:48:21Z)\nTruncation recovery: Re-read 6fd9b667 excluding oversized gate-run stdout, 78cba087 per affected issue path, and a728be5a’s first-parent merge patch.\n\n1. **F1 — blocking, issue-impact, medium:** [AGENTS.md](/home/vkaskivuo/Projects/just-in-time/AGENTS.md:101) manually enumerates gate keys and workspace scopes, including the newly added `mcp-ci`. The gate registry is the configured source of truth, while the rendered registry projection already supplies this information at [docs/reference/rules-and-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:47). This creates attributable prose duplication and can drift again. References: `@/invariant/single-source-prose`, `@/charter/D-6`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The MCP gate configuration and affected issue integrations meet the test-coverage criteria, but the change introduces a manual duplicate of registry-owned gate scope.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"AGENTS.md manually duplicates registry-owned gate keys and workspace scopes, including mcp-ci, instead of using a projection or citation.\",\"file\":\"AGENTS.md\",\"line\":101,\"references\":[\"@/invariant/single-source-prose\",\"@/charter/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 1819 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f60ad-351d-7ad1-88fd-eb792b937483\n--------\nuser\n--- 1806 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The MCP gate configuration and affected issue integrations meet the test-coverage criteria, but the change introduces a manual duplicate of registry-owned gate scope.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "AGENTS.md manually duplicates registry-owned gate keys and workspace scopes, including mcp-ci, instead of using a projection or citation.",
+        "file": "AGENTS.md",
+        "line": 101,
+        "references": [
+          "@/invariant/single-source-prose",
+          "@/charter/D-6"
+        ]
+      }
+    ]
+  }
+}

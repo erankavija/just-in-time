@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "52482482-efcc-41f8-a0da-0d9e76a3a111",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "950256ae-069c-4537-9379-06b457604fbc",
+  "commit": "a728be5a50c2b8ad125e6aab60738305c862d09a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T12:48:31.135603728Z",
+  "completed_at": "2026-07-14T12:49:51.240172388Z",
+  "duration_ms": 80104,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf type (level 4) with no resolved children. I inspected the four reachable `jit:950256ae` commits individually, including the merge patch; their union adds `mcp-ci`, assigns it to the affected MCP issues, and documents the distinct Node-workspace scopes. Uncommitted changes were not attributed.\n\nThe current registry runs `cd mcp-server && npm test`, and the projected local reference accurately distinguishes it from web-only `npm-ci` at [docs/reference/rules-and-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:47). The page explicitly identifies itself as this repository’s live configuration, so no adopter-facing shipped-default claim is implied. No prior review findings exist.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's local gate configuration and projected documentation accurately and discoverably distinguish mcp-server and web CI coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue's local gate configuration and projected documentation accurately and discoverably distinguish mcp-server and web CI coverage.",
+    "findings": []
+  }
+}

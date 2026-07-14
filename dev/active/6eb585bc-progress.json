@@ -28,7 +28,7 @@
           "title": "Gate npm-ci does not cover the mcp-server test suite",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "7446af34",
@@ -168,6 +168,8 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "950256ae": 1
+  },
   "started_at": "2026-07-14T00:00:00Z"
 }

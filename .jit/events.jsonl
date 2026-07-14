@@ -7163,6 +7163,16 @@
 {"type":"issue_claimed","id":"536aafb6-b397-4461-b91c-2572e2e978ca","issue_id":"45e1b7e8-bd42-445a-892a-0b7f79bd4ec9","timestamp":"2026-07-14T12:35:13.360478235Z","assignee":"agent:worker"}
 {"type":"issue_state_changed","id":"97178ed5-0383-4247-a210-959edfea9cd3","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:35:13.376903887Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"642234cc-93c8-4b94-8e0c-919bec1ab1ed","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:35:13.377106867Z","assignee":"agent:worker"}
+{"type":"gate_passed","id":"f7286ec2-d1ed-4020-accc-b078422a60bd","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:48:15.797516405Z","gate_key":"jit-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"03e7cf4b-9630-4128-82bd-2955c1e5e137","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:48:16.209400474Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"a15886f1-082e-48d8-ab11-7b10e8825df9","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:48:22.993828508Z","gate_key":"mcp-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"cfdcc3fc-e067-4278-bbf0-650e97c6519f","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:49:51.240755179Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"issue_created","id":"cc994fce-1a42-41e1-88b6-de50a1471af4","issue_id":"73482aa1-aa6b-46f6-9d6f-3152a102e558","timestamp":"2026-07-14T12:51:41.234740984Z","title":"Bound Rust build artifacts and compilation cost","priority":"high"}
 {"type":"issue_updated","id":"71c5ee6a-fa12-4c49-b782-0e387a213b3f","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-14T12:51:50.700577237Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_failed","id":"c591927e-efc9-4c45-8d34-fd69147c257f","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:52:34.034779079Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"519c44f2-5456-4103-bf64-a895ecde4054","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:53:40.555190651Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"issue_updated","id":"37ffbd63-fb91-4309-b91b-cf8daf628960","issue_id":"73482aa1-aa6b-46f6-9d6f-3152a102e558","timestamp":"2026-07-14T12:55:22.315799838Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"gate_passed","id":"23360d50-7b5c-41ab-9f0d-3dd6be7a1467","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:55:32.890584868Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"5d334b2f-c918-4e31-b14f-2cde96d25cb0","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:59:53.718758376Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"06c190fd-76ab-49ae-bb00-ec15881efec0","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T13:00:16.553923951Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"dc46f2f2-609c-4b20-be6a-ba626bdaf9d5","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T13:00:16.553969231Z"}

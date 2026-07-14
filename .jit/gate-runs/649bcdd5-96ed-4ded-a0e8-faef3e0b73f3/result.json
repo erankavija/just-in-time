@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "649bcdd5-96ed-4ded-a0e8-faef3e0b73f3",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "950256ae-069c-4537-9379-06b457604fbc",
+  "commit": "e091377ae2c39c5e1570521646591832c5febd47",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T12:55:33.102960503Z",
+  "completed_at": "2026-07-14T12:59:53.542661948Z",
+  "duration_ms": 260439,
+  "exit_code": 0,
+  "stdout": "Attribution: 78cba087, 6fd9b667, 031f8741, a728be5a, 771c0103 (`jit:950256ae`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/mcp-ci, @/gate/npm-ci, @/gate/jit-validate (.jit/gates.toml); @/invariant/gate-semantics, @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: jit-validate passed (0, 2026-07-14T12:48:15Z); doc-review passed (0, 2026-07-14T12:53:48Z); docs-mechanical passed (0, 2026-07-14T12:53:39Z); mcp-ci passed (0, 2026-07-14T12:48:21Z)\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The mcp-ci gate, scoped gate descriptions, affected issue integrations, and registry projection meet all hard criteria; the prior duplicate-prose finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The mcp-ci gate, scoped gate descriptions, affected issue integrations, and registry projection meet all hard criteria; the prior duplicate-prose finding is resolved.",
+    "findings": []
+  }
+}
