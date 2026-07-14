@@ -6,7 +6,6 @@
   "priority": "critical",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
-    "6eb585bc-998d-4778-906d-415fcdc1916e",
     "207364b1-cc06-4bf5-ae61-34908acc898c"
   ],
   "gates_required": [
@@ -39,7 +38,7 @@
     "type:epic"
   ],
   "created_at": "2026-07-14T18:53:51.384889730Z",
-  "updated_at": "2026-07-14T19:22:20.290369766Z",
+  "updated_at": "2026-07-14T19:58:47.483749020Z",
   "first_ready_at": "2026-07-14T18:53:51.384894920Z",
   "claimed_at": "2026-07-14T19:22:20.290364996Z"
 }

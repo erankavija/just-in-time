@@ -7309,3 +7309,4 @@
 {"type":"issue_claimed","id":"f43dfba8-0fcf-46c3-8243-23baa288a586","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:22:20.309398359Z","assignee":"agent:architect"}
 {"type":"issue_updated","id":"5880f1b5-7056-489c-9396-71ffb49b6e98","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:37:51.384216005Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"5ffad0b8-da92-4bee-91c5-7d839691e876","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:56:21.314266519Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"8e7fec47-581e-4b61-8de5-5ef836465738","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-14T19:58:47.715844669Z","updated_by":"dependency-remove","fields":["dependencies"]}
