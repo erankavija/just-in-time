@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2f888983-4b15-485a-b9ca-5c35d88e2b8b",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "bbd956bae6d94aef20434283dd2a2d2ec3037662",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T16:49:17.525024118Z",
+  "completed_at": "2026-07-14T16:50:58.184165225Z",
+  "duration_ms": 100659,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a maximum-level leaf with no resolved children. I inspected the ten reachable `jit:7446af34` commits individually; uncommitted gate-run artifacts were not attributed. The prior review has no unresolved blocking findings.\n\nThe affected documentation accurately covers the refusal condition, gate-run behavior, JSON/exit-code distinction, recovery, and unrelated-repository exception in the gate reference and troubleshooting guidance.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The stale-binary gate refusal is accurately documented, discoverable, and concise across its affected documentation cone.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The stale-binary gate refusal is accurately documented, discoverable, and concise across its affected documentation cone.",
+    "findings": []
+  }
+}

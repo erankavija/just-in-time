@@ -2,7 +2,7 @@
   "id": "7446af34-d386-44e3-aa20-3422893219f0",
   "title": "Detect a jit binary that predates the repository it is validating",
   "description": "Gate checkers invoke `jit` from `PATH`, not the binary built from the working tree. After a change to storage, validation, or any command a checker calls, the gate silently exercises the previously installed binary. The gate result then describes a version of the product that is not the one under review.\n\nObserved twice while driving epic 004d10b7. In the worst case `scripts/jit-validate.sh` (`exec jit validate \"$@\"`) reported an issue as not found using a stale binary; the `code-review` gate reported that as a blocking finding against the change under review, and the round was spent chasing a defect that did not exist in the working tree. The workaround is to remember `cargo install --path crates/jit` after landing anything a checker touches — a step nothing prompts for and whose omission produces a plausible-looking failure rather than an obvious one.\n\n## The mechanism, and why the fix is cheap\n\nThe binary already knows both halves of the comparison. `crates/jit/build_info.rs` (populated by `crates/jit/build.rs`) embeds the commit it was built from and whether that tree was dirty; `jit --version` prints them:\n\n    jit 0.2.1 (commit 824a4e74, dirty=true, profile release)\n\nSo a running `jit` can compare the commit it was built from against the repository's current `HEAD` and tell the operator that it is judging a tree it was not built from. Nothing does this today.\n\nEvery repo-local gate checker in `scripts/` shells out to `jit` this way (`jit-validate.sh`, `docs-mechanical.sh`, `docs-check-projections.sh`, `docs-check-citations.sh`, and others), so the exposure is the whole gate surface, not one script.\n\nDecide, with reasons, between warning and failing: a warning keeps a legitimate cross-version run possible; a hard failure inside a gate context is defensible because a gate verdict from the wrong binary is not evidence about the change. A `--allow-stale-binary` style escape hatch, or scoping the check to gate runs, are both acceptable resolutions if justified.\n\n## Success Criteria\n\n- [hard] REQ-01: When the running binary was built from a commit other than the repository's current `HEAD` (or from a dirty tree that no longer matches), jit surfaces that fact rather than silently proceeding; the chosen behavior (warn or fail) is justified against the gate-evidence argument above.\n- [hard] REQ-02: The check reaches the gate path, so a checker cannot return a verdict from a binary that predates the tree under review without that being visible in the run record.\n- [hard] REQ-03: The check does not fire for an ordinary user running an installed release against an unrelated repository, and does not require git (`@/charter/D-4`): outside a git repository, or with no resolvable HEAD, it stays silent.\n- [hard] REQ-04: Coverage exercises both the matching and mismatching cases against the real build-info values.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:worker",
   "dependencies": [],
@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T16:50:58.220246421Z"
+    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T16:28:36.350025615Z"
+      "updated_at": "2026-07-14T16:41:43.700236167Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T16:45:47.740365067Z"
     },
     "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T16:37:10.815162192Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T16:39:16.457449946Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T16:32:30.970942896Z"
+      "updated_at": "2026-07-14T16:49:17.525024118Z"
     }
   },
   "context": {},
@@ -42,7 +42,8 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-12T13:45:43.585456956Z",
-  "updated_at": "2026-07-14T16:39:16.960401581Z",
+  "updated_at": "2026-07-14T16:51:26.194799533Z",
   "first_ready_at": "2026-07-12T13:45:43.585463056Z",
-  "claimed_at": "2026-07-14T13:33:41.409939405Z"
+  "claimed_at": "2026-07-14T13:33:41.409939405Z",
+  "done_at": "2026-07-14T16:51:26.194798873Z"
 }

@@ -35,8 +35,8 @@
           "title": "Detect a jit binary that predates the repository it is validating",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_progress",
-          "note": "sub-wave 1b: dispatch after 45e1b7e8 merges (shared scripts/gate-run machinery)"
+          "status": "done",
+          "note": "2 worker rework rounds + 4 lead-direct fix rounds (guard-placement family); all findings closed, no regressions"
         }
       ]
     },
