@@ -117,6 +117,15 @@ fn unique_schema_stem(identity: &str, used_stems: &mut HashSet<String>) -> Strin
     }
 }
 
+/// The generated leading comment block of `.jit/rules.toml`, stating the current
+/// default-rule contract. The storage layer
+/// ([`rewrite_rules_header`](crate::storage::ruleset_store::rewrite_rules_header))
+/// republishes this header over an existing ruleset file so it never lags a
+/// change to the contract, preserving the rule bodies below it.
+pub fn rules_file_header() -> &'static str {
+    FILE_HEADER
+}
+
 const FILE_HEADER: &str = "\
 # .jit/rules.toml — the operative source of truth for issue/label validation.
 #

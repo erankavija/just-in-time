@@ -1,10 +1,14 @@
 //! Built-in DEFAULT rule set: the fixed default validation rules.
 //!
-//! `.jit/rules.toml` is the SOLE source of truth for issue/label validation (DR
-//! §8.2/§8.4). This module produces the FIXED default rule set that `jit init`
-//! serializes into that file, and that
+//! `.jit/rules.toml` declares the operative issue/label ruleset (DR §8.2/§8.4).
+//! This module produces the FIXED default rule set that `jit init` serializes
+//! into that file, that
 //! [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor) builds
-//! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path).
+//! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path),
+//! and that [`reconcile_default_rules_with_config`] reconciles a scaffolded
+//! file's default rules against the current registry at load — so a default
+//! rule's assertion and the `namespace-unique-*` membership follow `config.toml`,
+//! never a stale `schemas/default-*.json` projection.
 //!
 //! After the backward-compat hard removal (issue d4188154), the default set no
 //! longer reads any `[validation]` enforcement flags or per-namespace
@@ -46,7 +50,7 @@ use crate::domain::LabelNamespaces;
 use crate::validation::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
@@ -217,21 +221,28 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     RuleSet { rules }
 }
 
-/// Rebuild the assertion of every `origin = "default"` rule in `loaded` from the
-/// declared `namespaces` registry, so a default-origin rule validates against a
-/// schema derived from `config.toml` in memory rather than from its on-disk
-/// `schemas/default-*.json` projection.
+/// Reconcile the `origin = "default"` rules in `loaded` against the fixed default
+/// rule set that [`default_ruleset`] derives from the declared `namespaces`
+/// registry, so both the MEMBERSHIP and the ASSERTIONS of the default family
+/// follow `config.toml` in memory at load rather than the scaffolded `rules.toml`
+/// / `schemas/default-*.json` snapshot.
 ///
-/// This is the load-time derivation that keeps the fixed default rules in
-/// lock-step with a hand-edited registry: the on-disk schema is a write-through
-/// projection for external consumers, never the validation authority. A
-/// default-origin rule is rewritten only when [`default_ruleset`] generates a
-/// rule of the SAME name for the current `namespaces`; its assertion (and derived
-/// [`scope`](Rule::scope)) is replaced with the freshly-derived one, while its
-/// policy fields (`severity`, `enforce`, `when`, `description`) are preserved so
-/// those stay editable in `rules.toml`. Custom rules (any other `origin`) and any
-/// default-origin rule the current registry no longer generates are returned
-/// unchanged.
+/// When `loaded` carries at least one default-origin rule (the scaffolded state),
+/// the default family becomes a config projection:
+///
+/// - a default-origin rule the registry still generates keeps its editable policy
+///   fields (`severity`, `enforce`, `when`, `description`) but takes its assertion
+///   (and derived [`scope`](Rule::scope)) from config, in its original position;
+/// - a default-origin rule the registry no longer generates — e.g. a
+///   `namespace-unique-<ns>` whose namespace was removed — is DROPPED;
+/// - a default rule the registry now generates but `loaded` lacks — e.g. a
+///   `namespace-unique-<ns>` for a newly-declared unique namespace — is APPENDED.
+///
+/// So a hand edit of the registry adds or drops the corresponding default rule
+/// with no `rules.toml` write, and the baked schema is never the authority.
+/// Custom rules (any other `origin`) are returned untouched, in place. When
+/// `loaded` carries NO default-origin rule — a curated file that opted out of the
+/// defaults — nothing is added: the file is returned unchanged.
 ///
 /// Pure: performs no I/O, deterministic, and total.
 ///
@@ -239,10 +250,10 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 ///
 /// ```
 /// use jit::domain::{LabelNamespace, LabelNamespaces};
-/// use jit::validation::defaults::{default_ruleset, with_default_assertions_from_config};
+/// use jit::validation::defaults::{default_ruleset, reconcile_default_rules_with_config};
 /// use std::collections::HashMap;
 ///
-/// // A ruleset scaffolded when only `type` was declared.
+/// // A ruleset scaffolded when only `type` was declared (unique).
 /// let mut old = HashMap::new();
 /// old.insert("type".to_string(), LabelNamespace::new("Type", true));
 /// let scaffolded = default_ruleset(&LabelNamespaces {
@@ -252,11 +263,12 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 ///     label_associations: None,
 ///     strategic_types: None,
 /// });
+/// assert!(!scaffolded.rules.iter().any(|r| r.name == "namespace-unique-team"));
 ///
-/// // The registry now also declares `enforces` (a later hand edit).
+/// // The registry now also declares a unique `team` namespace (a later hand edit).
 /// let mut now = HashMap::new();
 /// now.insert("type".to_string(), LabelNamespace::new("Type", true));
-/// now.insert("enforces".to_string(), LabelNamespace::new("Enforces", false));
+/// now.insert("team".to_string(), LabelNamespace::new("Team", true));
 /// let current = LabelNamespaces {
 ///     schema_version: 2,
 ///     namespaces: now,
@@ -265,33 +277,54 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
 ///     strategic_types: None,
 /// };
 ///
-/// let derived = with_default_assertions_from_config(scaffolded, &current);
-/// // The `namespace-registry` rule now derives from the current registry.
-/// assert!(derived.rules.iter().any(|r| r.name == "namespace-registry"));
+/// let reconciled = reconcile_default_rules_with_config(scaffolded, &current);
+/// // The uniqueness rule for the newly-declared namespace now enforces.
+/// assert!(reconciled.rules.iter().any(|r| r.name == "namespace-unique-team"));
 /// ```
-pub fn with_default_assertions_from_config(
+pub fn reconcile_default_rules_with_config(
     loaded: RuleSet,
     namespaces: &LabelNamespaces,
 ) -> RuleSet {
-    let derived = default_ruleset(namespaces);
-    let by_name: HashMap<&str, &Assertion> = derived
+    // A file with no default-origin rule has deliberately opted out of the fixed
+    // defaults; leave it exactly as authored.
+    if !loaded
         .rules
         .iter()
-        .map(|rule| (rule.name.as_str(), &rule.assert))
-        .collect();
-    let rules = loaded
-        .rules
-        .into_iter()
-        .map(|mut rule| {
-            if rule.origin.as_deref() == Some(DEFAULT_ORIGIN) {
-                if let Some(assert) = by_name.get(rule.name.as_str()) {
-                    rule.assert = (*assert).clone();
-                    rule.scope = rule.assert.scope();
-                }
+        .any(|r| r.origin.as_deref() == Some(DEFAULT_ORIGIN))
+    {
+        return loaded;
+    }
+
+    let derived = default_ruleset(namespaces);
+    let derived_by_name: HashMap<&str, &Rule> =
+        derived.rules.iter().map(|r| (r.name.as_str(), r)).collect();
+
+    let mut consumed: HashSet<&str> = HashSet::new();
+    let mut rules: Vec<Rule> = Vec::with_capacity(loaded.rules.len());
+    for mut rule in loaded.rules {
+        if rule.origin.as_deref() == Some(DEFAULT_ORIGIN) {
+            // A default-origin rule survives iff the registry still generates it;
+            // its assertion is taken from config, its policy fields preserved.
+            if let Some(current) = derived_by_name.get(rule.name.as_str()) {
+                consumed.insert(current.name.as_str());
+                rule.assert = current.assert.clone();
+                rule.scope = rule.assert.scope();
+                rules.push(rule);
             }
-            rule
-        })
-        .collect();
+            // Otherwise the registry dropped it (e.g. a removed namespace): omit.
+        } else {
+            rules.push(rule);
+        }
+    }
+
+    // Append the default rules the registry now generates that `loaded` lacked
+    // (e.g. a uniqueness rule for a newly-declared namespace), in default order.
+    for rule in &derived.rules {
+        if !consumed.contains(rule.name.as_str()) {
+            rules.push(rule.clone());
+        }
+    }
+
     RuleSet { rules }
 }
 
@@ -750,22 +783,115 @@ mod tests {
         }
     }
 
+    /// A custom (non-default) json-schema rule, standing in for a repo-authored or
+    /// bracket rule that must survive reconciliation verbatim.
+    fn custom_json_rule(name: &str) -> Rule {
+        Rule {
+            name: name.to_string(),
+            origin: Some("bracket".to_string()),
+            description: None,
+            when: Selector::default(),
+            severity: Severity::Warn,
+            enforce: false,
+            assert: Assertion::JsonSchema(SchemaSource {
+                reference: format!("schemas/{name}.json"),
+                path: std::path::PathBuf::from(format!("schemas/{name}.json")),
+                schema: serde_json::json!({ "type": "object" }),
+            }),
+            scope: RuleScope::Local,
+        }
+    }
+
     #[test]
-    fn test_with_default_assertions_rederives_namespace_registry_from_config() {
-        // A default-origin namespace-registry rule carrying a STALE schema (its
-        // pattern knows only `type`) must be rebuilt from the CURRENT registry
-        // (which also declares `enforces`), so its schema no longer decides
-        // validation — config does.
+    fn test_reconcile_adds_rule_for_new_unique_namespace() {
+        // Scaffolded when only `type` was unique; the registry now also declares a
+        // unique `team`. Its uniqueness rule appears with NO file write, and a
+        // duplicate `team:` label blocks (enforce carried from the derived rule).
+        let loaded = default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        assert!(!loaded
+            .rules
+            .iter()
+            .any(|r| r.name == "namespace-unique-team"));
+
+        let now = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let team = reconciled
+            .rules
+            .iter()
+            .find(|r| r.name == "namespace-unique-team")
+            .expect("new unique namespace gains a uniqueness rule");
+        assert!(team.enforce, "appended default keeps enforce = true");
+
+        let dup = evaluate_local(
+            &issue_with(&["team:a", "team:b"]),
+            &reconciled,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(
+            dup.is_blocking(),
+            "a duplicate in the newly-enforced namespace must block"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_drops_rule_for_removed_namespace() {
+        // Scaffolded with a unique `team`; the registry drops `team`. Its
+        // uniqueness rule goes inert (removed), so a duplicate no longer blocks.
+        let loaded = default_ruleset(&registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("team", LabelNamespace::new("Team", true)),
+        ]));
+        assert!(loaded
+            .rules
+            .iter()
+            .any(|r| r.name == "namespace-unique-team"));
+
+        let now = registry(vec![("type", LabelNamespace::new("Type", true))]);
+        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        assert!(
+            !reconciled
+                .rules
+                .iter()
+                .any(|r| r.name == "namespace-unique-team"),
+            "a removed namespace drops its uniqueness rule"
+        );
+
+        let dup = evaluate_local(
+            &issue_with(&["team:a", "team:b"]),
+            &reconciled,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(
+            !dup.is_blocking(),
+            "with no uniqueness rule, a duplicate must not block"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_rederives_namespace_registry_from_config() {
+        // A scaffolded namespace-registry rule carrying a STALE schema (its pattern
+        // knows only `type`) is rebuilt from the CURRENT registry (which also
+        // declares `enforces`), so the on-disk schema no longer decides validation.
         let loaded = RuleSet {
             rules: vec![stale_namespace_registry_rule(&["type"])],
         };
-        let reg = registry(vec![
+        let now = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("enforces", LabelNamespace::new("Enforces", false)),
         ]);
 
-        let derived = with_default_assertions_from_config(loaded, &reg);
-        match &derived.rules[0].assert {
+        let reconciled = reconcile_default_rules_with_config(loaded, &now);
+        let reg_rule = reconciled
+            .rules
+            .iter()
+            .find(|r| r.name == "namespace-registry")
+            .expect("namespace-registry survives");
+        match &reg_rule.assert {
             Assertion::JsonSchema(src) => assert_eq!(
                 src.schema,
                 registered_namespace_schema(&["enforces", "type"]),
@@ -773,15 +899,15 @@ mod tests {
             ),
             other => panic!("expected JsonSchema, got {other:?}"),
         }
-        // Policy fields are preserved (only the assertion is re-derived).
-        assert_eq!(derived.rules[0].severity, Severity::Error);
-        assert!(!derived.rules[0].enforce);
+        // Policy fields are preserved on the surviving default rule.
+        assert_eq!(reg_rule.severity, Severity::Error);
+        assert!(!reg_rule.enforce);
 
         // A label in the newly-declared namespace now validates clean, WITHOUT
         // touching the on-disk projection.
         let ok = evaluate_local(
             &issue_with(&["enforces:x"]),
-            &derived,
+            &reconciled,
             crate::domain::ContentFormat::Markdown,
         )
         .unwrap();
@@ -793,63 +919,49 @@ mod tests {
     }
 
     #[test]
-    fn test_with_default_assertions_leaves_custom_rules_untouched() {
-        // A custom rule (origin != "default") keeps its own assertion verbatim: a
-        // custom json-schema still points at its declared file (REQ-03).
-        let custom = Rule {
-            name: "custom-shape".to_string(),
-            origin: Some("bracket".to_string()),
-            description: None,
-            when: Selector::default(),
-            severity: Severity::Warn,
-            enforce: false,
-            assert: Assertion::JsonSchema(SchemaSource {
-                reference: "schemas/custom-shape.json".to_string(),
-                path: std::path::PathBuf::from("schemas/custom-shape.json"),
-                schema: serde_json::json!({ "type": "object" }),
-            }),
-            scope: RuleScope::Local,
-        };
+    fn test_reconcile_leaves_custom_only_file_untouched() {
+        // A file with NO default-origin rule has opted out of the defaults: nothing
+        // is added and the custom rule is returned verbatim (REQ-03).
+        let custom = custom_json_rule("custom-shape");
         let loaded = RuleSet {
             rules: vec![custom.clone()],
         };
-        let derived = with_default_assertions_from_config(
+        let reconciled = reconcile_default_rules_with_config(
             loaded,
             &registry(vec![("type", LabelNamespace::new("Type", true))]),
         );
-        assert_eq!(derived.rules, vec![custom], "custom rules are untouched");
-    }
-
-    #[test]
-    fn test_with_default_assertions_leaves_unknown_default_rule_untouched() {
-        // A default-origin rule the CURRENT registry no longer generates (a
-        // uniqueness rule for a namespace since removed from config) is returned
-        // unchanged — there is no config-derived assertion to substitute.
-        let orphan = local_rule(
-            "namespace-unique-gone",
-            "leftover",
-            Selector::default(),
-            Severity::Error,
-            true,
-            Assertion::RequireLabel {
-                label: "gone:*".to_string(),
-                min: Some(0),
-                max: Some(1),
-            },
-        );
-        let loaded = RuleSet {
-            rules: vec![orphan.clone()],
-        };
-        let derived = with_default_assertions_from_config(loaded, &registry(vec![]));
         assert_eq!(
-            derived.rules,
-            vec![orphan],
-            "unknown default rule is untouched"
+            reconciled.rules,
+            vec![custom],
+            "a custom-only file is untouched"
         );
     }
 
     #[test]
-    fn test_with_default_assertions_rederives_type_hierarchy_schema() {
+    fn test_reconcile_preserves_custom_rule_alongside_defaults() {
+        // A custom rule interleaved with the scaffolded defaults survives verbatim
+        // while the default family reconciles to config.
+        let mut loaded =
+            default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let custom = custom_json_rule("coverage-preview");
+        loaded.rules.push(custom.clone());
+
+        let reconciled = reconcile_default_rules_with_config(
+            loaded,
+            &registry(vec![("type", LabelNamespace::new("Type", true))]),
+        );
+        assert!(
+            reconciled.rules.iter().any(|r| r == &custom),
+            "the custom rule is preserved verbatim"
+        );
+        assert!(
+            reconciled.rules.iter().any(|r| r.name == "label-format"),
+            "the default family is present"
+        );
+    }
+
+    #[test]
+    fn test_reconcile_rederives_type_hierarchy_schema() {
         // The `type-hierarchy-known` default rule is rebuilt from the current
         // hierarchy, so a newly-declared type validates without regenerating the
         // baked schema.
@@ -879,8 +991,13 @@ mod tests {
             label_associations: None,
             strategic_types: None,
         };
-        let derived = with_default_assertions_from_config(RuleSet { rules: vec![stale] }, &reg);
-        match &derived.rules[0].assert {
+        let reconciled = reconcile_default_rules_with_config(RuleSet { rules: vec![stale] }, &reg);
+        let rule = reconciled
+            .rules
+            .iter()
+            .find(|r| r.name == "type-hierarchy-known")
+            .expect("type-hierarchy-known survives");
+        match &rule.assert {
             Assertion::JsonSchema(src) => {
                 assert_eq!(src.schema, type_hierarchy_known_schema(&reg));
             }

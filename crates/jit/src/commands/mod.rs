@@ -309,14 +309,16 @@ pub struct CommandExecutor<S: IssueStore> {
     /// load/parse error so callers can surface a misconfigured rules file
     /// instead of silently treating it as "no rules".
     rules: OnceLock<Result<RuleSet, RuleConfigError>>,
-    /// Lazily-built EFFECTIVE rule set: the built-in default rules (derived from
-    /// this repo's `config.toml` by
-    /// [`default_ruleset`](crate::validation::defaults::default_ruleset)) followed
-    /// by the user's `.jit/rules.toml`. This is the single source of truth for
-    /// issue/label validation after the a0f0f342 migration — the former
-    /// hard-coded checks now live as default rules here. A load/parse error from
-    /// either source is retained as an `Err` so a misconfigured repo surfaces the
-    /// problem rather than silently disabling enforcement.
+    /// Lazily-built EFFECTIVE rule set. When `.jit/rules.toml` is present it
+    /// supplies the rules, with the `origin = "default"` family reconciled against
+    /// this repo's `config.toml` registry at load
+    /// ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config));
+    /// when absent, the built-in
+    /// [`default_ruleset`](crate::validation::defaults::default_ruleset) is built
+    /// IN MEMORY. The former hard-coded checks (a0f0f342 migration) now live as
+    /// default rules here. A load/parse error from either source is retained as an
+    /// `Err` so a misconfigured repo surfaces the problem rather than silently
+    /// disabling enforcement.
     effective_rules: OnceLock<Result<RuleSet, String>>,
     /// Lazily-loaded `.jit/config.toml`, cached so the unified write-time
     /// validation entry point does not re-read and re-parse `config.toml` on
@@ -364,19 +366,22 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Return the EFFECTIVE rule set, with `.jit/rules.toml` as the operative
-    /// single source of truth (DR §8.2/§8.4).
+    /// ruleset and its `origin = "default"` rules reconciled against `config.toml`
+    /// at load (DR §8.2/§8.4).
     ///
     /// Semantics depend on whether the file EXISTS, not whether it is empty:
     ///
     /// - **File present (even with zero rules):** the parsed file supplies the
     ///   operative rule set — which rules exist and, for the built-in rules `jit
     ///   init` scaffolds (marked `origin = "default"`), their editable policy
-    ///   fields (severity, enforce, selector). Each default-origin rule's
-    ///   ASSERTION is re-derived from the declared `[namespaces]` /
-    ///   `[type_hierarchy]` registry IN MEMORY at load
-    ///   ([`with_default_assertions_from_config`](crate::validation::defaults::with_default_assertions_from_config)),
-    ///   so a hand edit of the registry cannot desync validation against a stale
-    ///   `schemas/default-*.json` projection. Custom rules (any other `origin`)
+    ///   fields (severity, enforce, selector). The default family is reconciled
+    ///   against the declared `[namespaces]` / `[type_hierarchy]` registry IN
+    ///   MEMORY at load
+    ///   ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)):
+    ///   assertions are re-derived, a rule is added for a newly-declared namespace
+    ///   and dropped for a removed one, so a hand edit of the registry cannot
+    ///   desync validation against a stale `schemas/default-*.json` projection.
+    ///   Custom rules (any other `origin`)
     ///   are used verbatim, reading their own declared schema files. An
     ///   intentionally-emptied file yields an empty set.
     /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
@@ -395,16 +400,17 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let rules_path = self.storage.root().join("rules.toml");
                 if rules_path.exists() {
                     // File present (even empty) supplies the operative rule set.
-                    // Its default-origin rules are config-derived PROJECTIONS: their
-                    // on-disk `schemas/default-*.json` files are not the validation
-                    // authority, so re-derive each default-origin rule's assertion
-                    // from the declared registry IN MEMORY at load. Custom rules and
-                    // the default rules' policy fields (severity/enforce/selector)
-                    // are taken from the file unchanged.
+                    // Its default-origin rules are a config PROJECTION: reconcile
+                    // the default family against the declared registry IN MEMORY at
+                    // load — re-derive assertions, add a rule for a newly-declared
+                    // namespace, drop one whose namespace is gone — so the baked
+                    // `schemas/default-*.json` files are never the authority. Custom
+                    // rules and the default rules' editable policy fields
+                    // (severity/enforce/selector) are taken from the file unchanged.
                     let user = self.rules().map_err(|e| e.to_string())?.clone();
                     let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
                     Ok(
-                        crate::validation::defaults::with_default_assertions_from_config(
+                        crate::validation::defaults::reconcile_default_rules_with_config(
                             user, namespaces,
                         ),
                     )
@@ -998,8 +1004,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// namespace registry + type hierarchy.
     ///
     /// Idempotent: a no-op when `.jit/rules.toml` already exists (the present file
-    /// is the sole source and is left untouched), so re-init never clobbers user
-    /// edits. Returns `true` when it wrote the file, `false` when it was a no-op.
+    /// is left untouched, so re-init never clobbers user edits) beyond republishing
+    /// its projections (the header comment and `schemas/default-*.json`). Returns
+    /// `true` when it wrote a fresh file, `false` when it was a projection-only
+    /// refresh.
     pub fn scaffold_default_rules(&self) -> Result<bool> {
         let jit_root = self.storage.root();
 
@@ -1015,10 +1023,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         if crate::storage::ruleset_store::has_validation_ruleset(jit_root) {
             // `rules.toml` is never clobbered when present. Its default-origin
             // rules validate against the config registry derived in memory, but the
-            // `schemas/default-*.json` files are projections for external
-            // consumers; refresh them from the current registry so a re-init / apply
-            // republishes them. Idempotent and atomic; a no-op when already current.
+            // `schemas/default-*.json` files and the file's header comment are
+            // projections; republish both from the current registry / contract so a
+            // re-init refreshes them. The header rewrite preserves every rule body
+            // (including custom-rule comments). Idempotent and atomic; a no-op when
+            // already current.
             self.refresh_default_schema_projections()?;
+            crate::storage::ruleset_store::rewrite_rules_header(
+                jit_root,
+                crate::validation::serialize::rules_file_header(),
+            )?;
             return Ok(false);
         }
 
@@ -1043,8 +1057,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// current `[namespaces]` / `[type_hierarchy]` config, returning the names of
     /// the files (re)written.
     ///
-    /// The default rules validate against the registry derived in memory at load
-    /// ([`with_default_assertions_from_config`](crate::validation::defaults::with_default_assertions_from_config)),
+    /// The default rules validate against the registry reconciled in memory at
+    /// load
+    /// ([`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)),
     /// so these files are write-through projections for external consumers, never
     /// the validation authority. jit republishes them whenever it writes
     /// `config.toml` or `rules.toml` (init/re-init, `config set`) so a projection
