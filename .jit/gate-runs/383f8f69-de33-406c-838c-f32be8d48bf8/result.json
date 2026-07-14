@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "383f8f69-de33-406c-838c-f32be8d48bf8",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "74d18b3ab20d2277108b79d1da906487de8da63d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T13:20:27.031764602Z",
+  "completed_at": "2026-07-14T13:22:54.278253876Z",
+  "duration_ms": 147246,
+  "exit_code": 1,
+  "stdout": "Attribution: leaf issue `45e1b7e8`; reviewed eight individually inspected reachable `jit:45e1b7e8` commits with rename detection. No uncommitted changes were attributed.\n\n1. **F1 — blocking, issue-impact:** The protocol says it has “four steps” but now defines five, weakening discoverability of the required per-merge verification. Change “four” to “five” (or remove the count). [.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:14](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:14)\n\n2. **F2 — blocking, issue-impact:** The added table row makes the “third row” the per-merge build verifier, but the following paragraph describes the post-dispatch leak check and says to run it once per wave. Update the reference to the fourth row, preserving the distinct per-wave leak-check instruction. [.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:122](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:122)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-authored protocol references remain inconsistent with required per-merge verification.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The protocol says it has four steps although it now defines five, obscuring Step 5's required per-merge verification.\",\"file\":\".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md\",\"line\":14},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The stale “third row” cross-reference now identifies the merge verifier while describing the separate per-wave leak check.\",\"file\":\".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md\",\"line\":122}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.uJCb4sf4jh: binary file matches\n--- agent stderr (first 12 of 13569 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f60c9-364a-7963-bd1c-fd962906878a\n--------\n--- 13557 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two issue-authored protocol references remain inconsistent with required per-merge verification.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The protocol says it has four steps although it now defines five, obscuring Step 5's required per-merge verification.",
+        "file": ".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md",
+        "line": 14
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The stale “third row” cross-reference now identifies the merge verifier while describing the separate per-wave leak check.",
+        "file": ".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md",
+        "line": 122
+      }
+    ]
+  }
+}

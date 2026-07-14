@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "ecdd327c-0927-4de7-9cad-539515bea30b",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "77a8c9f3f7a22da1a271c30f64fe7a7c05780a39",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T13:09:23.619647605Z",
+  "completed_at": "2026-07-14T13:12:16.646214635Z",
+  "duration_ms": 173026,
+  "exit_code": 1,
+  "stdout": "Attribution: `bug` is a configured leaf (level 4) with no resolved children. I reviewed the six reachable `jit:45e1b7e8` commits individually with rename/copy detection. Their union adds the isolated commit-build verifier, regression coverage, criterion-marker fixes, and two workflow-reference updates.\n\nDocumentation impact: fail. The new workflow is accurate for this repository, but its reusable-skill documentation directs other projects to a repository-local, Rust-specific script that the skill does not package.\n\n1. **F1 — blocking, issue-impact (medium):** The new post-merge verification instructions in [worktree-dispatch-protocol.md](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:67) and [worktree-mode.md](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-parallel/references/worktree-mode.md:66) invoke `scripts/verify-commit-builds.sh`, but the verifier exists only at the JIT repository root and runs `cargo build --workspace`. The execution-lead protocol says its scripts are packaged with the skill and work for every project, but this verifier is neither packaged there nor project-agnostic. A skill consumer therefore cannot follow the required safeguard. Package a configurable verifier with the skill and invoke it from its actual location, or explicitly scope these instructions to this repository and remove the reusable/project-agnostic claim.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new reusable worktree workflow references a repository-local Rust verifier that the skill does not package.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Reusable worktree references invoke a root-only Cargo verifier despite claiming the workflow's scripts are packaged and project-agnostic.\",\"file\":\".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md\",\"line\":67}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10310 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f60bf-181f-7c20-a253-e9940648d0f2\n--------\nuser\n--- 10297 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The new reusable worktree workflow references a repository-local Rust verifier that the skill does not package.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Reusable worktree references invoke a root-only Cargo verifier despite claiming the workflow's scripts are packaged and project-agnostic.",
+        "file": ".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md",
+        "line": 67
+      }
+    ]
+  }
+}

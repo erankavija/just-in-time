@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "f7e1be2d-8e31-4791-88a8-bae4554bd933",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "c8f34d6161703e352ea0d891a6aedfe92becc22d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T13:28:43.997106893Z",
+  "completed_at": "2026-07-14T13:33:00.861089879Z",
+  "duration_ms": 256863,
+  "exit_code": 0,
+  "stdout": "Attribution: 8cbe17f5, fe42a10c, cc2dad9f, d59300ee, b72f524d, 77a8c9f3, 6c26d4ad, 74d18b3, c8f34d61 (`jit:45e1b7e8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/45e1b7e8/requirement/REQ-01–REQ-04 (markdown-first issue description); @/gate/jit-validate, @/gate/cargo-ci, @/gate/doc-review, @/gate/docs-mechanical (.jit/gates.toml); @/charter/D-1, D-2, D-3, D-4, D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: jit-validate passed (0); doc-review passed (0); docs-mechanical passed (0); cargo-ci passed (0); prior code-review passed (0)\nTruncation recovery: Re-read merge-commit patches per affected path and current files in bounded line ranges; no relevant omissions remain.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented in the current tree; the prior structured review has no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are implemented in the current tree; the prior structured review has no unresolved findings.",
+    "findings": []
+  }
+}

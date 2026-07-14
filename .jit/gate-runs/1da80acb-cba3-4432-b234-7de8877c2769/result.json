@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "1da80acb-cba3-4432-b234-7de8877c2769",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "74d18b3ab20d2277108b79d1da906487de8da63d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T13:22:54.310133149Z",
+  "completed_at": "2026-07-14T13:25:37.727720813Z",
+  "duration_ms": 163417,
+  "exit_code": 0,
+  "stdout": "Attribution: 8cbe17f5, fe42a10c, cc2dad9f, d59300ee, b72f524d, 77a8c9f3, 6c26d4ad, 74d18b3 (`jit:45e1b7e8`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate, @/gate/cargo-ci, @/gate/doc-review, @/gate/docs-mechanical (.jit/gates.toml); @/charter/D-1, D-2, D-4, D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: jit-validate passed (0); doc-review failed (1, prior F1); docs-mechanical passed (0); cargo-ci passed (0)\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented; the prior workflow-reference finding is resolved in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are implemented; the prior workflow-reference finding is resolved in the current tree.",
+    "findings": []
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "ea43ffba-d990-46a5-8b0f-be89a717feb4",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "c8f34d6161703e352ea0d891a6aedfe92becc22d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T13:26:29.512754110Z",
+  "completed_at": "2026-07-14T13:28:35.409323019Z",
+  "duration_ms": 125896,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf type and this issue has no resolved children. I reviewed the nine `jit:45e1b7e8` commits reachable on `main`, individually (including merge-parent patches); no fallback attribution was needed. Uncommitted JIT bookkeeping was excluded.\n\nThe project-local verifier and required skill workflow are accurately documented. The protocol requires verification after every merge, and the parallel-work reference matches it. Prior step-count and table-reference findings are resolved. No adopter-facing update is required for this project-provided script.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s commit-verification workflow is accurately and consistently documented; no issue-impact documentation defects remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue’s commit-verification workflow is accurately and consistently documented; no issue-impact documentation defects remain.",
+    "findings": []
+  }
+}

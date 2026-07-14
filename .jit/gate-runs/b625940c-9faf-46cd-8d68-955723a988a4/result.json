@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "b625940c-9faf-46cd-8d68-955723a988a4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "45e1b7e8-bd42-445a-892a-0b7f79bd4ec9",
+  "commit": "77a8c9f3f7a22da1a271c30f64fe7a7c05780a39",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T13:12:16.681565691Z",
+  "completed_at": "2026-07-14T13:15:23.823917807Z",
+  "duration_ms": 187142,
+  "exit_code": 1,
+  "stdout": "Attribution: 8cbe17f5, fe42a10c, cc2dad9f, d59300ee, b72f524d, 77a8c9f3\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,@/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate,@/gate/cargo-ci,@/gate/docs-mechanical,@/gate/doc-review (.jit/gates.toml)\nGate evidence: jit-validate passed (0, 2026-07-14T13:06:07Z); docs-mechanical passed (0, 2026-07-14T13:06:07Z); cargo-ci passed (0, 2026-07-14T13:06:15Z); doc-review failed (1, 2026-07-14T13:09:23Z); code-review none\nTruncation recovery: Recovered the initially truncated merge patch with parent-specific file lists; inspected its five-file first-parent delta through the individually tagged patches.\n\n1. **F1 — blocking, issue-impact (medium):** The new required workflow calls repository-root `scripts/verify-commit-builds.sh` at [.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:73](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:73) and [.agents/skills/jit-parallel/references/worktree-mode.md:70](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-parallel/references/worktree-mode.md:70), but the protocol says its utilities are packaged in the reusable skill and project-agnostic at [worktree-dispatch-protocol.md:126](/home/vkaskivuo/Projects/just-in-time/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:126). The verifier is neither packaged there nor project-agnostic (`cargo build --workspace`), so other consumers cannot perform the now-required safeguard. This is the unresolved latest doc-review finding.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required reusable worktree workflow references a repository-local Rust verifier that the skill does not package.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Reusable worktree references invoke a root-only Cargo verifier despite claiming the workflow utilities are packaged and project-agnostic.\",\"file\":\".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md\",\"line\":73,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5543 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f60c1-baf0-7d50-b944-c697ca547cf8\n--------\nuser\n--- 5530 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The required reusable worktree workflow references a repository-local Rust verifier that the skill does not package.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Reusable worktree references invoke a root-only Cargo verifier despite claiming the workflow utilities are packaged and project-agnostic.",
+        "file": ".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md",
+        "line": 73
+      }
+    ]
+  }
+}

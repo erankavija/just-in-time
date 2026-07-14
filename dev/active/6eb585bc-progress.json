@@ -21,7 +21,7 @@
           "title": "Gate results evidence the working tree, not the merged commit",
           "classification": "implementation",
           "model": "opus",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "950256ae",
@@ -35,7 +35,7 @@
           "title": "Detect a jit binary that predates the repository it is validating",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "in_progress",
           "note": "sub-wave 1b: dispatch after 45e1b7e8 merges (shared scripts/gate-run machinery)"
         }
       ]
@@ -162,14 +162,28 @@
           "classification": "implementation",
           "model": "opus",
           "status": "pending"
+        },
+        {
+          "short_id": "554ad07f",
+          "title": "Record working-tree cleanliness in gate-run evidence",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "filed 2026-07-14 from 45e1b7e8 REQ-04 split"
         }
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "554ad07f",
+      "note": "Record working-tree cleanliness in gate-run evidence; split from 45e1b7e8 REQ-04 (aspirational) per worker recommendation; wired under epic; slotted into wave 5"
+    }
+  ],
   "escalations": [],
   "rework_counts": {
-    "950256ae": 1
+    "950256ae": 1,
+    "45e1b7e8": 2
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
