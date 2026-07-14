@@ -41,8 +41,11 @@ Harness: [`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-bui
   nothing changed after the timed build) to enumerate every compiled test
   binary and its Cargo target kind, then `<binary> --list` and `<binary>
   --list --ignored` per binary to enumerate test cases and classify ignored
-  status. Doctests are out of scope: `cargo test --no-run` does not compile
-  doctest binaries.
+  status. Doctests cannot go through `--no-run` (cargo does not support
+  compiling them without running), so they are enumerated separately via
+  `cargo test --workspace --doc -- --list` / `-- --list --ignored` and folded
+  into the same inventory under a synthetic `"doctest"` kind. See "Current
+  footprint" below for the full accounting.
 - **Measurement**: wall time via `time.monotonic()` around each command;
   maximum resident set size via `getrusage(RUSAGE_CHILDREN)` immediately
   after the command exits — the same mechanism GNU `time -v` uses internally,
@@ -128,6 +131,12 @@ per-sample data in `baseline.json` for any deeper comparison.
   commit, in a shell with no `CARGO_*`/`RUST*` variables set, against the
   already-recorded `raw/*-samples.jsonl`, completes successfully and
   reproduces this `baseline.json` byte-for-byte apart from `generated_at`.
+  `baseline.json`'s `clean_samples`/`rebuild_samples` are a direct slurp of
+  `raw/{clean,rebuild}-samples.jsonl` (`jq -s '.' ...`), so this is also
+  verified end to end: the test-target and doctest corrections below are
+  applied to the raw record itself, not layered onto `baseline.json`
+  separately, and reassembly was re-run after each correction to confirm the
+  two stay in lockstep.
 
 ## Current footprint (from the test inventory, same clean sample)
 
@@ -137,7 +146,9 @@ per-sample data in `baseline.json` for any deeper comparison.
 | Unique active test-executable bytes | 14,817,088,760 (~13.8 GiB) |
 | Integration-test targets (Cargo `target.kind == ["test"]`) | 144 |
 | Total test targets (lib + bin + integration) | 148 |
-| Total discoverable test cases | 3,240 |
+| Doctest-owning crates (kind: `"doctest"`) | 2 (`jit`, `jit_server`) |
+| Total discoverable test cases (incl. doctests) | 3,306 |
+| — of which doctests | 66 |
 | Ignored test cases | 14 |
 
 **Test-target filtering correction:** targets are derived from Cargo
@@ -164,12 +175,24 @@ isolated build's size closely (debug info can embed the build directory
 path, which differs between the two target directories, but this does not
 materially change binary size).
 
-Cross-check against `cargo-ci.sh`'s full `cargo test --workspace` run (which,
-unlike `--no-run`, also executes doctests): 3,226 non-ignored inventoried
-cases + 66 doctests (`cargo test --workspace --doc`: 66 passed for `jit`, 0
-for `jit_server`) = 3,292, plus the same 14 ignored = 3,306 total — matching
-`cargo-ci.sh`'s reported `3292 passed, 0 failed, 14 ignored` exactly. The
-inventory is complete modulo the documented doctest exclusion.
+**Doctests are included in the inventory**, not excluded: `cargo test
+--no-run` cannot compile doctest binaries ("can't skip running doc tests with
+--no-run"), so they are enumerated separately via `cargo test --workspace
+--doc -- --list` and `-- --list --ignored` and appended to `targets` with a
+synthetic `kind: ["doctest"]` (one entry per crate, matching Cargo's own
+"Doc-tests `<crate>`" grouping — not a real Cargo `target.kind` value). They
+count toward `test_case_count` and `ignored_test_case_count` (`totals.
+doctest_case_count` gives the subset) but not toward `test_target_count`,
+`integration_test_target_count`, or `unique_active_test_executable_bytes`:
+Cargo compiles each doctest as an ephemeral per-case binary with no stable
+path to size, unlike the lib/bin/integration-test binaries that persist under
+`target/debug/deps` for the run's duration.
+
+Cross-check against `cargo-ci.sh`'s full `cargo test --workspace` run: 3,306
+inventoried cases (3,240 regular + 66 doctests) minus 14 ignored = 3,292
+expected passes, matching `cargo-ci.sh`'s reported `3292 passed, 0 failed, 14
+ignored` exactly. The inventory is complete: every case `cargo-ci.sh` counts
+is accounted for in `pre-change-test-inventory.json`.
 
 Full per-target, per-test breakdown (name, kind, executable path, every test
 case with its ignored status) is in
@@ -185,5 +208,10 @@ target_dir_bytes, probe_restored_verified, success}], medians}`.
 
 `pre-change-test-inventory.json`: `{schema_version, generated_at_git_revision,
 notes, targets: [{name, kind, executable, tests: [{name, ignored}],
-test_count, ignored_count, list_exit_code, list_ignored_exit_code}], totals,
-target_dir_bytes, unique_active_test_executable_bytes}`.
+test_count, ignored_count, list_exit_code, list_ignored_exit_code}], totals:
+{test_target_count, integration_test_target_count, doctest_target_count,
+test_case_count, doctest_case_count, ignored_test_case_count},
+target_dir_bytes, unique_active_test_executable_bytes}`. `kind` is `["lib"]`,
+`["bin"]`, or `["test"]` (Cargo's own `target.kind`) for compiled test
+binaries, or the synthetic `["doctest"]` (this harness's own label, one entry
+per crate) for doctests, whose `executable` is `null`.

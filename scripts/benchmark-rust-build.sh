@@ -34,16 +34,17 @@ set -euo pipefail
 #     plus each compiled test binary's `--list` / `--list --ignored` output,
 #     together with the integration-test target count, the complete
 #     target-directory byte count, and the unique active test-executable byte
-#     count.
+#     count. Doctests are enumerated separately (`cargo test --workspace --doc
+#     -- --list` / `-- --list --ignored`, since `--no-run` cannot compile
+#     them) and included in the test-case totals under a synthetic "doctest"
+#     kind, one entry per crate; they do not count toward the integration-test
+#     target count or the executable-byte total, since Cargo compiles each
+#     doctest as an ephemeral per-case binary with no stable path to size.
 #
 # Outputs (under BENCH_OUT_DIR, default dev/benchmarks/rust-build-efficiency):
 #   baseline.json                  — environment + every clean/rebuild sample + medians
 #   pre-change-test-inventory.json — every test case, its target and ignored status, sizes
 #   raw/<sample-name>/*.log        — raw stdout+stderr of every timed command in that sample
-#
-# Doctests are out of scope: `cargo test --no-run` does not compile doctest
-# binaries, so they contribute no test-target or executable-footprint cost and
-# are not enumerated here.
 #
 # Environment overrides:
 #   BENCH_CLEAN_SAMPLES     number of clean samples (default 3)
@@ -232,13 +233,13 @@ generate_test_inventory() {
   CARGO_TARGET_DIR="$target_dir" cargo test --workspace --no-run --message-format=json \
     >"$list_json" 2>"$sample_raw_dir/cargo-test-list.stderr.log"
 
-  python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" <<'PYEOF'
+  python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" "$sample_raw_dir" <<'PYEOF'
 import json
 import os
 import subprocess
 import sys
 
-list_json_path, target_dir, out_path, git_revision = sys.argv[1:5]
+list_json_path, target_dir, out_path, git_revision, sample_raw_dir = sys.argv[1:6]
 
 
 def parse_test_names(text):
@@ -294,8 +295,7 @@ for t in targets:
     t["list_ignored_exit_code"] = ignored_run.returncode
 
 integration_targets = [t for t in targets if t["kind"] == ["test"]]
-total_tests = sum(t["test_count"] for t in targets)
-total_ignored = sum(t["ignored_count"] for t in targets)
+real_target_count = len(targets)
 
 exe_bytes = 0
 for t in targets:
@@ -307,20 +307,94 @@ for t in targets:
 du_out = subprocess.run(["du", "-sb", target_dir], capture_output=True, text=True)
 dir_bytes = int(du_out.stdout.split()[0]) if du_out.returncode == 0 and du_out.stdout.strip() else None
 
+# Doctests: `cargo test --no-run` cannot compile them ("can't skip running doc
+# tests with --no-run"), so they are enumerated separately via `-- --list` /
+# `-- --list --ignored`, same as every other target's test cases. Cargo groups
+# these per crate under a "Doc-tests <crate>" header in the combined
+# stdout+stderr stream (stderr carries the header/compile lines, stdout the
+# per-case lines interleaved with it); merge the streams so headers stay
+# associated with the case lines that follow them, unlike capture_output's
+# separate stdout/stderr, which would lose that association.
+def run_doctest_list(*extra_args):
+    proc = subprocess.run(
+        ["cargo", "test", "--workspace", "--doc", "--", "--list", *extra_args],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300,
+        env={**os.environ, "CARGO_TARGET_DIR": target_dir},
+    )
+    return proc
+
+
+def parse_doctest_sections(text):
+    sections = {}
+    current = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("Doc-tests "):
+            current = stripped[len("Doc-tests "):]
+            sections.setdefault(current, [])
+            continue
+        if current is not None and stripped.endswith(": test"):
+            sections[current].append(stripped[: -len(": test")])
+    return sections
+
+
+doctest_all = run_doctest_list()
+doctest_ignored = run_doctest_list("--ignored")
+
+with open(os.path.join(sample_raw_dir, "cargo-doctest-list.log"), "w") as f:
+    f.write(doctest_all.stdout)
+with open(os.path.join(sample_raw_dir, "cargo-doctest-list-ignored.log"), "w") as f:
+    f.write(doctest_ignored.stdout)
+
+all_doctests_by_crate = parse_doctest_sections(doctest_all.stdout)
+ignored_doctests_by_crate = parse_doctest_sections(doctest_ignored.stdout)
+
+doctest_targets = []
+for crate, names in all_doctests_by_crate.items():
+    ignored_set = set(ignored_doctests_by_crate.get(crate, []))
+    doctest_targets.append({
+        "name": crate,
+        "kind": ["doctest"],
+        "executable": None,
+        "tests": [{"name": n, "ignored": n in ignored_set} for n in names],
+        "test_count": len(names),
+        "ignored_count": len(ignored_set),
+        "list_exit_code": doctest_all.returncode,
+        "list_ignored_exit_code": doctest_ignored.returncode,
+    })
+
+targets.extend(doctest_targets)
+total_doctests = sum(t["test_count"] for t in doctest_targets)
+total_tests = sum(t["test_count"] for t in targets)
+total_ignored = sum(t["ignored_count"] for t in targets)
+
 result = {
     "schema_version": 1,
     "generated_at_git_revision": git_revision,
     "notes": (
-        "Doctests are excluded: `cargo test --no-run` does not compile doctest "
-        "binaries. 'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], "
-        "[\"test\"] for a tests/*.rs integration target). Ignored status is the "
-        "set difference between `<exe> --list` and `<exe> --list --ignored`."
+        "'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], "
+        "[\"test\"] for a tests/*.rs integration target), except \"doctest\": "
+        "a synthetic label this harness assigns (not a Cargo target.kind "
+        "value) for one entry per crate matching Cargo's own \"Doc-tests "
+        "<crate>\" grouping, derived via `cargo test --workspace --doc -- "
+        "--list` / `-- --list --ignored` since `cargo test --no-run` cannot "
+        "compile doctest binaries. Doctests count toward test_case_count and "
+        "ignored_test_case_count (every discoverable test case) but not "
+        "toward test_target_count, integration_test_target_count, or "
+        "unique_active_test_executable_bytes: Cargo compiles each doctest as "
+        "an ephemeral per-case binary with no stable path to size, unlike "
+        "lib/bin/integration-test targets which persist under "
+        "target/debug/deps for the run's duration. Ignored status for both "
+        "regular tests and doctests is the set difference between the full "
+        "`--list` output and `--list --ignored`."
     ),
     "targets": targets,
     "totals": {
-        "test_target_count": len(targets),
+        "test_target_count": real_target_count,
         "integration_test_target_count": len(integration_targets),
+        "doctest_target_count": len(doctest_targets),
         "test_case_count": total_tests,
+        "doctest_case_count": total_doctests,
         "ignored_test_case_count": total_ignored,
     },
     "target_dir_bytes": dir_bytes,
@@ -341,16 +415,39 @@ print(json.dumps({
     "unique_active_test_executable_bytes": exe_bytes,
     "integration_test_target_count": len(integration_targets),
     "test_case_count": total_tests,
+    "doctest_case_count": total_doctests,
     "ignored_test_case_count": total_ignored,
 }))
 PYEOF
 }
 
+# init_empty_jsonl <file> / append_jsonl_atomic <file> <json_line>
+# Atomic publish (@/inv/atomic-writes) for the append-only sample logs: build
+# the file's next full state (empty, or existing content plus one more line)
+# in a temp file in the same directory, then rename into place, so a reader
+# (including a concurrent BENCH_SKIP_SAMPLING assembly run) never observes a
+# truncated or half-written line.
+init_empty_jsonl() {
+  local file="$1"
+  local tmp
+  tmp=$(mktemp "$(dirname "$file")/.$(basename "$file").XXXXXX")
+  : >"$tmp"
+  mv "$tmp" "$file"
+}
+append_jsonl_atomic() {
+  local file="$1" line="$2"
+  local tmp
+  tmp=$(mktemp "$(dirname "$file")/.$(basename "$file").XXXXXX")
+  [[ -f "$file" ]] && cat "$file" >"$tmp"
+  printf '%s\n' "$line" >>"$tmp"
+  mv "$tmp" "$file"
+}
+
 CLEAN_JSONL="$OUT_DIR/raw/clean-samples.jsonl"
 REBUILD_JSONL="$OUT_DIR/raw/rebuild-samples.jsonl"
 if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
-  : >"$CLEAN_JSONL"
-  : >"$REBUILD_JSONL"
+  init_empty_jsonl "$CLEAN_JSONL"
+  init_empty_jsonl "$REBUILD_JSONL"
 else
   echo "[benchmark] BENCH_SKIP_SAMPLING set: assembling from existing $CLEAN_JSONL / $REBUILD_JSONL, no new sampling" >&2
   [[ -s "$CLEAN_JSONL" ]] || { echo "ERROR: BENCH_SKIP_SAMPLING set but $CLEAN_JSONL is missing or empty." >&2; exit 2; }
@@ -389,15 +486,16 @@ run_clean_sample() {
   test_exit=$(echo "$test_meas" | jq -r .exit_code)
   success=$([[ "$clippy_exit" -eq 0 && "$test_exit" -eq 0 ]] && echo true || echo false)
 
-  jq -cn \
+  local record
+  record=$(jq -cn \
     --argjson sample "$idx" \
     --argjson clippy "$clippy_meas" \
     --argjson test_no_run "$test_meas" \
     --argjson target_dir_bytes "${dir_bytes:-null}" \
     --argjson inventory "$inventory_meas" \
     --argjson success "$success" \
-    '{sample: $sample, clippy: $clippy, test_no_run: $test_no_run, target_dir_bytes: $target_dir_bytes, inventory: $inventory, success: $success}' \
-    >>"$CLEAN_JSONL"
+    '{sample: $sample, clippy: $clippy, test_no_run: $test_no_run, target_dir_bytes: $target_dir_bytes, inventory: $inventory, success: $success}')
+  append_jsonl_atomic "$CLEAN_JSONL" "$record"
 
   if [[ "$success" != "true" ]]; then
     echo "ERROR: clean sample $idx failed (clippy exit $clippy_exit, test-no-run exit $test_exit)." >&2
@@ -468,7 +566,8 @@ run_rebuild_sample() {
   rebuild_exit=$(echo "$rebuild_meas" | jq -r .exit_code)
   success=$([[ "$rebuild_exit" -eq 0 ]] && echo true || echo false)
 
-  jq -cn \
+  local record
+  record=$(jq -cn \
     --argjson sample "$idx" \
     --argjson setup_clippy "$setup_clippy_meas" \
     --argjson setup_test_no_run "$setup_test_meas" \
@@ -476,8 +575,8 @@ run_rebuild_sample() {
     --argjson target_dir_bytes "${dir_bytes:-null}" \
     --argjson probe_restored_verified "$restore_ok" \
     --argjson success "$success" \
-    '{sample: $sample, setup_clippy: $setup_clippy, setup_test_no_run: $setup_test_no_run, rebuild_test_no_run: $rebuild_test_no_run, target_dir_bytes: $target_dir_bytes, probe_restored_verified: $probe_restored_verified, success: $success}' \
-    >>"$REBUILD_JSONL"
+    '{sample: $sample, setup_clippy: $setup_clippy, setup_test_no_run: $setup_test_no_run, rebuild_test_no_run: $rebuild_test_no_run, target_dir_bytes: $target_dir_bytes, probe_restored_verified: $probe_restored_verified, success: $success}')
+  append_jsonl_atomic "$REBUILD_JSONL" "$record"
 
   if [[ "$success" != "true" ]]; then
     echo "ERROR: rebuild sample $idx failed (rebuild test-no-run exit $rebuild_exit)." >&2
