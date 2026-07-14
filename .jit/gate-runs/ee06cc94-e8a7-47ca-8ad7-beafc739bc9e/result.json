@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "run_id": "ee06cc94-e8a7-47ca-8ad7-beafc739bc9e",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "3b34fdeddc5da03796f7a83681659e38b6e3452b",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T22:32:31.534912400Z",
+  "completed_at": "2026-07-14T22:44:05.640502827Z",
+  "duration_ms": 694105,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/8b05a612-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1), is substantive, and is linked as `doc_type: design` by the planning issue. The investigation and research documents are also present and non-empty.\n\n## Completeness against the criteria\n\nPass. Section 1 addresses all eleven hard container requirements without silently narrowing the capability set. The decomposition and coverage map at plan lines 276–290 preserve the native CLI, Rust server/API, built web UI, and MCP server while covering audits, release identity, artifacts, Docker consolidation, documentation, MSRV, rehearsal, and external-epic consumption.\n\nThe Linux x86_64 musl scope is explicitly identified as an assumption at line 328 rather than silently imposed.\n\n## Technical soundness and architectural fit\n\nThe server and Docker design now fits the codebase. `jit-server` currently calls `axum::serve(listener, app).await` without graceful shutdown at [crates/server/src/main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:135), so the prerequisite shutdown leaf at plan lines 180–187 correctly owns that product-code change. `/repo/.jit`, `/api/health`, embedded-web ordering, and the removal of nginx/Node/shell supervision also agree with the current server, Dockerfile, and storage boundaries.\n\nTwo blocking release-identity defects remain:\n\n- Plan lines 132–133 require an owner-approved workflow to create a protected candidate tag whose push starts candidate orchestration. The credential is unspecified. If implemented using the repository `GITHUB_TOKEN`—the current release workflow’s authentication pattern at `.github/workflows/release.yml:178–179—the tag push will not create another workflow run. GitHub explicitly suppresses most workflow events caused by `GITHUB_TOKEN`. Moreover, ruleset creation bypasses are assigned to actors such as GitHub Apps, not to a workflow filename. The plan must choose and constrain a custom GitHub App installation token or another concrete mechanism, including its ruleset actor, protected-secret access, permissions, and trigger behavior. See [GitHub’s `GITHUB_TOKEN` event semantics](https://docs.github.com/en/actions/concepts/security/github_token) and [ruleset bypass model](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).\n\n- The immutable candidate model verifies repository workflow SHAs but does not freeze external Actions. Current release-critical workflows use movable references including `dtolnay/rust-toolchain@master`, `actions/checkout@v4`, Docker actions at major tags, and `softprops/action-gh-release@v1` in `.github/workflows/ci.yml`, `release.yml`, and `docker.yml`. Thus identical candidate and workflow SHAs can execute different third-party code. GitHub states that a full commit SHA is the only immutable Action reference. The shared contract harness needs to enforce full-SHA pins across every candidate, CI, security, tag-authorizer, and publication path. See [GitHub’s secure-use guidance](https://docs.github.com/github-ae%40latest/actions/security-guides/security-hardening-for-github-actions).\n\n## Decomposition and dependencies\n\nPass qualitatively. The dependency ordering is coherent:\n\n- Advisory remediation precedes blocking enforcement.\n- Version alignment follows npm bootstrap and lock-domain remediation.\n- Candidate producers follow immutable identity and version/legal prerequisites.\n- Graceful server shutdown precedes the consolidated image.\n- The replacement image precedes topology removal.\n- OCI, native, and MCP candidates precede assembly and staging.\n- Documentation precedes clean-room rehearsal.\n- Rehearsal waits directly on both external epics and precedes tag creation and publication.\n\nShared-file work is generally serialized, especially the successive edits to the release caller. The two technical blockers above make the identity leaf non-executable as specified, but they are design defects rather than DAG ordering defects.\n\n## Risks and actionability\n\nThe plan covers the major dependency, provenance, OCI, npm, embedded-web, Docker, documentation, and external-epic risks with observable mitigations. It does not cover the two load-bearing workflow risks identified above.\n\nAdvisory: plan lines 268–273 make the publication workflow refuse mismatched GitHub assets, but do not prevent later manual/API replacement of published release assets. GitHub now supports immutable releases; the plan should enable that protection and use the documented draft → attach assets → publish sequence. See [GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).\n\n## Prior review feedback\n\n- Prior exact-SHA provenance finding: conceptually addressed through the immutable candidate-tag event, local reusable workflows, OIDC claims, and exact-subject verification. The remaining credential/trigger defect prevents that design from being executable.\n- Prior PID 1 finding: addressed by the dedicated server shutdown leaf at lines 180–187 and its prerequisite edge into Docker packaging.\n- Prior scoped-package public-access advisory: addressed explicitly with `npm publish <tarball> --access public` and unauthenticated verification at lines 84–91.\n\nThe linked investigation remains stale at line 21: it says the container directly depends on `6eb585bc`, while `.jit/issues/8b05a612-91e6-43c8-b36e-557e2417c88e.json:8–10` now contains only the breakdown dependency. The binding plan correctly describes the edge removal at lines 19 and 326, so this is advisory rather than blocking.\n\n## Findings\n\n1. **F1 — High, blocking:** Candidate-tag creation does not specify an authentication mechanism that both bypasses the proposed tag ruleset and causes the tag-push candidate workflow to run; the normal `GITHUB_TOKEN` cannot satisfy the trigger contract. Location: `dev/active/8b05a612-plan.md:132`.\n2. **F2 — High, blocking:** The immutable candidate design verifies repository workflow SHAs but does not require external Actions to be pinned to full commit SHAs, leaving release build and publication logic mutable. Location: `dev/active/8b05a612-plan.md:130`.\n3. **F3 — Medium, advisory:** The final-publication design does not enable GitHub immutable releases, so release assets remain replaceable outside the workflow despite its non-replacement contract. Location: `dev/active/8b05a612-plan.md:272`.\n4. **F4 — Low, advisory:** The linked investigation still claims a direct core-maintenance dependency that has been removed from the actual issue record and superseded by the plan’s rehearsal-leaf dependency. Location: `dev/active/8b05a612-investigation.md:21`.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior provenance, PID 1, and npm-access defects are addressed, but candidate-tag authentication/triggering and mutable external Actions still make the release identity design non-executable and non-immutable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate-tag creation does not specify an authentication mechanism that both bypasses the tag ruleset and causes the tag-push workflow to run; GITHUB_TOKEN cannot satisfy that contract.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":132,\"references\":[\"@/issue/8b05a612/requirement/REQ-03\",\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The immutable candidate design does not require external GitHub Actions to be pinned to full commit SHAs, leaving release build and publication logic mutable.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":130,\"references\":[\"@/issue/8b05a612/requirement/REQ-03\",\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The publication design does not enable GitHub immutable releases, so release assets remain replaceable outside the workflow despite its non-replacement contract.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":272,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The linked investigation still claims a direct core-maintenance dependency that has been removed from the actual issue record and superseded by the plan.\",\"file\":\"dev/active/8b05a612-investigation.md\",\"line\":21,\"references\":[\"@/issue/8b05a612/requirement/REQ-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4173 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62c2-a8c7-7113-aa46-bed2a94007e1\n--------\nuser\n--- 4160 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior provenance, PID 1, and npm-access defects are addressed, but candidate-tag authentication/triggering and mutable external Actions still make the release identity design non-executable and non-immutable.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Candidate-tag creation does not specify an authentication mechanism that both bypasses the tag ruleset and causes the tag-push workflow to run; GITHUB_TOKEN cannot satisfy that contract.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 132,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-03",
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The immutable candidate design does not require external GitHub Actions to be pinned to full commit SHAs, leaving release build and publication logic mutable.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 130,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-03",
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The publication design does not enable GitHub immutable releases, so release assets remain replaceable outside the workflow despite its non-replacement contract.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 272,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The linked investigation still claims a direct core-maintenance dependency that has been removed from the actual issue record and superseded by the plan.",
+        "file": "dev/active/8b05a612-investigation.md",
+        "line": 21,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-11"
+        ]
+      }
+    ]
+  }
+}
