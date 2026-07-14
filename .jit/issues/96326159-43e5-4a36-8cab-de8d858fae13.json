@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T22:44:14.828887399Z"
+      "updated_at": "2026-07-14T22:52:11.752134116Z"
     },
     "coverage-preview": {
       "status": "passed",
@@ -39,7 +39,7 @@
     "brackets:9b7b5f9c"
   ],
   "created_at": "2026-07-14T18:54:15.155931786Z",
-  "updated_at": "2026-07-14T22:48:33.404908629Z",
+  "updated_at": "2026-07-14T22:56:19.849252086Z",
   "first_ready_at": "2026-07-14T18:54:15.155935796Z",
   "claimed_at": "2026-07-14T22:22:10.132961382Z"
 }
