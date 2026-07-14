@@ -7307,3 +7307,4 @@
 {"type":"issue_claimed","id":"bca85391-e306-4acd-9d10-19b0425e5b4e","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-14T19:22:20.290598416Z","assignee":"agent:jit-execution-lead"}
 {"type":"issue_state_changed","id":"98621964-37f5-4637-bfd9-f52a0f0218ff","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:22:20.309225959Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"f43dfba8-0fcf-46c3-8243-23baa288a586","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:22:20.309398359Z","assignee":"agent:architect"}
+{"type":"issue_updated","id":"5880f1b5-7056-489c-9396-71ffb49b6e98","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T19:37:51.384216005Z","updated_by":"doc-add","fields":["documents"]}

@@ -17,7 +17,15 @@
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/8b05a612-investigation.md",
+      "commit": null,
+      "label": "Production Readiness Investigation",
+      "doc_type": "study",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:production-readiness",
     "milestone:v1.0",
@@ -30,7 +38,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-14T18:54:18.020731559Z",
-  "updated_at": "2026-07-14T19:22:20.309276399Z",
+  "updated_at": "2026-07-14T19:37:51.383975905Z",
   "first_ready_at": "2026-07-14T18:54:18.020732039Z",
   "claimed_at": "2026-07-14T19:22:20.309276169Z"
 }
