@@ -66,16 +66,16 @@ Re-run the leak check until it returns clean before doing any commits on main.
 
 ### Step 5 — Per-merge build verification
 
-Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — verify that the merged commit itself compiles:
+Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — verify that the merged commit itself builds:
 
 ```bash
 git merge --no-ff worktree-agent-<short-id>
-scripts/verify-commit-builds.sh          # judges HEAD (the merge commit) in isolation
+scripts/verify-commit-builds.sh          # verify the merge commit (HEAD) itself builds
 ```
 
-`verify-commit-builds.sh` resolves the named commit's sources with `git archive` into a throwaway directory and runs `cargo build --workspace` there, so its verdict is about the commit, not about whatever tree the lead happens to hold. Exit 0 means the commit builds; exit 1 means it does not; exit 2 is an environment problem.
+The verifier is a **project-provided** repository script, distinct from the skill-packaged dispatch and leak-check scripts above — what "builds" means belongs to the project. This protocol fixes its contract, not its implementation: given a commit, it must resolve THAT commit's sources in isolation — reading only the named commit (via `git archive` or an equivalent that never reads the caller's working tree and never stashes or cleans it) — and run the project's build command against them, exiting 0 when the commit builds and nonzero when it does not. A project satisfies this protocol by supplying the script at the conventional path `scripts/verify-commit-builds.sh`; the build command and any tool-specific detail live in that script, not here.
 
-This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a working tree. A worker branch anchored before a module deletion, merged after it, can cleanly re-add a `mod` declaration for a file that no longer exists — git sees a file removed on one side and an untouched declaration on the other, finds no textual overlap, and merges without a conflict. The leak check reports no leak (the merge is legitimate), every per-issue gate still reads green (the checker ran against a working tree that compiled), and `main` does not compile. Run the build verification after every merge so a broken merge commit is caught at the merge, not by the next clone or reset.
+This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a working tree. A worker branch anchored before a module deletion, merged after it, can cleanly re-add a declaration referencing a file that no longer exists — the merge sees the file removed on one side and the declaration untouched on the other, finds no textual overlap, and merges without a conflict. The leak check reports no leak (the merge is legitimate), every per-issue gate still reads green (the checker ran against a working tree that built), and the merged commit does not build. Run the build verification after every merge so a broken merge commit is caught at the merge, not by the next clone or reset.
 
 If the check reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
 
@@ -115,7 +115,7 @@ Document the rebase in the next handoff. The worker's spec compliance must be re
 |---|---|---|
 | Worktree branched from stale ancestor | Step 2 verifies `git rev-parse HEAD` of every worktree equals `main`'s | Pre-dispatch — a mismatch fails the script |
 | Worker writes files into main's checkout | Step 4 diffs `git status -uall` vs. snapshot | Post-dispatch — a leak shows up as "entries present now, not in snapshot" |
-| Clean merge leaves the merge commit non-compiling | Step 5 builds the named merge commit from `git archive`, isolated from the working tree | Post-merge — a broken merge commit exits nonzero even when gates and the leak check are green |
+| Clean merge leaves the merge commit non-building | Step 5 builds the named merge commit from sources resolved in isolation, not from the working tree | Post-merge — a broken merge commit exits nonzero even when gates and the leak check are green |
 | Lead forgets the post-dispatch check | The dispatch script's final line reminds the lead | Lead reads the reminder every time |
 | Worker bundles commits, then crashes mid-batch | Per-issue dispatch prompt rule: "commit each spiral step before proceeding" | Worker prompt — this is on the worker, not on the protocol |
 
