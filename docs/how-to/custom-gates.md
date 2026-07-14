@@ -949,12 +949,18 @@ Error: Refusing to run gate 'tests' for issue abc123: this jit binary
 predates the tree under review
 ```
 
-**Solution:** The `jit` resolved from `PATH` was built from a commit other
-than the repository's current `HEAD` (or from a dirty tree), so its verdict
-would not be evidence about the change under review. Rebuild and reinstall:
-`cargo install --path crates/jit`, then re-run the gate. This only fires
-inside the repository the binary was built from — validating a different
-repository with an installed release is unaffected.
+**Solution:** this fires only when BOTH hold: the repository under validation
+can resolve the running binary's build commit in its own history (the
+repository the binary was built from, or a clone/fork sharing that history),
+AND that commit no longer matches the repository's current `HEAD` (or the
+binary was built from a dirty tree) — so its verdict would not be evidence
+about the change under review. Otherwise (an unrelated repository, no git, or
+an unresolvable build commit) it stays silent — an installed release
+validating a different repository is unaffected. Rebuild and reinstall:
+`cargo install --path crates/jit`, then re-run the gate. See [the `jit gate
+evaluate` exit-code contract](../reference/cli-commands.md#jit-gate-evaluate)
+for the full condition and how this differs when it's a checker's own child
+`jit` (not the evaluator) that is stale.
 
 #### "Orphaned task"
 

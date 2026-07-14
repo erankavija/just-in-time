@@ -25,27 +25,41 @@
 //! repository under validation actually contains. [`assess_binary_provenance`]
 //! takes that as the caller-established `build_commit_known_in_repo` flag
 //! (resolved via `git rev-parse --verify <commit>^{commit}` at the I/O
-//! boundary — see [`commands::gate_check`](crate::commands) for the
-//! production wiring) precisely so a plain string comparison never drives the
-//! verdict.
+//! boundary — see `CommandExecutor::stale_binary_reason` (`commands::gate_check`)
+//! for the production wiring, shared by both call sites below) precisely so a
+//! plain string comparison never drives the verdict. The full refusal
+//! condition is therefore always both parts together: (1) this identity
+//! predicate holds, AND (2) [`assess_binary_provenance`] finds either a
+//! commit mismatch or a dirty build; a repository that fails part (1) —
+//! unrelated, no git, or an unresolvable build commit — never refuses,
+//! regardless of part (2).
 //!
 //! # Warn vs. fail (REQ-01)
 //!
-//! [`BinaryProvenance::Stale`] itself is silent on enforcement; the caller
-//! ([`commands::gate_check::check_gate`](crate::commands)) turns it into a hard
-//! failure (via `errors::StaleBinaryError`) rather than a warning. A gate
-//! checker's verdict is meant to be evidence about the tree under review; a
-//! verdict produced by a binary that predates that tree is not that evidence,
-//! so there is nothing legitimate for a warning to preserve inside a gate
-//! run — unlike an ad hoc `jit` invocation, a gate run's entire purpose is to
-//! be trusted later. Failing also means no verdict is ever recorded from stale
-//! evidence, so nothing downstream (`jit gate status`, rework loops) has to
-//! second-guess whether a passed/failed run in the history is trustworthy.
-//! The fix is one command away (`cargo install --path crates/jit`), so the
-//! cost of failing loudly is low against the cost of a silently wrong verdict
-//! (jit:7446af34's motivating incident: a stale binary reported a real fix as
-//! "not found", and the `code-review` gate spent a review round chasing a
-//! defect that did not exist in the working tree).
+//! [`BinaryProvenance::Stale`] itself is silent on enforcement; both
+//! production callers of `CommandExecutor::stale_binary_reason` turn it into
+//! a hard failure (via `errors::StaleBinaryError`) rather than a warning:
+//! [`commands::gate_check::check_gate`](crate::commands) (the evaluator's own
+//! guard, before it spawns a checker) and `main`'s startup dispatch (a
+//! checker's own child `jit` self-checking, REQ-02 — a checker script that
+//! shells out to `jit` resolves it from `PATH` independently of the
+//! evaluator). A gate checker's verdict is meant to be evidence about the
+//! tree under review; a verdict produced by a binary that predates that tree
+//! is not that evidence, so there is nothing legitimate for a warning to
+//! preserve inside a gate run — unlike an ad hoc `jit` invocation, a gate
+//! run's entire purpose is to be trusted later. Failing also means the
+//! refusing process itself never turns the stale binary's own computation
+//! into a recorded verdict (when `check_gate` refuses, no gate run is
+//! recorded at all; when a checker's child refuses instead, the evaluator
+//! still records an ordinary failed run around it, but that run's content is
+//! the refusal, never the stale binary's actual output), so nothing
+//! downstream (`jit gate status`, rework loops) has to second-guess whether a
+//! passed/failed run in the history is trustworthy. The fix is one command
+//! away (`cargo install --path crates/jit`), so the cost of failing loudly is
+//! low against the cost of a silently wrong verdict (jit:7446af34's
+//! motivating incident: a stale binary reported a real fix as "not found",
+//! and the `code-review` gate spent a review round chasing a defect that did
+//! not exist in the working tree).
 
 /// Why a running binary is judged to predate, or no longer match, the
 /// repository it is validating.

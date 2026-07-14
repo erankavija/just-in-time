@@ -328,35 +328,54 @@ impl ClaimRequiresGitError {
 /// build commit predates, or no longer matches, the repository's current
 /// `HEAD` (jit:7446af34).
 ///
-/// Raised from [`check_gate`](crate::commands::CommandExecutor::check_gate)
-/// — reached by `jit gate evaluate`/`gate evaluate-all` directly, and by `gate
-/// pass`/`gate pass-all` and any state transition's pre/postchecks that run an
-/// automated gate — BEFORE the checker process is spawned, so a stale binary
-/// never produces a gate verdict at all: `jit gate status` and every other
-/// consumer of gate evidence never has to distinguish a trustworthy run from
-/// an untrustworthy one after the fact. This is a hard failure rather than a
-/// warning because a gate run exists specifically to be trusted later, and a
-/// verdict from a binary that predates the tree under review is not evidence
-/// about that tree; a warning would still let a wrong verdict get recorded
-/// and acted on. The fix (`cargo install --path crates/jit`) is one command
-/// away, which is a low price against a wasted review round chasing a defect
-/// that does not exist in the working tree (or missing one that does) — the
-/// incident that motivated this check.
+/// Raised from two, independent places, both refusing BEFORE they do
+/// anything with the (potentially stale) binary that raises them:
 ///
-/// Never fires for an ordinary installed release validating an unrelated
-/// repository (REQ-03): see
+/// - [`check_gate`](crate::commands::CommandExecutor::check_gate) — reached
+///   by `jit gate evaluate`/`gate evaluate-all` directly, and by `gate
+///   pass`/`gate pass-all` and any state transition's pre/postchecks that run
+///   an automated gate — BEFORE the checker process is spawned. When THIS
+///   raises it, no gate run is ever recorded for that refusal.
+/// - `main`'s startup dispatch (binary crate; `refuse_if_stale_gate_child`) —
+///   when the running process is itself inside a gate checker's process tree
+///   (a checker script that shells out to `jit`, e.g.
+///   `scripts/jit-validate.sh`, resolves that `jit` from `PATH`
+///   independently of the evaluator, so it self-checks too, REQ-02) — BEFORE
+///   running the requested command. When THIS raises it, the refusing
+///   process itself records nothing, but the EVALUATOR that spawned the
+///   checker still records an ordinary failed [`GateRunResult`](crate::domain::GateRunResult)
+///   around it (ITS error is [`crate::commands::GatePassFailed`], not this
+///   type), with this error's message captured verbatim in that run's
+///   `stderr` — the refusal is visible in the run record even though a run
+///   WAS recorded (see `gate_execution::execute_gate_checker_with_context`'s
+///   `JIT_GATE_RUN` doc for the full mechanism).
+///
+/// This is a hard failure rather than a warning because a gate run exists
+/// specifically to be trusted later, and a verdict from a binary that
+/// predates the tree under review is not evidence about that tree; a warning
+/// would still let a wrong verdict get recorded and acted on. The fix
+/// (`cargo install --path crates/jit`) is one command away, which is a low
+/// price against a wasted review round chasing a defect that does not exist
+/// in the working tree (or missing one that does) — the incident that
+/// motivated this check.
+///
+/// The refusal condition is ALWAYS both: (1) the repository under validation
+/// can resolve the binary's build commit in its own history — the repository
+/// the binary was built from, or a clone/fork sharing that history — AND (2)
+/// either that commit no longer matches the repository's current `HEAD`, or
+/// the binary was built from a dirty tree. Otherwise (an unrelated
+/// repository, no git, or an unresolvable build commit) it never fires —
+/// REQ-03, an ordinary installed release validating an unrelated repository
+/// is unaffected. See
 /// [`domain::build_provenance`](crate::domain::build_provenance) for the
-/// identity predicate that keeps this silent unless the build commit is a
-/// known commit in the repository under validation. Downcastable in
-/// `error_to_exit_code` (→ `ExitCode::ExternalError`, exit `10`), the same
-/// family as [`ClaimRequiresGitError`] and
+/// identity predicate (part 1) in full. Downcastable in `error_to_exit_code`
+/// (→ `ExitCode::ExternalError`, exit `10`), the same family as
+/// [`ClaimRequiresGitError`] and
 /// [`RepositoryFormatTooNewError`](crate::storage::RepositoryFormatTooNewError):
 /// the binary, not the repository, needs attention. The `--json` path
-/// (`render_gate_pass_error` in `main.rs`) downcasts to this type the same way,
-/// so both output modes agree on exit code `10` and neither carries a
-/// `verdict` field: this is a PRE-verdict refusal — the checker never spawns,
-/// so no gate run is ever recorded, unlike [`crate::commands::GatePassFailed`]
-/// (which always reflects an executed checker).
+/// (`render_gate_pass_error` in `main.rs`) downcasts to this type the same
+/// way, so both output modes agree on exit code `10` for the `check_gate`
+/// case, and neither carries a `verdict` field there: it is PRE-verdict.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct StaleBinaryError {

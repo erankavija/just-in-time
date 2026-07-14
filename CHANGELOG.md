@@ -10,15 +10,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
   path that runs an automated checker: `gate pass`, `gate pass-all`, and a
-  state transition's pre/postchecks) now refuses to run a checker when the
-  running binary's build commit is a known commit in the repository under
-  review but no longer matches its current `HEAD` (or the build was dirty) —
-  a gate verdict from a binary that predates the tree under review is not
-  evidence about that tree. The refusal is a typed, exit-code-10 error naming
-  the build commit and the fix (`cargo install --path crates/jit`); no gate
-  run is ever recorded from a refused, stale-binary check. Silent for an
-  ordinary installed release validating an unrelated repository, and requires
-  no git beyond what the repository already uses.
+  state transition's pre/postchecks) refuses to run a checker when BOTH (1)
+  the repository under review can resolve the running binary's build commit
+  in its own history (the repository the binary was built from, or a clone or
+  fork sharing that history), AND (2) that commit no longer matches the
+  repository's current `HEAD`, or the binary was built from a dirty tree — a
+  gate verdict from such a binary is not evidence about the tree under
+  review. This is checked in two places: the evaluator itself refuses before
+  spawning any checker (a typed, exit-code-10 error naming the build commit
+  and the fix, `cargo install --path crates/jit`; no gate run is recorded for
+  that refusal), and — since a checker script that itself shells out to `jit`
+  (e.g. `scripts/jit-validate.sh`) resolves that `jit` from `PATH`
+  independently of the evaluator — any such child process self-checks too, so
+  a stale child makes the gate run FAIL with the refusal visible in the
+  recorded run's stdout/stderr, rather than silently producing a misleading
+  verdict. Silent otherwise (an unrelated repository, no git, or an
+  unresolvable build commit), so an ordinary installed release validating a
+  different repository is unaffected.
 
 - **Help cross-references from mutation/inspection commands to the reporting
   commands that answer "what happened".** `jit issue show --help` now names

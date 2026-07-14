@@ -57,7 +57,11 @@ fn omit_current_gate_projection(issue: &mut serde_json::Value, gate_key: &str) {
 /// for the actual decision. The second resolution (whether the build commit
 /// is known) is skipped entirely when `HEAD` itself does not resolve, so a
 /// non-git or git-unavailable `repo_root` costs a single git invocation.
-fn stale_binary_reason(
+///
+/// Given an explicit `repo_root` rather than deriving one, so it is directly
+/// testable against synthetic repositories; [`CommandExecutor::stale_binary_reason`]
+/// is the production entry point that supplies `repo_root` from storage.
+fn stale_binary_reason_for_repo(
     repo_root: &std::path::Path,
 ) -> Option<crate::domain::build_provenance::StaleBinaryReason> {
     use crate::domain::build_provenance::{assess_binary_provenance, BinaryProvenance};
@@ -116,6 +120,27 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|p| p.to_path_buf())
     }
 
+    /// Compare the running binary's own build provenance against the
+    /// repository this executor is rooted at ([`real_repo_root`](Self::real_repo_root)),
+    /// returning why it is stale, or `None` when it is fresh, the comparison
+    /// does not apply (REQ-03), or storage names no real on-disk repository
+    /// (e.g. `InMemoryStorage`).
+    ///
+    /// The single production entry point for the stale-binary check
+    /// (jit:7446af34): used by [`check_gate`](Self::check_gate) (REQ-01,
+    /// guards the evaluator's own binary before it spawns a checker process)
+    /// and by the binary crate's startup dispatch (REQ-02, guards a `jit`
+    /// process spawned BY a checker — e.g. a checker script that itself
+    /// shells out to `jit` — which resolves its own binary from `PATH`
+    /// independently of the evaluator and so needs the identical check
+    /// applied to ITSELF).
+    pub fn stale_binary_reason(
+        &self,
+    ) -> Option<crate::domain::build_provenance::StaleBinaryReason> {
+        let real_root = self.real_repo_root()?;
+        stale_binary_reason_for_repo(&real_root)
+    }
+
     /// Check a single gate for an issue
     ///
     /// Runs the gate checker if it's an automated gate, updates the issue status,
@@ -162,18 +187,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // REQ-01/02: refuse to produce a gate verdict from a binary that
         // predates, or no longer matches, the tree under review — checked
         // BEFORE the checker process is spawned, so a stale binary never
-        // produces (or persists) a verdict at all. Uses `real_repo_root`, not
-        // `repo_root` above: storage with no real on-disk root (e.g.
-        // `InMemoryStorage`) must never compare against whatever repository
-        // the host process happens to be running inside (REQ-03). See
-        // `domain::build_provenance` for the identity predicate and the
-        // warn-vs-fail rationale.
-        if let Some(real_root) = self.real_repo_root() {
-            if let Some(reason) = stale_binary_reason(&real_root) {
-                return Err(
-                    crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into(),
-                );
-            }
+        // produces (or persists) a verdict at all. This covers the
+        // EVALUATOR's own binary; a checker script that itself shells out to
+        // `jit` (e.g. `scripts/jit-validate.sh`) resolves ITS `jit` from
+        // `PATH` independently, so it carries the same self-check at startup
+        // via `JIT_GATE_RUN` (see `gate_execution::execute_gate_checker_with_context`
+        // and the binary crate's startup dispatch). See `domain::build_provenance`
+        // for the identity predicate (REQ-03) and the warn-vs-fail rationale.
+        if let Some(reason) = self.stale_binary_reason() {
+            return Err(crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into());
         }
 
         let working_dir = match checker {
