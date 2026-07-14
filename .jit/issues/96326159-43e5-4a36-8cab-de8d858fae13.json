@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "coverage-preview": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-14T18:54:15.157004427Z"
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T22:32:06.128772716Z"
     },
     "breakdown-review": {
       "status": "pending",
@@ -39,7 +39,7 @@
     "brackets:9b7b5f9c"
   ],
   "created_at": "2026-07-14T18:54:15.155931786Z",
-  "updated_at": "2026-07-14T22:22:10.132961602Z",
+  "updated_at": "2026-07-14T22:32:06.232162691Z",
   "first_ready_at": "2026-07-14T18:54:15.155935796Z",
   "claimed_at": "2026-07-14T22:22:10.132961382Z"
 }

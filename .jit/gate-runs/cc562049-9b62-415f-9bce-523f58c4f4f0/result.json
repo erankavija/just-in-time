@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "cc562049-9b62-415f-9bce-523f58c4f4f0",
+  "gate_key": "coverage-preview",
+  "stage": "postcheck",
+  "issue_id": "96326159-43e5-4a36-8cab-de8d858fae13",
+  "commit": "ab9f4cc14935db51129b57633d4608e9a08aaecd",
+  "branch": "worktree-agent-9b7b5f9c",
+  "status": "failed",
+  "started_at": "2026-07-14T22:32:06.128772716Z",
+  "completed_at": "2026-07-14T22:32:06.232006341Z",
+  "duration_ms": 103,
+  "exit_code": 5,
+  "stdout": "",
+  "stderr": "Error: Refusing to run gate 'coverage-preview' for issue 96326159-43e5-4a36-8cab-de8d858fae13: this jit binary predates the tree under review\n\nPossible causes:\n  • This jit binary was built from commit cce04f0ed1d35fedee5994f02339fa94339cca13, but the repository's current HEAD is ab9f4cc14935db51129b57633d4608e9a08aaecd\n  • A gate verdict produced by a stale binary is not evidence about the change under review\n\nTo fix:\n  • Rebuild and reinstall: cargo install --path crates/jit\n  • Verify with: jit --version (should show commit cce04f0ed1d35fedee5994f02339fa94339cca13)\n\njq: error (at <stdin>:16): Cannot iterate over null (null)\n",
+  "command": "./scripts/coverage-preview.sh",
+  "by": "auto:executor",
+  "message": null
+}
