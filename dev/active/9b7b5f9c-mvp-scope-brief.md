@@ -1,0 +1,36 @@
+# JIT Profiles v1.0 MVP Scope Brief
+
+**Issue:** 9b7b5f9c
+**Decision:** `@/charter/D-8`
+**Date:** 2026-07-14
+
+Deliver the smallest profile surface that materially improves v1.0 adoption: one versioned, embedded, offline `jit-dogfood` profile that safely installs JIT's repository-neutral workflow into a fresh or existing repository. Plain `jit init` remains minimal. The complete profile lifecycle is deferred without discarding its design.
+
+## Background
+
+Adopters currently assemble hierarchy, planning templates, gates, prompts, projections, content standards, and agent skills from several locations. The original profile epic also included composition, local packages, variables, shared ownership, reconfiguration, diff, upgrade, and removal. That package-manager breadth is not required to solve the immediate adoption problem and would make it the dominant v1.0 release risk. `@/charter/D-8` therefore keeps an embedded-profile MVP in v1.0 and moves the complete lifecycle to a post-1.0 epic.
+
+## Success Criteria
+
+- [hard] REQ-01: Plain `jit init` remains methodology-neutral; `jit init --profile jit-dogfood` applies the one embedded v1.0 profile and delegates to the same application path used by `jit profile apply jit-dogfood` for existing repositories.
+- [hard] REQ-02: Application works offline and without Git, never creates commits or rewrites existing issues, and performs no network access.
+- [hard] REQ-03: A versioned TOML manifest with generated JSON Schema declares the profile ID, compatible JIT range, semantic registry contributions, assets, executable declarations, and built-in projection operations without arbitrary install hooks or engine-level workflow assumptions.
+- [hard] REQ-04: Application builds and validates a deterministic final-state plan before mutation, publishes it under the repository-wide mutation lock, leaves every target unchanged on conflict or failure, preserves identical content, refuses to overwrite differing user content, and treats unchanged reapplication as a successful no-op.
+- [hard] REQ-05: A minimal record under `.jit/profiles/` stores the applied profile ID, version, origin, and content hashes needed to inspect provenance and prove unchanged reapplication; application appends an audit event consistent with `@/inv/event-log`.
+- [hard] REQ-06: The package and publisher reject absolute paths, traversal, escaping symlinks, undeclared executable assets, invalid interpolation, and any staged result that violates repository validation before publication.
+- [hard] REQ-07: `jit profile list`, `show`, and `apply` support human and `--json` output; apply supports `--dry-run`; request, result, error, and manifest shapes are exposed through `jit --schema`.
+- [hard] REQ-08: `jit-dogfood` installs the repository-neutral milestone, epic, story, task, bug, enhancement, planning, and breakdown taxonomy; the epic-only plan-before-fan-out template; advisory content standards; and enforced epic coverage while preserving the domain-agnostic engine.
+- [hard] REQ-09: The profile installs config-declared plan, breakdown, code-review, coverage, per-issue validation, and repository-validation gates with their portable prompts and scripts; deterministic checks require neither `jq` nor a JIT source checkout, and placeholder AI reviewers emit visible structured warnings.
+- [hard] REQ-10: The repository-neutral JIT skill suite, one canonical content-standards reference, concise managed `AGENTS.md` guidance, an empty invariant registry, and managed invariant plus rules/gates projections are installed without changing non-managed prose.
+- [hard] REQ-11: Adopter documentation presents the embedded profile as the preferred quickstart, links to one canonical profile reference, and keeps manual hierarchy, gate, and planning-bracket configuration as advanced customization rather than duplicating the walkthrough.
+- [hard] REQ-12: Automated tests cover fresh and existing repositories, offline and Git-free operation, deterministic merge, conflict rollback, idempotence, audit/provenance consistency, path safety, concurrency, JSON/schema exposure, portable assets, projections, and an end-to-end profile-to-plan workflow.
+
+## Deferred to the post-1.0 profile epic
+
+Multiple profile composition, explicit local profile directories, profile dependencies and incompatibilities, variables and sensitive-value handling, semantic shared ownership, reconfiguration, detailed diff, three-way upgrade, and safe removal are not v1.0 acceptance criteria. The original 23-requirement contract and full planning brief are carried verbatim by the continuation epic.
+
+## Risks
+
+- RISK-01: A nominally small profile can regrow the deferred package-manager surface; planning must trace every child to the twelve MVP requirements.
+- RISK-02: A passing placeholder reviewer can create false confidence; warnings must remain visible and structured.
+- RISK-03: Duplicating profile facts across assets, compatibility presets, and documentation would recreate the drift this feature is meant to remove.

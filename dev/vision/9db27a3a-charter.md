@@ -26,6 +26,12 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
 - D-7: Charter decisions are addressable `@/charter/D-N` items over the vision charter
+- D-8: Ship an adoption-focused profile MVP in v1.0 and defer the complete profile lifecycle
+- D-9: Remove redundant release surfaces without removing product capabilities
+- D-10: Support one Docker topology that serves the API and web UI from a repository mount
+- D-11: Release v1.0 with no known dependency advisories and blocking security audits
+- D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
+- D-13: Give each adopter-facing fact one canonical documentation home
 
 ## Decision Details
 
@@ -126,3 +132,87 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   details split keeps the addressable rows short and stable while the full
   rationale stays readable below them.
 - **Date:** 2026-07-07
+
+### D-8: Adoption-focused profile MVP before the complete lifecycle
+
+- **Chosen:** v1.0 ships one embedded, offline `jit-dogfood` profile with safe
+  application to fresh and existing repositories. Multi-profile composition,
+  local packages, variables, reconfiguration, diff, upgrade, removal, and
+  shared-ownership semantics move intact to a post-1.0 epic.
+- **Rejected:** Shipping the full profile package manager before v1.0, which
+  makes a large new lifecycle subsystem the release critical path; and dropping
+  profiles from v1.0 entirely, which leaves the strongest dogfooded workflow
+  difficult for adopters to install.
+- **Reasoning:** The embedded profile solves the immediate adoption problem with
+  a bounded surface. Deferring lifecycle breadth reduces release risk without
+  discarding the design or any already-shipped product capability.
+- **Date:** 2026-07-14
+
+### D-9: Cut redundant release surfaces, not product capabilities
+
+- **Chosen:** Preserve the CLI, server/API, web UI, and MCP server as supported
+  capabilities while removing packaging topologies, duplicated instructions,
+  and compatibility surfaces that provide no distinct user outcome.
+- **Rejected:** Blanket feature cuts to meet a date, which would make v1.0 less
+  capable; and retaining every existing delivery shape, which multiplies
+  testing, security, and documentation cost without equivalent adopter value.
+- **Reasoning:** Production readiness is a coherence exercise. A smaller number
+  of supported paths can be tested and documented end to end while the actual
+  product surface remains available.
+- **Date:** 2026-07-14
+
+### D-10: One supported Docker topology
+
+- **Chosen:** Ship one production Docker image in which the Rust server serves
+  both the API and the built web UI. The supported Compose example runs that
+  single service against a bind-mounted repository at `/repo`, with `.jit/` and
+  linked project documents kept in their repository context.
+- **Rejected:** Separate API and web images, a CLI image, and the current
+  all-in-one image. They duplicate native CLI distribution, split one product
+  deployment into avoidable services, or advertise processes and proxy routes
+  that are not actually supervised as one production service.
+- **Reasoning:** One image has a clear runtime contract, correct PID 1 and signal
+  behavior, one health check, one repository mount, and one smoke-testable user
+  path. Native binaries remain the primary CLI distribution and MCP retains its
+  own package distribution.
+- **Date:** 2026-07-14
+
+### D-11: Zero known dependency advisories at release
+
+- **Chosen:** Resolve every advisory reported by the Rust, web, and MCP
+  production-dependency audits before v1.0. Audit jobs fail hard, use no blanket
+  allowlists, and are required by the release workflow.
+- **Rejected:** Advisory-only CI, `continue-on-error`, install fallbacks that
+  hide audit failures, and carrying known advisories into v1.0 with a later-fix
+  note.
+- **Reasoning:** A stable release cannot claim production readiness while known
+  vulnerable or unmaintained dependency paths are accepted by automation.
+  Removing or replacing a dependency is part of fixing the gap when an in-place
+  upgrade is unavailable.
+- **Date:** 2026-07-14
+
+### D-12: Current-stable MSRV for v1.0
+
+- **Chosen:** Rust 1.97 is the v1.0 MSRV because it is the current stable release
+  on 2026-07-14. CI builds and tests the workspace with exactly the declared
+  MSRV; if stable advances before the v1.0 tag, the declaration is refreshed so
+  it is never more than one stable release behind.
+- **Rejected:** A stale conservative MSRV maintained without evidence, which
+  increases compatibility burden; and an unpinned `stable`-only policy, which
+  does not state or test the actual minimum compiler contract.
+- **Reasoning:** A recent explicit compiler baseline reduces dependency and CI
+  complexity while remaining reproducible for adopters and release builders.
+- **Date:** 2026-07-14
+
+### D-13: Canonical documentation homes instead of repeated prose
+
+- **Chosen:** Each adopter-facing workflow or volatile fact has one canonical
+  documentation page. README, installation, deployment, and component guides
+  provide audience-specific entry points and link to that source instead of
+  restating commands, matrices, or guarantees.
+- **Rejected:** Keeping near-identical walkthroughs in several files, which
+  makes every release change a multi-file synchronization task; and deleting
+  useful discoverability, which would make concise documentation harder to find.
+- **Reasoning:** Linking preserves navigation while pruning maintenance cost and
+  enforces `@/inv/single-source-prose` across the public documentation surface.
+- **Date:** 2026-07-14
