@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "c3fa259e-b148-4d49-aee3-53fb86c61da7",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "139cd850623e820828b966de9d14a9f1949dafee",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T15:01:41.511601659Z",
+  "completed_at": "2026-07-14T15:03:36.593025423Z",
+  "duration_ms": 115081,
+  "exit_code": 1,
+  "stdout": "Attribution: `bug` is a maximum-level leaf and its resolved tree has no children. I inspected all five reachable `jit:7446af34` commits individually; the two merge commits add no standalone patch. The prior blocking CLI-reference finding is addressed.\n\nDocumentation impact: the reference and exit-code contract accurately cover the pre-verdict exit-10 refusal and JSON shape. One issue-authored troubleshooting claim remains inaccurate.\n\n1. **F1 — medium, blocking, issue-impact:** [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:955) says the refusal “only fires inside the repository the binary was built from.” The implementation instead checks whether the current repository contains the build commit, so a clone or fork sharing that history can also trigger the refusal. Replace this with the actual predicate, while retaining that unrelated repositories remain unaffected.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The stale-binary how-to incorrectly limits the refusal to the original build repository; clones or forks sharing the build commit can also trigger it.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Troubleshooting incorrectly says the refusal only fires inside the repository the binary was built from; the implementation checks whether the current repository contains the build commit, so a clone or fork sharing that history can also refuse.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":955}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11630 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6125-e825-7510-8298-5907791225cf\n--------\nuser\n--- 11617 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The stale-binary how-to incorrectly limits the refusal to the original build repository; clones or forks sharing the build commit can also trigger it.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Troubleshooting incorrectly says the refusal only fires inside the repository the binary was built from; the implementation checks whether the current repository contains the build commit, so a clone or fork sharing that history can also refuse.",
+        "file": "docs/how-to/custom-gates.md",
+        "line": 955
+      }
+    ]
+  }
+}

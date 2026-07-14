@@ -81,12 +81,13 @@ pub enum BinaryProvenance {
     /// The binary predates, or no longer matches, the tree under review.
     Stale(StaleBinaryReason),
     /// The comparison could not establish that the repository under
-    /// validation IS the repository the binary was built from — no git, no
-    /// resolvable `HEAD`, an unknown build commit (the binary was built
-    /// outside a git checkout), or a build commit that is not a known commit
-    /// in this repository's history. REQ-03: stay silent in every one of
-    /// these cases rather than warn an ordinary user validating an unrelated
-    /// repository.
+    /// validation shares the binary's build history (it contains the build
+    /// commit — true of the source repository and of any clone or fork
+    /// carrying that history) — no git, no resolvable `HEAD`, an unknown
+    /// build commit (the binary was built outside a git checkout), or a
+    /// build commit that is not a known commit in this repository's history.
+    /// REQ-03: stay silent in every one of these cases rather than warn an
+    /// ordinary user validating an unrelated repository.
     NotApplicable,
 }
 

@@ -7222,3 +7222,7 @@
 {"type":"gate_passed","id":"7fbc9671-a73a-4c6b-bf6c-21cfbe89f1d9","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T14:28:20.155830941Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"7650b3c3-c1b0-4268-96de-adebb210342a","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T14:30:43.151541684Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"7534236c-7d01-4d3a-8822-7df8caa5c860","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T14:34:48.472467965Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f2e64868-3175-4cb6-8528-aa3a6fa56a8a","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T14:58:41.452904274Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"ba963ac9-c8d8-43b3-b5df-4c0e9de5f2c5","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T15:01:41.472594870Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"6218bb70-6323-4cc7-ba9a-a3d1a458e38f","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T15:03:36.593427134Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"b01e4627-b172-4869-8ef9-ef3f057217f9","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T15:07:57.966497418Z","gate_key":"code-review","updated_by":"auto:executor"}
