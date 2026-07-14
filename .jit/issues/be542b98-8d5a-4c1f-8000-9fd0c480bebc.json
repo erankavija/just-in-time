@@ -2,10 +2,12 @@
   "id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
   "title": "Route repository validation through an overlay view",
   "description": "Existing repository validation reads through one injectable, read-only view so the unchanged filesystem path and a planned-byte overlay execute the identical validation pipeline.\n\n## Background\n\nProfile planning must validate the exact proposed final repository without letting any validator reopen live files and judge a different state. This leaf introduces that reusable validation boundary without adding profile commands or types.\n\n## Success Criteria\n\n- [hard] REQ-01: Filesystem and overlay views drive effective config, rules/schema, gates/templates, item links, projections, issue/event/index records, DAG, namespace/hierarchy, and repository-integrity passes without reopening the storage root.\n- [hard] REQ-02: Overlay tests deliberately make live and planned bytes disagree and prove every named pass judges the planned final state, while filesystem-view regression tests preserve current validation results.\n\n## Scope\n\n**Blast radius:** repository-view trait and the config/gate/template/item/projection/validation readers only, with parity and adversarial overlay tests; no profile type or command is introduced.\n\n**Green landing:** All existing validation callers use the filesystem view unchanged, and an internal overlay can validate arbitrary final bytes independently of profiles.",
-  "state": "ready",
+  "state": "backlog",
   "priority": "high",
   "assignee": null,
-  "dependencies": [],
+  "dependencies": [
+    "96326159-43e5-4a36-8cab-de8d858fae13"
+  ],
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -23,6 +25,6 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.038371485Z",
-  "updated_at": "2026-07-14T22:28:46.038670415Z",
+  "updated_at": "2026-07-14T22:30:15.430345648Z",
   "first_ready_at": "2026-07-14T22:28:46.038371865Z"
 }

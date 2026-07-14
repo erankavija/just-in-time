@@ -7363,3 +7363,12 @@
 {"type":"gate_definition_updated","id":"d1114123-6c72-48ed-a534-80535d6890ec","timestamp":"2026-07-14T22:29:43.979280478Z","gate_key":"security-review"}
 {"type":"gate_definition_updated","id":"6aab5026-b5a2-4a37-a0be-2dd4c463f579","timestamp":"2026-07-14T22:29:43.987812844Z","gate_key":"secret-detection"}
 {"type":"gate_definition_updated","id":"83134456-aad7-44d0-9352-43a401e28d5b","timestamp":"2026-07-14T22:29:43.996258530Z","gate_key":"dependency-audit"}
+{"type":"issue_state_changed","id":"7aac08e8-317f-40be-8117-2506b88852aa","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-14T22:30:11.160547583Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"df2410ef-3223-4bef-baa2-75cf211a2239","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-14T22:30:11.160574423Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"280c54a3-e855-4031-91ca-d156f457d76f","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-14T22:30:15.430516338Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"2f6de6e4-61dc-471d-975c-0d533a7b9e5b","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-14T22:30:15.430544148Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"75ccd92b-6010-47db-8c58-faab8426a77c","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-14T22:30:18.951809289Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"f808a6e5-cb39-4150-9993-b39c9d97d912","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-14T22:30:18.951837759Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_state_changed","id":"6eb709dc-df26-4626-b4a9-5c9851f5fe41","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-14T22:30:23.351615948Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"8ef1dcd5-1892-446f-bfb6-2801a8f7665f","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-14T22:30:23.351643498Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"83c7a48d-8db2-4b6b-a7a3-7a5397dad17c","issue_id":"9b7b5f9c-6357-4e99-a1df-bef80d6bca1f","timestamp":"2026-07-14T22:30:32.416786600Z","updated_by":"dependency-add","fields":["dependencies"]}
