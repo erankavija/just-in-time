@@ -2,9 +2,9 @@
   "id": "ca024a2b-561d-432c-99f0-3a9ded3451d5",
   "title": "planning: Versioned repository profiles and portable JIT dogfood setup",
   "description": "Planning node for Versioned repository profiles and portable JIT dogfood setup (9b7b5f9c). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/9b7b5f9c-plan.md and link it to this node once written.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [],
   "gates_required": [
     "plan-review"
@@ -30,6 +30,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-14T18:54:15.154577775Z",
-  "updated_at": "2026-07-14T18:54:15.155824596Z",
-  "first_ready_at": "2026-07-14T18:54:15.154578185Z"
+  "updated_at": "2026-07-14T19:21:55.676950747Z",
+  "first_ready_at": "2026-07-14T18:54:15.154578185Z",
+  "claimed_at": "2026-07-14T19:21:55.676950617Z"
 }
