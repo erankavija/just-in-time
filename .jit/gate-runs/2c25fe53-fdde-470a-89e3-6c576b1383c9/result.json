@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "run_id": "2c25fe53-fdde-470a-89e3-6c576b1383c9",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "3ba6ff652d4c0858de2355e93aae530779e3f44a",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T22:14:06.696613148Z",
+  "completed_at": "2026-07-14T22:21:01.893091049Z",
+  "duration_ms": 415196,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/8b05a612-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1) and is linked as a `design` document in the planning issue. It is substantive and identifies the container criteria source at line 3.\n\n## Completeness against the criteria\n\nThe plan explicitly addresses all eleven `[hard]` container criteria and does not visibly narrow the supported CLI, server/API, web, or MCP surfaces. However, its proposed execution does not yet guarantee the exact-commit evidence required by REQ-04/REQ-05, and its Docker leaf cannot satisfy REQ-06 using the stated code footprint. These are blocking technical gaps detailed below.\n\n## Technical soundness and architectural fit\n\nThe repository analysis is otherwise accurate:\n\n- `jit-server` validates the supplied `.jit` directory and nests routes under `/api` in [crates/server/src/main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:61).\n- Embedded web assets are build-order-sensitive in [crates/server/build.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/build.rs:4).\n- The existing security and release workflows have the advisory and publication gaps described by the plan.\n- The revised OCI transport is technically plausible: Skopeo documents that `--all` copies an entire index and `--preserve-digests` fails rather than rewriting digests. [Skopeo copy documentation](https://github.com/containers/skopeo/blob/main/docs/skopeo-copy.1.md)\n\nTwo load-bearing assumptions remain incorrect or incomplete: GitHub provenance follows the triggering workflow context rather than an arbitrary checkout, and exec-form PID 1 alone does not make the current server terminate on SIGTERM.\n\n## Decomposition and dependencies\n\nThe overall ordering is coherent: remediation precedes enforcement; the replacement Docker image precedes topology removal; candidate assembly precedes staging and rehearsal; rehearsal precedes tag authorization; authorization precedes publication. The external `73482aa1`, `6eb585bc`, and `9b7b5f9c` dependencies are placed at sensible collision or acceptance boundaries.\n\nThe Docker image leaf is not independently executable within its declared blast radius, however: satisfying its signal criterion requires a server lifecycle change that the task currently excludes. Candidate assembly similarly needs an explicit workflow-event identity contract shared by its reusable producers and staging jobs.\n\n## Risks and actionability\n\nThe risk table recognizes same-SHA races and Docker signal behavior, but its mitigations do not resolve the two implementation mechanisms below. The npm bootstrap is substantially designed, though its one-time public scoped-package command should be made explicit because this is an external-state mutation.\n\n## Prior review feedback\n\nBoth previous blockers are addressed:\n\n- The live MSRV-recency command is now the final validation immediately before annotated tag creation at [lines 233–240](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:233).\n- The OCI design now distinguishes the transport hash, runnable digest `D_run`, and attested index digest `D_index`, with subject-pinned smoke and `--all --preserve-digests` registry publication at [lines 186–196](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:186).\n\n## Findings\n\n1. **F1 — High, blocking:** Candidate assembly accepts an explicit checkout SHA but never requires the GitHub event, caller, and workflow commit identities to equal that SHA. The plan promises GitHub attestations bound to the candidate at line 134 and dispatches reusable producers from the SHA-oriented assembly at lines 147–153. GitHub artifact attestations record the workflow’s commit SHA, `workflow_call` inherits the caller context, and `workflow_dispatch` uses the tip of its selected branch or tag—not the commit passed to `actions/checkout`. Consequently, a dispatch from a moved/default ref could test candidate SHA A while GitHub and npm OIDC provenance identify SHA B. Define an immutable invocation ref/event contract, assert `github.sha`/workflow identity equals the candidate before building or staging, and test mismatch rejection. [GitHub workflow event semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [artifact-attestation identity](https://docs.github.com/en/enterprise-cloud@latest/actions/concepts/security/artifact-attestations).\n\n2. **F2 — High, blocking:** The Docker task treats an exec-form `jit-server` PID 1 as sufficient for termination handling, but the current server registers no SIGTERM handler: [main.rs line 135](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:135) simply awaits `axum::serve`. Linux treats container PID 1 specially and ignores signals whose action remains default, including SIGTERM; Axum requires an explicit shutdown future for graceful termination. The task at plan line 171 requires bounded signal behavior, yet its line-175 blast radius includes only Docker files and fixtures. Add the required server lifecycle change—such as Tokio SIGTERM handling wired through `with_graceful_shutdown`—and corresponding process-level tests to this leaf or a prerequisite. [Docker PID 1 behavior](https://docs.docker.com/reference/cli/docker/container/run), [Axum graceful shutdown](https://docs.rs/axum/latest/axum/serve/struct.Serve.html).\n\n3. **F3 — Low, advisory:** The bootstrap leaf does not explicitly require `npm publish --access public` for the first publication of `@erankavija/jit-mcp-server`. New scoped packages default to restricted visibility, and free scopes may reject the publication without this flag. Since line 83 promises creation of a public channel, make the command and public-visibility verification explicit in line 85’s irreversible bootstrap procedure. [npm scoped public-package documentation](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/).\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior MSRV and OCI blockers are resolved, but exact-SHA provenance and Docker PID 1 signal handling remain technically incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate checkout SHA is not required to equal the GitHub event/caller/workflow SHA used by artifact and npm OIDC provenance.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":147,\"references\":[\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The Docker leaf requires SIGTERM behavior but the current PID 1 server has no signal handler and server code is excluded from the task blast radius.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":171,\"references\":[\"@/issue/8b05a612/requirement/REQ-06\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The first publication of the scoped npm package should explicitly use and verify public access.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":85,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4330 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62b2-719e-7e30-a77d-4ea7e7ce3f5d\n--------\nuser\n--- 4317 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior MSRV and OCI blockers are resolved, but exact-SHA provenance and Docker PID 1 signal handling remain technically incomplete.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Candidate checkout SHA is not required to equal the GitHub event/caller/workflow SHA used by artifact and npm OIDC provenance.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 147,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The Docker leaf requires SIGTERM behavior but the current PID 1 server has no signal handler and server code is excluded from the task blast radius.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 171,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The first publication of the scoped npm package should explicitly use and verify public access.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 85,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      }
+    ]
+  }
+}
