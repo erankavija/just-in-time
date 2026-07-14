@@ -952,9 +952,12 @@ predates the tree under review
 **Solution:** The `jit` resolved from `PATH` was built from a commit other
 than the repository's current `HEAD` (or from a dirty tree), so its verdict
 would not be evidence about the change under review. Rebuild and reinstall:
-`cargo install --path crates/jit`, then re-run the gate. This only fires
-inside the repository the binary was built from — validating a different
-repository with an installed release is unaffected.
+`cargo install --path crates/jit`, then re-run the gate. This fires only
+when the repository under validation contains the binary's build commit in
+its history and its `HEAD` differs (or the binary was built from a dirty
+tree) — so it covers the source repository and any clone or fork sharing
+that history, while validating an unrelated repository with an installed
+release is unaffected.
 
 #### "Orphaned task"
 
