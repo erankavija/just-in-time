@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "run_id": "5e63d319-976b-4e17-91ae-0ecb0a0eee15",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "01688b8d4edb19d0555e4d68ad9b9ec003ed7f9e",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T23:17:33.359837093Z",
+  "completed_at": "2026-07-14T23:23:44.488205549Z",
+  "duration_ms": 371128,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required [plan document](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1) exists, is substantive, and is linked to `e131f1dc` as `doc_type: design`.\n\n## Completeness against the criteria\n\nPass. Sections 1 and 3 address all eleven parent `[hard]` requirements without narrowing the four supported capabilities. In particular, the revision now places documentation and both external epics before source freeze and defines a published, deterministic source archive.\n\n## Technical soundness and architectural fit\n\nMostly sound. The plan accurately reflects the current implementation:\n\n- `jit-server` already owns `/api`, embedded web serving, and repository-relative document access, while [main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:135) lacks graceful shutdown.\n- [build.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/build.rs:4) confirms the embedded-web build-order hazard.\n- The current [Dockerfile](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/Dockerfile:39) and [entrypoint](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/docker/entrypoint.sh:12) substantiate the root, nginx/Node, background-process, and `tail` problems.\n- [security-audit.yml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.github/workflows/security-audit.yml:37) and [release.yml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.github/workflows/release.yml:128) substantiate the advisory and release-gating gaps.\n\nThe npm staging design nevertheless has an unresolved environment boundary, detailed as F2 below.\n\n## Decomposition and dependencies\n\nBlocking failure. The MCP candidate task consumes an artifact produced by a nominally parallel task without declaring that dependency.\n\nAt [plan lines 276–280](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:276), “Build and attest the frozen MCP candidate” depends only on frozen validation and MCP tooling, but its acceptance criterion requires running with “the frozen native jit candidate on PATH.” That candidate is produced by the separate native/source task at lines 267–274. Section 3 also explicitly describes the producers as parallel at line 172.\n\nThe MCP task must depend on the native/source candidate task, or the design must stop requiring that exact native candidate and specify an equivalent independently produced CLI. As written, the proposed DAG cannot execute the MCP task according to its own criteria.\n\n## Risks and actionability\n\nBlocking failure. The environment used for npm’s trusted-publisher identity is not defined.\n\nThe bootstrap task requires npm trust to be bound to an exact “protected environment” at [line 93](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:93). The authority task creates only `candidate-tag` and `final-release` environments and deliberately confines App credentials to their respective jobs at lines 137–145. The staging task at lines 300–306 names no third environment.\n\nNeither defined environment can safely fill the gap:\n\n- `candidate-tag` would expose its tag-creation App secrets to the staging job, contradicting line 138.\n- `final-release` is deliberately unavailable until after rehearsal, whereas staging precedes rehearsal.\n- Omitting the environment would contradict the environment-bound trust and identity checks chosen at lines 93 and 141.\n\nnpm treats the environment name, when configured, as part of the exact trusted-publisher binding ([npm trusted-publisher configuration](https://docs.npmjs.com/trusted-publishers/)). The plan needs a distinct, secret-isolated npm-stage environment, including ownership, protections, creation order, and the staging job’s explicit reference to it.\n\n## Prior review feedback\n\nThe latest run’s blocking findings were substantively addressed:\n\n- Prior F1: documentation, core maintenance, and profiles now precede source freeze at lines 241–249.\n- Prior F2: a repository-scoped GitHub App is now the explicit bypass actor at lines 134–145 and 323–331.\n- Prior F3: exact deterministic source bytes are built, installed, rehearsed, and published at lines 149–158, 267–274, and 313–318.\n- Prior advisory F4: the revised research citations now point to relevant sections.\n- Prior advisory F5: the investigation now correctly records the canonical MCP guide as absent and potentially created later.\n\n## Findings\n\n1. **F1 — High, blocking:** “Build and attest the frozen MCP candidate” requires the frozen native `jit` candidate but has no dependency on the task that produces it; the plan simultaneously declares the producers parallel. Add the native/source candidate task as an explicit prerequisite or redesign the MCP smoke input. File: `dev/active/8b05a612-plan.md:276`. References: `@/issue/8b05a612/requirement/REQ-05`, `@/issue/8b05a612/requirement/REQ-10`.\n2. **F2 — High, blocking:** The npm trusted-publisher contract requires a protected environment, but the plan defines only credential-bearing candidate-tag and post-rehearsal final-release environments and assigns no distinct environment to the pre-rehearsal staging job. Define and order a secret-isolated npm-stage environment. File: `dev/active/8b05a612-plan.md:93`. References: `@/issue/8b05a612/requirement/REQ-05`, `@/issue/8b05a612/requirement/REQ-10`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior findings are resolved, but the MCP candidate DAG omits its native-artifact prerequisite and npm staging lacks a viable protected-environment contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The MCP candidate task consumes the frozen native jit candidate without depending on the task that produces it, despite the plan declaring producers parallel.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":276,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The environment-bound npm trusted-publisher design defines no secret-isolated protected environment usable by the pre-rehearsal staging job.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":93,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6556 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62eb-e21a-7f23-9046-da8596f143da\n--------\nuser\n--- 6543 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior findings are resolved, but the MCP candidate DAG omits its native-artifact prerequisite and npm staging lacks a viable protected-environment contract.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The MCP candidate task consumes the frozen native jit candidate without depending on the task that produces it, despite the plan declaring producers parallel.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 276,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The environment-bound npm trusted-publisher design defines no secret-isolated protected environment usable by the pre-rehearsal staging job.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 93,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      }
+    ]
+  }
+}
