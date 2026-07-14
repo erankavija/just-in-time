@@ -129,6 +129,13 @@
           "is_shared": false
         }
       ]
+    },
+    {
+      "path": "dev/active/9b7b5f9c-plan.md",
+      "commit": null,
+      "label": "Profiles MVP Plan",
+      "doc_type": "design",
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -143,7 +150,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-14T18:54:15.154577775Z",
-  "updated_at": "2026-07-14T20:11:06.272638460Z",
+  "updated_at": "2026-07-14T20:18:29.125049492Z",
   "first_ready_at": "2026-07-14T18:54:15.154578185Z",
   "claimed_at": "2026-07-14T19:21:55.676950617Z"
 }
