@@ -50,7 +50,7 @@
           "title": "Bound Rust build artifacts and compilation cost",
           "classification": "container",
           "model": "-",
-          "status": "pending",
+          "status": "in_progress",
           "note": "driven wave-by-wave via dev/active/73482aa1-progress.json (6 sub-waves over 8 pre-wired children)"
         }
       ]

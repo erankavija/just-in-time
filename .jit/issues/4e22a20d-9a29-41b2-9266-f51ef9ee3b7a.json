@@ -2,9 +2,9 @@
   "id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
   "title": "Establish reproducible Rust build measurements and baseline",
   "description": "Create the repeatable measurement foundation for the Rust build-efficiency work before changing build topology or policy. The harness must capture a trustworthy pre-optimization baseline, a complete test inventory, and enough environment detail to compare later results on the same host and toolchain.\n\n## Background\n\nHistorical gate durations mix compilation, test execution, host contention, and stale artifacts. The benchmark therefore needs isolated target directories, repeated samples, and machine-readable results. The pre-change test inventory is also required to prove that suite consolidation preserves ignored and non-ignored cases.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed `scripts/benchmark-rust-build.sh` runs each clean sample in a newly created isolated `CARGO_TARGET_DIR`, refuses to overlap another repository Cargo build, executes zero-warning workspace all-target clippy followed by `cargo test --workspace --no-run`, and records each command's wall time, maximum resident memory, and exit status.\n- [hard] REQ-02: `dev/benchmarks/rust-build-efficiency/baseline.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples from the pre-optimization revision, together with Git revision, operating system, CPU count, memory, Cargo version, Rustc version, linker, target triple, and relevant Cargo and Rust environment variables.\n- [hard] REQ-03: Every source-rebuild sample begins from an equivalent completed clean build, appends the same reversible comment-only probe to `crates/jit/src/lib.rs`, compiles workspace tests without executing them, restores the original file byte-for-byte, and leaves the worktree free of benchmark-induced changes.\n- [hard] REQ-04: `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` records every discoverable workspace test case, its ignored status, and its Cargo test target before suite consolidation, and the measurement harness records integration-test target count, complete target-directory bytes, and unique active test-executable bytes from Cargo JSON output.\n- [hard] REQ-05: `dev/benchmarks/rust-build-efficiency/report.md` documents the protocol, baseline medians, raw-sample path, environment, and observed variance without presenting a single favorable run as representative.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -19,6 +19,7 @@
     "type:task"
   ],
   "created_at": "2026-07-14T13:02:01.567997375Z",
-  "updated_at": "2026-07-14T13:02:01.569980967Z",
-  "first_ready_at": "2026-07-14T13:02:01.568002645Z"
+  "updated_at": "2026-07-14T19:43:17.445042388Z",
+  "first_ready_at": "2026-07-14T13:02:01.568002645Z",
+  "claimed_at": "2026-07-14T19:43:17.445042198Z"
 }
