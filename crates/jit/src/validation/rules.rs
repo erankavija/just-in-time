@@ -718,6 +718,13 @@ impl Assertion {
     }
 }
 
+/// The provenance marker the FIXED built-in default rule set carries in
+/// [`Rule::origin`]. Default-origin rules are a config projection: their
+/// assertion (and `namespace-unique-*` membership) is reconciled from the
+/// declared registry at load, so their on-disk schema files are never the
+/// validation authority.
+pub(crate) const DEFAULT_ORIGIN: &str = "default";
+
 /// A fully parsed validation rule.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
@@ -1076,7 +1083,29 @@ impl RawRule {
         if let Some(state) = &self.when.state {
             state.validate(&self.name)?;
         }
-        let assert = self.assert.into_assertion(&self.name, jit_root)?;
+        // A default-origin rule's `schemas/default-*.json` file is a rebuildable
+        // PROJECTION, not the authority: `reconcile_default_rules_with_config`
+        // re-derives its assertion from config at load. So a MISSING or MALFORMED
+        // projection must not fail the load — fall back to a placeholder the
+        // reconciliation replaces, keeping the projection out of the validation
+        // path for default rules. Custom rules keep strict file-read semantics
+        // (REQ-03): only a `default`-origin rule's schema read/parse failure is
+        // tolerated, and only that failure class (a bad reference still errors).
+        let default_schema_ref = if self.origin.as_deref() == Some(DEFAULT_ORIGIN) {
+            self.assert.json_schema.clone()
+        } else {
+            None
+        };
+        let assert = match self.assert.into_assertion(&self.name, jit_root) {
+            Ok(assert) => assert,
+            Err(err) => match (default_schema_ref, &err) {
+                (
+                    Some(reference),
+                    RuleConfigError::SchemaIo { .. } | RuleConfigError::SchemaJson { .. },
+                ) => placeholder_default_schema_assertion(jit_root, reference),
+                _ => return Err(err),
+            },
+        };
         // A `checker-command` is the validate/gate ESCAPE HATCH (DR §4.3) and is
         // never evaluated on the write path, so it can NEVER block a write.
         // Authoring `enforce = true` on one would silently be a no-op as a
@@ -1429,6 +1458,23 @@ fn validate_schema_reference(rule: &str, reference: &str) -> Result<(), RuleConf
         return Err(reject("reference must end with '.json'"));
     }
     Ok(())
+}
+
+/// The stand-in assertion for a default-origin rule whose `schemas/default-*.json`
+/// projection is missing or malformed.
+///
+/// A permissive JSON Schema (`{}` matches anything) carrying the declared file
+/// identity for diagnostics. [`reconcile_default_rules_with_config`](crate::validation::defaults::reconcile_default_rules_with_config)
+/// replaces it with the config-derived assertion at load, so the rebuildable
+/// projection is never load-bearing for a default rule's validation and this
+/// placeholder is not evaluated once reconciliation has run.
+fn placeholder_default_schema_assertion(jit_root: &Path, reference: String) -> Assertion {
+    let path = jit_root.join(&reference);
+    Assertion::JsonSchema(SchemaSource {
+        reference,
+        path,
+        schema: serde_json::json!({}),
+    })
 }
 
 /// Load a `.jit/schemas/<name>.json` file referenced by a `json-schema` rule and
@@ -2379,6 +2425,82 @@ assert = { json-schema = "schemas/bad.json" }
 "#;
         let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
         assert!(matches!(err, RuleConfigError::SchemaJson { .. }));
+    }
+
+    #[test]
+    fn test_default_origin_missing_schema_falls_back_to_placeholder() {
+        // A default-origin rule whose `schemas/default-*.json` projection is ABSENT
+        // must still load (the projection is not the authority): the assertion
+        // becomes a placeholder that reconciliation replaces from config.
+        let dir = tempfile::tempdir().unwrap();
+        let toml = r#"
+[[rules]]
+name = "namespace-registry"
+origin = "default"
+assert = { json-schema = "schemas/default-namespace-registry.json" }
+"#;
+        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        match &set.rules[0].assert {
+            Assertion::JsonSchema(src) => {
+                assert_eq!(src.reference, "schemas/default-namespace-registry.json");
+                assert_eq!(src.schema, serde_json::json!({}), "permissive placeholder");
+            }
+            other => panic!("expected a JsonSchema placeholder, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_default_origin_malformed_schema_falls_back_to_placeholder() {
+        // A default-origin rule whose projection is present but MALFORMED likewise
+        // falls back rather than failing the load.
+        let dir = tempfile::tempdir().unwrap();
+        let schemas = dir.path().join("schemas");
+        std::fs::create_dir_all(&schemas).unwrap();
+        std::fs::write(schemas.join("default-label-format.json"), "{ not json").unwrap();
+        let toml = r#"
+[[rules]]
+name = "label-format"
+origin = "default"
+assert = { json-schema = "schemas/default-label-format.json" }
+"#;
+        let set = RuleSet::from_toml_str(toml, dir.path()).unwrap();
+        match &set.rules[0].assert {
+            Assertion::JsonSchema(src) => assert_eq!(src.schema, serde_json::json!({})),
+            other => panic!("expected a JsonSchema placeholder, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_custom_origin_missing_schema_still_errors() {
+        // REQ-03: a non-default rule keeps strict file-read semantics — a missing
+        // schema is a hard load error, exactly as before.
+        let dir = tempfile::tempdir().unwrap();
+        let toml = r#"
+[[rules]]
+name = "custom-shape"
+origin = "bracket"
+assert = { json-schema = "schemas/missing.json" }
+"#;
+        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
+        assert!(matches!(err, RuleConfigError::SchemaIo { .. }));
+    }
+
+    #[test]
+    fn test_default_origin_bad_schema_reference_still_errors() {
+        // Tolerance is scoped to a read/parse failure: a default rule with an
+        // UNSAFE reference (outside `schemas/`) is still rejected, not placeheld.
+        let dir = tempfile::tempdir().unwrap();
+        let toml = r#"
+[[rules]]
+name = "namespace-registry"
+origin = "default"
+assert = { json-schema = "/etc/passwd.json" }
+"#;
+        let err = RuleSet::from_toml_str(toml, dir.path()).unwrap_err();
+        assert!(matches!(
+            err,
+            RuleConfigError::InvalidSchemaReference { .. }
+        ));
     }
 
     // --- Schema reference safety -------------------------------------------
