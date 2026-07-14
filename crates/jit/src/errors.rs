@@ -324,6 +324,93 @@ impl ClaimRequiresGitError {
     }
 }
 
+/// Error returned when running a gate checker would use a `jit` binary whose
+/// build commit predates, or no longer matches, the repository's current
+/// `HEAD` (jit:7446af34).
+///
+/// Raised from [`check_gate`](crate::commands::CommandExecutor::check_gate)
+/// — reached by `jit gate evaluate`/`gate evaluate-all` directly, and by `gate
+/// pass`/`gate pass-all` and any state transition's pre/postchecks that run an
+/// automated gate — BEFORE the checker process is spawned, so a stale binary
+/// never produces a gate verdict at all: `jit gate status` and every other
+/// consumer of gate evidence never has to distinguish a trustworthy run from
+/// an untrustworthy one after the fact. This is a hard failure rather than a
+/// warning because a gate run exists specifically to be trusted later, and a
+/// verdict from a binary that predates the tree under review is not evidence
+/// about that tree; a warning would still let a wrong verdict get recorded
+/// and acted on. The fix (`cargo install --path crates/jit`) is one command
+/// away, which is a low price against a wasted review round chasing a defect
+/// that does not exist in the working tree (or missing one that does) — the
+/// incident that motivated this check.
+///
+/// Never fires for an ordinary installed release validating an unrelated
+/// repository (REQ-03): see
+/// [`domain::build_provenance`](crate::domain::build_provenance) for the
+/// identity predicate that keeps this silent unless the build commit is a
+/// known commit in the repository under validation. Downcastable in
+/// `error_to_exit_code` (→ `ExitCode::ExternalError`, exit `10`), the same
+/// family as [`ClaimRequiresGitError`] and
+/// [`RepositoryFormatTooNewError`](crate::storage::RepositoryFormatTooNewError):
+/// the binary, not the repository, needs attention.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("{message}")]
+pub struct StaleBinaryError {
+    message: String,
+}
+
+impl StaleBinaryError {
+    /// Build a [`StaleBinaryError`] for `issue_id`/`gate_key`, explaining
+    /// `reason` (a commit mismatch or a dirty build) and the fix.
+    pub fn new(
+        issue_id: &str,
+        gate_key: &str,
+        reason: &crate::domain::build_provenance::StaleBinaryReason,
+    ) -> Self {
+        use crate::domain::build_provenance::StaleBinaryReason;
+
+        let (cause, built_from) = match reason {
+            StaleBinaryReason::CommitMismatch { built_from, head } => (
+                format!(
+                    "This jit binary was built from commit {built_from}, but the \
+                     repository's current HEAD is {head}"
+                ),
+                built_from.clone(),
+            ),
+            StaleBinaryReason::DirtyBuild { built_from } => (
+                format!(
+                    "This jit binary was built from commit {built_from} with a dirty \
+                     working tree at build time; a dirty build cannot be proven to \
+                     still match the current tree"
+                ),
+                built_from.clone(),
+            ),
+        };
+
+        let actionable = ActionableError::new(format!(
+            "Refusing to run gate '{gate_key}' for issue {issue_id}: this jit binary \
+             predates the tree under review"
+        ))
+        .with_cause(cause)
+        .with_cause(
+            "A gate verdict produced by a stale binary is not evidence about the \
+             change under review",
+        )
+        .with_remedy("Rebuild and reinstall: cargo install --path crates/jit")
+        .with_remedy(format!(
+            "Verify with: jit --version (should show commit {built_from})"
+        ));
+
+        Self {
+            message: actionable.to_error_message(),
+        }
+    }
+
+    /// The fully-rendered, user-facing message.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A `jit dep add` rejected because the edge would break transitive reduction.
 ///
 /// Cycle detection is a write-time guard (@/inv/dag-acyclic); this error makes the

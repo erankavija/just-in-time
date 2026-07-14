@@ -105,6 +105,17 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::ExternalError;
     }
 
+    // A gate checker refused to run because the binary predates the tree
+    // under review (jit:7446af34): the same "the binary, not the repository,
+    // needs attention" family as the two checks above — external-dependency
+    // failure (exit 10).
+    if error
+        .downcast_ref::<jit::errors::StaleBinaryError>()
+        .is_some()
+    {
+        return ExitCode::ExternalError;
+    }
+
     // Check root cause for IO errors
     if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
         return match io_error.kind() {
@@ -7414,6 +7425,19 @@ mod exit_code_projection_tests {
             ),
             (
                 jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
+                10,
+                "*",
+            ),
+            (
+                jit::errors::StaleBinaryError::new(
+                    "abc123",
+                    "tests",
+                    &jit::domain::build_provenance::StaleBinaryReason::CommitMismatch {
+                        built_from: "a".repeat(40),
+                        head: "b".repeat(40),
+                    },
+                )
+                .into(),
                 10,
                 "*",
             ),
