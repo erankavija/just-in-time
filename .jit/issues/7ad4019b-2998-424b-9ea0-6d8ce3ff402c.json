@@ -1,0 +1,35 @@
+{
+  "id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "title": "Author the portable dogfood workflow package",
+  "description": "One production manifest/assets payload installs the repository-neutral workflow and, through the completed renderer, migrates every live skill/prompt/standard and public preset consumer to derived output in the same green change.\n\n## Background\n\nThis is the sole production payload owner. It authors the complete adopter-neutral package and switches compatibility and live dogfood consumers together, without introducing deferred lifecycle APIs or a second inventory.\n\n## Success Criteria\n\n- [hard] REQ-01: This leaf alone creates and binds the production `profiles/jit-dogfood/` manifest/assets containing taxonomy, bracket, coverage, six gates, review assets, skills, standard, AGENTS regions, empty invariants, and complete `invariant_projection`/`rules_gates_projection` singleton contributions; application preserves unmanaged bytes.\n- [hard] REQ-02: For absent region targets, output is marker/content/marker plus newline; for unmarked existing targets, original bytes remain an exact prefix followed by the deterministic blank-line boundary and region; reapplication replaces only one valid matching region, while partial/duplicate/reversed/nested matching markers conflict and foreign IDs remain untouched.\n- [hard] REQ-03: After application, ordinary `jit invariant render` and `jit reference render` consume the installed singleton configuration; the repository renderer switches live skills, prompts/scripts, standards, and preset definitions/assets to manifest-derived output with drift/equivalence tests and no second inventory.\n- [hard] REQ-04: Installed paths need neither `jq` nor source checkout, placeholders warn structurally, and goldens exclude project-local/deferred content; `./scripts/docs-mechanical.sh .agents/skills scripts .jit/reference profiles/jit-dogfood docs/examples docs/reference` passes after render.\n\n## Scope\n\n**Blast radius:** package manifest/assets, semantic registry/projection golden fixtures, and renderer-owned live outputs; renderer mechanics and preset derivation remain owned by their prerequisite leaf.\n\n**Green landing:** Application and payload golden tests prove the complete adopter-neutral workflow while the CLI remains private until the next leaf.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "92039d9c-1433-4b24-b3f6-2c206648cc8f",
+    "0d8f20a8-db02-43ba-ad9e-8f219b427690",
+    "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-08",
+    "satisfies:REQ-09",
+    "satisfies:REQ-10",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.042256597Z",
+  "updated_at": "2026-07-14T22:28:46.273228455Z",
+  "first_ready_at": "2026-07-14T22:28:46.042256807Z"
+}

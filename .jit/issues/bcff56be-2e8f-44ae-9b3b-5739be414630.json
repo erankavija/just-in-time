@@ -1,0 +1,33 @@
+{
+  "id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
+  "title": "Exercise cross-platform profile adoption",
+  "description": "A thin black-box acceptance suite proves that the independently tested package, transaction, command, documentation, and portable-workflow seams compose into the supported adopter journey.\n\n## Background\n\nThis final proof consumes public surfaces only. Product defects found here return to their owning leaves or separately tracked bugs rather than expanding this task into a catch-all implementation.\n\n## Success Criteria\n\n- [hard] REQ-01: On Unix and Windows, fresh and existing Git-free repositories produce equivalent final state through init delegation and direct apply, including dry-run/no-op behavior and platform-specific executable semantics.\n- [hard] REQ-02: One offline black-box journey applies the embedded profile, creates and approves a planning bracket, validates managed prose/projections and portable checker warnings, and reaches implementation-ready breakdown without a source checkout or `jq`.\n- [hard] REQ-03: The suite consumes only public CLI/schema/MCP surfaces and asserts that no deferred lifecycle command or field is exposed; unit, property, failure-injection, and component contract tests remain exclusively in their owning leaves.\n\n## Scope\n\n**Blast radius:** new black-box fixtures and platform CI invocation only. Any product defect discovered is returned to its owning leaf (or a separately tracked bug) rather than fixed opportunistically in this acceptance task.\n\n**Green landing:** The bounded cross-platform adopter journey passes over already-green components without duplicating their internal test matrices.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "c533ac18-88dc-42b6-a773-18228a5d2320"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "mcp-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-01",
+    "satisfies:REQ-08",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.043186518Z",
+  "updated_at": "2026-07-14T22:28:46.318852799Z",
+  "first_ready_at": "2026-07-14T22:28:46.043186728Z"
+}

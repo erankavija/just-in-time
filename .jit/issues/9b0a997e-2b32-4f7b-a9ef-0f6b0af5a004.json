@@ -1,0 +1,34 @@
+{
+  "id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+  "title": "Apply profiles with transactional provenance and audit",
+  "description": "The command-layer application service locks and rechecks the pure plan, publishes package targets, the minimal installed record, and one typed audit event in one recoverable transaction, and returns an exact no-op when nothing changed.\n\n## Background\n\nProfile application composes the pure planner and universal recovery boundary while keeping provenance, event bytes, and package targets in the same recoverable publication. The public CLI remains unchanged in this leaf.\n\n## Success Criteria\n\n- [hard] REQ-01: Apply works without Git or network access, never creates commits or issues, stores only profile ID/version/embedded origin/package and target hashes under `.jit/profiles/`, and keeps transaction state out of that record in the kernel-selected machine-local control location.\n- [hard] REQ-02: The typed event is consistent across enum, catalog, samples, schema, and filters; event-image construction preserves every existing byte, inserts one newline only when a non-empty prefix lacks one, then appends the serialized event and one newline.\n- [hard] REQ-03: Tests cover empty, newline-terminated, torn-tail, multiple-record, no-op, handled rollback, interruption, and recovery event logs, plus locked plan rebuild/overlay validation and cleanup warnings.\n- [hard] REQ-04: `./scripts/docs-mechanical.sh docs/reference/events.md` passes for the regenerated event reference.\n\n## Scope\n\n**Blast radius:** command executor, profile storage/record, `events.jsonl` torn-tail/prefix handling, event enum/catalog/schema/sample/reference projection, lock ordering, in-memory/test storage, and owned command harness tests; all event consumers and generated reference output change together.\n\n**Green landing:** The internal application service is callable in harness tests with complete transaction/event behavior, while the public CLI remains unchanged until its dedicated contract change.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "eceffc17-98ce-4e7d-8fe1-cbb539a078a2",
+    "56838d99-dc9d-4028-9b41-6ba691fc4852"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-02",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.040401316Z",
+  "updated_at": "2026-07-14T22:28:46.158910892Z",
+  "first_ready_at": "2026-07-14T22:28:46.040401536Z"
+}

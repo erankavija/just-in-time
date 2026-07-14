@@ -1,0 +1,47 @@
+{
+  "id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+  "title": "Define and validate embedded profile packages",
+  "description": "Generic manifest, contribution, asset, region, schema, hashing, and recursive embedding APIs validate deterministic synthetic fixture packages without creating or owning the production `jit-dogfood` tree.\n\n## Background\n\nThis leaf establishes the generic immutable package contract for the v1.0 embedded-profile MVP. It must not create the production payload or expose deferred profile lifecycle behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: Synthetic fixtures cover map, set, keyed-array, and complete singleton-table contributions—including both projection tables—plus one-to-one assets, compatibility, ordering, executable semantics, invalid hooks/paths/kinds, incomplete singleton values, and missing/extra content.\n- [hard] REQ-02: JSON Schema and canonical package/per-target hashes derive from runtime wire types and fixture bytes, with size/count/drift tests.\n- [hard] REQ-03: The embedding dependency's licenses are project-compatible, dependency audit passes, optional features are absent, and no production manifest/assets or duplicate inventory appears in this leaf.\n\n## Scope\n\n**Blast radius:** `crates/jit/Cargo.toml`, lockfile, generic profile domain/package modules, generated schema surface, and synthetic test fixtures only. No `profiles/jit-dogfood/`, CLI, local loader, or lifecycle API is introduced.\n\n**Green landing:** Synthetic packages parse, embed, validate, hash, and generate schema through internal APIs while production package paths remain absent.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate",
+    "security-review",
+    "secret-detection",
+    "dependency-audit"
+  ],
+  "gates_status": {
+    "security-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.432764651Z"
+    },
+    "secret-detection": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.432788291Z"
+    },
+    "dependency-audit": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.432807691Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-03",
+    "satisfies:REQ-06",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.034762002Z",
+  "updated_at": "2026-07-14T22:29:04.432826711Z",
+  "first_ready_at": "2026-07-14T22:28:46.034762432Z"
+}
