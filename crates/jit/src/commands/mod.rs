@@ -368,10 +368,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Semantics depend on whether the file EXISTS, not whether it is empty:
     ///
-    /// - **File present (even with zero rules):** the parsed file is the SOLE
-    ///   source. No in-code default rules are combined with it — every rule
-    ///   (including the built-in ones `jit init` scaffolds, marked `origin =
-    ///   "default"`) lives in the file and is user-editable. An
+    /// - **File present (even with zero rules):** the parsed file supplies the
+    ///   operative rule set — which rules exist and, for the built-in rules `jit
+    ///   init` scaffolds (marked `origin = "default"`), their editable policy
+    ///   fields (severity, enforce, selector). Each default-origin rule's
+    ///   ASSERTION is re-derived from the declared `[namespaces]` /
+    ///   `[type_hierarchy]` registry IN MEMORY at load
+    ///   ([`with_default_assertions_from_config`](crate::validation::defaults::with_default_assertions_from_config)),
+    ///   so a hand edit of the registry cannot desync validation against a stale
+    ///   `schemas/default-*.json` projection. Custom rules (any other `origin`)
+    ///   are used verbatim, reading their own declared schema files. An
     ///   intentionally-emptied file yields an empty set.
     /// - **File ABSENT (pre-init repo or deleted file):** build the FIXED
     ///   [`default_ruleset`](crate::validation::defaults::default_ruleset) from the
@@ -388,9 +394,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             .get_or_init(|| {
                 let rules_path = self.storage.root().join("rules.toml");
                 if rules_path.exists() {
-                    // File present (even empty) is authoritative: use it ALONE.
-                    let user = self.rules().map_err(|e| e.to_string())?;
-                    Ok(user.clone())
+                    // File present (even empty) supplies the operative rule set.
+                    // Its default-origin rules are config-derived PROJECTIONS: their
+                    // on-disk `schemas/default-*.json` files are not the validation
+                    // authority, so re-derive each default-origin rule's assertion
+                    // from the declared registry IN MEMORY at load. Custom rules and
+                    // the default rules' policy fields (severity/enforce/selector)
+                    // are taken from the file unchanged.
+                    let user = self.rules().map_err(|e| e.to_string())?.clone();
+                    let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
+                    Ok(
+                        crate::validation::defaults::with_default_assertions_from_config(
+                            user, namespaces,
+                        ),
+                    )
                 } else {
                     // File absent: build the fixed defaults IN MEMORY (no write,
                     // no warning) from the repo's namespace registry. Materialized
@@ -996,17 +1013,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         let namespaces = self.config_manager.namespaces_from_config(&config);
 
         if crate::storage::ruleset_store::has_validation_ruleset(jit_root) {
-            // `rules.toml` is the sole source when present, so we never clobber it.
-            // But its `type-hierarchy-known` rule reads a BAKED schema file
-            // that does NOT track `[type_hierarchy]` edits — re-init / apply must
-            // refresh that one file from config so a newly-declared type stops
-            // warning on the write path (R5). This is a no-op when the file is
-            // already current (idempotent, atomic).
-            crate::storage::ruleset_store::write_baked_schema(
-                jit_root,
-                crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE,
-                &crate::validation::serialize::type_hierarchy_schema_content(&namespaces),
-            )?;
+            // `rules.toml` is never clobbered when present. Its default-origin
+            // rules validate against the config registry derived in memory, but the
+            // `schemas/default-*.json` files are projections for external
+            // consumers; refresh them from the current registry so a re-init / apply
+            // republishes them. Idempotent and atomic; a no-op when already current.
+            self.refresh_default_schema_projections()?;
             return Ok(false);
         }
 
@@ -1027,27 +1039,41 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(true)
     }
 
-    /// Regenerate the baked write-path type-hierarchy schema
-    /// (`.jit/schemas/default-type-hierarchy-known.json`) from the current
-    /// `[type_hierarchy]` config, eliminating the dual source that lets a
-    /// config-declared type warn on the write path (R5).
+    /// Refresh every default-origin `schemas/default-*.json` projection from the
+    /// current `[namespaces]` / `[type_hierarchy]` config, returning the names of
+    /// the files (re)written.
     ///
-    /// `.jit/rules.toml` is the sole validation source when present, and its
-    /// `type-hierarchy-known` rule reads this frozen enum file rather than
-    /// the config hierarchy. After adding a type to `[type_hierarchy].types`, run
-    /// this so the write-path rule recognizes it. Idempotent and atomic; a no-op
-    /// for a repo with no baked schemas (the read path builds them in memory).
-    /// Returns `true` when a file was (re)written.
-    pub fn regenerate_type_hierarchy_schema(&self) -> Result<bool> {
+    /// The default rules validate against the registry derived in memory at load
+    /// ([`with_default_assertions_from_config`](crate::validation::defaults::with_default_assertions_from_config)),
+    /// so these files are write-through projections for external consumers, never
+    /// the validation authority. jit republishes them whenever it writes
+    /// `config.toml` or `rules.toml` (init/re-init, `config set`) so a projection
+    /// a tool reads stays current after a jit-driven registry change.
+    ///
+    /// Idempotent (rewriting current content yields identical bytes) and atomic
+    /// (temp + rename per file). A no-op for a repo with no materialized `schemas/`
+    /// layout — the read path builds the default schemas in memory — so it is safe
+    /// to call unconditionally.
+    pub fn refresh_default_schema_projections(&self) -> Result<Vec<String>> {
         let jit_root = self.storage.root();
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        // Validation builds the schema content; storage performs the atomic write.
-        crate::storage::ruleset_store::write_baked_schema(
-            jit_root,
-            crate::validation::defaults::TYPE_HIERARCHY_SCHEMA_FILE,
-            &crate::validation::serialize::type_hierarchy_schema_content(&namespaces),
-        )
+        // Validation builds the schema content (the SAME files `jit init`
+        // scaffolds); storage performs the atomic per-file write.
+        let serialized = crate::validation::serialize::serialize_ruleset(
+            &crate::validation::defaults::default_ruleset(&namespaces),
+        );
+        let mut written = Vec::new();
+        for file in serialized.schema_files {
+            if crate::storage::ruleset_store::write_baked_schema(
+                jit_root,
+                &file.name,
+                &file.content,
+            )? {
+                written.push(file.name);
+            }
+        }
+        Ok(written)
     }
 
     /// Acquire the control-plane lock named `lock_file`, held until the returned

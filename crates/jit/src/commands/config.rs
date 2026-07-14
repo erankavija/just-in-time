@@ -254,6 +254,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         // user-global first-write case).
         config_store::save_config_document(&config_path, &doc)?;
 
+        // A repo `config.toml` write republishes the default-schema projections
+        // from the (possibly changed) registry, keeping `schemas/default-*.json`
+        // current for external consumers. The user-global config carries no repo
+        // registry, so it never touches these files. A no-op when the repo has no
+        // materialized `schemas/` layout.
+        if !global {
+            self.refresh_default_schema_projections()?;
+        }
+
         Ok(ConfigSetOutcome {
             key: key.to_string(),
             value: value.to_string(),
