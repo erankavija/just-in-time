@@ -197,7 +197,8 @@
   "escalations": [],
   "rework_counts": {
     "950256ae": 1,
-    "45e1b7e8": 2
+    "45e1b7e8": 2,
+    "7446af34": 1
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
