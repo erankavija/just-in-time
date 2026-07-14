@@ -2,7 +2,7 @@
   "id": "96326159-43e5-4a36-8cab-de8d858fae13",
   "title": "breakdown: Versioned repository profiles and portable JIT dogfood setup",
   "description": "Breakdown node bracketing Versioned repository profiles and portable JIT dogfood setup (9b7b5f9c). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:codex-profiles-mvp",
   "dependencies": [
@@ -39,7 +39,8 @@
     "brackets:9b7b5f9c"
   ],
   "created_at": "2026-07-14T18:54:15.155931786Z",
-  "updated_at": "2026-07-14T22:56:19.849252086Z",
+  "updated_at": "2026-07-14T22:57:51.609707352Z",
   "first_ready_at": "2026-07-14T18:54:15.155935796Z",
-  "claimed_at": "2026-07-14T22:22:10.132961382Z"
+  "claimed_at": "2026-07-14T22:22:10.132961382Z",
+  "done_at": "2026-07-14T22:57:51.609706912Z"
 }
