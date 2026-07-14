@@ -265,18 +265,31 @@ refused while any direct or supported embedded-closure owner is non-terminal;
 a managed document with no owner remains eligible and reports `no-owner` as
 informational evidence.
 
-For a container target, the destination root is
-`<archive_root>/<container-short-id>/`, where `<archive_root>` is the
-repository-authored policy value rather than a built-in path. Execution creates
-or adopts `<archive_root>/<container-short-id>/.jit-container`; the marker
-contains the resolved full container ID followed by a newline. This binds the
-short-named directory to one exact container and detects short-prefix
-collisions. A marker naming another container blocks the plan with
-`destination-conflict`. A markerless directory with unaccounted entries also
-blocks, while accounted or otherwise adoptable layouts remain subject to the
-normal planner rules. The marker's `ArchivePublication.source` is `null`
-because it is executor-generated ownership metadata, not a copied or moved
-repository artifact.
+For a container target, the preferred destination root is
+`<archive_root>/<container-short-id>-<slug>/`, where `<archive_root>` is the
+repository-authored policy value rather than a built-in path. When the issue has
+exactly one `type:*` label and exactly one label in that type's configured
+membership namespace, the membership-label value supplies `<slug>`; for
+example, `epic:artifact-archival` yields
+`archive/2f84c930-artifact-archival/`. Otherwise the issue title supplies the
+slug. Slug normalization lowercases Unicode alphanumeric characters, collapses
+other runs to `-`, trims separators, limits the result to 48 characters, and
+uses `container` when no usable character remains.
+
+Execution creates a `.jit-container` marker containing the resolved full
+container ID followed by a newline. The short ID and marker-recorded full ID
+remain authoritative; the suffix is only a human-readable aid. Before choosing
+a new preferred root, planning scans the archive root's immediate non-symlink
+directories for that exact full-ID marker. One match freezes and reuses the
+existing directory even after title or label changes. Multiple matches block
+with deterministic `destination-conflict` findings. If no marker matches but
+the legacy `<archive_root>/<container-short-id>/` path exists, planning adopts
+that path without migration or data movement. Its existing markerless
+accounting and conflict checks still apply, so old archives do not fork a new
+slugged destination. A marker naming another container or a markerless resolved
+directory with unaccounted entries also blocks. The marker's
+`ArchivePublication.source` is `null` because it is executor-generated
+ownership metadata, not a copied or moved repository artifact.
 
 Execution stages and verifies bytes, validates supported local links in the
 proposed mirror layout, and publishes with atomic no-replace semantics. It then

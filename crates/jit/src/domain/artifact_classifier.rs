@@ -11,8 +11,11 @@ use crate::domain::artifact_plan::{
     EdgeResolutionMode, EvidenceCode, PendingDeletion, PlanBlocker, PlanError, PlanTarget,
     PolicyStatus, ReferenceChange, WarningCode,
 };
+use crate::domain::type_taxonomy::HierarchyConfig;
+use crate::domain::Issue;
 use crate::domain::State;
 use crate::domain::SHORT_ID_LENGTH;
+use crate::labels::type_value_of;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Explicit documentation policy used by the classifier.
@@ -142,6 +145,7 @@ pub struct ArtifactClassificationInventory {
     pub target: PlanTarget,
     pub artifacts: Vec<ArtifactPlanEntry>,
     pub blockers: Vec<PlanBlocker>,
+    destination_root: Option<String>,
 }
 
 impl ArtifactClassificationInventory {
@@ -155,7 +159,14 @@ impl ArtifactClassificationInventory {
             target,
             artifacts,
             blockers,
+            destination_root: None,
         }
+    }
+
+    /// Use the destination previously resolved by the storage boundary.
+    pub fn with_destination_root(mut self, destination_root: impl Into<String>) -> Self {
+        self.destination_root = Some(destination_root.into());
+        self
     }
 }
 
@@ -165,7 +176,10 @@ pub fn classify_artifacts(
     policy: ArtifactClassificationPolicy,
     facts: ArtifactClassificationFacts,
 ) -> Result<ArtifactPlan, PlanError> {
-    let destination_root = artifact_destination_root(&inventory.target, &policy.archive_root);
+    let destination_root = inventory
+        .destination_root
+        .clone()
+        .unwrap_or_else(|| artifact_destination_root(&inventory.target, &policy.archive_root));
     let mut plan_blockers = inventory.blockers;
     append_container_destination_blocker(
         &inventory.target,
@@ -708,6 +722,67 @@ pub fn artifact_destination_root(target: &PlanTarget, archive_root: &str) -> Str
     }
 }
 
+/// Compute a container's preferred human-readable destination before storage reconciliation.
+///
+/// An unambiguous label in the issue type's configured membership namespace
+/// takes precedence. Missing or ambiguous type/membership labels fall back to
+/// the title, while the short id remains the authoritative collision-resistant
+/// prefix.
+pub fn preferred_container_destination_root(
+    issue: &Issue,
+    hierarchy: &HierarchyConfig,
+    archive_root: &str,
+) -> String {
+    let issue_types = issue
+        .labels
+        .iter()
+        .filter_map(|label| type_value_of(label))
+        .collect::<Vec<_>>();
+    let strategic_value = (issue_types.len() == 1)
+        .then(|| hierarchy.get_membership_namespace(issue_types[0]))
+        .flatten()
+        .and_then(|namespace| {
+            let values = issue
+                .labels
+                .iter()
+                .filter_map(|label| label.split_once(':'))
+                .filter_map(|(candidate, value)| (candidate == namespace).then_some(value))
+                .collect::<Vec<_>>();
+            (values.len() == 1).then(|| values[0])
+        });
+    let slug = archive_container_slug(strategic_value.unwrap_or(&issue.title));
+    join_path(
+        archive_root,
+        &format!("{}-{slug}", container_short_id(&issue.id)),
+    )
+}
+
+/// Normalize user-authored label or title text into one bounded path component.
+pub fn archive_container_slug(value: &str) -> String {
+    const MAX_CHARS: usize = 48;
+
+    let mut slug = String::new();
+    let mut separator_pending = false;
+    for character in value.chars() {
+        if character.is_alphanumeric() {
+            if separator_pending && !slug.is_empty() {
+                slug.push('-');
+            }
+            slug.extend(character.to_lowercase());
+            separator_pending = false;
+        } else {
+            separator_pending = !slug.is_empty();
+        }
+    }
+    let bounded = slug.chars().take(MAX_CHARS).collect::<String>();
+    let bounded = bounded.trim_end_matches('-');
+    if bounded.is_empty() {
+        "container".to_string()
+    } else {
+        bounded.to_string()
+    }
+}
+
 fn target_document_path(target: &PlanTarget) -> Option<String> {
     match target {
         PlanTarget::Document { path } => Some(path.clone()),
@@ -756,6 +831,9 @@ fn merge<T: Clone>(existing: &[T], additional: impl IntoIterator<Item = T>) -> V
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::type_taxonomy::HierarchyConfig;
+    use crate::domain::Issue;
+    use std::collections::HashMap;
 
     const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
 
@@ -856,6 +934,61 @@ mod tests {
         assert!(contains_path("dev/active", "dev/active/plan.md"));
         assert!(contains_path("dev/active/", "./dev/active"));
         assert!(!contains_path("dev/active", "dev/active-other/plan.md"));
+    }
+
+    fn archive_hierarchy() -> HierarchyConfig {
+        HierarchyConfig::new(
+            HashMap::from([("epic".to_string(), 1)]),
+            HashMap::from([("epic".to_string(), "epic".to_string())]),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_preferred_container_destination_uses_unambiguous_strategic_label_slug() {
+        let mut issue = Issue::new("A title that may change".into(), String::new());
+        issue.id = CONTAINER.into();
+        issue.labels = vec!["type:epic".into(), "epic:artifact-archival".into()];
+
+        assert_eq!(
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
+            "archive/abcdef12-artifact-archival"
+        );
+    }
+
+    #[test]
+    fn test_preferred_container_destination_falls_back_to_title_for_missing_or_ambiguous_label() {
+        let mut issue = Issue::new("Stable Title Fallback".into(), String::new());
+        issue.id = CONTAINER.into();
+        issue.labels = vec!["type:epic".into()];
+
+        assert_eq!(
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
+            "archive/abcdef12-stable-title-fallback"
+        );
+
+        issue.labels = vec![
+            "type:epic".into(),
+            "epic:first".into(),
+            "epic:second".into(),
+        ];
+
+        assert_eq!(
+            preferred_container_destination_root(&issue, &archive_hierarchy(), "archive"),
+            "archive/abcdef12-stable-title-fallback"
+        );
+    }
+
+    #[test]
+    fn test_archive_container_slug_is_unicode_safe_bounded_and_nonempty() {
+        assert_eq!(archive_container_slug("Résumé Δοκιμή !!!"), "résumé-δοκιμή");
+        assert_eq!(
+            archive_container_slug("Platform/Archive_V2"),
+            "platform-archive-v2"
+        );
+        assert_eq!(archive_container_slug("///"), "container");
+        assert_eq!(archive_container_slug(&"a".repeat(80)).chars().count(), 48);
+        assert!(!archive_container_slug(&format!("{}-", "a".repeat(48))).ends_with('-'));
     }
 
     #[test]

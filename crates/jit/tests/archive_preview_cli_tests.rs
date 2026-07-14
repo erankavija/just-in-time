@@ -516,7 +516,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
     let result: Value = serde_json::from_slice(&container.stdout).unwrap();
     assert_eq!(result["target"]["kind"], "container");
     assert_eq!(result["event_appended"], true);
-    let destination_root = format!("archive/{}", &id[..8]);
+    let destination_root = format!("archive/{}-container", &id[..8]);
     assert_eq!(
         fs::read_to_string(
             container_repo
@@ -895,4 +895,113 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
         }
         assert_eq!(snapshot_tree(repo.path()), before);
     }
+}
+
+#[test]
+fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
+    let repo = TempDir::new().unwrap();
+    assert_success(&jit(&repo, &["init", "--json"]));
+    let shipped = fs::read_to_string(repo.path().join(".jit/config.toml")).unwrap();
+    fs::write(
+        repo.path().join(".jit/config.toml"),
+        format!(
+            "[documentation]\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n{shipped}"
+        ),
+    )
+    .unwrap();
+    fs::create_dir(repo.path().join("fixtures")).unwrap();
+    fs::write(repo.path().join("fixtures/root.md"), "archive me").unwrap();
+
+    let created = jit(
+        &repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Mutable title",
+            "--type",
+            "epic",
+            "--label",
+            "epic:artifact-archival",
+            "--json",
+        ],
+    );
+    assert_success(&created);
+    let id = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_success(&jit(
+        &repo,
+        &[
+            "doc",
+            "add",
+            &id,
+            "fixtures/root.md",
+            "--skip-scan",
+            "--json",
+        ],
+    ));
+    assert_success(&jit(
+        &repo,
+        &["issue", "update", &id, "--state", "rejected", "--json"],
+    ));
+
+    let expected_root = format!("archive/{}-artifact-archival", &id[..8]);
+    let before_preview = snapshot_tree(repo.path());
+    let preview = jit(&repo, &["archive", "container", &id, "--json"]);
+    assert_success(&preview);
+    let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(plan["destination_root"], expected_root);
+    let human = jit(&repo, &["archive", "container", &id]);
+    assert_success(&human);
+    assert!(String::from_utf8(human.stdout)
+        .unwrap()
+        .contains(&format!("Destination root: {expected_root}")));
+    let candidates = jit(&repo, &["archive", "candidates", "--json"]);
+    assert_success(&candidates);
+    let report: Value = serde_json::from_slice(&candidates.stdout).unwrap();
+    let candidate = report["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["target"]["id"] == id)
+        .unwrap();
+    assert_eq!(candidate["destination_root"], expected_root);
+    assert_eq!(snapshot_tree(repo.path()), before_preview);
+
+    let executed = jit(&repo, &["archive", "container", &id, "--execute", "--json"]);
+    assert_success(&executed);
+    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    assert_eq!(execution["destination_root"], expected_root);
+    assert_eq!(
+        fs::read_to_string(repo.path().join(&expected_root).join(".jit-container")).unwrap(),
+        format!("{id}\n")
+    );
+
+    assert_success(&jit(
+        &repo,
+        &[
+            "issue",
+            "update",
+            &id,
+            "--title",
+            "Entirely renamed",
+            "--remove-label",
+            "epic:artifact-archival",
+            "--label",
+            "epic:new-strategic-slug",
+            "--json",
+        ],
+    ));
+    let frozen = jit(&repo, &["archive", "container", &id, "--json"]);
+    assert_success(&frozen);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&frozen.stdout).unwrap()["destination_root"],
+        expected_root
+    );
+    assert!(!repo
+        .path()
+        .join(format!("archive/{}-new-strategic-slug", &id[..8]))
+        .exists());
 }

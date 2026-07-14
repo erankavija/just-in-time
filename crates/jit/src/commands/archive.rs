@@ -3,8 +3,8 @@
 use super::CommandExecutor;
 use crate::domain::artifact_classifier::{
     artifact_destination_root, artifact_mirror_destination, classify_artifacts,
-    ArtifactClassificationInventory, ArtifactClassificationPolicy, ArtifactLocation,
-    ArtifactLocationFacts,
+    preferred_container_destination_root, ArtifactClassificationInventory,
+    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_inventory::{inventory_explicit_roots, ExplicitRootTarget};
@@ -17,8 +17,8 @@ use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Event, Issue};
 use crate::storage::{
     collect_artifact_classification_facts, discover_artifact_dependencies,
-    discover_repository_embedded_owners, GitRevisionResolver, IssueStore, JsonFileStorage,
-    VerifiedArtifact,
+    discover_repository_embedded_owners, resolve_container_destination, GitRevisionResolver,
+    IssueStore, JsonFileStorage, VerifiedArtifact,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -153,7 +153,29 @@ impl<S: IssueStore> CommandExecutor<S> {
             (ArchiveTarget::Container(_), Some(id)) => PlanTarget::Container { id: id.into() },
             (ArchiveTarget::Container(_), None) => unreachable!("container id was resolved"),
         };
-        let destination_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
+        let legacy_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
+        let (destination_root, destination_conflicts) = match root_container_id.as_deref() {
+            Some(container_id) => {
+                let issue = issues
+                    .iter()
+                    .find(|issue| issue.id == container_id)
+                    .context("resolved archive container is missing from issue inventory")?;
+                let preferred_root =
+                    preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
+                if policy.archive_root.is_empty() {
+                    (preferred_root, Vec::new())
+                } else {
+                    let resolved = resolve_container_destination(
+                        &self.storage,
+                        &preferred_root,
+                        &legacy_root,
+                        container_id,
+                    )?;
+                    (resolved.destination_root, resolved.conflicting_roots)
+                }
+            }
+            None => (legacy_root, Vec::new()),
+        };
         // Feed inverse-mirror sources to inventory while retaining the real
         // durable issue records for exact apply/observe decisions below.
         let mut inventory_issues = issues.clone();
@@ -174,6 +196,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let embedded_owners =
             discover_repository_embedded_owners(&self.storage, &issues, &member_ids)?;
         let (plan_target, artifacts, mut blockers) = discovered.into_plan_parts();
+        blockers.extend(
+            destination_conflicts
+                .into_iter()
+                .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
+        );
 
         if let Some(container_id) = root_container_id.as_deref() {
             if issues
@@ -191,6 +218,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut facts = collect_artifact_classification_facts(
             &self.storage,
             &plan_target,
+            &destination_root,
             &artifacts,
             &policy,
             embedded_owners,
@@ -203,7 +231,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             &archive_events,
         );
         classify_artifacts(
-            ArtifactClassificationInventory::new(plan_target, artifacts, blockers),
+            ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
+                .with_destination_root(destination_root),
             policy,
             facts,
         )
@@ -1852,7 +1881,7 @@ mod tests {
     fn test_container_execution_creates_marker_and_inverse_mirror_rerun_is_noop() {
         let (repo, executor, id) = configured_repo();
         let first = executor.execute_archive_container(&id).unwrap();
-        let destination_root = format!("archive/{}", &id[..8]);
+        let destination_root = format!("archive/{}-archive-fixture", &id[..8]);
         assert_eq!(
             fs::read_to_string(repo.path().join(&destination_root).join(".jit-container")).unwrap(),
             format!("{id}\n")
@@ -1993,7 +2022,7 @@ mod tests {
 
         let executor = CommandExecutor::new(storage);
         let result = executor.execute_archive_container(&container_id).unwrap();
-        let destination = format!("archive/{}/fixtures/root.md", &container_id[..8]);
+        let destination = format!("archive/{}-container/fixtures/root.md", &container_id[..8]);
         let container = executor.storage.load_issue(&container_id).unwrap();
         let outside = executor.storage.load_issue(&outside_id).unwrap();
         assert_eq!(container.documents[0].path, destination);
@@ -2050,7 +2079,7 @@ epic = "epic"
 
         let mut epic = Issue::new("Archive fixture".into(), String::new());
         epic.state = State::Done;
-        epic.labels = vec!["type:epic".into()];
+        epic.labels = vec!["type:epic".into(), "epic:archive-fixture".into()];
         epic.documents = [
             "fixtures/readme.md",
             "fixtures/bundle/index.html",

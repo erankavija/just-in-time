@@ -44,7 +44,10 @@ pub use artifact_discovery::{
     DiscoveredArtifactInventory,
 };
 pub use artifact_mutation::{ArtifactMutationError, StagedArtifact, VerifiedArtifact};
-pub use artifact_planning::collect_artifact_classification_facts;
+pub use artifact_planning::{
+    collect_artifact_classification_facts, resolve_container_destination,
+    ResolvedContainerDestination,
+};
 pub use claim_coordinator::{ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{

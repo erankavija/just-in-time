@@ -1,12 +1,11 @@
 //! Read-only filesystem facts for archive planning.
 
 use crate::domain::artifact_classifier::{
-    artifact_destination_root, artifact_mirror_destination, ArtifactClassificationFacts,
-    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
-    ContainerDestinationState,
+    artifact_mirror_destination, ArtifactClassificationFacts, ArtifactClassificationPolicy,
+    ArtifactLocation, ArtifactLocationFacts, ContainerDestinationState,
 };
 use crate::domain::artifact_plan::{
-    ArtifactPlanEntry, ArtifactVersion, ContentIdentity, PlanTarget,
+    normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, ContentIdentity, PlanTarget,
 };
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
@@ -14,15 +13,136 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Storage-resolved destination for a container archive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedContainerDestination {
+    /// The frozen marker-backed, legacy, or newly preferred destination root.
+    pub destination_root: String,
+    /// Every marker-backed root when duplicate ownership makes execution unsafe.
+    pub conflicting_roots: Vec<String>,
+}
+
+/// Resolve a preferred container destination against durable marker ownership.
+///
+/// Only immediate, non-symlink children of the archive root are inspected.
+/// A unique matching marker freezes that directory. If no marker matches, an
+/// existing legacy short-id path is adopted before the preferred slugged path.
+///
+/// # Errors
+///
+/// Returns an error for invalid repository-relative paths or when filesystem
+/// metadata, marker contents, or archive-directory entries cannot be read.
+pub fn resolve_container_destination<S: IssueStore>(
+    storage: &S,
+    preferred_root: &str,
+    legacy_root: &str,
+    container_id: &str,
+) -> Result<ResolvedContainerDestination> {
+    validate_repo_relative_path(preferred_root)?;
+    validate_repo_relative_path(legacy_root)?;
+    let repo_root = repository_root(storage)?;
+    let archive_root = Path::new(legacy_root)
+        .parent()
+        .ok_or_else(|| anyhow!("container archive destination has no archive root"))?;
+    let archive_root_text = archive_root.to_string_lossy().replace('\\', "/");
+    validate_repo_relative_path(&archive_root_text)?;
+
+    let archive_directory = repo_root.join(archive_root);
+    let can_scan = !path_has_symlink(&repo_root, &archive_root_text)?
+        && fs::symlink_metadata(&archive_directory)
+            .map(|metadata| metadata.is_dir())
+            .or_else(|error| {
+                (error.kind() == std::io::ErrorKind::NotFound)
+                    .then_some(false)
+                    .ok_or(error)
+            })?;
+    let mut matching_roots = if can_scan {
+        fs::read_dir(&archive_directory)?
+            .map(|entry| -> Result<Option<String>> {
+                let entry = entry?;
+                let metadata = fs::symlink_metadata(entry.path())?;
+                if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                    return Ok(None);
+                }
+                let marker = entry.path().join(".jit-container");
+                let marker_metadata = match fs::symlink_metadata(&marker) {
+                    Ok(metadata) => metadata,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        return Ok(None);
+                    }
+                    Err(error) => return Err(error.into()),
+                };
+                if !marker_metadata.is_file() || marker_metadata.file_type().is_symlink() {
+                    return Ok(None);
+                }
+                let owner = fs::read(marker)?;
+                let owner = trim_ascii_whitespace(&owner);
+                if owner != container_id.as_bytes() {
+                    return Ok(None);
+                }
+                let file_name = entry.file_name();
+                let file_name = file_name
+                    .to_str()
+                    .ok_or_else(|| anyhow!("archive directory name is not valid UTF-8"))?;
+                Ok(Some(normalize_artifact_path(&format!(
+                    "{archive_root_text}/{file_name}"
+                ))))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    matching_roots.sort();
+
+    if let Some(destination_root) = matching_roots.first().cloned() {
+        let conflicting_roots = if matching_roots.len() > 1 {
+            matching_roots
+        } else {
+            Vec::new()
+        };
+        return Ok(ResolvedContainerDestination {
+            destination_root,
+            conflicting_roots,
+        });
+    }
+
+    let legacy_exists = match fs::symlink_metadata(repo_root.join(legacy_root)) {
+        Ok(_) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error.into()),
+    };
+    Ok(ResolvedContainerDestination {
+        destination_root: if legacy_exists {
+            legacy_root.to_string()
+        } else {
+            preferred_root.to_string()
+        },
+        conflicting_roots: Vec::new(),
+    })
+}
+
+fn trim_ascii_whitespace(mut bytes: &[u8]) -> &[u8] {
+    while bytes.first().is_some_and(u8::is_ascii_whitespace) {
+        bytes = &bytes[1..];
+    }
+    while bytes.last().is_some_and(u8::is_ascii_whitespace) {
+        bytes = &bytes[..bytes.len() - 1];
+    }
+    bytes
+}
+
 /// Inspect every source and possible mirror destination without following symlinks.
 pub fn collect_artifact_classification_facts<S: IssueStore>(
     storage: &S,
     target: &PlanTarget,
+    destination_root: &str,
     artifacts: &[ArtifactPlanEntry],
     policy: &ArtifactClassificationPolicy,
     embedded_owners: Vec<crate::domain::artifact_classifier::EmbeddedArtifactOwner>,
 ) -> Result<ArtifactClassificationFacts> {
-    let destination_root = artifact_destination_root(target, &policy.archive_root);
     let inspect_destinations = !policy.archive_root.is_empty();
     let locations = artifacts
         .iter()
@@ -32,7 +152,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
             let destination = if inspect_destinations {
                 inspect_location(
                     storage,
-                    &artifact_mirror_destination(&destination_root, artifact.source()),
+                    &artifact_mirror_destination(destination_root, artifact.source()),
                 )?
             } else {
                 ArtifactLocation::Missing
@@ -49,7 +169,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 
     let container_destination = match target {
         PlanTarget::Container { id } if inspect_destinations => {
-            inspect_container_destination(storage, &destination_root, id, artifacts)?
+            inspect_container_destination(storage, destination_root, id, artifacts)?
         }
         _ => ContainerDestinationState::Absent,
     };
@@ -248,4 +368,83 @@ fn repository_root<S: IssueStore>(storage: &S) -> Result<PathBuf> {
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| anyhow!("invalid storage path: {}", storage.root().display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::JsonFileStorage;
+    use tempfile::TempDir;
+
+    const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
+
+    fn storage() -> (TempDir, JsonFileStorage) {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        (repo, storage)
+    }
+
+    #[test]
+    fn test_resolve_container_destination_reuses_marker_after_preferred_slug_changes() {
+        let (repo, storage) = storage();
+        let original = repo.path().join("archive/abcdef12-original-slug");
+        fs::create_dir_all(&original).unwrap();
+        fs::write(original.join(".jit-container"), format!("{CONTAINER}\n")).unwrap();
+
+        let resolved = resolve_container_destination(
+            &storage,
+            "archive/abcdef12-renamed-slug",
+            "archive/abcdef12",
+            CONTAINER,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.destination_root, "archive/abcdef12-original-slug");
+        assert!(resolved.conflicting_roots.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_container_destination_adopts_existing_legacy_short_id_path() {
+        let (repo, storage) = storage();
+        fs::create_dir_all(repo.path().join("archive/abcdef12")).unwrap();
+
+        let resolved = resolve_container_destination(
+            &storage,
+            "archive/abcdef12-readable",
+            "archive/abcdef12",
+            CONTAINER,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.destination_root, "archive/abcdef12");
+        assert!(resolved.conflicting_roots.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_container_destination_reports_every_duplicate_marker_root() {
+        let (repo, storage) = storage();
+        for slug in ["first", "second"] {
+            let root = repo.path().join(format!("archive/abcdef12-{slug}"));
+            fs::create_dir_all(&root).unwrap();
+            fs::write(root.join(".jit-container"), format!("{CONTAINER}\n")).unwrap();
+        }
+
+        let resolved = resolve_container_destination(
+            &storage,
+            "archive/abcdef12-new",
+            "archive/abcdef12",
+            CONTAINER,
+        )
+        .unwrap();
+
+        assert_eq!(resolved.destination_root, "archive/abcdef12-first");
+        assert_eq!(
+            resolved.conflicting_roots,
+            [
+                "archive/abcdef12-first".to_string(),
+                "archive/abcdef12-second".to_string(),
+            ]
+        );
+    }
 }
