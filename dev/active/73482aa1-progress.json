@@ -1,0 +1,109 @@
+{
+  "container_id": "73482aa1-aa6b-46f6-9d6f-3152a102e558",
+  "container_short_id": "73482aa1",
+  "container_type": "story",
+  "parent_epic": "6eb585bc",
+  "batch": "rust-build-efficiency (filed 2026-07-14 by a parallel planning session; 8 pre-wired children; design doc dev/active/73482aa1-rust-build-efficiency.md)",
+  "status": "planned \u2014 execution starts after core-maintenance wave 1 completes (invoker directive 2026-07-14)",
+  "current_wave": 0,
+  "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol.",
+  "waves": [
+    {
+      "wave_number": 1,
+      "theme": "Baseline",
+      "issues": [
+        {
+          "short_id": "4e22a20d",
+          "title": "Establish reproducible Rust build measurements and baseline",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "theme": "Test topology + provenance (disjoint footprints)",
+      "issues": [
+        {
+          "short_id": "8d4f7084",
+          "title": "Consolidate Rust integration tests into cohesive suites",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "5d862134",
+          "title": "Stabilize build provenance inputs",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "theme": "Manifest changes (serial: shared Cargo.toml)",
+      "issues": [
+        {
+          "short_id": "57d0eb79",
+          "title": "Bound debug information and gate incremental state",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "3398bc19",
+          "title": "Remove unused resolver and duplicate TLS features",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "serial after 57d0eb79 within the wave"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "theme": "Budget enforcement in cargo-ci",
+      "issues": [
+        {
+          "short_id": "3f73423b",
+          "title": "Enforce Rust build-footprint budgets in cargo-ci",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "theme": "Verification against baseline",
+      "issues": [
+        {
+          "short_id": "26f97dc2",
+          "title": "Verify compilation gains and publish optimized results",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "theme": "Invariant + contributor policy",
+      "issues": [
+        {
+          "short_id": "362e3fec",
+          "title": "Register the build-footprint invariant and contributor policy",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": null
+}
