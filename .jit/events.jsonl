@@ -7165,3 +7165,4 @@
 {"type":"issue_claimed","id":"642234cc-93c8-4b94-8e0c-919bec1ab1ed","issue_id":"950256ae-069c-4537-9379-06b457604fbc","timestamp":"2026-07-14T12:35:13.377106867Z","assignee":"agent:worker"}
 {"type":"issue_created","id":"cc994fce-1a42-41e1-88b6-de50a1471af4","issue_id":"73482aa1-aa6b-46f6-9d6f-3152a102e558","timestamp":"2026-07-14T12:51:41.234740984Z","title":"Bound Rust build artifacts and compilation cost","priority":"high"}
 {"type":"issue_updated","id":"71c5ee6a-fa12-4c49-b782-0e387a213b3f","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-14T12:51:50.700577237Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"37ffbd63-fb91-4309-b91b-cf8daf628960","issue_id":"73482aa1-aa6b-46f6-9d6f-3152a102e558","timestamp":"2026-07-14T12:55:22.315799838Z","updated_by":"doc-add","fields":["documents"]}
