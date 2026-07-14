@@ -3,7 +3,7 @@
   "epic_short_id": "6eb585bc",
   "batch": "core-maintenance-2026-07-14 (18 open children: 14 filed since the usability batch, carryovers 1d59070d/0daba57d/c505031a, adopted 16402e14; prior batch report dev/active/6eb585bc-batch-report-2026-07-05.md, handoff dev/active/6eb585bc-handoff.md)",
   "current_wave": 1,
-  "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject — until it lands, verify manually).",
+  "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject \u2014 until it lands, verify manually).",
   "waves": [
     {
       "wave_number": 1,
@@ -14,21 +14,21 @@
           "title": "Validator reads stale baked default schemas instead of the declared namespace registry",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "short_id": "45e1b7e8",
           "title": "Gate results evidence the working tree, not the merged commit",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "short_id": "950256ae",
           "title": "Gate npm-ci does not cover the mcp-server test suite",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "short_id": "7446af34",
@@ -44,38 +44,125 @@
       "wave_number": 2,
       "theme": "CLI contract fixes, output shape first",
       "issues": [
-        { "short_id": "f40f1b0a", "title": "Unify the machine-readable gate field across command outputs", "classification": "implementation", "model": "opus", "status": "pending" },
-        { "short_id": "6f881a85", "title": "Exit quietly on closed stdout instead of panicking", "classification": "implementation", "model": "sonnet", "status": "pending" },
-        { "short_id": "0daba57d", "title": "Refused issue deletion exits nonzero", "classification": "implementation", "model": "sonnet", "status": "pending" },
-        { "short_id": "8917c558", "title": "Make jit doc add idempotent for an existing identical link", "classification": "implementation", "model": "sonnet", "status": "pending" }
+        {
+          "short_id": "f40f1b0a",
+          "title": "Unify the machine-readable gate field across command outputs",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "6f881a85",
+          "title": "Exit quietly on closed stdout instead of panicking",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "0daba57d",
+          "title": "Refused issue deletion exits nonzero",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "8917c558",
+          "title": "Make jit doc add idempotent for an existing identical link",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
       ]
     },
     {
       "wave_number": 3,
       "theme": "Gate surface semantics; alias removal last",
       "issues": [
-        { "short_id": "1d59070d", "title": "Checker command on gate define implies automated mode", "classification": "implementation", "model": "sonnet", "status": "pending" },
-        { "short_id": "52665a07", "title": "Remove language-flavored builtin gate presets; presets resolve project-declared bundles", "classification": "implementation", "model": "opus", "status": "pending" },
-        { "short_id": "8d7fc762", "title": "Gate command timeout never applies after the gate verb rename", "classification": "implementation", "model": "sonnet", "status": "pending" },
-        { "short_id": "c505031a", "title": "Remove deprecated gate command aliases (pass/pass-all/check/check-all)", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "last in wave: breaking sweep over the final verb surface (CLI, MCP schema, docs)" }
+        {
+          "short_id": "1d59070d",
+          "title": "Checker command on gate define implies automated mode",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "52665a07",
+          "title": "Remove language-flavored builtin gate presets; presets resolve project-declared bundles",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "8d7fc762",
+          "title": "Gate command timeout never applies after the gate verb rename",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "c505031a",
+          "title": "Remove deprecated gate command aliases (pass/pass-all/check/check-all)",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "last in wave: breaking sweep over the final verb surface (CLI, MCP schema, docs)"
+        }
       ]
     },
     {
       "wave_number": 4,
       "theme": "Dead paths and validation correctness",
       "issues": [
-        { "short_id": "0283ce74", "title": "Resolve four unreachable or inert runtime paths", "classification": "implementation", "model": "opus", "status": "pending" },
-        { "short_id": "894337e2", "title": "find_available_port races between probe and bind", "classification": "implementation", "model": "sonnet", "status": "pending" },
-        { "short_id": "16402e14", "title": "coverage-preview passes vacuously on checkbox-prefixed [hard] criteria", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "adopted into epic 2026-07-14 per invoker" }
+        {
+          "short_id": "0283ce74",
+          "title": "Resolve four unreachable or inert runtime paths",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "894337e2",
+          "title": "find_available_port races between probe and bind",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "16402e14",
+          "title": "coverage-preview passes vacuously on checkbox-prefixed [hard] criteria",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "adopted into epic 2026-07-14 per invoker"
+        }
       ]
     },
     {
       "wave_number": 5,
       "theme": "Enhancements on a hardened base",
       "issues": [
-        { "short_id": "45a140ae", "title": "Define Archived lifecycle semantics for artifact archival", "classification": "design+implementation", "model": "opus", "status": "pending", "note": "interview invoker on the semantic model before dispatch (escalation policy 6)" },
-        { "short_id": "3e12ffbd", "title": "Scoped batch-shape graph export as the batch-create inverse", "classification": "implementation", "model": "opus", "status": "pending" },
-        { "short_id": "450db193", "title": "Generic config-declared projection tables spanning registry- and markdown-first item kinds", "classification": "implementation", "model": "opus", "status": "pending" }
+        {
+          "short_id": "45a140ae",
+          "title": "Define Archived lifecycle semantics for artifact archival",
+          "classification": "design+implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "interview invoker on the semantic model before dispatch (escalation policy 6)"
+        },
+        {
+          "short_id": "3e12ffbd",
+          "title": "Scoped batch-shape graph export as the batch-create inverse",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "450db193",
+          "title": "Generic config-declared projection tables spanning registry- and markdown-first item kinds",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
       ]
     }
   ],
