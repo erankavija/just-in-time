@@ -7308,3 +7308,4 @@
 {"type":"issue_state_changed","id":"b84de0b3-e6c5-465c-8063-9c511a188b89","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T19:21:55.676897647Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"c1e7fdb9-8b0b-40cb-bd85-b4a5e72b30a6","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T19:21:55.677073857Z","assignee":"agent:jit-execution-lead"}
 {"type":"issue_updated","id":"d3dbbda6-9142-4788-a4e2-442fb6f67fe4","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T19:35:53.716336699Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"f379c05a-167a-415a-9324-10d33bcefcf6","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T20:11:06.273013630Z","updated_by":"doc-add","fields":["documents"]}
