@@ -285,10 +285,16 @@ fn test_non_gate_context_child_invocation_stays_unchecked() {
     };
 
     // `jit init`, run by the (objectively stale, relative to `scratch`)
-    // child binary directly — NOT as a gate checker's child, so JIT_GATE_RUN
-    // is absent (this test never sets it, and cargo test itself does not).
+    // child binary directly — NOT as a gate checker's child. The gate-context
+    // variables are scrubbed explicitly: when this test suite itself executes
+    // under a `cargo-ci` gate evaluation, the whole process tree inherits
+    // JIT_GATE_RUN=1 from the evaluator, which would otherwise turn this
+    // deliberately context-free invocation into a self-checking one.
     let output = Command::new(&child_binary)
         .current_dir(scratch.path())
+        .env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY")
         .arg("init")
         .output()
         .unwrap();
@@ -301,9 +307,12 @@ fn test_non_gate_context_child_invocation_stays_unchecked() {
     );
 
     // A second ordinary command, past init, for good measure: still no
-    // JIT_GATE_RUN, still unchecked.
+    // gate context, still unchecked.
     let output = Command::new(&child_binary)
         .current_dir(scratch.path())
+        .env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY")
         .args(["issue", "create", "--title", "Test", "--json"])
         .output()
         .unwrap();

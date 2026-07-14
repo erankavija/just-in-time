@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "dc158e94-dea3-4d57-aa1e-5473ff128781",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "8a9d2b41b5d81f7d5796bc067d4f16a646372928",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T15:53:06.983534570Z",
+  "completed_at": "2026-07-14T15:57:09.744584930Z",
+  "duration_ms": 242761,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest test_non_gate_context_child_invocation_stays_unchecked ... FAILED\ntest result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.23s\n---- test_non_gate_context_child_invocation_stays_unchecked stdout ----\n\nthread 'test_non_gate_context_child_invocation_stays_unchecked' (3786935) panicked at crates/jit/tests/stale_binary_child_process_tests.rs:295:5:\nan ordinary (non-gate-context) invocation of an objectively stale binary must succeed unchecked; stdout= stderr=Error: Refusing to run gate 'cargo-ci' for issue 7446af34-d386-44e3-aa20-3422893219f0: this jit binary predates the tree under review\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

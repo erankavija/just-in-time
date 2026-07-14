@@ -16,22 +16,22 @@
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T15:20:39.352372579Z"
+      "updated_at": "2026-07-14T15:53:06.445925929Z"
     },
     "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T15:16:39.538609243Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T15:14:27.584330709Z"
-    },
-    "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T15:10:08.465671534Z"
+      "updated_at": "2026-07-14T15:59:01.792313639Z"
+    },
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T15:53:06.983534570Z"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T15:57:09.781859938Z"
     }
   },
   "context": {},
@@ -42,7 +42,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-12T13:45:43.585456956Z",
-  "updated_at": "2026-07-14T15:20:39.755120322Z",
+  "updated_at": "2026-07-14T16:02:26.608330106Z",
   "first_ready_at": "2026-07-12T13:45:43.585463056Z",
   "claimed_at": "2026-07-14T13:33:41.409939405Z"
 }
