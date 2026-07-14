@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "a005c771-4399-45bc-b0fb-7b26ffc84845",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "91edd625f8387ae09dbe4b619420e4bce2b4574d",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T16:23:26.570509851Z",
+  "completed_at": "2026-07-14T16:24:42.464667029Z",
+  "duration_ms": 75894,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a leaf (level 4) with no DAG-resolved children, so I reviewed only its eight reachable `jit:7446af34` commits, each individually with rename detection. No tagged patch renamed or deleted adopter docs; uncommitted tracker artifacts were excluded.\n\nThe resulting gate-only stale-binary refusal is accurately documented in the canonical command reference and linked troubleshooting guidance. It covers the predicate, evaluator versus checker-child behavior, exit codes, JSON shape, remediation, and silent non-git/unrelated-repository cases.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped stale-binary gate refusal is accurately documented and discoverable; no issue-impact documentation defects remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue-scoped stale-binary gate refusal is accurately documented and discoverable; no issue-impact documentation defects remain.",
+    "findings": []
+  }
+}

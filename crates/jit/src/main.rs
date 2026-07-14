@@ -1631,9 +1631,36 @@ fn refuse_if_stale_gate_child(executor: &CommandExecutor<JsonFileStorage>) -> Re
     Ok(())
 }
 
+/// [`refuse_if_stale_gate_child`] for the pre-dispatch paths: runs before any
+/// early return (`--schema`, `version`), so even those outputs are never
+/// served from a stale binary inside a gate checker's process tree — a
+/// checker script can consume them to inform its verdict just like any other
+/// command's output (REQ-02, jit:7446af34). Constructs a discovery-backed
+/// executor only when `JIT_GATE_RUN` is present; the ordinary invocation
+/// path pays nothing.
+fn stale_gate_child_precheck() -> Result<()> {
+    if env::var_os("JIT_GATE_RUN").is_none() {
+        return Ok(());
+    }
+    let current_dir = env::current_dir()?;
+    let jit_dir = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
+        current_dir.join(custom_dir)
+    } else {
+        jit::storage::discovery::discover_jit_dir(&current_dir)
+            .unwrap_or_else(|| current_dir.join(".jit"))
+    };
+    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    refuse_if_stale_gate_child(&executor)
+}
+
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let quiet = cli.quiet;
+
+    // REQ-02 (jit:7446af34): refuse before ANY output — including the
+    // `--schema` and `version` early returns below — when this process is
+    // itself stale and running inside a gate checker's process tree.
+    stale_gate_child_precheck()?;
 
     // Handle --schema flag first
     if cli.schema {
@@ -1695,14 +1722,6 @@ fn run() -> Result<()> {
 
     let storage = JsonFileStorage::new(&jit_dir);
     let mut executor = CommandExecutor::new(storage.clone());
-
-    // REQ-02 (jit:7446af34): before running ANY command, refuse if this
-    // process is itself stale AND running inside a gate checker's process
-    // tree (see `refuse_if_stale_gate_child`'s doc comment). A no-op for an
-    // ordinary invocation; applies uniformly across every subcommand rather
-    // than only `validate`, since a checker script may shell out to any of
-    // them.
-    refuse_if_stale_gate_child(&executor)?;
 
     match &command {
         Commands::Init {

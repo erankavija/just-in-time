@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "48db68df-3f92-4d1f-aa1a-c689541a073a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "91edd625f8387ae09dbe4b619420e4bce2b4574d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T16:19:41.868180982Z",
+  "completed_at": "2026-07-14T16:23:26.513524049Z",
+  "duration_ms": 224645,
+  "exit_code": 1,
+  "stdout": "Attribution: c08dbd51, 63ff8d37, b1d9e9f1, a84e246, 60a34376, 55cf101b, 4594f28b, 91edd625 (`jit:7446af34`)\nPolicy sources: AGENTS.md; dev/vision/9db27a3a-charter.md; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/charter/D-4 and @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/inv/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-14T16:17:12Z); doc-review passed (exit 0, 2026-07-14T16:08:24Z); docs-mechanical passed (exit 0, 2026-07-14T16:14:34Z)\nTruncation recovery: bounded per-file merge diffs, current-source ranges, and individual merge statistics; unrelated interleaved history and .jit bookkeeping excluded\n\n1. **F1 — blocking, issue-impact, high:** The inherited gate-context protection is bypassed for `jit --schema` and `jit version`. Both return at [main.rs:1638](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1638) and [main.rs:1652](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1652), before `refuse_if_stale_gate_child()` runs at [main.rs:1705](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1705). Thus a stale `PATH`-resolved child binary can still supply schema or version data to a checker that then returns a normal persisted verdict, violating REQ-02’s guarantee for commands a checker invokes. The added regression covers `jit validate`, not these early-return paths.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Gate-child stale-binary protection is bypassed by early schema and version paths.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"jit --schema and jit version return before the inherited JIT_GATE_RUN stale-binary guard, allowing a stale checker child to inform a persisted verdict.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1638,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8183 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f616d-5282-7043-895e-ef6acde8479b\n--------\nuser\n--- 8170 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Gate-child stale-binary protection is bypassed by early schema and version paths.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "jit --schema and jit version return before the inherited JIT_GATE_RUN stale-binary guard, allowing a stale checker child to inform a persisted verdict.",
+        "file": "crates/jit/src/main.rs",
+        "line": 1638
+      }
+    ]
+  }
+}

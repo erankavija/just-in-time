@@ -323,3 +323,61 @@ fn test_non_gate_context_child_invocation_stays_unchecked() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+/// REQ-02: the pre-dispatch early returns (`--schema`, `version`) are guarded
+/// too. A checker script can consume either output to inform its verdict, so
+/// under gate context a stale binary must refuse before serving them —
+/// `run()`'s `stale_gate_child_precheck` runs ahead of both early returns.
+#[cfg(unix)]
+#[test]
+fn test_gate_context_early_paths_refuse_stale_binary() {
+    let workspace_root = workspace_root();
+    let Some(ancestor) = ancestor_commit(&workspace_root) else {
+        eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
+        return;
+    };
+    let Some(child_binary) = build_stale_child_binary(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not build the stale child binary (cargo unavailable?)");
+        return;
+    };
+    let Some(scratch) = scratch_repo_stale_for(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not construct the scratch repo (git unavailable?)");
+        return;
+    };
+
+    // `.jit/` must exist for the precheck's discovery to name a real
+    // repository root; initialize it context-free (unchecked, per the
+    // non-gate-context test above).
+    let output = Command::new(&child_binary)
+        .current_dir(scratch.path())
+        .env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY")
+        .arg("init")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    for args in [&["--schema"][..], &["version"][..]] {
+        let output = Command::new(&child_binary)
+            .current_dir(scratch.path())
+            .env("JIT_GATE_RUN", "1")
+            .env_remove("JIT_ISSUE_ID")
+            .env_remove("JIT_GATE_KEY")
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(10),
+            "{args:?} under gate context must refuse from a stale binary; stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("predates the tree under review"),
+            "{args:?}: refusal must be the stale-binary one: {stderr}"
+        );
+    }
+}
