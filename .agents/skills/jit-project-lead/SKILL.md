@@ -2,19 +2,20 @@
 name: jit-project-lead
 description: >
   Own the project vision and its top-level strategic container: charter
-  facilitation, wave dispatch of a jit-execution-lead per sub-strategic
-  container, charter-grounded escalation resolution, project-wide standards
-  sweeps. For a single container use jit-execution-lead.
+  facilitation, plan-then-execute wave dispatch per sub-strategic container,
+  charter-grounded escalation resolution, project-wide standards sweeps. For
+  planning a single container use jit-planning-lead; for executing one that is
+  fully planned use jit-execution-lead.
 ---
 
 # JIT Project Lead
 
-You are a standing steward one tier above jit-execution-lead. You own the
-project vision, drive the top-tier strategic container, delegate each
-sub-strategic container to a dispatched jit-execution-lead, resolve
-subordinate escalations against the vision, and enforce content standards
-project-wide. You steward outcomes across strategic containers; execution
-inside any single sub-strategic container belongs to the dispatched lead.
+You are a standing steward above the planning and execution leads. You own the
+project vision, drive the top-tier strategic container, delegate planning of
+each sub-strategic container to `jit-planning-lead`, then delegate its
+implementation to a fresh `jit-execution-lead`, resolve subordinate escalations
+against the vision, and enforce content standards project-wide. Planning and
+execution remain separate delegated phases.
 
 Tier names are derived from the project's configuration. This skill speaks of
 the "strategic tier" (the steward's anchor) and the "sub-strategic tier" (the
@@ -57,9 +58,9 @@ whole session:
 
 - **Steward anchor** — the most-strategic container type, the first entry of
   `strategic_types` in `.jit/config.toml`.
-- **Delegation boundary** — the breakable container types dispatched to an
-  execution lead, the union of `applies_to` across `[[template]]` entries in
-  `.jit/templates.toml`.
+- **Delegation boundary** — the breakable container types dispatched first to a
+  planning lead and then to an execution lead, the union of `applies_to` across
+  `[[template]]` entries in `.jit/templates.toml`.
 
 The reference covers all three shapes (collapsed single tier, two tier, many
 tier), the assumption checks, the numeric-level fallback when a config input is
@@ -96,29 +97,35 @@ Resume reads both back per the Pre-flight resume step.
 
 Once the strategic container's sub-strategic children are layered into
 dependency-ordered waves (`references/wave-layering.md`), drive them one wave at
-a time by dispatching a `jit-execution-lead` subagent per container in the
-current wave. Read `references/container-dispatch.md` **in full** and follow it;
-it is the one-tier-up analogue of how an execution lead dispatches its issue
-workers — the steward dispatches a lead the same way, reusing the execution
-lead's own worktree-isolation and leak-detection scripts unmodified one tier up.
+a time through two separate phases. First dispatch `jit-planning-lead` for every
+container whose planning/breakdown bracket is incomplete. Verify that both nodes
+are done, their gates passed, and the implementation frontier is fully fanned
+out. Only then dispatch a **fresh** `jit-execution-lead` to execute that
+already-planned container. Read `references/container-dispatch.md` **in full**
+and follow it; it reuses the execution lead's worktree-isolation and
+leak-detection scripts unmodified one tier up.
 
-In summary: each container id in the wave is handed to one execution lead as its
-end-to-end target; a wave of two or more containers is isolated by invoking
+In summary: each container id in the wave is handed first to a planning lead and
+then, after planning acceptance, to a distinct execution lead. A wave of two or
+more containers is isolated by invoking
 `../jit-execution-lead/scripts/dispatch-worker-worktree.sh` verbatim (worktrees
 anchored to `main` HEAD, no Agent `isolation` parameter) and reconciled after
 completion by `../jit-execution-lead/scripts/check-leak-into-main.sh`, per
 `../jit-execution-lead/references/worktree-dispatch-protocol.md`. The steward
 does not break a container down, plan its internal waves, or run its issues —
-the dispatched lead owns all of that. The steward gathers each container's own
-gate and success-criteria result, then — before advancing the wave — runs the
+the planning and execution leads own their separate phases. The steward gathers
+each container's own gate and success-criteria result, then — before advancing
+the wave — runs the
 cross-container coherence review over the wave's accepted containers per
 `references/coherence-review.md`; a FAIL blocks acceptance until every finding is
-resolved. A wave completes before the next begins.
+resolved. A wave completes before the next begins. Never ask an execution lead
+to create or complete the planning bracket.
 
 ## Subordinate escalations
 
-A dispatched execution lead reports every escalation to the steward, not to the
-human. Read `references/parent-escalation.md` **in full** and follow it: the
+A dispatched planning or execution lead reports every escalation to the
+steward, not to the human. Read `references/parent-escalation.md` **in full**
+and follow it: the
 default is to resolve the escalation against the vision and decision log,
 recording the resolution as a new `D-N` charter entry (a `## Decision Log` row
 plus its `### D-N` details, `references/vision-charter.md` format). Only three
@@ -227,4 +234,7 @@ Stop immediately and report to the invoker when:
   default to a mode.
 - Guessing tier names when derivation inputs are ambiguous. Stop and ask.
 - Skipping `jit recover`. Stale locks corrupt every downstream operation.
+- Dispatching `jit-execution-lead` before `jit-planning-lead` has completed and
+  gated the container's full breakdown, or letting one agent silently continue
+  from planning into execution. The two skills and delegated roles are separate.
 - Hardcoding a domain type name where the config supplies it.

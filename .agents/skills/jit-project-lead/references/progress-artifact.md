@@ -78,8 +78,11 @@ Fields:
   appears in exactly one wave's `containers` (the wave-layering coverage
   invariant), so every child has exactly one status row.
 - **`containers[].status`** — one of:
-  `pending` (planned, not dispatched) →
-  `dispatched` (a lead is driving it) →
+  `pending` (not yet planned) →
+  `planning` (`jit-planning-lead` is driving its bracket) →
+  `planned` (planning and breakdown nodes are done, their gates passed, and the
+  implementation frontier is ready) →
+  `executing` (a fresh `jit-execution-lead` is driving implementation) →
   `accepted` (the lead returned; the container's own gates passed and its
   `[hard]` criteria are met, per container-dispatch step 8) →
   `done` (accepted **and** the wave's coherence review passed).
@@ -88,7 +91,8 @@ Fields:
   container was rejected upstream — e.g. a rejected sub-strategic child that
   stays in the roster for a complete picture; carry a note stating why). A
   `rejected` row is never dispatched and is skipped on resume exactly like
-  `done`.
+  `done`. Legacy `dispatched` rows must be reconciled against the live bracket:
+  map them to `planning`, `planned`, or `executing`; never assume which phase.
 - **`containers[].wave`** — the row's wave number, redundant with its position
   for direct lookup.
 - **`coherence_review`** — per-wave cross-container review state
@@ -105,8 +109,9 @@ Fields:
   container sets). Persist its output here, then decorate each container with
   `status`/`wave` and each wave with `coherence_review`.
 - **Consumer** — `references/container-dispatch.md` reads `current_wave` to pick
-  the wave to dispatch, updates each container's `status` as leads return
-  (step 8), sets the wave's `coherence_review` (step 9), then advances
+  the wave to dispatch, updates each container's status across the distinct
+  planning and execution phases as leads return (steps 4, 5, and 8), sets the
+  wave's `coherence_review` (step 9), then advances
   `current_wave` and commits the file. One tier down, this mirrors the execution
   lead advancing `current_wave` and updating per-issue statuses in its own
   `progress.json`.

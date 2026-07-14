@@ -1,17 +1,16 @@
 # Sub-strategic container dispatch
 
-Drive one wave of sub-strategic containers by dispatching a `jit-execution-lead`
-subagent per container, each targeting one container id and instructed to drive
-it to completion end to end. This is the one-tier-up analogue of how
-`jit-execution-lead` dispatches issue-level workers: the steward dispatches an
-execution lead the same way an execution lead dispatches a worker, reusing the
-**same** worktree-isolation and leak-detection scripts one tier up.
+Drive one wave of sub-strategic containers through two explicit, sequential
+delegations per container: `jit-planning-lead` produces and gates the complete
+breakdown, then a fresh `jit-execution-lead` executes that already-planned tree.
+This is the one-tier-up analogue of issue-level dispatch and reuses the **same**
+worktree-isolation and leak-detection scripts one tier up.
 
 This reference consumes the ordered wave list from `references/wave-layering.md`
-and runs the current wave only. It does **not** break a container down, plan a
-container's internal waves, or execute any of its issues — the dispatched
-execution lead does all of that inside the container through its own flow. The
-steward hands over the container id and lets the lead run.
+and runs the current wave only. It does **not** plan, break down, or execute a
+container itself. The planning lead owns the plan and complete recursive
+breakdown; after that lead stops, the execution lead owns implementation. One
+agent never silently crosses both roles.
 
 ## Inputs
 
@@ -79,33 +78,41 @@ path.
    Agent's `isolation: "worktree"` parameter — it has been observed to branch
    from a stale ancestor.
 
-4. **Compose one prompt per container.** For each container id in `W`:
-   - **Prefix** the prompt with that container's header block emitted by the
-     dispatch script verbatim (worktree path, branch, and the path-discipline
-     rules that forbid absolute `/home/...` paths leaking into `main`). For a
-     solo container dispatched without a worktree (step 2), omit the header.
-   - **Body:** instruct the lead to drive this container to completion end to
-     end — the container id is the lead's end-to-end target; it runs its own
-     execution-lead flow (breakdown, wave planning, worker dispatch, review,
-     gate enforcement, completion) against that container. Do not restate or
-     pre-empt any of those steps.
-   - **Invoker:** name the steward as the lead's invoker per
-     `../../jit-execution-lead/references/escalation-policy.md` — the lead reports
-     completion and every escalation to the steward, not to the human. The
-     steward resolves against the vision or raises onward.
+4. **Plan every unplanned container.** Inspect each container's live bracket.
+   A container is planning-complete only when its planning and breakdown nodes
+   are both `done`, their configured gates passed, and the recursive breakdown
+   has no unplanned breakable frontier. Never infer this from the container's
+   prose or from the mere presence of bracket nodes.
 
-5. **Dispatch.** Send a **single message** with one Agent call per container in
-   `W`:
-   - `subagent_type: "general-purpose"` (the lead needs write access).
-   - **No `isolation` parameter** when step 3 already created the worktree —
-     adding it would create a second, stale-base worktree (TRAP 1).
-   - `run_in_background: true` for a wave of ≥2 so the steward dispatches the
-     whole wave without waiting on each lead.
+   For every incomplete container, dispatch a `general-purpose` subagent with
+   the container's step-3 prompt header and instruct it to invoke
+   `jit-planning-lead` in `plan-from-existing` mode. Its contract is planning and
+   breakdown only: mandatory investigation, synthesis, adversarial review,
+   plan gate, `jit-breakdown`, recursion, breakdown gates, then stop. Name the
+   steward as invoker. Use no Agent `isolation` parameter after manual worktree
+   creation. Dispatch the whole planning phase in background when the wave has
+   two or more containers.
 
-6. **Await the wave.** Wave discipline: every lead in `W` must finish (its
-   container `done`, or the lead escalated/stopped) before the next wave starts.
-   Do not dispatch `WAVES[current_wave + 1]` while any lead in `W` is still
-   running.
+   Await every planning lead. Verify the bracket and recursive frontier again
+   from jit state and record the container `planned`. A failed gate, incomplete
+   frontier, or planning escalation blocks execution; return it to the planning
+   lead or escalate. An already planning-complete container skips this phase,
+   not its verification.
+
+5. **Dispatch fresh execution leads.** For each verified `planned` container,
+   dispatch a new `general-purpose` subagent in the same isolated worktree (or
+   directly for a solo non-isolated container). Prefix the same prompt header,
+   instruct it to invoke `jit-execution-lead`, and state that the container is
+   already fully planned. The execution lead consumes the existing tree: it
+   plans implementation waves, dispatches workers, reviews, enforces gates, and
+   completes the container. It must not recreate or revise the planning bracket
+   except through an explicit escalation back to the steward and a new planning
+   pass. Name the steward as invoker and use no Agent isolation parameter.
+
+6. **Await execution.** Wave discipline: every execution lead in `W` must
+   finish (its container `done`, or the lead escalated/stopped) before the next
+   wave starts. Do not dispatch `WAVES[current_wave + 1]` while any planning or
+   execution lead in `W` is still running.
 
 7. **Leak check (after any wave that used worktrees).** Once every lead in `W`
    has returned, run:
@@ -145,19 +152,20 @@ path.
 
 ## What this reference does not do (REQ-03 boundary)
 
-The dispatched execution lead owns everything inside a container. This reference
+The dispatched planning lead owns the plan and recursive breakdown. The later
+execution lead owns implementation inside the planned container. This reference
 never:
 
-- breaks a container into stories or tasks (the lead's Section 3),
-- plans a container's internal implementation waves (the lead's Section 4),
-- classifies, dispatches, reviews, or reworks a container's own issues (the
-  lead's Sections 5–8),
-- pre-creates the lead's interior worker worktrees or runs the dispatch scripts
-  on the lead's behalf for interior work.
+- investigates, authors, reviews, or gates the plan itself,
+- breaks a container into stories or tasks,
+- plans the execution lead's internal implementation waves,
+- classifies, dispatches, reviews, or reworks implementation issues,
+- pre-creates either lead's interior worker worktrees or runs their interior
+  dispatch scripts.
 
-It hands over the container id and the isolated worktree, then waits for the
-lead's result. The scripts it reuses are the execution-lead's own, invoked
-unmodified one tier up.
+It hands over the container id and isolated worktree to one role at a time, then
+verifies the durable jit boundary before dispatching the next role. The scripts
+it reuses are invoked unmodified one tier up.
 
 ## Stop and escalate
 
@@ -181,7 +189,12 @@ Stop and report to the invoker (the human when the steward runs standalone) when
   `check-leak-into-main.sh` instead of invoking the execution-lead's canonical
   copies in place. Verbatim reuse is the requirement.
 - Re-implementing breakdown, wave planning, or per-issue execution at the
-  steward tier. Hand the container to the lead; do not do its interior work.
+  steward tier. Hand planning to `jit-planning-lead` and implementation to
+  `jit-execution-lead`; do not do either role's interior work.
+- Dispatching `jit-execution-lead` while the planning or breakdown node is open,
+  a planning gate is not passed, or a recursive breakable frontier remains.
+- Letting the planning agent continue into execution. Even in the same worktree,
+  execution receives a fresh agent and an explicit `jit-execution-lead` prompt.
 - Dispatching ≥2 concurrent leads without worktree isolation, or adding Agent's
   `isolation: "worktree"` on top of a manually created worktree (double,
   stale-base worktree — TRAP 1).
