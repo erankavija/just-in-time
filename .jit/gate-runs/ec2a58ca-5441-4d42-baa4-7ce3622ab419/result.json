@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "ec2a58ca-5441-4d42-baa4-7ce3622ab419",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "a98fd6b5bc828597c4e699811eeaabe4ab0ed34e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T16:32:30.970942896Z",
+  "completed_at": "2026-07-14T16:37:10.755225768Z",
+  "duration_ms": 279784,
+  "exit_code": 1,
+  "stdout": "Attribution: `c53215be`, `c08dbd51`, `63ff8d37`, `e863225a`, `b1d9e9f1`, `a84e2462`, `60a34376`, `6a26a403`, `55cf101b`, `4594f28b`, `91edd625`, `a98fd6b5` (`jit:7446af34`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-4` (`dev/vision/9db27a3a-charter.md`); `@/invariant/gate-semantics`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/gate/cargo-ci` (`.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0); doc-review passed (exit 0); docs-mechanical passed (exit 0); code-review failed (exit 1; prior schema/version finding is addressed)\nTruncation recovery: re-read the latest structured finding and bounded current code/test ranges; omitted historical `.jit` run artifacts were superseded by the supplied latest run history and outside the behavior cone.\n\n1. **F1 — high, blocking, issue-impact:** The new precheck still runs after `Cli::parse()` at [`crates/jit/src/main.rs:1657`](crates/jit/src/main.rs:1657). Clap’s global version handler is enabled at [`crates/jit/src/cli.rs:25`](crates/jit/src/cli.rs:25), so a stale checker child invoked as `jit -V`/`jit --version` exits during parsing before `stale_gate_child_precheck()` at line 1663. Help paths have the same ordering. A checker can therefore consume stale help/version output and return a normal persisted verdict without a stale-binary refusal, violating REQ-02. The added regression covers only `--schema` and the `version` subcommand.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Global Clap help/version exits bypass the stale gate-child precheck.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Cli::parse runs before the stale gate-child precheck, so Clap global help/version exits can let a stale checker child inform a persisted verdict without a stale-binary refusal.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1657,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8827 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6179-0f48-7bb0-8c41-b6cb094b6365\n--------\nuser\n--- 8814 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Global Clap help/version exits bypass the stale gate-child precheck.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Cli::parse runs before the stale gate-child precheck, so Clap global help/version exits can let a stale checker child inform a persisted verdict without a stale-binary refusal.",
+        "file": "crates/jit/src/main.rs",
+        "line": 1657
+      }
+    ]
+  }
+}

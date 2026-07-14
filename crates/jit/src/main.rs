@@ -1654,13 +1654,15 @@ fn stale_gate_child_precheck() -> Result<()> {
 }
 
 fn run() -> Result<()> {
+    // REQ-02 (jit:7446af34): refuse before ANY output — before Clap even
+    // parses (its `--help`/`-V` auto-exits print and terminate inside
+    // `Cli::parse`), and ahead of the `--schema` and `version` early returns
+    // below — when this process is itself stale and running inside a gate
+    // checker's process tree. Nothing observable precedes this guard.
+    stale_gate_child_precheck()?;
+
     let cli = Cli::parse();
     let quiet = cli.quiet;
-
-    // REQ-02 (jit:7446af34): refuse before ANY output — including the
-    // `--schema` and `version` early returns below — when this process is
-    // itself stale and running inside a gate checker's process tree.
-    stale_gate_child_precheck()?;
 
     // Handle --schema flag first
     if cli.schema {

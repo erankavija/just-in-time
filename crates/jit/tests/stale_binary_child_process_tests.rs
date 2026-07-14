@@ -324,10 +324,11 @@ fn test_non_gate_context_child_invocation_stays_unchecked() {
     );
 }
 
-/// REQ-02: the pre-dispatch early returns (`--schema`, `version`) are guarded
-/// too. A checker script can consume either output to inform its verdict, so
-/// under gate context a stale binary must refuse before serving them —
-/// `run()`'s `stale_gate_child_precheck` runs ahead of both early returns.
+/// REQ-02: every pre-dispatch output path (`--schema`, `version`, and Clap's
+/// own `--help` auto-exit) is guarded. A checker script can consume any of
+/// these outputs to inform its verdict, so under gate context a stale binary
+/// must refuse before serving them — `run()`'s `stale_gate_child_precheck`
+/// is its first statement, ahead of `Cli::parse` and every early return.
 #[cfg(unix)]
 #[test]
 fn test_gate_context_early_paths_refuse_stale_binary() {
@@ -358,7 +359,7 @@ fn test_gate_context_early_paths_refuse_stale_binary() {
         .unwrap();
     assert!(output.status.success());
 
-    for args in [&["--schema"][..], &["version"][..]] {
+    for args in [&["--schema"][..], &["version"][..], &["--help"][..]] {
         let output = Command::new(&child_binary)
             .current_dir(scratch.path())
             .env("JIT_GATE_RUN", "1")

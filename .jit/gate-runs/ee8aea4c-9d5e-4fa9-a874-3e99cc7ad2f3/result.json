@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "ee8aea4c-9d5e-4fa9-a874-3e99cc7ad2f3",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "a98fd6b5bc828597c4e699811eeaabe4ab0ed34e",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T16:37:10.815162192Z",
+  "completed_at": "2026-07-14T16:39:16.414469324Z",
+  "duration_ms": 125599,
+  "exit_code": 0,
+  "stdout": "Attribution: level-4 `bug` leaf with no resolved children; reviewed the union of 12 individually inspected reachable `jit:7446af34` commit patches (including merge-parent patches). No fallback was needed.\n\nDocumentation impact passes. The canonical gate reference, custom-gate troubleshooting, and exit-code reference accurately document the predicate, exit/JSON behavior, child-checker path, remedy, and unrelated-repository exception. The prior review was passing; no unresolved issue-impact finding remains.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The stale-binary gate refusal is accurately documented, discoverable, and concise across its affected documentation cone.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The stale-binary gate refusal is accurately documented, discoverable, and concise across its affected documentation cone.",
+    "findings": []
+  }
+}
