@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "run_id": "24fcae1c-7c90-41b4-8f55-10a7c1fb3478",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "07fb13be64455f8a15a1841322a9d7f76eb19a77",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T22:53:05.286657285Z",
+  "completed_at": "2026-07-14T22:59:24.814450549Z",
+  "duration_ms": 379527,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/8b05a612-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1), is substantive, and is linked as a design document in the planning issue at [.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:118).\n\n## Completeness against the criteria\n\nThe plan explicitly maps all eleven hard requirements and substantially covers security remediation, suite gating, version alignment, native/MCP/OCI publication, Docker consolidation, documentation ownership, MSRV, and rehearsal.\n\nHowever, REQ-05 and REQ-10 remain incomplete for source installation. The plan retains “supported native and source installation” at [line 231](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:231), matching the current source procedure in [INSTALL.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/INSTALL.md:153), but neither packages nor smokes a publishable source artifact. Its rehearsal uses a Git checkout, while its GitHub Release asset list contains only the native binary set and related evidence.\n\n## Technical soundness and architectural fit\n\nThe core architecture analysis is sound:\n\n- `/repo/.jit` correctly matches how `jit-server` initializes storage and derives the repository root in [crates/server/src/main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:61).\n- `/api/health`, embedded-web ordering, and the missing graceful-shutdown primitive are accurately grounded in [main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:104), [build.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/build.rs:4), and [routes.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/routes.rs:33).\n- Release, Docker, and security concerns remain at workflow and packaging boundaries rather than leaking into domain or storage layers.\n\nThe candidate-tag authentication and full-SHA Action pinning corrections are technically appropriate. npm staged publishing and GitHub immutable releases also match their current official contracts.\n\nThe final `v1.0.0` tag is still under-specified, though. The candidate App is explicitly scoped to the candidate namespace and environment, while the release-tag task requires a ruleset that denies alternate creation but identifies no release-tag bypass actor or credential. GitHub restrict-creation rules permit creation only by configured bypass actors; a protected workflow name is not itself such an actor. See [GitHub’s ruleset documentation](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).\n\n## Decomposition and dependencies\n\nMost implementation ordering is coherent: audit remediation precedes enforcement, graceful shutdown precedes Docker packaging, the replacement image precedes removals, and publication follows rehearsal and tag authorization.\n\nThe source-freeze ordering is blocking. Candidate assembly at [lines 165–172](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:165) records an immutable SHA and artifacts. Canonical documentation is then changed downstream at lines 228–244, and D9 deliberately delays both external epics until the rehearsal at lines 248–259. The rehearsal nevertheless checks out the earlier candidate SHA and expects those later documents and external-epic implementations to be present. They cannot be present unless the candidate is discarded and rebuilt, which the graph does not model.\n\nThe executable graph needs a source-freeze/candidate-production leaf after all source-changing prerequisites, or it must clearly separate workflow implementation tasks from the later candidate execution.\n\n## Risks and actionability\n\nThe risk register is detailed, but its mitigation for late core/profile changes repeats the faulty ordering rather than resolving it. Waiting for those epics only at rehearsal does not incorporate their commits into already-fixed artifacts.\n\nThe release-tag task also leaves an engineer to choose a load-bearing authentication and workflow-trigger design. It must state which App/token creates `v1.0.0`, which ruleset names that actor, where its credential is available, and whether publication remains in the same workflow run. If a separate push-triggered workflow is expected, a repository `GITHUB_TOKEN` push will not trigger it under [GitHub’s documented token behavior](https://docs.github.com/en/actions/concepts/security/github_token).\n\n## Prior review feedback\n\nThe latest review’s findings were addressed:\n\n- Candidate-tag creation now uses a repository-scoped GitHub App whose push can trigger orchestration.\n- Critical external Actions and reusable workflows must use full commit SHAs.\n- GitHub immutable releases are enabled before draft publication.\n- The investigation no longer claims the removed broad core-maintenance dependency exists.\n\nThose corrections do not resolve the new source-freeze, final-tag authority, and source-installation defects below.\n\n## Findings\n\n1. **F1 — Blocking, high:** Candidate production is sequenced before source-changing prerequisites. The immutable candidate is assembled at lines 165–172, while canonical documentation and external epics are only prerequisites downstream at lines 228–259 and 335. A rehearsal at that candidate SHA therefore cannot contain or verify those later commits. This blocks REQ-05, REQ-10, and REQ-11.\n\n2. **F2 — Blocking, high:** The protected `v1.0.0` tag has no executable authentication contract. Lines 261–269 require restrictive tag rules but do not name a bypass actor/token; the only specified App and secrets are scoped to candidate-tag creation at lines 133–143. This blocks the release-tag and publication chain under REQ-04, REQ-09, and REQ-10.\n\n3. **F3 — Blocking, high:** The plan retains a supported source-installation path without defining a published, smoke-tested source artifact. Lines 228–235 assign source installation to `INSTALL.md`, but native packaging and publication at lines 147–154 and 271–278 omit a source archive, while rehearsal uses a Git checkout rather than the eventual published source bytes. The plan must package and smoke an exact source artifact or explicitly demote source checkout to contributor-only guidance.\n\n4. **F4 — Advisory, low:** Several research citations are stale. For example, line 24 points to research lines 36–43 for MSRV although the MSRV section is at lines 52–59; line 27 points to 45–53 for audit semantics although those commands are at lines 61–68. These references should be corrected before decomposition.\n\n5. **F5 — Advisory, low:** The linked investigation says `docs/integrations/mcp.md` currently contains repeated MCP guidance at line 18, but that file does not exist. The plan safely allows creating it, so this is not blocking, but the current-state inventory should be corrected.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior security findings are fixed, but the immutable candidate is frozen before later source prerequisites, the final release-tag authority is unspecified, and supported source installation lacks a published smoke-tested artifact.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate production precedes canonical documentation and external-epic source changes, so the later rehearsal cannot verify them at the immutable candidate SHA.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":165,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\",\"@/issue/8b05a612/requirement/REQ-11\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The protected v1.0.0 tag task specifies no authenticated ruleset-bypass actor or token capable of creating the release tag.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":261,\"references\":[\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-09\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Supported source installation is retained without a published source artifact whose exact bytes are smoke-tested.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":228,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F4\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Several plan citations point to the wrong line ranges in the linked research document.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":24},{\"id\":\"F5\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The investigation inventories docs/integrations/mcp.md as an existing repeated-prose consumer even though the file is absent.\",\"file\":\"dev/active/8b05a612-investigation.md\",\"line\":18}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3339 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62d5-7b95-75e3-9d11-478d9ab41549\n--------\nuser\n--- 3326 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior security findings are fixed, but the immutable candidate is frozen before later source prerequisites, the final release-tag authority is unspecified, and supported source installation lacks a published smoke-tested artifact.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Candidate production precedes canonical documentation and external-epic source changes, so the later rehearsal cannot verify them at the immutable candidate SHA.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 165,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10",
+          "@/issue/8b05a612/requirement/REQ-11"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The protected v1.0.0 tag task specifies no authenticated ruleset-bypass actor or token capable of creating the release tag.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 261,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-09",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Supported source installation is retained without a published source artifact whose exact bytes are smoke-tested.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 228,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Several plan citations point to the wrong line ranges in the linked research document.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 24
+      },
+      {
+        "id": "F5",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "pre-existing",
+        "summary": "The investigation inventories docs/integrations/mcp.md as an existing repeated-prose consumer even though the file is absent.",
+        "file": "dev/active/8b05a612-investigation.md",
+        "line": 18
+      }
+    ]
+  }
+}
