@@ -7317,3 +7317,5 @@
 {"type":"issue_state_changed","id":"9945cc90-6138-4be5-8860-62ca1e264f8c","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:21:49.757033355Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"0ef0f043-70d1-44d2-af3a-bdd088c5c644","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:21:49.757072855Z"}
 {"type":"issue_state_changed","id":"331a3bd9-cd98-4018-b671-be9c2e20fd50","issue_id":"96326159-43e5-4a36-8cab-de8d858fae13","timestamp":"2026-07-14T22:21:49.961436413Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"db197e48-6d70-42c4-85a5-59962ba160ca","issue_id":"96326159-43e5-4a36-8cab-de8d858fae13","timestamp":"2026-07-14T22:22:10.132907202Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"e5997c5b-b750-42f0-b954-8bc7f07063e5","issue_id":"96326159-43e5-4a36-8cab-de8d858fae13","timestamp":"2026-07-14T22:22:10.133081442Z","assignee":"agent:codex-profiles-mvp"}
