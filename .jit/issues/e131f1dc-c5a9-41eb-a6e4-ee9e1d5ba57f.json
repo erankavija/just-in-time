@@ -24,6 +24,95 @@
       "label": "Production Readiness Investigation",
       "doc_type": "study",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/8b05a612-research.md",
+      "commit": null,
+      "label": "Production Readiness Research",
+      "doc_type": "research",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "https://docs.npmjs.com/trusted-publishers/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.docker.com/build/ci/github-actions/manage-tags-labels/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.npmjs.com/generating-provenance-statements/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.npmjs.com/cli/v11/commands/npm-audit/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://blog.rust-lang.org/releases/latest/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.docker.com/build/ci/github-actions/attestations/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
     }
   ],
   "labels": [
@@ -38,7 +127,7 @@
     "type:planning"
   ],
   "created_at": "2026-07-14T18:54:18.020731559Z",
-  "updated_at": "2026-07-14T19:37:51.383975905Z",
+  "updated_at": "2026-07-14T19:56:21.314054419Z",
   "first_ready_at": "2026-07-14T18:54:18.020732039Z",
   "claimed_at": "2026-07-14T19:22:20.309276169Z"
 }
