@@ -630,6 +630,11 @@ impl ErrorCode {
     pub const REPOSITORY_NOT_FOUND: &'static str = "REPOSITORY_NOT_FOUND";
     /// The repository's on-disk format is newer than this binary supports (exit code 10).
     pub const REPOSITORY_FORMAT_TOO_NEW: &'static str = "REPOSITORY_FORMAT_TOO_NEW";
+    /// A gate checker was refused because the running binary predates the
+    /// repository under review (exit code 10). Pre-verdict: unlike
+    /// `GATE_FAILED`, the checker never ran, so the envelope carries no
+    /// `verdict` field.
+    pub const STALE_BINARY: &'static str = "STALE_BINARY";
 }
 
 impl ErrorCode {
@@ -646,9 +651,10 @@ impl ErrorCode {
             | Self::INVALID_ID_PREFIX => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
             Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
-            Self::IO_ERROR | Self::CLAIM_REQUIRES_GIT | Self::REPOSITORY_FORMAT_TOO_NEW => {
-                ExitCode::ExternalError
-            }
+            Self::IO_ERROR
+            | Self::CLAIM_REQUIRES_GIT
+            | Self::REPOSITORY_FORMAT_TOO_NEW
+            | Self::STALE_BINARY => ExitCode::ExternalError,
             _ => ExitCode::GenericError,
         }
     }

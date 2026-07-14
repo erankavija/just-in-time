@@ -351,11 +351,19 @@ impl ClaimRequiresGitError {
 /// `error_to_exit_code` (→ `ExitCode::ExternalError`, exit `10`), the same
 /// family as [`ClaimRequiresGitError`] and
 /// [`RepositoryFormatTooNewError`](crate::storage::RepositoryFormatTooNewError):
-/// the binary, not the repository, needs attention.
+/// the binary, not the repository, needs attention. The `--json` path
+/// (`render_gate_pass_error` in `main.rs`) downcasts to this type the same way,
+/// so both output modes agree on exit code `10` and neither carries a
+/// `verdict` field: this is a PRE-verdict refusal — the checker never spawns,
+/// so no gate run is ever recorded, unlike [`crate::commands::GatePassFailed`]
+/// (which always reflects an executed checker).
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("{message}")]
 pub struct StaleBinaryError {
     message: String,
+    issue_id: String,
+    gate_key: String,
+    reason: crate::domain::build_provenance::StaleBinaryReason,
 }
 
 impl StaleBinaryError {
@@ -402,12 +410,30 @@ impl StaleBinaryError {
 
         Self {
             message: actionable.to_error_message(),
+            issue_id: issue_id.to_string(),
+            gate_key: gate_key.to_string(),
+            reason: reason.clone(),
         }
     }
 
     /// The fully-rendered, user-facing message.
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// The issue the refused gate belongs to.
+    pub fn issue_id(&self) -> &str {
+        &self.issue_id
+    }
+
+    /// The gate key whose checker was refused.
+    pub fn gate_key(&self) -> &str {
+        &self.gate_key
+    }
+
+    /// Why the binary was judged stale (commit mismatch or dirty build).
+    pub fn reason(&self) -> &crate::domain::build_provenance::StaleBinaryReason {
+        &self.reason
     }
 }
 

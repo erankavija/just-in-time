@@ -1516,10 +1516,22 @@ jit gate evaluate abc123 --gate tests --force
 [exit-code reference](exit-codes.md#command-specific-mappings) is the authority
 for every code `jit gate evaluate` returns. The command-specific split it
 records: a checker that ran and returned verdict `fail` exits `4`; a checker that
-could not produce a verdict (timeout, command-not-found, or crash) exits `10`.
-Pre-verdict argument errors (e.g. the gate is not required for the issue) and
-lookup errors (issue not found) are classified before the run path and are never
-reported as a runner error.
+ran but could not produce a verdict (timeout, command-not-found, or crash) exits
+`10`. Pre-verdict argument errors (e.g. the gate is not required for the issue)
+and lookup errors (issue not found) are classified before the run path and are
+never reported as a runner error.
+
+**Refused before the checker runs (exit `10`, no verdict):** when the running
+`jit` binary's build commit predates, or no longer matches, the repository's
+current `HEAD` (or the build was dirty), `jit gate evaluate` refuses to spawn
+the checker at all: a verdict produced by a binary that predates the tree under
+review is not evidence about that change. This is PRE-verdict — the checker
+never runs and no gate run is recorded — so it carries no `verdict` field,
+unlike the post-verdict runner-crash case above (which also exits `10` but DOES
+carry `verdict: "error"`). Text and `--json` modes agree on exit `10`; under
+`--json` the `code` is `STALE_BINARY`. Rebuild and reinstall (`cargo install
+--path crates/jit`) to clear it. Never fires for an ordinary installed release
+validating an unrelated repository.
 
 **`--json` verdict field:**
 
@@ -1527,10 +1539,12 @@ reported as a runner error.
 
 - `pass` — top-level field on the success response.
 - `fail` — under `error.details` when the checker ran and failed (code `4`).
-- `error` — under `error.details` when the runner failed (code `10`).
+- `error` — under `error.details` when the checker ran but the runner failed
+  (code `10`).
 
-Pre-verdict errors (codes `2` and `3`) are argument/lookup errors, not gate
-verdicts, so they carry no `verdict` field.
+Pre-verdict conditions carry no `verdict` field at all: argument/lookup errors
+(codes `2` and `3`), and the stale-binary refusal above — the one case where
+exit `10` does NOT mean the checker ran and crashed.
 
 ```bash
 # Success response
@@ -1544,8 +1558,9 @@ jit gate evaluate abc123 tests --json
 #   "message": "Passed gate 'tests' for issue abc123"
 # }
 
-# Checker failure (exit 4): error.details.verdict == "fail"
-# Runner error    (exit 10): error.details.verdict == "error"
+# Checker ran, failed          (exit 4):  error.details.verdict == "fail"
+# Checker ran, runner crashed  (exit 10): error.details.verdict == "error"
+# Checker never ran (stale binary, exit 10): error.code == "STALE_BINARY", no verdict field
 ```
 
 ### `jit gate evaluate-all`
@@ -1577,8 +1592,9 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
   per gate (`key`, `status`, `verdict`, `already_passed`). On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
-  `error.details.verdict` `fail` or `error` and `error.details.key` naming
-  the offending gate).
+  `error.details.key` naming the offending gate, and `error.details.verdict`
+  `fail` or `error` — or no `verdict` field at all for a pre-verdict refusal,
+  e.g. the exit-`10` stale-binary case).
 
 ```bash
 # All gates pass (one already passed at HEAD, one freshly run)
@@ -1595,7 +1611,8 @@ jit gate evaluate-all abc123 --json
 # }
 
 # Fail-fast: first failing gate sets the exit code; later gates do not run.
-jit gate evaluate-all abc123          # exit 4 if a checker fails, 10 on runner error
+jit gate evaluate-all abc123          # exit 4 if a checker fails, 10 on a runner
+                                       # error or a stale-binary refusal
 ```
 
 ### `jit gate fail`
@@ -3385,6 +3402,13 @@ a structured error object on stdout while keeping its exit code:
 - **Repository not found** (exit `3`): `code` `REPOSITORY_NOT_FOUND`.
 - **Repository format too new** (exit `10`): `code` `REPOSITORY_FORMAT_TOO_NEW`
   (the binary is older than the repository's on-disk format; upgrade `jit`).
+
+**Gate-checker refusal under `--json`** (exit `10`, mid-command rather than at
+startup): `code` `STALE_BINARY` — the running `jit` binary's build commit
+predates, or no longer matches, the repository under review, so `jit gate
+evaluate`/`evaluate-all` refuse to spawn the checker at all. Pre-verdict: no
+`verdict` field. See [`jit gate evaluate`](#jit-gate-evaluate) for the full
+contract.
 
 ```bash
 # Check exit codes
