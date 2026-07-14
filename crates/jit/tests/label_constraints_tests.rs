@@ -2,8 +2,8 @@
 //! surfaces, after the backward-compat hard removal (issue d4188154).
 //!
 //! The per-namespace `values` / `pattern` / `required` constraints were removed
-//! from config-derived defaults: `.jit/rules.toml` is the sole validation source,
-//! and a repo wanting those constraints authors them there directly. What the
+//! from config-derived defaults: validation is rule-driven, and a repo wanting
+//! those constraints authors them in `.jit/rules.toml` directly. What the
 //! registry still drives is the `namespace-registry` rule (unknown namespaces)
 //! and the `namespace-unique-<ns>` rules (uniqueness); both carry `origin =
 //! "default"`.

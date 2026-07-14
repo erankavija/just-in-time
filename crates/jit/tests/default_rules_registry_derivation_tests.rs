@@ -58,10 +58,64 @@ unique = false
     .unwrap();
 }
 
+/// Hand-declare an additional UNIQUE `squad` namespace by rewriting config.toml.
+fn declare_unique_squad_namespace(jit_dir: &std::path::Path) {
+    fs::write(
+        jit_dir.join("config.toml"),
+        r#"
+[namespaces.type]
+description = "Issue type"
+unique = true
+
+[namespaces.squad]
+description = "Owning squad"
+unique = true
+"#,
+    )
+    .unwrap();
+}
+
 fn issue_with_label(label: &str) -> Issue {
     let mut issue = Issue::new("t".to_string(), String::new());
     issue.labels = vec![label.to_string()];
     issue
+}
+
+fn issue_with_labels(labels: &[&str]) -> Issue {
+    let mut issue = Issue::new("t".to_string(), String::new());
+    issue.labels = labels.iter().map(|s| s.to_string()).collect();
+    issue
+}
+
+#[test]
+fn test_new_unique_namespace_enforces_uniqueness_without_regeneration() {
+    // REQ-01 membership: a hand-declared UNIQUE namespace materializes its
+    // `namespace-unique-*` rule from config at load, so a duplicate label in it
+    // blocks — with no `rules.toml`/schema write in between.
+    let (_temp, jit_dir) = setup_initialized_repo();
+    declare_unique_squad_namespace(&jit_dir);
+
+    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let rules = exec.effective_rules().unwrap();
+    assert!(
+        rules
+            .rules
+            .iter()
+            .any(|r| r.name == "namespace-unique-squad"),
+        "the new unique namespace gains a uniqueness rule at load"
+    );
+
+    let dup = evaluate_local(
+        &issue_with_labels(&["squad:a", "squad:b"]),
+        rules,
+        ContentFormat::Markdown,
+    )
+    .unwrap();
+    assert!(
+        dup.is_blocking(),
+        "a duplicate in the newly-enforced namespace must block, got {:?}",
+        dup.findings()
+    );
 }
 
 #[test]

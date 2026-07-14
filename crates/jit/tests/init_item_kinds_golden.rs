@@ -90,8 +90,8 @@ source-of-truth = \"registry-first\"
 # item as `@/invariant/<self-id>`.
 aliases = [\"inv\"]
 
-# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source, scaffolded above); the rule kind projects each entry's `name` as its
+# Rules are colon-free-named entries in `.jit/rules.toml` (scaffolded above); the
+# rule kind projects each entry's `name` as its
 # self-id and its optional `description` as its display text (falling back to
 # the `name` when a rule has no description), addressed at `@/rule/<name>`.
 [item_kinds.rule]
