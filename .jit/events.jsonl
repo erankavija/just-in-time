@@ -7312,3 +7312,4 @@
 {"type":"issue_updated","id":"8e7fec47-581e-4b61-8de5-5ef836465738","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-14T19:58:47.715844669Z","updated_by":"dependency-remove","fields":["dependencies"]}
 {"type":"issue_updated","id":"a3ba07f8-cd6f-4176-b676-0757d473be58","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T20:24:09.995623525Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"gate_failed","id":"920e50e5-6c2b-43b9-80b0-f589608bc75a","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T21:17:24.738295395Z","gate_key":"plan-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"941b3764-e2c3-4fdc-90e8-82a44ff699cf","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T22:00:16.226006430Z","gate_key":"plan-review","updated_by":"auto:executor"}
