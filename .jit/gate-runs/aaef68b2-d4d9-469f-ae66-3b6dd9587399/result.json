@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "aaef68b2-d4d9-469f-ae66-3b6dd9587399",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "af4c901a-c7f2-434e-9abb-0887542d5b7f",
+  "commit": "f71860330ad5950838f018e21bf4837ed172b043",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T17:00:35.431218465Z",
+  "completed_at": "2026-07-14T17:02:58.482582508Z",
+  "duration_ms": 143051,
+  "exit_code": 1,
+  "stdout": "Attribution: `bug` is a leaf type (level 4) with no resolved children. I inspected the six `jit:af4c901a` commits reachable from `HEAD` individually; no fallback attribution was needed. Uncommitted issue/gate metadata was excluded. The implementation now derives default-rule assertions from `config.toml`; default schema files are external projections.\n\nDocumentation impact: fail. The existing docs still describe the old authority and manual-sync workflow.\n\n1. **F1 — blocking, issue-impact, high:** The validation-source contract is inaccurate. [configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:136) says `.jit/rules.toml` is the single source of truth, contradicting the current behavior for `origin = \"default\"` rules. The same incorrect claim is repeated in [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:94), [example-config.toml](/home/vkaskivuo/Projects/just-in-time/docs/reference/example-config.toml:109), and [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:204) / [labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:609). Revise the canonical configuration reference to state that `rules.toml` selects default rules and their policy fields, while their assertions derive from `[namespaces]` and `[type_hierarchy]`; custom rules retain schema-file authority. Replace duplicated claims with that contract or a link to it.\n\n2. **F2 — blocking, issue-impact, medium:** [adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/adopt-planning-bracket.md:105) instructs users to re-run `jit init` because `type-hierarchy-known` reads a frozen schema. That is now false: validation immediately derives the allowed types from configuration. Replace the callout with a concise statement that no sync is required for validation; if external tooling consumes `schemas/default-*.json` after a manual config edit, `jit init` or a JIT config/rules write refreshes those projections.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Default-rule documentation still describes the superseded schema authority and manual-sync workflow.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Canonical and duplicated docs incorrectly call rules.toml the sole validation authority although default-rule assertions now derive from config.toml.\",\"file\":\"docs/reference/configuration.md\",\"line\":136,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The planning-bracket how-to incorrectly requires a type-schema sync for validation after changing type_hierarchy.\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":105,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.hlzYSMRzuI: binary file matches\n--- agent stderr (first 12 of 9767 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6192-c1ab-7dd0-a05c-3c0c956aad55\n--------\n--- 9755 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Default-rule documentation still describes the superseded schema authority and manual-sync workflow.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Canonical and duplicated docs incorrectly call rules.toml the sole validation authority although default-rule assertions now derive from config.toml.",
+        "file": "docs/reference/configuration.md",
+        "line": 136,
+        "references": [
+          "@/inv/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The planning-bracket how-to incorrectly requires a type-schema sync for validation after changing type_hierarchy.",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "line": 105,
+        "references": [
+          "@/inv/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

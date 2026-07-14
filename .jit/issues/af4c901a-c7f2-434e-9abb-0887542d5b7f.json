@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:39:23.681494569Z"
-    },
-    "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-09T11:45:21.482892431Z"
-    },
     "cargo-ci": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-09T11:45:21.482850491Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T16:52:48.587732707Z"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:39:23.689704805Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T17:02:58.495849808Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T16:56:40.311125801Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T17:00:35.431218465Z"
     }
   },
   "context": {},
@@ -51,7 +51,7 @@
     "component:storage"
   ],
   "created_at": "2026-07-09T11:45:21.404976774Z",
-  "updated_at": "2026-07-14T12:54:32.353804147Z",
+  "updated_at": "2026-07-14T17:02:58.998705534Z",
   "first_ready_at": "2026-07-09T11:45:21.404982624Z",
   "claimed_at": "2026-07-14T12:35:13.342996762Z"
 }
