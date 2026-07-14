@@ -213,3 +213,76 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
         eval.findings()
     );
 }
+
+/// The baked namespace-registry projection path in an initialized repo.
+fn namespace_registry_projection(jit_dir: &std::path::Path) -> std::path::PathBuf {
+    jit_dir
+        .join("schemas")
+        .join("default-namespace-registry.json")
+}
+
+#[test]
+fn test_missing_default_schema_still_validates_and_enforces() {
+    // F1: a DELETED default projection must not break validation — the default
+    // rules derive from config, so `effective_rules` loads and they still enforce.
+    let (_temp, jit_dir) = setup_initialized_repo();
+    std::fs::remove_file(namespace_registry_projection(&jit_dir)).unwrap();
+
+    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let rules = exec
+        .effective_rules()
+        .expect("a missing default projection must not fail rule loading");
+
+    // The default rule still ENFORCES from config: a registered namespace is
+    // clean, an unregistered one still fails namespace-registry.
+    let ok = evaluate_local(
+        &issue_with_label("type:task"),
+        rules,
+        ContentFormat::Markdown,
+    )
+    .unwrap();
+    assert!(
+        ok.findings().is_empty(),
+        "registered namespace validates clean, got {:?}",
+        ok.findings()
+    );
+    let bad = evaluate_local(
+        &issue_with_label("undeclared:x"),
+        rules,
+        ContentFormat::Markdown,
+    )
+    .unwrap();
+    assert!(
+        bad.findings()
+            .iter()
+            .any(|f| f.rule == "namespace-registry"),
+        "namespace-registry must still enforce from config, got {:?}",
+        bad.findings()
+    );
+}
+
+#[test]
+fn test_corrupt_default_schema_still_validates_and_enforces() {
+    // F1: a MALFORMED default projection is likewise non-fatal.
+    let (_temp, jit_dir) = setup_initialized_repo();
+    std::fs::write(namespace_registry_projection(&jit_dir), "{ not valid json").unwrap();
+
+    let exec = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let rules = exec
+        .effective_rules()
+        .expect("a malformed default projection must not fail rule loading");
+
+    let bad = evaluate_local(
+        &issue_with_label("undeclared:x"),
+        rules,
+        ContentFormat::Markdown,
+    )
+    .unwrap();
+    assert!(
+        bad.findings()
+            .iter()
+            .any(|f| f.rule == "namespace-registry"),
+        "namespace-registry must still enforce from config, got {:?}",
+        bad.findings()
+    );
+}

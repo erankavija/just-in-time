@@ -49,6 +49,7 @@ use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
 use crate::validation::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
+    DEFAULT_ORIGIN,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -379,9 +380,6 @@ pub(crate) fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig 
         None => HierarchyConfig::default(),
     }
 }
-
-/// The `origin` every rule this module emits carries (see [`Rule::origin`]).
-const DEFAULT_ORIGIN: &str = "default";
 
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
 fn local_rule(
