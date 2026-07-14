@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "54d0df31-fd90-47d1-a89a-7d5f74490304",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "af4c901a-c7f2-434e-9abb-0887542d5b7f",
+  "commit": "fbf486d97eeaeb4e40525d71b45b14c52958ab4f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T18:23:34.216866809Z",
+  "completed_at": "2026-07-14T18:26:00.759360631Z",
+  "duration_ms": 146542,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a maximum-level leaf with no resolved children. I reviewed the ten reachable `jit:af4c901a` commits individually (with rename detection) and verified the current tree.\n\nThe prior blockers are resolved: canonical reference and label docs explain config-derived default assertions, and the planning-bracket how-to removes the obsolete sync step. No issue-impact documentation defects remain.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Default-rule documentation accurately reflects config-derived validation and projection-only schemas.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Default-rule documentation accurately reflects config-derived validation and projection-only schemas.",
+    "findings": []
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "8522da78-f3d0-451c-849e-d93810518390",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "af4c901a-c7f2-434e-9abb-0887542d5b7f",
+  "commit": "fbf486d97eeaeb4e40525d71b45b14c52958ab4f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T18:18:57.693992838Z",
+  "completed_at": "2026-07-14T18:23:34.180739803Z",
+  "duration_ms": 276486,
+  "exit_code": 1,
+  "stdout": "Attribution: 33b6c9a8, 40e13872, d3850d44, 93cd7066, f7186033, 48cd8d79, f01b7bb0, 9342d9fb, d3ecd278, fd9a04ab\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci=passed (exit 0); doc-review=failed (exit 1); docs-mechanical=passed (exit 0)\nTruncation recovery: Per-commit/path patch reads, current loader/projection ranges, and linked-doc reads; unrelated parent-relative jit:7446 merge content excluded from the impact cone.\n\n1. **F1 — high, blocking, issue-impact:** Default schemas remain a mandatory validation input before reconciliation. [`effective_rules`](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:410>) loads the full ruleset first; every JSON-schema rule eagerly reads and parses its referenced file ([`rules.rs`](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/rules.rs:1292>), [`rules.rs`](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/rules.rs:1443>)). Thus a missing or malformed `schemas/default-*.json` prevents validation before the config-derived default assertion can replace it. The stale-valid-schema case is fixed, but projections can still desynchronize validation through availability or parseability, violating REQ-01’s authority boundary. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Default schema projections are still eagerly loaded, so a missing or malformed projection blocks config-derived default validation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Default JSON schemas are eagerly loaded before reconciliation, so missing or malformed projections still block validation.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":410,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8768 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f61da-832b-73d1-92f2-93a3f52af594\n--------\nuser\n--- 8755 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Default schema projections are still eagerly loaded, so a missing or malformed projection blocks config-derived default validation.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Default JSON schemas are eagerly loaded before reconciliation, so missing or malformed projections still block validation.",
+        "file": "crates/jit/src/commands/mod.rs",
+        "line": 410,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}
