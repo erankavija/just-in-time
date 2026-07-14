@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "64251220-dfed-4c7b-b20d-30697069aa03",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "4594f28b065b7b4b1de138c28b60b993f6fc3272",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T16:10:38.085454897Z",
+  "completed_at": "2026-07-14T16:14:34.462009804Z",
+  "duration_ms": 236376,
+  "exit_code": 1,
+  "stdout": "Attribution: 4594f28b, 55cf101b, 60a34376, a84e2462, b1d9e9f1 (`jit:7446af34`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci, @/gate/doc-review, @/gate/docs-mechanical, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1); doc-review passed (exit 0); docs-mechanical passed (exit 0); prior structured code-review passed (exit 0)\nTruncation recovery: recovered merge-parent and per-file patches plus bounded current-source reads for all affected implementation, test, and documentation paths\n\n1. **F1 — blocking, issue-impact (high):** The latest required Cargo CI run fails because `stale_binary_json_exit_tests.rs` launches its deliberately stale scratch binary without clearing inherited `JIT_GATE_RUN` at [stale_binary_json_exit_tests.rs:87](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/stale_binary_json_exit_tests.rs:87). Gate execution exports that marker to the checker subtree ([gate_execution.rs:117](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_execution.rs:117)), and startup refuses a stale child before `init` or the test’s text/JSON assertions run ([main.rs:1699](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1699)). Cargo CI reports the resulting assertion failure at line 92, leaving the JSON stale-binary contract test non-executable under the required gate. The sibling child-process test already scrubs this environment, but this test does not. References: @/gate/cargo-ci.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Cargo CI cannot execute the attributable stale-binary JSON regression test because it inherits gate context.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The JSON stale-binary regression test inherits JIT_GATE_RUN, causing its deliberately stale setup binary to refuse before the asserted gate paths run and failing Cargo CI.\",\"file\":\"crates/jit/tests/stale_binary_json_exit_tests.rs\",\"line\":87,\"references\":[\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7274 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6165-0559-76a3-9e09-c3dbf32fccfa\n--------\nuser\n--- 7261 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Cargo CI cannot execute the attributable stale-binary JSON regression test because it inherits gate context.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The JSON stale-binary regression test inherits JIT_GATE_RUN, causing its deliberately stale setup binary to refuse before the asserted gate paths run and failing Cargo CI.",
+        "file": "crates/jit/tests/stale_binary_json_exit_tests.rs",
+        "line": 87,
+        "references": [
+          "@/gate/cargo-ci"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "718651a1-eba6-4cbe-a05b-d7b3691b5ee8",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "4594f28b065b7b4b1de138c28b60b993f6fc3272",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T16:04:51.992963566Z",
+  "completed_at": "2026-07-14T16:08:24.226931438Z",
+  "duration_ms": 212233,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes ... FAILED\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s\n---- test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes stdout ----\n\nthread 'test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes' (3836706) panicked at crates/jit/tests/stale_binary_json_exit_tests.rs:92:5:\nassertion failed: status.success()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

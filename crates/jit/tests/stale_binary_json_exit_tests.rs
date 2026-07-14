@@ -25,6 +25,20 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
+/// A `jit` invocation with the gate-context variables scrubbed. When this
+/// test suite itself executes under a `cargo-ci` gate evaluation, the whole
+/// process tree inherits `JIT_GATE_RUN=1` from the evaluator; left in place,
+/// it would turn every spawned `jit` into a self-checking gate child and
+/// refuse before the evaluator-path behavior under test is ever reached.
+fn jit_cmd(repo_root: &Path) -> Command {
+    let mut cmd = Command::new(jit_binary());
+    cmd.current_dir(repo_root)
+        .env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY");
+    cmd
+}
+
 /// Build a scratch git repository whose `HEAD` is one commit past the running
 /// test binary's own build commit. Returns `None` (the caller should skip)
 /// when the binary was built without git, or any local git step fails for
@@ -84,15 +98,10 @@ fn scratch_repo_stale_against_own_build() -> Option<(TempDir, String)> {
 /// `jit init` + one automated gate (key `g`, always-passing checker) + one
 /// issue requiring it, all inside `repo_root`. Returns the issue id.
 fn setup_gated_issue(repo_root: &Path) -> String {
-    let status = Command::new(jit_binary())
-        .current_dir(repo_root)
-        .arg("init")
-        .status()
-        .unwrap();
+    let status = jit_cmd(repo_root).arg("init").status().unwrap();
     assert!(status.success());
 
-    let status = Command::new(jit_binary())
-        .current_dir(repo_root)
+    let status = jit_cmd(repo_root)
         .args([
             "gate",
             "define",
@@ -110,8 +119,7 @@ fn setup_gated_issue(repo_root: &Path) -> String {
         .unwrap();
     assert!(status.success());
 
-    let output = Command::new(jit_binary())
-        .current_dir(repo_root)
+    let output = jit_cmd(repo_root)
         .args(["issue", "create", "--title", "Test", "--json"])
         .output()
         .unwrap();
@@ -119,8 +127,7 @@ fn setup_gated_issue(repo_root: &Path) -> String {
     let created: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     let issue_id = created["id"].as_str().unwrap().to_string();
 
-    let status = Command::new(jit_binary())
-        .current_dir(repo_root)
+    let status = jit_cmd(repo_root)
         .args(["gate", "add", &issue_id, "g"])
         .status()
         .unwrap();
@@ -141,8 +148,7 @@ fn test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes() {
     let issue_id = setup_gated_issue(temp.path());
 
     // Text mode.
-    let text_output = Command::new(jit_binary())
-        .current_dir(temp.path())
+    let text_output = jit_cmd(temp.path())
         .args(["gate", "evaluate", &issue_id, "g"])
         .output()
         .unwrap();
@@ -159,8 +165,7 @@ fn test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes() {
     );
 
     // JSON mode: same exit code, plus a structured envelope.
-    let json_output = Command::new(jit_binary())
-        .current_dir(temp.path())
+    let json_output = jit_cmd(temp.path())
         .args(["gate", "evaluate", &issue_id, "g", "--json"])
         .output()
         .unwrap();
