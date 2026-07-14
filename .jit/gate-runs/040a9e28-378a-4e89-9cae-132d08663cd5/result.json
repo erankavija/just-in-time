@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "040a9e28-378a-4e89-9cae-132d08663cd5",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+  "commit": "f54d342cf8b4fd8f7ca0121d7b23dfd3a081f359",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T00:10:34.010873378Z",
+  "completed_at": "2026-07-14T00:11:50.185857811Z",
+  "duration_ms": 76174,
+  "exit_code": 0,
+  "stdout": "Attribution: `enhancement` is a leaf (maximum hierarchy level; no resolved children). I inspected the two current-branch commits tagged `jit:a9b5dd08` individually. Their union changes archive behavior and [the canonical archive reference](docs/reference/cli-commands.md:268); the linked design document is internal. Uncommitted JIT gate metadata was not attributed.\n\nDocumentation decision: pass. The reference accurately covers slug selection and normalization, marker-authoritative identity, frozen destinations, legacy ID-only adoption, conflict behavior, and the resolved output contract.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's tagged changes accurately document the archive-directory slug, stability, identity, and legacy-compatibility contract.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's tagged changes accurately document the archive-directory slug, stability, identity, and legacy-compatibility contract.",
+    "findings": []
+  }
+}

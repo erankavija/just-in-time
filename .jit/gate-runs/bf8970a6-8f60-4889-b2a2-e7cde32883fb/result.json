@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "bf8970a6-8f60-4889-b2a2-e7cde32883fb",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "a9b5dd08-c6ae-4add-99f1-275289e43f0c",
+  "commit": "f54d342cf8b4fd8f7ca0121d7b23dfd3a081f359",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T00:06:57.117285278Z",
+  "completed_at": "2026-07-14T00:10:33.904554841Z",
+  "duration_ms": 216787,
+  "exit_code": 0,
+  "stdout": "Attribution: 0686ca7f, f54d342c (`jit:a9b5dd08`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/domain-agnostic, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-14T00:04:23Z); doc-review pending; docs-mechanical pending\nTruncation recovery: scoped docs/reference and archive-path reads recovered a broad-search truncation; omitted matches were outside the attributable cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and documented in the attributable current tree; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are implemented and documented in the attributable current tree; no issue-impact defects found.",
+    "findings": []
+  }
+}
