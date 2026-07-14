@@ -64,6 +64,21 @@ If leaks are detected:
 
 Re-run the leak check until it returns clean before doing any commits on main.
 
+### Step 5 — Per-merge build verification
+
+Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — verify that the merged commit itself compiles:
+
+```bash
+git merge --no-ff worktree-agent-<short-id>
+scripts/verify-commit-builds.sh          # judges HEAD (the merge commit) in isolation
+```
+
+`verify-commit-builds.sh` resolves the named commit's sources with `git archive` into a throwaway directory and runs `cargo build --workspace` there, so its verdict is about the commit, not about whatever tree the lead happens to hold. Exit 0 means the commit builds; exit 1 means it does not; exit 2 is an environment problem.
+
+This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a working tree. A worker branch anchored before a module deletion, merged after it, can cleanly re-add a `mod` declaration for a file that no longer exists — git sees a file removed on one side and an untouched declaration on the other, finds no textual overlap, and merges without a conflict. The leak check reports no leak (the merge is legitimate), every per-issue gate still reads green (the checker ran against a working tree that compiled), and `main` does not compile. Run the build verification after every merge so a broken merge commit is caught at the merge, not by the next clone or reset.
+
+If the check reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
+
 ## Lead-preserve workflow on worker truncation
 
 If a worker terminates abnormally (API outage, timeout, OOM) leaving uncommitted changes in its worktree, capture them on the worker branch so the next-session lead can review:
@@ -100,6 +115,7 @@ Document the rebase in the next handoff. The worker's spec compliance must be re
 |---|---|---|
 | Worktree branched from stale ancestor | Step 2 verifies `git rev-parse HEAD` of every worktree equals `main`'s | Pre-dispatch — a mismatch fails the script |
 | Worker writes files into main's checkout | Step 4 diffs `git status -uall` vs. snapshot | Post-dispatch — a leak shows up as "entries present now, not in snapshot" |
+| Clean merge leaves the merge commit non-compiling | Step 5 builds the named merge commit from `git archive`, isolated from the working tree | Post-merge — a broken merge commit exits nonzero even when gates and the leak check are green |
 | Lead forgets the post-dispatch check | The dispatch script's final line reminds the lead | Lead reads the reminder every time |
 | Worker bundles commits, then crashes mid-batch | Per-issue dispatch prompt rule: "commit each spiral step before proceeding" | Worker prompt — this is on the worker, not on the protocol |
 

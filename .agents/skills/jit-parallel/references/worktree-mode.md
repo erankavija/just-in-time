@@ -63,6 +63,24 @@ both sides of that per-worktree append-only log without a conflict. The claim lo
 outside the versioned `.jit/` tree, so every worktree already reads and writes the same
 physical file. Code conflicts require manual resolution.
 
+After **each** merge — before the next merge and before any further commit lands on top —
+verify that the merge commit itself compiles:
+
+```bash
+scripts/verify-commit-builds.sh          # judges HEAD (the merge commit) in isolation
+```
+
+The script resolves the named commit's sources with `git archive` into a throwaway
+directory and runs `cargo build --workspace` there, so it judges the commit, not the tree
+the lead holds. A textually clean merge can still leave `main` non-compiling: a worker
+branch anchored before a module deletion, merged after it, re-adds a `mod` declaration for
+a file that no longer exists — git sees the file removed on one side and the declaration
+untouched on the other, finds no overlap, and merges without a conflict. The per-issue
+gates and the leak check below both evidence a working tree, so they stay green while the
+committed `main` fails to build; this check is what catches it. Exit 0 means the commit
+builds, exit 1 means it does not. On failure, amend or fix-forward the merge commit and
+re-run before merging the next branch.
+
 After the wave completes, run the leak check before committing anything on `main`:
 
 ```bash
