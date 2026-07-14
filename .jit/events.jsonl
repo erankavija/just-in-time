@@ -7314,3 +7314,6 @@
 {"type":"gate_failed","id":"2140f30d-85bc-4989-8218-c792ac7646b3","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T21:26:00.513050874Z","gate_key":"plan-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"4f9e0a92-e986-445e-a693-73d9a4f2f42a","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:03:31.755089964Z","gate_key":"plan-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"a95dd222-63c9-4a7b-ae74-75c301df8c36","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:19:49.602955002Z","gate_key":"plan-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"9945cc90-6138-4be5-8860-62ca1e264f8c","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:21:49.757033355Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"0ef0f043-70d1-44d2-af3a-bdd088c5c644","issue_id":"ca024a2b-561d-432c-99f0-3a9ded3451d5","timestamp":"2026-07-14T22:21:49.757072855Z"}
+{"type":"issue_state_changed","id":"331a3bd9-cd98-4018-b671-be9c2e20fd50","issue_id":"96326159-43e5-4a36-8cab-de8d858fae13","timestamp":"2026-07-14T22:21:49.961436413Z","from":"backlog","to":"ready"}
