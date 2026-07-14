@@ -64,22 +64,24 @@ outside the versioned `.jit/` tree, so every worktree already reads and writes t
 physical file. Code conflicts require manual resolution.
 
 After **each** merge — before the next merge and before any further commit lands on top —
-verify that the merge commit itself compiles:
+verify that the merge commit itself builds:
 
 ```bash
-scripts/verify-commit-builds.sh          # judges HEAD (the merge commit) in isolation
+scripts/verify-commit-builds.sh          # verify the merge commit (HEAD) itself builds
 ```
 
-The script resolves the named commit's sources with `git archive` into a throwaway
-directory and runs `cargo build --workspace` there, so it judges the commit, not the tree
-the lead holds. A textually clean merge can still leave `main` non-compiling: a worker
-branch anchored before a module deletion, merged after it, re-adds a `mod` declaration for
-a file that no longer exists — git sees the file removed on one side and the declaration
-untouched on the other, finds no overlap, and merges without a conflict. The per-issue
-gates and the leak check below both evidence a working tree, so they stay green while the
-committed `main` fails to build; this check is what catches it. Exit 0 means the commit
-builds, exit 1 means it does not. On failure, amend or fix-forward the merge commit and
-re-run before merging the next branch.
+This verifier is a project-provided repository script: given a commit, it resolves THAT
+commit's sources in isolation — reading only the named commit (via `git archive` or an
+equivalent that never reads the working tree and never stashes or cleans it) — and runs the
+project's build command against them, exiting 0 when the commit builds and nonzero when it
+does not. A project supplies it at the conventional path `scripts/verify-commit-builds.sh`;
+the build command lives in that script. A textually clean merge can otherwise leave the
+mainline broken: a worker branch anchored before a module deletion, merged after it, re-adds
+a declaration referencing a file that no longer exists — the merge sees the file removed on
+one side and the declaration untouched on the other, finds no overlap, and merges without a
+conflict. The per-issue gates and the leak check below both evidence a working tree, so they
+stay green while the committed mainline fails to build; this check is what catches it. On
+failure, amend or fix-forward the merge commit and re-run before merging the next branch.
 
 After the wave completes, run the leak check before committing anything on `main`:
 
