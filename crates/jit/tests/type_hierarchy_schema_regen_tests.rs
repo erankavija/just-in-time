@@ -1,15 +1,17 @@
-//! Integration tests for T1 (jit:c78168d8): regenerating the baked write-path
-//! type-hierarchy schema from `[type_hierarchy]` so a config-declared type passes
-//! write-path validation without hand-editing
-//! `.jit/schemas/default-type-hierarchy-known.json` (design doc risk R5).
+//! Integration tests (jit:af4c901a): the `type-hierarchy-known` default rule
+//! derives its allowed-type enum from `[type_hierarchy]` in memory at LOAD, so a
+//! config-declared type validates without regenerating
+//! `.jit/schemas/default-type-hierarchy-known.json`.
 //!
 //! Exercises the full disk-based path: a real `.jit/` scaffolded by
 //! `scaffold_default_rules` (so `rules.toml` + the baked schema exist), a
 //! `config.toml` edited to add a new type, then `CommandExecutor::create_issue`
 //! against `JsonFileStorage`. `type-hierarchy-known` (origin = "default") is
-//! `enforce = false`, so an unknown type never blocks the write — it surfaces
-//! as a WARNING; the deliverable is that the warning disappears once the
-//! schema is regenerated.
+//! `enforce = false`, so an unknown type never blocks the write — it would
+//! surface as a WARNING; the deliverable is that a declared type emits no warning
+//! even while the on-disk projection is stale, because the registry (not the
+//! baked file) is the authority. The projection is a write-through copy that
+//! `refresh_default_schema_projections` republishes on re-init / config writes.
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
@@ -75,37 +77,30 @@ fn create_typed(jit_dir: &std::path::Path, type_label: &str) -> Vec<String> {
 }
 
 #[test]
-fn test_new_type_warns_on_write_before_schema_regenerated() {
-    // BASELINE (the R5 bug): adding `planning` to config but NOT refreshing the
-    // baked schema leaves the write-path `type-hierarchy-known` rule reading
-    // the frozen enum, so a `type:planning` issue warns.
+fn test_new_type_passes_without_schema_regeneration() {
+    // DELIVERABLE (af4c901a): adding `planning` to `[type_hierarchy]` and NOT
+    // refreshing the baked schema still validates a `type:planning` issue clean —
+    // `type-hierarchy-known` derives its enum from config in memory at load, so
+    // the stale on-disk projection does not decide validation.
     let (_temp, jit_dir) = setup_initialized_repo();
     add_planning_type(&jit_dir);
 
-    let warnings = create_typed(&jit_dir, "type:planning");
+    // The on-disk projection is still stale (no regeneration step ran).
+    let schema = fs::read_to_string(
+        jit_dir
+            .join("schemas")
+            .join("default-type-hierarchy-known.json"),
+    )
+    .unwrap();
     assert!(
-        warnings.iter().any(|w| w.contains("type-hierarchy-known")),
-        "expected a stale type-hierarchy-known warning before regeneration, got {warnings:?}"
+        !schema.contains("planning"),
+        "precondition: the baked projection is still stale: {schema}"
     );
-}
-
-#[test]
-fn test_new_type_passes_write_path_after_schema_regenerated() {
-    // DELIVERABLE: regenerating the baked schema from `[type_hierarchy]` makes the
-    // write-path rule recognize `planning`, so creating a `type:planning` issue
-    // emits NO type-hierarchy-known warning.
-    let (_temp, jit_dir) = setup_initialized_repo();
-    add_planning_type(&jit_dir);
-
-    // Apply the config change: regenerate the baked schema.
-    let admin = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
-    let wrote = admin.regenerate_type_hierarchy_schema().unwrap();
-    assert!(wrote, "an existing baked layout must be refreshed");
 
     let warnings = create_typed(&jit_dir, "type:planning");
     assert!(
         !warnings.iter().any(|w| w.contains("type-hierarchy-known")),
-        "no type-hierarchy-known warning after regeneration, got {warnings:?}"
+        "a declared type must validate at load without regenerating, got {warnings:?}"
     );
 
     // The pre-existing types still validate cleanly too.
@@ -117,15 +112,30 @@ fn test_new_type_passes_write_path_after_schema_regenerated() {
 }
 
 #[test]
-fn test_reinit_refreshes_type_hierarchy_schema() {
-    // Re-running the scaffold (the idempotent `jit init` apply path) refreshes the
-    // baked schema from the edited config even though rules.toml already exists.
+fn test_unknown_type_still_warns() {
+    // Boundary: a type NOT declared in `[type_hierarchy]` still surfaces the
+    // `type-hierarchy-known` warning (derive-at-load did not blanket-disable it).
+    let (_temp, jit_dir) = setup_initialized_repo();
+
+    let warnings = create_typed(&jit_dir, "type:nonsense");
+    assert!(
+        warnings.iter().any(|w| w.contains("type-hierarchy-known")),
+        "an undeclared type must still warn, got {warnings:?}"
+    );
+}
+
+#[test]
+fn test_reinit_refreshes_type_hierarchy_projection() {
+    // Re-running the scaffold (the idempotent `jit init` apply path) republishes
+    // the baked schema projection from the edited config even though rules.toml
+    // already exists. Validation already passed before this (see above); the
+    // refresh keeps the file current for external consumers.
     let (_temp, jit_dir) = setup_initialized_repo();
     add_planning_type(&jit_dir);
 
     let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
     // rules.toml already exists, so scaffold returns false (no clobber) but still
-    // regenerates the baked type-hierarchy schema.
+    // republishes the default-schema projections.
     let scaffolded = executor.scaffold_default_rules().unwrap();
     assert!(
         !scaffolded,
@@ -140,12 +150,61 @@ fn test_reinit_refreshes_type_hierarchy_schema() {
     .unwrap();
     assert!(
         schema.contains("planning") && schema.contains("breakdown"),
-        "re-init must bake the newly-declared types into the schema: {schema}"
+        "re-init must republish the newly-declared types into the projection: {schema}"
+    );
+}
+
+#[test]
+fn test_refresh_republishes_all_default_projections() {
+    // `refresh_default_schema_projections` rewrites EVERY default-origin schema
+    // file (label-format, namespace-registry, type-hierarchy-known) from config,
+    // returning the names it wrote.
+    let (_temp, jit_dir) = setup_initialized_repo();
+    add_planning_type(&jit_dir);
+
+    let admin = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let mut written = admin.refresh_default_schema_projections().unwrap();
+    written.sort();
+    assert_eq!(
+        written,
+        vec![
+            "default-label-format.json".to_string(),
+            "default-namespace-registry.json".to_string(),
+            "default-type-hierarchy-known.json".to_string(),
+        ],
+        "all three default projections are republished"
     );
 
-    let warnings = create_typed(&jit_dir, "type:breakdown");
+    let schema = fs::read_to_string(
+        jit_dir
+            .join("schemas")
+            .join("default-type-hierarchy-known.json"),
+    )
+    .unwrap();
     assert!(
-        !warnings.iter().any(|w| w.contains("type-hierarchy-known")),
-        "no warning for a declared type after re-init, got {warnings:?}"
+        schema.contains("planning"),
+        "the republished type-hierarchy projection tracks config: {schema}"
     );
+}
+
+#[test]
+fn test_refresh_is_noop_without_materialized_schemas() {
+    // A repo whose `rules.toml`/`schemas/` were never materialized (read path
+    // builds defaults in memory) has nothing to republish: refresh writes nothing.
+    std::env::set_var("JIT_TEST_MODE", "1");
+    let temp = TempDir::new().unwrap();
+    let jit_dir = temp.path().join(".jit");
+    fs::create_dir(&jit_dir).unwrap();
+    fs::write(
+        jit_dir.join("config.toml"),
+        "[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+    )
+    .unwrap();
+    let storage = JsonFileStorage::new(&jit_dir);
+    storage.init().unwrap();
+
+    let admin = CommandExecutor::new(JsonFileStorage::new(&jit_dir));
+    let written = admin.refresh_default_schema_projections().unwrap();
+    assert!(written.is_empty(), "no baked layout => nothing republished");
+    assert!(!jit_dir.join("schemas").exists());
 }

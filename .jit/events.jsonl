@@ -7252,3 +7252,4 @@
 {"type":"gate_passed","id":"10a3a5d7-2b3f-436f-acd6-e3542fcba305","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T16:50:58.723218507Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"b2b32ae9-2afc-4b70-805e-f72f290a7c78","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T16:51:26.194999303Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"07195720-7f4d-4704-adb9-69c6f2476936","issue_id":"7446af34-d386-44e3-aa20-3422893219f0","timestamp":"2026-07-14T16:51:26.195040183Z"}
+{"type":"issue_updated","id":"58e5fb7f-a3c6-44ea-9437-7506d21c0dec","issue_id":"af4c901a-c7f2-434e-9abb-0887542d5b7f","timestamp":"2026-07-14T12:54:32.357469890Z","updated_by":"doc-add","fields":["documents"]}

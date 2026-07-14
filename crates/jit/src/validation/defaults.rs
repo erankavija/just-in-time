@@ -46,6 +46,7 @@ use crate::domain::LabelNamespaces;
 use crate::validation::rules::{
     Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
 };
+use std::collections::HashMap;
 
 /// The canonical `namespace:value` label format, mirroring the regex the legacy
 /// `validate_labels` enforced unconditionally via `labels::validate_label`.
@@ -216,12 +217,91 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     RuleSet { rules }
 }
 
+/// Rebuild the assertion of every `origin = "default"` rule in `loaded` from the
+/// declared `namespaces` registry, so a default-origin rule validates against a
+/// schema derived from `config.toml` in memory rather than from its on-disk
+/// `schemas/default-*.json` projection.
+///
+/// This is the load-time derivation that keeps the fixed default rules in
+/// lock-step with a hand-edited registry: the on-disk schema is a write-through
+/// projection for external consumers, never the validation authority. A
+/// default-origin rule is rewritten only when [`default_ruleset`] generates a
+/// rule of the SAME name for the current `namespaces`; its assertion (and derived
+/// [`scope`](Rule::scope)) is replaced with the freshly-derived one, while its
+/// policy fields (`severity`, `enforce`, `when`, `description`) are preserved so
+/// those stay editable in `rules.toml`. Custom rules (any other `origin`) and any
+/// default-origin rule the current registry no longer generates are returned
+/// unchanged.
+///
+/// Pure: performs no I/O, deterministic, and total.
+///
+/// # Examples
+///
+/// ```
+/// use jit::domain::{LabelNamespace, LabelNamespaces};
+/// use jit::validation::defaults::{default_ruleset, with_default_assertions_from_config};
+/// use std::collections::HashMap;
+///
+/// // A ruleset scaffolded when only `type` was declared.
+/// let mut old = HashMap::new();
+/// old.insert("type".to_string(), LabelNamespace::new("Type", true));
+/// let scaffolded = default_ruleset(&LabelNamespaces {
+///     schema_version: 2,
+///     namespaces: old,
+///     type_hierarchy: None,
+///     label_associations: None,
+///     strategic_types: None,
+/// });
+///
+/// // The registry now also declares `enforces` (a later hand edit).
+/// let mut now = HashMap::new();
+/// now.insert("type".to_string(), LabelNamespace::new("Type", true));
+/// now.insert("enforces".to_string(), LabelNamespace::new("Enforces", false));
+/// let current = LabelNamespaces {
+///     schema_version: 2,
+///     namespaces: now,
+///     type_hierarchy: None,
+///     label_associations: None,
+///     strategic_types: None,
+/// };
+///
+/// let derived = with_default_assertions_from_config(scaffolded, &current);
+/// // The `namespace-registry` rule now derives from the current registry.
+/// assert!(derived.rules.iter().any(|r| r.name == "namespace-registry"));
+/// ```
+pub fn with_default_assertions_from_config(
+    loaded: RuleSet,
+    namespaces: &LabelNamespaces,
+) -> RuleSet {
+    let derived = default_ruleset(namespaces);
+    let by_name: HashMap<&str, &Assertion> = derived
+        .rules
+        .iter()
+        .map(|rule| (rule.name.as_str(), &rule.assert))
+        .collect();
+    let rules = loaded
+        .rules
+        .into_iter()
+        .map(|mut rule| {
+            if rule.origin.as_deref() == Some(DEFAULT_ORIGIN) {
+                if let Some(assert) = by_name.get(rule.name.as_str()) {
+                    rule.assert = (*assert).clone();
+                    rule.scope = rule.assert.scope();
+                }
+            }
+            rule
+        })
+        .collect();
+    RuleSet { rules }
+}
+
 /// The stable schema file name the `type-hierarchy-known` rule (`origin =
 /// "default"`) references once serialized to `.jit/rules.toml` (the sanitized
 /// `<origin>:<name>` identity + `.json`, matching [`serialize`](crate::validation::serialize)'s
-/// schema-stem derivation). This is the ONE file the write-path rule reads, so
-/// regenerating it from config is what keeps the write path in sync with
-/// `[type_hierarchy]` (R5).
+/// schema-stem derivation). This file is a write-through projection: the rule
+/// derives its enum from `[type_hierarchy]` in memory at load
+/// ([`with_default_assertions_from_config`]), so the file tracks config for
+/// external consumers but never decides validation.
 pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json";
 
 /// Build the JSON Schema backing the `type-hierarchy-known` rule from a
@@ -230,10 +310,11 @@ pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json"
 /// deterministic output).
 ///
 /// This is the SINGLE source for that schema's shape, shared by
-/// [`default_ruleset`] (in-memory / `jit init` scaffold) and the on-disk
-/// regenerator (`regenerate_type_hierarchy_schema`), so the baked
-/// `.jit/schemas/default-type-hierarchy-known.json` can never drift from the
-/// in-memory default (R5: one source, not two). Pure: no I/O, deterministic.
+/// [`default_ruleset`] (used for both in-memory evaluation and the projection
+/// [`serialize`](crate::validation::serialize) writes), so the baked
+/// `.jit/schemas/default-type-hierarchy-known.json` projection can never drift
+/// from the schema validation actually uses (one source, not two). Pure: no I/O,
+/// deterministic.
 pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::Value {
     let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
     hierarchy_types.sort(); // deterministic schema enum order
@@ -647,6 +728,164 @@ mod tests {
         )
         .unwrap();
         assert!(good.findings().is_empty());
+    }
+
+    /// Build a loaded default-origin `namespace-registry` rule whose baked schema
+    /// is `stale_registry` (simulating an on-disk projection that predates a
+    /// registry edit).
+    fn stale_namespace_registry_rule(stale_registry: &[&str]) -> Rule {
+        Rule {
+            name: "namespace-registry".to_string(),
+            origin: Some("default".to_string()),
+            description: Some("stale".to_string()),
+            when: Selector::default(),
+            severity: Severity::Error,
+            enforce: false,
+            assert: Assertion::JsonSchema(SchemaSource {
+                reference: "schemas/default-namespace-registry.json".to_string(),
+                path: std::path::PathBuf::from("schemas/default-namespace-registry.json"),
+                schema: registered_namespace_schema(stale_registry),
+            }),
+            scope: RuleScope::Local,
+        }
+    }
+
+    #[test]
+    fn test_with_default_assertions_rederives_namespace_registry_from_config() {
+        // A default-origin namespace-registry rule carrying a STALE schema (its
+        // pattern knows only `type`) must be rebuilt from the CURRENT registry
+        // (which also declares `enforces`), so its schema no longer decides
+        // validation — config does.
+        let loaded = RuleSet {
+            rules: vec![stale_namespace_registry_rule(&["type"])],
+        };
+        let reg = registry(vec![
+            ("type", LabelNamespace::new("Type", true)),
+            ("enforces", LabelNamespace::new("Enforces", false)),
+        ]);
+
+        let derived = with_default_assertions_from_config(loaded, &reg);
+        match &derived.rules[0].assert {
+            Assertion::JsonSchema(src) => assert_eq!(
+                src.schema,
+                registered_namespace_schema(&["enforces", "type"]),
+                "assertion must derive from the current registry (sorted)"
+            ),
+            other => panic!("expected JsonSchema, got {other:?}"),
+        }
+        // Policy fields are preserved (only the assertion is re-derived).
+        assert_eq!(derived.rules[0].severity, Severity::Error);
+        assert!(!derived.rules[0].enforce);
+
+        // A label in the newly-declared namespace now validates clean, WITHOUT
+        // touching the on-disk projection.
+        let ok = evaluate_local(
+            &issue_with(&["enforces:x"]),
+            &derived,
+            crate::domain::ContentFormat::Markdown,
+        )
+        .unwrap();
+        assert!(
+            ok.findings().is_empty(),
+            "a declared namespace must validate: {:?}",
+            ok.findings()
+        );
+    }
+
+    #[test]
+    fn test_with_default_assertions_leaves_custom_rules_untouched() {
+        // A custom rule (origin != "default") keeps its own assertion verbatim: a
+        // custom json-schema still points at its declared file (REQ-03).
+        let custom = Rule {
+            name: "custom-shape".to_string(),
+            origin: Some("bracket".to_string()),
+            description: None,
+            when: Selector::default(),
+            severity: Severity::Warn,
+            enforce: false,
+            assert: Assertion::JsonSchema(SchemaSource {
+                reference: "schemas/custom-shape.json".to_string(),
+                path: std::path::PathBuf::from("schemas/custom-shape.json"),
+                schema: serde_json::json!({ "type": "object" }),
+            }),
+            scope: RuleScope::Local,
+        };
+        let loaded = RuleSet {
+            rules: vec![custom.clone()],
+        };
+        let derived = with_default_assertions_from_config(
+            loaded,
+            &registry(vec![("type", LabelNamespace::new("Type", true))]),
+        );
+        assert_eq!(derived.rules, vec![custom], "custom rules are untouched");
+    }
+
+    #[test]
+    fn test_with_default_assertions_leaves_unknown_default_rule_untouched() {
+        // A default-origin rule the CURRENT registry no longer generates (a
+        // uniqueness rule for a namespace since removed from config) is returned
+        // unchanged — there is no config-derived assertion to substitute.
+        let orphan = local_rule(
+            "namespace-unique-gone",
+            "leftover",
+            Selector::default(),
+            Severity::Error,
+            true,
+            Assertion::RequireLabel {
+                label: "gone:*".to_string(),
+                min: Some(0),
+                max: Some(1),
+            },
+        );
+        let loaded = RuleSet {
+            rules: vec![orphan.clone()],
+        };
+        let derived = with_default_assertions_from_config(loaded, &registry(vec![]));
+        assert_eq!(
+            derived.rules,
+            vec![orphan],
+            "unknown default rule is untouched"
+        );
+    }
+
+    #[test]
+    fn test_with_default_assertions_rederives_type_hierarchy_schema() {
+        // The `type-hierarchy-known` default rule is rebuilt from the current
+        // hierarchy, so a newly-declared type validates without regenerating the
+        // baked schema.
+        let stale = Rule {
+            name: "type-hierarchy-known".to_string(),
+            origin: Some("default".to_string()),
+            description: None,
+            when: Selector::default(),
+            severity: Severity::Error,
+            enforce: false,
+            assert: Assertion::JsonSchema(SchemaSource {
+                reference: TYPE_HIERARCHY_SCHEMA_FILE.to_string(),
+                path: std::path::PathBuf::from(TYPE_HIERARCHY_SCHEMA_FILE),
+                // A stale enum that knows only the default hierarchy.
+                schema: type_hierarchy_known_schema(&registry(vec![])),
+            }),
+            scope: RuleScope::Local,
+        };
+        let mut hierarchy = HashMap::new();
+        for (name, level) in [("epic", 2u8), ("planning", 3), ("task", 4)] {
+            hierarchy.insert(name.to_string(), level);
+        }
+        let reg = LabelNamespaces {
+            schema_version: 2,
+            namespaces: HashMap::new(),
+            type_hierarchy: Some(hierarchy),
+            label_associations: None,
+            strategic_types: None,
+        };
+        let derived = with_default_assertions_from_config(RuleSet { rules: vec![stale] }, &reg);
+        match &derived.rules[0].assert {
+            Assertion::JsonSchema(src) => {
+                assert_eq!(src.schema, type_hierarchy_known_schema(&reg));
+            }
+            other => panic!("expected JsonSchema, got {other:?}"),
+        }
     }
 
     #[test]
