@@ -11,7 +11,7 @@ See `dev/active/babcf05e-handoff-4.md` (in the gf2 project) for the full inciden
 
 ## Protocol
 
-The lead follows these four steps **every time** a parallel worktree dispatch is required.
+The lead follows these steps **every time** a parallel worktree dispatch is required.
 
 ### Step 1 — Pre-flight
 
@@ -119,7 +119,7 @@ Document the rebase in the next handoff. The worker's spec compliance must be re
 | Lead forgets the post-dispatch check | The dispatch script's final line reminds the lead | Lead reads the reminder every time |
 | Worker bundles commits, then crashes mid-batch | Per-issue dispatch prompt rule: "commit each spiral step before proceeding" | Worker prompt — this is on the worker, not on the protocol |
 
-The third row is worth emphasising: the post-dispatch check is the only guard against TRAP 6, and it is one shell line. The lead must run it after every wave, even when the wave looks clean by eyeball. Eyeballing is what missed the leak in babcf05e session 6 in the first place.
+The leak-check row (Step 4) is worth emphasising: the post-dispatch check is the only guard against TRAP 6, and it is one shell line. The lead must run it after every wave, even when the wave looks clean by eyeball. Eyeballing is what missed the leak in babcf05e session 6 in the first place.
 
 ## Implementation
 
