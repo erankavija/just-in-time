@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "654482a8-6393-40b7-920b-af65d34ede61",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7446af34-d386-44e3-aa20-3422893219f0",
+  "commit": "60a34376df3f33879858b1bde8d946559c014a31",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T15:16:39.538609243Z",
+  "completed_at": "2026-07-14T15:20:39.316301753Z",
+  "duration_ms": 239777,
+  "exit_code": 1,
+  "stdout": "Attribution: c53215be, c08dbd51, 63ff8d37, e863225a, b1d9e9f1, a84e2462, 60a34376 (`jit:7446af34`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review failed (exit 1); docs-mechanical passed (exit 0)\nTruncation recovery: Re-read bounded checker-script, gate-execution, policy, current-file, and latest-run ranges after broad output truncated.\n\n1. **F1 — high, blocking, issue-impact:** The guard at `crates/jit/src/commands/gate_check.rs:171` checks only the outer `jit gate evaluate` process. Repository checkers still invoke `jit` from inherited `PATH`—for example, [`scripts/jit-validate.sh:2`](scripts/jit-validate.sh:2)—and the executor does not replace `PATH` before spawning them ([`crates/jit/src/gate_execution.rs:218`](crates/jit/src/gate_execution.rs:218)). Thus a fresh outer binary can record a gate verdict produced by an older inner `jit validate` binary, leaving REQ-02 unmet. The added tests use `echo ran`, so they do not cover this real checker path.\n\n2. **F2 — medium, blocking, issue-impact:** [`docs/reference/cli-commands.md:1524`](docs/reference/cli-commands.md:1524) says a build/HEAD mismatch or dirty build causes refusal, but omits the required identity condition: the repository must also resolve the binary’s build commit. This contradicts its unrelated-repository exception and the implemented predicate. References: `@/invariant/single-source-prose`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The guard does not protect PATH-invoked checker binaries, and the canonical command reference states an incomplete refusal predicate.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The stale-binary guard checks only the outer gate evaluator; checker scripts can still invoke an older jit from PATH and persist its verdict.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":171,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical gate reference omits the required condition that the repository can resolve the binary's build commit before refusing a mismatch or dirty build.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1524,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6797 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.3\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6133-9ab2-71c1-a233-4f4a9946da4c\n--------\nuser\n--- 6784 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The guard does not protect PATH-invoked checker binaries, and the canonical command reference states an incomplete refusal predicate.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The stale-binary guard checks only the outer gate evaluator; checker scripts can still invoke an older jit from PATH and persist its verdict.",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "line": 171
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical gate reference omits the required condition that the repository can resolve the binary's build commit before refusing a mismatch or dirty build.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1524,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}
