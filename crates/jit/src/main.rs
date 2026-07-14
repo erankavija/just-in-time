@@ -513,29 +513,47 @@ fn render_gate_pass_error(
         // (`ErrorCode::to_exit_code`), matching the non-JSON path's
         // `ExitCode::ExternalError` classification of the same typed error in
         // `error_to_exit_code`.
-        use jit::domain::build_provenance::StaleBinaryReason;
-        let (reason_code, built_from) = match stale.reason() {
-            StaleBinaryReason::CommitMismatch { built_from, .. } => {
-                ("commit_mismatch", built_from.clone())
-            }
-            StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
-        };
-        JsonError::new(jit::output::ErrorCode::STALE_BINARY, e.to_string(), command)
-            .with_details(serde_json::json!({
-                "issue_id": stale.issue_id(),
-                "key": stale.gate_key(),
-                "reason": reason_code,
-                "built_from": built_from,
-            }))
-            .with_suggestion("Rebuild and reinstall: cargo install --path crates/jit")
-            .with_suggestion(format!(
-                "Verify with: jit --version (should show commit {built_from})"
-            ))
+        stale_binary_json_error(stale, command)
     } else {
         JsonError::new("GATE_ERROR", e.to_string(), command)
     };
     println!("{}", json_error.to_json_string()?);
     std::process::exit(json_error.exit_code().code());
+}
+
+/// Build the `--json` error envelope for a stale-binary refusal
+/// ([`StaleBinaryError`](jit::errors::StaleBinaryError), jit:7446af34).
+///
+/// Shared by [`render_gate_pass_error`] (the evaluator's own refusal, REQ-01)
+/// and [`emit_startup_json_error`] (a checker-spawned `jit` child's own
+/// self-refusal, REQ-02), so both carry the identical `STALE_BINARY` code,
+/// `details` (issue id, gate key, reason, build commit), and reinstall
+/// suggestion — one envelope shape regardless of which process in the gate
+/// run detected the staleness.
+fn stale_binary_json_error(
+    stale: &jit::errors::StaleBinaryError,
+    command: &str,
+) -> jit::output::JsonError {
+    use jit::domain::build_provenance::StaleBinaryReason;
+    use jit::output::{ErrorCode, JsonError};
+
+    let (reason_code, built_from) = match stale.reason() {
+        StaleBinaryReason::CommitMismatch { built_from, .. } => {
+            ("commit_mismatch", built_from.clone())
+        }
+        StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
+    };
+    JsonError::new(ErrorCode::STALE_BINARY, stale.to_string(), command)
+        .with_details(serde_json::json!({
+            "issue_id": stale.issue_id(),
+            "key": stale.gate_key(),
+            "reason": reason_code,
+            "built_from": built_from,
+        }))
+        .with_suggestion("Rebuild and reinstall: cargo install --path crates/jit")
+        .with_suggestion(format!(
+            "Verify with: jit --version (should show commit {built_from})"
+        ))
 }
 
 /// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
@@ -1536,14 +1554,16 @@ fn main() {
 
 /// Under `--json`, emit a structured error envelope on stdout for the startup
 /// failures that abort before any command handler runs: repository-not-found
-/// (exit 3) and repository-format-too-new (exit 10).
+/// (exit 3), repository-format-too-new (exit 10), and — when this process is
+/// itself a child spawned inside a gate checker's process tree (jit:7446af34
+/// REQ-02) — a stale-binary self-refusal (exit 10).
 ///
 /// The human-readable line always goes to stderr (via `main`) and the exit code
 /// is unchanged; this only ADDS the machine-readable object so `--json` callers
 /// can branch on the error class instead of parsing an empty stdout. The `--json`
 /// flag is read from argv because these failures occur during repository
 /// discovery/validation, before a parsed command-level `json` field exists. A
-/// no-op unless the error is one of the two startup conditions AND `--json` was
+/// no-op unless the error is one of these startup conditions AND `--json` was
 /// requested, so command handlers (which already render their own JSON) never
 /// double-print.
 fn emit_startup_json_error(error: &anyhow::Error) {
@@ -1562,6 +1582,8 @@ fn emit_startup_json_error(error: &anyhow::Error) {
         .is_some()
     {
         JsonError::new(ErrorCode::REPOSITORY_FORMAT_TOO_NEW, error.to_string(), "")
+    } else if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
+        stale_binary_json_error(stale, "")
     } else {
         return;
     };
@@ -1569,6 +1591,44 @@ fn emit_startup_json_error(error: &anyhow::Error) {
     if let Ok(rendered) = json_error.to_json_string() {
         println!("{}", rendered);
     }
+}
+
+/// REQ-02 (jit:7446af34): self-check this process's own build provenance
+/// before running ANY command, when it is itself running inside a gate
+/// checker's process tree.
+///
+/// `JIT_GATE_RUN` is set on every gate checker's environment
+/// ([`gate_execution::execute_gate_checker_with_context`](jit::gate_execution::execute_gate_checker_with_context))
+/// and inherited by anything the checker spawns — including a checker SCRIPT
+/// that itself shells out to `jit` (e.g. `scripts/jit-validate.sh`'s `exec
+/// jit validate "$@"`), which resolves `jit` from `PATH` independently of the
+/// evaluator process. The evaluator's own guard
+/// ([`check_gate`](jit::commands::CommandExecutor::check_gate), REQ-01) only
+/// covers the evaluator's own binary, so without this, a stale PATH `jit`
+/// inside the checker's process tree could still silently produce the
+/// checker's exit code and output — the incident that motivated this feature
+/// (jit:7446af34) — and the evaluator would faithfully persist it as a gate
+/// run. This makes any such staleness visible in the run record instead: the
+/// child refuses (exit `10`) rather than running its command, so the
+/// checker's own exit code and stderr — captured into the persisted
+/// [`GateRunResult`](jit::domain::GateRunResult) — carry the refusal.
+///
+/// A no-op when `JIT_GATE_RUN` is absent (an ordinary, non-gate-context
+/// invocation is completely unaffected), and silent under the identical
+/// REQ-03 identity predicate the evaluator-side check uses (outside git, an
+/// unrelated repository, or an unknown build commit never refuses). Reads
+/// `JIT_ISSUE_ID`/`JIT_GATE_KEY` (set alongside `JIT_GATE_RUN`) to label the
+/// refusal the same way the evaluator's own guard does.
+fn refuse_if_stale_gate_child(executor: &CommandExecutor<JsonFileStorage>) -> Result<()> {
+    if env::var_os("JIT_GATE_RUN").is_none() {
+        return Ok(());
+    }
+    if let Some(reason) = executor.stale_binary_reason() {
+        let issue_id = env::var("JIT_ISSUE_ID").unwrap_or_default();
+        let gate_key = env::var("JIT_GATE_KEY").unwrap_or_default();
+        return Err(jit::errors::StaleBinaryError::new(&issue_id, &gate_key, &reason).into());
+    }
+    Ok(())
 }
 
 fn run() -> Result<()> {
@@ -1635,6 +1695,14 @@ fn run() -> Result<()> {
 
     let storage = JsonFileStorage::new(&jit_dir);
     let mut executor = CommandExecutor::new(storage.clone());
+
+    // REQ-02 (jit:7446af34): before running ANY command, refuse if this
+    // process is itself stale AND running inside a gate checker's process
+    // tree (see `refuse_if_stale_gate_child`'s doc comment). A no-op for an
+    // ordinary invocation; applies uniformly across every subcommand rather
+    // than only `validate`, since a checker script may shell out to any of
+    // them.
+    refuse_if_stale_gate_child(&executor)?;
 
     match &command {
         Commands::Init {
