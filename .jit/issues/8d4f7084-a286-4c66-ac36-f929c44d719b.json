@@ -1,0 +1,25 @@
+{
+  "id": "8d4f7084-a286-4c66-ac36-f929c44d719b",
+  "title": "Consolidate Rust integration tests into cohesive suites",
+  "description": "Replace the one-crate-per-case integration-test layout with a small set of cohesive suite entry points while retaining separate case modules where they aid ownership and focused filtering. Shared harness code must live below Cargo's auto-discovery boundary so it cannot become an empty standalone executable.\n\n## Background\n\nCargo currently links roughly 140 integration-test targets, each carrying much of the same library and dependency graph. Consolidation should remove most link units without collapsing the repository into one serial test binary or losing targeted suite and test-name selection.\n\n## Success Criteria\n\n- [hard] REQ-01: `cargo metadata --no-deps --format-version=1` reports no more than 12 targets whose kind includes `test` across the workspace.\n- [hard] REQ-02: Integration cases are grouped by execution-model and subsystem cohesion into multiple independently selectable suites, and both `cargo test --test <suite>` and ordinary test-name filtering select focused work without running the entire workspace.\n- [hard] REQ-03: Shared harness and helper modules reside below suite or common module directories and do not appear as Cargo test targets.\n- [hard] REQ-04: A post-consolidation `cargo test --workspace -- --list` inventory matches every ignored and non-ignored case recorded in `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json`, allowing only documented suite-module qualification changes to case names.\n- [hard] REQ-05: Every workspace test passes after consolidation, and any removed or behaviorally changed case has an independently committed justification identifying the old case and the equivalent replacement coverage.\n- [hard] REQ-06: The suite topology retains more than one integration-test executable so Cargo can compile and execute independent suites in parallel.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "story:rust-build-efficiency",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-14T13:02:04.675398685Z",
+  "updated_at": "2026-07-14T13:02:25.992620476Z",
+  "first_ready_at": "2026-07-14T13:02:04.675403975Z"
+}

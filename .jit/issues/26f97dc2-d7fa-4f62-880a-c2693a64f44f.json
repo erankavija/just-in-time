@@ -1,0 +1,27 @@
+{
+  "id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
+  "title": "Verify compilation gains and publish optimized results",
+  "description": "Run the optimized build through the same isolated, repeated protocol as the baseline and publish the raw evidence and comparison. The results must demonstrate both bounded disk use and materially faster clean and source-rebuild compilation while confirming that all Rust validation variants and test cases remain intact.\n\n## Background\n\nCompilation improvements are only accepted when medians from equivalent same-host, same-toolchain samples meet the specified thresholds. A single favorable run or a comparison that changes the build sequence is insufficient.\n\n## Success Criteria\n\n- [hard] REQ-01: `dev/benchmarks/rust-build-efficiency/optimized.json` contains at least three successful clean samples and at least three successful representative source-rebuild samples collected with the committed harness on the same recorded Linux host, target triple, Rustc version, Cargo version, linker, build sequence, and source-change probe as the baseline.\n- [hard] REQ-02: Every optimized clean sample performs zero-warning workspace all-target clippy followed by workspace test compilation without test execution in a new isolated target directory, and records wall time, maximum resident memory, target-directory bytes, integration-target count, and unique active test-executable bytes.\n- [hard] REQ-03: The median complete fresh validation target directory is at most 10 GiB and unique active test executables total at most 2 GiB.\n- [hard] REQ-04: Median clean workspace test-compilation wall time is at least 40% below the baseline median, calculated as `100 × (baseline − optimized) / baseline` from the raw samples.\n- [hard] REQ-05: Median workspace test-rebuild wall time after the representative `crates/jit/src/lib.rs` source change is at least 60% below the baseline median using the same calculation and equivalent prepared clean states.\n- [hard] REQ-06: `dev/benchmarks/rust-build-efficiency/report.md` contains the baseline and optimized sample tables, medians, percentage changes, environment comparison, variance discussion, and links to both raw JSON artifacts.\n- [hard] REQ-07: The final revision passes `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, feature-enabled clippy and tests for `html,xml`, and a comparison against `dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json` showing that every pre-change ignored and non-ignored test remains discoverable or has a separately documented behavioral justification.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "5d862134-2424-4a1c-b9f4-204e3b53801b",
+    "3f73423b-fc24-4725-9fa3-dfbd2994f790"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "story:rust-build-efficiency",
+    "type:task"
+  ],
+  "created_at": "2026-07-14T13:02:21.120718163Z",
+  "updated_at": "2026-07-14T13:02:39.480833134Z",
+  "first_ready_at": "2026-07-14T13:02:21.120723553Z"
+}

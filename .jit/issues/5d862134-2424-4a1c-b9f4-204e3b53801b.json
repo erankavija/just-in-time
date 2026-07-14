@@ -1,0 +1,25 @@
+{
+  "id": "5d862134-2424-4a1c-b9f4-204e3b53801b",
+  "title": "Stabilize build provenance inputs",
+  "description": "Make ordinary validation and test builds insensitive to Git metadata-only changes and the wall clock while preserving an explicit, reproducible provenance interface for releases. The version command must continue to report injected release metadata accurately.\n\n## Background\n\nThe package build script watches `.git/index`, `HEAD`, and refs and embeds the current time. Staging or committing unchanged Rust sources can therefore rerun the build script and relink every package test target.\n\n## Success Criteria\n\n- [hard] REQ-01: Ordinary test and validation builds do not use `.git/index`, branch refs, or the current wall clock as changing compiler inputs, and two builds from identical source and explicit environment produce identical build provenance values.\n- [hard] REQ-02: After an initial `cargo test --workspace --no-run --message-format=json` build, both staging a metadata-only file change and creating a metadata-only commit followed by the same command produce zero non-fresh Rust test compiler artifacts when Rust sources and explicit provenance environment variables are unchanged.\n- [hard] REQ-03: Release builds accept `JIT_BUILD_GIT_HASH`, `JIT_BUILD_GIT_SHORT_HASH`, `JIT_BUILD_GIT_DIRTY`, and `SOURCE_DATE_EPOCH` as authoritative injected inputs, and `jit version --json` reports those exact supplied values.\n- [hard] REQ-04: Repeating a release build with the same injected commit fields and source-date epoch produces identical reported provenance, while changing an injected value invalidates the affected build output.\n- [hard] REQ-05: Builds without Git metadata still succeed and report stable documented fallback values rather than a wall-clock-dependent timestamp.\n- [hard] REQ-06: Regression coverage exercises the metadata-only invalidation contract in an isolated temporary Git repository and preserves the existing clean, dirty, and no-Git version-reporting contracts.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "story:rust-build-efficiency",
+    "type:bug"
+  ],
+  "created_at": "2026-07-14T13:02:13.459315642Z",
+  "updated_at": "2026-07-14T13:02:33.586705348Z",
+  "first_ready_at": "2026-07-14T13:02:13.459321162Z"
+}

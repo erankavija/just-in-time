@@ -1,0 +1,28 @@
+{
+  "id": "362e3fec-a012-4980-9846-021d3743779b",
+  "title": "Register the build-footprint invariant and contributor policy",
+  "description": "Make bounded Rust build topology and artifacts an explicit, discoverable project invariant and document how contributors stay within it. Registry-owned text and generated projections must remain mechanically synchronized, while contributor guidance explains placement, budgets, benchmarking, and diagnosis without duplicating volatile measurements by hand.\n\n## Background\n\nThe artifact checker prevents numeric regressions, but the project also needs a durable architectural statement explaining why the limits exist and how new tests or dependency features should be added. The invariant belongs in the project registry and is enforced by the Rust gate.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/invariants.toml` contains an enforced invariant with id `bounded-rust-build-footprint`, a statement covering bounded Rust test topology, compact build profiles, intentional dependency features, integration-target and active-executable budgets, and `enforced-by = \"@/gate/cargo-ci\"`.\n- [hard] REQ-02: The item API resolves `@/invariant/bounded-rust-build-footprint` to the registry entry, invariant enforcement checks report no drift, and the generated invariant region in `AGENTS.md` is mechanically fresh.\n- [hard] REQ-03: `dev/TESTING.md` documents the cohesive suite layout, the supported location for shared helpers, how to add a case without creating a new Cargo target, the 12-target and 2 GiB active-executable budgets, and the 10 GiB clean validation-directory acceptance budget.\n- [hard] REQ-04: Contributor guidance documents the exact benchmark entry point, isolated-target and repeated-sample protocol, interactive versus gate incremental policy, line-table debug policy, and dependency-feature expectations for JSON Schema and remote-document TLS.\n- [hard] REQ-05: Contributor guidance explains how to diagnose each build-footprint checker failure from its reported target count, executable bytes, profile state, incremental state, and dependency-feature graph before adding a new test target or feature.\n- [hard] REQ-06: Documentation validation, repository validation, invariant projection checks, and the Rust gate all pass with no hand-maintained copy of volatile sample measurements outside the benchmark artifacts.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "26f97dc2-d7fa-4f62-880a-c2693a64f44f"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "story:rust-build-efficiency",
+    "type:task"
+  ],
+  "created_at": "2026-07-14T13:02:23.499540893Z",
+  "updated_at": "2026-07-14T13:02:42.229486433Z",
+  "first_ready_at": "2026-07-14T13:02:23.499547023Z"
+}

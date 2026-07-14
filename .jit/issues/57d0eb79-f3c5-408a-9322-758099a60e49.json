@@ -1,0 +1,25 @@
+{
+  "id": "57d0eb79-f3c5-408a-9322-758099a60e49",
+  "title": "Bound debug information and gate incremental state",
+  "description": "Configure development and test profiles so failures retain useful line-number backtraces without embedding full debugger payloads in every test executable. Keep interactive incremental compilation explicit while ensuring broad gate builds do not accumulate incremental state.\n\n## Background\n\nA representative 246.7 MiB test executable contains 193.7 MiB of debug sections, and accumulated incremental state accounts for roughly 19 GiB. The repository currently has no manifest-level development or test profile policy.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace manifest sets both development and test debug information to `line-tables-only`, and a representative failing test with `RUST_BACKTRACE=1` reports a source file and line number from repository code.\n- [hard] REQ-02: The workspace manifest explicitly enables the intended incremental behavior for ordinary interactive development and tests rather than relying on an undocumented Cargo default.\n- [hard] REQ-03: `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every Rust compilation step while preserving the manifest's interactive policy outside the gate.\n- [hard] REQ-04: A fresh gate run in an isolated target directory completes without creating non-empty Cargo incremental compilation state and still runs formatting, zero-warning workspace all-target clippy, and the complete workspace test suite.\n- [hard] REQ-05: A regression test or deterministic policy assertion fails if either profile returns to full debug information or if the gate stops disabling incremental compilation.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "story:rust-build-efficiency",
+    "type:enhancement"
+  ],
+  "created_at": "2026-07-14T13:02:07.397960625Z",
+  "updated_at": "2026-07-14T13:02:29.052078461Z",
+  "first_ready_at": "2026-07-14T13:02:07.397966395Z"
+}
