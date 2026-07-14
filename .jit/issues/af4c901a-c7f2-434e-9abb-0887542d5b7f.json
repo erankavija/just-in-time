@@ -2,9 +2,9 @@
   "id": "af4c901a-c7f2-434e-9abb-0887542d5b7f",
   "title": "Validator reads stale baked default schemas instead of the declared namespace registry",
   "description": "Default-origin rule assertions derive from the declared registry at validation time; the on-disk default schemas become write-through projections that can no longer desync validation.\n\n## Background\n\nObserved in this repository: `[namespaces.enforces]` has been declared in `.jit/config.toml` since the invariants epic, yet the first `enforces:` label ever applied failed the `namespace-registry` rule. The baked schema `.jit/schemas/default-namespace-registry.json` still carried a namespace pattern without `enforces`; the validator reads that file as authority, so a legitimate hand edit of the declared registry silently invalidated validation, and the failure surfaced at label-use time, far from the causal config edit. Manual schema repair was the workaround.\n\nThe mechanism gap: default schemas are baked from the registry at scaffold time, and no non-test code path regenerates them afterward (`ruleset_store` carries a regeneration helper with no production caller). The declared registry in `config.toml` is the source of truth; the baked schema is a copy treated as authority — the machine-artifact analogue of the staleness defect named by @/inv/single-source-prose.\n\n## Success Criteria\n\n- [hard] REQ-01: Validation builds default-origin rule assertions (`label-format`, `namespace-registry`, `type-hierarchy-known`, the `namespace-unique-*` family) from the declared config registry in memory at load; on-disk schema files are not read as the authority for these rules.\n- [hard] REQ-02: `schemas/default-*.json` files remain as projections for external consumers and are refreshed from the registry whenever jit writes `config.toml` or `rules.toml`.\n- [hard] REQ-03: Custom rules (`origin` other than `default`) keep reading their declared schema files exactly as today.\n- [hard] REQ-04: Regression test: in a fixture repo, hand-declare a new namespace in `config.toml`, apply a label in it, and `jit validate` passes with no intervening regeneration step.\n- [hard] REQ-05: After the fix lands, this repository's `schemas/default-*.json` match the declared registry (projections refreshed by the landing change).\n\n## Notes\n\nDecisions pinned during intake:\n\n- **Derive at load.** Rejected: regenerate-on-write only — a hand edit of `config.toml` stays stale until some jit write happens; and drift-check plus a `jit rules sync` command — the failure still occurs and adds a manual step, when the registry alone can answer the question the schema was baked to answer.\n- **Priority high.** The breakage surfaces at label-use time, disconnected from the causal edit, so the misdiagnosis cost dominates the one-line workaround.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -13,6 +13,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:39:23.681494569Z"
+    },
     "cargo-ci": {
       "status": "pending",
       "updated_by": null,
@@ -22,11 +27,6 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-09T11:45:21.482892431Z"
-    },
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:39:23.681494569Z"
     },
     "docs-mechanical": {
       "status": "pending",
@@ -43,6 +43,7 @@
     "component:storage"
   ],
   "created_at": "2026-07-09T11:45:21.404976774Z",
-  "updated_at": "2026-07-12T13:39:23.689760735Z",
-  "first_ready_at": "2026-07-09T11:45:21.404982624Z"
+  "updated_at": "2026-07-14T12:35:13.342997022Z",
+  "first_ready_at": "2026-07-09T11:45:21.404982624Z",
+  "claimed_at": "2026-07-14T12:35:13.342996762Z"
 }

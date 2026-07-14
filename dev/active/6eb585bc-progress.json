@@ -1,266 +1,86 @@
 {
   "epic_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "epic_short_id": "6eb585bc",
-  "batch": "usability-maintenance-2026-07-05 (15 children filed from usability audit + session mining; prior 8-child batch complete, see dev/active/6eb585bc-batch-report-2026-07-05.md)",
-  "current_wave": 17,
-  "note": "15 open leaf children, no inter-sibling deps. Serial waves (invoker directive + main.rs/cli.rs contention). Order: output-shape conventions first (envelope, gate fields) so later features emit final shapes; doc/help sweeps last. Worker model per difficulty: sonnet easy, opus hard (invoker directive). Workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit binary (cargo install --path crates/jit) after waves changing output/storage shapes before running gates that consume them. DOGFOOD (invoker directive): after each wave lands + reinstall, the lead's own orchestration commands must use the newly landed features (envelope keys, gate status fields, repeatable --label, issue status projection, children rollup, config get, --full export); log friction found while dogfooding here and file candidates at batch end. REVIEW BAR (invoker, waves 14-15): help/doc text must be concise and describe current behavior only \u2014 legacy-behavior narration ('previously', 'no longer', 'used to') is a lead-review FAIL; before/after language belongs only in CHANGELOG migration notes. SESSION BOUNDARY (invoker, 2026-07-06): wave 16 (README, lead-direct) is this session's final task; write handoff after it. Waves 17-19 (c291e95c MCP re-curation, 1d59070d gate-define auto, 0daba57d delete exit) resume next session.",
+  "batch": "core-maintenance-2026-07-14 (18 open children: 14 filed since the usability batch, carryovers 1d59070d/0daba57d/c505031a, adopted 16402e14; prior batch report dev/active/6eb585bc-batch-report-2026-07-05.md, handoff dev/active/6eb585bc-handoff.md)",
+  "current_wave": 1,
+  "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject — until it lands, verify manually).",
   "waves": [
     {
       "wave_number": 1,
+      "theme": "Trustworthy verification loop",
       "issues": [
         {
-          "short_id": "74fbdb69",
-          "title": "Uniform JSON list envelope across query and list commands",
+          "short_id": "af4c901a",
+          "title": "Validator reads stale baked default schemas instead of the declared namespace registry",
           "classification": "implementation",
           "model": "opus",
-          "status": "done"
+          "status": "pending"
+        },
+        {
+          "short_id": "45e1b7e8",
+          "title": "Gate results evidence the working tree, not the merged commit",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "short_id": "950256ae",
+          "title": "Gate npm-ci does not cover the mcp-server test suite",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "short_id": "7446af34",
+          "title": "Detect a jit binary that predates the repository it is validating",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "sub-wave 1b: dispatch after 45e1b7e8 merges (shared scripts/gate-run machinery)"
         }
       ]
     },
     {
       "wave_number": 2,
+      "theme": "CLI contract fixes, output shape first",
       "issues": [
-        {
-          "short_id": "b1586c0d",
-          "title": "Unify gate field naming across JSON outputs",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
+        { "short_id": "f40f1b0a", "title": "Unify the machine-readable gate field across command outputs", "classification": "implementation", "model": "opus", "status": "pending" },
+        { "short_id": "6f881a85", "title": "Exit quietly on closed stdout instead of panicking", "classification": "implementation", "model": "sonnet", "status": "pending" },
+        { "short_id": "0daba57d", "title": "Refused issue deletion exits nonzero", "classification": "implementation", "model": "sonnet", "status": "pending" },
+        { "short_id": "8917c558", "title": "Make jit doc add idempotent for an existing identical link", "classification": "implementation", "model": "sonnet", "status": "pending" }
       ]
     },
     {
       "wave_number": 3,
+      "theme": "Gate surface semantics; alias removal last",
       "issues": [
-        {
-          "short_id": "dc3bef62",
-          "title": "Repeatable AND-combined label filters across query commands",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
+        { "short_id": "1d59070d", "title": "Checker command on gate define implies automated mode", "classification": "implementation", "model": "sonnet", "status": "pending" },
+        { "short_id": "52665a07", "title": "Remove language-flavored builtin gate presets; presets resolve project-declared bundles", "classification": "implementation", "model": "opus", "status": "pending" },
+        { "short_id": "8d7fc762", "title": "Gate command timeout never applies after the gate verb rename", "classification": "implementation", "model": "sonnet", "status": "pending" },
+        { "short_id": "c505031a", "title": "Remove deprecated gate command aliases (pass/pass-all/check/check-all)", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "last in wave: breaking sweep over the final verb surface (CLI, MCP schema, docs)" }
       ]
     },
     {
       "wave_number": 4,
+      "theme": "Dead paths and validation correctness",
       "issues": [
-        {
-          "short_id": "a05b87ae",
-          "title": "Typed exit codes for prefix and usage errors, JSON envelope for startup failures",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
+        { "short_id": "0283ce74", "title": "Resolve four unreachable or inert runtime paths", "classification": "implementation", "model": "opus", "status": "pending" },
+        { "short_id": "894337e2", "title": "find_available_port races between probe and bind", "classification": "implementation", "model": "sonnet", "status": "pending" },
+        { "short_id": "16402e14", "title": "coverage-preview passes vacuously on checkbox-prefixed [hard] criteria", "classification": "implementation", "model": "sonnet", "status": "pending", "note": "adopted into epic 2026-07-14 per invoker" }
       ]
     },
     {
       "wave_number": 5,
+      "theme": "Enhancements on a hardened base",
       "issues": [
-        {
-          "short_id": "30a3b5c1",
-          "title": "Error message polish: prefixes, assignee context, claim cross-references",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 6,
-      "issues": [
-        {
-          "short_id": "c8518f2a",
-          "title": "Atomic variadic dependency add",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 7,
-      "issues": [
-        {
-          "short_id": "d0f88ee2",
-          "title": "CLI verb alias sweep for observed wrong guesses",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 8,
-      "issues": [
-        {
-          "short_id": "043ae624",
-          "title": "Config value accessor command",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 9,
-      "issues": [
-        {
-          "short_id": "cc42a69b",
-          "title": "Compact issue status projection with unmet dependencies",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 10,
-      "issues": [
-        {
-          "short_id": "7fe5c743",
-          "title": "Container child rollup and state aggregation queries",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 11,
-      "issues": [
-        {
-          "short_id": "27338abc",
-          "title": "Structured gate findings in machine output",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 12,
-      "issues": [
-        {
-          "short_id": "0ab468ba",
-          "title": "Full-record bulk export behind a --full flag",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 13,
-      "issues": [
-        {
-          "short_id": "31e12d2b",
-          "title": "Hierarchy resolution in core shared by CLI and web UI",
-          "classification": "implementation",
-          "model": "opus",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 14,
-      "issues": [
-        {
-          "short_id": "62f3bebd",
-          "title": "Help cross-reference sweep for existing but undiscovered commands",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 15,
-      "issues": [
-        {
-          "short_id": "1a63ef75",
-          "title": "Sweep stale help text and machine-output parity gaps",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "done"
-        }
-      ]
-    },
-    {
-      "wave_number": 16,
-      "issues": [
-        {
-          "short_id": "b3a54e25",
-          "title": "Refresh README to the current agent-first surface",
-          "classification": "documentation",
-          "model": "lead-direct",
-          "status": "done",
-          "note": "invoker directive: lead authors the README refresh directly; gates still apply"
-        }
-      ]
-    },
-    {
-      "wave_number": 17,
-      "issues": [
-        {
-          "short_id": "c291e95c",
-          "title": "Refresh MCP curated tool set",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "pending"
-        }
-      ]
-    },
-    {
-      "wave_number": 18,
-      "issues": [
-        {
-          "short_id": "1d59070d",
-          "title": "gate define checker implies auto",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "pending"
-        }
-      ]
-    },
-    {
-      "wave_number": 19,
-      "issues": [
-        {
-          "short_id": "0daba57d",
-          "title": "refused delete exits nonzero",
-          "classification": "implementation",
-          "model": "sonnet",
-          "status": "pending"
-        }
+        { "short_id": "45a140ae", "title": "Define Archived lifecycle semantics for artifact archival", "classification": "design+implementation", "model": "opus", "status": "pending", "note": "interview invoker on the semantic model before dispatch (escalation policy 6)" },
+        { "short_id": "3e12ffbd", "title": "Scoped batch-shape graph export as the batch-create inverse", "classification": "implementation", "model": "opus", "status": "pending" },
+        { "short_id": "450db193", "title": "Generic config-declared projection tables spanning registry- and markdown-first item kinds", "classification": "implementation", "model": "opus", "status": "pending" }
       ]
     }
   ],
-  "created_during_execution": [
-    {
-      "note": "dogfood friction: installed binary lags workspace during a wave; lead must use ./target/debug/jit for post-wave checks until reinstall (hit on b1586c0d gate check-all)."
-    },
-    {
-      "note": "30a3b5c1 worker root-caused + fixed the shared-TMPDIR .git leak from test_is_secondary_worktree_detection (the prior batch's test-hygiene follow-up observation); leak fixture corrected and dev cache cleaned."
-    },
-    {
-      "note": "dogfood friction (wave 11): `gate define --checker-command X` without --mode auto silently creates a MANUAL gate that ignores the checker; evaluate then trivially passes. Candidate: --checker-command implies auto, or error on manual+checker-command combination."
-    },
-    {
-      "note": "mcp-server test-integration.js tool-count bound (<50) now fails at 68 \u2014 batch-added commands (status/children/progress/count/config get/migrate/graph tree/divergence) pushed past it. Fold threshold refresh into wave 15 (1a63ef75) dispatch."
-    }
-  ],
+  "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {
-    "74fbdb69": 1,
-    "a05b87ae": 1,
-    "c8518f2a": 2,
-    "043ae624": 1,
-    "cc42a69b": 1,
-    "7fe5c743": 2,
-    "0ab468ba": 1,
-    "31e12d2b": 2,
-    "1a63ef75": 2,
-    "b3a54e25": 5
-  },
-  "started_at": "2026-07-05T10:30:00Z"
+  "rework_counts": {},
+  "started_at": "2026-07-14T00:00:00Z"
 }

@@ -13,8 +13,9 @@
   "labels": [
     "component:validation",
     "type:bug",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "epic:core-maintenance"
   ],
   "created_at": "2026-07-02T23:07:41.824789482Z",
-  "updated_at": "2026-07-02T23:11:27.468679355Z"
+  "updated_at": "2026-07-14T12:34:14.440891400Z"
 }
