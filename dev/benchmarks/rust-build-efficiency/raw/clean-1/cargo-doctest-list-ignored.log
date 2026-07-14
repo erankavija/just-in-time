@@ -1,0 +1,8 @@
+   Compiling jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-4e22a20d/crates/jit)
+warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
+   Compiling jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-4e22a20d/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.14s
+   Doc-tests jit
+0 tests, 0 benchmarks
+   Doc-tests jit_server
+0 tests, 0 benchmarks

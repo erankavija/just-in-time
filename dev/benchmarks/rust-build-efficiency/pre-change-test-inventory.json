@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_at_git_revision": "56d737891129babf9571eb4de5659295bce8d827",
-  "notes": "Doctests are excluded: `cargo test --no-run` does not compile doctest binaries. 'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target). Ignored status is the set difference between `<exe> --list` and `<exe> --list --ignored`. Targets are filtered to profile.test == true artifacts only: Cargo also emits the plain (non-harness) `jit` and `jit-server` binaries alongside their test-harness builds, and those are not test targets.",
+  "notes": "'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target), except \"doctest\": a synthetic label this harness assigns (not a Cargo target.kind value) for one entry per crate matching Cargo's own \"Doc-tests <crate>\" grouping, derived via `cargo test --workspace --doc -- --list` / `-- --list --ignored` since `cargo test --no-run` cannot compile doctest binaries. Doctests count toward test_case_count and ignored_test_case_count (every discoverable test case) but not toward test_target_count, integration_test_target_count, or unique_active_test_executable_bytes: Cargo compiles each doctest as an ephemeral per-case binary with no stable path to size, unlike lib/bin/integration-test targets which persist under target/debug/deps for the run's duration. Ignored status for both regular tests and doctests is the set difference between the full `--list` output and `--list --ignored`.",
   "targets": [
     {
       "name": "jit",
@@ -14884,12 +14884,303 @@
       "ignored_count": 0,
       "list_exit_code": 0,
       "list_ignored_exit_code": 0
+    },
+    {
+      "name": "jit",
+      "kind": [
+        "doctest"
+      ],
+      "executable": null,
+      "tests": [
+        {
+          "name": "crates/jit/src/commands/batch_create.rs - commands::batch_create::BatchIssueDef (line 38)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/batch_create.rs - commands::batch_create::CommandExecutor<S>::batch_create_from_json (line 240)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/breakdown.rs - commands::breakdown::BracketChild (line 34)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/breakdown.rs - commands::breakdown::CommandExecutor<S>::bracket_breakdown_with_template (line 211)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/config.rs - commands::config::resolve_dotted_key (line 110)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/gate.rs - commands::gate::CommandExecutor<S>::update_gate (line 713)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::detect_divergences (line 240)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::resolve_hierarchy_tree (line 153)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/issue.rs - commands::issue::CommandExecutor<S>::issue_children (line 300)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/issue.rs - commands::issue::CommandExecutor<S>::issue_progress (line 353)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/query.rs - commands::query::CommandExecutor<S>::query_count_by_state (line 211)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/template.rs - commands::template::CommandExecutor<S>::apply_template_with (line 184)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/commands/template_expand.rs - commands::template_expand::expand_template (line 112)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::InvariantProjectionConfig (line 868)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::ItemKindConfig (line 410)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::ItemKindConfig (line 443)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::ItemKindConfig::missing_required_fields (line 551)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::JitConfig::validate_item_kinds (line 1568)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/config.rs - config::RulesGatesProjectionConfig (line 1032)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/document/adapter.rs - document::adapter::AdapterRegistry (line 145)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/document/adapter.rs - document::adapter::DocFormatAdapter (line 17)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/document/assets.rs - document::assets::AssetScanner (line 50)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/item.rs - domain::item::ItemKind (line 624)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/item.rs - domain::item::expand_kind_triple (line 1442)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/item.rs - domain::item::index_items (line 983)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/item.rs - domain::item::index_project_sources (line 1130)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/item.rs - domain::item::load_toml_scope_items (line 1203)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/queries.rs - domain::queries::bracket_scope_ids (line 388)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/queries.rs - domain::queries::build_issue_map (line 109)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/queries.rs - domain::queries::derive_lifecycle_timestamps (line 46)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/queries.rs - domain::queries::query_by_labels (line 276)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/domain/type_taxonomy.rs - domain::type_taxonomy (line 39)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/errors.rs - errors::ActionableError (line 21)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/gate_presets/planning.rs - gate_presets::planning::preview_coverage_rule (line 202)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/graph/hierarchy.rs - graph::hierarchy (line 97)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/graph/hierarchy.rs - graph::hierarchy::NodeHierarchy (line 178)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/graph/hierarchy.rs - graph::hierarchy::detect_membership_divergences (line 543)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/graph/hierarchy.rs - graph::hierarchy::resolve_hierarchy (line 280)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/output.rs - output::GateRunSummary (line 1805)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/output.rs - output::GraphTreeResponse (line 1102)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/output.rs - output::HierarchyNodeView (line 1054)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/output.rs - output::IssueStatusResponse (line 1380)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/query_engine/mod.rs - query_engine (line 18)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/search.rs - search (line 8)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/storage/claim_coordinator.rs - storage::claim_coordinator::Lease::is_expired (line 69)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/storage/gate_store.rs - storage::gate_store::save_gate_registry (line 84)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/storage/heartbeat.rs - storage::heartbeat (line 17)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/storage/heartbeat.rs - storage::heartbeat::HeartbeatManager::start_heartbeat_thread (line 322)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/storage/lease.rs - storage::lease (line 16)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/type_icons.rs - type_icons (line 14)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/defaults.rs - validation::defaults::default_ruleset (line 87)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/defaults.rs - validation::defaults::reconcile_default_rules_with_config (line 252)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/drift.rs - validation::drift::enforcement_drift_tolerant (line 162)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/engine.rs - validation::engine::KeywordFactory (line 67)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine (line 142)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine::validate (line 328)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine::with_keyword (line 235)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/engine.rs - validation::engine::render_finding_message (line 494)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/graph.rs - validation::graph::GraphFinding (line 204)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/graph.rs - validation::graph::evaluate_graph (line 313)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/local.rs - validation::local::LocalEvaluation (line 77)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/local.rs - validation::local::evaluate_local (line 235)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/validation/rules_gates_projection.rs - validation::rules_gates_projection::render_rules_and_gates_markdown (line 68)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/visualization.rs - visualization::export_dot (line 18)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/visualization.rs - visualization::export_json_full (line 194)",
+          "ignored": false
+        },
+        {
+          "name": "crates/jit/src/visualization.rs - visualization::export_mermaid (line 82)",
+          "ignored": false
+        }
+      ],
+      "test_count": 66,
+      "ignored_count": 0,
+      "list_exit_code": 0,
+      "list_ignored_exit_code": 0
+    },
+    {
+      "name": "jit_server",
+      "kind": [
+        "doctest"
+      ],
+      "executable": null,
+      "tests": [],
+      "test_count": 0,
+      "ignored_count": 0,
+      "list_exit_code": 0,
+      "list_ignored_exit_code": 0
     }
   ],
   "totals": {
     "test_target_count": 148,
     "integration_test_target_count": 144,
-    "test_case_count": 3240,
+    "doctest_target_count": 2,
+    "test_case_count": 3306,
+    "doctest_case_count": 66,
     "ignored_test_case_count": 14
   },
   "target_dir_bytes": 21089820236,
