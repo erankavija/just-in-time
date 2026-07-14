@@ -34,7 +34,7 @@
       "target_dir_bytes": 21089820236,
       "inventory": {
         "target_dir_bytes": 21089820236,
-        "unique_active_test_executable_bytes": 15314841704,
+        "unique_active_test_executable_bytes": 14817088760,
         "integration_test_target_count": 144,
         "test_case_count": 3240,
         "ignored_test_case_count": 14

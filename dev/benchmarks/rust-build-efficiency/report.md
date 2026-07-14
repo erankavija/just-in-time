@@ -110,26 +110,59 @@ per-sample data in `baseline.json` for any deeper comparison.
   at the time sampling started, though load average was low (0.34) and no
   OOM events are visible in `journalctl -k` for the sampling window; no
   sample failed or showed anomalous RSS as a result.
-- The harness's own final JSON-assembly step (after all 6 samples had already
-  completed and been recorded successfully) did not print a completion
-  message or leave a trace of failure in the run log; the process was gone
-  when checked roughly an hour later. All 6 samples' measurements were
-  already durably recorded in `raw/clean-samples.jsonl` /
-  `raw/rebuild-samples.jsonl` at that point, so `baseline.json` was
-  regenerated directly from that recorded data (the same `jq` assembly the
-  script performs, reproduced manually and verified to succeed standalone);
-  no re-sampling was needed and no sample data was discarded or rerun.
+- **Root cause of the original assembly failure (fixed):** all 6 samples
+  completed and were durably recorded in `raw/clean-samples.jsonl` /
+  `raw/rebuild-samples.jsonl`, but the harness's environment-capture step
+  computed `CARGO_RUST_ENV` with `env | grep -E '^(CARGO|RUST)[A-Z_]*=' | jq
+  ...`. With zero `CARGO_*`/`RUST*` variables set (this run's actual
+  environment), `grep` exits 1 on a no-match search; under `set -o pipefail`
+  that nonzero status becomes the whole pipeline's exit status even though
+  `jq` downstream succeeds, and `set -e` then terminates the script at that
+  line with no error output. The pipeline now treats an empty match set as
+  success (`grep ... || true`, alongside jq's existing `// {}` fallback for
+  empty input), so assembly completes in this case.
+  [`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-build.sh)
+  documents and handles this explicitly. Reproducibility was verified
+  directly: running the script with `BENCH_SKIP_SAMPLING=1` (assemble only,
+  no new sampling) and `BENCH_GIT_REVISION_OVERRIDE` set to the sampled
+  commit, in a shell with no `CARGO_*`/`RUST*` variables set, against the
+  already-recorded `raw/*-samples.jsonl`, completes successfully and
+  reproduces this `baseline.json` byte-for-byte apart from `generated_at`.
 
 ## Current footprint (from the test inventory, same clean sample)
 
 | | |
 |---|---|
 | Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) |
-| Unique active test-executable bytes | 15,314,841,704 (~14.3 GiB) |
+| Unique active test-executable bytes | 14,817,088,760 (~13.8 GiB) |
 | Integration-test targets (Cargo `target.kind == ["test"]`) | 144 |
-| Total test targets (lib + bin + integration) | 150 |
+| Total test targets (lib + bin + integration) | 148 |
 | Total discoverable test cases | 3,240 |
 | Ignored test cases | 14 |
+
+**Test-target filtering correction:** targets are derived from Cargo
+`compiler-artifact` messages filtered to `profile.test == true`. An earlier
+pass filtered only on `reason == "compiler-artifact"` and a non-null
+`executable`, which also matched two ordinary (non-test) `[[bin]]` build
+outputs that Cargo emits alongside their test-harness builds: the plain `jit`
+and `jit-server` executables (`target.kind == ["bin"]`, `profile.test ==
+false`). Both contributed zero test cases (`jit --list` and `jit-server
+--list` simply fail as unrecognized CLI invocations, `list_exit_code: 2`),
+so `test_case_count` and `ignored_test_case_count` are unaffected; only
+`test_target_count` (150 → 148) and `unique_active_test_executable_bytes`
+needed correction. The two dropped binaries' original sizes from the
+isolated sample's target directory cannot be recovered post hoc — that
+directory was removed immediately after the sample per the harness's own
+isolation design, and only the aggregate byte sum was persisted, not
+per-file sizes. The correction instead subtracts the equivalent same-commit,
+same-toolchain, same-profile binaries' current sizes from the ordinary
+(non-isolated) `target/debug/` directory — `jit`: 259,810,472 bytes;
+`jit-server`: 237,942,472 bytes; combined 497,752,944 bytes — from the
+original aggregate (15,314,841,704 − 497,752,944 = 14,817,088,760). A
+same-commit, same-profile debug build is expected to match the original
+isolated build's size closely (debug info can embed the build directory
+path, which differs between the two target directories, but this does not
+materially change binary size).
 
 Cross-check against `cargo-ci.sh`'s full `cargo test --workspace` run (which,
 unlike `--no-run`, also executes doctests): 3,226 non-ignored inventoried

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_at_git_revision": "56d737891129babf9571eb4de5659295bce8d827",
-  "notes": "Doctests are excluded: `cargo test --no-run` does not compile doctest binaries. 'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target). Ignored status is the set difference between `<exe> --list` and `<exe> --list --ignored`.",
+  "notes": "Doctests are excluded: `cargo test --no-run` does not compile doctest binaries. 'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target). Ignored status is the set difference between `<exe> --list` and `<exe> --list --ignored`. Targets are filtered to profile.test == true artifacts only: Cargo also emits the plain (non-harness) `jit` and `jit-server` binaries alongside their test-harness builds, and those are not test targets.",
   "targets": [
     {
       "name": "jit",
@@ -10966,18 +10966,6 @@
       "list_ignored_exit_code": 0
     },
     {
-      "name": "jit",
-      "kind": [
-        "bin"
-      ],
-      "executable": "/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.JhTDgc/debug/jit",
-      "tests": [],
-      "test_count": 0,
-      "ignored_count": 0,
-      "list_exit_code": 2,
-      "list_ignored_exit_code": 2
-    },
-    {
       "name": "stale_binary_json_exit_tests",
       "kind": [
         "test"
@@ -14472,18 +14460,6 @@
       "list_ignored_exit_code": 0
     },
     {
-      "name": "jit-server",
-      "kind": [
-        "bin"
-      ],
-      "executable": "/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.JhTDgc/debug/jit-server",
-      "tests": [],
-      "test_count": 0,
-      "ignored_count": 0,
-      "list_exit_code": 2,
-      "list_ignored_exit_code": 2
-    },
-    {
       "name": "harness_demo",
       "kind": [
         "test"
@@ -14911,11 +14887,11 @@
     }
   ],
   "totals": {
-    "test_target_count": 150,
+    "test_target_count": 148,
     "integration_test_target_count": 144,
     "test_case_count": 3240,
     "ignored_test_case_count": 14
   },
   "target_dir_bytes": 21089820236,
-  "unique_active_test_executable_bytes": 15314841704
+  "unique_active_test_executable_bytes": 14817088760
 }

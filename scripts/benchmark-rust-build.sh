@@ -61,6 +61,19 @@ set -euo pipefail
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock)
 #   BENCH_NO_LOCK=1         skip the host-wide build lock (e.g. an isolated CI
 #                           container that already owns the machine)
+#   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
+#                           baseline.json directly from the
+#                           raw/{clean,rebuild}-samples.jsonl already present
+#                           in BENCH_OUT_DIR (fails with exit 2 if either is
+#                           missing or empty). Regenerates baseline.json from
+#                           already-recorded samples without a new sampling
+#                           run; also the way to reproduce the assembly step
+#                           in isolation for verification.
+#   BENCH_GIT_REVISION_OVERRIDE  git revision recorded in baseline.json's
+#                           environment (default: current HEAD). Needed with
+#                           BENCH_SKIP_SAMPLING once HEAD has moved past the
+#                           commit the recorded samples were actually
+#                           collected at.
 #
 # Exit codes:
 #   0 — all requested samples completed successfully
@@ -137,7 +150,7 @@ if ! git diff --quiet -- "$PROBE_FILE" || ! git diff --cached --quiet -- "$PROBE
   exit 2
 fi
 
-GIT_REVISION=$(git rev-parse HEAD)
+GIT_REVISION="${BENCH_GIT_REVISION_OVERRIDE:-$(git rev-parse HEAD)}"
 
 mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 
@@ -250,6 +263,13 @@ with open(list_json_path) as f:
             continue
         if msg.get("reason") != "compiler-artifact":
             continue
+        if not msg.get("profile", {}).get("test"):
+            # Cargo also emits the plain (non-harness) binary for `[[bin]]`
+            # targets alongside its test-harness build (e.g. the real `jit`
+            # and `jit-server` executables). Only profile.test artifacts are
+            # actual test binaries; the rest are ordinary build output that
+            # happens to share the same target name and kind.
+            continue
         executable = msg.get("executable")
         if not executable or executable in seen_executables:
             continue
@@ -307,9 +327,14 @@ result = {
     "unique_active_test_executable_bytes": exe_bytes,
 }
 
-with open(out_path, "w") as out:
+# Atomic publish (@/inv/atomic-writes): write to a temp file in the same
+# directory, then rename into place, so a reader never observes a partially
+# written pre-change-test-inventory.json.
+tmp_out_path = out_path + f".tmp.{os.getpid()}"
+with open(tmp_out_path, "w") as out:
     json.dump(result, out, indent=2)
     out.write("\n")
+os.replace(tmp_out_path, out_path)
 
 print(json.dumps({
     "target_dir_bytes": dir_bytes,
@@ -323,8 +348,14 @@ PYEOF
 
 CLEAN_JSONL="$OUT_DIR/raw/clean-samples.jsonl"
 REBUILD_JSONL="$OUT_DIR/raw/rebuild-samples.jsonl"
-: >"$CLEAN_JSONL"
-: >"$REBUILD_JSONL"
+if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
+  : >"$CLEAN_JSONL"
+  : >"$REBUILD_JSONL"
+else
+  echo "[benchmark] BENCH_SKIP_SAMPLING set: assembling from existing $CLEAN_JSONL / $REBUILD_JSONL, no new sampling" >&2
+  [[ -s "$CLEAN_JSONL" ]] || { echo "ERROR: BENCH_SKIP_SAMPLING set but $CLEAN_JSONL is missing or empty." >&2; exit 2; }
+  [[ -s "$REBUILD_JSONL" ]] || { echo "ERROR: BENCH_SKIP_SAMPLING set but $REBUILD_JSONL is missing or empty." >&2; exit 2; }
+fi
 
 run_clean_sample() {
   local idx="$1"
@@ -461,13 +492,15 @@ run_rebuild_sample() {
   fi
 }
 
-for i in $(seq 1 "$CLEAN_SAMPLES"); do
-  run_clean_sample "$i"
-done
+if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
+  for i in $(seq 1 "$CLEAN_SAMPLES"); do
+    run_clean_sample "$i"
+  done
 
-for i in $(seq 1 "$REBUILD_SAMPLES"); do
-  run_rebuild_sample "$i"
-done
+  for i in $(seq 1 "$REBUILD_SAMPLES"); do
+    run_rebuild_sample "$i"
+  done
+fi
 
 echo "[benchmark] all samples complete; assembling baseline.json" >&2
 
@@ -489,7 +522,14 @@ else
   LINKER_DESC="cargo default (no linker override in .cargo/config.toml): $(cc --version | head -1) invoking $(ld --version | head -1)"
 fi
 
-CARGO_RUST_ENV=$(env | grep -E '^(CARGO|RUST)[A-Z_]*=' | jq -Rn '[inputs | split("=") | {(.[0]): (.[1:] | join("="))}] | add // {}')
+# `grep` exits 1 when it finds zero matches (the common case: no CARGO_*/RUST*
+# variables set). Under `set -o pipefail` that failure is the pipeline's exit
+# status even though `jq` downstream succeeds, which kills the whole script
+# right here under `set -e` with no error message. `|| true` makes an empty
+# match set a non-failure; jq's `// {}` already turns empty input into `{}`.
+CARGO_RUST_ENV=$(env | { grep -E '^(CARGO|RUST)[A-Z_]*=' || true; } | jq -Rn '[inputs | split("=") | {(.[0]): (.[1:] | join("="))}] | add // {}')
+
+BASELINE_TMP=$(mktemp "$OUT_DIR/.baseline.json.XXXXXX")
 
 jq -n \
   --argjson clean_samples "$CLEAN_ARRAY" \
@@ -537,7 +577,14 @@ jq -n \
       clean_total_wall_seconds: ($clean_samples | map(.clippy.wall_seconds + .test_no_run.wall_seconds) | median),
       rebuild_wall_seconds: ($rebuild_samples | map(.rebuild_test_no_run.wall_seconds) | median)
     }
-  }' >"$OUT_DIR/baseline.json"
+  }' >"$BASELINE_TMP"
+
+# Atomic publish (@/inv/atomic-writes): the temp file lives in the destination
+# directory so the rename is on the same filesystem, and `mv` never leaves a
+# reader observing a partially written baseline.json.
+mv "$BASELINE_TMP" "$OUT_DIR/baseline.json"
 
 echo "[benchmark] wrote $OUT_DIR/baseline.json" >&2
-echo "[benchmark] wrote $OUT_DIR/pre-change-test-inventory.json" >&2
+if [[ -z "${BENCH_SKIP_SAMPLING:-}" ]]; then
+  echo "[benchmark] wrote $OUT_DIR/pre-change-test-inventory.json" >&2
+fi
