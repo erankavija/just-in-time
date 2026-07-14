@@ -201,12 +201,17 @@ maintains, so the mechanism and the work that backs it cross-reference by a
 stable id rather than by copied text. The namespace is non-unique: one issue may
 enforce several items.
 
-> **Enforcement lives in `.jit/rules.toml`, the single source of truth.** Allowed
-> values, value patterns, required namespaces, the canonical label format, and the
-> orphan-leaf / strategic-consistency warnings are declarative rules there
-> (scaffolded by `jit init`). A `[namespaces.<name>]` table declares taxonomy
-> only: description, uniqueness, and examples. To restrict a namespace's values,
-> author a rule in `rules.toml`, e.g.:
+> **Enforcement lives in `.jit/rules.toml`.** The canonical label format, the
+> namespace registry, per-namespace uniqueness, and the orphan-leaf /
+> strategic-consistency warnings are declarative rules there (scaffolded by `jit
+> init`). Those built-in rules are `origin = "default"`: they derive their
+> assertion — and the membership of the `namespace-unique-*` family — from the
+> `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
+> `[namespaces.<name>]` table's `unique` flag and its membership drive them
+> directly (declaring a namespace enforces it on the next command, no
+> regeneration). To add constraints the defaults do not cover — allowed values,
+> value patterns, required namespaces — author a custom rule in `rules.toml`,
+> e.g.:
 
 ```toml
 # .jit/rules.toml: restrict type:* to a fixed set (authored, not config-derived)
@@ -607,7 +612,8 @@ jit --schema                    # JSON output shapes and the exit-code taxonomy
 ```
 
 The rules themselves — format pattern, uniqueness, allowed values — are readable
-as data in `.jit/rules.toml`, the single source of truth.
+as data in `.jit/rules.toml`; the built-in `origin = "default"` rules derive
+their assertion from the `config.toml` registry at load.
 
 ---
 

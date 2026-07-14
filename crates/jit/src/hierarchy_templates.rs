@@ -116,11 +116,14 @@ strictness = "loose"
 # Auto-assign this type when creating issues without a type:* label.
 default_type = "task"
 
-# NOTE: ALL label/type validation (format, namespace registry, allowed values,
-# patterns, uniqueness, required namespaces, orphan-leaf / strategic-consistency
-# warnings) is defined declaratively in `.jit/rules.toml` — the single source of
-# truth — which `jit init` scaffolds with the same default checks. Edit the rules
-# there, not here; this section carries only the two behavioral keys above.
+# NOTE: label/type validation (format, namespace registry, per-namespace
+# uniqueness, orphan-leaf / strategic-consistency warnings) is defined as
+# `origin = "default"` rules in `.jit/rules.toml`, which `jit init` scaffolds.
+# Those default rules derive their assertion — and the `namespace-unique-*`
+# membership — from the `[namespaces]` / `[type_hierarchy]` tables in THIS file
+# at load, so edit the registry here to change what they check. Author any other
+# constraint (allowed values, patterns, required namespaces) as a custom rule in
+# `.jit/rules.toml`.
 
 # =============================================================================
 # NAMESPACE REGISTRY
@@ -131,8 +134,8 @@ default_type = "task"
 #   examples    — documentation only, not enforced
 #
 # Allowed-value enums, value patterns, and required-ness are NOT configured here:
-# they live as `namespace-*` rules in `.jit/rules.toml`, the single source
-# of truth (scaffolded by `jit init`).
+# author them as custom rules in `.jit/rules.toml`. The built-in registry and
+# `namespace-unique-*` rules derive from this table at load.
 
 [namespaces.type]
 description = "Issue type (hierarchical). At most one per issue."
@@ -224,8 +227,8 @@ source-of-truth = "registry-first"
 # item as `@/invariant/<self-id>`.
 aliases = ["inv"]
 
-# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source, scaffolded above); the rule kind projects each entry's `name` as its
+# Rules are colon-free-named entries in `.jit/rules.toml` (scaffolded above); the
+# rule kind projects each entry's `name` as its
 # self-id and its optional `description` as its display text (falling back to
 # the `name` when a rule has no description), addressed at `@/rule/<name>`.
 [item_kinds.rule]
@@ -538,8 +541,8 @@ source-of-truth = \"registry-first\"
 # item as `@/invariant/<self-id>`.
 aliases = [\"inv\"]
 
-# Rules are colon-free-named entries in `.jit/rules.toml` (the sole validation
-# source, scaffolded above); the rule kind projects each entry's `name` as its
+# Rules are colon-free-named entries in `.jit/rules.toml` (scaffolded above); the
+# rule kind projects each entry's `name` as its
 # self-id and its optional `description` as its display text (falling back to
 # the `name` when a rule has no description), addressed at `@/rule/<name>`.
 [item_kinds.rule]

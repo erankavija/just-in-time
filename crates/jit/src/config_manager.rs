@@ -176,7 +176,7 @@ impl ConfigManager {
         for (name, ns_config) in namespaces_config {
             // Only the taxonomy (description/unique) crosses into the domain
             // registry; per-namespace constraints (values/pattern/required) were
-            // removed when rules.toml became the sole validation source.
+            // removed when validation became rule-driven.
             let ns = LabelNamespace::new(ns_config.description, ns_config.unique);
             namespaces.insert(name, ns);
         }
@@ -351,7 +351,7 @@ milestone = "milestone"
     fn test_namespace_constraint_keys_are_ignored() {
         // Stale per-namespace constraint keys (values/pattern/required) in an old
         // config.toml are IGNORED: the domain registry carries only taxonomy
-        // (description/unique). rules.toml is the sole validation source.
+        // (description/unique). Validation is rule-driven.
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();

@@ -20,7 +20,7 @@ const SCHEMAS_DIR: &str = "schemas";
 /// (`<jit_root>/rules.toml`).
 ///
 /// `jit init` scaffolds the default ruleset only when this is `false`, so a
-/// user-edited `rules.toml` (the sole source when present) is never clobbered.
+/// present, user-edited `rules.toml` is never clobbered.
 pub fn has_validation_ruleset(jit_root: &Path) -> bool {
     jit_root.join(RULES_FILE).exists()
 }
@@ -69,6 +69,43 @@ pub fn write_baked_schema(jit_root: &Path, file_name: &str, content: &str) -> Re
     std::fs::create_dir_all(&schemas_dir)
         .with_context(|| format!("creating {}", schemas_dir.display()))?;
     write_file_atomic(&target, content)?;
+    Ok(true)
+}
+
+/// Rewrite the leading header region of `<jit_root>/rules.toml` to `header`,
+/// preserving every `[[rules]]` block below it (and any comments authored inside
+/// them) verbatim.
+///
+/// The header region is everything before the first line that starts a `[[rules]]`
+/// table — a generated comment block, republished so it always states the current
+/// default-rule contract without disturbing custom rules. A ruleset file with no
+/// `[[rules]]` block (an intentionally empty ruleset) is rewritten to `header`
+/// alone. A no-op when `rules.toml` is absent (the scaffold path writes a fresh
+/// file, header included) or already current. Returns `true` when the file was
+/// rewritten. Atomic (temp + rename).
+pub fn rewrite_rules_header(jit_root: &Path, header: &str) -> Result<bool> {
+    let path = jit_root.join(RULES_FILE);
+    if !path.exists() {
+        return Ok(false);
+    }
+    let content =
+        std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    // Match `[[rules]]` only at the START of a line, so a `[[rules]]` sequence
+    // inside a header comment or a rule description can never be mistaken for the
+    // first rule table.
+    let body_start = if content.starts_with("[[rules]]") {
+        Some(0)
+    } else {
+        content.find("\n[[rules]]").map(|idx| idx + 1)
+    };
+    let rebuilt = match body_start {
+        Some(idx) => format!("{header}{}", &content[idx..]),
+        None => header.to_string(),
+    };
+    if rebuilt == content {
+        return Ok(false);
+    }
+    write_file_atomic(&path, &rebuilt)?;
     Ok(true)
 }
 
@@ -212,5 +249,52 @@ mod tests {
         .unwrap();
 
         assert_eq!(scaffolded, regenerated, "scaffold and regen must agree");
+    }
+
+    #[test]
+    fn test_rewrite_rules_header_replaces_header_and_keeps_bodies() {
+        // The leading comment block is replaced with the new header; every
+        // `[[rules]]` block (and its inline comments) is preserved byte-for-byte.
+        let dir = tempfile::tempdir().unwrap();
+        let original = "# old header line 1\n# old header line 2\n\n\
+             [[rules]]\nname = \"keep-me\"\n# a custom comment\nassert = { require-section = { heading = \"Goals\" } }\n";
+        std::fs::write(dir.path().join(RULES_FILE), original).unwrap();
+
+        let new_header = "# new header\n# second line\n\n";
+        let wrote = rewrite_rules_header(dir.path(), new_header).unwrap();
+        assert!(wrote, "a differing header must be rewritten");
+
+        let updated = std::fs::read_to_string(dir.path().join(RULES_FILE)).unwrap();
+        assert!(updated.starts_with(new_header), "new header is on top");
+        assert!(!updated.contains("old header"), "old header is gone");
+        assert!(
+            updated.contains("name = \"keep-me\"") && updated.contains("# a custom comment"),
+            "rule bodies and their comments are preserved: {updated}"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_rules_header_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let header = "# header\n\n";
+        std::fs::write(
+            dir.path().join(RULES_FILE),
+            format!("{header}[[rules]]\nname = \"r\"\nassert = {{ require-section = {{ heading = \"H\" }} }}\n"),
+        )
+        .unwrap();
+        assert!(
+            !rewrite_rules_header(dir.path(), header).unwrap(),
+            "an already-current header is a no-op"
+        );
+    }
+
+    #[test]
+    fn test_rewrite_rules_header_noop_without_file() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(
+            !rewrite_rules_header(dir.path(), "# header\n\n").unwrap(),
+            "absent rules.toml => nothing to rewrite"
+        );
+        assert!(!dir.path().join(RULES_FILE).exists());
     }
 }

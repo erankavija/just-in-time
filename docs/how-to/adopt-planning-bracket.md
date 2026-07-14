@@ -102,16 +102,12 @@ are the defaults the bracket tooling assumes. To use your own vocabulary, name
 them in `.jit/templates.toml`'s top-level `[roles]` and `[anchors]` tables — see
 [Template bindings](../reference/configuration.md#template-bindings-jittemplatestoml).
 
-> **Sync the type-known schema.** If your project has a baked
-> `.jit/schemas/default-type-hierarchy-known.json` (`jit init` scaffolds one), the
-> write-path `type-hierarchy-known` rule reads *that* frozen enum, not
-> `[type_hierarchy]`. Adding a type to config does not update the frozen file, so
-> re-run `jit init` afterwards to refresh it from config (idempotent); otherwise
-> the write path reports an unknown-type warning on every
-> `type:planning`/`type:breakdown` issue (a warning only — it never blocks a
-> write). The shipped examples carry no baked type-known schema, so their
-> write-path check builds the enum in memory from `[type_hierarchy]` and
-> recognizes `planning`/`breakdown` with no extra step.
+> **New types take effect immediately.** The `type-hierarchy-known` rule (a
+> built-in default) derives its allowed-type enum from `[type_hierarchy]` in
+> memory at load, so adding `planning` / `breakdown` to config recognizes them on
+> the next command with no regeneration step. The `schemas/default-*.json` files
+> `jit init` scaffolds are regenerated projections for external consumers, not the
+> validation authority.
 
 Declare the `brackets:` namespace so `B`'s container pointer validates cleanly:
 

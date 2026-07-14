@@ -253,8 +253,9 @@ where
 
 /// Validation behavior configuration.
 ///
-/// Per-rule enforcement lives in `.jit/rules.toml`, the sole rule source (DR
-/// §8.2/§8.4); serde ignores any stale enforcement keys still present in an old
+/// Per-rule enforcement lives in `.jit/rules.toml` (DR §8.2/§8.4), whose built-in
+/// default rules derive from this repo's registry at load; serde ignores any
+/// stale enforcement keys still present in an old
 /// `config.toml` (no `deny_unknown_fields`), so such a file still parses. The
 /// operative keys here are `strictness` (the repo-wide enforcement modulator),
 /// `default_type`, and `content_format`.
@@ -364,8 +365,8 @@ impl DocumentationConfig {
 /// Replaces the namespace definitions in labels.json.
 ///
 /// The per-namespace constraint fields (`values`, `pattern`, `required`) were
-/// removed when `.jit/rules.toml` became the sole validation source (DR §8.4): a
-/// repo that wants those constraints authors the corresponding rules in
+/// removed when `.jit/rules.toml` became the operative validation ruleset (DR
+/// §8.4): a repo that wants those constraints authors the corresponding rules in
 /// `rules.toml`. The registry keeps only TAXONOMY (`description`/`unique`/
 /// `examples`); serde ignores any stale constraint keys in an old `config.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1515,7 +1516,7 @@ impl JitConfig {
         // An old `config.toml` may still carry removed enforcement keys
         // (`require_type_label`, namespace `values`/`pattern`/`required`, etc.).
         // serde ignores them (no `deny_unknown_fields`), so the file still parses;
-        // the keys simply have no effect — `.jit/rules.toml` is the sole source.
+        // the keys simply have no effect — validation is rule-driven.
         let mut config: JitConfig =
             toml::from_str(&content).context("Failed to parse config.toml")?;
 
@@ -2453,8 +2454,8 @@ types = { epic = 1, task = 2 }
         // An OLD config carrying the removed enforcement / namespace-constraint
         // keys still loads (no `deny_unknown_fields`): serde ignores them, the
         // surviving behavioral keys parse, and the registry taxonomy is intact.
-        // `.jit/rules.toml` is the sole validation source, so the stale keys have
-        // no effect.
+        // `.jit/rules.toml` is the operative validation ruleset, so the stale keys
+        // have no effect.
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [validation]

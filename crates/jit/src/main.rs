@@ -1792,9 +1792,9 @@ fn run() -> Result<()> {
             let project_name =
                 executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?;
 
-            // Scaffold .jit/rules.toml (the operative single source of truth) with
-            // the FIXED default ruleset derived from the repo's namespace registry
-            // + type hierarchy. A no-op when rules.toml already exists (re-init
+            // Scaffold .jit/rules.toml (the operative ruleset) with the FIXED
+            // default ruleset derived from the repo's namespace registry + type
+            // hierarchy. A no-op when rules.toml already exists (re-init
             // never clobbers user edits).
             let scaffolded = executor.scaffold_default_rules()?;
             if scaffolded {

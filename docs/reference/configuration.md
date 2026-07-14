@@ -133,12 +133,18 @@ only the block/allow decision:
 An unrecognized value is rejected. Under `--force`, a blocked write or transition
 proceeds and the bypass is logged, at every level.
 
-> **Validation enforcement lives in `.jit/rules.toml`.** Label/type format, the
-> namespace registry, allowed values, value patterns, uniqueness, required
-> namespaces, and the orphan-leaf / strategic-consistency warnings are all
-> defined declaratively as rules in `.jit/rules.toml`, the single source of
-> truth, scaffolded by `jit init`. `strictness` tunes how those rules gate
-> operations globally; the rules themselves stay in `rules.toml`.
+> **Validation enforcement lives in `.jit/rules.toml`.** The ruleset `jit
+> validate` and write-validation enforce is declared there, scaffolded by `jit
+> init`: label/type format, the namespace registry, per-namespace uniqueness, the
+> orphan-leaf / strategic-consistency warnings, and any custom rules you author.
+> The built-in rules marked `origin = "default"` derive their assertion — and the
+> membership of the `namespace-unique-*` family — from the `[namespaces]` /
+> `[type_hierarchy]` registry in `config.toml`, in memory at load; the
+> `schemas/default-*.json` files are regenerated projections, not the validation
+> authority. So you change what a default rule checks by editing that registry
+> (a hand-declared namespace takes effect on the next command, no regeneration
+> step), and author new conventions as custom rules in `rules.toml`. `strictness`
+> tunes how all of these gate operations globally.
 
 ### `[namespaces.*]`
 

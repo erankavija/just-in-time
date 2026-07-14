@@ -24,14 +24,23 @@ of truth, and the baked schema is a copy treated as authority.
 
 ## Decision
 
-Derive at load. When a `rules.toml` is present, `effective_rules` still reads it
-for which rules exist and, for default-origin rules, their editable policy fields
-(`severity`, `enforce`, `when`, `description`). But each default-origin rule's
-**assertion** is rebuilt from the declared registry in memory, via the pure
-`validation::defaults::with_default_assertions_from_config`, which substitutes
-the assertion that `default_ruleset(registry)` generates for a rule of the same
-name. Custom rules (any `origin` other than `default`) are used verbatim and keep
-reading their own declared schema files.
+Derive at load. When a `rules.toml` is present, `effective_rules` reconciles the
+default-origin family against `default_ruleset(registry)` in memory, via the pure
+`validation::defaults::reconcile_default_rules_with_config`:
+
+- a default-origin rule the registry still generates keeps its editable policy
+  fields (`severity`, `enforce`, `when`, `description`) but takes its **assertion**
+  from config, in place;
+- a default-origin rule the registry no longer generates (e.g. a
+  `namespace-unique-<ns>` for a removed namespace) is dropped;
+- a default rule the registry now generates but the file lacks (e.g. the
+  uniqueness rule for a newly-declared unique namespace) is appended.
+
+So both the assertions and the `namespace-unique-*` membership of the default
+family follow `config.toml` with no `rules.toml` write. A file that carries NO
+default-origin rule has deliberately opted out of the defaults and is returned
+unchanged. Custom rules (any `origin` other than `default`) are used verbatim and
+keep reading their own declared schema files.
 
 Rejected alternatives (pinned at intake): regenerate-on-write only (a hand edit
 stays stale until some jit write happens) and drift-check plus a `jit rules sync`
@@ -40,11 +49,13 @@ answers the question the schema was baked to ask).
 
 ## Consequences
 
-- `schemas/default-*.json` remain as write-through projections for external
-  consumers, refreshed from the registry by
-  `CommandExecutor::refresh_default_schema_projections` whenever jit writes
-  `config.toml` or `rules.toml` (init/re-init and `config set`). They no longer
-  decide validation, so a projection can never desync it.
+- `schemas/default-*.json` and the `rules.toml` header comment remain as
+  write-through projections for external consumers, refreshed from the registry /
+  contract by `CommandExecutor::refresh_default_schema_projections` and
+  `storage::ruleset_store::rewrite_rules_header` (which preserves every rule body,
+  including custom-rule comments) whenever jit writes `config.toml` or `rules.toml`
+  (init/re-init and `config set`). They no longer decide validation, so a
+  projection can never desync it.
 - This generalizes the earlier type-hierarchy-specific fix (`jit:c78168d8`): the
   `type-hierarchy-known` rule now derives its enum at load like the other
   default rules, rather than depending on a write-time regeneration helper.
