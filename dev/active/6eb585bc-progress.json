@@ -3,7 +3,7 @@
   "epic_short_id": "6eb585bc",
   "batch": "core-maintenance-2026-07-14 (18 open children: 14 filed since the usability batch, carryovers 1d59070d/0daba57d/c505031a, adopted 16402e14; prior batch report dev/active/6eb585bc-batch-report-2026-07-05.md, handoff dev/active/6eb585bc-handoff.md)",
   "current_wave": 3,
-  "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject \u2014 until it lands, verify manually). INTERLEAVE (invoker 2026-07-14): story 73482aa1 (rust-build-efficiency, filed by a parallel session under this epic) executes as wave 2, before the remaining CLI/gate/validation waves; former waves 2-5 renumbered 3-6.",
+  "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject \u2014 until it lands, verify manually). INTERLEAVE (invoker 2026-07-14): story 73482aa1 (rust-build-efficiency, filed by a parallel session under this epic) executes as wave 2, before the remaining CLI/gate/validation waves; former waves 2-5 renumbered 3-6. SESSION 2 BOUNDARY (2026-07-15): handoff dev/active/6eb585bc-handoff-2.md; story 73482aa1 complete; wave 2.5 interleaves done; wave 3 in flight at f40f1b0a.",
   "waves": [
     {
       "wave_number": 1,
@@ -65,7 +65,7 @@
           "classification": "implementation",
           "model": "opus",
           "status": "in_rework",
-          "note": "round 2: doc-review+code-review both flagged the mutation-response surfaces (create/assign/claim/etc) and a stale --help line; rework 2 dispatched demanding exhaustive surface enumeration"
+          "note": "AT HANDOFF: cargo-ci+docs-mechanical green on 2b7db09e; doc-review+code-review failed round 4; BOTH round-4 findings fixed and committed (bare-query schema arm + cli-commands mutation-echo membership) but not re-gated. Next session: reinstall, re-run both AI gates; NEW finding => escalate (2 worker + 3 lead-direct rounds consumed). See dev/active/6eb585bc-handoff-2.md"
         },
         {
           "short_id": "6f881a85",
@@ -248,7 +248,7 @@
     "45e1b7e8": 2,
     "7446af34": 2,
     "af4c901a": 3,
-    "f40f1b0a": 2
+    "f40f1b0a": 4
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
