@@ -15,7 +15,13 @@
     "doc-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T14:28:14.635619165Z"
+    }
+  },
   "context": {},
   "documents": [],
   "labels": [
@@ -26,7 +32,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.041332657Z",
-  "updated_at": "2026-07-15T12:21:49.064498908Z",
+  "updated_at": "2026-07-15T14:32:33.787086184Z",
   "first_ready_at": "2026-07-14T22:28:46.041332877Z",
   "claimed_at": "2026-07-15T12:21:49.064498278Z"
 }
