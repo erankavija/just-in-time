@@ -11,8 +11,10 @@
 //! a non-fresh `profile.test` compiler artifact.
 //!
 //! Ignored from the default suite: the first build is a full cold workspace
-//! compile (minutes), intrinsic to what the test exercises. Run on demand / in
-//! CI with:
+//! compile (minutes), intrinsic to what the test exercises, so plain
+//! `cargo test` skips it. `scripts/cargo-ci.sh`'s `provenance` step runs it (and
+//! the `version_cli_tests` contract suite) with `--ignored` on every gate, so
+//! this hard REQ-06 contract is exercised by CI. Run it directly with:
 //!   cargo test -p jit --test build_provenance_metadata_stability_tests -- --ignored
 
 use std::path::{Path, PathBuf};
