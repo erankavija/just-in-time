@@ -546,4 +546,3 @@ this MVP.
    consumers in acceptance evidence; a Rust-only consumer sweep is incomplete.
 8. Preserve existing preset behavior where it remains public, but do not reintroduce
    upgrade/removal/deprecation lifecycle scope under the guise of compatibility.
-

@@ -1,7 +1,7 @@
 # Research: profile publication and binary embedding choices
 
-**Container:** `9b7b5f9c` — Add first-class reusable jit configuration profiles  
-**Scope:** two implementation choices for the embedded `jit-dogfood` MVP only  
+**Container:** `9b7b5f9c` — Add first-class reusable jit configuration profiles
+**Scope:** two implementation choices for the embedded `jit-dogfood` MVP only
 **Date:** 2026-07-14
 
 This note is deliberately narrower than an implementation plan. It excludes local profile
