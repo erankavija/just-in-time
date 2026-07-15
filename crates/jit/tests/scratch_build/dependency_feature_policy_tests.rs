@@ -102,29 +102,33 @@ fn test_ureq_manifest_selects_exactly_one_tls_backend_explicitly() {
 /// fixture, are irrelevant to what the crate itself ships) and returns the
 /// text output.
 ///
-/// Exit code 2 (environment problem: no cargo on PATH) is treated by the
-/// caller as a skip, matching the convention used elsewhere in this suite
-/// (see `merged_commit_build_verification_tests.rs`); any other non-zero exit
-/// is a hard failure since it means `cargo tree` itself rejected the query.
-fn cargo_tree_subtree(package: &str) -> Result<String, u8> {
+/// A missing `cargo` binary (spawn `NotFound` — a constrained environment,
+/// matching the skip convention used elsewhere in this suite, see
+/// `merged_commit_build_verification_tests.rs`) yields `None` so the caller
+/// can skip. Every other failure — including a non-zero `cargo tree` exit —
+/// panics: it means the query itself failed, and skipping would silently
+/// waive REQ-06's resolved-graph guard.
+fn cargo_tree_subtree(package: &str) -> Option<String> {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let output = Command::new(cargo)
+    let output = match Command::new(cargo)
         .current_dir(workspace_root())
         .args(["tree", "-e", "normal,build", "-p", package])
         .output()
-        .unwrap_or_else(|e| panic!("failed to spawn `cargo tree -p {package}`: {e}"));
+    {
+        Ok(output) => output,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(e) => panic!("failed to spawn `cargo tree -p {package}`: {e}"),
+    };
 
-    if !output.status.success() {
-        eprintln!(
-            "cargo tree -p {package} failed (exit {:?}):\nstdout:\n{}\nstderr:\n{}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return Err(2);
-    }
+    assert!(
+        output.status.success(),
+        "cargo tree -p {package} failed (exit {:?}):\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// A `cargo tree` line renders a dependency as `<name> v<version>`, so
@@ -139,12 +143,9 @@ fn tree_contains_package(tree: &str, name: &str) -> bool {
 
 #[test]
 fn test_jsonschema_resolved_subtree_excludes_remote_resolution_infrastructure() {
-    let tree = match cargo_tree_subtree("jsonschema") {
-        Ok(t) => t,
-        Err(_) => {
-            eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
-            return;
-        }
+    let Some(tree) = cargo_tree_subtree("jsonschema") else {
+        eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
+        return;
     };
 
     for banned in ["reqwest", "hyper", "tokio-rustls", "aws-lc-rs", "rustls"] {
@@ -159,12 +160,9 @@ fn test_jsonschema_resolved_subtree_excludes_remote_resolution_infrastructure() 
 
 #[test]
 fn test_ureq_resolved_subtree_selects_exactly_one_tls_backend_with_explicit_gzip() {
-    let tree = match cargo_tree_subtree("ureq") {
-        Ok(t) => t,
-        Err(_) => {
-            eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
-            return;
-        }
+    let Some(tree) = cargo_tree_subtree("ureq") else {
+        eprintln!("SKIP: no cargo on PATH to resolve the dependency graph");
+        return;
     };
 
     assert!(
