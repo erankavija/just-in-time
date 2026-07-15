@@ -24,14 +24,15 @@
     },
     {
       "wave_number": 2,
-      "theme": "Test topology + provenance (disjoint footprints)",
+      "theme": "Provenance then test topology (serialized: consolidation must fold in provenance tests; REQ-01 target count)",
       "issues": [
         {
           "short_id": "8d4f7084",
           "title": "Consolidate Rust integration tests into cohesive suites",
           "classification": "implementation",
           "model": "opus",
-          "status": "in_progress"
+          "status": "pending",
+          "note": "dispatch AFTER 5d862134 merges: its consolidation must include 5d862134 new provenance tests or the <=12-target REQ breaks post-merge; both touch the tests/ tree"
         },
         {
           "short_id": "5d862134",
