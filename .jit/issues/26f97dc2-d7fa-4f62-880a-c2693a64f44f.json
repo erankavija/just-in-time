@@ -16,13 +16,85 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/benchmarks/rust-build-efficiency/optimized.json",
+      "commit": null,
+      "label": "Optimized build samples",
+      "doc_type": null
+    },
+    {
+      "path": "dev/benchmarks/rust-build-efficiency/report.md",
+      "commit": null,
+      "label": "Baseline vs optimized benchmark report",
+      "doc_type": null,
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "raw/",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/raw",
+          "asset_type": "missing",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "../../../scripts/benchmark-rust-build.sh",
+          "resolved_path": "scripts/benchmark-rust-build.sh",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "d0521e8852db9d03ff79ea21e20d31ebbcb9f83af36357cfb807d21bb30501f9",
+          "is_shared": false
+        },
+        {
+          "original_path": "optimized.json",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/optimized.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "fe4f1c39a966f93428d5b320a7faae0a57ce6f2167711b0e7e544919540c0ff1",
+          "is_shared": false
+        },
+        {
+          "original_path": "pre-change-test-inventory.json",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "a9798c9b7848d34d3bf6568380582cf439526fc52048eb254b09ea006c6b12e8",
+          "is_shared": false
+        },
+        {
+          "original_path": "raw/clean-1/executable-remeasure.json",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/raw/clean-1/executable-remeasure.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "4da3d262647ed29067c08ad72d7732ddcf9f464394d816f126c72f80b0ba188d",
+          "is_shared": false
+        },
+        {
+          "original_path": "baseline.json",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/baseline.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "f0ba81667e03aa2d875c557f0b871d80b0d682c407dbd05c8e271572af627baa",
+          "is_shared": false
+        },
+        {
+          "original_path": "post-change-test-inventory.json",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/post-change-test-inventory.json",
+          "asset_type": "local",
+          "mime_type": null,
+          "content_hash": "df3552fb6966660bfcc0dd742ac53fecac591c9875d8414c356966fd1f32d5fc",
+          "is_shared": false
+        }
+      ]
+    }
+  ],
   "labels": [
     "story:rust-build-efficiency",
     "type:task"
   ],
   "created_at": "2026-07-14T13:02:21.120718163Z",
-  "updated_at": "2026-07-15T12:14:41.778469056Z",
+  "updated_at": "2026-07-15T13:53:32.071706004Z",
   "first_ready_at": "2026-07-14T13:02:21.120723553Z",
   "claimed_at": "2026-07-15T12:14:41.778468796Z"
 }

@@ -7783,3 +7783,5 @@
 {"type":"gate_passed","id":"bcfdbcb1-cff4-475b-84b8-88c139321e15","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:14.325347258Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"773db5fb-4eea-4d72-8e7a-7627e6f60ab2","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:16.341229194Z","gate_key":"secret-detection","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"58893e3c-987d-41fb-9fd9-3ca71e3e52c4","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:17.958286290Z","gate_key":"dependency-audit","updated_by":"auto:executor"}
+{"type":"issue_updated","id":"f1b2fa98-e852-4df5-962f-3cac7b296ba0","issue_id":"26f97dc2-d7fa-4f62-880a-c2693a64f44f","timestamp":"2026-07-15T13:53:32.062836658Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_updated","id":"2a5c44b9-3461-4273-8ceb-998a7c26aaec","issue_id":"26f97dc2-d7fa-4f62-880a-c2693a64f44f","timestamp":"2026-07-15T13:53:32.071919534Z","updated_by":"doc-add","fields":["documents"]}
