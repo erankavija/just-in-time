@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "364f741b-0d7a-4286-987e-1bbea7d15f5d",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "362e3fec-a012-4980-9846-021d3743779b",
+  "commit": "32bd168d2bb9552f477a85cfe3e5604455794371",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T17:06:16.602298735Z",
+  "completed_at": "2026-07-15T17:08:08.183557434Z",
+  "duration_ms": 111581,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured leaf type (level 4), and its resolved DAG node has no children. I reviewed the two reachable `jit:362e3fec` commits individually: the content commit changes the invariant registry, generated AGENTS projection, and `dev/TESTING.md`; the merge commit has no additional combined patch. Current registry resolution, projection freshness, checker behavior, and cited paths agree.\n\nThe change is repository-local contributor policy, not a shipped adopter-facing JIT capability, so no update to `docs/`, README, INSTALL, MCP, or web documentation is required. The contributor guidance is discoverable from `dev/index.md` and accurately describes the current build-budget checker and benchmark workflow.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's attributed contributor-policy documentation is accurate, discoverable, and requires no adopter-facing documentation update.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's attributed contributor-policy documentation is accurate, discoverable, and requires no adopter-facing documentation update.",
+    "findings": []
+  }
+}

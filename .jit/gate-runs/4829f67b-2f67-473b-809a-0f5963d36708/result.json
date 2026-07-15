@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "4829f67b-2f67-473b-809a-0f5963d36708",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "362e3fec-a012-4980-9846-021d3743779b",
+  "commit": "32bd168d2bb9552f477a85cfe3e5604455794371",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T17:08:08.220781271Z",
+  "completed_at": "2026-07-15T17:11:04.912612167Z",
+  "duration_ms": 176691,
+  "exit_code": 1,
+  "stdout": "Attribution: 32bd168d, 6f2d6745 (`jit:362e3fec`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first); @/invariant/single-source-prose (.jit/invariants.toml, registry-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml, registry-first); @/charter/D-6 (dev/vision/9db27a3a-charter.md, markdown-first)\nGate evidence: cargo-ci passed (0, 2026-07-15T17:04:17Z); repo-validate passed (0, 2026-07-15T17:04:16Z); doc-review passed (0, 2026-07-15T17:06:16Z); docs-mechanical passed (0, 2026-07-15T17:04:16Z)\nTruncation recovery: narrower per-commit patches and affected config/document/script line reads after combined-output truncation\n\n1. [blocking][issue-impact] `jit invariant check --json` currently reports `bounded-rust-build-footprint` as enforcement drift with `subject: \"@/gate/cargo-ci\"` and `unloadable: true`. This directly fails hard REQ-02 despite the registry entry at `.jit/invariants.toml:68` and passing recorded gates; the same check also reports other gate-bound invariants unloadable, so the project must restore a loadable gate registry/enforcement path before this invariant can be considered enforced. References: @/invariant/bounded-rust-build-footprint, @/gate/cargo-ci.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new invariant remains unenforceable because invariant checking reports its cargo-ci binding unloadable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Invariant checking reports bounded-rust-build-footprint as drift because @/gate/cargo-ci is unloadable, failing hard REQ-02.\",\"file\":\".jit/invariants.toml\",\"line\":71,\"references\":[\"@/invariant/bounded-rust-build-footprint\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5195 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f66c0-0775-7c00-91a1-4cc91ec22f10\n--------\nuser\n--- 5182 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The new invariant remains unenforceable because invariant checking reports its cargo-ci binding unloadable.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Invariant checking reports bounded-rust-build-footprint as drift because @/gate/cargo-ci is unloadable, failing hard REQ-02.",
+        "file": ".jit/invariants.toml",
+        "line": 71,
+        "references": [
+          "@/invariant/bounded-rust-build-footprint",
+          "@/gate/cargo-ci"
+        ]
+      }
+    ]
+  }
+}
