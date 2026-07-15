@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "22e6ab02-884b-4df0-b5cb-bed4f9a95f9d",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "commit": "6bba77c13df0c61ef3e8a8ac937f8ca18bbe30ab",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T13:01:24.241483660Z",
+  "completed_at": "2026-07-15T13:03:18.970202608Z",
+  "duration_ms": 114728,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest command_exit_code_projection_tests::test_command_exit_codes_validate_rule_findings_emits_1 ... FAILED\ntest exit_code_tests::test_exit_code_validation_command ... FAILED\ntest result: FAILED. 243 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s\n---- command_exit_code_projection_tests::test_command_exit_codes_validate_rule_findings_emits_1 stdout ----\n\nthread 'command_exit_code_projection_tests::test_command_exit_codes_validate_rule_findings_emits_1' (3437684) panicked at crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:131:5:\nassertion `left == right` failed: stderr: Error: namespace-and-hierarchy validation pass\n\n---- exit_code_tests::test_exit_code_validation_command stdout ----\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=970 bytes=14155036)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1002122104/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
