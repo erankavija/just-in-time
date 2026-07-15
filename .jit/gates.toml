@@ -23,8 +23,8 @@ REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
 [[gates]]
 version = 1
 key = "cargo-ci"
-title = "Cargo CI (fmt + clippy + tests)"
-description = "Full Rust CI pipeline: formatting check, zero-warning clippy, and the workspace test suite must all pass."
+title = "Cargo CI (fmt + clippy + tests + build policy)"
+description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite, the build-provenance contract suites, the build-footprint budget checker (integration-target and active-executable budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh), and the incremental-state check must all pass (@/invariant/bounded-rust-build-footprint)."
 stage = "postcheck"
 mode = "auto"
 priority = 100
