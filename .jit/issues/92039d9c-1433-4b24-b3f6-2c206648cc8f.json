@@ -17,9 +17,24 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T14:28:14.635619165Z"
+      "updated_at": "2026-07-15T14:35:28.938277189Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T14:39:03.649827652Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T14:38:48.985883209Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T14:38:47.687782625Z"
     }
   },
   "context": {},
@@ -32,7 +47,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.041332657Z",
-  "updated_at": "2026-07-15T14:32:33.787086184Z",
+  "updated_at": "2026-07-15T14:43:44.360212818Z",
   "first_ready_at": "2026-07-14T22:28:46.041332877Z",
   "claimed_at": "2026-07-15T12:21:49.064498278Z"
 }
