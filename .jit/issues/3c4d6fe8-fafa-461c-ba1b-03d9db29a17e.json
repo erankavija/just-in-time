@@ -2,9 +2,9 @@
   "id": "3c4d6fe8-fafa-461c-ba1b-03d9db29a17e",
   "title": "Remove secret-like label example from reference docs",
   "description": "The mandatory Gitleaks v8.30.1 scan reports a pre-existing generic-api-key false positive at docs/reference/labels.md:413 because the invalid label example is the bare text \"auth\". This is not an actual credential, but it blocks profiles leaf 0aec3b1e and must be corrected without weakening secret detection.\n\n## Success Criteria\n\n- [hard] REQ-01: Replace the secret-like valid/invalid label vocabulary while preserving the exact namespace:value versus malformed-label teaching point and the surrounding MCP guidance.\n- [hard] REQ-02: The official secret-detection gate passes with no allowlist, detector configuration change, inline suppression, ignored path, or reduced scan scope.\n- [hard] REQ-03: Repository and documentation validation pass, and the attributable change remains limited to the misleading example plus required evidence.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "secret-detection",
@@ -21,6 +21,7 @@
     "type:bug"
   ],
   "created_at": "2026-07-15T10:33:53.115670863Z",
-  "updated_at": "2026-07-15T10:33:53.117322694Z",
-  "first_ready_at": "2026-07-15T10:33:53.115675753Z"
+  "updated_at": "2026-07-15T11:02:17.354360065Z",
+  "first_ready_at": "2026-07-15T10:33:53.115675753Z",
+  "claimed_at": "2026-07-15T11:02:17.354359765Z"
 }

@@ -67,6 +67,20 @@
       ]
     },
     {
+      "wave_number": 3.5,
+      "theme": "Gate-fixture hygiene (filed by project-lead session, nested here; must precede footprint budgets)",
+      "issues": [
+        {
+          "short_id": "83efbcb4",
+          "title": "Bound provenance test source snapshots",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "filed 2026-07-15 (commits ebec1039/8da80c52); unbounded ~23 GiB fixture copy traversing .agents/worktrees + target dirs; lands before 3f73423b so budgets measure a sane gate"
+        }
+      ]
+    },
+    {
       "wave_number": 4,
       "theme": "Budget enforcement in cargo-ci",
       "issues": [
