@@ -7451,3 +7451,4 @@
 {"type":"issue_updated","id":"d6336344-e6b7-455b-b009-c8a51e072898","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-07-15T09:13:27.015193418Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"dependency_reduced","id":"9575f00b-2fab-40a6-b3a5-047a3d112f90","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-15T09:13:27.019217211Z","old_count":27,"new_count":26,"removed_deps":["9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"]}
 {"type":"gate_failed","id":"775002f3-4421-4741-830d-10f16cbaf9b8","issue_id":"207364b1-cc06-4bf5-ae61-34908acc898c","timestamp":"2026-07-15T09:14:05.436338387Z","gate_key":"coverage-preview","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"82bfd410-8f7d-4fc3-b013-36a08f26f13d","issue_id":"207364b1-cc06-4bf5-ae61-34908acc898c","timestamp":"2026-07-15T09:16:25.137053784Z","gate_key":"coverage-preview","updated_by":"auto:executor"}

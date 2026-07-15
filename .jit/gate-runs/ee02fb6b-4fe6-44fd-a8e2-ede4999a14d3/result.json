@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "ee02fb6b-4fe6-44fd-a8e2-ede4999a14d3",
+  "gate_key": "coverage-preview",
+  "stage": "postcheck",
+  "issue_id": "207364b1-cc06-4bf5-ae61-34908acc898c",
+  "commit": "500fbd301255700a74e5c4ceeff6c6644ac725e1",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-15T09:16:24.933333326Z",
+  "completed_at": "2026-07-15T09:16:25.136748424Z",
+  "duration_ms": 203,
+  "exit_code": 4,
+  "stdout": "❌ [coverage-preview] config error: issue 923e42fb matched the rule but its 'brackets:2821e177' container pointer names no known issue\n",
+  "stderr": "Scope validation failed with 1 error(s)\n",
+  "command": "./scripts/coverage-preview.sh",
+  "by": "auto:executor",
+  "message": null
+}

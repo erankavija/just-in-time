@@ -13,15 +13,15 @@
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T09:14:05.332952762Z"
-    },
     "breakdown-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-14T18:54:18.025842013Z"
+    },
+    "coverage-preview": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T09:16:24.933333326Z"
     }
   },
   "context": {},
@@ -39,6 +39,6 @@
     "brackets:8b05a612"
   ],
   "created_at": "2026-07-14T18:54:18.022025800Z",
-  "updated_at": "2026-07-15T09:14:05.436151347Z",
+  "updated_at": "2026-07-15T09:16:25.136887664Z",
   "first_ready_at": "2026-07-14T18:54:18.022026200Z"
 }
