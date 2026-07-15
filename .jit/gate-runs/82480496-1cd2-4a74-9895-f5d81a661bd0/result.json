@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "82480496-1cd2-4a74-9895-f5d81a661bd0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "c6e70c3f7a68a2964a4e6133f5c9c27bbb456798",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T01:51:59.707294430Z",
+  "completed_at": "2026-07-15T01:56:20.099408391Z",
+  "duration_ms": 260392,
+  "exit_code": 0,
+  "stdout": "Attribution: jit:4e22a20d commits fc12c648, 32b6cfc4, d2bca248, 5ccefe0a, 75256abb, 5d2399dd, b5d8278a, 4090eef5, e26d4624, c6e70c3f\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T01:49:51Z); doc-review passed (exit 0, 2026-07-15T01:46:34Z); prior code-review F1/F2 addressed by c6e70c3f\nTruncation recovery: narrowed merge-parent/path patches; current script line ranges; JSON structural, consistency, and executable-set checks\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied and the prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All five hard criteria are satisfied and the prior blocking findings are resolved.",
+    "findings": []
+  }
+}
