@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "f9984f5d-dd4d-4395-ab72-f04379a4c254",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "73482aa1-aa6b-46f6-9d6f-3152a102e558",
+  "commit": "2d7f631d4e88aa7b3520070f65dae110a3f3dee5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T17:25:52.395703134Z",
+  "completed_at": "2026-07-15T17:28:51.124090281Z",
+  "duration_ms": 178728,
+  "exit_code": 1,
+  "stdout": "Attribution: `73482aa1` is a level-3 container with nine delivered level-4 children. I inspected 76 unique `jit:<short-id>` commits reachable from `main` individually with rename detection; all included issues had tagged commits. Current code confirms the combined build-footprint behavior.\n\nDocumentation is otherwise coherent, but the projected gate catalog omits the new required cargo-ci budget/policy step.\n\n1. **F1 — blocking, issue-impact, medium:** [`docs/reference/rules-and-gates.md:39`](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:39) describes this repository’s `cargo-ci` gate as only formatting, clippy, and workspace tests. It now also fails on build-footprint budgets and profile, incremental-state, and dependency-feature policy drift. Update the `cargo-ci` description in `.jit/gates.toml` to cover the budget checker, then regenerate this projection. (`@/gate/cargo-ci`, `@/invariant/bounded-rust-build-footprint`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The cargo-ci gate catalog omits the build-footprint budget and policy enforcement added by this container.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The projected cargo-ci description omits its build-footprint budget and policy checks.\",\"file\":\"docs/reference/rules-and-gates.md\",\"line\":39,\"references\":[\"@/gate/cargo-ci\",\"@/invariant/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "grep: /tmp/tmp.fI9JiRQftk: binary file matches\n--- agent stderr (first 12 of 23006 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f66d0-444a-7fb3-9cf2-c531745b7c77\n--------\n--- 22994 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The cargo-ci gate catalog omits the build-footprint budget and policy enforcement added by this container.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The projected cargo-ci description omits its build-footprint budget and policy checks.",
+        "file": "docs/reference/rules-and-gates.md",
+        "line": 39,
+        "references": [
+          "@/gate/cargo-ci",
+          "@/invariant/bounded-rust-build-footprint"
+        ]
+      }
+    ]
+  }
+}

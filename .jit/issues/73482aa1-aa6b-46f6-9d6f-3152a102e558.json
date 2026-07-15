@@ -16,7 +16,28 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:20:49.357802602Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:25:52.063670982Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:25:52.395703134Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:19:07.905221498Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -35,6 +56,6 @@
     "type:story"
   ],
   "created_at": "2026-07-14T12:51:41.227102198Z",
-  "updated_at": "2026-07-15T17:18:05.920287644Z",
+  "updated_at": "2026-07-15T17:28:51.124292051Z",
   "first_ready_at": "2026-07-14T12:51:41.227106348Z"
 }

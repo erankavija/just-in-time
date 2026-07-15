@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "c0f408d6-b8d5-44ae-a232-a4d6d61bece4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "73482aa1-aa6b-46f6-9d6f-3152a102e558",
+  "commit": "2d7f631d4e88aa7b3520070f65dae110a3f3dee5",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T17:20:49.357802602Z",
+  "completed_at": "2026-07-15T17:25:52.059908209Z",
+  "duration_ms": 302702,
+  "exit_code": 0,
+  "stdout": "Attribution: 23 reachable `jit:73482aa1` commits: 54c81dfb, 56d73789, 32b6cfc4, 2605a98e, 235660d5, 555f3e06, 88c3ef08, 1ff2da0a, fb184763, 6ac21369, 25c37dbd, b8d429ba, 214aee55, 3479caf5, 0e40a36f, e305f965, 3d697d40, 9de45438, 13563d76, 2d42b96c, 6a138b65, 65bedc60, 2d7f631d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/bounded-rust-build-footprint, @/invariant/single-source-prose, @/invariant/atomic-writes (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T17:19:07Z); repo-validate pending; doc-review pending; docs-mechanical pending\nTruncation recovery: Per-commit stats/name-status and narrowed current implementation, tests, benchmark, inventory, policy, and structured-gate reads; the live inventory verifier was not relied on because it invokes Cargo and exited 101 in the read-only environment.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current tree satisfies the story’s hard build-footprint criteria; no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The current tree satisfies the story’s hard build-footprint criteria; no unresolved issue-impact defects were found.",
+    "findings": []
+  }
+}
