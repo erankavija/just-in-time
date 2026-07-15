@@ -8,7 +8,7 @@
       "issues": [
         {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
         {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "gates_passed_waiting_wave"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "escalated_max_rework"}
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "rework_attempt_3_authorized"}
       ]
     },
     {
@@ -86,7 +86,8 @@
     {
       "category": "maximum rework attempts reached",
       "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
-      "status": "requires human authorization for any further rework",
+      "status": "third rework attempt explicitly authorized by invoker",
+      "authorized_at": "2026-07-15",
       "gate_run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
       "findings": [
         "repository validation omits claims-index consistency",
@@ -99,7 +100,7 @@
   "rework_counts": {
     "866a5bbd-c98d-4588-83e8-7423f3b12005": 1,
     "92039d9c-1433-4b24-b3f6-2c206648cc8f": 1,
-    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 2
+    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 3
   },
   "started_at": "2026-07-15T15:20:34+03:00"
 }
