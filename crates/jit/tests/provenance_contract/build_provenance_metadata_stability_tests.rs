@@ -16,7 +16,12 @@
 //! the `version_cli_tests` contract suite) with `--ignored` on every gate, so
 //! this hard REQ-06 contract is exercised by CI. Run it directly with:
 //!   cargo test -p jit --test build_provenance_metadata_stability_tests -- --ignored
+//!
+//! The isolated repository is seeded via `repository_inventory::seed_isolated_repository`,
+//! which bounds the fixture to this workspace's repository-input inventory
+//! (jit:83efbcb4) rather than walking the whole working tree.
 
+use crate::repository_inventory::seed_isolated_repository;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -28,56 +33,15 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// Copy the workspace's tracked-ish sources into `dest` (excluding `.git`,
-/// `.jit`, `target`, and node_modules), then make it an independent Git repo
-/// with one commit. `web/dist/index.html` is pre-created so `crates/server`'s
-/// build script never creates it mid-run — otherwise the first build would
-/// materialize `web/dist`, and the second build's `rerun-if-changed=web/dist/`
-/// would fire and relink the server test target, a confound unrelated to the
-/// Git-metadata sensitivity under test.
+/// Seed `dest` as an isolated Git repository built from this workspace's
+/// repository-input inventory (see `repository_inventory` module docs; that
+/// is what bounds this fixture to tracked repository inputs rather than
+/// walking the whole working tree — jit:83efbcb4). Prints the seeded file and
+/// byte counts (REQ-04) before returning, so a cold-build run makes future
+/// snapshot growth observable without inspecting the fixture by hand.
 fn seed_source_repo(dest: &Path) {
-    let workspace_root = workspace_root();
-    std::fs::create_dir_all(dest).unwrap();
-
-    let copy = Command::new("bash")
-        .current_dir(&workspace_root)
-        .arg("-c")
-        .arg(
-            "tar --exclude=./.git --exclude=./.jit --exclude=./target \
-             --exclude=./web/node_modules --exclude=./mcp-server/node_modules \
-             -cf - . | tar -C \"$1\" -xf -",
-        )
-        .arg("copy-workspace")
-        .arg(dest)
-        .status()
-        .unwrap();
-    assert!(copy.success(), "workspace copy should succeed");
-
-    let dist = dest.join("web").join("dist");
-    std::fs::create_dir_all(&dist).unwrap();
-    std::fs::write(
-        dist.join("index.html"),
-        "<!doctype html><title>stub</title>",
-    )
-    .unwrap();
-
-    for args in [
-        vec!["init", "-q"],
-        vec!["config", "user.email", "jit-test@example.invalid"],
-        vec!["config", "user.name", "JIT Test"],
-        vec!["add", "."],
-        vec!["commit", "-q", "-m", "seed"],
-    ] {
-        let status = Command::new("git")
-            .current_dir(dest)
-            .args(&args)
-            .status()
-            .unwrap();
-        assert!(
-            status.success(),
-            "git setup command {args:?} should succeed"
-        );
-    }
+    let (file_count, total_bytes) = seed_isolated_repository(&workspace_root(), dest);
+    println!("provenance-fixture: files={file_count} bytes={total_bytes}");
 }
 
 /// Run `cargo test --workspace --no-run --message-format=json` in `source_dir`
