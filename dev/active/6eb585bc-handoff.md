@@ -6,7 +6,9 @@
 
 ## Current state
 
-- Epic: `6eb585bc` — state: backlog (open living container, assigned agent:jit-execution-lead assign-only)
+- Epic: `6eb585bc` — state: backlog (finite v1.0 prerequisite; complete and close
+  it before production-readiness source freeze per `@/charter/D-14`; assigned
+  agent:jit-execution-lead assign-only)
 - Wave in progress: none; waves 1–16 complete, waves 17–19 pending (session boundary was invoker-directed after wave 16)
 - Children summary: 16 batch children done this session (74fbdb69, b1586c0d, dc3bef62, a05b87ae, 30a3b5c1, c8518f2a, d0f88ee2, 043ae624, cc42a69b, 7fe5c743, 27338abc, 0ab468ba, 31e12d2b, 62f3bebd, 1a63ef75, b3a54e25); 4 open children remain: c291e95c (MCP tool-set re-curation, wave 17), 1d59070d (gate define checker implies auto, wave 18), 0daba57d (refused delete exits nonzero, wave 19), c505031a (deprecated gate aliases removal — pre-existing, NOT in this batch's waves)
 - Active claims: none (all workers relieved; b3a54e25 was lead-direct)
@@ -30,7 +32,11 @@
 - [ ] Wave 19: dispatch 0daba57d (refused delete exits nonzero + JSON envelope; sonnet).
 - [ ] Decide c505031a's slot (deprecated gate alias removal — pre-existing child, never waved). Ask the invoker whether to append it to this batch or leave for the next.
 - [ ] Interview the invoker on the archived-resurrection question (Open questions below) and file if approved.
-- [ ] After all children resolve: epic stays OPEN as living container (standing invoker decision); write the batch completion report (model: dev/active/6eb585bc-batch-report-2026-07-05.md), link via jit doc add, clear stewardship assignment.
+- [ ] After all children resolve: write the batch completion report (model:
+  dev/active/6eb585bc-batch-report-2026-07-05.md), link it via `jit doc add`, run
+  the epic's completion gates, and close `6eb585bc` before production-readiness
+  source freeze. This supersedes the former standing living-container decision
+  per `@/charter/D-14`.
 
 ## Traps — do not repeat these
 

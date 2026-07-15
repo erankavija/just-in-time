@@ -5,6 +5,12 @@ stays open as a living container** — new maintenance items will be added under
 over time. This report covers the batch of children driven to completion by the
 execution-lead workflow on 2026-07-05; it is not an epic-closure report.
 
+> **Superseded for v1.0 (2026-07-15):** Charter decision `@/charter/D-14`
+> replaces the living-container lifecycle instruction above. Finish the current
+> core-maintenance scope and close epic `6eb585bc` before the production-readiness
+> source-freeze boundary. The original paragraph remains as historical context
+> for this batch report, not as current execution guidance.
+
 ## Status against the epic criterion
 
 > Every child maintenance item is resolved (done or rejected) with its own verifiable criteria.
