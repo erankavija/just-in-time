@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "run_id": "ef70e96b-d670-4678-9237-8d58a95056ad",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "e8f5d25eced41c7f7ec929f5206457d2e374b2e3",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T18:33:39.139515783Z",
+  "completed_at": "2026-07-15T18:38:08.995714336Z",
+  "duration_ms": 269856,
+  "exit_code": 1,
+  "stdout": "Attribution: a92dc223, b156df88, 4c709b7f, 90b306da, e8f5d25e (`jit:f40f1b0a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose — .jit/invariants.toml\nGate evidence: cargo-ci passed (0); doc-review failed (1); docs-mechanical passed (0)\nTruncation recovery: Narrow per-commit/path patch reads and current source, schema, documentation, and test line-range reads\n\n1. **F1 — blocking, issue-impact (high):** `jit issue show --summary --json` now emits the projected `gates` array, but its generated `--help` text still promises `gates_required, gates_status` at `crates/jit/src/cli.rs:803`. This recreates the silent-wrong-field failure in a command reference and is not covered by the new contract tests. References: `@/invariant/single-source-prose`.\n\n2. **F2 — blocking, issue-impact (high):** The schema/reference is still incomplete for commands that emit gate-bearing issue data. `issue create --json` serializes `IssueShowResponse` (`crates/jit/src/main.rs:1949`) and thus `gates`, but `jit --schema` declares the raw `Issue` shape (`crates/jit/src/schema.rs:491`). Conversely, assign/claim/unassign/reject/release/claim-next emit raw issue gate fields (`crates/jit/src/main.rs:2747`, `2819`, `2839`, `2870`, `2889`, `2934`) but fall through to no specific schema (`crates/jit/src/schema.rs:595`). The new storage reference claims per-command schema disclosure at `docs/reference/storage-format.md:123`, while the added contract tests omit these surfaces. REQ-01, REQ-02, and REQ-04 therefore remain unmet. References: `@/invariant/single-source-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Gate-field documentation and schema coverage remain incorrect or absent for summary help, issue creation, and mutation responses.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The issue-show summary help still documents raw gate fields although the emitted JSON uses gates.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":803,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Gate-bearing create and mutation responses are misdeclared or undocumented in jit --schema and omitted from contract coverage.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":491,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12939 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f670e-510e-7901-bc3e-023b5afb35d6\n--------\nuser\n--- 12926 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Gate-field documentation and schema coverage remain incorrect or absent for summary help, issue creation, and mutation responses.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The issue-show summary help still documents raw gate fields although the emitted JSON uses gates.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 803,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Gate-bearing create and mutation responses are misdeclared or undocumented in jit --schema and omitted from contract coverage.",
+        "file": "crates/jit/src/schema.rs",
+        "line": 491,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

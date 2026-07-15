@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "28df730f-0c93-4e82-aede-b3761ee54b11",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "e8f5d25eced41c7f7ec929f5206457d2e374b2e3",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T18:31:33.198708041Z",
+  "completed_at": "2026-07-15T18:33:39.103071596Z",
+  "duration_ms": 125904,
+  "exit_code": 1,
+  "stdout": "Attribution: `f40f1b0a` is a leaf (`bug`, level 4) with no resolved children. I inspected the five reachable `jit:f40f1b0a` commits individually; all had tag-based attribution. The prior review had no unresolved findings.\n\nThe documentation contract is incomplete for machine-readable gate fields.\n\n1. **F1 — blocking, issue-impact.** The canonical gate-field rules omit `jit issue create --json` and several mutation responses that carry gate data, while claiming the two rules cover command JSON output and that `jit --schema` declares the emitted shape per command. Creation actually returns the `issue show` projection (`gates`), whereas assign/claim/unassign/reject/release/claim-next return stored-record gate fields (`gates_required` / `gates_status`); `issue create`’s schema currently incorrectly declares the stored `Issue` shape. Update the schema contracts for these commands, then amend the storage reference’s exhaustive “current members” and per-command-schema claim to cover them accurately.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue-authored gate-field reference omits machine-readable command surfaces and overstates schema coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical gate-field rules omit create and mutation JSON responses and incorrectly claim per-command schema coverage.\",\"file\":\"docs/reference/storage-format.md\",\"line\":113}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11688 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f670c-6755-7331-ac9f-85697c7dc365\n--------\nuser\n--- 11675 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The issue-authored gate-field reference omits machine-readable command surfaces and overstates schema coverage.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The canonical gate-field rules omit create and mutation JSON responses and incorrectly claim per-command schema coverage.",
+        "file": "docs/reference/storage-format.md",
+        "line": 113
+      }
+    ]
+  }
+}
