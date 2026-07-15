@@ -409,8 +409,8 @@ In the MCP server description or system prompt:
 ## Label Usage Rules
 
 1. **Format**: Always use `namespace:value` format
-   - ✅ Correct: "milestone:v1.0", "epic:auth"
-   - ❌ Wrong: "auth", "milestone-v1.0"
+   - ✅ Correct: "milestone:v1.0", "epic:billing"
+   - ❌ Wrong: "billing", "milestone-v1.0"
 
 2. **Namespaces**: Call `jit_label_namespaces` before writing a label —
    the registry is per-repository, and an undeclared namespace fails validation.
