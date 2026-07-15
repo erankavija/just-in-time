@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-15T01:49:16Z",
+  "generated_at": "2026-07-15T16:29:13Z",
   "environment": {
     "git_revision": "56d737891129babf9571eb4de5659295bce8d827",
     "os": "Arch Linux",
@@ -22,57 +22,64 @@
     {
       "sample": 1,
       "clippy": {
-        "wall_seconds": 26.227,
-        "max_rss_kb": 1098400,
+        "wall_seconds": 25.9,
+        "max_rss_kb": 1099664,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 208.317,
-        "max_rss_kb": 1513204,
+        "wall_seconds": 116.255,
+        "max_rss_kb": 1514672,
         "exit_code": 0
       },
-      "target_dir_bytes": 21089820236,
+      "target_dir_bytes": 21078884848,
       "inventory": {
-        "target_dir_bytes": 21089820236,
-        "unique_active_test_executable_bytes": 14816926968,
+        "target_dir_bytes": 21084838891,
+        "unique_active_test_executable_bytes": 14817099552,
         "integration_test_target_count": 144,
         "test_case_count": 3306,
         "doctest_case_count": 66,
-        "ignored_test_case_count": 14,
-        "correction_note": "Corrected twice post-hoc (code-review rework, jit:4e22a20d): (1) profile.test filter — the original sum 15314841704 mis-included the two ordinary non-test `jit`/`jit-server` binaries; (2) the corrected value is a MEASUREMENT from a fresh isolated `git archive` build of the same commit (56d73789) with the same toolchain: 148 profile.test executables summing to 14816926968 bytes (excluded non-test bins measured jit=259803096, jit-server=237935048). test_case_count includes 66 doctests via `cargo test --workspace --doc -- --list` (doctest_case_count). Timing and RSS fields are original in-sample measurements. Per-executable raw evidence is committed at raw/clean-1/executable-remeasure.json; see report.md for the full derivation."
+        "ignored_test_case_count": 14
       },
       "success": true
     },
     {
       "sample": 2,
       "clippy": {
-        "wall_seconds": 27.05,
-        "max_rss_kb": 1100412,
+        "wall_seconds": 27.062,
+        "max_rss_kb": 1099736,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 195.019,
-        "max_rss_kb": 1514584,
+        "wall_seconds": 210.074,
+        "max_rss_kb": 1514728,
         "exit_code": 0
       },
-      "target_dir_bytes": 19839495235,
-      "inventory": {},
+      "target_dir_bytes": 21084838618,
+      "inventory": {
+        "target_dir_bytes": 21084838618,
+        "unique_active_test_executable_bytes": 14817099552,
+        "integration_test_target_count": 144
+      },
       "success": true
     },
     {
       "sample": 3,
       "clippy": {
-        "wall_seconds": 26.885,
-        "max_rss_kb": 1099656,
+        "wall_seconds": 27.592,
+        "max_rss_kb": 1099208,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 185.582,
-        "max_rss_kb": 1515252,
+        "wall_seconds": 202.452,
+        "max_rss_kb": 1514176,
         "exit_code": 0
       },
-      "target_dir_bytes": 19839495726,
-      "inventory": {},
+      "target_dir_bytes": 21084839513,
+      "inventory": {
+        "target_dir_bytes": 21084839513,
+        "unique_active_test_executable_bytes": 14817099552,
+        "integration_test_target_count": 144
+      },
       "success": true
     }
   ],
@@ -80,71 +87,76 @@
     {
       "sample": 1,
       "setup_clippy": {
-        "wall_seconds": 27.124,
-        "max_rss_kb": 1099740,
+        "wall_seconds": 27.683,
+        "max_rss_kb": 1099164,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 188.894,
-        "max_rss_kb": 1512688,
+        "wall_seconds": 222.846,
+        "max_rss_kb": 1514636,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 178.865,
-        "max_rss_kb": 1250184,
+        "wall_seconds": 177.102,
+        "max_rss_kb": 1250540,
         "exit_code": 0
       },
-      "target_dir_bytes": 21084717858,
+      "target_dir_bytes": 21084838506,
       "probe_restored_verified": true,
       "success": true
     },
     {
       "sample": 2,
       "setup_clippy": {
-        "wall_seconds": 27.047,
-        "max_rss_kb": 1099536,
+        "wall_seconds": 26.692,
+        "max_rss_kb": 1097668,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 187.053,
-        "max_rss_kb": 1514008,
+        "wall_seconds": 224.478,
+        "max_rss_kb": 1513376,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 173.428,
-        "max_rss_kb": 1244852,
+        "wall_seconds": 172.302,
+        "max_rss_kb": 1250124,
         "exit_code": 0
       },
-      "target_dir_bytes": 21084718236,
+      "target_dir_bytes": 21084838484,
       "probe_restored_verified": true,
       "success": true
     },
     {
       "sample": 3,
       "setup_clippy": {
-        "wall_seconds": 26.76,
-        "max_rss_kb": 1100616,
+        "wall_seconds": 28.581,
+        "max_rss_kb": 1098872,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 191.27,
-        "max_rss_kb": 1513332,
+        "wall_seconds": 224.958,
+        "max_rss_kb": 1514496,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 188.408,
-        "max_rss_kb": 1249020,
+        "wall_seconds": 192.261,
+        "max_rss_kb": 1252236,
         "exit_code": 0
       },
-      "target_dir_bytes": 21084718088,
+      "target_dir_bytes": 21084838931,
       "probe_restored_verified": true,
       "success": true
     }
   ],
   "medians": {
-    "clean_clippy_wall_seconds": 26.885,
-    "clean_test_no_run_wall_seconds": 195.019,
-    "clean_total_wall_seconds": 222.06900000000002,
-    "rebuild_wall_seconds": 178.865
+    "clean_clippy_wall_seconds": 27.062,
+    "clean_test_no_run_wall_seconds": 202.452,
+    "clean_total_wall_seconds": 230.04399999999998,
+    "rebuild_wall_seconds": 177.102
+  },
+  "re_collection": {
+    "reason": "code-review jit:26f97dc2 round 3: the original baseline was sampled without the web/dist stub, so its clippy logs carried the jit-server missing-web-assets warning while optimized samples (stubbed per REQ-02) did not; re-collected at the identical revision with the corrected harness (ensure_web_dist_stub + per-sample inventory) for a symmetric zero-warning protocol",
+    "original_retained": "raw/clean-{1..3}, raw/rebuild-{1..3}, raw/{clean,rebuild}-samples.jsonl and git history of baseline.json",
+    "raw": "raw/baseline-v2-*"
   }
 }

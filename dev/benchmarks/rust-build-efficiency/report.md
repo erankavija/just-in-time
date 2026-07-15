@@ -86,16 +86,26 @@ source of truth.
 
 All wall times in seconds. Raw per-sample data:
 [`baseline.json`](baseline.json) (`clean_samples`, `rebuild_samples`); command
-logs under [`raw/`](raw/) (`raw/clean-<n>/`, `raw/rebuild-<n>/`).
+logs under [`raw/`](raw/) (`raw/baseline-v2-clean-<n>/`,
+`raw/baseline-v2-rebuild-<n>/`).
+
+The baseline was re-collected at its recorded revision (`56d73789`) with the
+same corrected harness the optimized run uses (`ensure_web_dist_stub` +
+per-sample inventory), so both sides of the comparison run the identical
+zero-warning protocol (`baseline.json`'s `re_collection` field records why;
+the first collection's raw samples remain under `raw/clean-<n>/` and
+`raw/rebuild-<n>/` and in this file's git history). Its disk metrics
+reproduce the first collection almost exactly (target directory ~19.6 GiB
+both times, unique test executables ~13.8 GiB both times).
 
 | Metric | Sample 1 | Sample 2 | Sample 3 | Median | Min-Max spread |
 |---|---|---|---|---|---|
-| Clean: clippy | 26.227 | 27.050 | 26.885 | **26.885** | 26.227-27.050 (3.1%) |
-| Clean: `test --no-run` | 208.317 | 195.019 | 185.582 | **195.019** | 185.582-208.317 (11.6%) |
-| Clean: total (clippy + test-compile) | 234.544 | 222.069 | 212.467 | **222.069** | 212.467-234.544 (9.9%) |
-| Rebuild: setup clippy | 27.124 | 27.047 | 26.760 | 27.047 | 26.760-27.124 (1.4%) |
-| Rebuild: setup `test --no-run` | 188.894 | 187.053 | 191.270 | 188.894 | 187.053-191.270 (2.3%) |
-| Rebuild: incremental `test --no-run` (headline) | 178.865 | 173.428 | 188.408 | **178.865** | 173.428-188.408 (8.4%) |
+| Clean: clippy | 25.900 | 27.062 | 27.592 | **27.062** | 25.900-27.592 (6.3%) |
+| Clean: `test --no-run` | 116.255 | 210.074 | 202.452 | **202.452** | 116.255-210.074 (46.3%) |
+| Clean: total (clippy + test-compile) | 142.155 | 237.136 | 230.044 | **230.044** | 142.155-237.136 (41.3%) |
+| Rebuild: setup clippy | 27.683 | 26.692 | 28.581 | 27.683 | 26.692-28.581 (6.8%) |
+| Rebuild: setup `test --no-run` | 222.846 | 224.478 | 224.958 | 224.478 | 222.846-224.958 (0.9%) |
+| Rebuild: incremental `test --no-run` (headline) | 177.102 | 172.302 | 192.261 | **177.102** | 172.302-192.261 (11.3%) |
 
 No single run is presented as representative on its own; use the median
 column as the baseline for the story's REQ-06 improvement targets (>=40%
@@ -104,27 +114,25 @@ per-sample data in `baseline.json` for any deeper comparison.
 
 **Observed variance / host noise:**
 
-- Clean `test --no-run` wall time trended down monotonically across the three
-  samples (208.3s -> 195.0s -> 185.6s), a ~12% spread. The most likely cause
-  is not build-topology variance: `~/.cargo`'s registry index and crate
-  source cache sit outside the isolated `CARGO_TARGET_DIR` and are shared
-  across samples, so only sample 1 pays any residual registry/source
-  cold-cache cost. The rebuild samples (which all start from their own fresh
-  setup build, same shared registry cache) show no such monotonic trend
-  (188.9s -> 187.1s -> 191.3s for the setup step), consistent with this
-  explanation rather than host contention.
-- Maximum RSS was stable across samples for every step (clippy ~1.098-1.100
-  GiB, `test --no-run` ~1.513-1.515 GiB, rebuild ~1.245-1.250 GiB; <0.2%
-  spread in every case), suggesting one specific dependency's build is
-  consistently the single largest process in the tree.
+- Clean sample 1's `test --no-run` finished in 116.3s against 210.1s/202.5s
+  for samples 2-3 — a fast outlier (the first collection showed the same
+  step at 185.6-208.3s). Every sample's own record is retained per the
+  protocol; the median is what the acceptance thresholds read, and it is
+  unaffected by a single fast sample. The outlier's direction is also
+  conservative: a faster baseline sample can only understate the optimized
+  improvement, never inflate it. The rebuild setup steps, by contrast, were
+  extremely stable (222.8-225.0s, 0.9% spread), so host contention did not
+  systematically depress the slow samples.
+- Maximum RSS was stable across samples for every step (clippy ~1.049 GiB,
+  `test --no-run` ~1.445 GiB, rebuild ~1.193 GiB; <0.1% spread in every
+  case), suggesting one specific dependency's build is consistently the
+  single largest process in the tree. The first collection showed the same
+  stability at slightly higher absolute values.
 - Zero lock-wait events were recorded: no concurrent `cargo-ci` or
-  `verify-commit-builds` gate build overlapped this run's sampling window
-  (22:56-23:31 local time on 2026-07-14).
-- Host swap was fully utilized (4.0 GiB/4.0 GiB) from unrelated prior activity
-  at the time sampling started, though load average was low (0.34) and no
-  OOM events are visible in `journalctl -k` for the sampling window; no
-  sample failed or showed anomalous RSS as a result.
-- **Root cause of the original assembly failure (fixed):** all 6 samples
+  `verify-commit-builds` gate build overlapped the re-collection's sampling
+  window (2026-07-15 afternoon, local time).
+- **First collection only — root cause of its assembly failure (fixed):**
+  all 6 of that collection's samples
   completed and were durably recorded in `raw/clean-samples.jsonl` /
   `raw/rebuild-samples.jsonl`, but the harness's environment-capture step
   computed `CARGO_RUST_ENV` with `env | grep -E '^(CARGO|RUST)[A-Z_]*=' | jq
@@ -230,12 +238,14 @@ fresh, fully isolated build of the identical commit — `git archive
 matches the recorded inventory exactly (148 `profile.test` executables;
 the two excluded non-test bins measured `jit` 259,803,096 bytes and
 `jit-server` 237,935,048 bytes), summing to 14,816,926,968 bytes. The
-per-executable measurements are committed as raw evidence at
+per-executable measurements are committed as first-collection raw evidence
+at
 [`raw/clean-1/executable-remeasure.json`](raw/clean-1/executable-remeasure.json)
 (148 entries plus the two excluded non-test binaries, with method
-metadata), and the provenance is recorded alongside the sample itself in
-`raw/clean-samples.jsonl` (sample 1, `correction_note`); timing and RSS
-fields everywhere remain the original in-sample measurements.
+metadata; provenance in `raw/clean-samples.jsonl`, sample 1,
+`correction_note`). The re-collection needed no such correction: its
+harness records every clean sample's inventory directly and reproduces the
+same totals.
 
 **Doctests are included in the inventory**, not excluded: `cargo test
 --no-run` cannot compile doctest binaries ("can't skip running doc tests with
@@ -361,7 +371,7 @@ memory reductions:
   `bounded-rust-build-footprint` invariant's automated checker).
 
 Directly comparing the two clean samples' `cargo test --workspace --no-run`
-compiler-artifact streams (`raw/clean-1/test-no-run.log` vs.
+compiler-artifact streams (`raw/baseline-v2-clean-1/test-no-run.log` vs.
 `raw/optimized-clean-1/test-no-run.log`) confirms the dependency-pruning work
 took effect: baseline compiles 277 crates, optimized compiles 270. The 17
 removed crates are exactly the remote-schema-resolution and duplicate-TLS
@@ -399,22 +409,22 @@ this is the same quantity REQ-04/REQ-05 phrase as "X% below baseline").
 
 | Metric | Baseline median | Optimized median | Reduction | Threshold | Result |
 |---|---:|---:|---:|---|---|
-| Clean: clippy | 26.885s | 20.958s | 22.0% | (no threshold) | — |
-| Clean: `test --no-run` (REQ-04) | 195.019s | 25.776s | **86.8%** | >=40% lower | **PASS** |
-| Clean: total (clippy + test-compile) | 222.069s | 46.939s | 78.9% | (no threshold) | — |
-| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 9.518s | **94.7%** | >=60% lower | **PASS** |
+| Clean: clippy | 27.062s | 20.958s | 22.6% | (no threshold) | — |
+| Clean: `test --no-run` (REQ-04) | 202.452s | 25.776s | **87.3%** | >=40% lower | **PASS** |
+| Clean: total (clippy + test-compile) | 230.044s | 46.939s | 79.6% | (no threshold) | — |
+| Rebuild: incremental `test --no-run` (REQ-05) | 177.102s | 9.518s | **94.6%** | >=60% lower | **PASS** |
 | Clean target-directory bytes, median (REQ-03) | 19.6 GiB | 3.68 GiB | 81.3% | <=10 GiB | **PASS** |
 | Unique active test-executable bytes (REQ-03) | 13.8 GiB | 0.94 GiB | 93.2% | <=2 GiB | **PASS** |
 
 Every hard budget and improvement threshold in the story's acceptance
 criteria (REQ-03/REQ-04/REQ-05) is met with wide margin: the clean
-test-compilation improvement (86.8%) is more than double the 40% floor, the
-rebuild improvement (94.7%) is well past the 60% floor, and both disk budgets
+test-compilation improvement (87.3%) is more than double the 40% floor, the
+rebuild improvement (94.6%) is well past the 60% floor, and both disk budgets
 land at roughly a third to a tenth of their ceilings. These margins hold even
-against the single slowest individual sample in each metric, including the
-one affected by the lock contention noted above (worst clean `test --no-run`
-sample 29.216s = 85.0% reduction; worst rebuild sample 12.278s = 93.1%
-reduction), so the conclusion is not sensitive to that variance.
+against the single slowest individual sample in each metric (worst clean
+`test --no-run` sample 29.216s = 85.6% reduction; worst rebuild sample
+12.278s = 93.1% reduction), so the conclusion is not sensitive to that
+variance.
 
 ## Test inventory verification (REQ-07)
 

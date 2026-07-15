@@ -1,0 +1,7 @@
+   Compiling jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/lead-baseline-recollect/crates/jit)
+   Compiling jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/lead-baseline-recollect/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.48s
+   Doc-tests jit
+0 tests, 0 benchmarks
+   Doc-tests jit_server
+0 tests, 0 benchmarks
