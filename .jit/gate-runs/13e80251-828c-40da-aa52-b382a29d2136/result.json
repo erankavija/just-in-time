@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "13e80251-828c-40da-aa52-b382a29d2136",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3398bc19-61ba-4030-955c-f49d19bfebca",
+  "commit": "6f5e786b91ebbcc8cb46a8df4a87f0efe351a146",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T10:14:40.846015580Z",
+  "completed_at": "2026-07-15T10:19:07.360849543Z",
+  "duration_ms": 266514,
+  "exit_code": 1,
+  "stdout": "Attribution: 598ca05e, e9f7aed0, a933751c, 62ceec87, ed1ba0f2, 062aeee1, d5345a9a, 6f5e786b (`jit:3398bc19`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T10:07:18Z); latest prior code-review failed (exit 1) and its rcgen-prose finding is corrected\nTruncation recovery: re-read affected patches by path, bounded Cargo.lock/package blocks, validation and TLS-test files, and locked offline jsonschema/ureq trees\n\n1. **[blocking][issue-impact] F1 (medium):** The REQ-06 regression assertion does not directly forbid JSON Schema resolver features. [`test_jsonschema_manifest_disables_default_features`](crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs:51) only checks `default-features = false`; it never inspects `jsonschema.features`. An explicit future `resolve-file` or `resolve-http` feature could therefore re-enable external resolution while satisfying that manifest assertion. The resolved-tree check only bans selected package names, not resolver feature names.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The dependency-feature regression suite does not deterministically reject explicit jsonschema resolver features.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The jsonschema manifest assertion checks only default-features and never rejects explicit resolver features, leaving REQ-06's remote-resolution guard incomplete.\",\"file\":\"crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs\",\"line\":51,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6620 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6545-83a4-79f1-9f03-0cfac4e599af\n--------\nuser\n--- 6607 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The dependency-feature regression suite does not deterministically reject explicit jsonschema resolver features.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The jsonschema manifest assertion checks only default-features and never rejects explicit resolver features, leaving REQ-06's remote-resolution guard incomplete.",
+        "file": "crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs",
+        "line": 51
+      }
+    ]
+  }
+}

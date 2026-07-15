@@ -59,6 +59,27 @@ fn test_jsonschema_manifest_disables_default_features() {
          aws-lc-rs for remote $ref resolution this crate never performs \
          (repository schemas only use local fragment refs)"
     );
+
+    let explicit_features: Vec<&str> = dep
+        .get("features")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .map(|v| {
+                    v.as_str()
+                        .expect("jsonschema feature entries must be strings")
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    for feature in &explicit_features {
+        assert!(
+            !feature.starts_with("resolve-") && !feature.starts_with("tls-"),
+            "jsonschema must not explicitly re-enable a remote-resolution or \
+             TLS feature (disabling defaults alone would not stop this): got \
+             `{feature}` in {explicit_features:?}"
+        );
+    }
 }
 
 #[test]
