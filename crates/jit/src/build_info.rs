@@ -1,4 +1,13 @@
 //! Compile-time build provenance for the `jit` CLI.
+//!
+//! Every provenance field originates in [`build.rs`](../../build.rs): it is
+//! populated ONLY from the four explicit release-injection variables
+//! (`JIT_BUILD_GIT_HASH`, `JIT_BUILD_GIT_SHORT_HASH`, `JIT_BUILD_GIT_DIRTY`,
+//! `SOURCE_DATE_EPOCH`) and reports a documented fallback otherwise. An
+//! ordinary build never reads ambient git or the wall clock, so its
+//! provenance is `"unknown"`/`None` rather than the surrounding repository's
+//! state (jit:5d862134). `scripts/install-jit.sh` supplies the real values at
+//! install time.
 
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -10,15 +19,20 @@ pub struct VersionInfo {
     pub package: &'static str,
     /// Crate package version.
     pub version: &'static str,
-    /// Full Git commit hash, or `"unknown"` when unavailable.
+    /// Full Git commit hash from the injected `JIT_BUILD_GIT_HASH`, or
+    /// `"unknown"` when the build injected no provenance.
     pub git_commit: &'static str,
-    /// Short Git commit hash, or `"unknown"` when unavailable.
+    /// Short Git commit hash from the injected `JIT_BUILD_GIT_SHORT_HASH`, or
+    /// `"unknown"` when the build injected no provenance.
     pub git_short_commit: &'static str,
-    /// Whether the source tree was dirty at build time. `None` means unknown.
+    /// Whether the source tree was dirty at build time, from the injected
+    /// `JIT_BUILD_GIT_DIRTY`. `None` when no dirty flag was injected.
     pub git_dirty: Option<bool>,
     /// Cargo build profile, such as `debug` or `release`.
     pub build_profile: &'static str,
-    /// Build timestamp as a Unix epoch seconds string, or `"unknown"`.
+    /// Build timestamp as a Unix epoch seconds string from the injected
+    /// `SOURCE_DATE_EPOCH`, or `"unknown"` when none was injected. Never the
+    /// wall clock.
     pub build_timestamp: &'static str,
     /// Cargo target triple.
     pub target: &'static str,

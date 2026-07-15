@@ -13,6 +13,7 @@ Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for A
 cargo build                          # Debug build (all workspace crates)
 cargo build --release                # Release build
 cargo install --path crates/jit      # Install jit binary to PATH
+./scripts/install-jit.sh             # Install WITH build provenance (dogfood default; keeps the stale-binary guard effective)
 
 # Test
 cargo test                           # All tests (unit + harness + integration)
