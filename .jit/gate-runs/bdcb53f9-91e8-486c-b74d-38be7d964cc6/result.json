@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "bdcb53f9-91e8-486c-b74d-38be7d964cc6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
+  "commit": "572745363e559c1ad6e1cf7beb01e452731c7c6e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T13:55:34.935884348Z",
+  "completed_at": "2026-07-15T13:59:42.550882868Z",
+  "duration_ms": 247614,
+  "exit_code": 1,
+  "stdout": "Attribution: 9391e22f, e0f30214 (first-parent duplicate), 62d406d0 — all `jit:26f97dc2`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-2, @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci=passed (exit 0, 2026-07-15T13:54:00Z); doc-review=pending (no run)\nTruncation recovery: re-read publication patches individually by artifact; inspected raw JSONL, generated-inventory aggregates, log tails, and the merge’s first-parent patch\n\n1. [blocking][issue-impact] F1 — REQ-02 requires every optimized clean sample to record integration-target count and unique active test-executable bytes. Samples 2 and 3 have empty `inventory` objects at [optimized.json](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/optimized.json:58) and line 74; the raw records match. The harness only generates inventory for the selected sample, and the report acknowledges the executable metric is from sample 1 alone. The repeated per-sample measurements required by the criterion are therefore absent.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 is unmet because two optimized clean samples omit required inventory metrics.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Optimized clean samples 2 and 3 omit integration-target and unique active test-executable measurements required for every clean sample by REQ-02.\",\"file\":\"dev/benchmarks/rust-build-efficiency/optimized.json\",\"line\":58,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4711 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f660f-bf8c-7f31-bb39-bff332de0957\n--------\nuser\n--- 4698 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-02 is unmet because two optimized clean samples omit required inventory metrics.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Optimized clean samples 2 and 3 omit integration-target and unique active test-executable measurements required for every clean sample by REQ-02.",
+        "file": "dev/benchmarks/rust-build-efficiency/optimized.json",
+        "line": 58
+      }
+    ]
+  }
+}

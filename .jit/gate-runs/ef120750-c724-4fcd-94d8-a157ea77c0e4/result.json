@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "ef120750-c724-4fcd-94d8-a157ea77c0e4",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "commit": "572745363e559c1ad6e1cf7beb01e452731c7c6e",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T13:56:01.233610161Z",
+  "completed_at": "2026-07-15T14:00:25.353006202Z",
+  "duration_ms": 264119,
+  "exit_code": 1,
+  "stdout": "Attribution: 92a4ad1e, 58d5aeee, cd834f1b, e14e68a7, 462824de, 73147263, b2472675, 6f14d354 (`jit:866a5bbd`)\nPolicy sources: AGENTS.md\nResolved items: @/inv/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-1, D-2, D-3, D-4, D-6, D-8 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed/0; repo-validate passed/0; security-review passed/none; secret-detection passed/0; dependency-audit failed/1; code-review none\nTruncation recovery: Re-read the truncated kernel patch through bounded current-tree ranges and patch slices; verified its storage paths have no later changes.\n\n1. **F1 — blocking, issue-impact, high:** Prepared rollback is not resumable after an already-reversed replacement or mode action. The journal records only `Prepared` until the whole reverse loop finishes; if a later reverse step (including `SyncReverseParent`) fails, recovery reruns an earlier replacement whose original file was already restored and whose backup was deleted, then rejects that original as an unexpected occupant. This violates the all-old convergence requirement. [crates/jit/src/storage/file_transaction.rs:425](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:425>)\n\n2. **F2 — blocking, issue-impact, high:** `SetMode` performs follow-enabled permission and open operations after the identity check. A target swapped for a symlink in that window is not handled with the required capability-relative no-follow operation, violating the hard path-safety criterion. [crates/jit/src/storage/file_transaction.rs:1023](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:1023>)\n\n3. **F3 — blocking, issue-impact, medium:** The required failure/race coverage is incomplete. The coverage test only observes a happy-path subset; it never injects `AfterRenameAside`, either fresh-root-removal boundary, or a `SetMode` action. Consequently it does not exercise replacement rollback, the mode path, or the failure that exposes F1. [crates/jit/src/storage/file_transaction.rs:1662](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:1662>)\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The transaction kernel has non-resumable prepared rollback, a no-follow violation in SetMode, and incomplete required failure coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Prepared rollback cannot resume after a previously reversed replacement or mode action when a later reverse step fails.\",\"file\":\"crates/jit/src/storage/file_transaction.rs\",\"line\":425,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"SetMode uses follow-enabled permission and open operations after preflight, violating the no-follow publication requirement.\",\"file\":\"crates/jit/src/storage/file_transaction.rs\",\"line\":1023,\"references\":[]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Failure injection tests omit required replacement, fresh-root-boundary, and SetMode failure coverage.\",\"file\":\"crates/jit/src/storage/file_transaction.rs\",\"line\":1662,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8639 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6610-23ce-7be1-8a48-0c374959e1b4\n--------\nuser\n--- 8626 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The transaction kernel has non-resumable prepared rollback, a no-follow violation in SetMode, and incomplete required failure coverage.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Prepared rollback cannot resume after a previously reversed replacement or mode action when a later reverse step fails.",
+        "file": "crates/jit/src/storage/file_transaction.rs",
+        "line": 425
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "SetMode uses follow-enabled permission and open operations after preflight, violating the no-follow publication requirement.",
+        "file": "crates/jit/src/storage/file_transaction.rs",
+        "line": 1023
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Failure injection tests omit required replacement, fresh-root-boundary, and SetMode failure coverage.",
+        "file": "crates/jit/src/storage/file_transaction.rs",
+        "line": 1662
+      }
+    ]
+  }
+}

@@ -22,25 +22,30 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T13:31:16.031616037Z"
     },
-    "security-review": {
-      "status": "passed",
-      "updated_by": "human:authorized-invoker",
-      "updated_at": "2026-07-15T12:22:30.221548297Z"
-    },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T13:34:14.022319408Z"
     },
-    "secret-detection": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T13:34:14.336274996Z"
-    },
     "dependency-audit": {
       "status": "failed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T13:34:16.352432572Z"
+    },
+    "secret-detection": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T13:55:41.553766790Z"
+    },
+    "security-review": {
+      "status": "passed",
+      "updated_by": "human:authorized-invoker",
+      "updated_at": "2026-07-15T12:22:30.221548297Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T13:56:01.233610161Z"
     }
   },
   "context": {},
@@ -54,7 +59,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.039436085Z",
-  "updated_at": "2026-07-15T13:34:17.958056230Z",
+  "updated_at": "2026-07-15T14:00:25.353255672Z",
   "first_ready_at": "2026-07-14T22:28:46.039436325Z",
   "claimed_at": "2026-07-15T12:22:40.913845732Z"
 }

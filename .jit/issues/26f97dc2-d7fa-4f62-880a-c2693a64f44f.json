@@ -14,7 +14,18 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T13:55:34.935884348Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T13:54:00.277702615Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -94,7 +105,7 @@
     "type:task"
   ],
   "created_at": "2026-07-14T13:02:21.120718163Z",
-  "updated_at": "2026-07-15T13:53:32.071706004Z",
+  "updated_at": "2026-07-15T13:59:42.551129568Z",
   "first_ready_at": "2026-07-14T13:02:21.120723553Z",
   "claimed_at": "2026-07-15T12:14:41.778468796Z"
 }

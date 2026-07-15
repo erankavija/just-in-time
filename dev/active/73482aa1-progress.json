@@ -103,7 +103,8 @@
           "title": "Verify compilation gains and publish optimized results",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "in_rework",
+          "note": "thresholds smashed (clean -88.6%, rebuild -95.8%, target dir 3.56 GiB, executables 0.91 GiB) but code-review round 1: REQ-02 per-sample inventory missing for clean samples 2-3 (harness measured only sample 1); rework: extend harness, re-collect clean samples"
         }
       ]
     },
@@ -136,7 +137,8 @@
     "5d862134": 1,
     "57d0eb79": 1,
     "3398bc19": 3,
-    "83efbcb4": 1
+    "83efbcb4": 1,
+    "26f97dc2": 1
   },
   "started_at": "2026-07-14T20:00:00Z"
 }
