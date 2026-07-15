@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "db61a7e8-112e-4abc-8b2e-12b3d91a0640",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
+  "commit": "94af248bda7f8ecaf2d6a9337f5ce56344b11f8c",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T16:47:35.441744283Z",
+  "completed_at": "2026-07-15T16:48:12.199855333Z",
+  "duration_ms": 36758,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured leaf type (level 4) and its resolved DAG node has no children. I inspected the eight reachable `jit:26f97dc2` commits individually with rename/copy detection; their union changes only benchmark evidence, the benchmark harness, and issue metadata. No uncommitted changes were attributed.\n\nThe current shipped effect is internal Rust build-validation measurement only. It adds no adopter-facing command, configuration, workflow, prerequisite, or guarantee requiring updates in `docs/`, `README.md`, `INSTALL.md`, `mcp-server/README.md`, or `web/README.md`. The required benchmark report is correctly retained under `dev/`, which is outside this gate’s adopter-documentation scope.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue changes only internal benchmark evidence and its harness; no adopter-facing documentation update is required.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue changes only internal benchmark evidence and its harness; no adopter-facing documentation update is required.",
+    "findings": []
+  }
+}
