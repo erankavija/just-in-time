@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::errors;
@@ -24,20 +24,29 @@ pub struct WorktreePaths {
 impl WorktreePaths {
     /// Detect worktree context using git commands.
     pub fn detect() -> Result<Self> {
+        Self::detect_from(&env::current_dir()?)
+    }
+
+    /// Detect worktree context from an explicitly selected repository root.
+    ///
+    /// This is the non-global counterpart to [`Self::detect`]. Validation views
+    /// use it so machine-local claims coordination is checked for the repository
+    /// being validated, even when that repository is not the process cwd.
+    pub(crate) fn detect_from(current: &Path) -> Result<Self> {
         // Check if in git repo
         let is_repo = Command::new("git")
+            .arg("-C")
+            .arg(current)
             .args(["rev-parse", "--is-inside-work-tree"])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
 
         if !is_repo {
-            // Not in git repo, use current dir
-            let current = env::current_dir()?;
             let dot_git = current.join(".git");
             return Ok(Self {
                 common_dir: dot_git.clone(),
-                worktree_root: current.clone(),
+                worktree_root: current.to_path_buf(),
                 local_jit: current.join(".jit"),
                 shared_jit: dot_git.join("jit"),
             });
@@ -45,6 +54,8 @@ impl WorktreePaths {
 
         // Get git common dir (shared .git)
         let common_dir_output = Command::new("git")
+            .arg("-C")
+            .arg(current)
             .args(["rev-parse", "--git-common-dir"])
             .output()
             .context("Failed to execute git command")?;
@@ -63,11 +74,13 @@ impl WorktreePaths {
         let common_dir = if common_dir_raw.is_absolute() {
             common_dir_raw
         } else {
-            env::current_dir()?.join(common_dir_raw).canonicalize()?
+            current.join(common_dir_raw).canonicalize()?
         };
 
         // Get worktree root
         let worktree_root_output = Command::new("git")
+            .arg("-C")
+            .arg(current)
             .args(["rev-parse", "--show-toplevel"])
             .output()
             .context("Failed to execute git command")?;

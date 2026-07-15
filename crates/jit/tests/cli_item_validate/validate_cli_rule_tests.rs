@@ -491,6 +491,54 @@ fn test_validate_id_with_fix_is_rejected() {
         ));
 }
 
+fn configure_review_placeholder(temp: &TempDir) {
+    fs::write(
+        temp.path().join(".jit/gates.toml"),
+        r#"[[gates]]
+version = 1
+key = "review-test"
+title = "Review"
+description = "External review placeholder"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+"#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn test_validate_reports_review_placeholder_warning_in_human_and_json_output() {
+    let temp = setup_repo_with_rules("");
+    configure_review_placeholder(&temp);
+
+    bin()
+        .current_dir(temp.path())
+        .arg("validate")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[review-placeholder]"))
+        .stdout(predicate::str::contains("review-test"));
+
+    let output = bin()
+        .current_dir(temp.path())
+        .args(["validate", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["valid"], true);
+    assert_eq!(json["warning_count"], 1);
+    assert_eq!(json["warnings"][0]["rule"], "review-placeholder");
+    assert_eq!(json["rule_findings"][0]["rule"], "review-placeholder");
+}
+
 #[test]
 fn test_validate_id_with_branch_drift_is_rejected() {
     // Finding #2: `--branch-drift` is repo-wide and incompatible with a positional id.

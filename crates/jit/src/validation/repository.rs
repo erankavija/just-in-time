@@ -80,6 +80,16 @@ pub trait RepositoryView: Send + Sync {
 
     /// List regular files recursively beneath a repository-relative directory.
     fn list_files(&self, relative_dir: &Path) -> Result<Vec<PathBuf>>;
+
+    /// Whether `relative` is explicitly deleted by a planned view layer.
+    ///
+    /// Ordinary filesystem absence returns `false`, preserving validators whose
+    /// contract permits a Git `HEAD` fallback. An overlay tombstone returns
+    /// `true`, making the proposed final-state deletion authoritative.
+    fn is_planned_deletion(&self, relative: &Path) -> Result<bool> {
+        validate_relative(relative)?;
+        Ok(false)
+    }
 }
 
 /// A repository view backed directly by the working tree filesystem.
@@ -225,6 +235,15 @@ impl RepositoryView for OverlayRepositoryView {
         }
         Ok(files.into_iter().collect())
     }
+
+    fn is_planned_deletion(&self, relative: &Path) -> Result<bool> {
+        validate_relative(relative)?;
+        match self.changes.get(relative) {
+            Some(None) => Ok(true),
+            Some(Some(_)) => Ok(false),
+            None => self.base.is_planned_deletion(relative),
+        }
+    }
 }
 
 /// Validate the exact repository exposed by `view` through the full read-only
@@ -260,6 +279,8 @@ pub fn validate_repository(view: &dyn RepositoryView) -> Result<RepositoryValida
     passes.push(RepositoryValidationPass::Records);
 
     validate_integrity(view, &records.issues, &gates)
+        .context("repository-integrity validation pass")?;
+    validate_machine_local_claims(view.repository_root())
         .context("repository-integrity validation pass")?;
     passes.push(RepositoryValidationPass::RepositoryIntegrity);
 
@@ -569,6 +590,13 @@ fn validate_integrity(
                         )
                     })?;
                 } else if view.read_file(Path::new(&document.path))?.is_none() {
+                    if view.is_planned_deletion(Path::new(&document.path))? {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': file '{}' not found in planned final repository",
+                            issue.id,
+                            document.path
+                        ));
+                    }
                     if has_commits {
                         let in_head = repository
                             .revparse_single("HEAD")
@@ -636,6 +664,24 @@ fn validate_integrity(
                     path
                 ));
             }
+        }
+    }
+    Ok(())
+}
+
+/// Validate the machine-local claims control plane selected by the repository
+/// root. This boundary intentionally sits beside `RepositoryView`: claims live
+/// in `.git/jit`, not in the planned `.jit` byte set, so overlays delegate to
+/// the same coordination state without reopening repository storage.
+fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
+    if std::env::var("JIT_TEST_MODE").is_err() {
+        let index_issues = crate::commands::validate_claims_index_at(repository_root)
+            .unwrap_or_else(|error| vec![format!("Failed to validate claims index: {error}")]);
+        if !index_issues.is_empty() {
+            return Err(anyhow!(
+                "Claims index validation failed:\n  {}",
+                index_issues.join("\n  ")
+            ));
         }
     }
     Ok(())
@@ -977,7 +1023,9 @@ fn validate_projections(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::DocumentReference;
     use crate::storage::{IssueStore, JsonFileStorage};
+    use std::process::Command;
 
     fn fixture() -> tempfile::TempDir {
         let repo = tempfile::tempdir().unwrap();
@@ -1013,6 +1061,27 @@ mod tests {
         .unwrap()
     }
 
+    fn commit_fixture(repo: &tempfile::TempDir, message: &str) {
+        for args in [
+            vec!["init"],
+            vec!["config", "user.name", "Repository View Test"],
+            vec!["config", "user.email", "view@example.invalid"],
+            vec!["add", "."],
+            vec!["commit", "-m", message],
+        ] {
+            let output = Command::new("git")
+                .current_dir(repo.path())
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "git command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
     #[test]
     fn test_filesystem_and_identity_overlay_preserve_validation_results() {
         let repo = fixture();
@@ -1033,21 +1102,35 @@ mod tests {
     }
 
     #[test]
-    fn test_overlay_config_templates_and_rules_ignore_disagreeing_live_bytes() {
+    fn test_overlay_config_ignores_disagreeing_live_bytes() {
         let repo = fixture();
         std::fs::write(repo.path().join(".jit/config.toml"), "not toml = [").unwrap();
         let view = overlay(
             &repo,
-            [
-                (
-                    ".jit/config.toml",
-                    Some("[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
-                ),
-                (".jit/templates.toml", Some("templates = []\n")),
-                (".jit/rules.toml", Some("")),
-            ],
+            [(".jit/config.toml", Some("[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"))],
         );
         assert!(validate_repository(&view).is_ok());
+    }
+
+    #[test]
+    fn test_overlay_templates_ignore_disagreeing_live_bytes() {
+        let repo = fixture();
+        std::fs::write(repo.path().join(".jit/templates.toml"), "not toml = [").unwrap();
+        let view = overlay(&repo, [(".jit/templates.toml", Some("templates = []\n"))]);
+
+        assert!(validate_repository(&view).is_ok());
+        assert!(validate_repository(&FilesystemRepositoryView::new(repo.path())).is_err());
+    }
+
+    #[test]
+    fn test_overlay_rules_ignore_disagreeing_live_bytes() {
+        let repo = fixture();
+        std::fs::write(repo.path().join(".jit/rules.toml"), "not toml = [").unwrap();
+        let view = overlay(&repo, [(".jit/rules.toml", Some(""))]);
+
+        assert!(validate_repository(&view).is_ok());
+        let live = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert_eq!(live.rule_report.findings[0].rule, "rules-file");
     }
 
     #[test]
@@ -1163,6 +1246,30 @@ mod tests {
     }
 
     #[test]
+    fn test_overlay_document_tombstone_overrides_live_worktree_and_head() {
+        let repo = fixture();
+        let store = JsonFileStorage::new(repo.path().join(".jit"));
+        let mut issue = store.list_issues().unwrap().remove(0);
+        issue
+            .documents
+            .push(DocumentReference::new("docs/tracked.md".to_string()));
+        store.save_issue(issue).unwrap();
+        std::fs::create_dir_all(repo.path().join("docs")).unwrap();
+        std::fs::write(repo.path().join("docs/tracked.md"), "tracked\n").unwrap();
+        commit_fixture(&repo, "tracked document");
+
+        validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        let error = format!(
+            "{:#}",
+            validate_repository(&overlay(&repo, [("docs/tracked.md", None)])).unwrap_err()
+        );
+        assert!(
+            error.contains("not found") && error.contains("docs/tracked.md"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn test_repository_view_keeps_non_enforced_rule_error_reportable() {
         let repo = fixture();
         let view = overlay(
@@ -1183,17 +1290,14 @@ mod tests {
     }
 
     #[test]
-    fn test_overlay_item_links_and_projection_use_planned_sources() {
+    fn test_overlay_item_links_judge_planned_registry_deletion() {
         let repo = fixture();
         let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-            [invariant_projection]\ntarget = \"INVARIANTS.md\"\nmode = \"separate-file\"\n";
+            ";
         let invariants = "[[invariants]]\nid = \"planned\"\nstatement = \"planned bytes win\"\nkind = \"advisory\"\n";
-        let registry = InvariantRegistry::from_toml_str(invariants).unwrap();
-        let rendered = render_invariants_markdown(
-            &registry,
-            crate::config::InvariantProjectionConfig::default().style(),
-        );
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        std::fs::write(repo.path().join(".jit/invariants.toml"), invariants).unwrap();
         let filesystem = FilesystemRepositoryView::new(repo.path());
         let index: RepositoryIndex =
             serde_json::from_str(&required_text(&filesystem, ".jit/index.json").unwrap()).unwrap();
@@ -1205,26 +1309,21 @@ mod tests {
         issue
             .labels
             .push("enforces:@/invariant/planned".to_string());
-        let view = OverlayRepositoryView::new(
-            Arc::new(FilesystemRepositoryView::new(repo.path())),
-            [
-                (
-                    PathBuf::from(".jit/config.toml"),
-                    Some(config.as_bytes().to_vec()),
-                ),
-                (
-                    PathBuf::from(".jit/invariants.toml"),
-                    Some(invariants.as_bytes().to_vec()),
-                ),
-                (PathBuf::from("INVARIANTS.md"), Some(rendered.into_bytes())),
-                (
-                    PathBuf::from(format!(".jit/issues/{id}.json")),
-                    Some(serde_json::to_vec_pretty(&issue).unwrap()),
-                ),
-            ],
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{id}.json")),
+            serde_json::to_vec_pretty(&issue).unwrap(),
         )
         .unwrap();
-        validate_repository(&view).unwrap();
+
+        let live = validate_repository(&filesystem).unwrap();
+        assert!(!live.rule_report.has_errors(), "{:?}", live.rule_report);
+        let planned =
+            validate_repository(&overlay(&repo, [(".jit/invariants.toml", None)])).unwrap();
+        assert!(planned
+            .rule_report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == crate::commands::DANGLING_LINK_RULE));
     }
 
     #[test]

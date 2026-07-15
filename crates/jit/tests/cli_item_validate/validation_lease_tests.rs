@@ -178,6 +178,56 @@ fn test_validate_leases_no_claims_index() {
 }
 
 #[test]
+fn test_validate_repository_detects_invalid_claims_index() {
+    let repo = setup_git_repo();
+    let claims_dir = repo.path().join(".git/jit");
+    fs::create_dir_all(&claims_dir).unwrap();
+    fs::write(
+        claims_dir.join("claims.index.json"),
+        serde_json::json!({
+            "schema_version": 2,
+            "generated_at": Utc::now(),
+            "last_seq": 0,
+            "stale_threshold_secs": 3600,
+            "leases": []
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let output = Command::new(jit_binary())
+        .args(["validate"])
+        .env_remove("JIT_TEST_MODE")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        combined.contains("Claims index validation failed"),
+        "{combined}"
+    );
+    assert!(combined.contains("Invalid schema version"), "{combined}");
+
+    let skipped = Command::new(jit_binary())
+        .args(["validate"])
+        .env("JIT_TEST_MODE", "1")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(
+        skipped.status.success(),
+        "JIT_TEST_MODE must preserve the established claims-check bypass: {}",
+        String::from_utf8_lossy(&skipped.stderr)
+    );
+}
+
+#[test]
 fn test_validate_leases_detects_expired_lease() {
     let repo = setup_git_repo();
     let worktree_name = format!("wt-{}", Ulid::new().to_string().to_lowercase());
