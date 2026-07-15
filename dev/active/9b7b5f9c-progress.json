@@ -8,7 +8,7 @@
       "issues": [
         {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
         {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "gates_passed_waiting_wave"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "rework_attempt_5_authorized"}
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "attempt_5_verified_worker_commit_unmerged"}
       ]
     },
     {
@@ -62,12 +62,22 @@
     }
   ],
   "created_during_execution": [],
+  "active_prerequisites": [
+    {
+      "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+      "short_id": "d3709cc6",
+      "title": "Remediate Rust dependency advisories",
+      "status": "wip_checkpoint_verification_incomplete",
+      "branch": "worktree-agent-d3709cc6",
+      "commit": "854dff4504ba0fa0a272042132e43365a5b0c2eb"
+    }
+  ],
   "escalations": [
     {
       "category": "cross-epic dependency",
       "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
       "blocking_issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "owned externally; continue until blocker"
+      "status": "explicitly brought into scope by invoker; claimed and remediation checkpoint preserved"
     },
     {
       "category": "external AI review data export",
@@ -86,7 +96,7 @@
     {
       "category": "maximum rework attempts reached",
       "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
-      "status": "continued rework through completion authorized by invoker; attempt 5 dispatched",
+      "status": "continued rework through completion authorized by invoker; attempt 5 worker verification passed and commit awaits lead integration",
       "authorized_at": "2026-07-15",
       "renewed_authorization_at": "2026-07-15",
       "gate_run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
