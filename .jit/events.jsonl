@@ -7346,3 +7346,5 @@
 {"type":"issue_completed","id":"fe052e3b-5a07-40a5-aabb-c20df5291e80","issue_id":"8d4f7084-a286-4c66-ac36-f929c44d719b","timestamp":"2026-07-15T07:05:55.989788635Z"}
 {"type":"issue_updated","id":"001b0320-221e-427b-b6e5-eee8f89f6ff1","issue_id":"d0f88ee2-7018-4779-8ccc-969b42eaabb7","timestamp":"2026-07-15T07:06:30.026718156Z","updated_by":"doc-remove","fields":["documents"]}
 {"type":"issue_updated","id":"96a90d63-23d1-482d-a13a-1f6b7d6e7c77","issue_id":"d0f88ee2-7018-4779-8ccc-969b42eaabb7","timestamp":"2026-07-15T07:06:30.034207771Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_state_changed","id":"8a8787d6-853d-44f9-a9bf-82998435d099","issue_id":"57d0eb79-f3c5-408a-9322-758099a60e49","timestamp":"2026-07-15T07:07:44.032613951Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"172b3e5c-93e5-4d87-964a-1b22b0f2b698","issue_id":"57d0eb79-f3c5-408a-9322-758099a60e49","timestamp":"2026-07-15T07:07:44.032872761Z","assignee":"agent:worker"}
