@@ -5,8 +5,8 @@
   "parent_epic": "6eb585bc",
   "batch": "rust-build-efficiency (filed 2026-07-14 by a parallel planning session; 8 pre-wired children; design doc dev/active/73482aa1-rust-build-efficiency.md)",
   "status": "executing (wave 2 of core-maintenance batch)",
-  "current_wave": 3,
-  "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol.",
+  "current_wave": 4,
+  "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol. INTERLEAVE (charter D-15, 2026-07-15): ef0065ad (scoped bracket validation, epic wave 2.5) dispatches after wave 3, before 73482aa1 wave 4.",
   "waves": [
     {
       "wave_number": 1,
@@ -61,8 +61,8 @@
           "title": "Remove unused resolver and duplicate TLS features",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
-          "note": "serial after 57d0eb79 within the wave"
+          "status": "done",
+          "note": "worker delivered clean core (rustls-only ureq, jsonschema default-features off, reqwest/hyper-on-jsonschema-path/aws-lc-rs/native-tls all dropped); 3 lead-direct review rounds: cargo-tree error handling (skip only on missing binary), unverified rcgen default-feature claim removed, explicit resolve-*/tls-* features forbidden by assertion. Gates green on merged commit 8b6ed75b"
         }
       ]
     },
@@ -119,7 +119,8 @@
   "rework_counts": {
     "4e22a20d": 2,
     "5d862134": 1,
-    "57d0eb79": 1
+    "57d0eb79": 1,
+    "3398bc19": 3
   },
   "started_at": "2026-07-14T20:00:00Z"
 }

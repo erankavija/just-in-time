@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "08708458-ffc2-4546-95f7-cb7241406d34",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3398bc19-61ba-4030-955c-f49d19bfebca",
+  "commit": "8b6ed75b2adf8198f786631151882584c1d0df30",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T10:28:04.650598988Z",
+  "completed_at": "2026-07-15T10:31:40.670291222Z",
+  "duration_ms": 216019,
+  "exit_code": 0,
+  "stdout": "Attribution: 598ca05e, e9f7aed0, a933751c, 62ceec87, ed1ba0f2, 062aeee1, d5345a9a, 6f5e786b, 8b6ed75b (`jit:3398bc19`)\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/gate/cargo-ci — .jit/gates.toml; @/gate/jit-validate — .jit/gates.toml; @/inv/single-source-prose — .jit/invariants.toml; @/charter/D-6 — dev/vision/9db27a3a-charter.md\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T10:20:27Z); code-review failed (exit 1, 2026-07-15T10:14:40Z), with its prior resolver-feature finding addressed in 8b6ed75b\nTruncation recovery: none; all reads were bounded and complete\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed dependency-feature narrowing and regression coverage meet the issue's hard criteria; prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributed dependency-feature narrowing and regression coverage meet the issue's hard criteria; prior blocking findings are resolved.",
+    "findings": []
+  }
+}
