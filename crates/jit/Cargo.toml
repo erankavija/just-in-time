@@ -40,12 +40,20 @@ toml_edit = "0.22"
 sha2 = "0.10"
 tar = "0.4"
 pulldown-cmark = { workspace = true }
-# Remote document access (external-link reachability checks) needs exactly one
-# TLS backend. Rustls is selected: it is ureq's own default provider, needs no
-# system TLS library, and (via the `_ring` feature) shares the `ring` crypto
-# backend already in the graph, so no second TLS implementation is compiled
-# (jit:3398bc19). `gzip` is named explicitly because content-decoding is a
-# deliberate capability of the remote-document path, not an implicit default.
+# Remote document access (external-link reachability checks, commands::document)
+# needs exactly one TLS backend (jit:3398bc19). Rustls is selected over native-tls:
+# ureq's `Agent::new_with_defaults()` — the only call site — always builds its
+# `TlsConfig` from `TlsProvider::default()`, which is unconditionally Rustls;
+# ureq's own native-tls provider docs state that choice "is never picked up
+# automatically". So native-tls was already dead weight in the old graph (compiled,
+# never reachable at runtime without a code change to select it explicitly), while
+# removing it changes no runtime behavior. Rustls also needs no system TLS library:
+# git2 already links system OpenSSL for its own purposes, but ureq's rustls feature
+# instead shares the pure-Rust `ring` crypto backend already pulled in via its own
+# `_ring` feature, so this stays a single additional TLS implementation rather than
+# a second consumer of the OpenSSL git2 needs. `gzip` is named explicitly because
+# content-decoding is a deliberate capability of the remote-document path, not an
+# implicit default.
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 tempfile = { workspace = true }
 dirs = "5.0"
@@ -69,3 +77,13 @@ assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }
 ulid = { workspace = true }
+# Test-only local HTTPS server for the remote-document TLS/gzip coverage
+# (jit:3398bc19 REQ-05): generates an ephemeral self-signed certificate so the
+# test never touches the network. `rcgen`'s default features select the
+# `ring` crypto backend already present in the graph (via ureq), not
+# aws-lc-rs. `rustls`/`flate2` are already transitive dependencies of `ureq`
+# (rustls, gzip features); declared directly here so the test can drive the
+# server side of the same TLS/gzip capability the client uses.
+rcgen = { version = "0.14", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+flate2 = "1"

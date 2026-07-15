@@ -14,5 +14,6 @@ mod label_hierarchy_e2e_test;
 mod label_query_json_tests;
 mod query_json_tests;
 mod query_tests;
+mod remote_document_tls_tests;
 mod scope_validation_tests;
 mod search_tests;
