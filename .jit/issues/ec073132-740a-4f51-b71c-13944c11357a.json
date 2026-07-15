@@ -1,16 +1,12 @@
 {
   "id": "ec073132-740a-4f51-b71c-13944c11357a",
   "title": "Implement gated candidate, rehearsal, tag, and publication orchestration",
-  "description": "This leaf exclusively owns every release-execution workflow/job graph and composes the prerequisite authority primitive through its fixed interface; no account-side setting or primitive implementation is duplicated.\n\n## Success Criteria\n\n- [hard] REQ-01: This leaf is the exclusive owner of `.github/workflows/` candidate, escrow, rehearsal, final-auth/recovery, npm, GHCR and final-GitHub execution YAML; workflow triggers, permissions, needs/job DAG, constant concurrency group, transition/root/escrow/tag-manifest schemas and cross-workflow hosted fixtures live here. It changes no App/ruleset/environment/immutable-release account configuration and does not reimplement the fixed-ref authority primitive.\n- [hard] REQ-02: Each candidate/final tag job calls the documented authority interface with exact typed inputs and validates its structured outputs; parsed-contract fixtures fail if workflows bypass it, mint App tokens themselves, construct refs independently, or duplicate its unit-fixture concerns. The authority leaf remains a dependency and file ownership is disjoint.\n- [hard] REQ-03: Order is freeze ID → candidate handoff/annotated tag → push-owned event completion ID → validation/producers/root → immutable public candidate-prerelease escrow → rehearsal from escrow → fresh final preflight/MSRV/prepared → annotated final tag/completion → direct npm-publish prepared/OIDC/completed → GHCR/final GitHub by exact tag/npm/escrow identities. No ref/name/listing authority or pre-tag final-v1 channel mutation exists.\n- [hard] REQ-04: The protocol pins artifact/attestation Actions, uses unique overwrite-forbidden 90-day records, and defines candidate-root, transition, escrow, rehearsal and compact tag-manifest schemas with every exact producer/run/identity/digest/parent needed for Actions-410 recovery. Exact-ID/API/attestation readers reject foreign, expired or substituted inputs; listings only check consistency.\n- [hard] REQ-05: Transition schemas cover candidate tag/escrow, final tag, direct npm, GHCR and final GitHub. Prepared precedes mutation; readback precedes completion. Stale absent-final-tag preparation is superseded with fresh preflight/MSRV; exact existing tag may recovery-complete. Tag creation is irreversible.\n- [hard] REQ-06: Every final mutator/recovery entry point declares literal `jit-v1.0.0-publication` with `cancel-in-progress:false` before live read and holds it through completion upload. Pending replacement requires explicit same-parent redispatch; no mutating subjob escapes and running mutators are never cancelled.\n- [hard] REQ-07: Parsed-YAML and hosted cross-workflow fixtures own serialization, pending replacement, push-owned completion propagation, fresh absent-tag authorization, exact-existing-tag recovery, Actions-410 escrow recovery, parent/escrow mismatch, unsafe retry and source-mutation cases. These fixtures compose—but do not duplicate—the authority primitive's unit/negative suite.\n- [hard] REQ-08: Post-tag workflows have actions:read and never actions:write; default contents are read-only, fixed-tag App authority is reachable only through the primitive, and release-publishing permissions are isolated. Endpoint fixtures reject published release/asset mutation and verify immutable escrow/final releases.\n\n## Notes\n\nBlast radius: `.github/workflows/` release/candidate/escrow/rehearsal/final-publication execution YAML, job DAG/concurrency/permissions, artifact/root/transition/escrow/tag-manifest schemas, cross-workflow API/attestation/release verifiers and hosted fixtures only; account-side settings and fixed-ref primitive files are excluded.",
+  "description": "Disjoint workflow and verification children implement the authenticated candidate-to-publication protocol by composing accepted authority and producer interfaces.\n\n## Success Criteria\n\n- [hard] REQ-01: Versioned transition, root, escrow, rehearsal, and compact tag-manifest schemas define every exact identity and crash/recovery boundary before workflow implementations consume them.\n- [hard] REQ-02: Candidate handoff/validation/producer/root, immutable escrow, clean-room rehearsal, final-tag, npm, GHCR, and final-GitHub workflows are independently owned and use least privilege, exact-ID authentication, overwrite-forbidden evidence, and no source rebuild or mutable discovery.\n- [hard] REQ-03: Every final mutator and recovery path shares literal `jit-v1.0.0-publication` with `cancel-in-progress:false`; prepared/live-readback/completed ordering and Actions-410 recovery reconcile immutable escrow, tag manifest, and exact live state.\n- [hard] REQ-04: Cross-workflow acceptance proves serialization, pending replacement behavior, no running cancellation, fresh absent-tag authorization, exact-existing-tag recovery, endpoint isolation, and denial of mismatch, unsafe retry, or precondition bypass.\n- [hard] REQ-05: The story's children exclusively own release-execution workflow YAML, protocol schemas, and hosted cross-workflow fixtures; they do not duplicate account-side configuration or producer primitive implementation.\n\n## Notes\n\nBlast radius: the `story:release-orchestration` child set; source freeze and all public release operations remain downstream execution work.\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "f7f80d53-508e-4b03-b045-5209061c8d0a",
-    "03b89b77-fdb9-443c-a491-441ae9447286",
-    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
-    "68c1f2f3-6620-4770-b6f3-395cc38219b7",
-    "cdee58b3-1428-4874-9814-dacefc517605"
+    "466d4af6-8b19-4ab7-ba0b-7abc9b0fc602"
   ],
   "gates_required": [
     "repo-validate",
@@ -21,15 +17,16 @@
   "context": {},
   "documents": [],
   "labels": [
-    "type:enhancement",
     "epic:production-readiness",
     "satisfies:REQ-03",
     "satisfies:REQ-04",
     "satisfies:REQ-05",
     "satisfies:REQ-07",
-    "satisfies:REQ-10"
+    "satisfies:REQ-10",
+    "story:release-orchestration",
+    "type:story"
   ],
   "created_at": "2026-07-15T09:12:53.174577020Z",
-  "updated_at": "2026-07-15T09:12:53.787139505Z",
+  "updated_at": "2026-07-15T11:20:53.838014485Z",
   "first_ready_at": "2026-07-15T09:12:53.174577260Z"
 }

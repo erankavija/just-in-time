@@ -1,0 +1,32 @@
+{
+  "id": "82bab119-cf80-4531-8a5e-0b435169c010",
+  "title": "Define release transition and recovery schemas",
+  "description": "Versioned machine contracts define every release transition and durable recovery identity before workflow implementations consume them.\n\n## Success Criteria\n\n- [hard] REQ-01: Candidate handoff/completion, candidate root, escrow, rehearsal, final-tag, npm, GHCR, final-GitHub, and compact tag-manifest schemas carry exact run, artifact, release, asset, digest, parent, repository, actor, workflow, and source identities.\n- [hard] REQ-02: Prepared, completed, recovery-completed, superseded, and irreversible boundaries are explicit; exact-ID readers reject foreign, expired, substituted, or inconsistent records and listings are never authoritative.\n- [hard] REQ-03: Schema fixtures cover crash boundaries and Actions-410 reconstruction from immutable escrow, tag manifest, and exact live state without authorizing rebuild or replacement.\n\n## Notes\n\nBlast radius: release protocol schemas, readers, and schema fixtures only; no mutating workflow or public channel operation.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "207364b1-cc06-4bf5-ae61-34908acc898c"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-orchestration",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-07",
+    "satisfies:REQ-10"
+  ],
+  "created_at": "2026-07-15T11:19:56.072899470Z",
+  "updated_at": "2026-07-15T11:20:19.412019631Z",
+  "first_ready_at": "2026-07-15T11:19:56.072899730Z"
+}
