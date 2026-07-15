@@ -1,76 +1,59 @@
 use std::env;
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
+// Build provenance for the `jit` CLI, embedded as compile-time env vars read by
+// `src/build_info.rs`.
+//
+// Ordinary builds (plain `cargo build`/`cargo test`) MUST NOT depend on Git
+// metadata or the wall clock: watching `.git/index`, `HEAD`, or refs, or
+// stamping the current time, makes an otherwise-unchanged rebuild non-fresh
+// whenever git state moves — staging or committing unchanged sources then
+// relinks every test target (jit:5d862134). So this script reads NOTHING
+// ambient. Provenance enters ONLY through four explicit environment variables;
+// absent them, each field is a stable documented fallback. This keeps two
+// builds from identical sources and identical explicit environment byte-for-byte
+// reproducible regardless of the surrounding git repository (REQ-01), and lets
+// a metadata-only change leave the build untouched (REQ-02).
+//
+// Releases inject real provenance through the same four variables (see
+// `scripts/install-jit.sh`); each is declared `rerun-if-env-changed`, so
+// repeating a build with the same values reproduces the same provenance and
+// changing any value invalidates the build output (REQ-03/REQ-04). A build with
+// no injected metadata still succeeds and reports the fallbacks rather than a
+// wall-clock timestamp (REQ-05).
 fn main() {
     println!("cargo:rerun-if-env-changed=JIT_BUILD_GIT_HASH");
     println!("cargo:rerun-if-env-changed=JIT_BUILD_GIT_SHORT_HASH");
     println!("cargo:rerun-if-env-changed=JIT_BUILD_GIT_DIRTY");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
-    println!("cargo:rerun-if-changed=../../.git/HEAD");
-    println!("cargo:rerun-if-changed=../../.git/index");
-    println!("cargo:rerun-if-changed=../../.git/packed-refs");
-    if let Some(head_ref) = git_output(&["symbolic-ref", "-q", "HEAD"]) {
-        println!("cargo:rerun-if-changed=../../.git/{}", head_ref);
-    }
 
-    let git_hash =
-        env_override("JIT_BUILD_GIT_HASH").or_else(|| git_output(&["rev-parse", "HEAD"]));
-    let git_short_hash = env_override("JIT_BUILD_GIT_SHORT_HASH")
-        .or_else(|| git_output(&["rev-parse", "--short=8", "HEAD"]));
-    let git_dirty = env_override("JIT_BUILD_GIT_DIRTY")
-        .unwrap_or_else(|| git_dirty().unwrap_or_else(|| "unknown".to_string()));
+    // Documented fallbacks for an ordinary build with no injected provenance:
+    // the commit fields and the dirty flag report "unknown", and the build
+    // timestamp reports "unknown" rather than the wall clock (REQ-05).
+    emit("JIT_GIT_HASH", env_override("JIT_BUILD_GIT_HASH"));
+    emit(
+        "JIT_GIT_SHORT_HASH",
+        env_override("JIT_BUILD_GIT_SHORT_HASH"),
+    );
+    emit("JIT_GIT_DIRTY", env_override("JIT_BUILD_GIT_DIRTY"));
+    emit("JIT_BUILD_TIMESTAMP", env_override("SOURCE_DATE_EPOCH"));
 
-    println!(
-        "cargo:rustc-env=JIT_GIT_HASH={}",
-        git_hash.unwrap_or_else(|| "unknown".to_string())
-    );
-    println!(
-        "cargo:rustc-env=JIT_GIT_SHORT_HASH={}",
-        git_short_hash.unwrap_or_else(|| "unknown".to_string())
-    );
-    println!("cargo:rustc-env=JIT_GIT_DIRTY={}", git_dirty);
-    println!(
-        "cargo:rustc-env=JIT_BUILD_PROFILE={}",
-        env::var("PROFILE").unwrap_or_else(|_| "unknown".to_string())
-    );
-    println!(
-        "cargo:rustc-env=JIT_BUILD_TARGET={}",
-        env::var("TARGET").unwrap_or_else(|_| "unknown".to_string())
-    );
-    println!("cargo:rustc-env=JIT_BUILD_TIMESTAMP={}", build_timestamp());
+    // PROFILE and TARGET are supplied by cargo, not git or the clock, so they
+    // are stable inputs and safe to embed directly.
+    emit("JIT_BUILD_PROFILE", env::var("PROFILE").ok());
+    emit("JIT_BUILD_TARGET", env::var("TARGET").ok());
 }
 
+/// Read an injected provenance variable, treating blank values as absent so an
+/// empty `SOURCE_DATE_EPOCH=` behaves like no injection at all.
 fn env_override(name: &str) -> Option<String> {
     env::var(name).ok().filter(|value| !value.trim().is_empty())
 }
 
-fn git_output(args: &[&str]) -> Option<String> {
-    Command::new("git")
-        .args(args)
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|stdout| stdout.trim().to_string())
-        .filter(|stdout| !stdout.is_empty())
-}
-
-fn git_dirty() -> Option<String> {
-    Command::new("git")
-        .args(["status", "--short", "--untracked-files=normal"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|stdout| (!stdout.trim().is_empty()).to_string())
-}
-
-fn build_timestamp() -> String {
-    env_override("SOURCE_DATE_EPOCH").unwrap_or_else(|| {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs().to_string())
-            .unwrap_or_else(|_| "unknown".to_string())
-    })
+/// Emit `name` as a `rustc-env` value, substituting the `"unknown"` fallback
+/// when no provenance was injected.
+fn emit(name: &str, value: Option<String>) {
+    println!(
+        "cargo:rustc-env={name}={}",
+        value.unwrap_or_else(|| "unknown".to_string())
+    );
 }

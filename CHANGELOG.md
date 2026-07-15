@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Build provenance no longer tracks Git metadata or the wall clock.**
+  `crates/jit/build.rs` previously watched `.git/index`, `HEAD`, and refs and
+  stamped the current time, so staging or committing unchanged Rust sources
+  reran the build script and relinked every test target. It now reads only the
+  four release-injection variables (`JIT_BUILD_GIT_HASH`,
+  `JIT_BUILD_GIT_SHORT_HASH`, `JIT_BUILD_GIT_DIRTY`, `SOURCE_DATE_EPOCH`) and
+  reports documented `unknown` fallbacks otherwise, so ordinary builds are
+  reproducible and insensitive to Git-metadata-only changes. Releases and
+  installs inject real provenance through the new `scripts/install-jit.sh`
+  (commit, short commit, dirty flag, and commit-time `SOURCE_DATE_EPOCH`),
+  which `jit version --json` reports exactly. The stale-binary guard composes
+  unchanged: it judges the installed binary, which `scripts/install-jit.sh`
+  stamps with the commit it was built from.
+
 ### Added
 
 - **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
@@ -18,7 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   gate verdict from such a binary is not evidence about the tree under
   review. This is checked in two places: the evaluator itself refuses before
   spawning any checker (a typed, exit-code-10 error naming the build commit
-  and the fix, `cargo install --path crates/jit`; no gate run is recorded for
+  and the fix, `scripts/install-jit.sh`; no gate run is recorded for
   that refusal), and — since a checker script that itself shells out to `jit`
   (e.g. `scripts/jit-validate.sh`) resolves that `jit` from `PATH`
   independently of the evaluator — any such child process self-checks too, so

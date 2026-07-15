@@ -956,8 +956,10 @@ AND that commit no longer matches the repository's current `HEAD` (or the
 binary was built from a dirty tree) — so its verdict would not be evidence
 about the change under review. Otherwise (an unrelated repository, no git, or
 an unresolvable build commit) it stays silent — an installed release
-validating a different repository is unaffected. Rebuild and reinstall:
-`cargo install --path crates/jit`, then re-run the gate. See [the `jit gate
+validating a different repository is unaffected. Rebuild and reinstall with
+`scripts/install-jit.sh` (it injects build provenance around `cargo install
+--path crates/jit`, so the reinstalled binary reports the commit it was built
+from), then re-run the gate. See [the `jit gate
 evaluate` exit-code contract](../reference/cli-commands.md#jit-gate-evaluate)
 for the full condition and how this differs when it's a checker's own child
 `jit` (not the evaluator) that is stale.
