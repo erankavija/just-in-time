@@ -1205,16 +1205,18 @@ jit gate update <KEY> [OPTIONS]
 - `--priority <N>` - New execution priority (lower runs first)
 - `--json` - Emit the updated gate definition as JSON
 
-Every mutable field is reachable from the CLI: each clearable checker field has
-both a set flag and a `--clear-*` flag, so editing a gate never requires
-hand-editing the registry file. Passing a set flag together with its `--clear-*`
-twin is an `INVALID_ARGUMENT` error.
+Every mutable `exec`-checker field is reachable from the CLI: each clearable
+field has both a set flag and a `--clear-*` flag. Native checker types are
+selected in `.jit/gates.toml`; the CLI has no checker-type option. Passing a set
+flag together with its `--clear-*` twin is an `INVALID_ARGUMENT` error.
 
-Switching a gate to `auto` (via `--mode auto` or `--auto`) requires the gate to
-have a checker command; supply `--checker-command` in the same call if the gate
-had none. Switching to `manual` drops the checker. At least one field must be
-provided; an update with no fields is an `INVALID_ARGUMENT` error. Updating a key
-that is not in the registry is a `GATE_NOT_FOUND` error.
+Switching a gate to `auto` (via `--mode auto` or `--auto`) requires a configured
+checker. A gate that already has a native checker keeps it; otherwise supply
+`--checker-command` in the same call to configure an `exec` checker. Supplying
+`--checker-command` for a native checker replaces it with an `exec` checker.
+Switching to `manual` drops the checker. At least one field must be provided; an
+update with no fields is an `INVALID_ARGUMENT` error. Updating a key that is not
+in the registry is a `GATE_NOT_FOUND` error.
 
 The write goes through the canonical atomic-write primitive (temp file + rename)
 and appends a `gate_definition_updated` event to the event log.
@@ -1529,9 +1531,10 @@ ran but could not produce a verdict (timeout, command-not-found, or crash) exits
 and lookup errors (issue not found) are classified before the run path and are
 never reported as a runner error.
 
-**Stale-binary refusal (jit:7446af34):** a `jit` binary that predates the
-repository it is validating must not produce — or let a checker's own child
-process produce — a trusted gate verdict. The refusal condition is ALL of:
+**Stale-binary refusal for `exec` checkers (jit:7446af34):** a `jit` binary that
+predates the repository it is validating must not produce — or let an `exec`
+checker's own child process produce — a trusted gate verdict. Native in-process
+checkers do not use this subprocess guard. The refusal condition is ALL of:
 
 1. the repository under validation can resolve the running binary's build
    commit in its own history (the repository the binary was built from, or a
@@ -1571,18 +1574,18 @@ reports its commit and the guard can judge it) to clear either case.
 `jit gate evaluate --json` carries a `verdict` field describing the run-path outcome:
 
 - `pass` — top-level field on the success response.
-- `fail` — under `error.details` when the checker ran and failed (code `4`).
+- `fail` — under `error.details` when the checker evaluated to failure (code `4`).
   This is also what a stale checker-child refusal looks like from the
-  evaluator's side (see above): the checker "ran" (a subprocess executed and
-  exited nonzero), so the outer command still gets a normal `fail` verdict —
-  the checker's own `checker_result.stderr` is what shows it was a
+  evaluator's side for an `exec` checker (see above): its subprocess exited
+  nonzero, so the outer command still gets a normal `fail` verdict — the
+  checker's own `checker_result.stderr` is what shows it was a
   stale-binary refusal.
-- `error` — under `error.details` when the checker ran but the runner failed
-  (code `10`).
+- `error` — under `error.details` when checker evaluation failed unexpectedly
+  (for example, an `exec` runner failed; code `10`).
 
 Pre-verdict conditions carry no `verdict` field at all: argument/lookup errors
-(codes `2` and `3`), and the evaluator's own stale-binary refusal above — the
-one case where exit `10` does NOT mean the checker ran and crashed.
+(codes `2` and `3`), and an `exec` evaluator's own stale-binary refusal above —
+the one case where exit `10` does not carry a checker verdict.
 
 ```bash
 # Success response
@@ -1632,7 +1635,7 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
-  per gate (`key`, `status`, `verdict`, `already_passed`). On the first
+  per gate (`key`, `status`, `verdict`, `already_passed`, `warnings`). On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.key` naming the offending gate, and `error.details.verdict`
   `fail` or `error` — or no `verdict` field at all when the EVALUATOR itself
@@ -1647,8 +1650,8 @@ jit gate evaluate-all abc123 --json
 #   "status": "passed",
 #   "verdict": "pass",
 #   "gates": [
-#     { "key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true },
-#     { "key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false }
+#     { "key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true,  "warnings": [] },
+#     { "key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false, "warnings": [] }
 #   ],
 #   "message": "Passed 2 required gate(s) for issue abc123"
 # }

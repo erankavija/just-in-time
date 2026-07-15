@@ -22,6 +22,60 @@ use anyhow::Result;
 /// presets.
 pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
 
+/// Canonical `.jit/gates.toml` syntax for every native checker type.
+const PORTABLE_CHECKER_REGISTRY_EXAMPLES: &str = r#"[[gates]]
+version = 1
+key = "repository-policy"
+title = "Repository validation"
+description = "Validate the whole repository"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "repository_validation"
+
+[[gates]]
+version = 1
+key = "work-item-policy"
+title = "Issue validation"
+description = "Validate the gated issue"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "issue_validation"
+
+[[gates]]
+version = 1
+key = "container-coverage"
+title = "Container coverage"
+description = "Validate the container named by the covers label"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "label_target_validation"
+label_namespace = "covers"
+
+[[gates]]
+version = 1
+key = "external-review"
+title = "External review"
+description = "Passing placeholder until a reviewer is configured"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder""#;
+
 /// Every built-in preset, sorted by name.
 ///
 /// The sort makes the projection deterministic: [`BuiltinPresets::load`] returns
@@ -223,6 +277,15 @@ pub fn render_reference_markdown() -> Result<String> {
            update <key> --checker-command <command>`) before treating the gate as review\n\
            evidence.\n\
          \n\
+         Native checker types are selected in the gate registry; `jit gate define` does not\n\
+         have a checker-type option. These four independent definitions show the canonical\n\
+         `.jit/gates.toml` syntax. The keys are examples and can be replaced with any\n\
+         configured gate keys:\n\
+         \n\
+         ```toml\n\
+         {portable_checker_registry_examples}\n\
+         ```\n\
+         \n\
          A project can also define its own presets: `jit gate preset create <issue> <name>`\n\
          captures an issue's gates into `.jit/config/gate-presets/<name>.json`, and every\n\
          JSON file in that directory loads alongside the built-ins. `jit gate preset create`\n\
@@ -234,7 +297,8 @@ pub fn render_reference_markdown() -> Result<String> {
          | --- | --- | --- |\n\
          {summary}\n\
          \n\
-         {sections}"
+         {sections}",
+        portable_checker_registry_examples = PORTABLE_CHECKER_REGISTRY_EXAMPLES,
     ))
 }
 
@@ -267,6 +331,37 @@ mod tests {
             "{REFERENCE_PATH} is stale — regenerate it from the built-in presets \
              (run: cargo test -p jit gate_presets::reference -- --ignored regenerate)"
         );
+    }
+
+    #[test]
+    fn test_portable_checker_registry_examples_load_as_canonical_toml() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("gates.toml"),
+            PORTABLE_CHECKER_REGISTRY_EXAMPLES,
+        )
+        .unwrap();
+
+        let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
+        assert_eq!(registry.gates.len(), 4);
+        assert!(matches!(
+            registry.gates["repository-policy"].checker.as_ref(),
+            Some(GateChecker::RepositoryValidation)
+        ));
+        assert!(matches!(
+            registry.gates["work-item-policy"].checker.as_ref(),
+            Some(GateChecker::IssueValidation)
+        ));
+        assert!(matches!(
+            registry.gates["container-coverage"].checker.as_ref(),
+            Some(GateChecker::LabelTargetValidation {
+                label_namespace
+            }) if label_namespace == "covers"
+        ));
+        assert!(matches!(
+            registry.gates["external-review"].checker.as_ref(),
+            Some(GateChecker::ReviewPlaceholder)
+        ));
     }
 
     /// Regenerate the committed reference from the built-in presets. Ignored by

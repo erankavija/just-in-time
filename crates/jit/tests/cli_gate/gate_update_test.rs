@@ -52,6 +52,31 @@ fn define_auto_gate(temp: &TempDir, key: &str) {
         .success();
 }
 
+/// Install a native checker through its canonical registry representation.
+fn define_review_placeholder_gate(temp: &TempDir, key: &str) {
+    let registry_path = temp.path().join(".jit").join("gates.toml");
+    fs::write(
+        registry_path,
+        format!(
+            r#"
+[[gates]]
+version = 1
+key = "{key}"
+title = "Review"
+description = "External review placeholder"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+"#
+        ),
+    )
+    .unwrap();
+}
+
 /// Read `gate show <key> --json` as a JSON value.
 fn gate_show(temp: &TempDir, key: &str) -> serde_json::Value {
     let out = jit(temp)
@@ -129,6 +154,29 @@ fn test_gate_update_checker_field_preserves_command() {
     assert_eq!(gate["checker"]["command"], "cargo test");
     // Untouched non-checker fields stay put.
     assert_eq!(gate["title"], "Original Title");
+}
+
+#[test]
+fn test_gate_update_checker_command_replaces_native_placeholder_with_exec() {
+    let temp = setup_repo();
+    define_review_placeholder_gate(&temp, "review-any-key");
+
+    jit(&temp)
+        .args([
+            "gate",
+            "update",
+            "review-any-key",
+            "--checker-command",
+            "reviewer --stdin",
+        ])
+        .assert()
+        .success();
+
+    let gate = gate_show(&temp, "review-any-key");
+    assert_eq!(gate["checker"]["type"], "exec");
+    assert_eq!(gate["checker"]["command"], "reviewer --stdin");
+    assert_eq!(gate["checker"]["timeout_seconds"], 300);
+    assert_eq!(gate["checker"]["pass_context"], false);
 }
 
 #[test]
