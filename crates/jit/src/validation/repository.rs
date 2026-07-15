@@ -14,11 +14,13 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{Event, EventTag, Issue};
+use crate::domain::{Event, EventTag, GateChecker, Issue};
 use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
+use crate::validation::engine::Finding;
 use crate::validation::invariants::InvariantRegistry;
 use crate::validation::projection::{render_invariants_markdown, splice_region};
+use crate::validation::report::{ReportedFinding, RuleReport};
 use crate::validation::rules::{RuleConfigError, RuleSet, SchemaSource, Severity};
 use crate::validation::rules_gates_projection::render_rules_and_gates_markdown;
 use anyhow::{anyhow, Context, Result};
@@ -35,7 +37,7 @@ const SUPPORTED_INDEX_SCHEMA_VERSION: u32 = 2;
 pub enum RepositoryValidationPass {
     /// `config.toml`, `templates.toml`, and `invariants.toml` parse and agree.
     EffectiveConfig,
-    /// `rules.toml` and every referenced `schemas/*.json` load from the view.
+    /// `rules.toml` and referenced `schemas/*.json` are inspected from the view.
     RulesAndSchemas,
     /// `gates.toml` parses and gate identities are unique.
     Gates,
@@ -51,15 +53,17 @@ pub enum RepositoryValidationPass {
     Projections,
 }
 
-/// Successful validation, including the stages that consumed the view.
+/// Validation outcome, including semantic findings and stages reached.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepositoryValidationReport {
-    /// Passes completed in deterministic pipeline order.
+    /// Stages reached in deterministic pipeline order.
     pub passes: Vec<RepositoryValidationPass>,
     /// Number of issue records validated.
     pub issue_count: usize,
     /// Number of known event records validated.
     pub event_count: usize,
+    /// Declarative and built-in semantic findings produced from the same view.
+    pub rule_report: RuleReport,
 }
 
 /// A read-only repository byte source.
@@ -232,8 +236,21 @@ pub fn validate_repository(view: &dyn RepositoryView) -> Result<RepositoryValida
 
     let namespaces =
         ConfigManager::new(view.repository_root().join(".jit")).namespaces_from_config(&config);
-    let rules =
-        load_rules(view, &config, &namespaces).context("rules-and-schemas validation pass")?;
+    let (rules, rules_loaded, mut findings) = match load_rules(view, &config, &namespaces) {
+        Ok(rules) => (rules, true, Vec::new()),
+        Err(error) => (
+            RuleSet::empty(),
+            false,
+            vec![ReportedFinding::new(
+                None,
+                &Finding {
+                    rule: "rules-file".to_string(),
+                    severity: Severity::Error,
+                    message: format!("config error: {error:#}"),
+                },
+            )],
+        ),
+    };
     passes.push(RepositoryValidationPass::RulesAndSchemas);
 
     let gates = load_gates(view).context("gates validation pass")?;
@@ -246,22 +263,37 @@ pub fn validate_repository(view: &dyn RepositoryView) -> Result<RepositoryValida
         .context("repository-integrity validation pass")?;
     passes.push(RepositoryValidationPass::RepositoryIntegrity);
 
-    validate_rules(view, &records.issues, &rules, &namespaces, &config)
-        .context("namespace-and-hierarchy validation pass")?;
-    validate_enforcement_drift(&config, &rules, &gates)
-        .context("namespace-and-hierarchy validation pass")?;
+    if rules_loaded {
+        findings.extend(
+            collect_rule_findings(view, &records.issues, &rules, &namespaces, &config)
+                .context("namespace-and-hierarchy validation pass")?,
+        );
+    }
+    findings.extend(collect_enforcement_drift_findings(
+        &config,
+        rules_loaded.then_some(&rules),
+        &gates,
+    ));
+    findings.extend(collect_review_placeholder_findings(&gates));
     passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
 
-    validate_item_links(view, &records.issues, &config).context("item-links validation pass")?;
+    findings.extend(
+        collect_item_link_findings(view, &records.issues, &config)
+            .context("item-links validation pass")?,
+    );
     passes.push(RepositoryValidationPass::ItemLinks);
 
-    validate_projections(view, &config, &rules, &gates).context("projections validation pass")?;
+    if rules_loaded {
+        validate_projections(view, &config, &rules, &gates)
+            .context("projections validation pass")?;
+    }
     passes.push(RepositoryValidationPass::Projections);
 
     Ok(RepositoryValidationReport {
         passes,
         issue_count: records.issues.len(),
         event_count: records.event_count,
+        rule_report: RuleReport { findings },
     })
 }
 
@@ -554,33 +586,28 @@ fn validate_integrity(
     Ok(())
 }
 
-fn validate_rules(
+fn collect_rule_findings(
     view: &dyn RepositoryView,
     issues: &[Issue],
     rules: &RuleSet,
     namespaces: &crate::domain::LabelNamespaces,
     config: &JitConfig,
-) -> Result<()> {
+) -> Result<Vec<ReportedFinding>> {
     let repo_format = config
         .validation
         .as_ref()
         .map_or(Ok(crate::domain::ContentFormat::Markdown), |validation| {
             validation.content_format()
         })?;
+    let mut reported = Vec::new();
     for issue in issues {
         let evaluation = crate::validation::evaluate_local(issue, rules, repo_format)?;
-        if let Some(finding) = evaluation
-            .findings()
-            .into_iter()
-            .find(|finding| finding.severity == Severity::Error)
-        {
-            return Err(anyhow!(
-                "issue {} fails rule '{}': {}",
-                issue.short_id(),
-                finding.rule,
-                finding.message
-            ));
-        }
+        reported.extend(
+            evaluation
+                .findings()
+                .into_iter()
+                .map(|finding| ReportedFinding::new(Some(issue.id.clone()), finding)),
+        );
     }
     let graph_rules: Vec<_> = rules
         .rules
@@ -589,7 +616,7 @@ fn validate_rules(
         .collect();
     let hierarchy = crate::validation::defaults::hierarchy_config(namespaces);
     let plan_content = resolve_plan_content(view, issues, config)?;
-    let findings = crate::validation::graph::evaluate_graph(
+    let graph_findings = crate::validation::graph::evaluate_graph(
         &graph_rules,
         issues,
         &hierarchy,
@@ -597,37 +624,69 @@ fn validate_rules(
         chrono::Utc::now(),
         &plan_content,
     );
-    if let Some(finding) = findings
-        .iter()
-        .find(|finding| finding.finding.severity == Severity::Error)
-    {
-        return Err(anyhow!(
-            "graph rule '{}' failed: {}",
-            finding.finding.rule,
-            finding.finding.message
-        ));
-    }
-    Ok(())
+    reported.extend(
+        graph_findings
+            .iter()
+            .map(|finding| ReportedFinding::new(finding.issue_id.clone(), &finding.finding)),
+    );
+    Ok(reported)
 }
 
-fn validate_enforcement_drift(
+fn collect_enforcement_drift_findings(
     config: &JitConfig,
-    rules: &RuleSet,
+    rules: Option<&RuleSet>,
     gates: &GateRegistry,
-) -> Result<()> {
+) -> Vec<ReportedFinding> {
     use crate::validation::drift::{enforcement_drift_tolerant, SourceState};
 
-    let rule_names: BTreeSet<&str> = rules.rules.iter().map(|rule| rule.name.as_str()).collect();
+    let rule_names: Option<BTreeSet<&str>> =
+        rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
     let gate_keys: BTreeSet<&str> = gates.gates.keys().map(String::as_str).collect();
-    let findings = enforcement_drift_tolerant(
+    enforcement_drift_tolerant(
         &config.invariants.invariants,
-        SourceState::Loaded(&rule_names),
+        rule_names
+            .as_ref()
+            .map_or(SourceState::Unloadable, SourceState::Loaded),
         SourceState::Loaded(&gate_keys),
-    );
-    if let Some(finding) = findings.first() {
-        return Err(anyhow!(finding.message()));
+    )
+    .into_iter()
+    .map(|finding| {
+        ReportedFinding::new(
+            None,
+            &Finding {
+                rule: crate::commands::ENFORCEMENT_DRIFT_RULE.to_string(),
+                severity: Severity::Error,
+                message: finding.message(),
+            },
+        )
+    })
+    .collect()
+}
+
+fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
+    let mut keys: Vec<&str> = gates
+        .gates
+        .iter()
+        .filter_map(|(key, gate)| {
+            matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key.as_str())
+        })
+        .collect();
+    keys.sort_unstable();
+    if keys.is_empty() {
+        Vec::new()
+    } else {
+        vec![ReportedFinding::new(
+            None,
+            &Finding {
+                rule: crate::commands::REVIEW_PLACEHOLDER_RULE.to_string(),
+                severity: Severity::Warn,
+                message: format!(
+                    "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
+                    keys.join(", ")
+                ),
+            },
+        )]
     }
-    Ok(())
 }
 
 fn resolve_plan_content(
@@ -670,14 +729,14 @@ fn resolve_plan_content(
     Ok(content)
 }
 
-fn validate_item_links(
+fn collect_item_link_findings(
     view: &dyn RepositoryView,
     issues: &[Issue],
     config: &JitConfig,
-) -> Result<()> {
+) -> Result<Vec<ReportedFinding>> {
     let kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
     if kinds.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let repo_format = config
         .validation
@@ -691,6 +750,7 @@ fn validate_item_links(
         .filter(|kind| !kind.kind_scope().is_project())
         .cloned()
         .collect();
+    let mut findings = Vec::new();
     for issue in issues {
         let parser = content_parser_for(issue.content_format, repo_format)?;
         addresses.extend(
@@ -733,55 +793,65 @@ fn validate_item_links(
             if !link_namespaces.contains(namespace) || !is_qualified_reference(value) {
                 continue;
             }
-            let address = if value.starts_with('@') {
-                parse_kind_segmented_address(value)?
-            } else {
-                expand_sugar_address(value, &kinds)?
-            };
-            let canonical = match address.scope {
-                AddressScope::Project => {
-                    format!("@/{}/{}", address.kind, address.self_id)
-                }
-                AddressScope::NamedProject(name) => {
-                    let declared = config
-                        .project
-                        .as_ref()
-                        .and_then(|project| project.name.as_ref())
-                        .map(crate::config::ProjectName::as_str);
-                    if declared != Some(name.as_str()) {
-                        return Err(anyhow!(
-                            "item link '{label}' addresses project '{name}', not the local project"
-                        ));
+            let canonical = (|| -> Result<String> {
+                let address = if value.starts_with('@') {
+                    parse_kind_segmented_address(value)?
+                } else {
+                    expand_sugar_address(value, &kinds)?
+                };
+                match address.scope {
+                    AddressScope::Project => Ok(format!("@/{}/{}", address.kind, address.self_id)),
+                    AddressScope::NamedProject(name) => {
+                        let declared = config
+                            .project
+                            .as_ref()
+                            .and_then(|project| project.name.as_ref())
+                            .map(crate::config::ProjectName::as_str);
+                        if declared != Some(name.as_str()) {
+                            return Err(anyhow!(
+                                "addresses project '{name}', not the local project"
+                            ));
+                        }
+                        Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
-                    format!("@/{}/{}", address.kind, address.self_id)
+                    AddressScope::Issue(issue_ref) => {
+                        let matches: Vec<&Issue> = issues
+                            .iter()
+                            .filter(|candidate| candidate.id.starts_with(&issue_ref))
+                            .collect();
+                        let [owner] = matches.as_slice() else {
+                            return Err(anyhow!(
+                                "has an unresolved or ambiguous issue scope '{issue_ref}'"
+                            ));
+                        };
+                        Ok(format!(
+                            "@/issue/{}/{}/{}",
+                            owner.short_id(),
+                            address.kind,
+                            address.self_id
+                        ))
+                    }
                 }
-                AddressScope::Issue(issue_ref) => {
-                    let matches: Vec<&Issue> = issues
-                        .iter()
-                        .filter(|candidate| candidate.id.starts_with(&issue_ref))
-                        .collect();
-                    let [owner] = matches.as_slice() else {
-                        return Err(anyhow!(
-                            "item link '{label}' has an unresolved or ambiguous issue scope '{issue_ref}'"
-                        ));
-                    };
-                    format!(
-                        "@/issue/{}/{}/{}",
-                        owner.short_id(),
-                        address.kind,
-                        address.self_id
-                    )
-                }
+            })();
+            let detail = match canonical {
+                Ok(canonical) if addresses.contains(&canonical) => continue,
+                Ok(_) => format!("the qualified id '{value}' resolves to no addressable item"),
+                Err(error) => error.to_string(),
             };
-            if !addresses.contains(&canonical) {
-                return Err(anyhow!(
-                    "issue {} has dangling item link '{label}'",
-                    issue.short_id()
-                ));
-            }
+            findings.push(ReportedFinding::new(
+                Some(issue.id.clone()),
+                &Finding {
+                    rule: crate::commands::DANGLING_LINK_RULE.to_string(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "issue {} has a dangling item link '{label}': {detail}",
+                        issue.short_id()
+                    ),
+                },
+            ));
         }
     }
-    Ok(())
+    Ok(findings)
 }
 
 fn projected_content(
@@ -940,10 +1010,9 @@ mod tests {
             ],
         );
         assert!(validate_repository(&view).is_ok());
-        let live_error = validate_repository(&FilesystemRepositoryView::new(repo.path()))
-            .unwrap_err()
-            .to_string();
-        assert!(live_error.contains("rules-and-schemas"), "{live_error}");
+        let live_report = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert!(live_report.rule_report.has_errors());
+        assert_eq!(live_report.rule_report.findings[0].rule, "rules-file");
     }
 
     #[test]
@@ -1029,8 +1098,33 @@ mod tests {
                 Some("[type_hierarchy.types]\nepic = 2\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"),
             )],
         );
-        let error = format!("{:#}", validate_repository(&view).unwrap_err());
-        assert!(error.contains("namespace-and-hierarchy"), "{error}");
+        let report = validate_repository(&view).unwrap();
+        assert!(report.rule_report.has_errors());
+        assert!(report
+            .rule_report
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "type-hierarchy-known"));
+    }
+
+    #[test]
+    fn test_repository_view_keeps_non_enforced_rule_error_reportable() {
+        let repo = fixture();
+        let view = overlay(
+            &repo,
+            [(
+                ".jit/rules.toml",
+                Some(
+                    "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
+                     severity = \"error\"\nenforce = false\n\
+                     assert = { require-label = { label = \"req:*\", min = 1 } }\n",
+                ),
+            )],
+        );
+
+        let report = validate_repository(&view).unwrap();
+        assert_eq!(report.rule_report.error_count(), 1);
+        assert_eq!(report.rule_report.findings[0].rule, "task-needs-req");
     }
 
     #[test]

@@ -6390,33 +6390,28 @@ fn run() -> Result<()> {
                 // planning injects an overlay view into this identical pipeline,
                 // so no parser can reopen live `.jit` bytes while judging a
                 // proposed final state. Capture (do NOT `?`-propagate) any
-                // integrity error: surfacing it through
-                // the generic error path would lose the structured rule report
-                // (which includes graph-rule findings). The exit status is decided
-                // AFTER rendering, below.
+                // integrity error so it can be rendered before the exit status is
+                // decided below.
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
                 let repository_view =
                     jit::validation::repository::FilesystemRepositoryView::from_jit_root(&jit_dir)?;
-                let integrity_error =
-                    jit::validation::repository::validate_repository(&repository_view)
-                        .err()
-                        .map(|e| {
-                            anyhow::Error::new(jit::errors::ValidationFailedError::new(
-                                e.to_string(),
-                            ))
-                        });
+                let (integrity_error, rule_report) =
+                    match jit::validation::repository::validate_repository(&repository_view) {
+                        Ok(report) => (None, report.rule_report),
+                        Err(error) => (
+                            Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
+                                format!("Invalid repository: {error:#}"),
+                            ))),
+                            jit::validation::report::RuleReport::default(),
+                        ),
+                    };
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
-                // Run the declarative rules for every issue AND the cross-issue
-                // graph rules so a whole-repo `jit validate [--json]` surfaces (and
-                // fails on) local AND graph rule findings, not just integrity
-                // checks. `run_rules(None)` already folds in graph-rule findings,
-                // INCLUDING the built-in type-hierarchy warnings (orphan-leaf,
-                // strategic-consistency) that were formerly surfaced by the
-                // hard-coded `collect_all_warnings` path.
-                let rule_report = executor.run_rules(None)?;
+                // The view-derived report contains the declarative local/graph
+                // findings and built-in semantic findings. Do not reopen the
+                // storage root through `CommandExecutor` after judging the view.
                 let rules_failed = rule_report.has_errors();
                 let validation_failed = rules_failed || integrity_error.is_some();
 

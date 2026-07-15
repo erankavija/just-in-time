@@ -199,7 +199,22 @@ impl<S: IssueStore> CommandExecutor<S> {
             let view = crate::validation::repository::FilesystemRepositoryView::from_jit_root(
                 self.storage.root(),
             )?;
-            crate::validation::repository::validate_repository(&view)?;
+            let report = crate::validation::repository::validate_repository(&view)?;
+            if report.rule_report.has_errors() {
+                let messages = report
+                    .rule_report
+                    .findings
+                    .iter()
+                    .filter(|finding| finding.is_error())
+                    .map(|finding| format!("[{}] {}", finding.rule, finding.message))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                return Err(anyhow!(
+                    "Validation failed with {} rule error(s):\n{}",
+                    report.rule_report.error_count(),
+                    messages
+                ));
+            }
             return Ok(());
         }
 
