@@ -7871,3 +7871,9 @@
 {"type":"gate_failed","id":"4af7b528-2661-4a51-b335-ef34d7f68a4f","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:42:08.872503932Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"b4152db6-ee2e-4fbd-b029-4f7945571785","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:44:39.780112979Z","gate_key":"doc-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"3343edef-15bd-4fe7-a3b8-d308445ab724","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:48:45.327406315Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"79dd9793-b915-416c-a5cf-b0fa110924c7","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:52:23.445561735Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"ea38d185-3c4b-481f-a031-2ad58297c5ff","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:54:29.303340856Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"1338b499-62a4-4020-9465-d77b0d31cc21","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T19:56:54.297362912Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fed08b1c-9d85-463d-8f07-39ada8e07794","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T20:01:33.840729089Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"b0275270-7553-42de-b7f4-81086c8a59be","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T20:02:54.549482239Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"eb7245c9-297f-42a5-8d9e-588c8109df5c","issue_id":"f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63","timestamp":"2026-07-15T20:02:54.549525609Z"}

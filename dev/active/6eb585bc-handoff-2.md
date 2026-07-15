@@ -9,14 +9,13 @@
 - Epic: `6eb585bc` — in_progress. **Standing change (@/charter/D-14, commit 57ec9eb7): the epic is a finite v1.0 prerequisite — close it when this scope completes, before the production-readiness source freeze. The living-container decision is superseded.**
 - **Story 73482aa1 (rust-build-efficiency): DONE and closed** — all 9 children, story gates green. Report: dev/active/73482aa1-completion-report.md. Headline: clean test-compile −87.3%, rebuild −94.6%, 144→11 test targets, target dir 19.6→3.7 GiB, executables 13.8→0.94 GiB, `@/invariant/bounded-rust-build-footprint` enforced by cargo-ci.
 - Epic interleaves DONE this session: ef0065ad (scoped bracket validation — unblocked production planning per @/charter/D-15), 3c4d6fe8 (secret-like label example; also produced the invoker-approved secret-detection gate rescope to scripts/secret-scan.sh).
-- **Wave 3 (CLI contracts) — IN FLIGHT, one issue:** `f40f1b0a` is in_progress at the rework ceiling. State at handoff: cargo-ci + docs-mechanical PASSED on merged 2b7db09e; doc-review + code-review FAILED round 4; **both round-4 findings are FIXED and COMMITTED but NOT yet re-gated** (commits e330557a, the multi-ID envelope commit, and the round-4 commit "declare bare-query contract"). Worker branch worktree-agent-f40f1b0a fully merged; further fixes were lead-direct on main.
+- **Wave 3 (CLI contracts): `f40f1b0a` DONE** (invoker extended the session to finish it) — all four gates green on dc8df01e after 6 review rounds; see the epic progress note for the final scope (unified gates array, per-command schema declarations incl. mutation echoes and bare query, phantom `query ready` purged, three projection rules, doc-consuming schema cross-check test).
 - Wave 3 NOT started: 6f881a85, 0daba57d, 8917c558. Waves 4–6 pending (incl. 45a140ae's required invoker interview). Two carryover decisions from handoff-1 remain open (c505031a slot; archived-resurrection question).
 - Active claims: f40f1b0a (agent:worker). All other workers relieved; their worktrees remain under .agents/worktrees/ (agent-8d4f7084/57d0eb79/3398bc19/ef0065ad/3c4d6fe8/83efbcb4/3f73423b/26f97dc2/362e3fec/f40f1b0a — all merged, safe to prune).
 - Progress files: dev/active/6eb585bc-progress.json (epic; wave 2.5/3 statuses current), dev/active/73482aa1-progress.json (story; COMPLETE).
 
 ## What to do next
 
-- [ ] **Finish f40f1b0a:** reinstall (`./scripts/install-jit.sh`), re-run doc-review + code-review on current HEAD. The two round-4 findings (bare `jit query` schema declaration; cli-commands.md mutation-echo membership) are already fixed and committed. If a NEW finding appears, ESCALATE to the invoker per max-rework policy — this issue has consumed 2 worker + 3 lead-direct rounds; the reviewers enumerate gate-bearing surfaces one batch per round (see Traps). On green: `jit issue update f40f1b0a --state done`, update the epic progress file.
 - [ ] Continue wave 3 serially (main.rs cluster): 6f881a85 (stdout panic; sonnet), 0daba57d (refused delete exit code; sonnet), 8917c558 (doc add idempotence; sonnet).
 - [ ] Waves 4–6 per dev/active/6eb585bc-progress.json; interview the invoker on 45a140ae's semantic model BEFORE dispatching it; also settle c505031a's slot and the archived-resurrection question (handoff-1 Open questions).
 - [ ] At epic completion: batch completion report, epic gates, **close the epic** (D-14), archive progress/handoff docs, link via jit doc add.
@@ -40,7 +39,6 @@
 
 - 45a140ae (Archived lifecycle semantics): interview required before dispatch (escalation policy 6) — carried from batch plan.
 - c505031a slot + archived-resurrection loophole: carried from handoff-1.
-- If f40f1b0a's round-5 review surfaces a new finding: escalate with the full round history (this handoff + progress file) rather than iterating.
 
 ## Reference artefacts
 

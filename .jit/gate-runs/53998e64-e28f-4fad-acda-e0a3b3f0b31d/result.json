@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "53998e64-e28f-4fad-acda-e0a3b3f0b31d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "dc8df01eb1a1c9325ee1e40277f7544beacc2452",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T19:56:54.335466200Z",
+  "completed_at": "2026-07-15T20:01:33.840279399Z",
+  "duration_ms": 279504,
+  "exit_code": 0,
+  "stdout": "Attribution: `jit:f40f1b0a` — a92dc223, b156df88, 4c709b7f, 90b306da, e8f5d25, 1a65c313, 60c8efd7, 7c2e0876, e330557a, 2b7db09e, f36d64c2, 6e3280f5, dc8df01e\nPolicy sources: AGENTS.md\nResolved items: @/inv/single-source-prose (.jit/invariants.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0); doc-review passed (exit 0); docs-mechanical passed (exit 0)\nTruncation recovery: per-path patch reads, current-file ranges, and constituent merge-patch verification\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; prior F1 and F2 are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard success criteria are met; prior F1 and F2 are addressed.",
+    "findings": []
+  }
+}

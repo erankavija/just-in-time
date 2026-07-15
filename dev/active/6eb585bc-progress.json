@@ -64,8 +64,8 @@
           "title": "Unify the machine-readable gate field across command outputs",
           "classification": "implementation",
           "model": "opus",
-          "status": "in_rework",
-          "note": "AT HANDOFF: cargo-ci+docs-mechanical green on 2b7db09e; doc-review+code-review failed round 4; BOTH round-4 findings fixed and committed (bare-query schema arm + cli-commands mutation-echo membership) but not re-gated. Next session: reinstall, re-run both AI gates; NEW finding => escalate (2 worker + 3 lead-direct rounds consumed). See dev/active/6eb585bc-handoff-2.md"
+          "status": "done",
+          "note": "DONE 2026-07-15 after 6 review rounds (2 worker + 4 lead-direct): gates array unified across projected views, storage shape declared for every record dump incl. mutation echoes and bare query, phantom 'query ready' spelling purged, three projection rules documented, and a doc-consuming schema test binds storage-format.md's rules to the live schema. All four gates green on dc8df01e"
         },
         {
           "short_id": "6f881a85",
@@ -248,7 +248,7 @@
     "45e1b7e8": 2,
     "7446af34": 2,
     "af4c901a": 3,
-    "f40f1b0a": 4
+    "f40f1b0a": 6
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
