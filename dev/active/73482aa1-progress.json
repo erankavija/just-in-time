@@ -75,8 +75,8 @@
           "title": "Bound provenance test source snapshots",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
-          "note": "filed 2026-07-15 (commits ebec1039/8da80c52); unbounded ~23 GiB fixture copy traversing .agents/worktrees + target dirs; lands before 3f73423b so budgets measure a sane gate"
+          "status": "done",
+          "note": "filed 2026-07-15 (commits ebec1039/8da80c52); unbounded ~23 GiB fixture copy traversing .agents/worktrees + target dirs; lands before 3f73423b so budgets measure a sane gate. DONE 2026-07-15: 1 lead-direct review round (unconditional is_banned_input filter + fixture proves exclusion without ignore rules); gates green; fixture now 957 files / ~14 MB vs the former whole-tree copy"
         }
       ]
     },
@@ -134,7 +134,8 @@
     "4e22a20d": 2,
     "5d862134": 1,
     "57d0eb79": 1,
-    "3398bc19": 3
+    "3398bc19": 3,
+    "83efbcb4": 1
   },
   "started_at": "2026-07-14T20:00:00Z"
 }
