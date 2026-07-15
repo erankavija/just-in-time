@@ -7818,3 +7818,5 @@
 {"type":"issue_state_changed","id":"b878d9c3-781a-48c6-b3dd-ba2c11449a09","issue_id":"362e3fec-a012-4980-9846-021d3743779b","timestamp":"2026-07-15T16:48:33.298100345Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"19854a52-f240-4cc3-bb7c-8f1beea7f091","issue_id":"362e3fec-a012-4980-9846-021d3743779b","timestamp":"2026-07-15T16:48:33.299100966Z","assignee":"agent:worker"}
 {"type":"gate_passed","id":"260d6f84-9a31-4c8e-a606-de03ac143b1a","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T16:50:25.578413953Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"e4526bd4-cc37-4686-8417-0ba7f89602ae","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T16:51:49.917896872Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"6494f19f-7968-4045-a9fc-3e6ef0007294","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T16:54:22.420792519Z","gate_key":"code-review","updated_by":"auto:executor"}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "a24ea0c4-91d6-484e-adb1-a6566a98dd87",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
+  "commit": "3630ea43867c92bafe14bebeac94acafa4f8f8f4",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T16:51:57.349196916Z",
+  "completed_at": "2026-07-15T16:54:22.420387589Z",
+  "duration_ms": 145071,
+  "exit_code": 1,
+  "stdout": "Attribution: 3630ea43, 94af248b, c2ca50d6, 3447c301, f9cb4fa2, fad3e5a0, b1826200, 6f2b0114, 5bad31d0, f6373ecb  \nPolicy sources: AGENTS.md  \nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-8 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0); repo-validate passed (exit 0); code-review previously failed (exit 1; independent judgment, non-blocking by itself)  \nTruncation recovery: recovered individual commit/merge diffs through affected-path reads and inspected current implementation by line range  \n\n1. **Blocking — issue-impact.** [crates/jit/src/main.rs:6401](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:6401) discards the entire `RuleReport` whenever `validate_repository` returns a structural error, replacing it with `RuleReport::default()` at line 6408. Before this change, whole-repository validation captured the integrity error and still called `run_rules(None)`, so JSON and human output included local/graph rule findings alongside an integrity failure. This regresses filesystem-view validation results and leaves REQ-02 unverified; no test covers simultaneous structural and rule failures.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Whole-repository validation drops rule findings whenever a structural validation error occurs.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Whole-repository validation replaces the rule report with an empty report after any structural failure, regressing prior combined validation output.\",\"file\":\"crates/jit/src/main.rs\",\"line\":6408,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 19781 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f66b1-3804-7470-823b-ee89862424bd\n--------\nuser\n--- 19768 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Whole-repository validation drops rule findings whenever a structural validation error occurs.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Whole-repository validation replaces the rule report with an empty report after any structural failure, regressing prior combined validation output.",
+        "file": "crates/jit/src/main.rs",
+        "line": 6408
+      }
+    ]
+  }
+}
