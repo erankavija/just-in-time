@@ -27,6 +27,11 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T13:34:14.022319408Z"
     },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T14:21:07.951691050Z"
+    },
     "dependency-audit": {
       "status": "failed",
       "updated_by": "auto:executor",
@@ -41,11 +46,6 @@
       "status": "passed",
       "updated_by": "human:authorized-invoker",
       "updated_at": "2026-07-15T12:22:30.221548297Z"
-    },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T13:56:01.233610161Z"
     }
   },
   "context": {},
@@ -59,7 +59,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.039436085Z",
-  "updated_at": "2026-07-15T14:00:25.353255672Z",
+  "updated_at": "2026-07-15T14:26:37.046347850Z",
   "first_ready_at": "2026-07-14T22:28:46.039436325Z",
   "claimed_at": "2026-07-15T12:22:40.913845732Z"
 }

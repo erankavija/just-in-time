@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "70587701-669f-4541-8b9b-70996f7753d1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "commit": "c7b881e68bf76a703e54c9759a5434b2c2c1c9d4",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T14:21:07.951691050Z",
+  "completed_at": "2026-07-15T14:26:37.046103100Z",
+  "duration_ms": 329094,
+  "exit_code": 0,
+  "stdout": "Attribution: c7b881e6, cc36e49f, 6f14d354, b2472675, 73147263, 462824de, 58d5aeee, 92a4ad1e, cd834f1b, e14e68a7 (`jit:866a5bbd`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate, @/gate/repo-validate (.jit/gates.toml); @/charter/D-1, D-2, D-3, D-4, D-6, D-8 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed/0; repo-validate passed/0; security-review passed/none; secret-detection passed/0; dependency-audit failed/1\nTruncation recovery: Re-read bounded current-tree publication, rollback, capability, normalization, and test ranges; inspected the recovery patch and individual non-core patches separately.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current transaction kernel addresses the prior blocking findings and no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The current transaction kernel addresses the prior blocking findings and no unresolved issue-impact defects were found.",
+    "findings": []
+  }
+}
