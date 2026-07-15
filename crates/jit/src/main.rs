@@ -2069,31 +2069,38 @@ fn run() -> Result<()> {
                     )?;
 
                     if json {
-                        use jit::output::JsonOutput;
-                        use serde_json::json;
+                        use jit::output::{
+                            IssueSearchFullResponse, IssueSearchResponse, JsonOutput,
+                        };
 
-                        // Use MinimalIssue unless --full flag is provided
+                        let count = issues.len();
+                        let msg = match &query {
+                            Some(q) => format!("Found {count} issue(s) matching '{q}'"),
+                            None => format!("Found {count} issue(s)"),
+                        };
+                        // `--full` returns complete stored records (gate list under
+                        // the storage names `gates_required`/`gates_status`); the
+                        // default shape returns lean `MinimalIssue` entries. Both go
+                        // through their typed response so the emitted shape stays in
+                        // lockstep with the schema derived from the same struct
+                        // (jit:f40f1b0a).
                         let output_data = if full {
-                            json!({
-                                "query": query,
-                                "issues": issues,
-                                "count": issues.len(),
-                            })
+                            serde_json::to_value(IssueSearchFullResponse {
+                                query: query.clone(),
+                                issues,
+                                count,
+                            })?
                         } else {
                             use jit::domain::MinimalIssue;
                             let minimal_issues: Vec<MinimalIssue> =
                                 issues.iter().map(MinimalIssue::from).collect();
-                            json!({
-                                "query": query,
-                                "issues": minimal_issues,
-                                "count": minimal_issues.len(),
-                            })
+                            serde_json::to_value(IssueSearchResponse {
+                                query: query.clone(),
+                                issues: minimal_issues,
+                                count,
+                            })?
                         };
 
-                        let msg = match &query {
-                            Some(q) => format!("Found {} issue(s) matching '{}'", issues.len(), q),
-                            None => format!("Found {} issue(s)", issues.len()),
-                        };
                         let output =
                             JsonOutput::success(output_data, "issue search").with_message(msg);
                         println!("{}", output.to_json_string()?);

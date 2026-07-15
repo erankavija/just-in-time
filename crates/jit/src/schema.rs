@@ -512,13 +512,14 @@ impl CommandSchema {
                 "GateCheckAllResponse",
             ),
 
-            // Query commands emit two shapes: the default lean summary
+            // Issue-record LIST surfaces emit two shapes: the default lean summary
             // (`MinimalIssue` entries, no gate fields) and, under `--full`, the
             // complete stored records (gate list under `gates_required` /
             // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
             // a missing gate field to the summary projection rather than the data.
+            // `issue list` and its top-level `list` alias share the query shape.
             "query_available" | "query_all" | "query_ready" | "query_strategic"
-            | "query_closed" => {
+            | "query_closed" | "issue_list" | "list" => {
                 let union = json!({
                     "oneOf": [
                         schema_to_value::<IssueListResponse>(),
@@ -530,6 +531,20 @@ impl CommandSchema {
                         is carried under gates_required / gates_status."
                 });
                 (Some(union), "IssueListResponse")
+            }
+            // `issue search` mirrors the list surfaces, plus an echoed `query`.
+            "issue_search" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<IssueSearchResponse>(),
+                        schema_to_value::<IssueSearchFullResponse>(),
+                    ],
+                    "description": "Default shape: lean MinimalIssue entries with no \
+                        gate fields, plus the echoed query. With --full: complete \
+                        stored issue records, whose gate list is carried under \
+                        gates_required / gates_status."
+                });
+                (Some(union), "IssueSearchResponse")
             }
             "query_blocked" => (
                 Some(schema_to_value::<BlockedListResponse>()),
@@ -1404,24 +1419,29 @@ mod tests {
         );
     }
 
-    /// Fetch the success schema published for a two-segment command path
-    /// (e.g. `issue`/`show`).
-    fn published_output_schema(parent: &str, child: &str) -> Value {
+    /// Fetch the published success schema for a command addressed by its path
+    /// segments (`["issue", "show"]`, or `["list"]` for a top-level command).
+    fn published_output_schema(path: &[&str]) -> Value {
         let schema = CommandSchema::generate();
-        let cmd = schema
-            .commands
-            .get(parent)
-            .and_then(|c| c.subcommands.as_ref())
-            .and_then(|s| s.get(child))
-            .unwrap_or_else(|| panic!("{parent} {child} subcommand should exist"));
+        let (last, parents) = path.split_last().expect("non-empty command path");
+        let mut commands = &schema.commands;
+        for seg in parents {
+            commands = commands
+                .get(*seg)
+                .and_then(|c| c.subcommands.as_ref())
+                .unwrap_or_else(|| panic!("{} should have subcommands", path.join(" ")));
+        }
+        let cmd = commands
+            .get(*last)
+            .unwrap_or_else(|| panic!("{} command should exist", path.join(" ")));
         let output = cmd
             .output
             .as_ref()
-            .unwrap_or_else(|| panic!("{parent} {child} should have an output schema"));
+            .unwrap_or_else(|| panic!("{} should have an output schema", path.join(" ")));
         output
             .success_schema
             .clone()
-            .unwrap_or_else(|| panic!("{parent} {child} success_schema should be present"))
+            .unwrap_or_else(|| panic!("{} success_schema should be present", path.join(" ")))
     }
 
     /// Recursively union the keys of every `properties` object anywhere in a JSON
@@ -1454,31 +1474,42 @@ mod tests {
     /// struct's field changes the derived schema and fails this test.
     #[test]
     fn test_schema_projected_issue_views_declare_unified_gates_field() {
-        for (parent, child) in [("issue", "show"), ("issue", "status")] {
-            let props = declared_property_names(&published_output_schema(parent, child));
+        for path in [["issue", "show"], ["issue", "status"]] {
+            let label = path.join(" ");
+            let props = declared_property_names(&published_output_schema(&path));
             assert!(
                 props.contains("gates"),
-                "{parent} {child} schema must declare the `gates` property; got: {props:?}"
+                "{label} schema must declare the `gates` property; got: {props:?}"
             );
             assert!(
                 !props.contains("gates_required") && !props.contains("gates_status"),
-                "{parent} {child} is a projected view and must not declare the storage \
+                "{label} is a projected view and must not declare the storage \
                  gate properties; got: {props:?}"
             );
         }
     }
 
-    /// REQ-02/REQ-04: the raw-record dump commands declare that `--full` emits
-    /// the storage gate fields, while their default summary shape omits the gate
-    /// list. Deriving the full arm from the `Issue` struct keeps the declared
-    /// names in lockstep with the serialized record.
+    /// REQ-02/REQ-04: EVERY `--full` record-dump surface declares that its full
+    /// arm emits the storage gate fields, while its default summary shape omits
+    /// the gate list. Deriving the full arms from the `Issue` struct keeps the
+    /// declared names in lockstep with the serialized record. Covers the query
+    /// family, graph export, `issue list` and its top-level `list` alias, and
+    /// `issue search`.
     #[test]
     fn test_schema_record_dumps_declare_storage_gate_fields() {
-        for (parent, child) in [("query", "all"), ("graph", "export")] {
-            let props = declared_property_names(&published_output_schema(parent, child));
+        let surfaces: &[&[&str]] = &[
+            &["query", "all"],
+            &["graph", "export"],
+            &["issue", "list"],
+            &["list"],
+            &["issue", "search"],
+        ];
+        for path in surfaces {
+            let label = path.join(" ");
+            let props = declared_property_names(&published_output_schema(path));
             assert!(
                 props.contains("gates_required") && props.contains("gates_status"),
-                "{parent} {child} --full arm must declare the storage gate properties; \
+                "{label} --full arm must declare the storage gate properties; \
                  got: {props:?}"
             );
         }
