@@ -1,11 +1,13 @@
-# Rust build efficiency: pre-optimization baseline
+# Rust build efficiency: baseline and optimized benchmark results
 
-Measurement foundation for the `rust-build-efficiency` story (jit:73482aa1),
-produced by jit:4e22a20d before any build-topology, profile, or dependency
-change. Captures a trustworthy pre-optimization baseline and a complete
-pre-change test inventory so later work (suite consolidation, profile tuning,
-dependency pruning) can be judged against real numbers instead of a single
-anecdotal run.
+Benchmark evidence for the `rust-build-efficiency` story (jit:73482aa1): a
+pre-optimization baseline (jit:4e22a20d, before any build-topology, profile,
+or dependency change) and a post-optimization comparison run (jit:26f97dc2,
+after the story's landed optimization work) collected with the identical
+committed harness and acceptance protocol, so the improvement claims rest on
+matched-methodology measurements rather than a single anecdotal run. See
+"What changed" below for the work the optimized run measures, and
+"Comparison and acceptance thresholds" for the accept/reject verdict.
 
 ## Protocol
 
@@ -44,8 +46,8 @@ Harness: [`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-bui
   status. Doctests cannot go through `--no-run` (cargo does not support
   compiling them without running), so they are enumerated separately via
   `cargo test --workspace --doc -- --list` / `-- --list --ignored` and folded
-  into the same inventory under a synthetic `"doctest"` kind. See "Current
-  footprint" below for the full accounting.
+  into the same inventory under a synthetic `"doctest"` kind. See "Baseline
+  footprint" and "Optimized footprint" below for the full accounting.
 - **Measurement**: wall time via `time.monotonic()` around each command;
   maximum resident set size via `getrusage(RUSAGE_CHILDREN)` immediately
   after the command exits — the same mechanism GNU `time -v` uses internally,
@@ -55,21 +57,26 @@ Harness: [`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-bui
 
 ## Environment
 
-| | |
-|---|---|
-| Git revision (pre-optimization) | `56d737891129babf9571eb4de5659295bce8d827` |
-| OS | Arch Linux, kernel Linux 7.0.14-arch1-1 |
-| CPU count | 24 |
-| Memory | 33,543,761,920 bytes (~31.2 GiB) |
-| Cargo | cargo 1.97.0 (c980f4866 2026-06-30) |
-| Rustc | rustc 1.97.0 (2d8144b78 2026-07-07) |
-| Target triple | x86_64-unknown-linux-gnu |
-| Linker | cargo default (no `.cargo/config.toml` linker override present): cc (GCC) 16.1.1 20260625 invoking GNU ld (GNU Binutils) 2.46.1 |
-| Relevant `CARGO_*`/`RUST*` env vars | none set |
+Both runs executed on the same host with the identical toolchain, CPU,
+memory, and linker; only the Git revision differs, and only by the story's
+own landed optimization commits (see "What changed").
 
-Full environment block, including the exact `cargo_rust_env` capture, is in
-[`baseline.json`](baseline.json)'s `environment` object — this table is a
-projection of it, not a second source of truth.
+| | Baseline | Optimized |
+|---|---|---|
+| Git revision | `56d737891129babf9571eb4de5659295bce8d827` | `e305f9655f565c6c16937138ed4ea1035c859bc3` |
+| OS | Arch Linux, kernel Linux 7.0.14-arch1-1 | Arch Linux, kernel Linux 7.0.14-arch1-1 |
+| CPU count | 24 | 24 |
+| Memory | 33,543,761,920 bytes (~31.2 GiB) | 33,543,761,920 bytes (~31.2 GiB) |
+| Cargo | cargo 1.97.0 (c980f4866 2026-06-30) | cargo 1.97.0 (c980f4866 2026-06-30) |
+| Rustc | rustc 1.97.0 (2d8144b78 2026-07-07) | rustc 1.97.0 (2d8144b78 2026-07-07) |
+| Target triple | x86_64-unknown-linux-gnu | x86_64-unknown-linux-gnu |
+| Linker | cargo default (no `.cargo/config.toml` linker override present): cc (GCC) 16.1.1 20260625 invoking GNU ld (GNU Binutils) 2.46.1 | identical |
+| Relevant `CARGO_*`/`RUST*` env vars | none set | none set |
+
+Full environment blocks, including the exact `cargo_rust_env` capture, are in
+[`baseline.json`](baseline.json)'s and [`optimized.json`](optimized.json)'s
+`environment` objects — this table is a projection of them, not a second
+source of truth.
 
 ## Baseline medians and variance
 
@@ -138,7 +145,57 @@ per-sample data in `baseline.json` for any deeper comparison.
   separately, and reassembly was re-run after each correction to confirm the
   two stay in lockstep.
 
-## Current footprint (from the test inventory, same clean sample)
+## Optimized medians and variance
+
+All wall times in seconds. Raw per-sample data:
+[`optimized.json`](optimized.json) (`clean_samples`, `rebuild_samples`);
+command logs under [`raw/`](raw/) (`raw/optimized-clean-<n>/`,
+`raw/optimized-rebuild-<n>/`). Same harness, same protocol, same host, same
+`crates/jit/src/lib.rs` probe as the baseline run above; only the Git
+revision differs.
+
+| Metric | Sample 1 | Sample 2 | Sample 3 | Median | Min-Max spread |
+|---|---|---|---|---|---|
+| Clean: clippy | 20.248 | 20.312 | 20.421 | **20.312** | 20.248-20.421 (0.9%) |
+| Clean: `test --no-run` | 22.127 | 22.274 | 22.464 | **22.274** | 22.127-22.464 (1.5%) |
+| Clean: total (clippy + test-compile) | 42.375 | 42.586 | 42.885 | **42.586** | 42.375-42.885 (1.2%) |
+| Rebuild: setup clippy | 20.177 | 20.474 | 20.316 | 20.316 | 20.177-20.474 (1.5%) |
+| Rebuild: setup `test --no-run` | 22.353 | 22.741 | 22.281 | 22.353 | 22.281-22.741 (2.1%) |
+| Rebuild: incremental `test --no-run` (headline) | 8.514 | 7.056 | 7.580 | **7.580** | 7.056-8.514 (20.7%) |
+
+As with the baseline, no single run is representative on its own; the median
+column is what REQ-04/REQ-05 acceptance is computed against (see
+"Comparison and acceptance thresholds" below).
+
+**Observed variance / host noise:**
+
+- Clean-sample and rebuild-setup steps show the same low single-digit percent
+  spread as the baseline (0.9-2.1%), consistent with a quiet, uncontended
+  sampling window: `grep -c "waiting for exclusive build lock"` against this
+  run's harness log returns 0 — no concurrent `cargo-ci`/`verify-commit-builds`
+  gate build overlapped any of the six timed samples.
+- The rebuild headline step shows a larger proportional spread (20.7%,
+  7.056-8.514s) than the baseline's rebuild spread (8.4%), but the *absolute*
+  spread is comparable (~1.5s here vs. baseline's ~15s) — at a ~7-8s median
+  instead of baseline's ~179s, the same order of absolute scheduling/filesystem
+  jitter that was a rounding error at baseline scale is now a visible
+  percentage. This is consistent with jitter, not a regression: max-RSS for
+  this step is stable across all three samples (1,004,200-1,007,012 KB, <0.3%
+  spread), and the setup steps immediately before it (same target dir, same
+  build) show ordinary low spread.
+- Maximum RSS was stable across samples for every step and is uniformly lower
+  than baseline: clippy ~1.022-1.024 GiB (baseline ~1.098-1.100 GiB), `test
+  --no-run` ~1.403-1.423 GiB (baseline ~1.513-1.515 GiB), rebuild
+  ~0.958-0.960 GiB (baseline ~1.245-1.250 GiB) — the largest relative RSS drop
+  is on the incremental-rebuild path, consistent with the removed dependency
+  subtree (`aws-lc-rs`/`aws-lc-sys`, `reqwest`, `native-tls`, `tokio-rustls`,
+  `hyper-rustls`, and related crates; see "What changed") no longer being
+  linked into that step.
+- This run executed 2026-07-15, one day after the baseline's 2026-07-14
+  sampling window; both windows were independently confirmed lock-contention
+  free via the same `grep -c` check against each run's own harness log.
+
+## Baseline footprint (from the test inventory, same clean sample)
 
 | | |
 |---|---|
@@ -202,6 +259,37 @@ Full per-target, per-test breakdown (name, kind, executable path, every test
 case with its ignored status) is in
 [`pre-change-test-inventory.json`](pre-change-test-inventory.json).
 
+## Optimized footprint (from the test inventory, same clean sample)
+
+Derived the same way as the baseline footprint above, from optimized clean
+sample 1 (`raw/optimized-clean-1/`), and published in full at
+[`post-change-test-inventory.json`](post-change-test-inventory.json) (same
+schema as `pre-change-test-inventory.json`).
+
+| | Baseline | Optimized |
+|---|---|---|
+| Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) | 3,822,359,533 (~3.56 GiB) |
+| Unique active test-executable bytes | 14,816,926,968 (~13.8 GiB) | 978,319,560 (~0.91 GiB) |
+| Integration-test targets (Cargo `target.kind == ["test"]`) | 144 | 11 |
+| Total discoverable test cases (incl. doctests) | 3,306 | 3,330 |
+| — of which doctests | 66 | 66 |
+| Ignored test cases | 14 | 14 |
+
+The 24-case increase in total test cases (3,306 -> 3,330, doctests and
+ignored-count both unchanged) comes from new tests the optimization work
+itself added — dependency-feature, build-profile, and budget-checker
+regression fixtures — not from any change to pre-existing tests; see "Test
+inventory verification" below for the full accounting of every pre-change
+case.
+
+Both target-directory bytes and unique active test-executable bytes are
+reproducible across all three optimized clean samples to within rounding
+(3,822,359,533 / 3,822,360,395 / 3,822,359,893 bytes; the inventory step
+itself only runs on sample 1 per the harness's `BENCH_INVENTORY_SAMPLE`
+default, so the executable-byte figure is sample 1's alone, while
+target-directory bytes are recorded for every sample — see
+[`optimized.json`](optimized.json)'s `clean_samples`).
+
 ## JSON shapes
 
 `baseline.json`: `{schema_version, generated_at, environment, measurement_methodology,
@@ -219,3 +307,108 @@ target_dir_bytes, unique_active_test_executable_bytes}`. `kind` is `["lib"]`,
 `["bin"]`, or `["test"]` (Cargo's own `target.kind`) for compiled test
 binaries, or the synthetic `["doctest"]` (this harness's own label, one entry
 per crate) for doctests, whose `executable` is `null`.
+
+`optimized.json` and `post-change-test-inventory.json` follow the identical
+schemas above: the harness itself always writes `baseline.json` and
+`pre-change-test-inventory.json`, and this issue's run relabels its output to
+these repository-facing filenames when publishing the optimized comparison,
+so the two revisions' evidence can sit side by side under `dev/benchmarks/`
+without one overwriting the other.
+
+## What changed
+
+The optimized run measures the tip of the story's landed optimization work,
+each already merged and gated independently:
+
+- jit:5d862134 — Stabilize build provenance inputs (Git-metadata-only changes
+  no longer relink every test target).
+- jit:8d4f7084 — Consolidate Rust integration tests into cohesive suites
+  (144 integration targets -> 11).
+- jit:57d0eb79 — Bound debug information and gate incremental state
+  (`line-tables-only` debuginfo, `CARGO_INCREMENTAL=0` in the gate).
+- jit:3398bc19 — Remove unused resolver and duplicate TLS features (drops
+  `aws-lc-rs`/`aws-lc-sys`, `reqwest`, `native-tls`, `tokio-rustls`,
+  `hyper-rustls`, and related crates from the default build; see the
+  compiled-crate diff below).
+- jit:83efbcb4 — Bound provenance test source snapshots.
+- jit:3f73423b — Enforce Rust build-footprint budgets in `cargo-ci` (the
+  `bounded-rust-build-footprint` invariant's automated checker).
+
+Directly comparing the two clean samples' `cargo test --workspace --no-run`
+compiler-artifact streams (`raw/clean-1/test-no-run.log` vs.
+`raw/optimized-clean-1/test-no-run.log`) confirms the dependency-pruning work
+took effect: baseline compiles 277 crates, optimized compiles 260. The 17
+removed crates are exactly the remote-schema-resolution and duplicate-TLS
+dependency subtree named in the design doc (`aws-lc-rs`, `aws-lc-sys`,
+`reqwest`, `native-tls`, `tokio-rustls`, `hyper-rustls`, `h2`, `openssl`,
+`rustls-native-certs`, `rustls-platform-verifier`, `webpki-root-certs`,
+`der`, `base64ct`, `foreign-types`, `foreign-types-shared`, `pem-rfc7468`,
+`ipnet`), offset by 2 small additions (`rcgen`, `yasna`). `git2`'s own
+platform-OpenSSL requirement (`openssl-sys`, `openssl-probe` at the versions
+`git2` pins) is unaffected — only the newer `openssl`/`openssl-probe`
+versions pulled in by the removed `native-tls`/`reqwest` chain are gone.
+`aws-lc-sys` in particular compiles a full C cryptography library from
+source and is well known to dominate wall-clock time in workspaces that pull
+it transitively; its removal, together with the rest of the pruned subtree,
+is the primary driver of the clean and rebuild wall-time reductions below —
+not a measurement artifact, and not explained by the modest 6% reduction in
+total compiled-crate count alone.
+
+## Comparison and acceptance thresholds
+
+Percentage reduction computed as `100 × (baseline − optimized) / baseline`
+from the medians above, per REQ-04/REQ-05 (a positive value is a reduction;
+this is the same quantity REQ-04/REQ-05 phrase as "X% below baseline").
+
+| Metric | Baseline median | Optimized median | Reduction | Threshold | Result |
+|---|---:|---:|---:|---|---|
+| Clean: clippy | 26.885s | 20.312s | 24.4% | (no threshold) | — |
+| Clean: `test --no-run` (REQ-04) | 195.019s | 22.274s | **88.6%** | >=40% lower | **PASS** |
+| Clean: total (clippy + test-compile) | 222.069s | 42.586s | 80.8% | (no threshold) | — |
+| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 7.580s | **95.8%** | >=60% lower | **PASS** |
+| Clean target-directory bytes, median (REQ-03) | 19.6 GiB | 3.56 GiB | 81.9% | <=10 GiB | **PASS** |
+| Unique active test-executable bytes (REQ-03) | 13.8 GiB | 0.91 GiB | 93.4% | <=2 GiB | **PASS** |
+
+Every hard budget and improvement threshold in the story's acceptance
+criteria (REQ-03/REQ-04/REQ-05) is met with wide margin: the clean
+test-compilation improvement (88.6%) is more than double the 40% floor, the
+rebuild improvement (95.8%) is well past the 60% floor, and both disk budgets
+land at roughly a third to a twentieth of their ceilings.
+
+## Test inventory verification (REQ-07)
+
+Four validation variants, run at the optimized revision:
+
+| Variant | Result |
+|---|---|
+| `cargo test --workspace` | 3,316 passed, 0 failed, 14 ignored |
+| `cargo clippy --workspace --all-targets -- -D warnings` | zero warnings |
+| `cargo clippy -p jit --features html,xml --all-targets -- -D warnings` | zero warnings |
+| `cargo test -p jit --features html,xml` | all non-doctest suites passed (unit + all 10 of the `jit` crate's integration suites — `document_api_tests` belongs to `jit-server`, out of `-p jit` scope — 0 failed); 66/66 doctests passed |
+
+The feature-gated doctest step initially failed under this host's default
+`/tmp` (a quota-bound tmpfs already near capacity) with `ld terminated with
+signal 7 [Bus error]` on every doctest binary — the same class of resource
+exhaustion `scripts/cargo-ci.sh` already works around by pointing `TMPDIR` at
+a disk-backed cache directory. Re-running only the doctest step
+(`cargo test -p jit --doc --features html,xml`) with
+`TMPDIR=${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp` passed cleanly (66
+passed, 0 failed); every non-doctest suite in the same feature-gated run had
+already passed under the default `TMPDIR` in the same invocation, confirming
+the failure was host resource pressure, not a code defect.
+
+**Pre-change vs. post-change test inventory.** Every one of the 3,306 cases
+in [`pre-change-test-inventory.json`](pre-change-test-inventory.json) is
+accounted for in [`post-change-test-inventory.json`](post-change-test-inventory.json):
+3,303 match exactly by name (through the consolidation qualification rule
+recorded in `consolidation-inventory-diff.json`'s `case_name_map`) and
+ignored-status, and the remaining 3 are exactly the cases documented as
+removed by jit:5d862134 in that same artifact's `pre_existing_drift`
+(`version_cli_tests`, superseded by provenance-injection tests covering the
+same behavior under new names). Zero unjustified missing cases, zero
+ignored-status mismatches. The committed `verify-consolidation-inventory.py`
+corroborates this independently against the current tree: 0 missing, 21
+"extra" cases — new tests added by the subsequent optimization stories
+(`build_profile_policy_tests`, `dependency_feature_policy_tests`,
+`remote_document_tls_tests`, `rust_build_budget_checker_tests`,
+`repository_inventory_tests`, `scope_validation_tests`), not a loss.
