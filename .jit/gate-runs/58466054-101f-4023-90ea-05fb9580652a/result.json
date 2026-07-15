@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "58466054-101f-4023-90ea-05fb9580652a",
+  "gate_key": "secret-detection",
+  "stage": "postcheck",
+  "issue_id": "3c4d6fe8-fafa-461c-ba1b-03d9db29a17e",
+  "commit": "e18406c5c83a3aaaba4a722bbb948909daba0321",
+  "branch": "main",
+  "status": "error",
+  "started_at": "2026-07-15T11:11:30.795322354Z",
+  "completed_at": "2026-07-15T11:11:50.852768939Z",
+  "duration_ms": 20057,
+  "exit_code": null,
+  "stdout": "",
+  "stderr": "\n    ○\n    │╲\n    │ ○\n    ○ ░\n    ░    gitleaks\n\n",
+  "command": "gitleaks detect --no-git",
+  "by": "auto:executor",
+  "message": null
+}

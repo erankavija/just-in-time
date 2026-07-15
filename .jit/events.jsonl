@@ -7493,3 +7493,7 @@
 {"type":"issue_claimed","id":"11c61258-b716-4c74-9aec-7b8ef1e02ad4","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T11:02:17.357136747Z","assignee":"agent:worker"}
 {"type":"issue_state_changed","id":"55ca81bb-05c2-482b-b480-ffcc6b68b61d","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T11:02:17.374167309Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"4c8a31da-073e-4b71-8cdd-9e567ad4cd1b","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T11:02:17.374365059Z","assignee":"agent:worker"}
+{"type":"gate_failed","id":"80b67103-9e7b-4b7c-8507-1258ffd446f7","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T11:09:42.500684104Z","gate_key":"secret-detection","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"7dd826ce-6523-40d0-9e79-8d839e227cf5","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T11:09:42.814679263Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"41291a6b-87eb-4b81-bfa9-862984f77e6d","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T11:10:43.248810119Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"e55237d9-506d-4ec8-8aa1-0c18e532f808","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T11:11:50.853171779Z","gate_key":"secret-detection","updated_by":"auto:executor"}

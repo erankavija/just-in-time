@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "c0ec9317-a1da-4085-89b0-ce4cce1be74c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "3c4d6fe8-fafa-461c-ba1b-03d9db29a17e",
+  "commit": "e18406c5c83a3aaaba4a722bbb948909daba0321",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T11:09:42.850885009Z",
+  "completed_at": "2026-07-15T11:10:43.248346369Z",
+  "duration_ms": 60397,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a level-4 leaf with no resolved children. Reviewed the three reachable `jit:3c4d6fe8` commits individually; only the label-reference patch affects adopter documentation. Uncommitted `.jit` state was excluded.\n\nDocumentation impact: `docs/reference/labels.md:411-413` correctly retains the `namespace:value` versus malformed-label teaching point and surrounding MCP guidance using `epic:billing` / `billing`. Tool names and label grammar agree with the current source. No further documentation update is required.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf's attributed documentation change accurately preserves the label-format guidance without requiring further adopter documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf's attributed documentation change accurately preserves the label-format guidance without requiring further adopter documentation.",
+    "findings": []
+  }
+}

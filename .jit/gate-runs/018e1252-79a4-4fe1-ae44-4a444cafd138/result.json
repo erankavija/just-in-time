@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "018e1252-79a4-4fe1-ae44-4a444cafd138",
+  "gate_key": "secret-detection",
+  "stage": "postcheck",
+  "issue_id": "3c4d6fe8-fafa-461c-ba1b-03d9db29a17e",
+  "commit": "e18406c5c83a3aaaba4a722bbb948909daba0321",
+  "branch": "main",
+  "status": "error",
+  "started_at": "2026-07-15T11:09:42.397862550Z",
+  "completed_at": "2026-07-15T11:09:42.500264884Z",
+  "duration_ms": 102,
+  "exit_code": 127,
+  "stdout": "",
+  "stderr": "sh: line 1: gitleaks: command not found\n",
+  "command": "gitleaks detect --no-git",
+  "by": "auto:executor",
+  "message": null
+}
