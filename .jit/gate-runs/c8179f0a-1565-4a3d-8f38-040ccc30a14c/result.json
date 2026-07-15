@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "c8179f0a-1565-4a3d-8f38-040ccc30a14c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "57d0eb79-f3c5-408a-9322-758099a60e49",
+  "commit": "979df241a562e43079593a61bc1b21c8d7649c2c",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T08:20:10.809048033Z",
+  "completed_at": "2026-07-15T08:24:01.551979104Z",
+  "duration_ms": 230742,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:57d0eb79` commits 599aa2a8, 8091edca, 359f32cf, 77862dfc, 979df241\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T08:13:37Z); prior code-review failed (exit 1; its prose finding is addressed)\nTruncation recovery: Re-read truncated patches individually by commit/path, both merge-parent diffs, and current script/test line ranges.\n\n1. F1 — high — blocking, issue-impact: REQ-04 remains unmet. [`scripts/cargo-ci.sh:172`](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci.sh:172) only uses a caller-provided `CARGO_TARGET_DIR`; otherwise it queries Cargo’s normal target directory at line 181. It neither creates nor verifies a fresh isolated target directory. The later check only searches whichever directory was selected, so the passing gate cannot establish the required isolated-target run. The regression assertion at [`build_profile_policy_tests.rs:95`](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/scratch_build/build_profile_policy_tests.rs:95) likewise checks state detection, not isolation.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The build-profile policy and incremental-state check are present, but REQ-04's fresh isolated-target requirement remains unimplemented and unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci does not establish or verify a fresh isolated CARGO_TARGET_DIR, leaving REQ-04 unmet despite its post-build incremental-state check.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":172}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3194 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f64dc-acdb-78a3-b3a6-5677287e28d5\n--------\nuser\n--- 3181 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The build-profile policy and incremental-state check are present, but REQ-04's fresh isolated-target requirement remains unimplemented and unverified.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "cargo-ci does not establish or verify a fresh isolated CARGO_TARGET_DIR, leaving REQ-04 unmet despite its post-build incremental-state check.",
+        "file": "scripts/cargo-ci.sh",
+        "line": 172
+      }
+    ]
+  }
+}
