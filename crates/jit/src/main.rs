@@ -575,26 +575,25 @@ fn print_apply_result(
     json: bool,
 ) -> Result<()> {
     if json {
-        // Load each created node so the JSON consumer gets the full issues
-        // alongside the role→id map.
-        let created_issues: serde_json::Map<String, serde_json::Value> = result
+        // Load each created node so the JSON consumer gets the full stored
+        // records (gate list under the storage names) alongside the role→id map.
+        // Routed through the typed response so the schema derives from the same
+        // `Issue` the emission serializes (jit:f40f1b0a).
+        let created_issues: std::collections::BTreeMap<String, jit::domain::Issue> = result
             .created_node_ids_by_role
             .iter()
-            .map(|(role, id)| {
-                let issue = storage.load_issue(id)?;
-                Ok((role.clone(), serde_json::to_value(issue)?))
-            })
+            .map(|(role, id)| Ok((role.clone(), storage.load_issue(id)?)))
             .collect::<Result<_>>()?;
-        let data = serde_json::json!({
-            "template": result.template,
-            "container": container,
-            "anchor_bindings": result.anchor_bindings,
-            "created_node_ids_by_role": result.created_node_ids_by_role,
-            "anchor_dependency_snapshots": result.anchor_dependency_snapshots,
-            "created_issues": created_issues,
-        });
+        let response = jit::output::TemplateApplyResponse {
+            template: result.template.clone(),
+            container: container.to_string(),
+            anchor_bindings: result.anchor_bindings.clone(),
+            created_node_ids_by_role: result.created_node_ids_by_role.clone(),
+            anchor_dependency_snapshots: result.anchor_dependency_snapshots.clone(),
+            created_issues,
+        };
         let msg = format!("Applied template '{}' to {}", result.template, container);
-        let output = JsonOutput::success(data, "apply").with_message(msg);
+        let output = JsonOutput::success(response, "apply").with_message(msg);
         println!("{}", output.to_json_string()?);
     } else if quiet {
         for id in result.created_node_ids_by_role.values() {
@@ -2809,14 +2808,15 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&full_id)?;
                         let msg = format!("Claimed issue {}", issue.short_id());
-                        let mut value = serde_json::to_value(&issue)?;
-                        if let serde_json::Value::Object(map) = &mut value {
-                            map.insert(
-                                "warnings".to_string(),
-                                serde_json::to_value(&claim_warnings)?,
-                            );
-                        }
-                        let output = JsonOutput::success(value, "issue claim").with_message(msg);
+                        // Record echo: the raw stored issue (gate list under the
+                        // storage names) plus the advisory warnings, routed
+                        // through the typed response so the schema stays in
+                        // lockstep with the emission (jit:f40f1b0a).
+                        let response = jit::output::ClaimResponse {
+                            issue,
+                            warnings: claim_warnings,
+                        };
+                        let output = JsonOutput::success(response, "issue claim").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", full_id));
@@ -2923,15 +2923,13 @@ fn run() -> Result<()> {
                     if json {
                         let issue = storage.load_issue(&id)?;
                         let msg = format!("Claimed issue {}", issue.short_id());
-                        let mut value = serde_json::to_value(&issue)?;
-                        if let serde_json::Value::Object(map) = &mut value {
-                            map.insert(
-                                "warnings".to_string(),
-                                serde_json::to_value(&claim_warnings)?,
-                            );
-                        }
+                        // Same record-echo shape as `issue claim` (jit:f40f1b0a).
+                        let response = jit::output::ClaimResponse {
+                            issue,
+                            warnings: claim_warnings,
+                        };
                         let output =
-                            JsonOutput::success(value, "issue claim-next").with_message(msg);
+                            JsonOutput::success(response, "issue claim-next").with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else {
                         let _ = output_ctx.print_success(format!("Claimed issue: {}", id));

@@ -488,7 +488,34 @@ impl CommandSchema {
                 });
                 (Some(union), "IssueShowResponse")
             }
-            "issue_create" => (Some(schema_to_value::<Issue>()), "Issue"),
+            // `issue create --json` returns the same enriched projection as
+            // `issue show`, so its gate list is the `gates` array, not the raw
+            // stored record.
+            "issue_create" => (
+                Some(schema_to_value::<IssueShowResponse>()),
+                "IssueShowResponse",
+            ),
+            // Lifecycle mutation confirmations echo the raw stored record, so the
+            // gate list stays under gates_required / gates_status. `claim` /
+            // `claim-next` add the advisory `warnings` array (ClaimResponse);
+            // `claim`'s `--assign-only` mode omits it, hence the `oneOf`.
+            "issue_assign" | "issue_unassign" | "issue_reject" | "issue_release" => {
+                (Some(schema_to_value::<Issue>()), "Issue")
+            }
+            "issue_claim" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<ClaimResponse>(),
+                        schema_to_value::<Issue>(),
+                    ],
+                    "description": "The claimed issue's complete stored record \
+                        (gate list under gates_required / gates_status). The \
+                        default claim adds an advisory `warnings` array; \
+                        `--assign-only` omits it."
+                });
+                (Some(union), "ClaimResponse")
+            }
+            "issue_claim-next" => (Some(schema_to_value::<ClaimResponse>()), "ClaimResponse"),
             "issue_update" => (
                 Some(schema_to_value::<IssueUpdateResponse>()),
                 "IssueUpdateResponse",
@@ -549,6 +576,14 @@ impl CommandSchema {
             "query_blocked" => (
                 Some(schema_to_value::<BlockedListResponse>()),
                 "BlockedListResponse",
+            ),
+
+            // `jit apply` echoes each created node's raw stored record under
+            // `created_issues`, so their gate lists are carried under
+            // gates_required / gates_status.
+            "apply" => (
+                Some(schema_to_value::<TemplateApplyResponse>()),
+                "TemplateApplyResponse",
             ),
 
             // Graph commands
@@ -1474,7 +1509,9 @@ mod tests {
     /// struct's field changes the derived schema and fails this test.
     #[test]
     fn test_schema_projected_issue_views_declare_unified_gates_field() {
-        for path in [["issue", "show"], ["issue", "status"]] {
+        // `issue create` returns the `issue show` projection, so it joins the
+        // projected views that expose `gates` and never the storage split.
+        for path in [["issue", "show"], ["issue", "status"], ["issue", "create"]] {
             let label = path.join(" ");
             let props = declared_property_names(&published_output_schema(&path));
             assert!(
@@ -1489,12 +1526,13 @@ mod tests {
         }
     }
 
-    /// REQ-02/REQ-04: EVERY `--full` record-dump surface declares that its full
-    /// arm emits the storage gate fields, while its default summary shape omits
-    /// the gate list. Deriving the full arms from the `Issue` struct keeps the
-    /// declared names in lockstep with the serialized record. Covers the query
-    /// family, graph export, `issue list` and its top-level `list` alias, and
-    /// `issue search`.
+    /// REQ-02/REQ-04: EVERY surface that hands back a stored issue record
+    /// declares the storage gate fields. Two families: the `--full` list dumps
+    /// (query family, graph export, `issue list` + top-level `list`, `issue
+    /// search`) and the single-issue record echoes (`issue assign`, `unassign`,
+    /// `reject`, `release`, `claim`, `claim-next`, and `apply`'s created-issues
+    /// map). Deriving the arms from the `Issue` struct keeps the declared names
+    /// in lockstep with the serialized record.
     #[test]
     fn test_schema_record_dumps_declare_storage_gate_fields() {
         let surfaces: &[&[&str]] = &[
@@ -1503,13 +1541,20 @@ mod tests {
             &["issue", "list"],
             &["list"],
             &["issue", "search"],
+            &["issue", "assign"],
+            &["issue", "unassign"],
+            &["issue", "reject"],
+            &["issue", "release"],
+            &["issue", "claim"],
+            &["issue", "claim-next"],
+            &["apply"],
         ];
         for path in surfaces {
             let label = path.join(" ");
             let props = declared_property_names(&published_output_schema(path));
             assert!(
                 props.contains("gates_required") && props.contains("gates_status"),
-                "{label} --full arm must declare the storage gate properties; \
+                "{label} record dump must declare the storage gate properties; \
                  got: {props:?}"
             );
         }

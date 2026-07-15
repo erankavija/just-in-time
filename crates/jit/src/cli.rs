@@ -800,8 +800,8 @@ pub enum IssueCommands {
         ids: Vec<String>,
 
         /// Return a compact response (id, short_id, title, state, priority,
-        /// labels, gates_required, gates_status) without the description or
-        /// enriched dependencies. Affects --json output only.
+        /// labels, gates) without the description or enriched dependencies.
+        /// Affects --json output only.
         #[arg(long)]
         summary: bool,
 
