@@ -48,8 +48,12 @@ sudo mv jit /usr/local/bin/    # Core CLI tool
 
 **From source:**
 ```bash
-cargo install --path crates/jit
+./scripts/install-jit.sh    # wraps cargo install with build provenance
 ```
+The wrapper records the source commit in the binary so jit's stale-binary
+guard can tell whether an installed binary matches the repository it
+validates. A plain `cargo install --path crates/jit` also works but produces
+a binary with unknown provenance, which the guard treats as unverifiable.
 
 **Optional components:**
 - `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; see [Web UI installation](INSTALL.md#build-web-ui).

@@ -307,7 +307,8 @@ supports:
 - Binary support **<** repository version: the binary refuses to operate and
   exits nonzero (exit code 10, external-dependency family) with a single-line
   error naming both the repository's format version and the version the binary
-  supports. The fix is to upgrade `jit` (e.g. `cargo install --path crates/jit`)
+  supports. The fix is to upgrade `jit` (from a source checkout,
+  `./scripts/install-jit.sh`)
   rather than treating it as repository corruption.
 
 `config.toml` separately records a `[version] schema` describing the
