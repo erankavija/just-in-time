@@ -75,6 +75,37 @@ fn gate_findings_from_rule_report(
         .collect()
 }
 
+/// Convert one exact repository view into the built-in gate finding contract.
+///
+/// Structural failure remains authoritative while its partial semantic report
+/// is converted once through the same severity/disposition mapping as a clean
+/// validation result.
+fn gate_findings_from_repository_view(
+    view: &dyn crate::validation::repository::RepositoryView,
+) -> (Vec<GateFinding>, bool) {
+    let (structural_error, report) = match crate::validation::repository::validate_repository(view)
+    {
+        Ok(report) => (None, report),
+        Err(failure) => {
+            let (error, report) = failure.into_parts();
+            (Some(error), report)
+        }
+    };
+    let mut findings = gate_findings_from_rule_report(&report.rule_report);
+    findings.extend(structural_error.as_ref().map(|error| GateFinding {
+        id: "repository-integrity".to_string(),
+        severity: "high".to_string(),
+        disposition: Some("blocking".to_string()),
+        origin: Some("issue-impact".to_string()),
+        summary: format!("{error:#}"),
+        file: None,
+        line: None,
+        references: Vec::new(),
+    }));
+    let failed = report.rule_report.has_errors() || structural_error.is_some();
+    (findings, failed)
+}
+
 /// Compare the running binary's own build provenance
 /// ([`build_info::version_info`](crate::build_info::version_info)) against
 /// `repo_root`'s current `HEAD`, returning why it is stale, or `None` when it
@@ -310,36 +341,67 @@ impl<S: IssueStore> CommandExecutor<S> {
         stage: GateStage,
         checker: &crate::domain::GateChecker,
     ) -> Result<GateRunResult> {
+        self.execute_builtin_checker_with_repository_view(gate_key, issue_id, stage, checker, None)
+    }
+
+    /// Execute a built-in checker, optionally supplying the exact repository
+    /// view for a repository-validation check.
+    ///
+    /// Production file-backed callers leave `repository_view` absent and are
+    /// routed through a filesystem view rooted at the executor's storage.
+    /// Tests or a future overlay caller can supply a view explicitly to exercise
+    /// this identical checker-result conversion without reopening storage.
+    fn execute_builtin_checker_with_repository_view(
+        &self,
+        gate_key: &str,
+        issue_id: &str,
+        stage: GateStage,
+        checker: &crate::domain::GateChecker,
+        repository_view: Option<&dyn crate::validation::repository::RepositoryView>,
+    ) -> Result<GateRunResult> {
         use crate::domain::GateChecker;
         use crate::validation::report::RuleReport;
+
+        if repository_view.is_some() && !matches!(checker, GateChecker::RepositoryValidation) {
+            anyhow::bail!("an injected repository view requires the repository_validation checker");
+        }
 
         let started_at = chrono::Utc::now();
         let start = std::time::Instant::now();
 
         let (command, mut findings, explicit_failure) = match checker {
             GateChecker::RepositoryValidation => {
-                let integrity = self
-                    .validate_integrity_silent()
-                    .err()
-                    .map(|error| GateFinding {
-                        id: "repository-integrity".to_string(),
-                        severity: "high".to_string(),
-                        disposition: Some("blocking".to_string()),
-                        origin: Some("issue-impact".to_string()),
-                        summary: error.to_string(),
-                        file: None,
-                        line: None,
-                        references: Vec::new(),
-                    });
-                let integrity_failed = integrity.is_some();
-                let report = self.run_rules(None)?;
-                let mut findings = gate_findings_from_rule_report(&report);
-                findings.extend(integrity);
-                (
-                    "builtin:repository_validation",
-                    findings,
-                    report.has_errors() || integrity_failed,
-                )
+                let (findings, failed) = if let Some(view) = repository_view {
+                    gate_findings_from_repository_view(view)
+                } else if self.storage.is_file_backed() {
+                    let view =
+                        crate::validation::repository::FilesystemRepositoryView::from_jit_root(
+                            self.storage.root(),
+                        )?;
+                    gate_findings_from_repository_view(&view)
+                } else {
+                    // Pure in-memory stores have no repository byte source. Keep
+                    // their established storage-backed command-test behavior.
+                    let integrity =
+                        self.validate_integrity_silent()
+                            .err()
+                            .map(|error| GateFinding {
+                                id: "repository-integrity".to_string(),
+                                severity: "high".to_string(),
+                                disposition: Some("blocking".to_string()),
+                                origin: Some("issue-impact".to_string()),
+                                summary: error.to_string(),
+                                file: None,
+                                line: None,
+                                references: Vec::new(),
+                            });
+                    let integrity_failed = integrity.is_some();
+                    let report = self.run_rules(None)?;
+                    let mut findings = gate_findings_from_rule_report(&report);
+                    findings.extend(integrity);
+                    (findings, report.has_errors() || integrity_failed)
+                };
+                ("builtin:repository_validation", findings, failed)
             }
             GateChecker::IssueValidation => {
                 let report = self.run_rules(Some(issue_id))?;
@@ -787,12 +849,15 @@ mod tests {
         GateChecker, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage, State,
         GATE_RUN_SCHEMA_VERSION,
     };
-    use crate::storage::{InMemoryStorage, IssueStore};
+    use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
+    use crate::validation::repository::{FilesystemRepositoryView, OverlayRepositoryView};
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
-    fn add_builtin_gate(
-        executor: &CommandExecutor<InMemoryStorage>,
+    fn add_builtin_gate<S: IssueStore>(
+        executor: &CommandExecutor<S>,
         gate_key: &str,
         checker: GateChecker,
         labels: Vec<String>,
@@ -1073,6 +1138,155 @@ enforce_leases = "off"
         assert_eq!(result.command, "builtin:repository_validation");
         assert_ne!(result.status, GateRunStatus::Error);
         assert!(result.findings.is_some());
+    }
+
+    const LATE_REPOSITORY_RULE: &str = r#"
+[[rules]]
+name = "planned-task-needs-summary"
+when = { type = "task" }
+severity = "error"
+enforce = false
+assert = { require-section = { heading = "Summary" } }
+"#;
+
+    fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, String) {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        let executor = CommandExecutor::new(storage);
+        let issue_id = add_builtin_gate(
+            &executor,
+            "not-a-reserved-repository-key",
+            GateChecker::RepositoryValidation,
+            vec!["type:task".to_string()],
+        );
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut placeholder = registry
+            .gates
+            .get("not-a-reserved-repository-key")
+            .unwrap()
+            .clone();
+        placeholder.key = "editable-review".to_string();
+        placeholder.checker = Some(GateChecker::ReviewPlaceholder);
+        registry.gates.insert(placeholder.key.clone(), placeholder);
+        executor.storage.save_gate_registry(&registry).unwrap();
+        (repo, executor, issue_id)
+    }
+
+    #[test]
+    fn test_repository_validation_checker_uses_injected_overlay_result_path() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let filesystem = FilesystemRepositoryView::new(repo.path());
+        let live = executor
+            .execute_builtin_checker_with_repository_view(
+                "not-a-reserved-repository-key",
+                &issue_id,
+                GateStage::Postcheck,
+                &GateChecker::RepositoryValidation,
+                Some(&filesystem),
+            )
+            .unwrap();
+        assert_eq!(live.status, GateRunStatus::Passed);
+        assert!(live.findings.unwrap().findings.iter().any(|finding| {
+            finding.severity == "low"
+                && finding.disposition.as_deref() == Some("advisory")
+                && finding.summary.contains("review-placeholder")
+                && finding.summary.contains("editable-review")
+        }));
+
+        let mut planned_issue = executor.storage.load_issue(&issue_id).unwrap();
+        planned_issue.dependencies.push("nonexistent".to_string());
+        let overlay = OverlayRepositoryView::new(
+            Arc::new(FilesystemRepositoryView::new(repo.path())),
+            [
+                (
+                    PathBuf::from(".jit/rules.toml"),
+                    Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
+                ),
+                (
+                    PathBuf::from(format!(".jit/issues/{issue_id}.json")),
+                    Some(serde_json::to_vec_pretty(&planned_issue).unwrap()),
+                ),
+            ],
+        )
+        .unwrap();
+        let planned = executor
+            .execute_builtin_checker_with_repository_view(
+                "not-a-reserved-repository-key",
+                &issue_id,
+                GateStage::Postcheck,
+                &GateChecker::RepositoryValidation,
+                Some(&overlay),
+            )
+            .unwrap();
+
+        assert_eq!(planned.command, "builtin:repository_validation");
+        assert_eq!(planned.status, GateRunStatus::Failed);
+        assert_eq!(planned.exit_code, Some(4));
+        let findings = planned.findings.unwrap().findings;
+        assert!(
+            findings.iter().any(|finding| {
+                finding.id == "repository-integrity"
+                    && finding.severity == "high"
+                    && finding.disposition.as_deref() == Some("blocking")
+                    && finding.summary.contains("does not exist")
+            }),
+            "{findings:#?}"
+        );
+        assert!(findings.iter().any(|finding| {
+            finding.severity == "high"
+                && finding.disposition.as_deref() == Some("blocking")
+                && finding.summary.contains("planned-task-needs-summary")
+        }));
+    }
+
+    #[test]
+    fn test_check_gate_file_repository_ignores_legacy_cached_rules() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let cached = executor.run_rules(None).unwrap();
+        assert!(!cached
+            .findings
+            .iter()
+            .any(|finding| finding.rule == "planned-task-needs-summary"));
+        std::fs::write(repo.path().join(".jit/rules.toml"), LATE_REPOSITORY_RULE).unwrap();
+
+        let result = executor
+            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .unwrap();
+
+        assert_eq!(result.command, "builtin:repository_validation");
+        assert_eq!(result.status, GateRunStatus::Failed);
+        assert_eq!(result.exit_code, Some(4));
+        assert!(result
+            .findings
+            .unwrap()
+            .findings
+            .iter()
+            .any(|finding| finding.summary.contains("planned-task-needs-summary")));
+    }
+
+    #[test]
+    fn test_repository_validation_file_backend_reports_missing_index_through_view() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
+
+        let result = executor
+            .execute_builtin_checker(
+                "not-a-reserved-repository-key",
+                &issue_id,
+                GateStage::Postcheck,
+                &GateChecker::RepositoryValidation,
+            )
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Failed);
+        assert_eq!(result.exit_code, Some(4));
+        assert!(result
+            .findings
+            .unwrap()
+            .findings
+            .iter()
+            .any(|finding| finding.summary.contains("index.json")));
     }
 
     #[test]
