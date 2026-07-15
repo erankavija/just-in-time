@@ -9,6 +9,10 @@
 //! REQ-03: `scripts/cargo-ci.sh` overrides that interactive default and
 //! disables incremental compilation for every Rust compilation step the gate
 //! runs, so broad gate builds do not accumulate incremental state.
+//! REQ-04: the gate makes that property deterministic itself — a dedicated
+//! step fails the run when a non-empty `incremental` directory remains under
+//! the target directory the run actually used, rather than relying on a
+//! one-off manual isolated-run observation.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -84,5 +88,37 @@ fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
         "CARGO_INCREMENTAL=0 must be exported before the first gate step so it \
          covers every Rust compilation the gate performs (fmt, clippy, test, \
          provenance)"
+    );
+}
+
+#[test]
+fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling() {
+    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
+        .expect("read scripts/cargo-ci.sh");
+
+    let step_pos = script
+        .find("run_step incremental-state")
+        .unwrap_or_else(|| {
+            panic!(
+                "scripts/cargo-ci.sh must run a deterministic \"incremental-state\" \
+             gate step; exporting CARGO_INCREMENTAL=0 alone does not verify \
+             that no incremental state came back"
+            )
+        });
+    let test_step_pos = script
+        .find("run_step test ")
+        .expect("scripts/cargo-ci.sh must run the test step");
+    assert!(
+        step_pos > test_step_pos,
+        "the incremental-state check must run after compilation (the test \
+         step), so it observes what the gate's own builds actually left \
+         behind on disk"
+    );
+
+    assert!(
+        script.contains("-name incremental") && script.contains("-not -empty"),
+        "the incremental-state step must search for non-empty `incremental` \
+         directories (the actual regression signal), not merely assert that \
+         a variable is exported"
     );
 }

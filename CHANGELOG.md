@@ -23,16 +23,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   stamps with the commit it was built from.
 
 - **Debug info and incremental compilation are bounded by policy instead of
-  Cargo's undocumented defaults.** A representative test executable carried
-  193.7 MiB of full debug sections out of 246.7 MiB. The workspace manifest's
+  Cargo's undocumented defaults.** Full debug sections dominated a
+  representative test executable's size, and incremental state accumulated
+  without bound across gate runs (baseline measured in
+  `dev/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
   `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
   keeping line-number backtraces without the full debugger payload, and both
   state `incremental = true` explicitly so ordinary interactive builds and
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
-  step (fmt, clippy, test, provenance): a gate run compiles once and exits,
-  so incremental state has no later rebuild to amortize its cost against —
-  left enabled, gate runs had accumulated roughly 19 GiB of it.
+  step (fmt, clippy, test, provenance) and now runs a dedicated
+  `incremental-state` step afterward that fails the gate if any non-empty
+  `incremental` directory remains under the target directory the run used:
+  a gate run compiles once and exits, so incremental state has no later
+  rebuild to amortize its cost against.
 
 ### Added
 
