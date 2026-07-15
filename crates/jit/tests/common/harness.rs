@@ -3,6 +3,8 @@
 //! Provides a fluent API for testing CLI commands without spawning processes.
 //! Uses in-memory storage for 10-100x faster test execution.
 
+#![allow(dead_code)]
+
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State};
 use jit::storage::{InMemoryStorage, IssueStore};

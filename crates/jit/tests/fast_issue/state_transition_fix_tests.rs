@@ -3,9 +3,7 @@
 //! After worktree merges, issues in backlog may have all dependencies reach a
 //! terminal state but never auto-transition to ready. The validate --fix command
 //! should detect and fix these pending transitions.
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::State;
 use jit::storage::IssueStore;
 

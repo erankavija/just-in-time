@@ -3,9 +3,7 @@
 //! This shows the recommended patterns for using the TestHarness
 //! for fast, reliable in-process testing.
 
-mod harness;
-
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::{Priority, State};
 
 // ========== Query Tests ==========

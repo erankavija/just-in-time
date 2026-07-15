@@ -23,9 +23,7 @@
 //! `*_with_template` core methods (mirroring the apply-engine tests), so no
 //! on-disk `templates.toml` is needed.
 
-mod harness;
-
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::commands::{BracketChild, CommandExecutor};
 use jit::domain::{Issue, Priority, State};
 use jit::labels::parse_label;

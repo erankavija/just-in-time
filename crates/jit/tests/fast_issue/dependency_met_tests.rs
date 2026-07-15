@@ -4,9 +4,7 @@
 //! `Rejected`). Every surface reads that one rule: state transitions, the
 //! blocked query's reasons, `issue show` rendering, and the Ready-issue
 //! demotion that guards a newly added edge.
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::queries::{query_blocked, BlockingReason};
 use jit::domain::State;
 use jit::output::IssueShowResponse;

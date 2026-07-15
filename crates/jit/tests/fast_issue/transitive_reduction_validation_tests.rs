@@ -2,9 +2,7 @@
 //!
 //! Ensures the dependency DAG maintains its transitive reduction form with no
 //! redundant edges. Tests detection, auto-fix, and edge cases.
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::storage::IssueStore;
 
 #[test]

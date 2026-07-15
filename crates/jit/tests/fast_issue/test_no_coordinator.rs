@@ -5,9 +5,7 @@
 //! - All issue commands work
 //! - No coordinator commands exist
 //! - Core functionality is intact
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 

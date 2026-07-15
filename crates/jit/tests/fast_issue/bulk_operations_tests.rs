@@ -1,7 +1,5 @@
 //! Tests for bulk operations (multiple gates, dependencies, labels in single command)
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::storage::IssueStore;
 
 // ========================================

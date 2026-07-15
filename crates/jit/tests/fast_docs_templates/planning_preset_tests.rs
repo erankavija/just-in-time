@@ -5,9 +5,7 @@
 //! applying `coverage-preview` attaches the deterministic scoped-validate gate
 //! to a breakdown node.
 
-mod harness;
-
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::{GateChecker, GateMode};
 use jit::storage::IssueStore;
 

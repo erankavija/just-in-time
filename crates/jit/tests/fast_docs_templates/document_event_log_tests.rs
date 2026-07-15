@@ -3,9 +3,7 @@
 //! `jit doc add` and `jit doc remove` mutate an issue's `documents` field, so
 //! each must append an `issue_updated` event with `fields: ["documents"]`,
 //! mirroring `issue update` / `bulk_update` / dependency commands.
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::Event;
 use jit::storage::IssueStore;
 

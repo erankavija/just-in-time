@@ -5,9 +5,7 @@
 //! writing anything. A batch with any rejected edge leaves the dependency set
 //! and the event log completely unchanged (REQ-01, REQ-03), and the resulting
 //! error names every rejected edge, not only the first (REQ-02).
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::errors::DependencyBatchRejectedError;
 use jit::storage::IssueStore;
 

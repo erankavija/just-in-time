@@ -70,7 +70,7 @@ ensure_real_cargo() {
 
 ensure_real_cargo
 
-# Disk-backed TMPDIR: a few tests (version_cli_tests) compile the whole crate
+# Disk-backed TMPDIR: a few tests (provenance_contract suite) compile the whole crate
 # into a fresh temp target dir; on a small tmpfs /tmp that hits "Disk quota
 # exceeded". Use a disk-backed cache dir. It must live OUTSIDE any git repo:
 # tests such as test_get_current_branch_errors_when_git_fails create a temp dir
@@ -182,8 +182,7 @@ run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
 # only (never scripts/cargo-ci.sh or verify-commit-builds.sh), so they do not
 # re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
 run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
-  --test build_provenance_metadata_stability_tests \
-  --test version_cli_tests -- --ignored
+  --test provenance_contract -- --ignored
 
 echo "$summary"
 

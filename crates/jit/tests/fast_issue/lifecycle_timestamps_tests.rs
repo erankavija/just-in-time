@@ -6,10 +6,8 @@
 //! domain layer (`Issue::mark_*`, `derive_lifecycle_timestamps`); here we verify
 //! the command paths wire those helpers in.
 
-mod harness;
-
+use crate::harness::TestHarness;
 use chrono::{TimeZone, Utc};
-use harness::TestHarness;
 use jit::domain::{Event, State};
 use jit::storage::IssueStore;
 

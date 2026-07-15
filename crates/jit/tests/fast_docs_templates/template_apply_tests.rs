@@ -14,9 +14,7 @@
 //! pre-apply upstream deps move onto P), yielding the acyclic, transitively
 //! reduced spine C→B→P→upstream.
 
-mod harness;
-
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};

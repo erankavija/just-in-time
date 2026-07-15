@@ -1,9 +1,7 @@
 //! Tests for short hash issue ID resolution
 //!
 //! Validates that partial UUID prefixes work like git short hashes.
-
-mod harness;
-use harness::TestHarness;
+use crate::harness::TestHarness;
 use jit::domain::Issue;
 use jit::storage::{InMemoryStorage, IssueStore};
 use proptest::prelude::*;
