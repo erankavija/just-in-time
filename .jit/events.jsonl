@@ -7477,3 +7477,7 @@
 {"type":"issue_state_changed","id":"a3d6364a-6c02-45e3-b684-d0204d5aea21","issue_id":"3f73423b-fc24-4725-9fa3-dfbd2994f790","timestamp":"2026-07-15T10:32:04.927102141Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"ab7e1711-85a7-42b2-91aa-b7ddb1ae8f61","issue_id":"ef0065ad-3b33-4533-874c-65532350cc80","timestamp":"2026-07-15T10:32:46.202352195Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"1b6c4287-9259-4a51-9a5e-ff82982f356e","issue_id":"ef0065ad-3b33-4533-874c-65532350cc80","timestamp":"2026-07-15T10:32:46.202726255Z","assignee":"agent:worker"}
+{"type":"issue_created","id":"e41df71b-d6cb-488e-8e22-1febb8201dd2","issue_id":"3c4d6fe8-fafa-461c-ba1b-03d9db29a17e","timestamp":"2026-07-15T10:33:53.120577037Z","title":"Remove secret-like label example from reference docs","priority":"high"}
+{"type":"issue_state_changed","id":"30da22d8-6fec-4efa-b918-a72e4f4d09e5","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-15T10:33:59.856841155Z","from":"ready","to":"backlog"}
+{"type":"issue_updated","id":"aee3ad0f-32a5-4f0c-9d0d-bfb31ff4f331","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-15T10:33:59.856873585Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_updated","id":"26dd040f-a620-4506-bced-6ce8369d4b62","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-15T10:33:59.863107760Z","updated_by":"dependency-add","fields":["dependencies"]}
