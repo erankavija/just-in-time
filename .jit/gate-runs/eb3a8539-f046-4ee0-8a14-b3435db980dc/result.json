@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": "eb3a8539-f046-4ee0-8a14-b3435db980dc",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "cd2a33557caf833b43dace99becf3950fec50020",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T23:27:37.697045992Z",
+  "completed_at": "2026-07-14T23:33:42.076950101Z",
+  "duration_ms": 364379,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/8b05a612-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1), is substantive, and is linked as a `design` document in the planning issue at [.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:117). The linked investigation and research documents are also present and complete.\n\n## Completeness against the criteria\n\nThe plan explicitly maps all eleven `[hard]` container criteria in §1 and provides concrete implementation leaves and acceptance checks in §3. It preserves the CLI/server/web/MCP scope, covers all three audit domains, release identity, artifact publication, Docker consolidation, documentation ownership, MSRV policy, rehearsal, and external core/profile integration.\n\nREQ-11 is textually covered but not executable as currently wired: the source-freeze leaf requires the external core-maintenance epic itself to become terminal, contradicting that epic’s standing lifecycle decision. This is blocking and detailed below.\n\n## Technical soundness and architectural fit\n\nThe local architectural claims are accurate:\n\n- The server validates and watches an existing `.jit` directory and derives repository context from its parent in [crates/server/src/main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:61).\n- API routing, embedded-web fallback, and the current lack of graceful shutdown match [crates/server/src/main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:104).\n- The existing Docker image builds Rust before the web bundle and uses nginx, Node, root execution, `/data`, and a shell supervisor, as described in [Dockerfile](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/Dockerfile:20) and [docker/entrypoint.sh](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/docker/entrypoint.sh:12).\n- The hosted-service assumptions are also current: npm supports stage-only trusted publishers bound to a GitHub environment and requires human 2FA approval of a stage ([npm trusted publishing](https://docs.npmjs.com/trusted-publishers/), [npm staged publishing](https://docs.npmjs.com/staged-publishing/)); GitHub immutable releases lock assets and the associated tag after publishing ([GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)); Rust 1.97 is current ([Rust 1.97 announcement](https://blog.rust-lang.org/releases/latest/)).\n\nThe only advisory technical defect is the unexplained “binding D-14” reference in §Decisions: no D-14 exists in the charter, issue description, or repository search.\n\n## Decomposition and dependencies\n\nMost of the decomposition is coherent:\n\n- Remediation precedes blocking security enforcement.\n- Graceful server shutdown precedes the consolidated image, which precedes topology removal.\n- Source-changing work converges before source freeze.\n- Candidate production, assembly, staging, rehearsal, final tagging, and publication are correctly ordered.\n- The MCP execution leaf now explicitly depends on the native/source candidate producer at [plan line 277](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:277).\n\nHowever, “Freeze the exact integrated v1.0 source” depends directly on `6eb585bc` and requires both external epics to be terminal at [plan lines 242–245](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:242). Core maintenance is expressly an open living container, and its current handoff says it remains open after every child resolves at [dev/active/6eb585bc-handoff.md line 33](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/6eb585bc-handoff.md:33). JIT considers only `Done` and `Rejected` dependencies met, as documented in [containment-and-completion.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/docs/concepts/containment-and-completion.md:76). Consequently, the freeze and every downstream release leaf remain blocked indefinitely. The plan needs a terminal v1 core-maintenance checkpoint or an explicitly approved change to the living-container decision.\n\n## Risks and actionability\n\nThe plan is otherwise unusually actionable: leaves have bounded blast radii, observable criteria, explicit ownership, and meaningful failure tests.\n\nThe risk entry at plan line 382 claims the direct core-epic dependency mitigates late contract changes, but it does not address the epic’s non-terminal lifecycle. That is a load-bearing unresolved risk, not an implementation detail.\n\n## Prior review feedback\n\nBoth prior blocking findings are resolved:\n\n- Prior F1: the MCP candidate now depends on and consumes the retained native candidate at plan lines 277–281.\n- Prior F2: bootstrap now creates a distinct protected, candidate-ref-restricted, secret-free `npm-stage` environment at lines 93–95; staging tooling declares `environment: npm-stage` and minimal permissions at line 165; the actual stage leaf repeats that contract at lines 304–307.\n\n## Findings\n\n1. **F1 — High, blocking:** The source-freeze leaf depends on the terminal state of `6eb585bc`, but core maintenance has a standing decision to remain open as a living container after all children resolve. Because non-terminal dependencies remain unmet, the release DAG cannot reach source freeze, rehearsal, or publication. Replace the dependency with a terminal v1 core checkpoint or obtain and record an explicit decision to close/reject the living epic.\n\n2. **F2 — Low, advisory:** Plan decision D9 calls its external-dependency choice “binding D-14,” but no D-14 exists in the charter, relevant issues, or repository. Link the actual decision source or remove the stale attribution.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior blockers are resolved, but the release DAG waits on a core-maintenance epic that is explicitly intended to remain non-terminal.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The source-freeze leaf can never become ready because it depends on core-maintenance epic 6eb585bc becoming terminal while that epic's standing decision is to remain open as a living container.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":242,\"references\":[\"@/issue/8b05a612/requirement/REQ-10\",\"@/issue/8b05a612/requirement/REQ-11\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Decision D9 cites a binding D-14 that does not exist in the charter, relevant issues, or repository.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":400}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5969 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62f5-1a99-7b31-a7fe-279743544ac8\n--------\nuser\n--- 5956 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior blockers are resolved, but the release DAG waits on a core-maintenance epic that is explicitly intended to remain non-terminal.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The source-freeze leaf can never become ready because it depends on core-maintenance epic 6eb585bc becoming terminal while that epic's standing decision is to remain open as a living container.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 242,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-10",
+          "@/issue/8b05a612/requirement/REQ-11"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Decision D9 cites a binding D-14 that does not exist in the charter, relevant issues, or repository.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 400
+      }
+    ]
+  }
+}

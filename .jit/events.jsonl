@@ -7317,3 +7317,4 @@
 {"type":"gate_failed","id":"b278b479-d7d1-41bf-8a84-ed9c4191cdc9","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T22:44:05.643311379Z","gate_key":"plan-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"ed4765af-3e19-47f6-bfd2-fb67d5680767","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T22:59:24.814915449Z","gate_key":"plan-review","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"95e79a71-59d4-4032-99d6-5671aae5cadd","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T23:23:44.488703389Z","gate_key":"plan-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"b04e3ec7-8191-4e0a-83c4-0f7e4a332954","issue_id":"e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f","timestamp":"2026-07-14T23:33:42.077356841Z","gate_key":"plan-review","updated_by":"auto:executor"}
