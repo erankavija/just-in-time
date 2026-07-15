@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
+  "commit": "1b2d0599bccd89236089e33d074b4be3ca1448e6",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T15:24:55.061069993Z",
+  "completed_at": "2026-07-15T15:28:32.146551442Z",
+  "duration_ms": 217085,
+  "exit_code": 1,
+  "stdout": "Attribution: f6373ecb, 5bad31d0, 6f2b0114, b1826200, fad3e5a0, f9cb4fa2, 3447c301 (`jit:be542b98`)\nPolicy sources: AGENTS.md; dev/vision/9db27a3a-charter.md; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-8 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T15:21:40Z); repo-validate passed (exit 0, 2026-07-15T15:24:44Z); code-review unrun (no recorded projection)\nTruncation recovery: bounded per-commit/path reads for the 1,097-line initial repository-view patch and both rework patches\n\n1. **F1 — blocking, issue-impact:** File-backed validation now bypasses the pre-existing claims-index integrity check. `validate_silent` routes every persisted repository to `validate_repository` at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:198), but its replacement integrity pass at [repository.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/repository.rs:517) never calls `validate_claims_index`; the retained legacy path still does at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:616). Consequently a corrupt active claims index can pass `jit validate`, violating the filesystem-view regression criterion.\n\n2. **F2 — blocking, issue-impact:** The overlay is not authoritative for document-reference integrity. When an overlay deletes an uncommitted document, [repository.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/repository.rs:571) falls back to live Git `HEAD` at line 573 and accepts the reference if the old file exists there. A planned final repository that deletes a still-referenced document therefore validates against different bytes. No adversarial overlay test covers document references, leaving REQ-01 and REQ-02 unmet.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The repository-view route drops claims-index validation and can validate document references against live HEAD rather than the planned overlay.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"File-backed validation omits the established claims-index integrity check.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":517,\"references\":[],\"disposition\":\"blocking\",\"origin\":\"issue-impact\"},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"A deleted overlay document can be accepted from live Git HEAD instead of the planned final state.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":571,\"references\":[],\"disposition\":\"blocking\",\"origin\":\"issue-impact\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5688 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6661-899c-76e3-b701-7d67be2e8c59\n--------\nuser\n--- 5675 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The repository-view route drops claims-index validation and can validate document references against live HEAD rather than the planned overlay.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "File-backed validation omits the established claims-index integrity check.",
+        "file": "crates/jit/src/validation/repository.rs",
+        "line": 517
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "A deleted overlay document can be accepted from live Git HEAD instead of the planned final state.",
+        "file": "crates/jit/src/validation/repository.rs",
+        "line": 571
+      }
+    ]
+  }
+}

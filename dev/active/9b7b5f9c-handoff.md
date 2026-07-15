@@ -1,73 +1,58 @@
-# Handoff — Versioned repository profiles and portable JIT dogfood setup (9b7b5f9c) — session 1
+# Handoff — Versioned repository profiles and portable JIT dogfood setup (9b7b5f9c) — session 2
 
-**Date:** 2026-07-15T16:36:15+03:00
-**Session number:** 1
-**Prior handoffs:** None.
+**Date:** 2026-07-15T18:28:44+03:00
+**Session number:** 2
+**Prior handoff:** session 1 in this file's history.
 
 ## Current state
 
-- Epic: `9b7b5f9c` — state: backlog (assigned to `agent:jit-execution-lead`)
-- Wave in progress: wave 1 of 9
-- Children summary: 0 done, 3 in_progress, 9 backlog/ready, 0 rejected
-- Active claims: `866a5bbd`, `92039d9c`, and `be542b98` are assigned to `agent:worker` since this session.
-- Open escalations: cross-epic dependency/audit remediation; pre-existing secret-scan findings outside the epic; informed consent for AI review data export.
-- Progress file: `dev/active/9b7b5f9c-progress.json` (reflects the above)
+- Epic `9b7b5f9c` remains in wave 1 of 9 with three claimed `in_progress` children.
+- `92039d9c` has all five gates passed at final implementation HEAD and is waiting for the rest of wave 1.
+- `866a5bbd` has five gates passed; only repository-wide `dependency-audit` fails, owned by the external `73482aa1` → `d3709cc6` chain.
+- `be542b98` has `cargo-ci` and `repo-validate` passed, but `code-review` failed with two high blockers after both permitted rework attempts were already consumed.
+- Progress source: `dev/active/9b7b5f9c-progress.json`.
 
-## What just happened
+## Work completed this session
 
-- Recovered one stale `.git/jit/locks/claims.lock`; repository validation was green before dispatch.
-- Confirmed the approved planning bracket is complete: planning `ca024a2b` and breakdown `96326159` are done with their gates passed; 12 implementation tasks cover all epic criteria.
-- Persisted a nine-wave plan; wave 3 is explicitly blocked by cross-epic issue `d3709cc6`.
-- Dispatched wave 1 in SHA-anchored worktrees and passed the authorized `security-review` precheck for `866a5bbd`.
-- Integrated transaction kernel `866a5bbd` (`92a4ad1e` plus merge), portable checks `92039d9c` (`822ea0b4` plus merge), and overlay validation `be542b98` (`5bad31d0` plus merge).
-- Verified every merge commit independently with `scripts/verify-commit-builds.sh`; all three built from archived commit sources.
-- Reworked overlay validation twice: `fad3e5a0` restored exit-1 rule reports versus exit-4 structural errors; `3447c301` restored legacy structural diagnostics. Exact regressions and 11 repository-view tests pass.
-- Cargo CI for `866a5bbd` passed after clearing stale generated incremental state: 3,349 tests passed, zero failed on the preceding full run; the recorded clean retry passed.
-- `repo-validate` and `security-review` pass for `866a5bbd`.
-- `secret-detection` fails only on two redacted, pre-existing `generic-api-key` matches in `.jit/issues/0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe.json:4` and `dev/active/8b05a612-plan.md:166`; neither belongs to this epic.
-- `dependency-audit` fails with 10 vulnerabilities and 7 denied warnings. Existing issue `d3709cc6` owns remediation and depends on backlog story `73482aa1` outside this epic.
-- `code-review` was not run: the execution environment requires informed consent before exporting issue context and attributable patches to the external Codex reviewer.
+- Resolved the two approved secret-scan false positives; `866a5bbd` secret detection passes.
+- Reworked transaction recovery once (`cc36e49f`, merged by `c7b881e6`): durable per-action rollback progress, no-follow identity-checked mode mutation, and complete failure-boundary coverage. Full library tests, clippy, commit-build verification, and second code review passed with zero findings.
+- Reworked portable checks once (`551712ba`, merged by `0f072ff2`): canonical native-checker TOML, `evaluate-all --json` warnings, corrected native-vs-Exec prose, and focused label/update regressions. Lead API-prose correction: `70da02d5`.
+- Final `92039d9c` evidence passes: `cargo-ci`, `code-review`, `docs-mechanical`, `doc-review`, and `repo-validate`. The code-review retry was necessary only because issue gate ordering initially ran review before current docs-mechanical evidence existed.
+- Independently audited overlay validation and then ran its official gates. `cargo-ci` and `repo-validate` pass; code-review run `27811bd8-1fe5-40e0-9877-7ff21a86c745` fails with two high findings:
+  1. file-backed validation omits the established claims-index integrity check;
+  2. a document deleted by an overlay can be accepted from live Git `HEAD`, so the planned final state is not authoritative.
+- Prior overlay review findings remain closed, but the task already used both allowed rework attempts (`fad3e5a0`, `3447c301`).
 
-## What to do next
+## Required next decision
 
-- [ ] Resolve the three invoker questions below and record the answers in `dev/active/9b7b5f9c-progress.json`.
-- [ ] If approved, make only the two narrow secret-like prose edits, rebuild/install JIT with current HEAD provenance, and rerun `secret-detection` for `866a5bbd`.
-- [ ] Wait for or explicitly coordinate completion of `73482aa1` → `d3709cc6`; then rerun `dependency-audit` for `866a5bbd`.
-- [ ] With informed consent, run `code-review` for `866a5bbd`; complete the full six-tier lead review and rework any gate findings.
-- [ ] Evaluate all gates for `92039d9c` and `be542b98`; AI `code-review`/`doc-review` require the same informed consent.
-- [ ] After every wave-1 gate passes, mark the three issues done, update progress to wave 2, commit JIT state separately, and dispatch `eceffc17`.
+- Explicit human authorization is required for a third rework attempt on `be542b98`. If authorized, dispatch a new isolated worktree and require both official F1/F2 fixes, adversarial deletion/claims tests, the previously noted template/item-link adversarial coverage, and stale profile-planning comment correction. Then rerun all three gates and the six-tier lead review.
+- Without that authorization, wave 1 cannot complete and wave 2 must not start.
 
-## Traps — do not repeat these
+## Other blocker
 
-- **Do not run `jit gate evaluate-all` without informed external-review consent.** The environment rejected it because `code-review` exports issue context and attributable patches through `codex exec`; run deterministic gates individually until consent exists.
-- **Do not collapse repository-view semantic findings into `anyhow` errors.** That changed rule findings from exit 1 to exit 4 and broke integrity diagnostics. The accepted split is `RepositoryValidationReport.rule_report` for semantic findings and typed structural errors for exit 4 (`fad3e5a0`, `3447c301`).
-- **Do not infer that Git-free document validation is new or broken.** The pre-overlay `CommandExecutor::validate_document_references` intentionally skipped document checks when `git2::Repository::open` failed; the final view implementation preserves that existing behavior.
-- **Do not rerun `cargo-ci` after targeted dev-profile tests without clearing generated incremental state.** The gate intentionally fails on non-empty `target/debug/incremental`; `cargo clean` cleared the cache-only failure before the passing retry.
-- **Do not treat dependency-audit failures as transaction-kernel rework.** The advisories are repository-wide and owned by cross-epic issue `d3709cc6`, which itself depends on `73482aa1`.
-- **Do not weaken or bypass secret detection.** Its two findings are redacted and pre-existing, but the gate remains failed until the source prose is changed with explicit cross-issue scope approval.
-- **Reinstall JIT after every commit before evaluating a gate.** The stale-binary guard compares installed build provenance with current HEAD, including JIT-state commits.
-- **Worktree workers can exhaust `/tmp` quota.** A completed worker left `/tmp/jit-target-92039`; `cargo clean --target-dir /tmp/jit-target-92039` reclaimed the generated cache. Inspect and clean only task-owned generated targets.
+- `866a5bbd` cannot complete until repository-wide dependency advisories are remediated. `d3709cc6` remains backlog behind `73482aa1`, which remains backlog behind `362e3fec`. This chain is outside epic `9b7b5f9c` and is owned externally.
 
-## Open questions needing invoker input
+## Resume checklist
 
-- Question: Do you explicitly consent to sending issue descriptions, linked-document context, and attributable `jit:<short-id>` code patches to the external Codex reviewer for `code-review` and `doc-review` gates?
-  - Context: Blanket gate authorization did not satisfy the environment's informed workspace-data-export requirement.
-  - Options: consent to the described export; decline and leave AI gates pending.
-  - Recommendation: Consent if repository code may be processed by the configured external reviewer; gates cannot otherwise pass.
-- Question: May the lead edit the two pre-existing secret-like prose occurrences outside epic `9b7b5f9c`?
-  - Context: Redacted gitleaks findings are in production-readiness issue `0c3fcf3a` and plan `dev/active/8b05a612-plan.md`, not in wave-1 code.
-  - Options: authorize narrowly replacing only the flagged secret-like token in both sources; have the owning epic fix them externally; stop this epic with `secret-detection` failed.
-  - Recommendation: Authorize the two narrow wording edits, with no scope or behavioral change.
-- Question: How should the existing cross-epic chain `73482aa1` → `d3709cc6` be completed?
-  - Context: `dependency-audit` cannot pass and `0aec3b1e` cannot become ready until that production/core-maintenance work lands.
-  - Options: run a separate execution lead for the owning containers and resume this epic afterward; explicitly override the single-epic invariant and expand this execution; stop with the dependency unresolved.
-  - Recommendation: Complete the chain through its owning execution lead, then resume `9b7b5f9c`; this preserves DAG ownership and single-epic scope.
+- [ ] Reinstall JIT after the latest state commit; the stale-binary guard requires exact HEAD provenance.
+- [ ] If third overlay rework is authorized, increment `be542b98`'s rework count to 3 only with the authorization recorded, dispatch an isolated branch, and preserve the cumulative findings table.
+- [ ] Rerun `cargo-ci`, `code-review`, and `repo-validate` for `be542b98`; all must pass.
+- [ ] Check `73482aa1` and `d3709cc6`; when their chain lands, rerun `866a5bbd dependency-audit`.
+- [ ] Only when all three wave-1 children pass every gate, mark them Done together, update progress to wave 2, and dispatch `eceffc17`.
+
+## Traps
+
+- Do not treat the two overlay findings as optional: both are high, blocking, and issue-impact.
+- Do not silently exceed the skill's two-attempt rework limit; record explicit human authorization first.
+- Clear generated `target` state before `cargo-ci`; concurrent dev-profile builds make its incremental-state check fail even when all tests pass.
+- Run `docs-mechanical` before AI review when review acceptance depends on current generated-doc evidence.
+- Reinstall with `./scripts/install-jit.sh` after every commit before evaluating an Exec gate.
+- Keep the dependency remediation in its owning epic; do not expand this single-epic execution.
 
 ## Reference artefacts
 
-- Epic: `jit issue show 9b7b5f9c`
-- Design docs: `dev/active/9b7b5f9c-mvp-scope-brief.md`
-- Planning docs: `dev/active/9b7b5f9c-plan.md`
+- Plan: `dev/active/9b7b5f9c-plan.md`
 - Progress: `dev/active/9b7b5f9c-progress.json`
-- Gate evidence: `.jit/gate-runs/` entries linked from `jit gate status 866a5bbd --all --json`
-- External blockers: `jit issue show d3709cc6`; `jit issue show 73482aa1`
+- Overlay failed review: `.jit/gate-runs/27811bd8-1fe5-40e0-9877-7ff21a86c745/result.json`
+- Portable final reviews: `.jit/gate-runs/fd5300d2-b6fa-4307-ab33-b9123ac1d65b/result.json`, `.jit/gate-runs/abdc28a6-6df9-4d1b-a3b1-8e0ce72335fd/result.json`
+- Transaction final review: `.jit/gate-runs/70587701-669f-4541-8b9b-70996f7753d1/result.json`

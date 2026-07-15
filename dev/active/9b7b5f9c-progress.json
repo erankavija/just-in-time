@@ -87,8 +87,10 @@
       "category": "maximum rework attempts reached",
       "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
       "status": "requires human authorization for any further rework",
+      "gate_run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
       "findings": [
         "repository validation omits claims-index consistency",
+        "deleted overlay documents can be accepted from live Git HEAD",
         "overlay template and item-link tests are not adversarial",
         "profile-planning comments are premature"
       ]
