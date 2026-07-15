@@ -871,6 +871,30 @@ pub struct IssueListFullResponse {
     pub count: usize,
 }
 
+/// Summary response for `jit issue search … --json` (no `--full`).
+///
+/// The [`IssueListResponse`] shape plus the echoed `query`: lean
+/// [`MinimalIssue`] entries with no gate fields.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueSearchResponse {
+    pub query: Option<String>,
+    pub issues: Vec<MinimalIssue>,
+    pub count: usize,
+}
+
+/// Full-record response for `jit issue search … --full --json`.
+///
+/// The search counterpart of [`IssueListFullResponse`]: complete stored
+/// [`Issue`] records (gate list under the storage names `gates_required` /
+/// `gates_status`) plus the echoed `query`. Declared alongside
+/// [`IssueSearchResponse`] in `jit --schema`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueSearchFullResponse {
+    pub query: Option<String>,
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
 /// Response for blocked query with reasons (minimal issue + reasons)
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedListResponse {

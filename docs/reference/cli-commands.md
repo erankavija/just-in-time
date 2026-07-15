@@ -811,8 +811,9 @@ exposes that list under the same `gates` field name the full view uses,
 projected to `{key, status}` per required gate (the full view additionally
 carries each gate's `last_run_at` / `exit_code`). It never emits the on-disk
 record's `gates_required` / `gates_status`; those appear only where a command
-hands back the raw stored record (`jit graph export --full`, `jit query
---full`). See [Storage Format](storage-format.md#gate-fields-in-command-output).
+hands back the raw stored record (any `--full` record dump). See the two
+projection rules and their current members in
+[Storage Format](storage-format.md#gate-fields-in-command-output).
 
 **Field projection (`--field` / `--fields`):**
 - Projected names are the serialized keys of the `issue show --json` object

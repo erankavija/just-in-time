@@ -1,15 +1,16 @@
 //! Cross-surface contract for how an issue's gate list is named in
 //! machine-readable output (jit:f40f1b0a).
 //!
-//! The gate list reaches consumers under exactly two declared shapes:
+//! Two rules govern which shape the gate list takes:
 //!
-//! - Projected ISSUE VIEWS — `issue show`, `issue show --summary`, and
-//!   `issue status` — expose it as a `gates` array of `{key, status, ...}`
-//!   objects. None of them carry the raw storage field names.
-//! - Raw RECORD DUMPS — `graph export --full` and `query --full` — emit the
-//!   on-disk issue record verbatim, so the gate list stays under the storage
-//!   names `gates_required` / `gates_status`. The summary shapes of those
-//!   commands omit the gate list entirely.
+//! - Projected ISSUE VIEWS expose it as a `gates` array of `{key, status, ...}`
+//!   objects, never the raw storage names. Covered here: `issue show`,
+//!   `issue show --summary`, `issue status`.
+//! - Raw RECORD DUMPS (any `--full` surface) emit the on-disk issue record
+//!   verbatim, so the gate list stays under `gates_required` / `gates_status`,
+//!   and their default summary shape omits it. Covered here: `graph export
+//!   --full`, `query all --full`, `issue list --full`, top-level `list --full`,
+//!   `issue search --full`.
 //!
 //! These asserts pin the emitted side; `crate::schema` unit tests pin the
 //! matching `jit --schema` declaration, so a rename on either side fails the
@@ -161,39 +162,93 @@ fn test_graph_export_full_keeps_storage_gate_fields() {
     );
 }
 
+/// Pick the entry for `id` out of an `{issues: [...]}` list-envelope response.
+fn find_issue<'a>(envelope: &'a Value, id: &str, ctx: &str) -> &'a Value {
+    envelope["issues"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{ctx}: `issues` must be an array; got: {envelope}"))
+        .iter()
+        .find(|n| n["id"].as_str() == Some(id))
+        .unwrap_or_else(|| panic!("{ctx}: record for the gated issue; got: {envelope}"))
+}
+
+/// Assert a raw-record dump entry carries the on-disk storage gate fields and
+/// not the projected `gates` array.
+fn assert_storage_record(record: &Value, ctx: &str) {
+    assert!(
+        record["gates_required"]
+            .as_array()
+            .is_some_and(|g| g.iter().any(|k| k == "manual-gate")),
+        "{ctx}: --full record carries the storage gates_required list; got: {record}"
+    );
+    assert!(
+        record["gates_status"].is_object(),
+        "{ctx}: --full record carries the storage gates_status map; got: {record}"
+    );
+    assert!(
+        record.get("gates").is_none(),
+        "{ctx}: raw record dump must not carry the projected `gates` array; got: {record}"
+    );
+}
+
+/// Assert a lean summary entry omits the gate list under every name.
+fn assert_summary_omits_gates(record: &Value, ctx: &str) {
+    for absent in ["gates", "gates_required", "gates_status"] {
+        assert!(
+            record.get(absent).is_none(),
+            "{ctx}: summary omits the gate list ({absent}); got: {record}"
+        );
+    }
+}
+
 #[test]
 fn test_query_full_keeps_storage_gate_fields_and_summary_omits_them() {
     let (temp, id) = setup_repo_with_gated_issue();
 
     let full = json(&temp, &["query", "all", "--full", "--json"]);
-    let full_issue = full["issues"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|n| n["id"].as_str() == Some(id.as_str()))
-        .expect("full query record for the gated issue");
-    assert!(
-        full_issue["gates_required"]
-            .as_array()
-            .is_some_and(|g| g.iter().any(|k| k == "manual-gate")),
-        "query --full record carries the storage gates_required list; got: {full_issue}"
-    );
-    assert!(
-        full_issue["gates_status"].is_object(),
-        "query --full record carries the storage gates_status map; got: {full_issue}"
+    assert_storage_record(
+        find_issue(&full, &id, "query all --full"),
+        "query all --full",
     );
 
     let summary = json(&temp, &["query", "all", "--json"]);
-    let summary_issue = summary["issues"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|n| n["id"].as_str() == Some(id.as_str()))
-        .expect("summary query record for the gated issue");
-    for absent in ["gates", "gates_required", "gates_status"] {
-        assert!(
-            summary_issue.get(absent).is_none(),
-            "query summary omits the gate list ({absent}); got: {summary_issue}"
-        );
-    }
+    assert_summary_omits_gates(find_issue(&summary, &id, "query all"), "query all");
+}
+
+#[test]
+fn test_issue_list_full_keeps_storage_gate_fields_and_summary_omits_them() {
+    let (temp, id) = setup_repo_with_gated_issue();
+
+    let full = json(&temp, &["issue", "list", "--full", "--json"]);
+    assert_storage_record(
+        find_issue(&full, &id, "issue list --full"),
+        "issue list --full",
+    );
+
+    let summary = json(&temp, &["issue", "list", "--json"]);
+    assert_summary_omits_gates(find_issue(&summary, &id, "issue list"), "issue list");
+}
+
+#[test]
+fn test_top_level_list_full_keeps_storage_gate_fields() {
+    let (temp, id) = setup_repo_with_gated_issue();
+
+    // Top-level `list` normalizes to `issue list`, so `--full` must expose the
+    // same raw record.
+    let full = json(&temp, &["list", "--full", "--json"]);
+    assert_storage_record(find_issue(&full, &id, "list --full"), "list --full");
+}
+
+#[test]
+fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
+    let (temp, id) = setup_repo_with_gated_issue();
+
+    let full = json(&temp, &["issue", "search", "Gated", "--full", "--json"]);
+    assert_storage_record(
+        find_issue(&full, &id, "issue search --full"),
+        "issue search --full",
+    );
+
+    let summary = json(&temp, &["issue", "search", "Gated", "--json"]);
+    assert_summary_omits_gates(find_issue(&summary, &id, "issue search"), "issue search");
 }
