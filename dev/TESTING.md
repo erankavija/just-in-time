@@ -187,7 +187,9 @@ profile, gate incremental, and dependency-feature policies, failing the gate whe
 a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
 (`--metadata-json`, `--artifacts-json`, `--root`), so
 `scratch_build/rust_build_budget_checker_tests.rs` exercises each failure mode
-with synthetic JSON and sparse executables — no compilation.
+with synthetic JSON and sparse executables — no compilation. See "4. Build
+Footprint Budget" below for the exact budgets, the build-profile and
+dependency-feature policy they check, and how to diagnose a failure.
 
 Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
 they never surface as their own test targets. Add a new integration case to the file that
@@ -230,6 +232,88 @@ belongs in the harness layer, where it runs faster and fails more legibly.
 
 Run a whole suite with `cargo test --test cli_repo_workflow`, or filter to one module or case
 with `cargo test --test cli_repo_workflow integration_test`.
+
+## 4. Build Footprint Budget
+
+The Rust workspace's test topology, build profiles, and dependency features are bounded by
+the enforced `@/inv/bounded-rust-build-footprint` project invariant.
+
+### Budgets
+
+`cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces two budgets on every
+gate run, both derived from `cargo metadata` and `cargo test --workspace --no-run
+--message-format=json` rather than a `target/` directory scan (stale per-hash artifacts
+there cannot describe the current build): at most 12 integration-test targets and at most
+2 GiB of unique active test-executable bytes. Both constants are declared once, in the
+script's own header comment (`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`); read them
+there rather than assuming either has changed.
+
+A third budget — at most 10 GiB for the complete fresh validation target directory — is the
+acceptance threshold the benchmark protocol below validates against once per build-topology
+change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
+defeat the point of the interactive incremental-build policy described next. See
+[dev/active/73482aa1-rust-build-efficiency.md](active/73482aa1-rust-build-efficiency.md)
+("Benchmark protocol") for the full acceptance criteria and
+[dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
+for the measured comparison.
+
+### Build profile and dependency-feature policy
+
+- **Debug info** — `[profile.dev]`/`[profile.test]` in the workspace `Cargo.toml` set
+  `debug = "line-tables-only"`: enough for line-number backtraces on a local failure, without
+  embedding the full debugger payload (type info, macro expansions) that dominates a test
+  executable's size.
+- **Incremental compilation** — both profiles also state `incremental = true` explicitly, for
+  ordinary interactive development, where the cost amortizes across many rebuilds of the same
+  tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
+  since a gate run compiles once and exits with no later rebuild to amortize against; a
+  dedicated `incremental-state` gate step fails the run if a non-empty `incremental` directory
+  remains under the target directory afterward.
+- **Dependency features** — `jsonschema` (`crates/jit/Cargo.toml`) sets
+  `default-features = false`: repository schemas only use local fragment refs
+  (`#/types/Priority`, `#/types/State`), so the crate's remote `$ref`-resolution
+  infrastructure is never exercised. `ureq` (the remote-document-access client) also sets
+  `default-features = false` and enables exactly `rustls` and `gzip`: one deliberately chosen
+  TLS backend, plus the content-decoding feature the remote-document path relies on.
+
+### Benchmarking a build-topology change
+
+`scripts/benchmark-rust-build.sh` is the committed benchmark harness; see its header comment
+for the full contract and environment overrides. Each clean or rebuild sample runs in a
+freshly created, isolated `CARGO_TARGET_DIR`, removed immediately after that sample's
+measurements are recorded, so no sample inherits another's warm build state. It collects at
+least three clean samples (zero-warning `cargo clippy --workspace --all-targets -- -D
+warnings` followed by `cargo test --workspace --no-run`, each timed) and at least three
+rebuild samples (the same sequence as setup, then one fixed, reversible, comment-only probe
+line appended to `crates/jit/src/lib.rs`, a second timed `test --no-run` for the incremental
+rebuild, and the file restored byte-for-byte and verified against `git show HEAD:...`), and
+reports the median of each. Run it with `./scripts/benchmark-rust-build.sh`; see
+[dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
+for the story's own recorded comparison and acceptance verdict.
+
+### Diagnosing a budget-checker failure
+
+On failure, `scripts/rust-build-budget.sh` reports the observed value, the limit, and a
+corrective area for each violated check on stderr. Read that diagnostic before adding a new
+test target or dependency feature:
+
+- **Integration-test targets over budget** — a new top-level `crates/jit/tests/*.rs` file was
+  added. Add the case to an existing suite's module instead (see the shared-helpers and
+  case-placement guidance in "3. Integration Tests" above), or fold it into the suite whose
+  execution model and subsystem it matches.
+- **Active test-executable bytes over budget** — the linked executables grew past the
+  ceiling. Check whether a new dependency pulled in unexpectedly large debug info, or whether
+  the debug/incremental profile policy above regressed, before adding more test code to the
+  same suites.
+- **Profile drift** — `[profile.dev]` or `[profile.test]` in the workspace `Cargo.toml` no
+  longer sets `debug = "line-tables-only"`. Restore it.
+- **Incremental-policy drift** — `scripts/cargo-ci.sh` no longer exports
+  `CARGO_INCREMENTAL=0` before its first step. Restore the export.
+- **Remote resolver reintroduction** — `jsonschema` in `crates/jit/Cargo.toml` no longer sets
+  `default-features = false`, or explicitly re-enables a `resolve-*`/`tls-*` feature. Disable
+  default features (and drop the explicit feature) again.
+- **Duplicate TLS backend / TLS backend drift** — `ureq` enables `native-tls` alongside
+  `rustls`, or no longer enables `rustls`. Keep exactly the `rustls` feature (plus `gzip`).
 
 ## Test Environment
 

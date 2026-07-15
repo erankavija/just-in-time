@@ -177,6 +177,7 @@ Each invariant is addressable at `@/inv/<name>`.
 - **assignee-format** — Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice).
 - **domain-agnostic** — Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions.
 - **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
+- **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
 <!-- jit:invariants:end -->
 
 ## Commit Conventions
