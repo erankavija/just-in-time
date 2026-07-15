@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "81a20e74-3a3d-471d-9cb8-e050ddb96fcb",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "58414756087c37501c137b887bd8c10a3f206275",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:29:55.691887741Z",
+  "completed_at": "2026-07-15T19:34:13.913655444Z",
+  "duration_ms": 258221,
+  "exit_code": 1,
+  "stdout": "Attribution: a92dc223, b156df88, 4c709b7f, 90b306da, e8f5d25e, 1a65c313, 60c8efd7, 7c2e0876, e330557a, 2b7db09e, f36d64c2 (`jit:f40f1b0a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed/0 (2026-07-15T19:11:22Z); doc-review passed/0 (2026-07-15T19:27:45Z); docs-mechanical passed/0 (2026-07-15T19:11:21Z)\nTruncation recovery: narrowed per-commit patches, schema/output slices, documentation reads, and contract-test searches\n\n1. **F1 — blocking, issue-impact, high:** REQ-04 is not met: the documented output contract includes `query available`, `ready`, `strategic`, and `closed` among raw-record outputs ([storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:113)), but the attributable contract test only exercises `query all` ([gate_field_contract_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:211)). The separate available/strategic/closed emitters still assemble untyped JSON independently ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:5153)), and no test consumes the reference text. A field rename in the documentation or one of these emitters can therefore pass the build without detecting a disagreement. This leaves the documented cross-command shape unprotected. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The documented gate-field contract is not fully coupled to emitted-shape coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 remains unmet because documented query variants and the reference text are not covered by a contract test against their emitted shapes.\",\"file\":\"crates/jit/tests/cli_issue/gate_field_contract_test.rs\",\"line\":211,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11549 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6741-d688-73e3-99c2-eab9328f6fbe\n--------\nuser\n--- 11536 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The documented gate-field contract is not fully coupled to emitted-shape coverage.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-04 remains unmet because documented query variants and the reference text are not covered by a contract test against their emitted shapes.",
+        "file": "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
+        "line": 211,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

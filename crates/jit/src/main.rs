@@ -5147,25 +5147,24 @@ fn run() -> Result<()> {
                         if json {
                             use jit::domain::MinimalIssue;
                             use jit::output::JsonOutput;
-                            use serde_json::json;
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(
-                                    json!({
-                                        "count": issues.len(),
-                                        "issues": issues,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                        count: issues.len(),
+                                        issues,
+                                    })?,
                                     "query available",
                                 )
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(
-                                    json!({
-                                        "count": minimal.len(),
-                                        "issues": minimal,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListResponse {
+                                        count: minimal.len(),
+                                        issues: minimal,
+                                    })?,
                                     "query available",
                                 )
                             }
@@ -5286,25 +5285,24 @@ fn run() -> Result<()> {
                         if json {
                             use jit::domain::MinimalIssue;
                             use jit::output::JsonOutput;
-                            use serde_json::json;
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(
-                                    json!({
-                                        "count": issues.len(),
-                                        "issues": issues,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                        count: issues.len(),
+                                        issues,
+                                    })?,
                                     "query strategic",
                                 )
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(
-                                    json!({
-                                        "count": minimal.len(),
-                                        "issues": minimal,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListResponse {
+                                        count: minimal.len(),
+                                        issues: minimal,
+                                    })?,
                                     "query strategic",
                                 )
                             }
@@ -5334,25 +5332,24 @@ fn run() -> Result<()> {
                         if json {
                             use jit::domain::MinimalIssue;
                             use jit::output::JsonOutput;
-                            use serde_json::json;
 
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(
-                                    json!({
-                                        "count": issues.len(),
-                                        "issues": issues,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListFullResponse {
+                                        count: issues.len(),
+                                        issues,
+                                    })?,
                                     "query closed",
                                 )
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(
-                                    json!({
-                                        "count": minimal.len(),
-                                        "issues": minimal,
-                                    }),
+                                    serde_json::to_value(jit::output::IssueListResponse {
+                                        count: minimal.len(),
+                                        issues: minimal,
+                                    })?,
                                     "query closed",
                                 )
                             }

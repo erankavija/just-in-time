@@ -825,7 +825,7 @@ pub enum IssueCommands {
     ///
     /// This is the orchestration one-liner agents otherwise rebuild by piping
     /// `issue show` JSON through jq. A dependency is *unmet* when it is not yet
-    /// `Done`/`Rejected` (the same readiness test as `query ready`); the section
+    /// `Done`/`Rejected` (the same readiness test `query available` applies); the section
     /// reads `none` when nothing is blocking.
     ///
     /// Text form (default), one line per id:

@@ -949,7 +949,9 @@ pub struct IssueStatusListResponse {
     pub count: usize,
 }
 
-/// Response for `query ready` command
+/// Ready-issue list envelope built on [`query_ready`](crate::domain::queries::query_ready)
+/// (no dedicated CLI subcommand emits it; `query available` layers the
+/// unassigned filter on the same readiness test).
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ReadyQueryResponse {
     pub issues: Vec<MinimalIssue>,

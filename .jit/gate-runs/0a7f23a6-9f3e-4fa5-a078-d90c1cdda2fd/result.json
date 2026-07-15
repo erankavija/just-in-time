@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "0a7f23a6-9f3e-4fa5-a078-d90c1cdda2fd",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "58414756087c37501c137b887bd8c10a3f206275",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T19:27:45.423339783Z",
+  "completed_at": "2026-07-15T19:29:55.655251654Z",
+  "duration_ms": 130231,
+  "exit_code": 0,
+  "stdout": "Leaf review: `bug` is a maximum-level type and has no resolved children. Attribution is the union of ten reachable, individually inspected `jit:f40f1b0a` commits; no fallback was needed.\n\nThe prior bare-`jit query` schema finding is resolved. The raw/projected gate-field contract is accurate and discoverable in [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:108) and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:808). Current outputs and `jit --schema` agree, including bare query; the targeted contract suite passed (16 tests).\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed gate-field documentation contract is accurate, discoverable, and matches current JSON output and schema declarations.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributed gate-field documentation contract is accurate, discoverable, and matches current JSON output and schema declarations.",
+    "findings": []
+  }
+}

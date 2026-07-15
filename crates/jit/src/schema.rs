@@ -560,8 +560,8 @@ impl CommandSchema {
             // `issue list` and its top-level `list` alias share the query shape.
             // Bare `jit query` (no subcommand) is documented as equivalent to
             // `query all`, so it declares the same contract.
-            "query" | "query_available" | "query_all" | "query_ready" | "query_strategic"
-            | "query_closed" | "issue_list" | "list" => {
+            "query" | "query_available" | "query_all" | "query_strategic" | "query_closed"
+            | "issue_list" | "list" => {
                 let union = json!({
                     "oneOf": [
                         schema_to_value::<IssueListResponse>(),

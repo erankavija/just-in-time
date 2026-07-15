@@ -222,6 +222,84 @@ fn test_query_full_keeps_storage_gate_fields_and_summary_omits_them() {
 }
 
 #[test]
+fn test_query_variant_full_dumps_keep_storage_gate_fields() {
+    // The gated fixture issue is unassigned and unblocked, so it appears in
+    // `query available`; rejecting it afterwards makes it a `query closed`
+    // member. `query strategic` needs a strategic-typed issue, so one is
+    // created with the same gate. Together these pin every documented
+    // raw-record query variant to the storage shape.
+    let (temp, id) = setup_repo_with_gated_issue();
+
+    let available = json(&temp, &["query", "available", "--full", "--json"]);
+    assert_storage_record(
+        find_issue(&available, &id, "query available --full"),
+        "query available --full",
+    );
+    assert_summary_omits_gates(
+        find_issue(
+            &json(&temp, &["query", "available", "--json"]),
+            &id,
+            "query available",
+        ),
+        "query available",
+    );
+
+    let strategic_out = jit(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Strategic gated",
+            "--type",
+            "epic",
+            "--description",
+            "Body",
+        ],
+    );
+    let strategic_stdout = String::from_utf8_lossy(&strategic_out);
+    let strategic_id = strategic_stdout
+        .lines()
+        .find(|l| l.contains("Created issue:"))
+        .unwrap()
+        .split_whitespace()
+        .last()
+        .unwrap()
+        .to_string();
+    jit(
+        &temp,
+        &[
+            "issue",
+            "update",
+            &strategic_id,
+            "--add-gate",
+            "manual-gate",
+        ],
+    );
+    let strategic = json(&temp, &["query", "strategic", "--full", "--json"]);
+    assert_storage_record(
+        find_issue(&strategic, &strategic_id, "query strategic --full"),
+        "query strategic --full",
+    );
+
+    jit(
+        &temp,
+        &[
+            "issue",
+            "update",
+            &id,
+            "--state",
+            "rejected",
+        ],
+    );
+    let closed = json(&temp, &["query", "closed", "--full", "--json"]);
+    assert_storage_record(
+        find_issue(&closed, &id, "query closed --full"),
+        "query closed --full",
+    );
+}
+
+#[test]
 fn test_issue_list_full_keeps_storage_gate_fields_and_summary_omits_them() {
     let (temp, id) = setup_repo_with_gated_issue();
 
