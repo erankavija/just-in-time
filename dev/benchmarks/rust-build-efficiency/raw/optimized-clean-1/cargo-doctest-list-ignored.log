@@ -1,4 +1,3 @@
-warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
    Doc-tests jit
 0 tests, 0 benchmarks

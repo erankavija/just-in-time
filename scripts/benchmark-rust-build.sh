@@ -206,6 +206,23 @@ new_isolated_target_dir() {
   mktemp -d "$TARGET_BASE/target.XXXXXX"
 }
 
+# ensure_web_dist_stub
+# REQ-02 (jit:26f97dc2): crates/server/build.rs emits a `cargo:warning=` when
+# web/dist/index.html is missing (the web UI hasn't been built) — this
+# doesn't fail `-D warnings` (build-script cargo:warning= messages are not
+# lint warnings), but it does make the clippy log non-empty, which is not a
+# genuinely zero-warning result. Idempotent; mirrors the same stub fixture
+# helper in
+# crates/jit/tests/provenance_contract/repository_inventory.rs. Measurement-
+# environment preparation only — it does not change what gets compiled or how
+# (REQ-01 unaffected), and is called before every clippy invocation below so
+# a stub removed between samples (by an unrelated process) is re-created.
+ensure_web_dist_stub() {
+  local dist="$repo_root/web/dist"
+  mkdir -p "$dist"
+  [[ -f "$dist/index.html" ]] || printf '<!doctype html><title>stub</title>' >"$dist/index.html"
+}
+
 # run_measured <log_file> <cmd...>
 # Runs <cmd...> with combined stdout+stderr redirected to <log_file>, then
 # prints ONE JSON line to stdout: {"wall_seconds":F,"max_rss_kb":N,"exit_code":N}.
@@ -578,6 +595,7 @@ run_clean_sample() {
   echo "[benchmark] clean sample $idx/$CLEAN_SAMPLES: target dir $target_dir" >&2
 
   acquire_lock
+  ensure_web_dist_stub
   local clippy_meas test_meas
   clippy_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/clippy.log" \
     cargo clippy --workspace --all-targets -- -D warnings)
@@ -634,6 +652,7 @@ run_rebuild_sample() {
   echo "[benchmark] rebuild sample $idx/$REBUILD_SAMPLES: target dir $target_dir (setup clean build)" >&2
 
   acquire_lock
+  ensure_web_dist_stub
   local setup_clippy_meas setup_test_meas
   setup_clippy_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/setup-clippy.log" \
     cargo clippy --workspace --all-targets -- -D warnings)
