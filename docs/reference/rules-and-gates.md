@@ -50,7 +50,7 @@ names, gate keys, and checkers your project declares.
 - **@/gate/npm-ci** — NPM CI (test + lint + build): Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci. Scoped to web/ — does not exercise mcp-server/; see mcp-ci for that workspace.
 - **@/gate/plan-review** — AI Plan Review: AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document
 - **@/gate/repo-validate** — Repo Validate: Whole-repository validation must pass (`jit validate` with NO issue id runs run_rules(None) plus the repo-integrity checks); blocks the bound container from reaching Done until the entire repository validates. Distinct from the per-issue jit-validate gate, which scopes to one issue via $JIT_ISSUE_ID.
-- **@/gate/secret-detection** — No secrets in code: gitleaks scans working-tree content without Git history; a finding or unavailable scanner fails closed and blocks completion.
+- **@/gate/secret-detection** — No secrets in code: gitleaks scans the working-tree version of every tracked file (scripts/secret-scan.sh) without Git history; generated and operational trees are excluded by construction, and a finding, failed copy, or unavailable scanner fails closed and blocks completion.
 - **@/gate/security-review** — Security review completed: Manual threat-model review covers path containment, symlink and junction races, recovery journals, untrusted manifest content, dependency risk, and secrets.
 - **@/gate/tdd-reminder** — TDD Reminder: Write tests first
 - **@/gate/tests** — All Tests Pass: Full test suite must pass

@@ -310,7 +310,7 @@ pass_context = false
 version = 1
 key = "secret-detection"
 title = "No secrets in code"
-description = "gitleaks scans working-tree content without Git history; a finding or unavailable scanner fails closed and blocks completion."
+description = "gitleaks scans the working-tree version of every tracked file (scripts/secret-scan.sh) without Git history; generated and operational trees are excluded by construction, and a finding, failed copy, or unavailable scanner fails closed and blocks completion."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -318,8 +318,8 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "gitleaks detect --no-git"
-timeout_seconds = 20
+command = "./scripts/secret-scan.sh"
+timeout_seconds = 120
 pass_context = false
 
 [gates.checker.env]
