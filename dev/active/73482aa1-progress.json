@@ -53,7 +53,8 @@
           "title": "Bound debug information and gate incremental state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "in_rework",
+          "note": "merged to main 359f32cf; cargo-ci passed; code-review FAILED round 1 (F1 high: REQ-04 must be deterministic in the gate, not a one-off isolated run; F2: hand-copied 246.7/193.7 MiB + ~19 GiB figures violate @/inv/single-source-prose). Rework dispatched to same worker/worktree"
         },
         {
           "short_id": "3398bc19",
@@ -109,7 +110,8 @@
   "escalations": [],
   "rework_counts": {
     "4e22a20d": 2,
-    "5d862134": 1
+    "5d862134": 1,
+    "57d0eb79": 1
   },
   "started_at": "2026-07-14T20:00:00Z"
 }
