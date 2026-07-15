@@ -9,7 +9,8 @@ use super::transaction_action::{
     FileIdentity, JournalActionKind, TargetIdentity, TransactionAction,
 };
 use super::transaction_journal::{
-    JournalAction, TransactionDecision, TransactionJournal, JOURNAL_FILE, JOURNAL_VERSION,
+    JournalAction, RollbackActionState, TransactionDecision, TransactionJournal, JOURNAL_FILE,
+    JOURNAL_VERSION,
 };
 use super::transaction_recovery::{
     FailurePoint, FileTransactionError, NoTransactionFailures, RecoveryRequiredError,
@@ -355,7 +356,11 @@ impl FileTransactionKernel {
             }
         };
         preflight_volume(&control.stages, &self.root, action.path())?;
-        Ok(JournalAction { action, original })
+        Ok(JournalAction {
+            action,
+            original,
+            rollback_state: RollbackActionState::Pending,
+        })
     }
 
     fn publish_actions(&self, control: &ControlDirs, journal: &TransactionJournal) -> Result<()> {
@@ -403,8 +408,18 @@ impl FileTransactionKernel {
                     }
                     JournalActionKind::SetMode {
                         path, unix_mode, ..
-                    } => set_mode(&parent, &leaf, Some(*unix_mode))
-                        .with_context(|| format!("setting mode on {path}"))?,
+                    } => {
+                        self.injector
+                            .check(&FailurePoint::BeforeModeMutation { action: index })?;
+                        let TargetIdentity::File { identity } = &action.original else {
+                            return Err(FileTransactionError::UnsupportedTarget {
+                                path: path.clone(),
+                            }
+                            .into());
+                        };
+                        set_mode_if_identity(&parent, &leaf, identity, Some(*unix_mode))
+                            .with_context(|| format!("setting mode on {path}"))?;
+                    }
                 }
                 self.injector
                     .check(&FailurePoint::SyncTargetParent { action: index })?;
@@ -416,11 +431,23 @@ impl FileTransactionKernel {
     }
 
     fn rollback(&self, control: &ControlDirs, journal: &mut TransactionJournal) -> Result<()> {
-        for (index, action) in journal.actions.iter().enumerate().rev() {
+        for index in (0..journal.actions.len()).rev() {
+            if journal.actions[index].rollback_state == RollbackActionState::Restored {
+                verify_restored_action(&self.root, control, &journal.actions[index])?;
+                continue;
+            }
             self.injector
                 .check(&FailurePoint::ReverseAction { action: index })?;
-            reverse_action(&self.root, control, action)
-                .with_context(|| format!("reversing durable transaction action {index}"))?;
+            reverse_action(
+                &self.root,
+                control,
+                &journal.actions[index],
+                &*self.injector,
+                index,
+            )
+            .with_context(|| format!("reversing durable transaction action {index}"))?;
+            journal.actions[index].rollback_state = RollbackActionState::Restored;
+            self.write_journal(&control.transaction, journal)?;
             self.injector
                 .check(&FailurePoint::SyncReverseParent { action: index })?;
         }
@@ -565,7 +592,13 @@ fn ensure_published_identity(root: &Dir, action: &JournalAction) -> Result<()> {
     }
 }
 
-fn reverse_action(root: &Dir, control: &ControlDirs, entry: &JournalAction) -> Result<()> {
+fn reverse_action(
+    root: &Dir,
+    control: &ControlDirs,
+    entry: &JournalAction,
+    injector: &dyn TransactionFailureInjector,
+    action_index: usize,
+) -> Result<()> {
     let (parent, leaf) = match open_parent(root, entry.action.path(), false) {
         Ok(value) => value,
         Err(error)
@@ -594,7 +627,25 @@ fn reverse_action(root: &Dir, control: &ControlDirs, entry: &JournalAction) -> R
             backup_name,
             ..
         } => {
-            match inspect_leaf(&parent, &leaf)? {
+            let current = inspect_leaf(&parent, &leaf)?;
+            if current == entry.original {
+                let backup = inspect_leaf(&control.backups, backup_name)?;
+                match backup {
+                    TargetIdentity::Absent => return Ok(()),
+                    value if value == entry.original => {
+                        control.backups.remove_file(backup_name)?;
+                        sync_directory(&control.backups)?;
+                        return Ok(());
+                    }
+                    _ => {
+                        return Err(FileTransactionError::UnexpectedOccupant {
+                            path: format!("backup for {path}"),
+                        }
+                        .into())
+                    }
+                }
+            }
+            match current {
                 TargetIdentity::Absent => {}
                 TargetIdentity::File { identity } if identity == *final_identity => {
                     parent.remove_file(&leaf)?;
@@ -626,16 +677,43 @@ fn reverse_action(root: &Dir, control: &ControlDirs, entry: &JournalAction) -> R
             final_identity,
             ..
         } => {
-            ensure_identity(
-                &parent,
-                &leaf,
-                &TargetIdentity::File {
+            let current = inspect_leaf(&parent, &leaf)?;
+            if current == entry.original {
+                return Ok(());
+            }
+            if current
+                != (TargetIdentity::File {
                     identity: final_identity.clone(),
-                },
-                path,
-            )?;
-            set_mode(&parent, &leaf, *original_mode)?;
+                })
+            {
+                return Err(FileTransactionError::UnexpectedOccupant { path: path.clone() }.into());
+            }
+            injector.check(&FailurePoint::BeforeReverseModeMutation {
+                action: action_index,
+            })?;
+            set_mode_if_identity(&parent, &leaf, final_identity, *original_mode)?;
             sync_directory(&parent)?;
+        }
+    }
+    Ok(())
+}
+
+fn verify_restored_action(root: &Dir, control: &ControlDirs, entry: &JournalAction) -> Result<()> {
+    if inspect_target(root, entry.action.path())? != entry.original {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: entry.action.path().to_string(),
+        }
+        .into());
+    }
+    if let JournalActionKind::WriteFile {
+        path, backup_name, ..
+    } = &entry.action
+    {
+        if inspect_leaf(&control.backups, backup_name)? != TargetIdentity::Absent {
+            return Err(FileTransactionError::UnexpectedOccupant {
+                path: format!("backup for {path}"),
+            }
+            .into());
         }
     }
     Ok(())
@@ -813,17 +891,18 @@ fn inspect_leaf(parent: &Dir, leaf: &str) -> Result<TargetIdentity> {
 }
 
 fn inspect_file(parent: &Dir, leaf: &str) -> Result<FileIdentity> {
+    let mut file = open_regular_file_nofollow(parent, leaf)?;
+    inspect_open_file(&mut file, leaf)
+}
+
+fn inspect_open_file(file: &mut cap_std::fs::File, path: &str) -> Result<FileIdentity> {
     #[cfg(unix)]
     use cap_std::fs::PermissionsExt as _;
 
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(leaf, &options)?;
     let metadata = file.metadata()?;
     if !metadata.is_file() {
         return Err(FileTransactionError::UnsupportedTarget {
-            path: leaf.to_string(),
+            path: path.to_string(),
         }
         .into());
     }
@@ -839,6 +918,20 @@ fn inspect_file(parent: &Dir, leaf: &str) -> Result<FileIdentity> {
         byte_size: bytes.len() as u64,
         unix_mode,
     })
+}
+
+fn open_regular_file_nofollow(parent: &Dir, leaf: &str) -> Result<cap_std::fs::File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let file = parent.open_with(leaf, &options)?;
+    if !file.metadata()?.is_file() {
+        return Err(FileTransactionError::UnsupportedTarget {
+            path: leaf.to_string(),
+        }
+        .into());
+    }
+    Ok(file)
 }
 
 fn ensure_identity(parent: &Dir, leaf: &str, expected: &TargetIdentity, path: &str) -> Result<()> {
@@ -1020,11 +1113,41 @@ fn set_mode(parent: &Dir, leaf: &str, mode: Option<u32>) -> Result<()> {
     #[cfg(unix)]
     if let Some(mode) = mode {
         use cap_std::fs::PermissionsExt;
-        parent.set_permissions(leaf, cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
-        parent.open(leaf)?.sync_all()?;
+        let file = open_regular_file_nofollow(parent, leaf)?;
+        file.set_permissions(cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
+        file.sync_all()?;
     }
     #[cfg(not(unix))]
     let _ = (parent, leaf, mode);
+    Ok(())
+}
+
+fn set_mode_if_identity(
+    parent: &Dir,
+    leaf: &str,
+    expected: &FileIdentity,
+    mode: Option<u32>,
+) -> Result<()> {
+    let mut file = open_regular_file_nofollow(parent, leaf)?;
+    let actual = inspect_open_file(&mut file, leaf)?;
+    if actual != *expected {
+        return Err(FileTransactionError::UnexpectedOccupant {
+            path: leaf.to_string(),
+        }
+        .into());
+    }
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt;
+        if let Some(mode) = mode {
+            file.set_permissions(cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
+            file.sync_all()?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = mode;
+    }
     Ok(())
 }
 
@@ -1307,6 +1430,134 @@ mod tests {
     }
 
     #[test]
+    fn test_sync_reverse_parent_failure_resumes_from_durable_action_progress() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        std::fs::write(temp.path().join("target.txt"), b"old").unwrap();
+        let failures = Arc::new(SelectedFailures::new([
+            FailurePoint::AfterPublish { action: 0 },
+            FailurePoint::SyncReverseParent { action: 0 },
+        ]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "reverse-parent-progress".to_string(),
+                    actions: vec![write("target.txt", b"new")],
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+            RecoveryState::Prepared
+        );
+        assert_eq!(
+            std::fs::read(temp.path().join("target.txt")).unwrap(),
+            b"old"
+        );
+
+        kernel.recover(&guard, "reverse-parent-progress").unwrap();
+        assert_eq!(
+            kernel.recovery_state("reverse-parent-progress").unwrap(),
+            None
+        );
+        assert_eq!(
+            std::fs::read(temp.path().join("target.txt")).unwrap(),
+            b"old"
+        );
+    }
+
+    #[test]
+    fn test_recovery_skips_durably_restored_replacement_after_later_reverse_failure() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        std::fs::write(temp.path().join("first.txt"), b"first-old").unwrap();
+        std::fs::write(temp.path().join("second.txt"), b"second-old").unwrap();
+        let failures = Arc::new(SelectedFailures::new([
+            FailurePoint::AfterPublish { action: 1 },
+            FailurePoint::ReverseAction { action: 0 },
+        ]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "replacement-progress".to_string(),
+                    actions: vec![
+                        write("first.txt", b"first-new"),
+                        write("second.txt", b"second-new"),
+                    ],
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+            RecoveryState::Prepared
+        );
+        let journal: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(
+                temp.path()
+                    .join(".jit/tmp/transactions/replacement-progress/journal.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(journal["actions"][1]["rollback_state"], "restored");
+        assert_eq!(
+            std::fs::read(temp.path().join("second.txt")).unwrap(),
+            b"second-old"
+        );
+
+        FileTransactionKernel::new(root_capability(&temp))
+            .unwrap()
+            .recover(&guard, "replacement-progress")
+            .unwrap();
+        assert_eq!(
+            std::fs::read(temp.path().join("first.txt")).unwrap(),
+            b"first-old"
+        );
+        assert_eq!(
+            std::fs::read(temp.path().join("second.txt")).unwrap(),
+            b"second-old"
+        );
+    }
+
+    #[test]
+    fn test_after_rename_aside_failure_restores_original_without_overwrite() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        std::fs::write(temp.path().join("replace.txt"), b"old").unwrap();
+        let failures = Arc::new(SelectedFailures::new([FailurePoint::AfterRenameAside {
+            action: 0,
+        }]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        assert!(kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "rename-aside".to_string(),
+                    actions: vec![write("replace.txt", b"new")],
+                },
+            )
+            .is_err());
+        assert_eq!(
+            std::fs::read(temp.path().join("replace.txt")).unwrap(),
+            b"old"
+        );
+        assert_eq!(kernel.recovery_state("rename-aside").unwrap(), None);
+    }
+
+    #[test]
     fn test_fresh_root_rollback_removes_jit_before_terminal_journal_cleanup() {
         let temp = TempDir::new().unwrap();
         let failures = Arc::new(SelectedFailures::new([
@@ -1350,6 +1601,45 @@ mod tests {
             removed < terminal,
             "absence is synchronized before terminal rollback"
         );
+    }
+
+    #[test]
+    fn test_fresh_root_removal_boundaries_retain_prepared_journal_and_resume() {
+        for (id, boundary) in [
+            ("before-root-remove", FailurePoint::BeforeFreshRootRemoval),
+            ("after-root-remove", FailurePoint::AfterFreshRootRemoval),
+        ] {
+            let temp = TempDir::new().unwrap();
+            let failures = Arc::new(SelectedFailures::new([
+                FailurePoint::AfterPublish { action: 1 },
+                boundary,
+            ]));
+            let kernel =
+                FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+            let (_lock, guard) = acquired_guard(&temp);
+            let error = kernel
+                .execute(
+                    &guard,
+                    FileTransactionPlan {
+                        transaction_id: id.to_string(),
+                        actions: vec![write(".jit/index.json", b"{}")],
+                    },
+                )
+                .unwrap_err();
+            assert_eq!(
+                error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+                RecoveryState::Prepared
+            );
+            assert_eq!(
+                kernel.recovery_state(id).unwrap(),
+                Some(RecoveryState::Prepared)
+            );
+            FileTransactionKernel::new(root_capability(&temp))
+                .unwrap()
+                .recover(&guard, id)
+                .unwrap();
+            assert!(!temp.path().join(".jit").exists());
+        }
     }
 
     #[test]
@@ -1632,6 +1922,315 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_before_mode_mutation_failure_leaves_original_mode() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        let target = temp.path().join("mode.txt");
+        std::fs::write(&target, b"mode").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let failures = Arc::new(SelectedFailures::new([FailurePoint::BeforeModeMutation {
+            action: 0,
+        }]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        assert!(kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-forward".to_string(),
+                    actions: vec![TransactionAction::SetMode {
+                        path: "mode.txt".to_string(),
+                        unix_mode: 0o755,
+                    }],
+                },
+            )
+            .is_err());
+        assert_eq!(kernel.recovery_state("mode-forward").unwrap(), None);
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_set_mode_forward_and_reverse_failures_are_injectable_and_resumable() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        let target = temp.path().join("mode.txt");
+        std::fs::write(&target, b"mode").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let failures = Arc::new(SelectedFailures::new([
+            FailurePoint::SyncTargetParent { action: 0 },
+            FailurePoint::BeforeReverseModeMutation { action: 0 },
+        ]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures.clone()).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-reverse".to_string(),
+                    actions: vec![TransactionAction::SetMode {
+                        path: "mode.txt".to_string(),
+                        unix_mode: 0o755,
+                    }],
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+            RecoveryState::Prepared
+        );
+        assert!(failures
+            .observed()
+            .contains(&FailurePoint::BeforeModeMutation { action: 0 }));
+
+        FileTransactionKernel::new(root_capability(&temp))
+            .unwrap()
+            .recover(&guard, "mode-reverse")
+            .unwrap();
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_recovery_skips_durably_restored_mode_after_later_reverse_failure() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        for name in ["first-mode.txt", "second-mode.txt"] {
+            let path = temp.path().join(name);
+            std::fs::write(&path, b"mode").unwrap();
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let failures = Arc::new(SelectedFailures::new([
+            FailurePoint::SyncTargetParent { action: 1 },
+            FailurePoint::ReverseAction { action: 0 },
+        ]));
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-progress".to_string(),
+                    actions: vec![
+                        TransactionAction::SetMode {
+                            path: "first-mode.txt".to_string(),
+                            unix_mode: 0o755,
+                        },
+                        TransactionAction::SetMode {
+                            path: "second-mode.txt".to_string(),
+                            unix_mode: 0o755,
+                        },
+                    ],
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+            RecoveryState::Prepared
+        );
+        let journal: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(
+                temp.path()
+                    .join(".jit/tmp/transactions/mode-progress/journal.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(journal["actions"][1]["rollback_state"], "restored");
+
+        FileTransactionKernel::new(root_capability(&temp))
+            .unwrap()
+            .recover(&guard, "mode-progress")
+            .unwrap();
+        for name in ["first-mode.txt", "second-mode.txt"] {
+            assert_eq!(
+                std::fs::metadata(temp.path().join(name))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_set_mode_leaf_symlink_swap_cannot_mutate_external_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt as _};
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        let target = temp.path().join("mode.txt");
+        let moved = temp.path().join("mode-original.txt");
+        std::fs::write(&target, b"inside").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let outside = TempDir::new().unwrap();
+        let outside_target = outside.path().join("outside.txt");
+        std::fs::write(&outside_target, b"outside").unwrap();
+        std::fs::set_permissions(&outside_target, std::fs::Permissions::from_mode(0o640)).unwrap();
+        let hook_target = target.clone();
+        let hook_moved = moved.clone();
+        let hook_outside = outside_target.clone();
+        let injector = Arc::new(HookInjector {
+            point: FailurePoint::BeforeModeMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_moved).unwrap();
+                symlink(&hook_outside, &hook_target).unwrap();
+            }))),
+        });
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), injector).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-symlink-race".to_string(),
+                    actions: vec![TransactionAction::SetMode {
+                        path: "mode.txt".to_string(),
+                        unix_mode: 0o755,
+                    }],
+                },
+            )
+            .unwrap_err();
+        assert!(error.downcast_ref::<RecoveryRequiredError>().is_some());
+        assert_eq!(
+            std::fs::metadata(&outside_target)
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+        assert_eq!(
+            std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_set_mode_leaf_symlink_swap_cannot_mutate_external_target_on_windows() {
+        use std::os::windows::fs::symlink_file;
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        let target = temp.path().join("target.txt");
+        let moved = temp.path().join("target.moved");
+        let outside = temp.path().join("outside.txt");
+        let probe = temp.path().join("symlink-probe");
+        std::fs::write(&target, b"target").unwrap();
+        std::fs::write(&outside, b"outside").unwrap();
+        if symlink_file(&outside, &probe).is_err() {
+            return;
+        }
+        std::fs::remove_file(&probe).unwrap();
+
+        let hook_target = target.clone();
+        let hook_moved = moved.clone();
+        let hook_outside = outside.clone();
+        let injector = Arc::new(HookInjector {
+            point: FailurePoint::BeforeModeMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_moved).unwrap();
+                symlink_file(&hook_outside, &hook_target).unwrap();
+            }))),
+        });
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), injector).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-symlink-race-windows".to_string(),
+                    actions: vec![TransactionAction::SetMode {
+                        path: "target.txt".to_string(),
+                        unix_mode: 0o755,
+                    }],
+                },
+            )
+            .unwrap_err();
+        assert!(error.downcast_ref::<RecoveryRequiredError>().is_some());
+        assert_eq!(std::fs::read(&outside).unwrap(), b"outside");
+
+        std::fs::remove_file(&target).unwrap();
+        std::fs::rename(&moved, &target).unwrap();
+        kernel.recover(&guard, "mode-symlink-race-windows").unwrap();
+        assert_eq!(std::fs::read(&outside).unwrap(), b"outside");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_set_mode_revalidates_identity_on_the_mutated_handle() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
+        let target = temp.path().join("mode.txt");
+        let moved = temp.path().join("mode-original.txt");
+        std::fs::write(&target, b"inside").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let hook_target = target.clone();
+        let hook_moved = moved.clone();
+        let injector = Arc::new(HookInjector {
+            point: FailurePoint::BeforeModeMutation { action: 0 },
+            hook: Mutex::new(Some(Box::new(move || {
+                std::fs::rename(&hook_target, &hook_moved).unwrap();
+                std::fs::write(&hook_target, b"unexpected").unwrap();
+                std::fs::set_permissions(&hook_target, std::fs::Permissions::from_mode(0o640))
+                    .unwrap();
+            }))),
+        });
+        let kernel =
+            FileTransactionKernel::with_injector(root_capability(&temp), injector).unwrap();
+        let (_lock, guard) = acquired_guard(&temp);
+
+        let error = kernel
+            .execute(
+                &guard,
+                FileTransactionPlan {
+                    transaction_id: "mode-regular-race".to_string(),
+                    actions: vec![TransactionAction::SetMode {
+                        path: "mode.txt".to_string(),
+                        unix_mode: 0o755,
+                    }],
+                },
+            )
+            .unwrap_err();
+        assert!(error.downcast_ref::<RecoveryRequiredError>().is_some());
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+        assert_eq!(
+            std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
     #[cfg(windows)]
     #[test]
     fn test_write_file_reports_unix_mode_as_not_applicable_on_windows() {
@@ -1697,6 +2296,91 @@ mod tests {
                 observed.contains(&expected),
                 "missing injection point {expected:?}"
             );
+        }
+    }
+
+    #[test]
+    fn test_each_forward_failure_point_preserves_atomic_outcome() {
+        for (id, failure, expected_final) in [
+            ("fail-stage", FailurePoint::Stage { action: 0 }, false),
+            (
+                "fail-stage-sync",
+                FailurePoint::SyncStage { action: 0 },
+                false,
+            ),
+            (
+                "fail-prepared-sync",
+                FailurePoint::SyncJournal {
+                    decision: RecoveryState::Prepared,
+                },
+                false,
+            ),
+            (
+                "fail-before-action",
+                FailurePoint::BeforeAction { action: 0 },
+                false,
+            ),
+            (
+                "fail-after-parent-open",
+                FailurePoint::AfterParentOpen { action: 0 },
+                false,
+            ),
+            (
+                "fail-after-publish",
+                FailurePoint::AfterPublish { action: 0 },
+                false,
+            ),
+            (
+                "fail-target-parent-sync",
+                FailurePoint::SyncTargetParent { action: 0 },
+                false,
+            ),
+            (
+                "fail-committed-sync",
+                FailurePoint::SyncJournal {
+                    decision: RecoveryState::Committed,
+                },
+                true,
+            ),
+            ("fail-cleanup", FailurePoint::CleanupTerminalResidue, true),
+        ] {
+            let temp = TempDir::new().unwrap();
+            std::fs::create_dir(temp.path().join(".jit")).unwrap();
+            let failures = Arc::new(SelectedFailures::new([failure]));
+            let kernel =
+                FileTransactionKernel::with_injector(root_capability(&temp), failures).unwrap();
+            let (_lock, guard) = acquired_guard(&temp);
+            assert!(kernel
+                .execute(
+                    &guard,
+                    FileTransactionPlan {
+                        transaction_id: id.to_string(),
+                        actions: vec![write("target.txt", b"final")],
+                    },
+                )
+                .is_err());
+
+            assert_eq!(
+                temp.path().join("target.txt").exists(),
+                expected_final,
+                "unexpected target outcome after {id}"
+            );
+            if let Some(state) = kernel.recovery_state(id).unwrap() {
+                assert!(matches!(
+                    state,
+                    RecoveryState::Prepared | RecoveryState::Committed
+                ));
+                kernel.recover(&guard, id).unwrap();
+            }
+            assert_eq!(kernel.recovery_state(id).unwrap(), None);
+            if expected_final {
+                assert_eq!(
+                    std::fs::read(temp.path().join("target.txt")).unwrap(),
+                    b"final"
+                );
+            } else {
+                assert!(!temp.path().join("target.txt").exists());
+            }
         }
     }
 
