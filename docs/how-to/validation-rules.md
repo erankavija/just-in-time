@@ -399,7 +399,7 @@ None of these is built into JIT. They are configuration over one engine.
 ## Verifying your own ruleset
 
 A ruleset is "real" when it loads and behaves. The shipped examples are checked
-by [`crates/jit/tests/example_rulesets_tests.rs`](../../crates/jit/tests/example_rulesets_tests.rs),
+by [`crates/jit/tests/fast_rules/example_rulesets_tests.rs`](../../crates/jit/tests/fast_rules/example_rulesets_tests.rs),
 which loads each `rules.toml` through the production loader and asserts a
 compliant sample issue passes and a non-compliant one fails through the real
 engine. To check your own rules in your project, run:
