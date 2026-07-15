@@ -40,6 +40,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Automatic Rust build-footprint budget enforcement in the `cargo-ci` gate.**
+  A committed checker, `scripts/rust-build-budget.sh`, derives the logical test
+  topology and active-executable footprint from Cargo output rather than
+  scanning stale `target/` artifacts: it counts integration-test targets from
+  `cargo metadata` (fails above 12) and sums the unique active test-executable
+  sizes from `cargo test --workspace --no-run --message-format=json` (fails
+  above 2 GiB), and it asserts the debug-profile, gate-incremental, and
+  dependency-feature (no remote JSON Schema resolution, one TLS backend)
+  policies against the committed manifests and gate script. The budgets and
+  their evidence are defined once in the checker and
+  `dev/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
+  as a `budget` step after its test step, reusing warm Cargo artifacts (no
+  second cold build), and folds a concise footprint summary into the persisted
+  gate summary; over-budget or policy-drift runs fail with a diagnostic naming
+  the observed value, the limit, and the corrective area. Each failure mode has
+  an injectable-input regression fixture in
+  `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that runs
+  without compilation.
+
 - **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
   path that runs an automated checker: `gate pass`, `gate pass-all`, and a
   state transition's pre/postchecks) refuses to run a checker when BOTH (1)

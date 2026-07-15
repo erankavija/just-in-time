@@ -176,8 +176,18 @@ model and subsystem:
 | --- | --- | --- |
 | `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
 | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary and merged-commit checks) |
+| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary and merged-commit checks), plus the build-footprint budget-checker fixtures |
 | `provenance_contract` | `#[ignore]`d contracts | build-provenance stability, run by `scripts/cargo-ci.sh` under `--ignored` |
+
+The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
+its test step, on warm Cargo artifacts. The checker derives the integration-test
+target count and unique active test-executable bytes from `cargo metadata` and
+`cargo test --workspace --no-run --message-format=json`, and asserts the debug
+profile, gate incremental, and dependency-feature policies, failing the gate when
+a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
+(`--metadata-json`, `--artifacts-json`, `--root`), so
+`scratch_build/rust_build_budget_checker_tests.rs` exercises each failure mode
+with synthetic JSON and sparse executables — no compilation.
 
 Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
 they never surface as their own test targets. Add a new integration case to the file that
