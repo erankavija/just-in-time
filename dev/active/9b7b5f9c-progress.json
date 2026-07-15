@@ -7,7 +7,7 @@
       "wave_number": 1,
       "issues": [
         {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
-        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "rework_attempt_1"},
+        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "gates_passed_waiting_wave"},
         {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "escalated_max_rework"}
       ]
     },

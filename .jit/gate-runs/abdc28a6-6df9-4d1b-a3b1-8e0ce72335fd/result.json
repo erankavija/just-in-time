@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "abdc28a6-6df9-4d1b-a3b1-8e0ce72335fd",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "92039d9c-1433-4b24-b3f6-2c206648cc8f",
+  "commit": "70da02d51ccbcbe45af35bd17c2e4a5577a78779",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T15:17:39.451909888Z",
+  "completed_at": "2026-07-15T15:19:19.688580828Z",
+  "duration_ms": 100236,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a leaf, with no resolved children. I reviewed the eight reachable `jit:92039d9c` commits individually (including merge-parent patches); no fallback attribution was needed, and uncommitted changes were excluded.\n\nThe prior blocking finding is resolved. The current reference provides accurate native-checker configuration and placeholder-warning behavior in [gate-presets.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/gate-presets.md:24), with appropriate supporting concept, how-to, and CLI-reference updates. No issue-impact documentation defects remain.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Native portable checkers and placeholder-review warnings are accurately documented in the affected documentation cone.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Native portable checkers and placeholder-review warnings are accurately documented in the affected documentation cone.",
+    "findings": []
+  }
+}
