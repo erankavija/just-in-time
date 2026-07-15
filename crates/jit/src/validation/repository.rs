@@ -66,6 +66,51 @@ pub struct RepositoryValidationReport {
     pub rule_report: RuleReport,
 }
 
+/// A structural repository-validation failure with all semantic findings that
+/// could still be collected from the already loaded [`RepositoryView`].
+///
+/// Callers that render validation output should inspect [`Self::report`] before
+/// propagating [`Self::into_error`]. This keeps a structural failure authoritative
+/// without discarding rule findings or rerunning rules through another data source.
+#[derive(Debug)]
+pub struct RepositoryValidationFailure {
+    error: anyhow::Error,
+    report: RepositoryValidationReport,
+}
+
+impl RepositoryValidationFailure {
+    fn new(error: anyhow::Error, report: RepositoryValidationReport) -> Self {
+        Self { error, report }
+    }
+
+    /// Partial validation report collected from the exact supplied view.
+    pub fn report(&self) -> &RepositoryValidationReport {
+        &self.report
+    }
+
+    /// Consume the failure into its structural error and partial report.
+    pub fn into_parts(self) -> (anyhow::Error, RepositoryValidationReport) {
+        (self.error, self.report)
+    }
+
+    /// Consume the failure into its authoritative structural error.
+    pub fn into_error(self) -> anyhow::Error {
+        self.error
+    }
+}
+
+impl std::fmt::Display for RepositoryValidationFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:#}", self.error)
+    }
+}
+
+impl std::error::Error for RepositoryValidationFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.error.as_ref())
+    }
+}
+
 /// A read-only repository byte source.
 ///
 /// Paths are relative to the repository root. Implementations must never follow
@@ -248,9 +293,24 @@ impl RepositoryView for OverlayRepositoryView {
 
 /// Validate the exact repository exposed by `view` through the full read-only
 /// pipeline.
-pub fn validate_repository(view: &dyn RepositoryView) -> Result<RepositoryValidationReport> {
+pub fn validate_repository(
+    view: &dyn RepositoryView,
+) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
     let mut passes = Vec::new();
-    let config = load_config(view).context("effective-config validation pass")?;
+    let config = match load_config(view).context("effective-config validation pass") {
+        Ok(config) => config,
+        Err(error) => {
+            return Err(RepositoryValidationFailure::new(
+                error,
+                RepositoryValidationReport {
+                    passes,
+                    issue_count: 0,
+                    event_count: 0,
+                    rule_report: RuleReport::default(),
+                },
+            ));
+        }
+    };
     passes.push(RepositoryValidationPass::EffectiveConfig);
 
     let namespaces =
@@ -272,50 +332,127 @@ pub fn validate_repository(view: &dyn RepositoryView) -> Result<RepositoryValida
     };
     passes.push(RepositoryValidationPass::RulesAndSchemas);
 
-    let gates = load_gates(view).context("gates validation pass")?;
-    passes.push(RepositoryValidationPass::Gates);
+    let mut structural_error = None;
+    let gates = match load_gates(view).context("gates validation pass") {
+        Ok(gates) => {
+            passes.push(RepositoryValidationPass::Gates);
+            Some(gates)
+        }
+        Err(error) => {
+            structural_error = Some(error);
+            None
+        }
+    };
 
-    let records = load_records(view).context("records validation pass")?;
-    passes.push(RepositoryValidationPass::Records);
+    let records = match load_records(view).context("records validation pass") {
+        Ok(records) => {
+            passes.push(RepositoryValidationPass::Records);
+            Some(records)
+        }
+        Err(error) => {
+            if structural_error.is_none() {
+                structural_error = Some(error);
+            }
+            None
+        }
+    };
 
-    validate_integrity(view, &records.issues, &gates)
-        .context("repository-integrity validation pass")?;
-    validate_machine_local_claims(view.repository_root())
-        .context("repository-integrity validation pass")?;
-    passes.push(RepositoryValidationPass::RepositoryIntegrity);
+    if let (Some(records), Some(gates)) = (&records, &gates) {
+        let integrity_error = validate_integrity(view, &records.issues, gates)
+            .context("repository-integrity validation pass")
+            .err();
+        if let Some(error) = integrity_error {
+            if structural_error.is_none() {
+                structural_error = Some(error);
+            }
+        } else if structural_error.is_none() {
+            structural_error = validate_machine_local_claims(view.repository_root())
+                .context("repository-integrity validation pass")
+                .err();
+            if structural_error.is_none() {
+                passes.push(RepositoryValidationPass::RepositoryIntegrity);
+            }
+        }
+    }
+
+    let mut namespace_and_hierarchy_complete = true;
+    if rules_loaded {
+        if let Some(records) = &records {
+            match collect_rule_findings(view, &records.issues, &rules, &namespaces, &config)
+                .context("namespace-and-hierarchy validation pass")
+            {
+                Ok(rule_findings) => findings.extend(rule_findings),
+                Err(error) => {
+                    namespace_and_hierarchy_complete = false;
+                    if structural_error.is_none() {
+                        structural_error = Some(error);
+                    }
+                }
+            }
+        } else {
+            namespace_and_hierarchy_complete = false;
+        }
+    }
+    if let Some(gates) = &gates {
+        findings.extend(collect_enforcement_drift_findings(
+            &config,
+            rules_loaded.then_some(&rules),
+            gates,
+        ));
+        findings.extend(collect_review_placeholder_findings(gates));
+    } else {
+        namespace_and_hierarchy_complete = false;
+    }
+    if namespace_and_hierarchy_complete {
+        passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
+    }
+
+    if let Some(records) = &records {
+        match collect_item_link_findings(view, &records.issues, &config)
+            .context("item-links validation pass")
+        {
+            Ok(item_findings) => {
+                findings.extend(item_findings);
+                passes.push(RepositoryValidationPass::ItemLinks);
+            }
+            Err(error) => {
+                if structural_error.is_none() {
+                    structural_error = Some(error);
+                }
+            }
+        }
+    }
 
     if rules_loaded {
-        findings.extend(
-            collect_rule_findings(view, &records.issues, &rules, &namespaces, &config)
-                .context("namespace-and-hierarchy validation pass")?,
-        );
+        if let Some(gates) = &gates {
+            match validate_projections(view, &config, &rules, gates)
+                .context("projections validation pass")
+            {
+                Ok(()) => passes.push(RepositoryValidationPass::Projections),
+                Err(error) => {
+                    if structural_error.is_none() {
+                        structural_error = Some(error);
+                    }
+                }
+            }
+        }
+    } else if gates.is_some() {
+        passes.push(RepositoryValidationPass::Projections);
     }
-    findings.extend(collect_enforcement_drift_findings(
-        &config,
-        rules_loaded.then_some(&rules),
-        &gates,
-    ));
-    findings.extend(collect_review_placeholder_findings(&gates));
-    passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
 
-    findings.extend(
-        collect_item_link_findings(view, &records.issues, &config)
-            .context("item-links validation pass")?,
-    );
-    passes.push(RepositoryValidationPass::ItemLinks);
-
-    if rules_loaded {
-        validate_projections(view, &config, &rules, &gates)
-            .context("projections validation pass")?;
-    }
-    passes.push(RepositoryValidationPass::Projections);
-
-    Ok(RepositoryValidationReport {
+    let (issue_count, event_count) = records.as_ref().map_or((0, 0), |records| {
+        (records.issues.len(), records.event_count)
+    });
+    let report = RepositoryValidationReport {
         passes,
-        issue_count: records.issues.len(),
-        event_count: records.event_count,
+        issue_count,
+        event_count,
         rule_report: RuleReport { findings },
-    })
+    };
+    match structural_error {
+        Some(error) => Err(RepositoryValidationFailure::new(error, report)),
+        None => Ok(report),
+    }
 }
 
 fn validate_relative(path: &Path) -> Result<()> {
@@ -1287,6 +1424,41 @@ mod tests {
         let report = validate_repository(&view).unwrap();
         assert_eq!(report.rule_report.error_count(), 1);
         assert_eq!(report.rule_report.findings[0].rule, "task-needs-req");
+    }
+
+    #[test]
+    fn test_repository_failure_retains_partial_rule_report() {
+        let repo = fixture();
+        let store = JsonFileStorage::new(repo.path().join(".jit"));
+        let mut issue = store.list_issues().unwrap().remove(0);
+        issue.dependencies.push("nonexistent".to_string());
+        let rules = "[[rules]]\nname = \"task-needs-req\"\nwhen = { type = \"task\" }\n\
+                     severity = \"error\"\nenforce = false\n\
+                     assert = { require-label = { label = \"req:*\", min = 1 } }\n";
+        let live = validate_repository(&FilesystemRepositoryView::new(repo.path())).unwrap();
+        assert!(!live.rule_report.has_errors());
+        let view = OverlayRepositoryView::new(
+            Arc::new(FilesystemRepositoryView::new(repo.path())),
+            [
+                (
+                    PathBuf::from(".jit/rules.toml"),
+                    Some(rules.as_bytes().to_vec()),
+                ),
+                (
+                    PathBuf::from(format!(".jit/issues/{}.json", issue.id)),
+                    Some(serde_json::to_vec_pretty(&issue).unwrap()),
+                ),
+            ],
+        )
+        .unwrap();
+
+        let failure = validate_repository(&view).unwrap_err();
+        assert!(failure.to_string().contains("does not exist"), "{failure}");
+        assert_eq!(failure.report().rule_report.error_count(), 1);
+        assert_eq!(
+            failure.report().rule_report.findings[0].rule,
+            "task-needs-req"
+        );
     }
 
     #[test]
