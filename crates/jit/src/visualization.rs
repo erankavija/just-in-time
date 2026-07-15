@@ -4,8 +4,80 @@
 //! like DOT (Graphviz) and Mermaid. These functions are Issue-specific and access
 //! Issue fields like title and state for rendering.
 
-use crate::domain::{Issue, State};
+use crate::domain::{Issue, Priority, State};
+use crate::graph::hierarchy::NodeHierarchy;
 use crate::graph::DependencyGraph;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+/// One edge in a `jit graph export --format json` document: a dependency from
+/// `from` (the dependent issue) to `to` (the prerequisite id). Shared verbatim
+/// by both the summary and `--full` shapes.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphExportEdge {
+    pub from: String,
+    pub to: String,
+}
+
+/// A node in the default (summary) `jit graph export --format json` shape.
+///
+/// Lean projection for orchestration loops: it deliberately omits the gate list
+/// (and every other heavy field). A consumer that needs an issue's gates asks
+/// for `--full`, whose node is the complete stored record ([`GraphExportFullNode`]).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphExportSummaryNode {
+    pub id: String,
+    pub short_id: String,
+    pub title: String,
+    pub state: State,
+    pub priority: Priority,
+    pub labels: Vec<String>,
+}
+
+/// A node in the `jit graph export --format json --full` shape: the complete
+/// stored [`Issue`] record — so the gate list appears under the storage names
+/// `gates_required` / `gates_status`, exactly as `.jit/issues/<id>.json` carries
+/// it — with the resolved-hierarchy facts (`parent`, `children`, `cluster`,
+/// `rank`) flattened alongside.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphExportFullNode {
+    #[serde(flatten)]
+    pub issue: Issue,
+    #[serde(flatten)]
+    pub hierarchy: NodeHierarchy,
+}
+
+/// The `{ nodes, edges }` document emitted by the default `jit graph export
+/// --format json` shape.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphExportSummaryResponse {
+    pub nodes: Vec<GraphExportSummaryNode>,
+    pub edges: Vec<GraphExportEdge>,
+}
+
+/// The `{ nodes, edges }` document emitted by `jit graph export --format json
+/// --full`. Declared alongside [`GraphExportSummaryResponse`] in `jit --schema`
+/// so a consumer can tell the gate-bearing full record from the gate-free
+/// summary without reading the source.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GraphExportFullResponse {
+    pub nodes: Vec<GraphExportFullNode>,
+    pub edges: Vec<GraphExportEdge>,
+}
+
+/// Build the shared edge list from a node set: one [`GraphExportEdge`] per
+/// stored dependency, so both export shapes derive edges identically.
+fn build_export_edges(all_nodes: &[&Issue]) -> Vec<GraphExportEdge> {
+    all_nodes
+        .iter()
+        .flat_map(|issue| {
+            issue.dependencies.iter().map(|dep_id| GraphExportEdge {
+                from: issue.id.clone(),
+                to: dep_id.clone(),
+            })
+        })
+        .collect()
+}
 
 /// Export Issue dependency graph as DOT format for Graphviz
 ///
@@ -149,22 +221,23 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
     let mut all_nodes = Vec::new();
     collect_all_nodes(graph, &mut all_nodes);
 
-    let nodes: Vec<serde_json::Value> = all_nodes
+    let nodes: Vec<GraphExportSummaryNode> = all_nodes
         .iter()
-        .map(|issue| {
-            let short_id: String = issue.id.chars().take(8).collect();
-            serde_json::json!({
-                "id": issue.id,
-                "short_id": short_id,
-                "title": issue.title,
-                "state": issue.state,
-                "priority": issue.priority,
-                "labels": issue.labels,
-            })
+        .map(|issue| GraphExportSummaryNode {
+            id: issue.id.clone(),
+            short_id: issue.id.chars().take(8).collect(),
+            title: issue.title.clone(),
+            state: issue.state,
+            priority: issue.priority,
+            labels: issue.labels.clone(),
         })
         .collect();
 
-    render_graph_json(nodes, &all_nodes)
+    let response = GraphExportSummaryResponse {
+        nodes,
+        edges: build_export_edges(&all_nodes),
+    };
+    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Export Issue dependency graph as JSON with COMPLETE node records (`--full`).
@@ -220,43 +293,19 @@ pub fn export_json_full(
     let mut all_nodes = Vec::new();
     collect_all_nodes(graph, &mut all_nodes);
 
-    let nodes: Vec<serde_json::Value> = all_nodes
+    let nodes: Vec<GraphExportFullNode> = all_nodes
         .iter()
-        .map(|issue| {
-            let mut value = serde_json::to_value(issue).unwrap_or(serde_json::Value::Null);
-            let facts = resolution.get(&issue.id).cloned().unwrap_or_default();
-            if let (Some(obj), Ok(serde_json::Value::Object(resolved))) =
-                (value.as_object_mut(), serde_json::to_value(&facts))
-            {
-                obj.extend(resolved);
-            }
-            value
+        .map(|issue| GraphExportFullNode {
+            issue: (*issue).clone(),
+            hierarchy: resolution.get(&issue.id).cloned().unwrap_or_default(),
         })
         .collect();
 
-    render_graph_json(nodes, &all_nodes)
-}
-
-/// Assemble the `{ "nodes", "edges" }` document, pretty-printed.
-///
-/// The `edges` list is derived from the same node set both export shapes share,
-/// so the two shapes differ ONLY in node contents (summary vs. full record).
-fn render_graph_json(nodes: Vec<serde_json::Value>, all_nodes: &[&Issue]) -> String {
-    let edges: Vec<serde_json::Value> = all_nodes
-        .iter()
-        .flat_map(|issue| {
-            issue
-                .dependencies
-                .iter()
-                .map(|dep_id| serde_json::json!({ "from": issue.id, "to": dep_id }))
-        })
-        .collect();
-
-    serde_json::to_string_pretty(&serde_json::json!({
-        "nodes": nodes,
-        "edges": edges,
-    }))
-    .unwrap_or_else(|_| "{}".to_string())
+    let response = GraphExportFullResponse {
+        nodes,
+        edges: build_export_edges(&all_nodes),
+    };
+    serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
 }
 
 // Helper function to collect all nodes from the graph

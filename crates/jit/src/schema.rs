@@ -493,6 +493,18 @@ impl CommandSchema {
                 Some(schema_to_value::<IssueUpdateResponse>()),
                 "IssueUpdateResponse",
             ),
+            // `issue status` projects each issue's gate list under the compact
+            // `gates` array, the same field name `issue show` uses.
+            "issue_status" => (
+                Some(schema_to_value::<IssueStatusResponse>()),
+                "IssueStatusResponse",
+            ),
+            // `issue children` wraps one `IssueStatusResponse` per child, so the
+            // same compact `gates` array reaches each entry.
+            "issue_children" => (
+                Some(schema_to_value::<IssueChildrenResponse>()),
+                "IssueChildrenResponse",
+            ),
 
             // Gate commands
             "gate_check-all" => (
@@ -500,12 +512,25 @@ impl CommandSchema {
                 "GateCheckAllResponse",
             ),
 
-            // Query commands
+            // Query commands emit two shapes: the default lean summary
+            // (`MinimalIssue` entries, no gate fields) and, under `--full`, the
+            // complete stored records (gate list under `gates_required` /
+            // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
+            // a missing gate field to the summary projection rather than the data.
             "query_available" | "query_all" | "query_ready" | "query_strategic"
-            | "query_closed" => (
-                Some(schema_to_value::<IssueListResponse>()),
-                "IssueListResponse",
-            ),
+            | "query_closed" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<IssueListResponse>(),
+                        schema_to_value::<IssueListFullResponse>(),
+                    ],
+                    "description": "Default shape: lean MinimalIssue entries (id, \
+                        short_id, title, state, priority) with no gate fields. \
+                        With --full: complete stored issue records, whose gate list \
+                        is carried under gates_required / gates_status."
+                });
+                (Some(union), "IssueListResponse")
+            }
             "query_blocked" => (
                 Some(schema_to_value::<BlockedListResponse>()),
                 "BlockedListResponse",
@@ -528,6 +553,26 @@ impl CommandSchema {
                 Some(schema_to_value::<GraphTreeResponse>()),
                 "GraphTreeResponse",
             ),
+            // `graph export --format json` emits two shapes: the default lean
+            // summary nodes (no gate fields) and, under `--full`, complete stored
+            // issue records (gate list under `gates_required` / `gates_status`)
+            // with the resolved hierarchy flattened on. Declaring both via `oneOf`
+            // makes the gate-free summary distinguishable from the full record.
+            "graph_export" => {
+                use crate::visualization::{GraphExportFullResponse, GraphExportSummaryResponse};
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<GraphExportSummaryResponse>(),
+                        schema_to_value::<GraphExportFullResponse>(),
+                    ],
+                    "description": "Default shape: lean summary nodes (id, short_id, \
+                        title, state, priority, labels) with no gate fields. With \
+                        --full: complete stored issue records, whose gate list is \
+                        carried under gates_required / gates_status, plus the \
+                        resolved-hierarchy fields (parent, children, cluster, rank)."
+                });
+                (Some(union), "GraphExportSummaryResponse")
+            }
 
             "gate_list" => (
                 Some(schema_to_value::<GateListResponse>()),
@@ -1357,5 +1402,85 @@ mod tests {
             "docs/reference/exit-codes.md is stale; regenerate with \
              UPDATE_EXIT_CODE_DOC=1 cargo test test_exit_code_reference_doc_is_current"
         );
+    }
+
+    /// Fetch the success schema published for a two-segment command path
+    /// (e.g. `issue`/`show`).
+    fn published_output_schema(parent: &str, child: &str) -> Value {
+        let schema = CommandSchema::generate();
+        let cmd = schema
+            .commands
+            .get(parent)
+            .and_then(|c| c.subcommands.as_ref())
+            .and_then(|s| s.get(child))
+            .unwrap_or_else(|| panic!("{parent} {child} subcommand should exist"));
+        let output = cmd
+            .output
+            .as_ref()
+            .unwrap_or_else(|| panic!("{parent} {child} should have an output schema"));
+        output
+            .success_schema
+            .clone()
+            .unwrap_or_else(|| panic!("{parent} {child} success_schema should be present"))
+    }
+
+    /// Recursively union the keys of every `properties` object anywhere in a JSON
+    /// Schema value, so the check is robust against `oneOf` arms, `$defs`, and
+    /// flattened sub-schemas — and against field names that merely appear in a
+    /// `description` string.
+    fn declared_property_names(schema: &Value) -> std::collections::HashSet<String> {
+        let mut names = std::collections::HashSet::new();
+        fn walk(value: &Value, names: &mut std::collections::HashSet<String>) {
+            match value {
+                Value::Object(map) => {
+                    if let Some(Value::Object(props)) = map.get("properties") {
+                        names.extend(props.keys().cloned());
+                    }
+                    for child in map.values() {
+                        walk(child, names);
+                    }
+                }
+                Value::Array(items) => items.iter().for_each(|i| walk(i, names)),
+                _ => {}
+            }
+        }
+        walk(schema, &mut names);
+        names
+    }
+
+    /// REQ-01/REQ-02/REQ-04: every projected issue view (`issue show`, its
+    /// `--summary`, and `issue status`) declares the gate list under the unified
+    /// `gates` field and never the raw storage names. A rename of the response
+    /// struct's field changes the derived schema and fails this test.
+    #[test]
+    fn test_schema_projected_issue_views_declare_unified_gates_field() {
+        for (parent, child) in [("issue", "show"), ("issue", "status")] {
+            let props = declared_property_names(&published_output_schema(parent, child));
+            assert!(
+                props.contains("gates"),
+                "{parent} {child} schema must declare the `gates` property; got: {props:?}"
+            );
+            assert!(
+                !props.contains("gates_required") && !props.contains("gates_status"),
+                "{parent} {child} is a projected view and must not declare the storage \
+                 gate properties; got: {props:?}"
+            );
+        }
+    }
+
+    /// REQ-02/REQ-04: the raw-record dump commands declare that `--full` emits
+    /// the storage gate fields, while their default summary shape omits the gate
+    /// list. Deriving the full arm from the `Issue` struct keeps the declared
+    /// names in lockstep with the serialized record.
+    #[test]
+    fn test_schema_record_dumps_declare_storage_gate_fields() {
+        for (parent, child) in [("query", "all"), ("graph", "export")] {
+            let props = declared_property_names(&published_output_schema(parent, child));
+            assert!(
+                props.contains("gates_required") && props.contains("gates_status"),
+                "{parent} {child} --full arm must declare the storage gate properties; \
+                 got: {props:?}"
+            );
+        }
     }
 }
