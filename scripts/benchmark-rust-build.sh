@@ -27,14 +27,19 @@ set -euo pipefail
 #     contention from another build competing for the same CPUs.
 #   - Each sample's CARGO_TARGET_DIR is removed immediately after its
 #     measurements are recorded, before the next sample starts.
+#   - Every clean sample derives its own integration-test target count and
+#     unique active test-executable byte count from that sample's own `cargo
+#     test --workspace --no-run --message-format=json` compiler-artifact
+#     stream (a nearly free re-check: nothing changed since the timed `test
+#     --no-run` step immediately before it in the same target dir).
 #   - On the designated inventory sample (default: clean sample 1), the
 #     harness additionally derives the pre-change test inventory: every
 #     discoverable test case (ignored and non-ignored) with its Cargo test
-#     target, from `cargo test --workspace --no-run --message-format=json`
-#     plus each compiled test binary's `--list` / `--list --ignored` output,
-#     together with the integration-test target count, the complete
-#     target-directory byte count, and the unique active test-executable byte
-#     count. Doctests are enumerated separately (`cargo test --workspace --doc
+#     target, from that same compiler-artifact stream plus each compiled test
+#     binary's `--list` / `--list --ignored` output, together with the
+#     integration-test target count, the complete target-directory byte count,
+#     and the unique active test-executable byte count. Doctests are
+#     enumerated separately (`cargo test --workspace --doc
 #     -- --list` / `-- --list --ignored`, since `--no-run` cannot compile
 #     them) and included in the test-case totals under a synthetic "doctest"
 #     kind, one entry per crate; they do not count toward the integration-test
@@ -244,18 +249,25 @@ target_dir_bytes() {
   du -sb "$1" 2>/dev/null | awk '{print $1}'
 }
 
-# generate_test_inventory <target_dir> <sample_raw_dir>
-# Derives dev/benchmarks/.../pre-change-test-inventory.json from a completed
-# clean build's isolated target dir, and prints
-# {"target_dir_bytes":N,"unique_active_test_executable_bytes":N} to stdout for
-# the caller to fold into that clean sample's baseline.json record.
-generate_test_inventory() {
+# derive_active_test_metrics <target_dir> <sample_raw_dir>
+# REQ-02 (jit:26f97dc2): cheap, per-clean-sample metrics — integration-test
+# target count and unique active test-executable bytes — derived from this
+# sample's own `cargo test --workspace --no-run --message-format=json`
+# compiler-artifact stream. Runs for EVERY clean sample (not just the
+# designated inventory sample below) since REQ-02 requires each optimized
+# clean sample to independently record these two figures. The re-run is a
+# nearly free re-check: nothing changed since the timed `test --no-run` step
+# immediately before it in the same target dir, so no recompilation occurs.
+# Writes $sample_raw_dir/cargo-test-list.json, reused (not re-generated) by
+# generate_test_inventory below when this is also the designated inventory
+# sample. Prints
+# {"target_dir_bytes":N,"unique_active_test_executable_bytes":N,"integration_test_target_count":N}.
+derive_active_test_metrics() {
   local target_dir="$1" sample_raw_dir="$2"
   local list_json="$sample_raw_dir/cargo-test-list.json"
 
-  echo "[benchmark] deriving pre-change test inventory from $target_dir" >&2
   # Atomic publication (@/inv/atomic-writes): capture to temp files beside the
-  # destinations, rename only after the command completes.
+  # destination, rename only after the command completes.
   local list_tmp stderr_tmp
   list_tmp=$(mktemp "$list_json.XXXXXX")
   stderr_tmp=$(mktemp "$sample_raw_dir/cargo-test-list.stderr.log.XXXXXX")
@@ -263,6 +275,68 @@ generate_test_inventory() {
     >"$list_tmp" 2>"$stderr_tmp"
   mv "$list_tmp" "$list_json"
   mv "$stderr_tmp" "$sample_raw_dir/cargo-test-list.stderr.log"
+
+  python3 - "$list_json" "$target_dir" <<'PYEOF'
+import json
+import os
+import subprocess
+import sys
+
+list_json_path, target_dir = sys.argv[1:3]
+
+seen_executables = set()
+integration_target_count = 0
+with open(list_json_path) as f:
+    for line in f:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if msg.get("reason") != "compiler-artifact":
+            continue
+        if not msg.get("profile", {}).get("test"):
+            continue
+        executable = msg.get("executable")
+        if not executable or executable in seen_executables:
+            continue
+        seen_executables.add(executable)
+        if msg.get("target", {}).get("kind") == ["test"]:
+            integration_target_count += 1
+
+exe_bytes = 0
+for exe in seen_executables:
+    try:
+        exe_bytes += os.path.getsize(exe)
+    except OSError:
+        pass
+
+du_out = subprocess.run(["du", "-sb", target_dir], capture_output=True, text=True)
+dir_bytes = int(du_out.stdout.split()[0]) if du_out.returncode == 0 and du_out.stdout.strip() else None
+
+print(json.dumps({
+    "target_dir_bytes": dir_bytes,
+    "unique_active_test_executable_bytes": exe_bytes,
+    "integration_test_target_count": integration_target_count,
+}))
+PYEOF
+}
+
+# generate_test_inventory <target_dir> <sample_raw_dir>
+# Derives dev/benchmarks/.../pre-change-test-inventory.json from a completed
+# clean build's isolated target dir, and prints
+# {"target_dir_bytes":N,"unique_active_test_executable_bytes":N} to stdout for
+# the caller to fold into that clean sample's baseline.json record. Reuses
+# $sample_raw_dir/cargo-test-list.json already written by
+# derive_active_test_metrics for this sample rather than re-running `cargo
+# test --no-run --message-format=json` a second time.
+generate_test_inventory() {
+  local target_dir="$1" sample_raw_dir="$2"
+  local list_json="$sample_raw_dir/cargo-test-list.json"
+
+  echo "[benchmark] deriving pre-change test inventory from $target_dir" >&2
 
   python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" "$sample_raw_dir" <<'PYEOF'
 import json
@@ -510,7 +584,12 @@ run_clean_sample() {
   test_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/test-no-run.log" \
     cargo test --workspace --no-run)
 
-  local inventory_meas="{}"
+  # REQ-02 (jit:26f97dc2): every clean sample records its own integration-test
+  # target count and unique active test-executable bytes; the designated
+  # inventory sample additionally derives the full per-test-case inventory,
+  # which supersedes (and matches) these same two fields for that one sample.
+  local inventory_meas
+  inventory_meas=$(derive_active_test_metrics "$target_dir" "$sample_raw_dir")
   if [[ "$idx" -eq "$INVENTORY_SAMPLE" ]]; then
     inventory_meas=$(generate_test_inventory "$target_dir" "$sample_raw_dir")
   fi

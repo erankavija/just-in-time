@@ -1,191 +1,179 @@
    Compiling cfg-if v1.0.4
    Compiling memchr v2.7.6
    Compiling itoa v1.0.15
+   Compiling once_cell v1.21.3
    Compiling smallvec v1.15.1
    Compiling log v0.4.28
-   Compiling once_cell v1.21.3
    Compiling bytes v1.11.0
+   Compiling bitflags v2.10.0
    Compiling stable_deref_trait v1.2.1
    Compiling scopeguard v1.2.0
-   Compiling bitflags v2.10.0
-   Compiling litemap v0.8.1
+   Compiling linux-raw-sys v0.11.0
    Compiling libc v0.2.180
    Compiling serde_core v1.0.228
    Compiling zerocopy v0.8.31
-   Compiling percent-encoding v2.3.2
    Compiling writeable v0.6.2
    Compiling regex-syntax v0.8.8
+   Compiling litemap v0.8.1
+   Compiling percent-encoding v2.3.2
    Compiling num-traits v0.2.19
-   Compiling typenum v1.19.0
    Compiling lock_api v0.4.14
-   Compiling icu_normalizer_data v2.1.1
+   Compiling typenum v1.19.0
    Compiling zerofrom v0.1.6
+   Compiling icu_normalizer_data v2.1.1
    Compiling icu_properties_data v2.1.1
-   Compiling unicase v2.8.1
    Compiling ryu v1.0.20
-   Compiling linux-raw-sys v0.11.0
+   Compiling unicase v2.8.1
    Compiling httparse v1.10.1
    Compiling foldhash v0.2.0
    Compiling equivalent v1.0.2
+   Compiling yoke v0.8.1
    Compiling allocator-api2 v0.2.21
    Compiling zeroize v1.8.2
    Compiling form_urlencoded v1.2.2
+   Compiling anstyle v1.0.13
    Compiling untrusted v0.9.0
    Compiling utf8_iter v1.0.4
-   Compiling anstyle v1.0.13
    Compiling bit-vec v0.8.0
-   Compiling yoke v0.8.1
+   Compiling cpufeatures v0.2.17
    Compiling lazy_static v1.5.0
    Compiling utf8parse v0.2.2
-   Compiling cpufeatures v0.2.17
    Compiling ref-cast v1.0.25
-   Compiling colorchoice v1.0.4
-   Compiling borrow-or-share v0.2.4
-   Compiling is_terminal_polyfill v1.70.2
-   Compiling adler2 v2.0.1
-   Compiling anstyle-query v1.1.5
-   Compiling rustls-pki-types v1.13.2
-   Compiling anstyle-parse v0.2.7
-   Compiling fastrand v2.3.0
-   Compiling simd-adler32 v0.3.8
+   Compiling io-lifetimes v3.0.1
+   Compiling io-lifetimes v2.0.4
    Compiling pin-project-lite v0.2.16
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling simd-adler32 v0.3.8
+   Compiling rustls-pki-types v1.13.2
    Compiling zerovec v0.11.5
    Compiling zerotrie v0.2.3
+   Compiling anstyle-parse v0.2.7
+   Compiling fastrand v2.3.0
+   Compiling colorchoice v1.0.4
+   Compiling adler2 v2.0.1
+   Compiling anstyle-query v1.1.5
+   Compiling borrow-or-share v0.2.4
+   Compiling io-extras v0.19.0
+   Compiling rustix v1.1.2
+   Compiling bit-set v0.8.0
    Compiling thiserror v1.0.69
    Compiling crc32fast v1.5.0
-   Compiling time-core v0.1.6
-   Compiling outref v0.5.2
-   Compiling option-ext v0.2.0
-   Compiling bit-set v0.8.0
-   Compiling toml_write v0.1.2
-   Compiling unicode-width v0.2.2
-   Compiling num-conv v0.1.0
-   Compiling iana-time-zone v0.1.64
-   Compiling anstream v0.6.21
    Compiling miniz_oxide v0.8.9
-   Compiling rustix v1.1.2
-   Compiling hashbrown v0.16.1
+   Compiling anstream v0.6.21
+   Compiling clap_lex v0.7.6
+   Compiling unicode-width v0.2.2
    Compiling aho-corasick v1.1.4
    Compiling base64 v0.22.1
-   Compiling linux-raw-sys v0.4.15
-   Compiling clap_lex v0.7.6
    Compiling powerfmt v0.2.0
    Compiling winnow v0.7.14
-   Compiling micromap v0.3.0
    Compiling http v1.4.0
-   Compiling subtle v2.6.1
+   Compiling hashbrown v0.16.1
+   Compiling ipnet v2.12.0
+   Compiling ambient-authority v0.0.2
    Compiling strsim v0.11.1
-   Compiling vsimd v0.8.0
-   Compiling deranged v0.5.5
-   Compiling webpki-roots v1.0.6
-   Compiling getopts v0.2.24
-   Compiling time-macros v0.2.24
-   Compiling anyhow v1.0.100
-   Compiling unicode-general-category v1.1.0
+   Compiling linux-raw-sys v0.4.15
+   Compiling micromap v0.3.0
+   Compiling toml_write v0.1.2
+   Compiling num-conv v0.1.0
+   Compiling outref v0.5.2
+   Compiling time-core v0.1.6
+   Compiling maybe-owned v0.3.4
    Compiling generic-array v0.14.7
+   Compiling subtle v2.6.1
    Compiling num-integer v0.1.46
-   Compiling num-complex v0.4.6
-   Compiling clap_builder v4.5.53
    Compiling tinystr v0.8.2
    Compiling potential_utf v0.1.4
+   Compiling num-complex v0.4.6
+   Compiling vsimd v0.8.0
+   Compiling option-ext v0.2.0
+   Compiling iana-time-zone v0.1.64
    Compiling flate2 v1.1.9
-   Compiling icu_locale_core v2.1.1
    Compiling icu_collections v2.1.1
+   Compiling time-macros v0.2.24
+   Compiling clap_builder v4.5.53
+   Compiling getopts v0.2.24
+   Compiling icu_locale_core v2.1.1
    Compiling rustix v0.38.44
+   Compiling webpki-roots v1.0.6
    Compiling num-bigint v0.4.6
    Compiling num-iter v0.1.45
+   Compiling deranged v0.5.5
    Compiling indexmap v2.12.1
-   Compiling uuid-simd v0.8.0
-   Compiling dyn-clone v1.0.20
-   Compiling fnv v1.0.7
-   Compiling utf-8 v0.7.6
-   Compiling home v0.5.12
-   Compiling futures-core v0.3.31
+   Compiling anyhow v1.0.100
+   Compiling unicode-general-category v1.1.0
    Compiling openssl-probe v0.1.6
-   Compiling either v1.15.0
-   Compiling data-encoding v2.11.0
-   Compiling pulldown-cmark-escape v0.11.0
-   Compiling bytecount v0.6.9
-   Compiling jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-26f97dc2/crates/jit)
+   Compiling uuid-simd v0.8.0
+   Compiling futures-core v0.3.31
+   Compiling home v0.5.12
+   Compiling dyn-clone v1.0.20
+   Compiling ureq-proto v0.5.3
    Compiling crypto-common v0.1.7
    Compiling block-buffer v0.10.4
-   Compiling ureq-proto v0.5.3
    Compiling num-cmp v0.1.0
-   Compiling pulldown-cmark v0.13.4
-   Compiling futures-sink v0.3.32
+   Compiling fnv v1.0.7
+   Compiling either v1.15.0
+   Compiling bytecount v0.6.9
+   Compiling pulldown-cmark-escape v0.11.0
    Compiling digest v0.10.7
-   Compiling similar v2.7.0
-   Compiling pin-utils v0.1.0
-   Compiling futures-channel v0.3.31
-   Compiling futures-io v0.3.31
+   Compiling data-encoding v2.11.0
+   Compiling utf-8 v0.7.6
    Compiling parking_lot_core v0.9.12
    Compiling getrandom v0.3.4
    Compiling getrandom v0.2.16
-   Compiling sha2 v0.10.9
    Compiling libz-sys v1.1.23
-   Compiling parking_lot v0.12.5
-   Compiling icu_provider v2.1.1
+   Compiling sha2 v0.10.9
    Compiling openssl-sys v0.9.111
    Compiling filetime v0.2.26
+   Compiling dirs-sys v0.4.1
+   Compiling jit v0.2.1 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-26f97dc2/crates/jit)
+   Compiling parking_lot v0.12.5
+   Compiling icu_provider v2.1.1
+   Compiling regex-automata v0.4.13
    Compiling ring v0.17.14
    Compiling ppv-lite86 v0.2.21
-   Compiling dirs-sys v0.4.1
-   Compiling regex-automata v0.4.13
-   Compiling time v0.3.44
-   Compiling nix v0.31.1
    Compiling dirs v5.0.1
-   Compiling icu_properties v2.1.1
+   Compiling nix v0.31.1
+   Compiling pulldown-cmark v0.13.4
+   Compiling futures-sink v0.3.32
+   Compiling similar v2.7.0
    Compiling icu_normalizer v2.1.1
+   Compiling icu_properties v2.1.1
+   Compiling futures-channel v0.3.31
    Compiling rand_core v0.9.3
+   Compiling pin-utils v0.1.0
    Compiling mio v1.1.0
-   Compiling tempfile v3.23.0
-   Compiling xattr v1.6.1
-   Compiling fs4 v0.13.1
-   Compiling slab v0.4.11
    Compiling futures-task v0.3.31
+   Compiling futures-io v0.3.31
+   Compiling slab v0.4.11
    Compiling rand_chacha v0.9.0
-   Compiling wait-timeout v0.2.1
-   Compiling num-rational v0.4.2
-   Compiling tar v0.4.44
-   Compiling futures-util v0.3.31
    Compiling signal-hook-registry v1.4.7
    Compiling socket2 v0.6.1
+   Compiling time v0.3.44
+   Compiling wait-timeout v0.2.1
+   Compiling num-rational v0.4.2
+   Compiling futures-util v0.3.31
+   Compiling tracing-core v0.1.35
    Compiling serde v1.0.228
    Compiling serde_json v1.0.145
-   Compiling tracing-core v0.1.35
-   Compiling predicates-core v1.0.9
-   Compiling rand v0.9.2
    Compiling libssh2-sys v0.3.1
    Compiling which v6.0.3
-   Compiling float-cmp v0.10.0
-   Compiling difflib v0.4.0
-   Compiling normalize-line-endings v0.3.0
-   Compiling num v0.4.3
+   Compiling predicates-core v1.0.9
    Compiling libgit2-sys v0.16.2+1.7.2
-   Compiling fraction v0.15.4
-   Compiling quick-error v1.2.3
    Compiling tokio v1.48.0
+   Compiling rand v0.9.2
+   Compiling num v0.4.3
+   Compiling float-cmp v0.10.0
    Compiling termtree v0.5.1
-   Compiling rusty-fork v0.3.1
-   Compiling tracing v0.1.43
+   Compiling fraction v0.15.4
+   Compiling normalize-line-endings v0.3.0
+   Compiling difflib v0.4.0
+   Compiling quick-error v1.2.3
    Compiling predicates-tree v1.0.12
-   Compiling rand_xorshift v0.4.0
+   Compiling tracing v0.1.43
    Compiling clap v4.5.53
-   Compiling idna_adapter v1.2.1
-   Compiling ahash v0.8.12
-   Compiling fluent-uri v0.4.1
-   Compiling toml_datetime v0.6.11
-   Compiling serde_spanned v0.6.9
-   Compiling chrono v0.4.42
-   Compiling idna v1.1.0
-   Compiling email_address v0.2.9
-   Compiling uuid v1.18.1
+   Compiling rand_xorshift v0.4.0
    Compiling unarray v0.1.4
-   Compiling ulid v1.2.1
-   Compiling proptest v1.9.0
    Compiling http-body v1.0.1
-   Compiling rustls-webpki v0.103.9
-   Compiling toml_edit v0.22.27
    Compiling tower-service v0.3.3
    Compiling tower-layer v0.3.3
    Compiling mime v0.3.17
@@ -193,49 +181,71 @@
    Compiling try-lock v0.2.5
    Compiling same-file v1.0.6
    Compiling httpdate v1.0.3
-   Compiling http-body-util v0.1.3
+   Compiling idna_adapter v1.2.1
    Compiling want v0.3.1
+   Compiling http-body-util v0.1.3
    Compiling atomic-waker v1.1.2
-   Compiling walkdir v2.5.0
+   Compiling idna v1.1.0
+   Compiling fs-set-times v0.20.3
+   Compiling tempfile v3.23.0
+   Compiling rustls-webpki v0.103.9
+   Compiling rustix-linux-procfs v0.1.1
+   Compiling serde_spanned v0.6.9
+   Compiling fluent-uri v0.4.1
+   Compiling ahash v0.8.12
+   Compiling toml_datetime v0.6.11
+   Compiling cap-primitives v4.0.2
+   Compiling xattr v1.6.1
+   Compiling chrono v0.4.42
+   Compiling email_address v0.2.9
+   Compiling fs4 v0.13.1
+   Compiling uuid v1.18.1
    Compiling url v2.5.7
-   Compiling yasna v0.6.0
+   Compiling toml_edit v0.22.27
+   Compiling tar v0.4.44
+   Compiling rusty-fork v0.3.1
+   Compiling ulid v1.2.1
+   Compiling walkdir v2.5.0
    Compiling sync_wrapper v1.0.2
    Compiling pin-project v1.1.10
    Compiling serde_urlencoded v0.7.1
+   Compiling proptest v1.9.0
+   Compiling rustls v0.23.36
+   Compiling rust-embed-utils v8.11.0
+   Compiling referencing v0.46.5
+   Compiling cap-std v4.0.2
+   Compiling yasna v0.6.0
    Compiling serde_path_to_error v0.1.20
    Compiling rand_core v0.6.4
    Compiling inotify-sys v0.1.5
    Compiling instant v0.1.13
-   Compiling rust-embed-utils v8.11.0
-   Compiling matchit v0.7.3
    Compiling bitflags v1.3.2
-   Compiling referencing v0.46.5
+   Compiling git2 v0.18.3
+   Compiling matchit v0.7.3
+   Compiling notify-types v1.0.1
    Compiling inotify v0.10.2
    Compiling rand_chacha v0.3.1
-   Compiling notify-types v1.0.1
    Compiling rust-embed-impl v8.11.0
    Compiling tracing-log v0.2.0
-   Compiling rustls v0.23.36
    Compiling sharded-slab v0.1.7
    Compiling thread_local v1.1.9
    Compiling nu-ansi-term v0.50.3
    Compiling http-range-header v0.4.2
    Compiling jit-server v0.1.0 (/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-26f97dc2/crates/server)
    Compiling rand v0.8.5
-   Compiling rcgen v0.14.8
-   Compiling notify v7.0.0
-   Compiling git2 v0.18.3
    Compiling thiserror v2.0.17
-warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
    Compiling http v0.2.12
-   Compiling diff v0.1.13
    Compiling yansi v1.0.1
+   Compiling notify v7.0.0
+   Compiling diff v0.1.13
+   Compiling rcgen v0.14.8
    Compiling reserve-port v2.3.0
+warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
    Compiling cookie v0.18.1
    Compiling auto-future v1.0.0
    Compiling schemars v0.8.22
-   Compiling rust-embed v8.11.0
    Compiling pretty_assertions v1.4.1
+   Compiling rust-embed v8.11.0
    Compiling regex v1.12.2
    Compiling fancy-regex v0.17.0
    Compiling bstr v1.12.1
@@ -245,33 +255,33 @@ warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server bina
    Compiling axum-core v0.4.5
    Compiling futures-executor v0.3.31
    Compiling rust-multipart-rfc7578_2 v0.6.1
-   Compiling toml v0.8.23
    Compiling futures v0.3.31
    Compiling jsonschema v0.46.2
    Compiling assert_cmd v2.1.1
+   Compiling toml v0.8.23
    Compiling hyper v1.8.1
    Compiling tokio-util v0.7.18
    Compiling tower v0.5.2
    Compiling tower v0.4.13
    Compiling ureq v3.2.0
-   Compiling tower-http v0.5.2
    Compiling tokio-stream v0.1.18
+   Compiling tower-http v0.5.2
    Compiling hyper-util v0.1.19
    Compiling axum v0.7.9
    Compiling axum-test v14.10.0
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.24s
-  Executable unittests src/lib.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/jit-a006da67ab56d2d8)
-  Executable unittests src/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/jit-3f4e2003db3ad9f6)
-  Executable tests/cli_gate/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/cli_gate-12bc7e298d5a6371)
-  Executable tests/cli_issue/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/cli_issue-f35e5b80556fe817)
-  Executable tests/cli_item_validate/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/cli_item_validate-fc85d84e45bc8efd)
-  Executable tests/cli_query_graph/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/cli_query_graph-2f8b191322897dd4)
-  Executable tests/cli_repo_workflow/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/cli_repo_workflow-6868a246262f7a43)
-  Executable tests/fast_docs_templates/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/fast_docs_templates-21fdd3dc0621fec6)
-  Executable tests/fast_issue/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/fast_issue-9c84d3bcc3e6e144)
-  Executable tests/fast_rules/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/fast_rules-0bf6a285eb4a954d)
-  Executable tests/provenance_contract/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/provenance_contract-c6a7d3747551a809)
-  Executable tests/scratch_build/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/scratch_build-8890944b9fd77a66)
-  Executable unittests src/lib.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/jit_server-9006aeab1bf173b2)
-  Executable unittests src/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/jit_server-6053bd01fa4403f8)
-  Executable tests/document_api_tests.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.qnDyqV/debug/deps/document_api_tests-8ace5ab85b6f3e26)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.42s
+  Executable unittests src/lib.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/jit-c5cf9cbcb64c418e)
+  Executable unittests src/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/jit-25156615ec800de3)
+  Executable tests/cli_gate/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/cli_gate-d5b6822982d8e351)
+  Executable tests/cli_issue/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/cli_issue-63971aa006800e45)
+  Executable tests/cli_item_validate/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/cli_item_validate-24f5d4a8ec783413)
+  Executable tests/cli_query_graph/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/cli_query_graph-8e4b61f5c2b159ea)
+  Executable tests/cli_repo_workflow/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/cli_repo_workflow-0d9ccac584162972)
+  Executable tests/fast_docs_templates/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/fast_docs_templates-69230be518862b32)
+  Executable tests/fast_issue/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/fast_issue-5bc97ba6bd2e0180)
+  Executable tests/fast_rules/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/fast_rules-b96c08947288d50e)
+  Executable tests/provenance_contract/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/provenance_contract-04501848d6b4f824)
+  Executable tests/scratch_build/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/scratch_build-43da77477d14cadd)
+  Executable unittests src/lib.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/jit_server-ef5f02c28a8bf7b9)
+  Executable unittests src/main.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/jit_server-8cb66ebb8327ab2a)
+  Executable tests/document_api_tests.rs (/home/vkaskivuo/.cache/jit-benchmark-rust-build/target.XjZG4J/debug/deps/document_api_tests-34bec69937aead72)

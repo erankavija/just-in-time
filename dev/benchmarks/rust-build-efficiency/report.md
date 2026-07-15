@@ -63,7 +63,7 @@ own landed optimization commits (see "What changed").
 
 | | Baseline | Optimized |
 |---|---|---|
-| Git revision | `56d737891129babf9571eb4de5659295bce8d827` | `e305f9655f565c6c16937138ed4ea1035c859bc3` |
+| Git revision | `56d737891129babf9571eb4de5659295bce8d827` | `3d697d4086203de9841e9282617fc4b114925039` |
 | OS | Arch Linux, kernel Linux 7.0.14-arch1-1 | Arch Linux, kernel Linux 7.0.14-arch1-1 |
 | CPU count | 24 | 24 |
 | Memory | 33,543,761,920 bytes (~31.2 GiB) | 33,543,761,920 bytes (~31.2 GiB) |
@@ -156,44 +156,56 @@ revision differs.
 
 | Metric | Sample 1 | Sample 2 | Sample 3 | Median | Min-Max spread |
 |---|---|---|---|---|---|
-| Clean: clippy | 20.248 | 20.312 | 20.421 | **20.312** | 20.248-20.421 (0.9%) |
-| Clean: `test --no-run` | 22.127 | 22.274 | 22.464 | **22.274** | 22.127-22.464 (1.5%) |
-| Clean: total (clippy + test-compile) | 42.375 | 42.586 | 42.885 | **42.586** | 42.375-42.885 (1.2%) |
-| Rebuild: setup clippy | 20.177 | 20.474 | 20.316 | 20.316 | 20.177-20.474 (1.5%) |
-| Rebuild: setup `test --no-run` | 22.353 | 22.741 | 22.281 | 22.353 | 22.281-22.741 (2.1%) |
-| Rebuild: incremental `test --no-run` (headline) | 8.514 | 7.056 | 7.580 | **7.580** | 7.056-8.514 (20.7%) |
+| Clean: clippy | 20.849 | 21.103 | 20.813 | **20.849** | 20.813-21.103 (1.4%) |
+| Clean: `test --no-run` | 23.147 | 23.540 | 23.302 | **23.302** | 23.147-23.540 (1.7%) |
+| Clean: total (clippy + test-compile) | 43.996 | 44.643 | 44.115 | **44.115** | 43.996-44.643 (1.5%) |
+| Rebuild: setup clippy | 20.799 | 21.466 | 21.264 | 21.264 | 20.799-21.466 (3.2%) |
+| Rebuild: setup `test --no-run` | 29.060 | 23.718 | 23.450 | 23.718 | 23.450-29.060 (23.9%) |
+| Rebuild: incremental `test --no-run` (headline) | 11.475 | 11.619 | 14.405 | **11.619** | 11.475-14.405 (25.5%) |
 
 As with the baseline, no single run is representative on its own; the median
 column is what REQ-04/REQ-05 acceptance is computed against (see
-"Comparison and acceptance thresholds" below).
+"Comparison and acceptance thresholds" below). These are the harness's second
+collection at this issue's optimized revision: the first collection (medians
+20.312s / 22.274s / 42.586s / 7.580s) predates a `git merge --ff-only main`
+that pulled in unrelated, independently gated parallel work (a new
+capability-based filesystem dependency subtree among other changes) landed
+on `main` while this issue was in review; REQ-01 requires measuring at the
+current revision, so this second collection at `3d697d40...` supersedes the
+first. Reported figures throughout this report are from this collection.
 
 **Observed variance / host noise:**
 
-- Clean-sample and rebuild-setup steps show the same low single-digit percent
-  spread as the baseline (0.9-2.1%), consistent with a quiet, uncontended
-  sampling window: `grep -c "waiting for exclusive build lock"` against this
-  run's harness log returns 0 — no concurrent `cargo-ci`/`verify-commit-builds`
-  gate build overlapped any of the six timed samples.
-- The rebuild headline step shows a larger proportional spread (20.7%,
-  7.056-8.514s) than the baseline's rebuild spread (8.4%), but the *absolute*
-  spread is comparable (~1.5s here vs. baseline's ~15s) — at a ~7-8s median
-  instead of baseline's ~179s, the same order of absolute scheduling/filesystem
-  jitter that was a rounding error at baseline scale is now a visible
-  percentage. This is consistent with jitter, not a regression: max-RSS for
-  this step is stable across all three samples (1,004,200-1,007,012 KB, <0.3%
-  spread), and the setup steps immediately before it (same target dir, same
-  build) show ordinary low spread.
-- Maximum RSS was stable across samples for every step and is uniformly lower
-  than baseline: clippy ~1.022-1.024 GiB (baseline ~1.098-1.100 GiB), `test
-  --no-run` ~1.403-1.423 GiB (baseline ~1.513-1.515 GiB), rebuild
-  ~0.958-0.960 GiB (baseline ~1.245-1.250 GiB) — the largest relative RSS drop
-  is on the incremental-rebuild path, consistent with the removed dependency
-  subtree (`aws-lc-rs`/`aws-lc-sys`, `reqwest`, `native-tls`, `tokio-rustls`,
-  `hyper-rustls`, and related crates; see "What changed") no longer being
-  linked into that step.
-- This run executed 2026-07-15, one day after the baseline's 2026-07-14
-  sampling window; both windows were independently confirmed lock-contention
-  free via the same `grep -c` check against each run's own harness log.
+- Clean-sample steps show the same low single-digit percent spread as the
+  baseline (1.4-1.7%), consistent with a quiet, uncontended sampling window:
+  `grep -c "waiting for exclusive build lock"` against this run's harness log
+  returns 0 — no concurrent `cargo-ci`/`verify-commit-builds` gate build
+  overlapped any of the six timed samples.
+- Rebuild setup `test --no-run` and the rebuild headline step both show a
+  larger spread (23.9%, 25.5%) than their clean-sample counterparts, driven
+  by sample 1's setup step (29.060s vs. 23.45-23.72s for samples 2-3) and
+  sample 3's headline rebuild (14.405s vs. 11.48-11.62s for samples 1-2). As
+  with the first collection, the *absolute* spread (~2-6s) is the more
+  informative figure than the percentage at these much smaller absolute
+  durations than the baseline's ~179-189s steps: ordinary scheduling/
+  filesystem jitter that is a rounding error at baseline scale becomes a
+  visible percentage here. This is consistent with jitter, not a regression
+  or contention: zero lock-wait events were recorded (no concurrent gate
+  build), and max-RSS is stable across all three rebuild samples
+  (1,060,760-1,061,816 KB, <0.1% spread) even though their wall times vary
+  by 25%. The acceptance conclusion is insensitive to this variance: even
+  the single slowest rebuild sample alone (14.405s) is a 91.9% reduction
+  from the baseline median, still well past the 60% floor.
+- Maximum RSS was stable across samples for every step and is higher than
+  the first collection (clippy ~1.066-1.067 GiB, `test --no-run` ~1.508-1.509
+  GiB, rebuild ~1.012-1.013 GiB) but still below baseline (~1.098-1.100 GiB,
+  ~1.513-1.515 GiB, ~1.245-1.250 GiB respectively) — consistent with the
+  merge adding some compiled code back (the new filesystem-sandboxing
+  dependency subtree) while the pruned TLS/remote-resolution subtree (see
+  "What changed") remains removed.
+- This run executed 2026-07-15, the same day as the first collection; both
+  were independently confirmed lock-contention free via the same `grep -c`
+  check against each run's own harness log.
 
 ## Baseline footprint (from the test inventory, same clean sample)
 
@@ -268,27 +280,44 @@ schema as `pre-change-test-inventory.json`).
 
 | | Baseline | Optimized |
 |---|---|---|
-| Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) | 3,822,359,533 (~3.56 GiB) |
-| Unique active test-executable bytes | 14,816,926,968 (~13.8 GiB) | 978,319,560 (~0.91 GiB) |
+| Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) | 3,947,706,680 (~3.68 GiB, median) |
+| Unique active test-executable bytes | 14,816,926,968 (~13.8 GiB) | 1,006,148,744 (~0.94 GiB) |
 | Integration-test targets (Cargo `target.kind == ["test"]`) | 144 | 11 |
-| Total discoverable test cases (incl. doctests) | 3,306 | 3,330 |
+| Total discoverable test cases (incl. doctests) | 3,306 | 3,363 |
 | — of which doctests | 66 | 66 |
 | Ignored test cases | 14 | 14 |
 
-The 24-case increase in total test cases (3,306 -> 3,330, doctests and
-ignored-count both unchanged) comes from new tests the optimization work
-itself added — dependency-feature, build-profile, and budget-checker
-regression fixtures — not from any change to pre-existing tests; see "Test
-inventory verification" below for the full accounting of every pre-change
-case.
+The 57-case increase in total test cases (3,306 -> 3,363, doctests and
+ignored-count both unchanged) comes from new tests added by this story's own
+optimization work plus unrelated parallel work merged from `main` (see
+"Optimized medians and variance" above) — not from any change to
+pre-existing tests; see "Test inventory verification" below for the full
+accounting of every pre-change case.
 
-Both target-directory bytes and unique active test-executable bytes are
-reproducible across all three optimized clean samples to within rounding
-(3,822,359,533 / 3,822,360,395 / 3,822,359,893 bytes; the inventory step
-itself only runs on sample 1 per the harness's `BENCH_INVENTORY_SAMPLE`
-default, so the executable-byte figure is sample 1's alone, while
-target-directory bytes are recorded for every sample — see
-[`optimized.json`](optimized.json)'s `clean_samples`).
+**REQ-02: every clean sample records its own metrics.** Unlike the harness's
+original behavior (deriving the full per-test-case inventory, including
+target count and executable bytes, only for one designated sample), every
+optimized clean sample now independently records its own integration-test
+target count and unique active test-executable bytes, via
+`derive_active_test_metrics` in
+[`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-build.sh)
+(added in this issue's rework round):
+
+| Sample | Target-directory bytes | Unique active test-executable bytes | Integration-test targets |
+|---|---:|---:|---:|
+| 1 | 3,947,706,894 | 1,006,148,744 | 11 |
+| 2 | 3,947,706,680 | 1,006,148,744 | 11 |
+| 3 | 3,947,706,503 | 1,006,148,744 | 11 |
+
+Executable bytes and target count are identical across all three samples
+(the same deterministic build), and target-directory bytes agree to within
+391 bytes — all three independently confirm the REQ-03 budgets below. Sample
+1 additionally derives the full per-test-case inventory (the designated
+`BENCH_INVENTORY_SAMPLE`), which is why only its record in
+[`optimized.json`](optimized.json)'s `clean_samples` carries the additional
+`test_case_count`/`doctest_case_count`/`ignored_test_case_count` fields;
+samples 2-3 carry the three REQ-02 fields only, which is all REQ-02
+requires.
 
 ## JSON shapes
 
@@ -337,22 +366,33 @@ each already merged and gated independently:
 Directly comparing the two clean samples' `cargo test --workspace --no-run`
 compiler-artifact streams (`raw/clean-1/test-no-run.log` vs.
 `raw/optimized-clean-1/test-no-run.log`) confirms the dependency-pruning work
-took effect: baseline compiles 277 crates, optimized compiles 260. The 17
+took effect: baseline compiles 277 crates, optimized compiles 270. The 17
 removed crates are exactly the remote-schema-resolution and duplicate-TLS
 dependency subtree named in the design doc (`aws-lc-rs`, `aws-lc-sys`,
 `reqwest`, `native-tls`, `tokio-rustls`, `hyper-rustls`, `h2`, `openssl`,
 `rustls-native-certs`, `rustls-platform-verifier`, `webpki-root-certs`,
 `der`, `base64ct`, `foreign-types`, `foreign-types-shared`, `pem-rfc7468`,
-`ipnet`), offset by 2 small additions (`rcgen`, `yasna`). `git2`'s own
-platform-OpenSSL requirement (`openssl-sys`, `openssl-probe` at the versions
-`git2` pins) is unaffected — only the newer `openssl`/`openssl-probe`
-versions pulled in by the removed `native-tls`/`reqwest` chain are gone.
-`aws-lc-sys` in particular compiles a full C cryptography library from
-source and is well known to dominate wall-clock time in workspaces that pull
-it transitively; its removal, together with the rest of the pruned subtree,
-is the primary driver of the clean and rebuild wall-time reductions below —
-not a measurement artifact, and not explained by the modest 6% reduction in
-total compiled-crate count alone.
+`ipnet`). `git2`'s own platform-OpenSSL requirement (`openssl-sys`,
+`openssl-probe` at the versions `git2` pins) is unaffected — only the newer
+`openssl`/`openssl-probe` versions pulled in by the removed
+`native-tls`/`reqwest` chain are gone. `aws-lc-sys` in particular compiles a
+full C cryptography library from source and is well known to dominate
+wall-clock time in workspaces that pull it transitively; its removal,
+together with the rest of the pruned subtree, is the primary driver of the
+clean and rebuild wall-time reductions below — not a measurement artifact.
+
+Offsetting that removal, this optimized revision also compiles 11 crates not
+in the baseline: `rcgen` and `yasna` (small, from this story's own work), and
+a 9-crate capability-based-filesystem subtree (`cap-std`, `cap-primitives`,
+`ambient-authority`, `fs-set-times`, `io-extras`, `io-lifetimes`,
+`rustix-linux-procfs`, `maybe-owned`) pulled in by unrelated, independently
+gated parallel work that had merged into `main` by the time this issue's
+rework round re-collected samples (see "Optimized medians and variance"
+above) — not part of the `rust-build-efficiency` story. Net: 277 -> 270
+crates, a smaller headline reduction than the story's own pruning alone
+would show, but the removed TLS/remote-resolution subtree — the actual
+driver of the wall-time and memory reductions — is unaffected by this
+unrelated addition.
 
 ## Comparison and acceptance thresholds
 
@@ -362,18 +402,22 @@ this is the same quantity REQ-04/REQ-05 phrase as "X% below baseline").
 
 | Metric | Baseline median | Optimized median | Reduction | Threshold | Result |
 |---|---:|---:|---:|---|---|
-| Clean: clippy | 26.885s | 20.312s | 24.4% | (no threshold) | — |
-| Clean: `test --no-run` (REQ-04) | 195.019s | 22.274s | **88.6%** | >=40% lower | **PASS** |
-| Clean: total (clippy + test-compile) | 222.069s | 42.586s | 80.8% | (no threshold) | — |
-| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 7.580s | **95.8%** | >=60% lower | **PASS** |
-| Clean target-directory bytes, median (REQ-03) | 19.6 GiB | 3.56 GiB | 81.9% | <=10 GiB | **PASS** |
-| Unique active test-executable bytes (REQ-03) | 13.8 GiB | 0.91 GiB | 93.4% | <=2 GiB | **PASS** |
+| Clean: clippy | 26.885s | 20.849s | 22.4% | (no threshold) | — |
+| Clean: `test --no-run` (REQ-04) | 195.019s | 23.302s | **88.1%** | >=40% lower | **PASS** |
+| Clean: total (clippy + test-compile) | 222.069s | 44.115s | 80.1% | (no threshold) | — |
+| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 11.619s | **93.5%** | >=60% lower | **PASS** |
+| Clean target-directory bytes, median (REQ-03) | 19.6 GiB | 3.68 GiB | 81.3% | <=10 GiB | **PASS** |
+| Unique active test-executable bytes (REQ-03) | 13.8 GiB | 0.94 GiB | 93.2% | <=2 GiB | **PASS** |
 
 Every hard budget and improvement threshold in the story's acceptance
 criteria (REQ-03/REQ-04/REQ-05) is met with wide margin: the clean
-test-compilation improvement (88.6%) is more than double the 40% floor, the
-rebuild improvement (95.8%) is well past the 60% floor, and both disk budgets
-land at roughly a third to a twentieth of their ceilings.
+test-compilation improvement (88.1%) is more than double the 40% floor, the
+rebuild improvement (93.5%) is well past the 60% floor, and both disk budgets
+land at roughly a third to a tenth of their ceilings. These margins hold even
+against the single slowest individual sample in each metric (worst clean
+`test --no-run` sample 23.540s = 87.9% reduction; worst rebuild sample
+14.405s = 91.9% reduction), so the conclusion is not sensitive to the
+variance discussed above.
 
 ## Test inventory verification (REQ-07)
 
