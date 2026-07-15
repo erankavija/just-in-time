@@ -79,6 +79,14 @@ ensure_real_cargo
 export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
 mkdir -p "$TMPDIR"
 
+# Disable incremental compilation for every step below (jit:57d0eb79). The
+# workspace manifest's [profile.dev]/[profile.test] leave incremental on for
+# ordinary interactive builds, where it earns back its disk cost across many
+# rebuilds of the same tree. A gate run compiles once and exits, so it has no
+# later rebuild to amortize that cost against; left on, gate runs accumulated
+# ~19 GiB of incremental artifacts with nothing to show for it.
+export CARGO_INCREMENTAL=0
+
 # Parallel test harness across 20 threads. The suite is I/O-bound (the
 # storage::claim_coordinator proptests do real filesystem locking over hundreds
 # of cases each), so serial execution pushed the gate past two minutes. Capped
