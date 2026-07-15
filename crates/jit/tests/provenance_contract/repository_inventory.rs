@@ -11,20 +11,22 @@
 //! source file added to the working tree but not yet `git add`ed still
 //! appears), rooted at the given source directory.
 //!
-//! That inventory structurally cannot contain `.agents/worktrees`, nested
-//! Cargo `target/` directories, Git internals, or Node `node_modules` trees —
-//! all are ignored (`.gitignore`) in this repository, so `--exclude-standard`
-//! never returns them. `.jit/` is different: this repository dogfoods jit on
-//! itself, so `.jit/` is tracked (and not gitignored) here. It is excluded by
-//! an explicit path filter below rather than by git's ignore rules.
+//! The banned input categories — `.agents/worktrees`, nested Cargo `target/`
+//! directories, Git metadata, Node `node_modules` trees, and the dogfooding
+//! `.jit/` tree — are dropped by explicit, unconditional path filters
+//! ([`is_banned_input`]), independent of the source checkout's ignore rules.
+//! In this repository `.gitignore` already keeps most of them out of the
+//! `git ls-files` listing, but that is an optimization, not the guarantee:
+//! even force-added (`git add -f`) or unignored content in a banned category
+//! never reaches the seeded copy.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// List `source_root`'s repository-input inventory via
-/// `git ls-files --cached --others --exclude-standard`, excluding the
-/// dogfooding `.jit/` tree. See the module docs for which mechanism keeps each
-/// banned category out.
+/// `git ls-files --cached --others --exclude-standard`, dropping every path
+/// [`is_banned_input`] rejects. See the module docs for the split between the
+/// listing (keeps the inventory small) and the filter (the guarantee).
 pub(crate) fn repository_inputs(source_root: &Path) -> Vec<PathBuf> {
     let output = Command::new("git")
         .current_dir(source_root)
@@ -41,8 +43,24 @@ pub(crate) fn repository_inputs(source_root: &Path) -> Vec<PathBuf> {
         .expect("repository-input paths are valid UTF-8")
         .lines()
         .map(PathBuf::from)
-        .filter(|path| !path.starts_with(".jit"))
+        .filter(|path| !is_banned_input(path))
         .collect()
+}
+
+/// Unconditionally banned repository-input categories (REQ-01): operational
+/// and generated trees that must never seed a provenance fixture, whatever
+/// the source checkout's git or ignore state says about them.
+///
+/// `Path::starts_with` matches whole components, so `.gitignore` and
+/// `.gitattributes` are not caught by the `.git` prefix and stay in the
+/// inventory.
+fn is_banned_input(path: &Path) -> bool {
+    path.starts_with(".jit")
+        || path.starts_with(".git")
+        || path.starts_with(".agents/worktrees")
+        || path
+            .components()
+            .any(|c| matches!(c.as_os_str().to_str(), Some("target" | "node_modules")))
 }
 
 /// Seed `dest` as an isolated, independent Git repository built from

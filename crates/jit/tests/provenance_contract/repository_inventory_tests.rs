@@ -34,11 +34,10 @@ fn seed_fixture_repo(root: &Path) {
     std::fs::create_dir_all(root.join(".jit/issues")).unwrap();
     std::fs::write(root.join(".jit/issues/example.json"), "{}\n").unwrap();
 
-    std::fs::write(
-        root.join(".gitignore"),
-        "/target/\n**/target/\nnode_modules/\n.agents/worktrees/\n",
-    )
-    .unwrap();
+    // Deliberately NO ignore rules for the banned categories: the exclusion
+    // under test is the inventory's unconditional filter, not this fixture's
+    // (or any checkout's) .gitignore.
+    std::fs::write(root.join(".gitignore"), "*.log\n").unwrap();
 
     for args in [
         vec!["init", "-q"],
@@ -86,6 +85,23 @@ fn seed_fixture_repo(root: &Path) {
         "module.exports = {};\n",
     )
     .unwrap();
+
+    // Force-add one banned file: even content git tracks (add -f) must never
+    // reach the seeded copy — the exclusion is the filter, not git state.
+    let status = Command::new("git")
+        .current_dir(root)
+        .args([
+            "add",
+            "-f",
+            "target/debug/deps/top_level.rlib",
+            "node_modules/leftpad/index.js",
+        ])
+        .status()
+        .unwrap();
+    assert!(
+        status.success(),
+        "force-adding banned fixtures should succeed"
+    );
 }
 
 #[test]
