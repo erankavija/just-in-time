@@ -6,9 +6,9 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "pending"},
-        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "pending"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "pending"}
+        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
+        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "integrated_pending_gates"},
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "integrated_pending_gates"}
       ]
     },
     {
@@ -68,6 +68,20 @@
       "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
       "blocking_issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
       "status": "open"
+    },
+    {
+      "category": "external AI review data export",
+      "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+      "status": "awaiting informed consent"
+    },
+    {
+      "category": "pre-existing secret-scan findings outside epic",
+      "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+      "finding_paths": [
+        ".jit/issues/0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe.json",
+        "dev/active/8b05a612-plan.md"
+      ],
+      "status": "awaiting scope approval"
     }
   ],
   "rework_counts": {
