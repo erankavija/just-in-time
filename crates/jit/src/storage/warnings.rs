@@ -16,6 +16,7 @@
 //! straight into the output layer, and [`Serialize`](serde::Serialize) so it
 //! can be embedded in `--json` payloads as structured data.
 
+use schemars::JsonSchema;
 use serde::Serialize;
 use std::fmt;
 use std::path::PathBuf;
@@ -29,7 +30,7 @@ use std::path::PathBuf;
 ///
 /// The [`Display`](std::fmt::Display) form is the bare message body with no
 /// `Warning:`/`Error:` prefix, so the output layer can apply its own framing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum StorageWarning {
     /// A gap was detected in the claims-log sequence numbers during rebuild.

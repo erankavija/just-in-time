@@ -110,15 +110,17 @@ Each issue is stored as `issues/<uuid>.json`:
 The `gates_required` / `gates_status` split above is the **on-disk record
 shape**. Two rules govern how it reaches a command's `--json` output:
 
-- **Every `--full` record dump emits the stored record verbatim**, so its gate
-  list stays under `gates_required` / `gates_status`. Current members: `jit
-  graph export --format json --full`, `jit query … --full`, `jit issue list
-  --full` (and its top-level `jit list --full` alias), and `jit issue search
-  --full`.
+- **Every command that hands back a stored issue record verbatim emits it
+  under `gates_required` / `gates_status`.** Current members: the `--full`
+  record dumps (`jit graph export --format json --full`, `jit query … --full`,
+  `jit issue list --full` and its top-level `jit list --full` alias, `jit issue
+  search --full`); the single-issue lifecycle mutation confirmations (`jit issue
+  assign`, `unassign`, `reject`, `release`, `claim`, `claim-next`); and `jit
+  apply`'s `created_issues` map.
 - **Every projected issue view exposes the gate list as a single `gates`
   array** (`{key, status, …}` per required gate), never `gates_required` /
-  `gates_status`. Current members: `jit issue show`, `jit issue show
-  --summary`, `jit issue status`, and `jit issue children`.
+  `gates_status`. Current members: `jit issue create`, `jit issue show`, `jit
+  issue show --summary`, `jit issue status`, and `jit issue children`.
 
 So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 --schema` declares, per command, which of the two shapes it emits; see

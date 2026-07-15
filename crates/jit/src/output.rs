@@ -895,6 +895,37 @@ pub struct IssueSearchFullResponse {
     pub count: usize,
 }
 
+/// Response for `jit issue claim` and `jit issue claim-next --json`.
+///
+/// A record echo: the complete stored [`Issue`] just claimed — so the gate list
+/// appears under the storage names `gates_required` / `gates_status`, exactly as
+/// the on-disk record carries it — flattened to the top level, plus the advisory
+/// `warnings` array the claim produced. Declared as a record dump in
+/// `jit --schema`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ClaimResponse {
+    #[serde(flatten)]
+    pub issue: Issue,
+    pub warnings: Vec<crate::storage::StorageWarning>,
+}
+
+/// Response for `jit apply --json`.
+///
+/// `created_issues` maps each template role to the complete stored [`Issue`]
+/// record created for it, so each carries the gate list under the storage names
+/// `gates_required` / `gates_status` (the raw-record shape). Declared in
+/// `jit --schema`; deriving `created_issues` from [`Issue`] keeps the gate field
+/// names in lockstep with the serialized record.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct TemplateApplyResponse {
+    pub template: String,
+    pub container: String,
+    pub anchor_bindings: std::collections::BTreeMap<String, String>,
+    pub created_node_ids_by_role: std::collections::BTreeMap<String, String>,
+    pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<String>>,
+    pub created_issues: std::collections::BTreeMap<String, Issue>,
+}
+
 /// Response for blocked query with reasons (minimal issue + reasons)
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedListResponse {
