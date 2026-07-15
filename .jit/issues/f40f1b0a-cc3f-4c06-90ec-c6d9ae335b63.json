@@ -2,9 +2,9 @@
   "id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
   "title": "Unify the machine-readable gate field across command outputs",
   "description": "The gate list an issue carries is exposed under three different names and shapes across machine-readable outputs, and one of them is the shape the storage reference documents. A consumer that follows the documentation and calls `jit issue show --json` asks for a key that is not there — and JSON answers with absence, not an error, so a wrong field name is indistinguishable from \"this issue has no gates\".\n\nObserved while auditing gates across an epic: reading `gates_required` from `jit issue show --json` reported every issue as ungated. The audit looked clean and was wrong.\n\n## The three shapes\n\n| Surface | Shape |\n| --- | --- |\n| Stored record, `jit graph export --full`, `jit query --full` | `gates_required` (array of keys) + `gates_status` (map key -> status) |\n| `jit issue show --json` | `gates` (array of `{key, status, exit_code, last_run_at}`) |\n| `jit query` / `jit list` summaries | absent entirely |\n\n`docs/reference/storage-format.md` documents `gates_required` / `gates_status` — the storage shape — because that is what the record holds. Nothing tells a reader that the single-issue command renames and reshapes it.\n\nThe failure mode is agent-facing: an agent that reads a field name from the reference, or that carries a field name across two commands, gets a silently empty result rather than a diagnosable error, and reports a false conclusion.\n\n## Success Criteria\n\n- [hard] REQ-01: One name and one shape for an issue's gates across every machine-readable output that carries them, or — if the summary and full projections must differ — the difference is declared in `jit --schema` so a consumer can discover it without reading the source.\n- [hard] REQ-02: `jit --schema` documents the issue output shape each command emits, including which fields a summary projection omits, so a field absent from a response is attributable to the projection rather than to the data.\n- [hard] REQ-03: Documentation that names these fields (`docs/reference/storage-format.md` and the generated references) agrees with what the commands emit; no page names a field a command does not return.\n- [hard] REQ-04: Coverage asserts the emitted shape against the documented one, so a rename on either side fails the build rather than silently changing what consumers see.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -21,6 +21,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-12T13:45:16.391314261Z",
-  "updated_at": "2026-07-12T13:45:16.392808392Z",
-  "first_ready_at": "2026-07-12T13:45:16.391320001Z"
+  "updated_at": "2026-07-15T17:39:49.756473822Z",
+  "first_ready_at": "2026-07-12T13:45:16.391320001Z",
+  "claimed_at": "2026-07-15T17:39:49.756473502Z"
 }
