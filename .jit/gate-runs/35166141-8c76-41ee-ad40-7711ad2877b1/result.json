@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "35166141-8c76-41ee-ad40-7711ad2877b1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "7c2e08768dcaedeeb4bb72a3cb3ad752a16a95ad",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T18:59:35.317489328Z",
+  "completed_at": "2026-07-15T19:01:37.398249562Z",
+  "duration_ms": 122080,
+  "exit_code": 1,
+  "stdout": "Attribution: `f40f1b0a` is a leaf (`bug`, level 4) with no resolved children. I reviewed its eight reachable `jit:f40f1b0a` commits individually; all have commit attribution. Working-tree `.jit` changes were excluded. The prior finding is addressed for create, lifecycle mutations, and `apply`.\n\nThe remaining contract is inaccurate for `jit query blocked --full`: documentation groups it into `jit query … --full` raw-record dumps, but the current command returns a reason-enriched minimal projection without any gate-list field, and `jit --schema` does not declare the `--full` variant.\n\n1. **F1 — blocking, issue-impact, high:** [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:113) says `jit query … --full` emits raw `gates_required` / `gates_status` records and that `jit --schema` declares the projection per command. `jit query blocked --full --json` instead emits `BlockedIssue` entries based on `MinimalIssue`, omitting all gate fields; its schema declares only `BlockedListResponse`. Narrow the documented raw-query list to the variants that actually return records, explicitly document the blocked-query omission, and declare its `--full` response shape in `jit --schema` (or make that command emit raw records).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The gate-field reference incorrectly treats `jit query blocked --full` as a raw record dump and its schema does not declare that variant.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The documented `jit query … --full` raw-record rule is false for `query blocked --full`, whose output omits gates and whose schema omits the full variant.\",\"file\":\"docs/reference/storage-format.md\",\"line\":113}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 45162 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6726-114d-78e2-b00c-60974ad509f3\n--------\nuser\n--- 45149 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The gate-field reference incorrectly treats `jit query blocked --full` as a raw record dump and its schema does not declare that variant.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The documented `jit query … --full` raw-record rule is false for `query blocked --full`, whose output omits gates and whose schema omits the full variant.",
+        "file": "docs/reference/storage-format.md",
+        "line": 113
+      }
+    ]
+  }
+}

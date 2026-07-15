@@ -5196,7 +5196,6 @@ fn run() -> Result<()> {
                         if json {
                             use jit::domain::MinimalIssue;
                             use jit::output::JsonOutput;
-                            use serde_json::json;
 
                             let msg = format!("Found {} issue(s)", blocked.len());
                             let output = if full {
@@ -5233,10 +5232,10 @@ fn run() -> Result<()> {
                                     .collect();
 
                                 JsonOutput::success(
-                                    json!({
-                                        "count": blocked_issues.len(),
-                                        "issues": blocked_issues,
-                                    }),
+                                    serde_json::to_value(jit::output::BlockedFullListResponse {
+                                        count: blocked_issues.len(),
+                                        issues: blocked_issues,
+                                    })?,
                                     "query blocked",
                                 )
                             } else {
@@ -5251,10 +5250,10 @@ fn run() -> Result<()> {
                                     .collect();
 
                                 JsonOutput::success(
-                                    json!({
-                                        "count": minimal.len(),
-                                        "issues": minimal,
-                                    }),
+                                    serde_json::to_value(jit::output::BlockedListResponse {
+                                        count: minimal.len(),
+                                        issues: minimal,
+                                    })?,
                                     "query blocked",
                                 )
                             }

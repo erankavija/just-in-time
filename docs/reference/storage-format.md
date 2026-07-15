@@ -112,8 +112,9 @@ shape**. Two rules govern how it reaches a command's `--json` output:
 
 - **Every command that hands back a stored issue record verbatim emits it
   under `gates_required` / `gates_status`.** Current members: the `--full`
-  record dumps (`jit graph export --format json --full`, `jit query … --full`,
-  `jit issue list --full` and its top-level `jit list --full` alias, `jit issue
+  record dumps (`jit graph export --format json --full`; `jit query all`,
+  `available`, `ready`, `strategic`, and `closed` with `--full`; `jit issue
+  list --full` and its top-level `jit list --full` alias; `jit issue
   search --full`); the single-issue lifecycle mutation confirmations (`jit issue
   assign`, `unassign`, `reject`, `release`, `claim`, `claim-next`); and `jit
   apply`'s `created_issues` map.
@@ -121,6 +122,11 @@ shape**. Two rules govern how it reaches a command's `--json` output:
   array** (`{key, status, …}` per required gate), never `gates_required` /
   `gates_status`. Current members: `jit issue create`, `jit issue show`, `jit
   issue show --summary`, `jit issue status`, and `jit issue children`.
+
+`jit query blocked` belongs to neither rule: both its shapes (default, and the
+reason-enriched `--full`) build on the lean summary projection and carry no
+gate-list fields at all — a blocking gate appears only as a `blocked_reasons`
+entry.
 
 So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 --schema` declares, per command, which of the two shapes it emits; see

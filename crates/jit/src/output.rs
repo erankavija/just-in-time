@@ -947,6 +947,16 @@ pub struct BlockedQueryResponse {
     pub count: usize,
 }
 
+/// Response for `query blocked --full`: reason-enriched entries. Neither
+/// blocked shape carries the issue's gate-list fields — a blocking gate
+/// appears only as a structured reason — so this command belongs to neither
+/// gate-field rule in the storage reference.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct BlockedFullListResponse {
+    pub issues: Vec<BlockedIssue>,
+    pub count: usize,
+}
+
 /// Issue with blocking reasons (minimal version for lists)
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedIssue {

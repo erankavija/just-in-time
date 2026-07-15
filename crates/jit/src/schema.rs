@@ -573,10 +573,23 @@ impl CommandSchema {
                 });
                 (Some(union), "IssueSearchResponse")
             }
-            "query_blocked" => (
-                Some(schema_to_value::<BlockedListResponse>()),
-                "BlockedListResponse",
-            ),
+            // `query blocked` is the one query whose --full variant is NOT a
+            // record dump: both shapes build on MinimalIssue and carry no
+            // gate-list fields; a blocking gate appears only as a reason.
+            "query_blocked" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<BlockedListResponse>(),
+                        schema_to_value::<BlockedFullListResponse>(),
+                    ],
+                    "description": "Default shape: MinimalBlockedIssue entries \
+                        (lean fields plus blocked_reasons strings). With --full: \
+                        BlockedIssue entries (lean fields plus structured \
+                        blocked_reasons). Neither shape carries gate-list fields; \
+                        a blocking gate appears only as a reason entry."
+                });
+                (Some(union), "BlockedListResponse")
+            }
 
             // `jit apply` echoes each created node's raw stored record under
             // `created_issues`, so their gate lists are carried under
