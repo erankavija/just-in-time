@@ -856,6 +856,21 @@ pub struct IssueListResponse {
     pub count: usize,
 }
 
+/// Full-record response for `jit query … --full --json`.
+///
+/// Where the default query shape ([`IssueListResponse`]) emits lean
+/// [`MinimalIssue`] entries with no gate fields, `--full` hands back complete
+/// stored [`Issue`] records, so the gate list appears under the storage names
+/// `gates_required` / `gates_status` — the same shape `.jit/issues/<id>.json`
+/// carries. The two shapes are declared side by side in `jit --schema`
+/// (@/inv/single-source-prose: the full arm is derived from the [`Issue`]
+/// struct, not a hand-written mirror).
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueListFullResponse {
+    pub issues: Vec<Issue>,
+    pub count: usize,
+}
+
 /// Response for blocked query with reasons (minimal issue + reasons)
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct BlockedListResponse {
@@ -1754,8 +1769,12 @@ impl From<&Issue> for IssueUpdateResponse {
 
 /// Compact response returned by `jit issue show --summary --json`.
 ///
-/// Carries the `MinimalIssue` fields plus `gates_status`, but omits the
-/// description and enriched dependency list.
+/// Carries the `MinimalIssue` fields plus the issue's `gates` list, but omits
+/// the description and enriched dependency list. `gates` is the same field name
+/// the full `issue show --json` ([`IssueShowResponse`]) exposes, projected to
+/// `{key, status}` per gate: the summary drops the `last_run_at`/`exit_code`
+/// run enrichment that the full view's [`GateView`] carries, so a consumer that
+/// only needs per-gate status reads it identically on both shapes.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct IssueShowSummaryResponse {
     pub id: String,
@@ -1767,8 +1786,9 @@ pub struct IssueShowSummaryResponse {
     pub assignee: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
-    pub gates_required: Vec<String>,
-    pub gates_status: std::collections::HashMap<String, GateState>,
+    /// One `{key, status}` entry per required gate — the summary projection of
+    /// the full view's `gates`, without run enrichment.
+    pub gates: Vec<GateStatusEntry>,
 }
 
 impl From<&Issue> for IssueShowSummaryResponse {
@@ -1784,8 +1804,11 @@ impl From<&Issue> for IssueShowSummaryResponse {
                 .as_ref()
                 .map(crate::domain::Assignee::to_string),
             labels: issue.labels.clone(),
-            gates_required: issue.gates_required.clone(),
-            gates_status: issue.gates_status.clone(),
+            gates: issue
+                .gates_required
+                .iter()
+                .map(|key| GateStatusEntry::for_required(key, issue.gates_status.get(key)))
+                .collect(),
         }
     }
 }
@@ -1914,6 +1937,21 @@ impl GateRunSummary {
 pub struct GateStatusEntry {
     pub key: String,
     pub status: GateStatus,
+}
+
+impl GateStatusEntry {
+    /// Build the `{key, status}` entry for one required gate: its recorded
+    /// [`GateState`] status, or `pending` when no run or attestation exists.
+    ///
+    /// Centralizes the pending-default so the compact `gates` projection shared
+    /// by `issue status` and `issue show --summary` matches the status the full
+    /// [`GateView`] reports for the same gate.
+    pub fn for_required(key: &str, state: Option<&GateState>) -> Self {
+        Self {
+            key: key.to_string(),
+            status: state.map(|s| s.status).unwrap_or(GateStatus::Pending),
+        }
+    }
 }
 
 /// JSON payload of `jit gate status-all --json` (alias `gate check-all`).

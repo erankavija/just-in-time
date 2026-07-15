@@ -9,6 +9,7 @@ mod command_exit_code_projection_tests;
 mod container_rollup_tests;
 mod error_json_tests;
 mod exit_code_tests;
+mod gate_field_contract_test;
 mod issue_create_json_contract_test;
 mod issue_create_positional_type_tests;
 mod issue_search_json_tests;

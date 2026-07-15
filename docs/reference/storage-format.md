@@ -105,6 +105,19 @@ Each issue is stored as `issues/<uuid>.json`:
 | `claimed_at` | timestamp? | When the issue was FIRST claimed/assigned |
 | `done_at` | timestamp? | When the issue FIRST reached `done` |
 
+#### Gate fields in command output
+
+The `gates_required` / `gates_status` split above is the **on-disk record
+shape**. Commands that hand back the raw record verbatim — `jit graph export
+--format json --full` and `jit query … --full` — emit these two fields exactly
+as shown. The projected single-issue views reshape them: `jit issue show`,
+`jit issue show --summary`, and `jit issue status` expose the gate list as a
+single `gates` array (`{key, status, …}` per required gate), not as
+`gates_required` / `gates_status`. Reading `gates_required` from `jit issue
+show --json` therefore finds nothing. `jit --schema` declares, per command,
+which of the two shapes that command emits; see
+[`jit issue show`](cli-commands.md#inspecting-issues-jit-issue-show).
+
 #### Lifecycle timestamps
 
 `first_ready_at`, `claimed_at`, and `done_at` record when an issue first passed

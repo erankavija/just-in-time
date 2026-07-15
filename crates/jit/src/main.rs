@@ -1370,27 +1370,27 @@ fn run_query_all<S: IssueStore>(
 
     if json {
         use jit::domain::MinimalIssue;
-        use jit::output::JsonOutput;
-        use serde_json::json;
+        use jit::output::{IssueListFullResponse, IssueListResponse, JsonOutput};
 
         let msg = format!("Found {} issue(s)", issues.len());
+        // `--full` hands back complete stored records (gate list under the
+        // storage names `gates_required`/`gates_status`); the default shape emits
+        // lean `MinimalIssue` entries. Both go through their typed response so the
+        // emitted shape stays in lockstep with the schema derived from the same
+        // struct (jit:f40f1b0a).
         let output = if full {
-            JsonOutput::success(
-                json!({
-                    "count": issues.len(),
-                    "issues": issues,
-                }),
-                "query all",
-            )
+            let response = IssueListFullResponse {
+                count: issues.len(),
+                issues,
+            };
+            JsonOutput::success(serde_json::to_value(response)?, "query all")
         } else {
             let minimal: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
-            JsonOutput::success(
-                json!({
-                    "count": minimal.len(),
-                    "issues": minimal,
-                }),
-                "query all",
-            )
+            let response = IssueListResponse {
+                count: minimal.len(),
+                issues: minimal,
+            };
+            JsonOutput::success(serde_json::to_value(response)?, "query all")
         }
         .with_message(msg);
         println!("{}", output.to_json_string()?);
