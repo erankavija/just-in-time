@@ -555,7 +555,7 @@ impl CommandSchema {
     }
 
     fn generate_types() -> HashMap<String, Value> {
-        use crate::domain::State;
+        use crate::domain::{GateChecker, State};
 
         let mut types = HashMap::new();
 
@@ -582,6 +582,11 @@ impl CommandSchema {
                 "enum": ["low", "normal", "high", "critical"],
                 "description": "Issue priority level"
             }),
+        );
+
+        types.insert(
+            "GateChecker".to_string(),
+            serde_json::to_value(schema_for!(GateChecker)).unwrap_or(json!({})),
         );
 
         types.insert(
@@ -1110,6 +1115,30 @@ mod tests {
             enum_vals, expected,
             "schema State enum must match State::all() exactly (single source of truth)"
         );
+    }
+
+    #[test]
+    fn test_schema_publishes_every_gate_checker_wire_variant() {
+        let schema = CommandSchema::generate();
+        let checker = schema
+            .types
+            .get("GateChecker")
+            .expect("GateChecker type in schema");
+        let encoded = serde_json::to_string(checker).unwrap();
+
+        for checker_type in [
+            "exec",
+            "repository_validation",
+            "issue_validation",
+            "label_target_validation",
+            "review_placeholder",
+        ] {
+            assert!(
+                encoded.contains(checker_type),
+                "GateChecker schema omits {checker_type}: {encoded}"
+            );
+        }
+        assert!(encoded.contains("label_namespace"));
     }
 
     /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,

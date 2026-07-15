@@ -342,6 +342,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
                     Some("codex exec")
                 );
             }
+            other => panic!("expected exec checker, got {other:?}"),
         }
         assert!(preset.validate().is_ok());
     }
@@ -376,6 +377,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
                     Some("codex exec")
                 );
             }
+            other => panic!("expected exec checker, got {other:?}"),
         }
         assert!(preset.validate().is_ok());
     }
@@ -401,6 +403,7 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
                 assert_eq!(command, "./scripts/coverage-preview.sh");
                 assert!(*pass_context);
             }
+            other => panic!("expected exec checker, got {other:?}"),
         }
         assert!(preset.validate().is_ok());
     }

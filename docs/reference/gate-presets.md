@@ -21,6 +21,25 @@ actually enforces live in its own `.jit/gates.toml`, its settings in
 `.jit/config.toml`; render those with `jit reference render` (see
 [Rules and Gates](rules-and-gates.md)).
 
+## Portable checker types
+
+Automated gate definitions can use `exec` or one of four in-process checker types.
+The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the
+configured gate key does not change their behavior:
+
+- `repository_validation` runs structural and declarative validation for the whole
+repository.
+- `issue_validation` runs declarative validation for the gated issue.
+- `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
+from the gated issue and runs scoped validation for that target. Its checker table
+must set `label_namespace`.
+- `review_placeholder` passes so a workflow can be installed before an external
+reviewer is selected, but records an advisory structured finding and prints
+`WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns
+while any gate uses it. Replace it with an `exec` checker (for example, `jit gate
+update <key> --checker-command <command>`) before treating the gate as review
+evidence.
+
 A project can also define its own presets: `jit gate preset create <issue> <name>`
 captures an issue's gates into `.jit/config/gate-presets/<name>.json`, and every
 JSON file in that directory loads alongside the built-ins. `jit gate preset create`

@@ -3437,6 +3437,23 @@ fn run() -> Result<()> {
                                         println!("    Working dir: {}", wd);
                                     }
                                 }
+                                jit::domain::GateChecker::RepositoryValidation => {
+                                    println!("  Checker: repository validation (built-in)");
+                                }
+                                jit::domain::GateChecker::IssueValidation => {
+                                    println!("  Checker: issue validation (built-in)");
+                                }
+                                jit::domain::GateChecker::LabelTargetValidation {
+                                    label_namespace,
+                                } => {
+                                    println!(
+                                        "  Checker: label-target validation (built-in, namespace: {})",
+                                        label_namespace
+                                    );
+                                }
+                                jit::domain::GateChecker::ReviewPlaceholder => {
+                                    println!("  Checker: WARNING — external review placeholder");
+                                }
                             }
                         }
                     }
@@ -4005,6 +4022,7 @@ fn run() -> Result<()> {
                                 "status": "passed",
                                 "verdict": "pass",
                                 "already_passed": already_passed,
+                                "warnings": outcome.warnings,
                                 "message": message,
                             });
                             let output = JsonOutput::success(response, "gate evaluate");
@@ -4222,6 +4240,24 @@ fn run() -> Result<()> {
                                             } => {
                                                 println!("    Command: {}", command);
                                                 println!("    Timeout: {}s", timeout_seconds);
+                                            }
+                                            jit::domain::GateChecker::RepositoryValidation => {
+                                                println!("    Built-in: repository validation");
+                                            }
+                                            jit::domain::GateChecker::IssueValidation => {
+                                                println!("    Built-in: issue validation");
+                                            }
+                                            jit::domain::GateChecker::LabelTargetValidation {
+                                                label_namespace,
+                                            } => {
+                                                println!(
+                                                    "    Built-in: label-target validation ({label_namespace}:)"
+                                                );
+                                            }
+                                            jit::domain::GateChecker::ReviewPlaceholder => {
+                                                println!(
+                                                    "    Built-in: WARNING — external review placeholder"
+                                                );
                                             }
                                         }
                                     }
