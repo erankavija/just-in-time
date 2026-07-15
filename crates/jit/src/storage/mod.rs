@@ -19,6 +19,7 @@ pub mod config_store;
 pub mod control_plane;
 pub mod discovery;
 pub mod errors;
+pub mod file_transaction;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git_revision;
@@ -34,6 +35,10 @@ pub mod reference;
 pub mod repo_lock;
 pub mod ruleset_store;
 pub mod temp_cleanup;
+mod transaction_action;
+mod transaction_journal;
+mod transaction_recovery;
+mod transaction_staging;
 pub mod warnings;
 pub mod worktree_identity;
 pub mod worktree_paths;
@@ -55,12 +60,19 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
+pub use file_transaction::{FileTransactionKernel, FileTransactionOutcome, FileTransactionPlan};
 pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
 pub use json::JsonFileStorage;
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
+pub use transaction_action::TransactionAction;
+pub use transaction_journal::TransactionDecision;
+pub use transaction_recovery::{
+    FailurePoint as TransactionFailurePoint, FileTransactionError, NoTransactionFailures,
+    RecoveryRequiredError, RecoveryState, TransactionFailureInjector,
+};
 pub use warnings::StorageWarning;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
