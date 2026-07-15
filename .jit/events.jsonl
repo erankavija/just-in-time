@@ -7358,3 +7358,5 @@
 {"type":"issue_completed","id":"c4911ac4-2a87-4c7d-a96c-9206a671d42f","issue_id":"57d0eb79-f3c5-408a-9322-758099a60e49","timestamp":"2026-07-15T08:44:42.019531392Z"}
 {"type":"issue_state_changed","id":"4dc26570-ba58-45d7-8cfa-b338ab5b6385","issue_id":"3398bc19-61ba-4030-955c-f49d19bfebca","timestamp":"2026-07-15T08:45:24.784657460Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"06035c11-bc48-42e4-b601-585bd17131f6","issue_id":"3398bc19-61ba-4030-955c-f49d19bfebca","timestamp":"2026-07-15T08:45:24.784905720Z","assignee":"agent:worker"}
+{"type":"issue_created","id":"6c351395-820b-4e54-be30-8522ff3f9cbd","issue_id":"ef0065ad-3b33-4533-874c-65532350cc80","timestamp":"2026-07-15T09:21:40.614542632Z","title":"Scope bracket validation to the requested container","priority":"high"}
+{"type":"issue_updated","id":"7707db82-c6e4-4bf0-a984-ee2dd45b48a4","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-15T09:22:16.843591676Z","updated_by":"dependency-add","fields":["dependencies"]}

@@ -1,0 +1,26 @@
+{
+  "id": "ef0065ad-3b33-4533-874c-65532350cc80",
+  "title": "Scope bracket validation to the requested container",
+  "description": "Scoped validation currently evaluates a historical breakdown that enters a container dependency closure, then resolves that breakdowns brackets pointer against only the partial scoped issue map. A valid repository therefore fails a coverage gate for an unrelated bracket even though global validation is clean.\n\n## Background\n\nThe production-readiness breakdown reproduced the defect with a scoped validation of its container. External dependencies correctly brought completed upstream closures into the slice. Historical breakdown 923e42fb carries the valid brackets:2821e177 pointer and both issues exist, but the container target is outside the sliced map, so coverage-preview reports a configuration error unrelated to the requested bracket.\n\n## Success Criteria\n\n- [hard] REQ-01: Scoped validation evaluates container-specific coverage rules only for the requested bracket while allowing valid references to resolve against the complete repository issue index.\n- [hard] REQ-02: A regression test covers a scoped container whose dependency closure contains an unrelated completed breakdown without its container and produces no false missing-pointer finding.\n- [hard] REQ-03: A scoped breakdown with a genuinely missing or invalid brackets pointer still fails with a precise configuration finding.\n- [hard] REQ-04: Global validation behavior and genuine label-coverage findings remain unchanged.\n- [hard] REQ-05: The production-readiness coverage-preview reproduction passes without removing historical labels, weakening scope edges, or bypassing the gate.\n\n## Notes\n\nDiscovered while planning production-readiness container 8b05a612. The failed gate run is retained as evidence. This is validation-engine work owned by core maintenance per @/charter/D-15.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:bug",
+    "epic:core-maintenance",
+    "milestone:v1.0",
+    "component:validation",
+    "per:@/charter/D-15"
+  ],
+  "created_at": "2026-07-15T09:21:40.612723100Z",
+  "updated_at": "2026-07-15T09:21:40.614052081Z",
+  "first_ready_at": "2026-07-15T09:21:40.612728460Z"
+}
