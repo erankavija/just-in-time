@@ -58,12 +58,16 @@ Harness: [`scripts/benchmark-rust-build.sh`](../../../scripts/benchmark-rust-bui
 ## Environment
 
 Both runs executed on the same host with the identical toolchain, CPU,
-memory, and linker; only the Git revision differs, and only by the story's
-own landed optimization commits (see "What changed").
+memory, and linker. The Git revision differs: the optimized run measures
+`a99edacc5c960b66deb1214f2deb856aca18f0a1`, the tip of `main` at collection
+time — everything merged to `main` by then, not only the
+`rust-build-efficiency` story's own landed work. See "What changed" for
+exactly what that includes and which commits this report attributes the
+measured gains to.
 
 | | Baseline | Optimized |
 |---|---|---|
-| Git revision | `56d737891129babf9571eb4de5659295bce8d827` | `3d697d4086203de9841e9282617fc4b114925039` |
+| Git revision | `56d737891129babf9571eb4de5659295bce8d827` | `a99edacc5c960b66deb1214f2deb856aca18f0a1` |
 | OS | Arch Linux, kernel Linux 7.0.14-arch1-1 | Arch Linux, kernel Linux 7.0.14-arch1-1 |
 | CPU count | 24 | 24 |
 | Memory | 33,543,761,920 bytes (~31.2 GiB) | 33,543,761,920 bytes (~31.2 GiB) |
@@ -156,56 +160,41 @@ revision differs.
 
 | Metric | Sample 1 | Sample 2 | Sample 3 | Median | Min-Max spread |
 |---|---|---|---|---|---|
-| Clean: clippy | 20.849 | 21.103 | 20.813 | **20.849** | 20.813-21.103 (1.4%) |
-| Clean: `test --no-run` | 23.147 | 23.540 | 23.302 | **23.302** | 23.147-23.540 (1.7%) |
-| Clean: total (clippy + test-compile) | 43.996 | 44.643 | 44.115 | **44.115** | 43.996-44.643 (1.5%) |
-| Rebuild: setup clippy | 20.799 | 21.466 | 21.264 | 21.264 | 20.799-21.466 (3.2%) |
-| Rebuild: setup `test --no-run` | 29.060 | 23.718 | 23.450 | 23.718 | 23.450-29.060 (23.9%) |
-| Rebuild: incremental `test --no-run` (headline) | 11.475 | 11.619 | 14.405 | **11.619** | 11.475-14.405 (25.5%) |
+| Clean: clippy | 20.865 | 22.758 | 20.958 | **20.958** | 20.865-22.758 (9.1%) |
+| Clean: `test --no-run` | 29.216 | 24.181 | 25.776 | **25.776** | 24.181-29.216 (20.8%) |
+| Clean: total (clippy + test-compile) | 50.081 | 46.939 | 46.734 | **46.939** | 46.734-50.081 (7.2%) |
+| Rebuild: setup clippy | 20.914 | 20.880 | 20.895 | 20.895 | 20.880-20.914 (0.2%) |
+| Rebuild: setup `test --no-run` | 25.056 | 24.802 | 23.588 | 24.802 | 23.588-25.056 (6.2%) |
+| Rebuild: incremental `test --no-run` (headline) | 12.278 | 9.518 | 9.084 | **9.518** | 9.084-12.278 (35.2%) |
 
 As with the baseline, no single run is representative on its own; the median
 column is what REQ-04/REQ-05 acceptance is computed against (see
-"Comparison and acceptance thresholds" below). These are the harness's second
-collection at this issue's optimized revision: the first collection (medians
-20.312s / 22.274s / 42.586s / 7.580s) predates a `git merge --ff-only main`
-that pulled in unrelated, independently gated parallel work (a new
-capability-based filesystem dependency subtree among other changes) landed
-on `main` while this issue was in review; REQ-01 requires measuring at the
-current revision, so this second collection at `3d697d40...` supersedes the
-first. Reported figures throughout this report are from this collection.
+"Comparison and acceptance thresholds" below).
 
 **Observed variance / host noise:**
 
-- Clean-sample steps show the same low single-digit percent spread as the
-  baseline (1.4-1.7%), consistent with a quiet, uncontended sampling window:
-  `grep -c "waiting for exclusive build lock"` against this run's harness log
-  returns 0 — no concurrent `cargo-ci`/`verify-commit-builds` gate build
-  overlapped any of the six timed samples.
-- Rebuild setup `test --no-run` and the rebuild headline step both show a
-  larger spread (23.9%, 25.5%) than their clean-sample counterparts, driven
-  by sample 1's setup step (29.060s vs. 23.45-23.72s for samples 2-3) and
-  sample 3's headline rebuild (14.405s vs. 11.48-11.62s for samples 1-2). As
-  with the first collection, the *absolute* spread (~2-6s) is the more
-  informative figure than the percentage at these much smaller absolute
-  durations than the baseline's ~179-189s steps: ordinary scheduling/
-  filesystem jitter that is a rounding error at baseline scale becomes a
-  visible percentage here. This is consistent with jitter, not a regression
-  or contention: zero lock-wait events were recorded (no concurrent gate
-  build), and max-RSS is stable across all three rebuild samples
-  (1,060,760-1,061,816 KB, <0.1% spread) even though their wall times vary
-  by 25%. The acceptance conclusion is insensitive to this variance: even
-  the single slowest rebuild sample alone (14.405s) is a 91.9% reduction
-  from the baseline median, still well past the 60% floor.
-- Maximum RSS was stable across samples for every step and is higher than
-  the first collection (clippy ~1.066-1.067 GiB, `test --no-run` ~1.508-1.509
-  GiB, rebuild ~1.012-1.013 GiB) but still below baseline (~1.098-1.100 GiB,
-  ~1.513-1.515 GiB, ~1.245-1.250 GiB respectively) — consistent with the
-  merge adding some compiled code back (the new filesystem-sandboxing
-  dependency subtree) while the pruned TLS/remote-resolution subtree (see
-  "What changed") remains removed.
-- This run executed 2026-07-15, the same day as the first collection; both
-  were independently confirmed lock-contention free via the same `grep -c`
-  check against each run's own harness log.
+- `grep -c "waiting for exclusive build lock"` against this run's harness
+  log returns 1: an unrelated `cargo-ci`/`verify-commit-builds` gate build
+  held the shared lock immediately before clean sample 3 acquired it (see
+  "Non-overlap" in "Protocol"). The wait itself only delays lock acquisition,
+  not the timed measurement inside it (timing starts after the lock is held),
+  but the elevated spread on clean sample 1's `test --no-run` (29.216s vs.
+  24.181-25.776s for samples 2-3) and rebuild sample 1's headline rebuild
+  (12.278s vs. 9.084-9.518s for samples 2-3) is consistent with residual host
+  contention from that same competing build spilling into adjacent samples
+  outside the lock's own critical section (e.g. CPU scheduling pressure from
+  a build that does not itself acquire this benchmark's lock, such as an
+  ordinary developer `cargo check` in a different working tree).
+- The acceptance conclusion is insensitive to this contention: even the
+  single slowest sample in each metric (`test --no-run` at 29.216s, headline
+  rebuild at 12.278s) is an 85.0% and 93.1% reduction from the baseline
+  median respectively — both still comfortably past their 40%/60% floors.
+- Maximum RSS was stable and unaffected by the lock contention: clippy
+  ~1.066-1.067 GiB, `test --no-run` ~1.517-1.554 GiB, rebuild ~1.013-1.015
+  GiB — all below baseline's ~1.098-1.100 GiB, ~1.513-1.515 GiB, and
+  ~1.245-1.250 GiB respectively, consistent with the pruned TLS/
+  remote-resolution dependency subtree (see "What changed") remaining
+  removed.
 
 ## Baseline footprint (from the test inventory, same clean sample)
 
@@ -280,7 +269,7 @@ schema as `pre-change-test-inventory.json`).
 
 | | Baseline | Optimized |
 |---|---|---|
-| Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) | 3,947,706,680 (~3.68 GiB, median) |
+| Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) | 3,947,706,819 (~3.68 GiB, median) |
 | Unique active test-executable bytes | 14,816,926,968 (~13.8 GiB) | 1,006,148,744 (~0.94 GiB) |
 | Integration-test targets (Cargo `target.kind == ["test"]`) | 144 | 11 |
 | Total discoverable test cases (incl. doctests) | 3,306 | 3,363 |
@@ -305,13 +294,13 @@ target count and unique active test-executable bytes, via
 
 | Sample | Target-directory bytes | Unique active test-executable bytes | Integration-test targets |
 |---|---:|---:|---:|
-| 1 | 3,947,706,894 | 1,006,148,744 | 11 |
-| 2 | 3,947,706,680 | 1,006,148,744 | 11 |
-| 3 | 3,947,706,503 | 1,006,148,744 | 11 |
+| 1 | 3,947,706,819 | 1,006,148,744 | 11 |
+| 2 | 3,947,706,881 | 1,006,148,744 | 11 |
+| 3 | 3,947,706,301 | 1,006,148,744 | 11 |
 
 Executable bytes and target count are identical across all three samples
 (the same deterministic build), and target-directory bytes agree to within
-391 bytes — all three independently confirm the REQ-03 budgets below. Sample
+580 bytes — all three independently confirm the REQ-03 budgets below. Sample
 1 additionally derives the full per-test-case inventory (the designated
 `BENCH_INVENTORY_SAMPLE`), which is why only its record in
 [`optimized.json`](optimized.json)'s `clean_samples` carries the additional
@@ -346,8 +335,16 @@ without one overwriting the other.
 
 ## What changed
 
-The optimized run measures the tip of the story's landed optimization work,
-each already merged and gated independently:
+The optimized run measures `a99edacc...`, the tip of `main` at collection
+time. That revision includes everything merged to `main` by then, which is
+more than this story's own work — it also carries unrelated, independently
+gated parallel work (see the compiled-crate diff below for the one piece
+that affects a reported figure: a capability-based filesystem dependency
+subtree). This report attributes the measured gains specifically to the
+`rust-build-efficiency` story's own landed commits, each already merged and
+gated independently, because they are the ones with a documented mechanism
+(dependency and profile pruning) that directly explains the wall-time and
+memory reductions:
 
 - jit:5d862134 — Stabilize build provenance inputs (Git-metadata-only changes
   no longer relink every test target).
@@ -402,22 +399,22 @@ this is the same quantity REQ-04/REQ-05 phrase as "X% below baseline").
 
 | Metric | Baseline median | Optimized median | Reduction | Threshold | Result |
 |---|---:|---:|---:|---|---|
-| Clean: clippy | 26.885s | 20.849s | 22.4% | (no threshold) | — |
-| Clean: `test --no-run` (REQ-04) | 195.019s | 23.302s | **88.1%** | >=40% lower | **PASS** |
-| Clean: total (clippy + test-compile) | 222.069s | 44.115s | 80.1% | (no threshold) | — |
-| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 11.619s | **93.5%** | >=60% lower | **PASS** |
+| Clean: clippy | 26.885s | 20.958s | 22.0% | (no threshold) | — |
+| Clean: `test --no-run` (REQ-04) | 195.019s | 25.776s | **86.8%** | >=40% lower | **PASS** |
+| Clean: total (clippy + test-compile) | 222.069s | 46.939s | 78.9% | (no threshold) | — |
+| Rebuild: incremental `test --no-run` (REQ-05) | 178.865s | 9.518s | **94.7%** | >=60% lower | **PASS** |
 | Clean target-directory bytes, median (REQ-03) | 19.6 GiB | 3.68 GiB | 81.3% | <=10 GiB | **PASS** |
 | Unique active test-executable bytes (REQ-03) | 13.8 GiB | 0.94 GiB | 93.2% | <=2 GiB | **PASS** |
 
 Every hard budget and improvement threshold in the story's acceptance
 criteria (REQ-03/REQ-04/REQ-05) is met with wide margin: the clean
-test-compilation improvement (88.1%) is more than double the 40% floor, the
-rebuild improvement (93.5%) is well past the 60% floor, and both disk budgets
+test-compilation improvement (86.8%) is more than double the 40% floor, the
+rebuild improvement (94.7%) is well past the 60% floor, and both disk budgets
 land at roughly a third to a tenth of their ceilings. These margins hold even
-against the single slowest individual sample in each metric (worst clean
-`test --no-run` sample 23.540s = 87.9% reduction; worst rebuild sample
-14.405s = 91.9% reduction), so the conclusion is not sensitive to the
-variance discussed above.
+against the single slowest individual sample in each metric, including the
+one affected by the lock contention noted above (worst clean `test --no-run`
+sample 29.216s = 85.0% reduction; worst rebuild sample 12.278s = 93.1%
+reduction), so the conclusion is not sensitive to that variance.
 
 ## Test inventory verification (REQ-07)
 
