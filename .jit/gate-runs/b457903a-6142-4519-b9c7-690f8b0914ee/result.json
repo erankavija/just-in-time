@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "b457903a-6142-4519-b9c7-690f8b0914ee",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "2b7db09e7060de1b4a5b11e45054ab77620e5c1f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:13:43.265602376Z",
+  "completed_at": "2026-07-15T19:16:05.255142987Z",
+  "duration_ms": 141989,
+  "exit_code": 1,
+  "stdout": "Attribution: `bug` is a level-4 leaf, so I reviewed only the ten reachable `jit:f40f1b0a` commits (including their individual patches). The prior `query blocked --full` finding is resolved.\n\nThe documentation contract still fails for bare `jit query`: it is documented as equivalent to `jit query all`, but its `--schema` entry remains generic despite emitting gate-free summaries by default and storage-shaped records with `--full`.\n\n1. **F1 — blocking, issue-impact, high:** `docs/reference/storage-format.md:131` says `jit --schema` declares each command’s emitted shape, but bare `jit query --json` / `jit query --full --json` has only `{\"success\":\"CommandResponse\",\"error\":\"ErrorResponse\"}` in the current schema. This recreates the silent-absence ambiguity for a documented query spelling. Declare the bare `query` output as the same summary/full `oneOf` contract as `query all`, cover it in the schema contract test, and list `jit query --full` among the storage-record surfaces.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Bare `jit query` emits summary and full issue shapes but `jit --schema` does not declare either.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The storage reference promises per-command schemas, but bare `jit query` has only a generic schema despite its gate-field-dependent summary/full outputs.\",\"file\":\"docs/reference/storage-format.md\",\"line\":131}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 33586 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6733-0243-7b92-ada7-760b040ec721\n--------\nuser\n--- 33573 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Bare `jit query` emits summary and full issue shapes but `jit --schema` does not declare either.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The storage reference promises per-command schemas, but bare `jit query` has only a generic schema despite its gate-field-dependent summary/full outputs.",
+        "file": "docs/reference/storage-format.md",
+        "line": 131
+      }
+    ]
+  }
+}

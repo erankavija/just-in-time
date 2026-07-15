@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "9dc66690-cf6d-4491-b34d-2e0da82bb53b",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "2b7db09e7060de1b4a5b11e45054ab77620e5c1f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:16:05.291953774Z",
+  "completed_at": "2026-07-15T19:19:06.736226636Z",
+  "duration_ms": 181444,
+  "exit_code": 1,
+  "stdout": "Attribution: a92dc223, b156df88, 4c709b7f, 90b306da, e8f5d25e, 1a65c313, 60c8efd7, 7c2e0876, e330557a, 2b7db09e (`jit:f40f1b0a`)\nPolicy sources: AGENTS.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/single-source-prose → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T19:11:22Z); doc-review failed (exit 1, 2026-07-15T19:13:43Z); docs-mechanical passed (exit 0, 2026-07-15T19:11:21Z)\nTruncation recovery: narrowed schema, output, CLI, test, and documentation reads after two truncated searches\n\n1. **F1 — blocking, issue-impact (high):** The CLI reference says `gates_required` / `gates_status` appear only in “any `--full` record dump” at [docs/reference/cli-commands.md:813](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:813), but raw `Issue` responses from `issue assign`, `unassign`, `reject`, `release`, `claim`, `claim-next`, and `apply` also emit them (for example [crates/jit/src/main.rs:2746](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2746)). This contradicts the updated storage reference and leaves REQ-03 unmet. Reference: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"CLI documentation still incorrectly limits raw gate fields to --full record dumps.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CLI reference says raw gate fields appear only in --full dumps, but mutation confirmations and apply also emit stored Issue records.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":813,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7387 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6735-2afa-7c02-acf0-ef64742a52c2\n--------\nuser\n--- 7374 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "CLI documentation still incorrectly limits raw gate fields to --full record dumps.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "CLI reference says raw gate fields appear only in --full dumps, but mutation confirmations and apply also emit stored Issue records.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 813,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

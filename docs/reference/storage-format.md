@@ -113,7 +113,8 @@ shape**. Two rules govern how it reaches a command's `--json` output:
 - **Every command that hands back a stored issue record verbatim emits it
   under `gates_required` / `gates_status`.** Current members: the `--full`
   record dumps (`jit graph export --format json --full`; `jit query all`,
-  `available`, `ready`, `strategic`, and `closed` with `--full`; `jit issue
+  `available`, `ready`, `strategic`, and `closed` with `--full`, including the
+  bare `jit query --full` spelling that defaults to `all`; `jit issue
   list --full` and its top-level `jit list --full` alias; `jit issue
   search --full`); the single-issue lifecycle mutation confirmations (`jit issue
   assign`, `unassign`, `reject`, `release`, `claim`, `claim-next`); and `jit

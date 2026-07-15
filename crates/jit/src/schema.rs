@@ -558,7 +558,9 @@ impl CommandSchema {
             // `gates_status`). Declaring both via `oneOf` lets a consumer attribute
             // a missing gate field to the summary projection rather than the data.
             // `issue list` and its top-level `list` alias share the query shape.
-            "query_available" | "query_all" | "query_ready" | "query_strategic"
+            // Bare `jit query` (no subcommand) is documented as equivalent to
+            // `query all`, so it declares the same contract.
+            "query" | "query_available" | "query_all" | "query_ready" | "query_strategic"
             | "query_closed" | "issue_list" | "list" => {
                 let union = json!({
                     "oneOf": [
@@ -1562,6 +1564,7 @@ mod tests {
     #[test]
     fn test_schema_record_dumps_declare_storage_gate_fields() {
         let surfaces: &[&[&str]] = &[
+            &["query"],
             &["query", "all"],
             &["graph", "export"],
             &["issue", "list"],
