@@ -933,6 +933,22 @@ pub struct BlockedListResponse {
     pub count: usize,
 }
 
+/// Multi-id envelope for `issue show <id> <id> …` — full show projections in
+/// argument order.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueShowListResponse {
+    pub issues: Vec<IssueShowResponse>,
+    pub count: usize,
+}
+
+/// Multi-id envelope for `issue status <id> <id> …` — status projections in
+/// argument order.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueStatusListResponse {
+    pub issues: Vec<IssueStatusResponse>,
+    pub count: usize,
+}
+
 /// Response for `query ready` command
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct ReadyQueryResponse {

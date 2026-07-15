@@ -2142,10 +2142,10 @@ fn run() -> Result<()> {
                             .map(|id| build_issue_show_response(&executor, id))
                             .collect::<Result<Vec<_>>>()?;
                         let output = jit::output::JsonOutput::success(
-                            serde_json::json!({
-                                "count": responses.len(),
-                                "issues": responses,
-                            }),
+                            serde_json::to_value(jit::output::IssueShowListResponse {
+                                count: responses.len(),
+                                issues: responses,
+                            })?,
                             "issue show",
                         );
                         println!("{}", output.to_json_string()?);
@@ -2316,10 +2316,10 @@ fn run() -> Result<()> {
                             println!("{}", output.to_json_string()?);
                         } else {
                             let output = jit::output::JsonOutput::success(
-                                serde_json::json!({
-                                    "count": statuses.len(),
-                                    "issues": statuses,
-                                }),
+                                serde_json::to_value(jit::output::IssueStatusListResponse {
+                                    count: statuses.len(),
+                                    issues: statuses,
+                                })?,
                                 "issue status",
                             );
                             println!("{}", output.to_json_string()?);

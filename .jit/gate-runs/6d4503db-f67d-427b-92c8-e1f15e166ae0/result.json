@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "6d4503db-f67d-427b-92c8-e1f15e166ae0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "7c2e08768dcaedeeb4bb72a3cb3ad752a16a95ad",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:01:37.435216919Z",
+  "completed_at": "2026-07-15T19:07:19.317959128Z",
+  "duration_ms": 341882,
+  "exit_code": 1,
+  "stdout": "Attribution: `a92dc223`, `b156df88`, `4c709b7f`, `90b306da`, `e8f5d25e`, `1a65c313`, `60c8efd7`, `7c2e0876`, `e330557a`\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/invariant/bounded-rust-build-footprint` (`.jit/invariants.toml`); `@/gate/jit-validate` (`.jit/gates.toml`)\nGate evidence: cargo-ci passed/0; docs-mechanical passed/0; doc-review failed/1 (its structured F1 is addressed by `e330557a`)\nTruncation recovery: Per-file rereads for all three merge patches, targeted source/schema/docs slices, and the individual `e330557a` patch\n\n1. **F1 — blocking, issue-impact, high:** `jit --schema` declares only bare `IssueShowResponse` / `IssueShowSummaryResponse` for `issue show` at `crates/jit/src/schema.rs:482`, but `jit issue show <id> <id> --json` emits a `{count, issues}` envelope at `crates/jit/src/main.rs:2139`; multi-ID `issue status` emits the same unmodeled envelope at `crates/jit/src/main.rs:2317`. Those entries carry the `gates` projection, yet consumers cannot discover the enclosing shape or its projection from the schema. Existing contract tests cover only single-ID responses. This leaves REQ-02 and REQ-04 unmet.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Multi-ID issue show and status JSON envelopes carrying gates are not declared or contract-tested in jit --schema.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Multi-ID issue show and status emit unmodeled JSON envelopes, so jit --schema does not document every gate-bearing command shape.\",\"file\":\"crates/jit/src/schema.rs\",\"line\":482,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 14665 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6727-edff-7310-b4a3-399a3011ff6b\n--------\nuser\n--- 14652 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Multi-ID issue show and status JSON envelopes carrying gates are not declared or contract-tested in jit --schema.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Multi-ID issue show and status emit unmodeled JSON envelopes, so jit --schema does not document every gate-bearing command shape.",
+        "file": "crates/jit/src/schema.rs",
+        "line": 482
+      }
+    ]
+  }
+}

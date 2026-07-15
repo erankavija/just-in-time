@@ -484,7 +484,12 @@ impl CommandSchema {
                     "oneOf": [
                         schema_to_value::<IssueShowResponse>(),
                         schema_to_value::<IssueShowSummaryResponse>(),
-                    ]
+                        schema_to_value::<IssueShowListResponse>(),
+                    ],
+                    "description": "Single id: a bare IssueShowResponse \
+                        (IssueShowSummaryResponse with --summary). Multiple ids: \
+                        the {count, issues} envelope of full IssueShowResponse \
+                        objects in argument order."
                 });
                 (Some(union), "IssueShowResponse")
             }
@@ -522,10 +527,18 @@ impl CommandSchema {
             ),
             // `issue status` projects each issue's gate list under the compact
             // `gates` array, the same field name `issue show` uses.
-            "issue_status" => (
-                Some(schema_to_value::<IssueStatusResponse>()),
-                "IssueStatusResponse",
-            ),
+            "issue_status" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<IssueStatusResponse>(),
+                        schema_to_value::<IssueStatusListResponse>(),
+                    ],
+                    "description": "Single id: a bare IssueStatusResponse. \
+                        Multiple ids: the {count, issues} envelope of \
+                        IssueStatusResponse objects in argument order."
+                });
+                (Some(union), "IssueStatusResponse")
+            }
             // `issue children` wraps one `IssueStatusResponse` per child, so the
             // same compact `gates` array reaches each entry.
             "issue_children" => (
