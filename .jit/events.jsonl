@@ -7481,3 +7481,5 @@
 {"type":"issue_state_changed","id":"30da22d8-6fec-4efa-b918-a72e4f4d09e5","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-15T10:33:59.856841155Z","from":"ready","to":"backlog"}
 {"type":"issue_updated","id":"aee3ad0f-32a5-4f0c-9d0d-bfb31ff4f331","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-15T10:33:59.856873585Z","updated_by":"dependency-add","fields":["dependencies"]}
 {"type":"issue_updated","id":"26dd040f-a620-4506-bced-6ce8369d4b62","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-15T10:33:59.863107760Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"issue_created","id":"cdcc0390-b797-4825-8864-4508a9d9a15a","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T10:49:24.624392004Z","title":"Bound provenance test source snapshots","priority":"high"}
+{"type":"issue_updated","id":"186680cf-0564-4efa-a86a-d079e0f166ac","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-15T10:49:39.162817426Z","updated_by":"dependency-add","fields":["dependencies"]}
