@@ -66,21 +66,22 @@ counterexample across generated inputs.
 | `crates/jit/src/graph/hierarchy.rs` | Resolution invariants hold on arbitrary DAGs; resolution is order-invariant |
 | `crates/jit/src/domain/type_taxonomy.rs` | Type-name extraction normalizes consistently; invalid labels are rejected |
 | `crates/jit/src/storage/claim_coordinator_proptests.rs` | Index rebuild is idempotent and lossless; lease counts stay consistent; sequence numbers increase monotonically; concurrent claims stay exclusive |
-| `crates/jit/tests/template_apply_tests.rs` | Template application yields an acyclic, transitively reduced graph; force-refresh is idempotent over nodes and edges |
-| `crates/jit/tests/short_hash_tests.rs` | Any unique prefix resolves to its issue; shared prefixes are reported as ambiguous |
+| `crates/jit/tests/fast_docs_templates/template_apply_tests.rs` | Template application yields an acyclic, transitively reduced graph; force-refresh is idempotent over nodes and edges |
+| `crates/jit/tests/fast_issue/short_hash_tests.rs` | Any unique prefix resolves to its issue; shared prefixes are reported as ambiguous |
 
 When proptest finds a counterexample it records the seed so the case is replayed on every
 later run. Those seeds live in `crates/jit/proptest-regressions/` and, for the integration
-target, in `crates/jit/tests/short_hash_tests.proptest-regressions`. Commit them: they are
-regression tests.
+target, in `crates/jit/tests/fast_issue/short_hash_tests.proptest-regressions` (beside the
+suite module that owns the property). Commit them: they are regression tests.
 
 Write a property test when you can name an invariant that must hold for all inputs. Write an
 example test when you care about one specific input.
 
 ## 2. Harness Tests
 
-Location: `crates/jit/tests/harness.rs` (the harness) and `crates/jit/tests/harness_demo.rs`
-(tests that use it).
+Location: `crates/jit/tests/common/harness.rs` (the harness, below Cargo's auto-discovery
+boundary so it is never its own test target) and the in-process suites that use it, such as
+`crates/jit/tests/fast_docs_templates/harness_demo.rs`.
 
 `TestHarness` backs a real `CommandExecutor` with `InMemoryStorage`, so a test drives command
 logic end to end in the calling process, with issue state held in memory. Each harness gets
@@ -133,10 +134,12 @@ let h = TestHarness::new().with_item_kinds();
 
 ### Usage
 
-```rust
-mod harness;
+A suite that runs in-process declares the shared harness once in its `main.rs`
+(`#[path = "../common/harness.rs"] mod harness;`); each test module inside the suite reaches
+it through the crate root:
 
-use harness::TestHarness;
+```rust
+use crate::harness::TestHarness;
 
 #[test]
 fn test_harness_query_ready() {
@@ -155,20 +158,35 @@ fn test_harness_query_ready() {
 }
 ```
 
-Harness tests in `harness_demo.rs` cover queries, the issue lifecycle, dependency blocking
-and cycle detection, gates, container rollups, item resolution, response projections, and
-behavior at scale.
+Harness tests in `fast_docs_templates/harness_demo.rs` cover queries, the issue lifecycle,
+dependency blocking and cycle detection, gates, container rollups, item resolution, response
+projections, and behavior at scale.
 
-Run them with `cargo test --test harness_demo`.
+Run the whole suite with `cargo test --test fast_docs_templates`, or just the demo module
+with `cargo test --test fast_docs_templates harness_demo`.
 
 ## 3. Integration Tests
 
-Location: `crates/jit/tests/*.rs`, for example `crates/jit/tests/integration_test.rs` and
-`crates/jit/tests/query_tests.rs`.
+Integration tests are grouped into cohesive **suites**. Each suite is one directory under
+`crates/jit/tests/<suite>/` whose `main.rs` declares its test files as modules, so Cargo
+links and runs one executable per suite instead of one per file. Suites divide by execution
+model and subsystem:
 
-These spawn the compiled binary through `env!("CARGO_BIN_EXE_jit")` against a `TempDir` seeded
-by `jit init`, then assert on exit status, stdout, and JSON payloads. They are the only layer
-that can catch argument-parsing regressions, output-format drift, and exit-code changes.
+| Suite | Execution model | Covers |
+| --- | --- | --- |
+| `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
+| `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
+| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary and merged-commit checks) |
+| `provenance_contract` | `#[ignore]`d contracts | build-provenance stability, run by `scripts/cargo-ci.sh` under `--ignored` |
+
+Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
+they never surface as their own test targets. Add a new integration case to the file that
+matches its subsystem, or add a module file plus a `mod` line in the suite's `main.rs`.
+
+The CLI suites spawn the compiled binary through `env!("CARGO_BIN_EXE_jit")` against a
+`TempDir` seeded by `jit init`, then assert on exit status, stdout, and JSON payloads. They
+are the only layer that can catch argument-parsing regressions, output-format drift, and
+exit-code changes.
 
 ```rust
 #[test]
@@ -200,7 +218,8 @@ belongs in the harness layer, where it runs faster and fails more legibly.
 
 `crates/server/tests/` holds the equivalent layer for the web UI server crate.
 
-Run them with `cargo test --test integration_test` (or any other target name).
+Run a whole suite with `cargo test --test cli_repo_workflow`, or filter to one module or case
+with `cargo test --test cli_repo_workflow integration_test`.
 
 ## Test Environment
 
@@ -225,11 +244,11 @@ cargo test
 cargo test --lib
 
 # Harness tests
-cargo test --test harness_demo
+cargo test --test fast_docs_templates harness_demo
 
-# One integration target
-cargo test --test integration_test
-cargo test --test query_tests
+# One integration suite, or one module within it
+cargo test --test cli_repo_workflow
+cargo test --test cli_query_graph query_tests
 
 # Doc examples
 cargo test --doc
@@ -304,7 +323,7 @@ fn test_defer_issue_returns_issue_to_backlog() {
     // ...assertions on the returned value and on storage...
 }
 
-// 2. Harness test, in crates/jit/tests/harness_demo.rs
+// 2. Harness test, in crates/jit/tests/fast_docs_templates/harness_demo.rs
 #[test]
 fn test_harness_defer_issue() {
     let h = TestHarness::new();
@@ -334,5 +353,5 @@ fn test_cli_defer_issue() {
 - [AGENTS.md](../AGENTS.md) - architecture, layer boundaries, coding conventions
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
 - [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
-- [crates/jit/tests/harness.rs](../crates/jit/tests/harness.rs) - the harness implementation
-- [crates/jit/tests/harness_demo.rs](../crates/jit/tests/harness_demo.rs) - worked harness examples
+- [crates/jit/tests/common/harness.rs](../crates/jit/tests/common/harness.rs) - the harness implementation
+- [crates/jit/tests/fast_docs_templates/harness_demo.rs](../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples
