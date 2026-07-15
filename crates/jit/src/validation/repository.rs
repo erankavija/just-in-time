@@ -14,7 +14,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{Event, EventTag, GateChecker, Issue};
+use crate::domain::{Event, EventTag, GateChecker, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
@@ -524,42 +524,72 @@ fn validate_integrity(
         for dependency in &issue.dependencies {
             if !ids.contains(dependency.as_str()) {
                 return Err(anyhow!(
-                    "issue '{}' depends on missing issue '{dependency}'",
-                    issue.id
+                    "Invalid dependency: issue '{}' depends on '{}' which does not exist",
+                    issue.id,
+                    dependency
                 ));
             }
         }
         for gate in &issue.gates_required {
             if !gates.gates.contains_key(gate) {
                 return Err(anyhow!(
-                    "issue '{}' requires undefined gate '{gate}'",
+                    "Gate '{}' required by issue '{}' is not defined in registry",
+                    gate,
                     issue.id
                 ));
             }
         }
-        for document in &issue.documents {
-            if let Some(reference) = document.commit.as_deref() {
-                let repository = git2::Repository::open(view.repository_root())?;
-                let object = repository.revparse_single(reference)?;
-                object
-                    .peel_to_commit()?
-                    .tree()?
-                    .get_path(Path::new(&document.path))?;
-            } else if view.read_file(Path::new(&document.path))?.is_none() {
-                let in_head = git2::Repository::open(view.repository_root())
-                    .and_then(|repository| {
-                        let object = repository.revparse_single("HEAD")?;
-                        let commit = object.peel_to_commit()?;
-                        let tree = commit.tree()?;
-                        tree.get_path(Path::new(&document.path)).map(|_| ())
-                    })
-                    .is_ok();
-                if !in_head {
-                    return Err(anyhow!(
-                        "issue '{}' references missing document '{}'",
-                        issue.id,
-                        document.path
-                    ));
+    }
+
+    // Preserve the established command diagnostics while sourcing working-tree
+    // bytes exclusively from the view. Document validation remains optional
+    // outside git repositories, as before.
+    if let Ok(repository) = git2::Repository::open(view.repository_root()) {
+        let has_commits = repository.head().is_ok();
+        for issue in issues {
+            for document in &issue.documents {
+                if let Some(reference) = document.commit.as_deref() {
+                    let commit = repository
+                        .revparse_single(reference)
+                        .and_then(|object| object.peel_to_commit())
+                        .map_err(|_| {
+                            anyhow!(
+                                "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
+                                issue.id,
+                                reference,
+                                document.path
+                            )
+                        })?;
+                    commit.tree()?.get_path(Path::new(&document.path)).map_err(|_| {
+                        anyhow!(
+                            "Invalid document reference in issue '{}': file '{}' not found at commit {}",
+                            issue.id,
+                            document.path,
+                            reference
+                        )
+                    })?;
+                } else if view.read_file(Path::new(&document.path))?.is_none() {
+                    if has_commits {
+                        let in_head = repository
+                            .revparse_single("HEAD")
+                            .and_then(|object| object.peel_to_commit())
+                            .and_then(|commit| commit.tree())
+                            .and_then(|tree| tree.get_path(Path::new(&document.path)).map(|_| ()))
+                            .is_ok();
+                        if !in_head {
+                            return Err(anyhow!(
+                                "Invalid document reference in issue '{}': file '{}' not found at HEAD or in working tree",
+                                issue.id,
+                                document.path
+                            ));
+                        }
+                    } else {
+                        return Err(anyhow!(
+                            "Invalid document reference in issue '{}': file '{}' not found in working tree (repository has no commits yet)",
+                            issue.id,
+                            document.path
+                        ));
+                    }
                 }
             }
         }
@@ -567,20 +597,45 @@ fn validate_integrity(
     let refs: Vec<&Issue> = issues.iter().collect();
     let graph = DependencyGraph::new(&refs);
     graph.validate_dag()?;
-    if issues.len() > 1 && !graph.get_isolated_nodes().is_empty() {
-        return Err(anyhow!("repository contains isolated issues"));
+    if issues.len() > 1 {
+        let isolated = graph.get_isolated_nodes();
+        if !isolated.is_empty() {
+            let isolated_ids = isolated
+                .iter()
+                .map(|issue| format!("'{}' ({})", issue.short_id(), issue.title))
+                .collect::<Vec<_>>()
+                .join("\n  ");
+            return Err(anyhow!(
+                "Found {} isolated issue(s) not connected to the dependency graph:\n  {}\n\
+                 Isolated issues have no dependencies and are not dependencies of any other issue.\n\
+                 Either add dependencies with 'jit dep add' or delete these issues.",
+                isolated.len(),
+                isolated_ids
+            ));
+        }
     }
     for issue in issues {
         let reduced = graph.compute_transitive_reduction(&issue.id);
-        if issue
-            .dependencies
-            .iter()
-            .any(|dependency| !reduced.contains(dependency))
-        {
-            return Err(anyhow!(
-                "issue '{}' contains a transitively redundant dependency",
-                issue.id
-            ));
+        let reduced_set: HashSet<&String> = reduced.iter().collect();
+        for dependency in &issue.dependencies {
+            if !reduced_set.contains(dependency) {
+                let path = graph.find_shortest_path(&issue.id, dependency);
+                let path = if path.is_empty() {
+                    "unknown path".to_string()
+                } else {
+                    path.iter()
+                        .map(|id| &id[..SHORT_ID_LENGTH.min(id.len())])
+                        .collect::<Vec<_>>()
+                        .join(" → ")
+                };
+                return Err(anyhow!(
+                    "Transitive reduction violation: Issue {} has redundant dependency on {} \
+                     (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
+                    issue.short_id(),
+                    dependency.chars().take(SHORT_ID_LENGTH).collect::<String>(),
+                    path
+                ));
+            }
         }
     }
     Ok(())
