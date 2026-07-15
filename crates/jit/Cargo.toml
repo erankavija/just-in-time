@@ -27,7 +27,7 @@ cap-primitives = "4.0.2"
 uuid = { workspace = true }
 chrono = { workspace = true }
 fs4 = { version = "0.13", features = ["sync"] }
-git2 = "0.18"
+git2 = "0.21"
 which = "6.0"
 similar = "2.6"
 regex = "1.12.2"
@@ -61,7 +61,7 @@ nix = { version = "0.31.1", features = ["fs", "signal"] }
 # in the default build (see `[features]`), so the default `cargo build` neither
 # compiles the parser modules nor pulls these crates.
 tl = { version = "0.7", optional = true }
-quick-xml = { version = "0.40", optional = true }
+quick-xml = { version = "0.41", optional = true }
 
 [features]
 # HTML content parser (document/parser/html.rs). Pulls the pure-Rust `tl` HTML
