@@ -1,12 +1,12 @@
 warning: jit-server@0.1.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
    Doc-tests jit
 crates/jit/src/commands/batch_create.rs - commands::batch_create::BatchIssueDef (line 38): test
 crates/jit/src/commands/batch_create.rs - commands::batch_create::CommandExecutor<S>::batch_create_from_json (line 240): test
 crates/jit/src/commands/breakdown.rs - commands::breakdown::BracketChild (line 34): test
 crates/jit/src/commands/breakdown.rs - commands::breakdown::CommandExecutor<S>::bracket_breakdown_with_template (line 211): test
 crates/jit/src/commands/config.rs - commands::config::resolve_dotted_key (line 110): test
-crates/jit/src/commands/gate.rs - commands::gate::CommandExecutor<S>::update_gate (line 713): test
+crates/jit/src/commands/gate.rs - commands::gate::CommandExecutor<S>::update_gate (line 717): test
 crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::detect_divergences (line 240): test
 crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::resolve_hierarchy_tree (line 153): test
 crates/jit/src/commands/issue.rs - commands::issue::CommandExecutor<S>::issue_children (line 300): test
