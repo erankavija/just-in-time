@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "64eb4673-5d72-441e-9a6e-c9ca545e2d38",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8d4f7084-a286-4c66-ac36-f929c44d719b",
+  "commit": "1f2a5bf81019a5565e216fffed61ae60b6f4c614",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T06:59:30.546363350Z",
+  "completed_at": "2026-07-15T07:05:31.095183712Z",
+  "duration_ms": 360548,
+  "exit_code": 0,
+  "stdout": "Attribution: 1348c5b6, 50c57067, 1f2a5bf8 (`jit:8d4f7084`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-7 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/gate-semantics (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T06:55:37Z); code-review unrun/no prior structured run\nTruncation recovery: bounded documentation/patch reads, structural inventory comparisons, verifier read, and issue-scoped gate-run lookup\n\n1. [advisory][pre-existing] The baseline map still has three non-qualification differences: three ignored `version_cli_tests` cases are absent and three provenance cases are added. The artifact attributes this to pre-existing `jit:5d862134`, before this issue’s anchor, so it does not fail the attributable consolidation; it prevents a literal qualification-only baseline claim. [dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json:220](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json:220)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable suite consolidation passes review; one unrelated pre-existing inventory drift is advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The baseline inventory has three documented pre-existing non-qualification case differences.\",\"file\":\"dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json\",\"line\":220,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributable suite consolidation passes review; one unrelated pre-existing inventory drift is advisory.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "pre-existing",
+        "summary": "The baseline inventory has three documented pre-existing non-qualification case differences.",
+        "file": "dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json",
+        "line": 220
+      }
+    ]
+  }
+}

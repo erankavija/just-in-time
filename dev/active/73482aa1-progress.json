@@ -5,7 +5,7 @@
   "parent_epic": "6eb585bc",
   "batch": "rust-build-efficiency (filed 2026-07-14 by a parallel planning session; 8 pre-wired children; design doc dev/active/73482aa1-rust-build-efficiency.md)",
   "status": "executing (wave 2 of core-maintenance batch)",
-  "current_wave": 2,
+  "current_wave": 3,
   "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol.",
   "waves": [
     {
@@ -31,8 +31,8 @@
           "title": "Consolidate Rust integration tests into cohesive suites",
           "classification": "implementation",
           "model": "opus",
-          "status": "in_progress",
-          "note": "dispatch AFTER 5d862134 merges: its consolidation must include 5d862134 new provenance tests or the <=12-target REQ breaks post-merge; both touch the tests/ tree"
+          "status": "done",
+          "note": "first-pass green: cargo-ci (3292 passed) + code-review (1 advisory pre-existing finding) on merged commit 1f2a5bf8; 11 test targets (REQ-01<=12); REQ-04 machine-verified (1366 cases, verify-consolidation-inventory.py); lead repaired one doc link the moves broke (d0f88ee2 -> cli_issue/verb_hint_tests.rs)"
         },
         {
           "short_id": "5d862134",
