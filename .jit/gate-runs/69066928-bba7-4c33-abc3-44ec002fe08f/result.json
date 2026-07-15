@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "69066928-bba7-4c33-abc3-44ec002fe08f",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "commit": "fad3e5a06b9ee29bb513ed20c632b6ef85c701ba",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T13:16:35.420753248Z",
+  "completed_at": "2026-07-15T13:18:23.444557211Z",
+  "duration_ms": 108023,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest validate_document_tests::test_validate_fails_for_missing_document ... FAILED\ntest result: FAILED. 99 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s\n---- validate_document_tests::test_validate_fails_for_missing_document stdout ----\n\nthread 'validate_document_tests::test_validate_fails_for_missing_document' (3480557) panicked at crates/jit/tests/cli_item_validate/validate_document_tests.rs:164:5:\nexpected 'not found' in output, got: Error: Invalid repository: repository-integrity validation pass: issue '7ad91360-ab9d-4688-b4c1-bd06b94fc6a2' references missing document 'docs/ghost.md'\n❌ Repository integrity error: Invalid repository: repository-integrity validation pass: issue '7ad91360-ab9d-4688-b4c1-bd06b94fc6a2' references missing document 'docs/ghost.md'\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=970 bytes=14158933)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1002760872/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
