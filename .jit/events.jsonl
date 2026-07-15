@@ -7774,3 +7774,5 @@
 {"type":"issue_state_changed","id":"b6d6680b-8fc9-427b-ae7e-c4d73bc7ec98","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T12:21:49.101956296Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"f4623b56-2db4-41cb-9616-03616c7605f0","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T12:21:49.102308356Z","assignee":"agent:worker"}
 {"type":"gate_passed","id":"5829890e-cf63-49fa-b8f9-b34909c8013c","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T12:22:30.221775777Z","gate_key":"security-review","updated_by":"human:authorized-invoker"}
+{"type":"issue_state_changed","id":"3568eb0a-81a5-4f73-ade7-921c3688f4c5","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T12:22:40.913782102Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"3ff69d0b-3fb5-42ad-aac4-745c4e16463e","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T12:22:40.913992082Z","assignee":"agent:worker"}
