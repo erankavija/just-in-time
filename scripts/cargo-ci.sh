@@ -117,7 +117,17 @@ summarize_pass() {
             | awk '{s+=$1} END {print s+0}')
       i=$(grep -oP '\K\d+(?= ignored)' "$WORK/$name.out" \
             | awk '{s+=$1} END {print s+0}')
-      echo "${p:-0} passed, ${f:-0} failed, ${i:-0} ignored"
+      # REQ-04 (jit:83efbcb4): the provenance step's own $WORK/provenance.out
+      # is deleted by the EXIT trap once this script finishes, so surface its
+      # seeded-fixture file/byte count line (printed via --nocapture) into the
+      # persisted gate summary here rather than leaving it observable only in
+      # a temp file that is already gone by the time anyone reads this output.
+      local fixture=""
+      if [ "$name" = "provenance" ]; then
+        fixture=$(grep -o 'provenance-fixture: files=[0-9]* bytes=[0-9]*' "$WORK/$name.out" | tail -1)
+        [ -n "$fixture" ] && fixture=" ($fixture)"
+      fi
+      echo "${p:-0} passed, ${f:-0} failed, ${i:-0} ignored${fixture}"
       ;;
     *)
       echo "ok"
@@ -231,8 +241,12 @@ run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
 # them, so this step does. No lock interaction: these tests spawn plain `cargo`
 # only (never scripts/cargo-ci.sh or verify-commit-builds.sh), so they do not
 # re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
+# --nocapture (jit:83efbcb4 REQ-04): the metadata-stability test prints the
+# seeded-fixture file/byte count line before its cold build; this flag is what
+# lets that line reach $WORK/provenance.out for summarize_pass to fold into
+# the persisted gate summary below, on a passing run and not just a failure.
 run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
-  --test provenance_contract -- --ignored
+  --test provenance_contract -- --ignored --nocapture
 
 # REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
 # left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
