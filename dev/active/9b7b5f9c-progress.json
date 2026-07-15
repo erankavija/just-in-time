@@ -8,7 +8,7 @@
       "issues": [
         {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "blocked_gates"},
         {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "gates_passed_waiting_wave"},
-        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "rework_attempt_4_authorized"}
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "rework_attempt_5_authorized"}
       ]
     },
     {
@@ -86,24 +86,25 @@
     {
       "category": "maximum rework attempts reached",
       "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
-      "status": "continued rework through completion authorized by invoker; attempt 4 dispatched",
+      "status": "continued rework through completion authorized by invoker; attempt 5 dispatched",
       "authorized_at": "2026-07-15",
       "renewed_authorization_at": "2026-07-15",
       "gate_run_id": "27811bd8-1fe5-40e0-9877-7ff21a86c745",
-      "latest_gate_run_id": "a24ea0c4-91d6-484e-adb1-a6566a98dd87",
+      "latest_gate_run_id": "be860123-be85-4169-83c2-e173e642faff",
       "findings": [
         "repository validation omits claims-index consistency",
         "deleted overlay documents can be accepted from live Git HEAD",
         "whole-repository structural failure discards simultaneous rule findings",
         "overlay template and item-link tests are not adversarial",
-        "profile-planning comments are premature"
+        "profile-planning comments are premature",
+        "built-in repository_validation gate bypasses the repository-view pipeline"
       ]
     }
   ],
   "rework_counts": {
     "866a5bbd-c98d-4588-83e8-7423f3b12005": 1,
     "92039d9c-1433-4b24-b3f6-2c206648cc8f": 1,
-    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 4
+    "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 5
   },
   "started_at": "2026-07-15T15:20:34+03:00"
 }
