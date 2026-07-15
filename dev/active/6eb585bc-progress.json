@@ -64,7 +64,8 @@
           "title": "Unify the machine-readable gate field across command outputs",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "in_rework",
+          "note": "merged 4c709b7f; cargo-ci/doc-review/docs-mechanical passed; code-review round 1: alias full-record surfaces (issue list --full, list, issue search --full) missing from schema/docs/contract test; rework dispatched"
         },
         {
           "short_id": "6f881a85",
@@ -246,7 +247,8 @@
     "950256ae": 1,
     "45e1b7e8": 2,
     "7446af34": 2,
-    "af4c901a": 3
+    "af4c901a": 3,
+    "f40f1b0a": 1
   },
   "started_at": "2026-07-14T00:00:00Z"
 }
