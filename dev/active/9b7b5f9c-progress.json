@@ -1,0 +1,75 @@
+{
+  "epic_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
+  "epic_short_id": "9b7b5f9c",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "866a5bbd-c98d-4588-83e8-7423f3b12005", "short_id": "866a5bbd", "title": "Add the durable file-set transaction kernel", "classification": "implementation", "status": "pending"},
+        {"id": "92039d9c-1433-4b24-b3f6-2c206648cc8f", "short_id": "92039d9c", "title": "Provide portable deterministic checks and review warnings", "classification": "implementation", "status": "pending"},
+        {"id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc", "short_id": "be542b98", "title": "Route repository validation through an overlay view", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2", "short_id": "eceffc17", "title": "Enforce recovery at the universal mutation boundary", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563", "short_id": "0aec3b1e", "title": "Define and validate embedded profile packages", "classification": "implementation", "status": "blocked_external_dependency"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "0d8f20a8-db02-43ba-ad9e-8f219b427690", "short_id": "0d8f20a8", "title": "Build package projection and drift mechanics", "classification": "implementation", "status": "pending"},
+        {"id": "56838d99-dc9d-4028-9b41-6ba691fc4852", "short_id": "56838d99", "title": "Plan safe deterministic profile application", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004", "short_id": "9b0a997e", "title": "Apply profiles with transactional provenance and audit", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c", "short_id": "7ad4019b", "title": "Author the portable dogfood workflow package", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id": "070ca05f-f7a9-4922-b796-3376a0b813b2", "short_id": "070ca05f", "title": "Expose profile commands through init, schema, and MCP", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {"id": "c533ac18-88dc-42b6-a773-18228a5d2320", "short_id": "c533ac18", "title": "Consolidate adopter profile documentation", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {"id": "bcff56be-2e8f-44ae-9b3b-5739be414630", "short_id": "bcff56be", "title": "Exercise cross-platform profile adoption", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [
+    {
+      "category": "cross-epic dependency",
+      "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+      "blocking_issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+      "status": "open"
+    }
+  ],
+  "rework_counts": {},
+  "started_at": "2026-07-15T15:20:34+03:00"
+}
