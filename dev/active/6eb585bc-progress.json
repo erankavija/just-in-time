@@ -125,6 +125,20 @@
       ]
     },
     {
+      "wave_number": 2.5,
+      "theme": "Charter-priority interleave: scoped validation fix (@/charter/D-15: production-readiness breakdown is blocked on it)",
+      "issues": [
+        {
+          "short_id": "ef0065ad",
+          "title": "Scope bracket validation to the requested container",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "filed 2026-07-15 by the project-lead session; adopted per @/charter/D-15; dispatch immediately after 73482aa1 wave 3 (3398bc19) closes, ahead of the remaining 73482aa1 waves"
+        }
+      ]
+    },
+    {
       "wave_number": 5,
       "theme": "Dead paths and validation correctness",
       "issues": [
@@ -198,6 +212,10 @@
     }
   ],
   "created_during_execution": [
+    {
+      "short_id": "ef0065ad",
+      "note": "Scope bracket validation to the requested container; filed by the project-lead session 2026-07-15 (@/charter/D-15); interleaved as wave 2.5. STANDING CHANGE (@/charter/D-14, commit 57ec9eb7): the epic is now a finite v1.0 prerequisite — close 6eb585bc when this scope completes, before production-readiness source freeze; the living-container decision is superseded"
+    },
     {
       "short_id": "554ad07f",
       "note": "Record working-tree cleanliness in gate-run evidence; split from 45e1b7e8 REQ-04 (aspirational) per worker recommendation; wired under epic; slotted into wave 5"

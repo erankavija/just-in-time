@@ -1,0 +1,29 @@
+{
+  "id": "c533ac18-88dc-42b6-a773-18228a5d2320",
+  "title": "Consolidate adopter profile documentation",
+  "description": "Adopters reach one canonical profile reference and preferred dogfood quickstart from concise entry pages, while manual hierarchy, gate, and planning-bracket setup remains discoverable as advanced customization.\n\n## Background\n\nThe profile MVP becomes the preferred onboarding route without removing legitimate advanced configuration. Volatile package facts and guarantees have one canonical owner; audience-specific entry pages link instead of repeating them.\n\n## Success Criteria\n\n- [hard] REQ-01: The quickstart demonstrates the embedded offline profile and links to a single canonical command/package/guarantee reference.\n- [hard] REQ-02: README, installation, configuration, gate-preset, planning, skill, deployment, examples, and CLI references link instead of repeating volatile inventories, commands, or guarantee prose, and all links/citations resolve.\n- [hard] REQ-03: The reference states transaction/recovery limits and the exact post-1.0 lifecycle exclusions without implying local packages, composition, variables, upgrade, or removal exist.\n- [hard] REQ-04: `./scripts/docs-mechanical.sh README.md INSTALL.md docs .agents/skills scripts .jit/reference profiles/jit-dogfood` passes as explicit full-surface evidence in addition to the configured docs gate.\n\n## Scope\n\n**Blast radius:** `README.md`, `INSTALL.md`, quickstart, CLI/config/storage/guarantee/gate/planning references, relevant how-to pages/examples, skill documentation links, and generated references; one canonical fact owner replaces repetition without removing navigation.\n\n**Green landing:** All public entry points resolve to the canonical reference, advanced manuals remain usable, and mechanical documentation checks pass without relying on future wording changes.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "070ca05f-f7a9-4922-b796-3376a0b813b2"
+  ],
+  "gates_required": [
+    "docs-mechanical",
+    "doc-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-11",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.042720848Z",
+  "updated_at": "2026-07-14T22:28:46.295829272Z",
+  "first_ready_at": "2026-07-14T22:28:46.042721068Z"
+}

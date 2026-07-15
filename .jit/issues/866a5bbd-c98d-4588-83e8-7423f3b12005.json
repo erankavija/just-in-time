@@ -1,0 +1,49 @@
+{
+  "id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "title": "Add the durable file-set transaction kernel",
+  "description": "A reusable storage kernel prepares, publishes, rolls back, and completes one journaled set of file, mode, and directory actions under a caller-held guard, using an external bootstrap control plane when `.jit/` did not exist and `.jit/tmp/` otherwise.\n\n## Background\n\nThe kernel implements the approved recoverable-publication contract for both existing repositories and fresh roots. It provides storage mechanics only; no existing writer or command adopts it in this leaf.\n\n## Success Criteria\n\n- [hard] REQ-01: Prepared/committed/rolled-back decisions, rename-aside replacement, verified no-replace creation, synchronization, and typed recovery-required state implement the approved contract; a fresh-root rollback removes `.jit/` while its synchronized sibling journal remains, then records terminal rollback before cleanup.\n- [hard] REQ-02: All production traversal/publication uses held `cap_std::fs::Dir` parents and capability-relative no-follow operations, with no `std::fs` pathname fallback; unsupported capability/filesystem behavior fails preflight, and created directories are handle-confined, parent-synced, and rollback-safe on Unix and Windows.\n- [hard] REQ-03: Failure and race injection covers external/internal journal creation, every stage/sync/action/decision/reverse action, before/after fresh-root removal, terminal-residue cleanup, parent symlink/junction swap, cross-volume, mode, unexpected bootstrap occupant, and unexpected target occupant.\n\n## Scope\n\n**Blast radius:** new journal/staging/action/recovery-state modules plus narrowly reused artifact/atomic primitives, storage errors, and kernel failure tests; no existing writer or command changes yet.\n\n**Green landing:** A caller-held-guard harness proves deterministic publication, exact handled rollback to both an existing repository and no `.jit/`, and resumable prepared/committed/rolled-back state without changing an existing writer or command.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "96326159-43e5-4a36-8cab-de8d858fae13"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "repo-validate",
+    "security-review",
+    "secret-detection",
+    "dependency-audit"
+  ],
+  "gates_status": {
+    "dependency-audit": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.433778181Z"
+    },
+    "secret-detection": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.433758841Z"
+    },
+    "security-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-14T22:29:04.433734631Z"
+    }
+  },
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-04",
+    "satisfies:REQ-06",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.039436085Z",
+  "updated_at": "2026-07-14T22:57:51.862526216Z",
+  "first_ready_at": "2026-07-14T22:28:46.039436325Z"
+}
