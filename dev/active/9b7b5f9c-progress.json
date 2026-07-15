@@ -67,12 +67,12 @@
       "category": "cross-epic dependency",
       "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
       "blocking_issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "open"
+      "status": "owned externally; continue until blocker"
     },
     {
       "category": "external AI review data export",
       "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
-      "status": "awaiting informed consent"
+      "status": "approved by invoker"
     },
     {
       "category": "pre-existing secret-scan findings outside epic",
@@ -81,10 +81,11 @@
         ".jit/issues/0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe.json",
         "dev/active/8b05a612-plan.md"
       ],
-      "status": "awaiting scope approval"
+      "status": "resolved by approved wording edits"
     }
   ],
   "rework_counts": {
+    "866a5bbd-c98d-4588-83e8-7423f3b12005": 1,
     "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 2
   },
   "started_at": "2026-07-15T15:20:34+03:00"
