@@ -2,9 +2,9 @@
   "id": "3398bc19-61ba-4030-955c-f49d19bfebca",
   "title": "Remove unused resolver and duplicate TLS features",
   "description": "Narrow the default Rust dependency feature graph to the capabilities the product actually uses. Local JSON Schema validation must not compile remote-resolution infrastructure, and remote document access must select one TLS implementation while preserving supported HTTPS and compressed-response behavior.\n\n## Background\n\nThe default `jsonschema` feature set pulls HTTP resolution through Reqwest, Hyper, Rustls, Tokio-Rustls, and AWS-LC even though repository schemas use local fragment references. `ureq` currently combines its default Rustls stack with an explicitly selected native-TLS backend.\n\n## Success Criteria\n\n- [hard] REQ-01: The default `jsonschema` dependency disables default features, and the resolved default workspace graph contains no `reqwest`, `hyper`, `tokio-rustls`, or `aws-lc-rs` path introduced for JSON Schema resolution.\n- [hard] REQ-02: The default `ureq` dependency disables default features and enables exactly one intentional TLS backend for remote document access, with any required content-decoding feature selected explicitly.\n- [hard] REQ-03: `cargo tree -e features --workspace` demonstrates exactly one enabled TLS implementation on the remote-document path and no remote JSON Schema resolver feature.\n- [hard] REQ-04: Existing local schema-validation behavior passes unchanged, including local fragment references to priority and state definitions.\n- [hard] REQ-05: Automated tests cover successful HTTPS remote-document access and any supported compressed response behavior using the selected feature set, without depending on a second TLS backend.\n- [hard] REQ-06: A deterministic dependency-feature assertion fails if remote JSON Schema resolution or an additional TLS backend returns to the default graph.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a"
   ],
@@ -20,6 +20,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T13:02:09.754162758Z",
-  "updated_at": "2026-07-15T01:57:42.418924031Z",
-  "first_ready_at": "2026-07-14T13:02:09.754168528Z"
+  "updated_at": "2026-07-15T08:45:24.784738040Z",
+  "first_ready_at": "2026-07-14T13:02:09.754168528Z",
+  "claimed_at": "2026-07-15T08:45:24.784737820Z"
 }
