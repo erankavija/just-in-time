@@ -6349,19 +6349,28 @@ fn run() -> Result<()> {
                     println!("{}", output.to_json_string()?);
                 }
             } else {
-                // Standard whole-repo validation. Run the repo-integrity checks
-                // (broken deps, gates, labels, DAG, transitive reduction, claims
-                // index) SEPARATELY from the declarative rule report, and capture
-                // (do NOT `?`-propagate) any integrity error: surfacing it through
+                // Standard whole-repo validation. Load every repository-dependent
+                // input through the one read-only filesystem view. Profile
+                // planning injects an overlay view into this identical pipeline,
+                // so no parser can reopen live `.jit` bytes while judging a
+                // proposed final state. Capture (do NOT `?`-propagate) any
+                // integrity error: surfacing it through
                 // the generic error path would lose the structured rule report
                 // (which includes graph-rule findings). The exit status is decided
                 // AFTER rendering, below.
                 // Wrap any integrity violation in the typed ValidationFailedError
                 // (message preserved verbatim) so the top-level handler classifies
                 // it as a validation failure by downcast rather than by message text.
-                let integrity_error = executor.validate_integrity_silent().err().map(|e| {
-                    anyhow::Error::new(jit::errors::ValidationFailedError::new(e.to_string()))
-                });
+                let repository_view =
+                    jit::validation::repository::FilesystemRepositoryView::from_jit_root(&jit_dir)?;
+                let integrity_error =
+                    jit::validation::repository::validate_repository(&repository_view)
+                        .err()
+                        .map(|e| {
+                            anyhow::Error::new(jit::errors::ValidationFailedError::new(
+                                e.to_string(),
+                            ))
+                        });
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 
                 // Run the declarative rules for every issue AND the cross-issue

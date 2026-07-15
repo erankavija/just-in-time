@@ -40,6 +40,7 @@ pub mod invariants;
 pub mod local;
 pub mod projection;
 pub mod report;
+pub mod repository;
 pub mod rules;
 pub mod rules_gates_projection;
 pub mod serialize;

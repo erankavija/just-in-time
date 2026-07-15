@@ -84,6 +84,7 @@ pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
     TemplateDelta,
 };
+pub(crate) use validate::{find_planning_node, planning_node_plan_path};
 pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE};
 
 // Re-export WorktreeIdentity for init return type

@@ -185,6 +185,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     // Type hierarchy is orthogonal to DAG structure
 
     pub fn validate_silent(&self) -> Result<()> {
+        // File-backed repositories execute the byte-exact repository-view
+        // pipeline. The overlay implementation feeds this same function during
+        // final-state planning; selecting the filesystem view here preserves
+        // existing callers while preventing validation readers from forking.
+        // Pure in-memory stores have no persisted index and retain the legacy
+        // storage-backed path below for command unit tests.
+        if self.storage.root().join("index.json").is_file() {
+            let view = crate::validation::repository::FilesystemRepositoryView::from_jit_root(
+                self.storage.root(),
+            )?;
+            crate::validation::repository::validate_repository(&view)?;
+            return Ok(());
+        }
+
         // Repository-integrity checks (broken deps, gates, docs, DAG, isolated
         // nodes, transitive reduction, claims index). Label/type-label/namespace
         // checks are NO LONGER here: they are default rules evaluated below.
@@ -1631,7 +1645,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 ///
 /// Domain-agnostic: the planning type is read from the container's template
 /// (selected by the repository's planning-role binding), not hardcoded.
-fn find_planning_node<'a>(
+pub(crate) fn find_planning_node<'a>(
     container: &Issue,
     template: &crate::templates::GraphTemplate,
     roles: &crate::templates::RoleBindings,
@@ -1664,7 +1678,7 @@ fn find_planning_node<'a>(
 /// [`DocumentReference`](crate::domain::DocumentReference) — the validation-time
 /// source of truth for the plan-doc location. Returns `None` when the node
 /// records no such reference (the plan is inline, in the container's body).
-fn planning_node_plan_path(planning: &Issue) -> Option<String> {
+pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
     use crate::commands::plan_doc::PLAN_DOC_LABEL;
 
     planning
