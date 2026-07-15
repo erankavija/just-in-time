@@ -378,13 +378,72 @@ pub fn evaluate_graph(
     now: DateTime<Utc>,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
+    // Whole-repo evaluation: the evaluation slice IS the resolution index, so a
+    // `container-from-label` pointer resolves against the same set it evaluates.
+    evaluate_graph_indexed(
+        rules,
+        issues,
+        issues,
+        hierarchy,
+        repo_default_format,
+        now,
+        plan_content,
+    )
+}
+
+/// Evaluate graph rules over a **partial** issue slice while resolving container
+/// pointers against the **complete** repository index (`--scope`, ef0065ad).
+///
+/// The `evaluation` slice decides which issues fire each rule and which issues
+/// the coverage walk considers as candidates (a bracket subtree). The
+/// `resolution_index` is the whole-repository issue set used ONLY to resolve a
+/// `container-from-label` pointer to a container: a valid pointer to a container
+/// outside the slice therefore resolves cleanly (rather than reading as a
+/// dangling pointer against the partial map), and that container's coverage —
+/// belonging to a different bracket scope — is skipped, so only the requested
+/// bracket's coverage is evaluated. A pointer that resolves to no issue in the
+/// full index is still a genuine config error. When `evaluation` and
+/// `resolution_index` are the same slice this is exactly [`evaluate_graph`].
+pub fn evaluate_graph_scoped(
+    rules: &[&Rule],
+    evaluation: &[Issue],
+    resolution_index: &[Issue],
+    hierarchy: &HierarchyConfig,
+    repo_default_format: ContentFormat,
+    now: DateTime<Utc>,
+    plan_content: &HashMap<String, String>,
+) -> Vec<GraphFinding> {
+    evaluate_graph_indexed(
+        rules,
+        evaluation,
+        resolution_index,
+        hierarchy,
+        repo_default_format,
+        now,
+        plan_content,
+    )
+}
+
+/// Shared driver for [`evaluate_graph`] and [`evaluate_graph_scoped`]: evaluate
+/// each graph rule over the `evaluation` slice, resolving container pointers
+/// against `resolution_index`.
+fn evaluate_graph_indexed(
+    rules: &[&Rule],
+    evaluation: &[Issue],
+    resolution_index: &[Issue],
+    hierarchy: &HierarchyConfig,
+    repo_default_format: ContentFormat,
+    now: DateTime<Utc>,
+    plan_content: &HashMap<String, String>,
+) -> Vec<GraphFinding> {
     rules
         .iter()
         .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
         .flat_map(|rule| {
             evaluate_one(
                 rule,
-                issues,
+                evaluation,
+                resolution_index,
                 hierarchy,
                 repo_default_format,
                 now,
@@ -398,15 +457,21 @@ pub fn evaluate_graph(
 fn evaluate_one(
     rule: &Rule,
     issues: &[Issue],
+    resolution_index: &[Issue],
     hierarchy: &HierarchyConfig,
     repo_default_format: ContentFormat,
     now: DateTime<Utc>,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
     match &rule.assert {
-        Assertion::LabelCoverage { config } => {
-            evaluate_label_coverage(rule, config, issues, repo_default_format, plan_content)
-        }
+        Assertion::LabelCoverage { config } => evaluate_label_coverage(
+            rule,
+            config,
+            issues,
+            resolution_index,
+            repo_default_format,
+            plan_content,
+        ),
         Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
         Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
         Assertion::GateRecency {
@@ -621,12 +686,21 @@ fn optional_str<'a>(
 ///   issue type can evaluate another issue's criteria (container indirection).
 ///
 /// One finding is produced per uncovered criterion id per container. A malformed
-/// config — including a firing issue whose `container-from-label` pointer cannot
-/// be resolved — yields a single `config-error` finding.
+/// config — including a firing issue whose `container-from-label` pointer resolves
+/// to no issue in `resolution_index` — yields a single `config-error` finding.
+///
+/// `resolution_index` is the issue set a `container-from-label` pointer resolves
+/// against; it is the complete repository index even when `issues` is a partial
+/// `--scope` slice (ef0065ad). A pointer that resolves to a container OUTSIDE the
+/// evaluation slice names a different bracket scope, so that firing issue's
+/// coverage is skipped (no finding) rather than evaluated against the partial map.
+/// For whole-repo evaluation the two sets are identical, so every resolved
+/// container is in-slice and nothing is skipped.
 fn evaluate_label_coverage(
     rule: &Rule,
     config: &toml::value::Table,
     issues: &[Issue],
+    resolution_index: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
@@ -751,8 +825,18 @@ fn evaluate_label_coverage(
             let container: &Issue = match container_ns {
                 None => source,
                 Some(ns) => match values_in_namespace(source, ns).next() {
-                    Some(value) => match resolve_container(value, issues) {
-                        ContainerMatch::Unique(c) => c,
+                    Some(value) => match resolve_container(value, resolution_index) {
+                        ContainerMatch::Unique(c) => {
+                            // A valid pointer to a container outside the evaluation
+                            // slice names a different bracket scope; skip this
+                            // firing issue's coverage (ef0065ad). Whole-repo
+                            // evaluation resolves against the same slice, so the
+                            // container is always in-slice and nothing is skipped.
+                            if !issues.iter().any(|i| i.id == c.id) {
+                                return Vec::new();
+                            }
+                            c
+                        }
                         ContainerMatch::Ambiguous => {
                             return vec![config_error(
                                 rule,
@@ -2402,6 +2486,82 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1);
         assert!(findings[0].finding.message.contains("config error"));
         assert!(findings[0].finding.message.contains("brackets"));
+    }
+
+    // --- label-coverage: scoped resolution index (ef0065ad) ----------------
+
+    #[test]
+    fn test_scoped_container_pointer_resolves_outside_slice_and_skips() {
+        // REQ-01/REQ-02 at the engine layer: a breakdown fires in the evaluation
+        // slice, but the container it brackets lives only in the full resolution
+        // index (outside the slice). The pointer resolves cleanly against the full
+        // index, so the out-of-scope container's coverage is skipped rather than
+        // reported as a dangling pointer.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        // The container carries an UNCOVERED criterion: were it evaluated it would
+        // fire a finding, so a clean result proves the coverage was skipped.
+        let container = epic_with_criteria(&["REQ-01"]);
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        breakdown
+            .labels
+            .push(format!("brackets:{}", container.short_id()));
+
+        // The slice holds only the firing breakdown; the container is full-index-only.
+        let slice = vec![breakdown.clone()];
+        let full = vec![container, breakdown];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph_scoped(
+            &rules,
+            &slice,
+            &full,
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert!(
+            findings.is_empty(),
+            "an out-of-slice container must be skipped, not reported: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_scoped_container_pointer_unresolvable_in_full_index_is_config_error() {
+        // REQ-03 at the engine layer: a pointer that resolves to no issue even in
+        // the full resolution index is a genuine config error, not silently skipped.
+        let rule = rule_from(
+            "[[rules]]\nname = \"preview\"\nwhen = { type = \"breakdown\" }\n\
+             severity = \"error\"\nassert = { label-coverage = { \
+             child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
+        );
+        let mut breakdown = issue("B", &["type:breakdown"]);
+        breakdown.labels.push("brackets:deadbeef".to_string());
+
+        let slice = vec![breakdown.clone()];
+        let full = vec![breakdown];
+
+        let rules = vec![&rule];
+        let findings = evaluate_graph_scoped(
+            &rules,
+            &slice,
+            &full,
+            &HierarchyConfig::default(),
+            ContentFormat::Markdown,
+            fixed_now(),
+            &HashMap::new(),
+        );
+        assert_eq!(
+            findings.len(),
+            1,
+            "dangling pointer must fail: {findings:?}"
+        );
+        assert!(findings[0].finding.message.contains("config error"));
+        assert!(findings[0].finding.message.contains("brackets:deadbeef"));
     }
 
     #[test]
