@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "fda65a14-c2a5-4d1d-90fc-00935dfb3afb",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5d862134-2424-4a1c-b9f4-204e3b53801b",
+  "commit": "0dee4a6b989415f5eeb15408403a34265ccc8b90",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T02:36:15.110922696Z",
+  "completed_at": "2026-07-15T02:40:44.547187903Z",
+  "duration_ms": 269436,
+  "exit_code": 1,
+  "stdout": "Attribution: 4d3b0d48, 7282d631, 0dee4a6b (`jit:5d862134`)\nPolicy sources: AGENTS.md; .jit/gates.toml\nResolved items: @/charter/D-4 — dev/vision/9db27a3a-charter.md\nGate evidence: cargo-ci passed (exit 0); code-review unrun\nTruncation recovery: bounded re-reads of version/stale-binary tests and merge-only progress patch\n\n1. **F1 — blocking, issue-impact:** The new hard-contract regression tests are all `#[ignore]` ([build_provenance_metadata_stability_tests.rs:120](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/build_provenance_metadata_stability_tests.rs:120), [version_cli_tests.rs:84](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/version_cli_tests.rs:84), [version_cli_tests.rs:103](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/version_cli_tests.rs:103)). The required `cargo-ci` only runs default `cargo test --workspace` ([cargo-ci.sh:173](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci.sh:173)), and no relevant CI/script target invokes them with `--ignored`. Thus REQ-06’s metadata-only and injected/no-provenance contracts are not exercised by the recorded required validation.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Required provenance regression tests are ignored and not invoked by the required CI gate.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The hard-contract provenance regression tests are ignored and no required CI target runs them with --ignored, leaving REQ-06 unexercised.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":173,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3880 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f63a1-cd26-7eb0-bca9-3c1201f16a12\n--------\nuser\n--- 3867 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Required provenance regression tests are ignored and not invoked by the required CI gate.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The hard-contract provenance regression tests are ignored and no required CI target runs them with --ignored, leaving REQ-06 unexercised.",
+        "file": "scripts/cargo-ci.sh",
+        "line": 173
+      }
+    ]
+  }
+}

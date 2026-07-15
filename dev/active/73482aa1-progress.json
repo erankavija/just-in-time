@@ -107,7 +107,8 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "4e22a20d": 2
+    "4e22a20d": 2,
+    "5d862134": 1
   },
   "started_at": "2026-07-14T20:00:00Z"
 }
