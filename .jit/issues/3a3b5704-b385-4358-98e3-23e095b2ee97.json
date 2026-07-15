@@ -1,0 +1,31 @@
+{
+  "id": "3a3b5704-b385-4358-98e3-23e095b2ee97",
+  "title": "Remove obsolete Docker topologies and migrate every active consumer",
+  "description": "The repository exposes only the consolidated image and one-service Compose path, with no active reference to the removed split, CLI, or all-in-one contracts.\n\n## Success Criteria\n\n- [hard] REQ-01: docker/Dockerfile.api, docker/Dockerfile.web, docker/Dockerfile.cli, docker/entrypoint.sh, docker/nginx.conf, and their obsolete runtime configuration are deleted after the replacement image passes smoke.\n- [hard] REQ-02: docker-compose.yml defines one service that bind-mounts the caller's whole repository at /repo, exposes the server/web port, maps explicit JIT_UID:JIT_GID values to the effective container user, and uses neither a detached named data volume nor a CLI initialization service.\n- [hard] REQ-03: scripts/test-podman.sh, scripts/validate-setup.sh, INSTALL.md, docs/how-to/deployment.md, and any active README Docker entry point use the supported image/repository-mount contract, show how JIT_UID and JIT_GID are derived from the repository owner, and explain the fixed 10001:10001 default and ownership prerequisite in the same change.\n- [hard] REQ-04: A repository-wide search over tracked active files, examples, and fixtures finds no split image names, removed Dockerfile/entrypoint/nginx paths, CLI Docker service, old all-in-one process contract, or Docker /data volume instruction; dev/archive and incidental storage-test /data strings are explicitly excluded.\n\n## Notes\n\nBlast radius: the exhaustive Docker consumers at `dev/active/8b05a612-investigation.md:25-27`; archive evidence is not rewritten.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "3b033738-a6ef-40ab-8fc1-d296f3fbb863"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "npm-ci",
+    "mcp-ci",
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-07"
+  ],
+  "created_at": "2026-07-15T09:12:53.175974891Z",
+  "updated_at": "2026-07-15T09:12:53.855974565Z",
+  "first_ready_at": "2026-07-15T09:12:53.175975111Z"
+}

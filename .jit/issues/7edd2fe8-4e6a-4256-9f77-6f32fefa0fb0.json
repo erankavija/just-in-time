@@ -1,0 +1,28 @@
+{
+  "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
+  "title": "Establish deterministic workflow contract verification",
+  "description": "Every critical GitHub workflow is checked through one maintained static-and-dynamic harness rather than bespoke or hypothetical failure fixtures.\n\n## Success Criteria\n\n- [hard] REQ-01: A pinned actionlint binary validates all committed workflow YAML, and a repository-owned parser performs deterministic structural assertions over parsed triggers, workflow_call inputs/outputs, needs edges, permissions, candidate/publication ownership, and forbidden failure escapes or public-publish steps. It recursively scans critical workflow and local-composite uses: entries and rejects every non-local Action or reusable workflow reference that is not an exact 40-character hexadecimal commit SHA.\n- [hard] REQ-02: One documented harness interface lets security, normal CI, candidate assembly, Docker, and publication workflows declare their required static graph assertions and controlled failing job without copying a verifier into each workflow.\n- [hard] REQ-03: Disposable namespaced GitHub PR and tag fixtures call the reusable workflows with deterministic failure injection, record run URLs/IDs, and prove the caller fails, all downstream candidate/publication jobs remain unstarted, and no release, npm, or GHCR identity changes.\n- [hard] REQ-04: The static checks run locally and on every pull request; the dynamic disposable-repository/ref fixtures run in a GitHub-hosted protected test environment and are required for changes to critical workflow contracts, with fixture refs and artifacts cleaned after evidence capture.\n- [hard] REQ-05: The migration replaces every movable external uses: reference on CI, security, candidate, Docker, tag-authorizer, and publication paths with a reviewed full SHA plus a human-readable upstream-version comment. Pin-update pull requests must identify the upstream release/tag-to-SHA resolution, changelog and permission changes, pass all static/dynamic fixtures, and receive release-maintainer review; automation may propose but never auto-merge an update.\n\n## Notes\n\nBlast radius: one focused workflow-contract script/test directory, its pinned actionlint setup, all critical workflow/local-composite external `uses:` pins, the controlled pin-update policy, and a non-publishing fixture workflow; no product or release-channel behavior changes.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "207364b1-cc06-4bf5-ae61-34908acc898c"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-03",
+    "satisfies:REQ-07"
+  ],
+  "created_at": "2026-07-15T09:12:53.165641913Z",
+  "updated_at": "2026-07-15T09:13:26.445072673Z",
+  "first_ready_at": "2026-07-15T09:12:53.165642283Z"
+}

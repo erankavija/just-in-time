@@ -1,0 +1,29 @@
+{
+  "id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
+  "title": "Establish canonical installation, deployment, MCP, source, and release references",
+  "description": "Every supported binary, deterministic-source, deployment, package, compatibility, upgrade, and MSRV workflow has one maintained adopter-facing home before source freeze.\n\n## Success Criteria\n\n- [hard] REQ-01: INSTALL.md owns supported native and extracted-source-archive installation plus checksum/provenance verification; docs/how-to/deployment.md owns the one-image /repo deployment; a created or existing canonical MCP guide owns package installation/client startup; the release-policy reference owns version, compatibility, upgrade, artifact, source-exclusion, and MSRV procedures.\n- [hard] REQ-02: Every command, artifact name, package channel, image tag, mount path, health URL, runtime prerequisite, and version policy in those homes is exercised by automation or explicitly derived from a maintained manifest/workflow source.\n- [hard] REQ-03: The canonical pages distinguish supported release paths from contributor source-checkout workflows and contain no instruction that requires an unshipped source-only asset.\n- [hard] REQ-04: Link, command-snippet, support-matrix, and source-archive manifest/exclusion checks fail when a canonical path is missing, stale, duplicated, or requires Git metadata absent from the published archive.\n- [hard] REQ-05: Completion records that these documents are source-changing freeze inputs; no candidate tag, candidate artifact, or public v1 identity exists, and every later execution leaf consumes the frozen copies without editing prose.\n\n## Notes\n\nBlast radius: `INSTALL.md`, `docs/how-to/deployment.md`, the canonical MCP integration page (created if absent), one release-policy reference, navigation, and doc checks; historical/unrelated conceptual docs are unchanged.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "ec073132-740a-4f51-b71c-13944c11357a"
+  ],
+  "gates_required": [
+    "docs-mechanical",
+    "doc-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-05",
+    "satisfies:REQ-08",
+    "satisfies:REQ-09"
+  ],
+  "created_at": "2026-07-15T09:12:53.176872641Z",
+  "updated_at": "2026-07-15T09:12:53.923514854Z",
+  "first_ready_at": "2026-07-15T09:12:53.176872871Z"
+}

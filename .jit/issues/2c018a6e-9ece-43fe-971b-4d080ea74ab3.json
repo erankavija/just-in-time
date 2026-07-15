@@ -1,0 +1,32 @@
+{
+  "id": "2c018a6e-9ece-43fe-971b-4d080ea74ab3",
+  "title": "Build and attest the frozen OCI candidate",
+  "description": "One unchanged OCI-layout tar preserves the runnable image and attestation index through runtime smoke and disposable-registry proof.\n\n## Success Criteria\n\n- [hard] REQ-01: After identity preflight, pinned Buildx/BuildKit exports one Linux/amd64 type=oci tar labeled with the freeze revision/version and max provenance/SPDX SBOM, without load, registry push, save, or repack.\n- [hard] REQ-02: Evidence records tar SHA-256, D_index, D_run and descriptors; in-toto subjects equal D_run. Pinned Skopeo copies D_run digest-preservingly to rootless Podman for the full runtime matrix—including WORKDIR /repo and seeded issue/document /api/search results—and copies the complete index with --all --preserve-digests to a disposable registry whose digest/descriptors equal D_index.\n- [hard] REQ-03: Source tar bytes/index remain unchanged after smoke and are uploaded once under the unique candidate/SHA/producer-run/attempt name with 90-day retention and exact artifact ID/ZIP digest/expiry outputs. GHCR :1.0.0 remains absent and no source/tag/public mutation occurs.\n\n## Notes\n\nBlast radius: one OCI candidate archive, temporary local runtime/registry state, and evidence only.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "2d225728-bae1-45bc-b7f3-2d81c789c422"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "npm-ci",
+    "mcp-ci",
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-06",
+    "satisfies:REQ-07"
+  ],
+  "created_at": "2026-07-15T09:12:53.180067844Z",
+  "updated_at": "2026-07-15T09:12:54.274447550Z",
+  "first_ready_at": "2026-07-15T09:12:53.180068054Z"
+}

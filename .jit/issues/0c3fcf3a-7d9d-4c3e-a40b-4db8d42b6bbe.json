@@ -1,0 +1,29 @@
+{
+  "id": "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
+  "title": "Implement MCP candidate and publication tooling",
+  "description": "Exact pack/smoke/attestation and post-tag direct OIDC publication are fixture-tested before freeze without packing or publishing v1.0.0.\n\n## Success Criteria\n\n- [hard] REQ-01: Package metadata identifies the repository, license files, executable, and v1.0.0 version; producer definitions accept only the candidate envelope, pass identity preflight before npm test/pack, capture exactly one npm pack --json output, and smoke the installed tarball through initialize/tools-list.\n- [hard] REQ-02: The pure publication script/interface accepts an already-authenticated escrow tarball path plus expected integrity/package/tag/provenance identity, uses no NODE_AUTH_TOKEN, runs exactly `npm publish <escrowed-tarball> --provenance --access public`, performs exact registry readback, and returns structured command/readback fields. It does not create prepared/completed transitions, declare concurrency, download Actions/escrow records, select environments, or recover workflows.\n- [hard] REQ-03: Unit fixtures reject second pack, changed bytes, source-directory publish, mismatched expected integrity/package/provenance, token use and incorrect registry readback. Orchestration exclusively owns early-publish guards, exact parent authentication, OIDC/environment permission wiring, `jit-v1.0.0-publication`, prepared/completed/Actions-410 recovery and all mutating-subjob/cross-workflow fixtures.\n- [hard] REQ-04: Completion proves public npm 1.0.0 is absent and no v1 tarball was retained; only MCP metadata, scripts/interfaces and unit fixtures land, not release-execution YAML.\n\n## Notes\n\nBlast radius: MCP metadata, pack/smoke/direct-publish scripts/interfaces and unit fixtures; orchestration owns execution workflow YAML and v1 bytes/publication are downstream.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "22d374bd-1416-48f7-b933-d73cc4cff6d7"
+  ],
+  "gates_required": [
+    "mcp-ci",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T09:12:53.174127639Z",
+  "updated_at": "2026-07-15T09:12:53.672331852Z",
+  "first_ready_at": "2026-07-15T09:12:53.174127899Z"
+}

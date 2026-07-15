@@ -1,0 +1,39 @@
+{
+  "id": "0f2dbe50-7d6b-4fa2-948c-a8c121e2bb5a",
+  "title": "Freeze the exact integrated v1.0 source",
+  "description": "One clean protected-branch commit contains every product, dependency, workflow/tooling, Docker, documentation, core, and profiles change; its trusted freeze workflow uploads and attests the exact immutable handoff before any candidate identity or product artifact exists.\n\n## Success Criteria\n\n- [hard] REQ-01: Core maintenance epic 6eb585bc and profiles MVP 9b7b5f9c are both in Done state before this leaf may start; every source-changing readiness leaf is also successfully complete. Their accepted commits are ancestors of the protected release-branch tip, the profile quickstart is present, conflict resolution is complete, and targeted Rust-remediation/core-child serialization is reflected in integrated Cargo.lock/manifests.\n- [hard] REQ-02: A fresh fetch/checkout proves HEAD equals the protected remote tip, git status --porcelain=v2 --untracked-files=all is empty, no submodule/worktree input is unresolved, the tree is reproducible from the commit, all product manifests declare 1.0.0, every critical external Action is full-SHA pinned, GitHub immutable releases are enabled, and canonical docs/tooling are present.\n- [hard] REQ-03: Normal suites, blocking audits, repository validation, exact MSRV, workflow-contract tests, Docker PR/runtime fixtures, documentation checks, and external core/profile public-contract checks pass on this commit without modifying it.\n- [hard] REQ-04: The workflow attests then uploads exactly one overwrite-forbidden `freeze-root-v1.0.0-<SHA>-run<R>-attempt<A>` manifest at 90-day retention, recording SHA/tree, protected branch/ref, prerequisite issue/commit IDs, workflow/tool-policy digests, suite run IDs, immutable-release setting, timestamp, repository/actor/event/run identity, and absence of candidate/final tags, public npm 1.0.0, GHCR :1.0.0, and GitHub v1 release. Its exact artifact ID/digest/expiry and attestation verification are retained in the run summary for reviewer selection.\n- [hard] REQ-05: This leaf creates no tag and no native, source, MCP, or OCI candidate. Failed/ambiguous upload, retention below 90 days, any later source commit, dirty input, changed workflow definition, or external-epic amendment invalidates the freeze and requires a new freeze artifact before candidate creation; no downstream leaf may patch source in place.\n\n## Notes\n\nBlast radius: read-only integration verification plus one immutable attested freeze artifact. At breakdown, attach `6eb585bc` and `9b7b5f9c` directly here; do not insert a milestone/checkpoint container and do not defer core completion to rehearsal.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
+    "6eb585bc-998d-4778-906d-415fcdc1916e",
+    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "npm-ci",
+    "mcp-ci",
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-08",
+    "satisfies:REQ-09",
+    "satisfies:REQ-10",
+    "satisfies:REQ-11"
+  ],
+  "created_at": "2026-07-15T09:12:53.177775002Z",
+  "updated_at": "2026-07-15T09:13:26.297638866Z",
+  "first_ready_at": "2026-07-15T09:12:53.177775272Z"
+}

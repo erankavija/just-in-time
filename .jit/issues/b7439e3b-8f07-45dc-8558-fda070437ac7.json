@@ -1,0 +1,29 @@
+{
+  "id": "b7439e3b-8f07-45dc-8558-fda070437ac7",
+  "title": "Publish and authenticate the exact MCP package",
+  "description": "After tag completion, a protected reviewer-gated secret-free OIDC job publishes the exact escrowed/rehearsed MCP tarball and records exact public identity without repacking, even if Actions evidence has expired.\n\n## Success Criteria\n\n- [hard] REQ-01: The entire workflow declares the same constant group with `cancel-in-progress:false` before live read and holds it through completion/recovery upload. The normal interface accepts final_tag_completed_artifact_id; Actions 410 recovery accepts the exact annotated final tag identity. Both verify the compact tag manifest, immutable candidate escrow/root/rehearsal chain and exact MCP asset, enter npm-publish, confirm public 1.0.0 absent, and upload npm-publish-prepared when possible.\n- [hard] REQ-02: With actions/contents/attestations read, id-token write, all others none, and no NODE_AUTH_TOKEN, it downloads the tarball by tag-manifest escrow release/asset ID, verifies integrity/release attestation, and runs exactly `npm publish <escrowed-tarball> --provenance --access public`; no alternate packaging path, interactive credential path, App, GHCR, or GitHub credential is available.\n- [hard] REQ-03: Exact registry readback must match tarball integrity, provenance, package/repository/workflow/freeze/tag identity before npm-publish-completed records prepared/parent IDs, public identity, timestamp, and run.\n- [hard] REQ-04: Recovery normally accepts npm_publish_prepared_artifact_id; if it is 410, escrow+tag manifest are authoritative. Exact public identity writes a new recovery-completed artifact; confirmed absence permits retry of the same escrow asset while holding the group, and mismatch/unknown state is a same-version incident. Listings cannot select a record.\n- [hard] REQ-05: Fixtures reject early publish, second pack, different bytes, source publish, token use, wrong environment/ref/OIDC, foreign parent substitution, escrow loss/mismatch, public mismatch, credential crossover, a running cancellation, or mutation outside the constant group; pending replacement requires explicit same-parent redispatch.\n\n## Notes\n\nBlast radius: constant-group exact-byte public npm publication from immutable escrow and append-only transition evidence only; Actions are read-only.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "4fc565fd-a8cc-44ad-ad1e-ca912412d16c"
+  ],
+  "gates_required": [
+    "mcp-ci",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-10"
+  ],
+  "created_at": "2026-07-15T09:12:53.182397045Z",
+  "updated_at": "2026-07-15T09:12:54.450538348Z",
+  "first_ready_at": "2026-07-15T09:12:53.182397295Z"
+}

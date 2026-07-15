@@ -1,0 +1,29 @@
+{
+  "id": "5cb1a9a6-8dfb-431d-b018-58cdb364b6ca",
+  "title": "Implement immutable candidate and final-tag authority",
+  "description": "Account-side GitHub authority and one reusable fixed-ref tag/identity primitive are configured and tested behind a documented interface; release execution YAML remains exclusively downstream.\n\n## Success Criteria\n\n- [hard] REQ-01: One dedicated GitHub App is installed only on the release repository with repository contents:write and implicit metadata read, no organization/account permissions, and no other installation. The App is the explicit sole bypass actor for rulesets targeting both refs/tags/candidate/v1.0.0/* and exactly refs/tags/v1.0.0; other actors cannot create/update/delete either namespace.\n- [hard] REQ-02: Release administrators configure distinct candidate-tag, final-release, candidate-escrow, npm-publish and final-GitHub environments; immutable releases; read-only repository workflow defaults; and release-resume with no secrets. Account-side runbooks state reviewers/owners and prove no credential crossover. No execution workflow is authored here.\n- [hard] REQ-03: A repository-owned fixed-ref authority primitive exposes one versioned interface: exact operation enum candidate-tag|final-tag; prepared/handoff ID+digest; freeze SHA/root digest; compact tag payload; expected actor/environment/repository. It constructs only the two constant annotated ref namespaces, mints one repository-only App token, non-force creates, exact-readbacks tag object/peeled SHA, returns structured completion fields, and always revokes without persisting credentials.\n- [hard] REQ-04: The primitive's unit/negative fixtures reject arbitrary/movable refs, update/delete/force, GITHUB_TOKEN/PAT, wrong actor/environment/repository/SHA/evidence, malformed payload, missing/over-broad App installation, credential persistence, and cross-namespace use. Fixtures do not simulate or own orchestration job graphs, transitions, concurrency, or cross-workflow resume.\n- [hard] REQ-05: Release-admin acceptance verifies rulesets, App installation, environment isolation, immutable-release setting and repository permission defaults against the runbook. It records that App permissions are repository-scoped; constant constructors, protected environments, one-use tokens and exact readback are compensating ref-level controls.\n- [hard] REQ-06: This leaf creates no `.github/workflows/*.yml` release/candidate execution definition, trigger, job DAG, transition/root/escrow schema, cross-workflow fixture, tag, release or candidate byte. Its stable interface contract is the only handoff consumed by orchestration and producer tooling.\n\n## Notes\n\nBlast radius: account-side GitHub App/rulesets/environments/immutable-release/workflow-default settings, release-admin runbooks, the repository-owned fixed-ref identity/tag primitive and its unit/negative fixtures only; no release-execution YAML or job graph.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "e0fed1bb-dd07-49d1-8321-79a2d93805dc"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T09:12:53.173224379Z",
+  "updated_at": "2026-07-15T09:12:53.536702113Z",
+  "first_ready_at": "2026-07-15T09:12:53.173224599Z"
+}

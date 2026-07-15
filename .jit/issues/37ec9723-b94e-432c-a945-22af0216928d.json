@@ -1,0 +1,29 @@
+{
+  "id": "37ec9723-b94e-432c-a945-22af0216928d",
+  "title": "Build and attest the frozen MCP candidate",
+  "description": "One exact MCP tarball is packed, clean-installed, protocol-smoked, attested, and retained from the freeze SHA without registry mutation.\n\n## Success Criteria\n\n- [hard] REQ-01: After identity preflight, the supported Node/npm pair runs tests and exactly one npm pack --json, retains its path/integrity, installs it into a clean prefix, and runs installed jit-mcp-server initialize/tools-list with the frozen native jit candidate on PATH.\n- [hard] REQ-02: A verified GitHub attestation binds tarball digest to freeze/event/workflow/repository identity; tarball/evidence upload once with 90-day retention and exact ID/ZIP digest/expiry. Changed bytes, second pack/upload, conflicting public 1.0.0, or provenance mismatch fails.\n- [hard] REQ-03: This leaf performs no registry command, source repack, source edit, tag creation, or public mutation.\n\n## Notes\n\nBlast radius: one exact MCP tarball and evidence only.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "348b34f5-a103-4bbf-a0be-3df954f7b971"
+  ],
+  "gates_required": [
+    "mcp-ci",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T09:12:53.179589643Z",
+  "updated_at": "2026-07-15T09:12:54.252716164Z",
+  "first_ready_at": "2026-07-15T09:12:53.179589883Z"
+}

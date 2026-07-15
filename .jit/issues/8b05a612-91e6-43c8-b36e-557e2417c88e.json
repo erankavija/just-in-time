@@ -6,7 +6,7 @@
   "priority": "critical",
   "assignee": "agent:jit-execution-lead",
   "dependencies": [
-    "207364b1-cc06-4bf5-ae61-34908acc898c"
+    "c2f41057-2c48-4af5-9729-711d51374da3"
   ],
   "gates_required": [
     "cargo-ci",
@@ -38,7 +38,7 @@
     "type:epic"
   ],
   "created_at": "2026-07-14T18:53:51.384889730Z",
-  "updated_at": "2026-07-14T19:58:47.483749020Z",
+  "updated_at": "2026-07-15T09:13:27.015001508Z",
   "first_ready_at": "2026-07-14T18:53:51.384894920Z",
   "claimed_at": "2026-07-14T19:22:20.290364996Z"
 }

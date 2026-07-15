@@ -1,0 +1,29 @@
+{
+  "id": "cdee58b3-1428-4874-9814-dacefc517605",
+  "title": "Enforce the declared MSRV recency window",
+  "description": "CI proves the workspace on its exact declared compiler and exposes one tested recency command that the protected tag-authorizer can run immediately before tag creation.\n\n## Success Criteria\n\n- [hard] REQ-01: Workspace rust-version remains 1.97 unless the pre-tag stable comparison requires a refresh, and every Rust crate inherits that single declaration.\n- [hard] REQ-02: After the serialized shutdown dependency has committed its final Cargo.lock, the exact-MSRV job derives its compiler from cargo metadata and builds/tests the combined workspace—including axum-server/tokio-util—with that compiler.\n- [hard] REQ-03: A deterministic command derives stable at run time, emits machine-readable declared/stable versions plus its own script digest, and fails when declared minor is newer than stable or stable_minor minus declared_minor exceeds one, with unit fixtures for current, one-behind, too-old, and future values.\n- [hard] REQ-04: The command is reusable by CI and the protected tag-authorizer; one canonical policy documents derivation and refresh without copying the current stable number into workflow configuration or additional prose.\n\n## Notes\n\nBlast radius: root `Cargo.toml`, the existing MSRV CI job, a focused version-policy script/test, and the canonical release-policy page.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "f04f7888-a828-4677-aea8-f640a6702375",
+    "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:enhancement",
+    "epic:production-readiness",
+    "satisfies:REQ-04",
+    "satisfies:REQ-09"
+  ],
+  "created_at": "2026-07-15T09:12:53.172301878Z",
+  "updated_at": "2026-07-15T09:12:53.540263586Z",
+  "first_ready_at": "2026-07-15T09:12:53.172302098Z"
+}
