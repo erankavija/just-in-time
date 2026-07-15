@@ -980,9 +980,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             &all,
             breakdown_type.as_deref(),
         );
+        // Keep the full issue set alive: it is the resolution index against which a
+        // `container-from-label` pointer resolves, so a valid pointer to a
+        // container outside this slice does not read as dangling (ef0065ad).
         let slice: Vec<Issue> = all
-            .into_iter()
+            .iter()
             .filter(|i| scope_ids.contains(&i.id))
+            .cloned()
             .collect();
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
@@ -1020,9 +1024,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Resolve external plan docs for the in-scope issues so a container
             // whose criteria live in an external file validates against the FILE.
             let plan_content = self.resolve_plan_content(&slice)?;
-            let graph_findings = crate::validation::graph::evaluate_graph(
+            let graph_findings = crate::validation::graph::evaluate_graph_scoped(
                 &graph_rules,
                 &slice,
+                &all,
                 &hierarchy,
                 repo_format,
                 chrono::Utc::now(),
