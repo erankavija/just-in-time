@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "d8c492ed-df01-4373-834f-18b31c73dd72",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "362e3fec-a012-4980-9846-021d3743779b",
+  "commit": "8798311827287ec17add7c790e5c10435a302562",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T17:13:45.234959810Z",
+  "completed_at": "2026-07-15T17:17:32.206005128Z",
+  "duration_ms": 226971,
+  "exit_code": 0,
+  "stdout": "Attribution: `6f2d6745`, `32bd168d`, `4e50d5e5` (`jit:362e3fec`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/bounded-rust-build-footprint`, `@/invariant/single-source-prose` (`.jit/invariants.toml`, registry-first); `@/gate/cargo-ci`, `@/gate/jit-validate` (`.jit/gates.toml`, registry-first); `@/charter/D-2`, `@/charter/D-6` (`dev/vision/9db27a3a-charter.md`, markdown-first)\nGate evidence: cargo-ci passed (0, 2026-07-15T17:04:17Z); repo-validate passed (0, 2026-07-15T17:04:16Z); docs-mechanical passed (0, 2026-07-15T17:04:16Z); doc-review passed (0, 2026-07-15T17:06:16Z); code-review failed (1, 2026-07-15T17:11:04Z)\nTruncation recovery: Narrow per-commit/merge-parent patches and targeted source, documentation, script, and gate-run reads; isolated the read-only gate-lock limitation.\n\n1. No findings. The prior drift report was caused by the read-only sandbox being unable to open the gate-registry lock; the recorded passing `repo-validate` run at the attributed commit exercises the same drift path, and the relevant registry, projection, and guidance files remain unchanged.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed invariant registration, projection, and contributor guidance meet the issue criteria; the prior drift finding was a read-only lock artifact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributed invariant registration, projection, and contributor guidance meet the issue criteria; the prior drift finding was a read-only lock artifact.",
+    "findings": []
+  }
+}
