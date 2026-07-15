@@ -5,7 +5,7 @@
   "parent_epic": "6eb585bc",
   "batch": "rust-build-efficiency (filed 2026-07-14 by a parallel planning session; 8 pre-wired children; design doc dev/active/73482aa1-rust-build-efficiency.md)",
   "status": "executing (wave 2 of core-maintenance batch)",
-  "current_wave": 5,
+  "current_wave": 6,
   "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol. INTERLEAVE (charter D-15, 2026-07-15): ef0065ad (scoped bracket validation, epic wave 2.5) dispatches after wave 3, before 73482aa1 wave 4.",
   "waves": [
     {
@@ -103,8 +103,8 @@
           "title": "Verify compilation gains and publish optimized results",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_rework",
-          "note": "thresholds smashed (clean -88.6%, rebuild -95.8%, target dir 3.56 GiB, executables 0.91 GiB) but code-review round 1: REQ-02 per-sample inventory missing for clean samples 2-3 (harness measured only sample 1); rework: extend harness, re-collect clean samples. Round 3 (final before escalation): reviewer flagged stub asymmetry (optimized stubbed, baseline not \u2014 baseline logs carry the warning, violating the protocol's own zero-warning step); LEAD-DIRECT baseline re-collection at 56d73789 with the corrected harness in lead-owned worktree lead-baseline-recollect (detached pid, log scratchpad/baseline-v2.log)"
+          "status": "done",
+          "note": "DONE after 3 review rounds (per-sample inventory; zero-warning stub; baseline re-collected at 56d73789 for protocol symmetry, lead-direct). Final evidence: clean test-compile -87.3% (202.5s->25.8s), rebuild -94.6% (177.1s->9.5s), target dir 19.6->3.7 GiB, executables 13.8->0.94 GiB, 144->11 test targets. Gates green on 61f51541"
         }
       ]
     },
