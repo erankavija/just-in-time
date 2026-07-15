@@ -160,8 +160,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// (e.g. `InMemoryStorage`).
     ///
     /// The single production entry point for the stale-binary check
-    /// (jit:7446af34): used by [`check_gate`](Self::check_gate) (REQ-01,
-    /// guards the evaluator's own binary before it spawns a checker process)
+    /// (jit:7446af34): used by [`check_gate`](Self::check_gate) for `exec`
+    /// checkers (REQ-01, guards the evaluator's own binary before it spawns a
+    /// checker process)
     /// and by the binary crate's startup dispatch (REQ-02, guards a `jit`
     /// process spawned BY a checker — e.g. a checker script that itself
     /// shells out to `jit` — which resolves its own binary from `PATH`
@@ -176,10 +177,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Check a single gate for an issue
     ///
-    /// Runs the gate checker if it's an automated gate, updates the issue status,
-    /// and returns the run result. When the checker has `pass_context: true`, builds
-    /// structured context (issue data, gate definition, prompt, run history) and
-    /// passes it to the checker process via a temp file.
+    /// Runs the configured native or `exec` checker for an automated gate,
+    /// updates the issue status, and returns the run result. When an `exec`
+    /// checker has `pass_context: true`, builds structured context (issue data,
+    /// gate definition, prompt, run history) and passes it to the checker
+    /// process via a temp file.
     pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;

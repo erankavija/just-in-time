@@ -331,11 +331,13 @@ impl ClaimRequiresGitError {
 /// Raised from two, independent places, both refusing BEFORE they do
 /// anything with the (potentially stale) binary that raises them:
 ///
-/// - [`check_gate`](crate::commands::CommandExecutor::check_gate) — reached
+/// - [`check_gate`](crate::commands::CommandExecutor::check_gate) for an
+///   `exec` checker — reached
 ///   by `jit gate evaluate`/`gate evaluate-all` directly, and by `gate
 ///   pass`/`gate pass-all` and any state transition's pre/postchecks that run
-///   an automated gate — BEFORE the checker process is spawned. When THIS
-///   raises it, no gate run is ever recorded for that refusal.
+///   an `exec` gate — BEFORE the checker process is spawned. Native in-process
+///   checkers do not use this refusal. When THIS raises it, no gate run is ever
+///   recorded for that refusal.
 /// - `main`'s startup dispatch (binary crate; `refuse_if_stale_gate_child`) —
 ///   when the running process is itself inside a gate checker's process tree
 ///   (a checker script that shells out to `jit`, e.g.
