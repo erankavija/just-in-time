@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "6211f6e2-8db9-4235-84ef-bb79fb684f7c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "26f97dc2-d7fa-4f62-880a-c2693a64f44f",
+  "commit": "a97e1682c8d4bc75a48e8868944c8e1ba28e1c15",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T15:35:58.935995207Z",
+  "completed_at": "2026-07-15T15:42:35.119611502Z",
+  "duration_ms": 396183,
+  "exit_code": 1,
+  "stdout": "Attribution: 9391e22f, e0f30214, 62d406d0, ad39647f, a99edacc, 2a465507, a97e1682 (`jit:26f97dc2`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-4, D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, atomic-writes (.jit/invariants.toml); @/gate/cargo-ci, jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T15:34:26Z); doc-review pending; prior code-review failed on F1, whose per-clean inventory defect is now addressed\nTruncation recovery: per-commit per-file patches; raw JSONL, log, and inventory aggregate reads narrowed from generated-artifact diffs\n\n1. **F1** — **blocking**, **issue-impact**: The zero-warning rework creates `web/dist/index.html` for every optimized sample at [scripts/benchmark-rust-build.sh](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-rust-build.sh:220), while all three baseline clippy logs record missing web assets ([clean-1](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/raw/clean-1/clippy.log:222)). The default server feature embeds that directory, so this changes compilation inputs; the report nevertheless claims the same protocol with only the Git revision differing at [report.md](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/report.md:157). This does not establish the equivalent baseline/optimized build sequence required by REQ-01.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 is not established because optimized samples embed an injected web asset absent from the baseline.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Optimized samples inject an embedded web asset absent from baseline samples, invalidating the claimed equivalent benchmark protocol.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":220,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11131 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f666b-a853-7813-b6b4-a7e99f97cefb\n--------\nuser\n--- 11118 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "REQ-01 is not established because optimized samples embed an injected web asset absent from the baseline.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Optimized samples inject an embedded web asset absent from baseline samples, invalidating the claimed equivalent benchmark protocol.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 220
+      }
+    ]
+  }
+}
