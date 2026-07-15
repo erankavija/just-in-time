@@ -6,11 +6,11 @@
 //! infrastructure. Default features pull that infrastructure in anyway
 //! (`resolve-http`/`resolve-file`/`tls-aws-lc-rs`, and transitively reqwest,
 //! hyper, and aws-lc-rs), so the manifest disables default features.
-//! REQ-02: `ureq` (the remote-document-access client) previously combined its
-//! default Rustls stack with an explicitly selected native-tls backend,
-//! compiling two TLS implementations at once. The manifest now disables
-//! default features and enables exactly Rustls plus the `gzip`
-//! content-decoding feature explicitly.
+//! REQ-02: `ureq` (the remote-document-access client) must compile exactly one
+//! TLS implementation. The manifest disables default features and enables
+//! exactly Rustls plus the `gzip` content-decoding feature explicitly; a
+//! second backend (e.g. native-tls alongside the default Rustls stack) is the
+//! regression these tests exist to catch.
 //! REQ-03/REQ-06: the manifest intent above is necessary but not sufficient —
 //! a stray feature edge elsewhere in the workspace could reintroduce the
 //! banned packages without changing either dependency line. These tests
