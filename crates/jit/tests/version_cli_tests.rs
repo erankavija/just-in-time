@@ -68,85 +68,89 @@ fn test_version_command_reports_json_provenance_without_repo() {
     assert!(json.get("target").is_some());
 }
 
-// Ignored from the default suite: this spawns a fresh `cargo run` into a clean
-// CARGO_TARGET_DIR, forcing a full cold compile (~85s) to exercise the build
-// script under a specific git state. Compilation is intrinsic to what it tests,
-// so it cannot meet the per-test speed budget. Run on demand / in CI with:
+// Ignored from the default suite: these spawn `cargo run` into dedicated
+// CARGO_TARGET_DIRs, forcing a cold compile (~85s) to exercise the build script
+// under specific provenance environments. Compilation is intrinsic to what they
+// test, so they cannot meet the per-test speed budget. Run on demand / in CI
+// with:
 //   cargo test -p jit --test version_cli_tests -- --ignored
+
+// REQ-05: a build that injects NO provenance succeeds and reports the
+// documented fallbacks — `unknown` commit fields, null dirty, and an `unknown`
+// timestamp rather than a wall-clock-dependent value. The build reads no
+// ambient Git or clock at all, so the surrounding workspace's Git state does
+// not leak into the reported provenance.
 #[test]
 #[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
-fn test_version_build_without_git_metadata_reports_unknowns() {
+fn test_version_build_without_injected_provenance_reports_unknowns() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
+    let json = version_json(&temp_dir.path().join("target-no-provenance"), &[]);
 
-    let output = Command::new("cargo")
-        .current_dir(workspace_root)
-        .env("CARGO_TARGET_DIR", temp_dir.path().join("target-no-git"))
-        .env("GIT_DIR", temp_dir.path().join("missing-git-dir"))
-        .env("SOURCE_DATE_EPOCH", "0")
-        .args(["run", "-p", "jit", "--quiet", "--", "version", "--json"])
-        .output()
-        .unwrap();
-
-    assert!(
-        output.status.success(),
-        "cargo run without Git metadata should succeed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
     assert_eq!(json["git_commit"].as_str(), Some("unknown"));
     assert_eq!(json["git_short_commit"].as_str(), Some("unknown"));
     assert!(json["git_dirty"].is_null());
-    assert_eq!(json["build_timestamp"].as_str(), Some("0"));
+    // REQ-05: the fallback, not the wall clock.
+    assert_eq!(json["build_timestamp"].as_str(), Some("unknown"));
 }
 
-// Ignored from the default suite (full cold rebuild ~85s). See the note on
-// test_version_build_without_git_metadata_reports_unknowns. Run with --ignored.
+// REQ-03/REQ-04: injected provenance is reported exactly, reproduced on an
+// unchanged rebuild, and invalidated when an injected value changes; the clean
+// (`dirty=false`) and dirty (`dirty=true`) reporting contracts both hold.
+//
+// Ignored from the default suite (cold rebuild, plus incremental rebuilds as
+// each injected environment changes). See the note above. Run with --ignored.
 #[test]
-#[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
-fn test_version_build_from_clean_git_checkout_reports_not_dirty() {
+#[ignore = "cold rebuild + incremental rebuilds; run explicitly with --ignored"]
+fn test_injected_provenance_is_reported_reproduced_and_invalidated() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    let source_dir = clean_git_checkout(&temp_dir);
+    let target = temp_dir.path().join("target-injected");
 
-    let output = run_version_json_from_source(&temp_dir, &source_dir, "target-clean-git");
+    let hash_a = "1111111111111111111111111111111111111111";
+    let clean_env = [
+        ("JIT_BUILD_GIT_HASH", hash_a),
+        ("JIT_BUILD_GIT_SHORT_HASH", "11111111"),
+        ("JIT_BUILD_GIT_DIRTY", "false"),
+        ("SOURCE_DATE_EPOCH", "1700000000"),
+    ];
 
-    assert!(
-        output.status.success(),
-        "cargo run from clean Git checkout should succeed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    // REQ-03: `jit version --json` reports the injected values exactly. Clean
+    // reporting contract: injected `dirty=false` reports `false`.
+    let first = version_json(&target, &clean_env);
+    assert_eq!(first["git_commit"].as_str(), Some(hash_a));
+    assert_eq!(first["git_short_commit"].as_str(), Some("11111111"));
+    assert_eq!(first["git_dirty"].as_bool(), Some(false));
+    assert_eq!(first["build_timestamp"].as_str(), Some("1700000000"));
+
+    // REQ-04 (reproducible): repeating the build with the same injected fields
+    // reports identical provenance.
+    let repeat = version_json(&target, &clean_env);
+    assert_eq!(
+        first, repeat,
+        "identical injected provenance must reproduce identically"
     );
 
-    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
-    assert_eq!(json["git_dirty"].as_bool(), Some(false));
-}
+    // REQ-04 (invalidation): changing an injected value invalidates the build
+    // output — the newly reported value follows the change.
+    let hash_b = "2222222222222222222222222222222222222222";
+    let changed_env = [
+        ("JIT_BUILD_GIT_HASH", hash_b),
+        ("JIT_BUILD_GIT_SHORT_HASH", "22222222"),
+        ("JIT_BUILD_GIT_DIRTY", "false"),
+        ("SOURCE_DATE_EPOCH", "1700000000"),
+    ];
+    let changed = version_json(&target, &changed_env);
+    assert_eq!(changed["git_commit"].as_str(), Some(hash_b));
+    assert_eq!(changed["git_short_commit"].as_str(), Some("22222222"));
 
-// Ignored from the default suite (full cold rebuild ~85s). See the note on
-// test_version_build_without_git_metadata_reports_unknowns. Run with --ignored.
-#[test]
-#[ignore = "full cold rebuild (~85s); run explicitly with --ignored"]
-fn test_version_build_from_untracked_dirty_checkout_reports_dirty() {
-    let temp_dir = tempfile::TempDir::new().unwrap();
-    let source_dir = clean_git_checkout(&temp_dir);
-    std::fs::write(source_dir.join("untracked-version-provenance.txt"), "dirty").unwrap();
-
-    let output = run_version_json_from_source(&temp_dir, &source_dir, "target-dirty-git");
-
-    assert!(
-        output.status.success(),
-        "cargo run from dirty Git checkout should succeed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let json: Value = serde_json::from_slice(&output.stdout).expect("version output is JSON");
-    assert_eq!(json["git_dirty"].as_bool(), Some(true));
+    // Dirty reporting contract: injected `dirty=true` reports `true`.
+    let dirty_env = [
+        ("JIT_BUILD_GIT_HASH", hash_b),
+        ("JIT_BUILD_GIT_SHORT_HASH", "22222222"),
+        ("JIT_BUILD_GIT_DIRTY", "true"),
+        ("SOURCE_DATE_EPOCH", "1700000000"),
+    ];
+    let dirty = version_json(&target, &dirty_env);
+    assert_eq!(dirty["git_dirty"].as_bool(), Some(true));
 }
 
 // MSRV drift guard. The supported Rust version is declared once, as
@@ -205,55 +209,33 @@ fn test_workspace_declares_and_inherits_rust_version() {
     }
 }
 
-fn clean_git_checkout(temp_dir: &tempfile::TempDir) -> std::path::PathBuf {
+/// Build `jit` from the real workspace into `target_dir` with the given
+/// provenance environment injected, then run `version --json` and return the
+/// parsed output. `target_dir` is a dedicated `CARGO_TARGET_DIR`, so the first
+/// call into a fresh directory pays a full cold compile and later calls into
+/// the same directory rebuild incrementally as the injected environment
+/// changes.
+fn version_json(target_dir: &Path, env: &[(&str, &str)]) -> Value {
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap();
-    let source_dir = temp_dir.path().join("source");
-    std::fs::create_dir(&source_dir).unwrap();
 
-    let archive_status = StdCommand::new("bash")
-        .current_dir(workspace_root)
-        .arg("-c")
-        .arg(
-            "tar --exclude=.git --exclude=.jit --exclude=target --exclude=web/node_modules --exclude=mcp-server/node_modules -cf - . | tar -C \"$1\" -xf -",
-        )
-        .arg("copy-workspace")
-        .arg(&source_dir)
-        .status()
-        .unwrap();
-    assert!(archive_status.success(), "workspace copy should succeed");
-
-    for args in [
-        vec!["init"],
-        vec!["config", "user.email", "jit-test@example.invalid"],
-        vec!["config", "user.name", "JIT Test"],
-        vec!["add", "."],
-        vec!["commit", "-m", "clean source"],
-    ] {
-        let status = StdCommand::new("git")
-            .current_dir(&source_dir)
-            .args(args)
-            .status()
-            .unwrap();
-        assert!(status.success(), "git setup command should succeed");
+    let mut cmd = StdCommand::new("cargo");
+    cmd.current_dir(workspace_root)
+        .env("CARGO_TARGET_DIR", target_dir)
+        .args(["run", "-p", "jit", "--quiet", "--", "version", "--json"]);
+    for (key, value) in env {
+        cmd.env(key, value);
     }
 
-    source_dir
-}
-
-fn run_version_json_from_source(
-    temp_dir: &tempfile::TempDir,
-    source_dir: &Path,
-    target_name: &str,
-) -> std::process::Output {
-    Command::new("cargo")
-        .current_dir(source_dir)
-        .env("CARGO_TARGET_DIR", temp_dir.path().join(target_name))
-        .env("SOURCE_DATE_EPOCH", "0")
-        .args(["run", "-p", "jit", "--quiet", "--", "version", "--json"])
-        .output()
-        .unwrap()
+    let output = cmd.output().unwrap();
+    assert!(
+        output.status.success(),
+        "cargo run should succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("version output is JSON")
 }
