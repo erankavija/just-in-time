@@ -22,6 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unchanged: it judges the installed binary, which `scripts/install-jit.sh`
   stamps with the commit it was built from.
 
+- **Debug info and incremental compilation are bounded by policy instead of
+  Cargo's undocumented defaults.** A representative test executable carried
+  193.7 MiB of full debug sections out of 246.7 MiB. The workspace manifest's
+  `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
+  keeping line-number backtraces without the full debugger payload, and both
+  state `incremental = true` explicitly so ordinary interactive builds and
+  test runs keep Cargo's incremental cache on purpose rather than by
+  accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
+  step (fmt, clippy, test, provenance): a gate run compiles once and exits,
+  so incremental state has no later rebuild to amortize its cost against —
+  left enabled, gate runs had accumulated roughly 19 GiB of it.
+
 ### Added
 
 - **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
