@@ -135,6 +135,14 @@
           "model": "opus",
           "status": "pending",
           "note": "filed 2026-07-15 by the project-lead session; adopted per @/charter/D-15; dispatch immediately after 73482aa1 wave 3 (3398bc19) closes, ahead of the remaining 73482aa1 waves"
+        },
+        {
+          "short_id": "3c4d6fe8",
+          "title": "Remove secret-like label example from reference docs",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "routed by the project-lead session 2026-07-15 (commit 84b0b36d, jit:3c4d6fe8); blocks 0aec3b1e in the production stream; gates secret-detection/repo-validate/doc-review; dispatch after ef0065ad settles"
         }
       ]
     },
