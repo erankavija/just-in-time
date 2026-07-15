@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "69bee39a-f6a9-49fd-9bb0-553ab46779ed",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "bdba6d787194bcdcae57069b23ca6d1b8df2b60f",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-15T08:33:31.993065275Z",
+  "completed_at": "2026-07-15T08:39:38.135266035Z",
+  "duration_ms": 366142,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The planning issue requires `dev/active/8b05a612-plan.md`, and that non-empty document is linked as a design document in the issue record ([issue record](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:118)).\n\n## Completeness against the criteria\n\nThe plan addresses all eleven hard criteria through the criterion table, task acceptance criteria, and coverage map ([plan](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:368)). Capability preservation, advisory remediation, workflow enforcement, version alignment, artifact publication, Docker consolidation, documentation ownership, MSRV, rehearsal, and upstream DAG integration are all represented without obvious scope narrowing.\n\n## Technical soundness and architectural fit\n\nThe repository analysis is substantially accurate:\n\n- Current `jit-server` directly awaits `axum::serve` ([main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:135)).\n- SSE is currently unbounded and has keepalive enabled ([sse.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/sse.rs:16)).\n- `/api/search` depends on the process working directory ([routes.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/routes.rs:297)).\n- The proposed `/repo` working directory, embedded-web build ordering, and separation of packaging from domain/storage logic fit the existing architecture.\n\nHowever, the shutdown design still lacks the mechanism required to guarantee its promised bounded PID-1 exit. The blocking defect is enumerated below.\n\n## Decomposition and dependencies\n\nThe dependency chain is generally coherent: remediation precedes enforcement; server shutdown precedes the image; the replacement image precedes topology removal; all source-changing work and both external epics precede freeze; frozen validation precedes producers; escrow precedes rehearsal and final tagging.\n\nThere is one advisory ownership overlap between the authority and orchestration leaves, detailed below. It should be clarified before breakdown to prevent duplicate workflow implementation.\n\n## Risks and actionability\n\nThe revised release protocol resolves the previous lock and evidence-retention blockers:\n\n- The literal repository-wide concurrency group is an executable mutex across workflows, with explicit handling for replaced pending runs. This matches GitHub’s documented repository-wide concurrency behavior ([GitHub concurrency documentation](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency)).\n- Exact candidate bytes and evidence are promoted from expiring Actions artifacts into an immutable candidate release before the final tag. GitHub documents that published immutable-release assets and their associated tag cannot be modified while the release exists ([GitHub immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)).\n- The final tag carries the compact recovery manifest necessary to authenticate escrow after Actions expiry.\n\nThe shutdown risk mitigation, however, repeats the incomplete bounded-drain design and therefore does not fully close the prior F1 feedback.\n\n## Prior review feedback\n\n- Prior F1: partially addressed. Active SSE cancellation and EOF testing were added, but the bounded drain of other active connections remains undefined.\n- Prior F2: addressed through the constant `jit-v1.0.0-publication` concurrency group and hosted serialization fixtures.\n- Prior F3: addressed by immutable candidate-release escrow plus the tag-embedded recovery manifest; Actions artifacts are no longer the sole post-tag byte store.\n\n## Findings\n\n1. **F1 — High, blocking:** The shutdown leaf promises bounded draining and exit before the container stop timeout, but its only concrete server mechanism is a cancellation token plus Axum `with_graceful_shutdown` ([plan](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:187)). Cancelling SSE solves the known long-lived stream, but Axum 0.7 waits for all connection tasks without an internal deadline (`close_tx.closed().await` in the installed source at [serve.rs](/home/vkaskivuo/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/axum-0.7.9/src/serve.rs:458)). The plan does not select an application-enforced drain deadline, specify what gets aborted after it, or test a deliberately non-completing ordinary connection. Consequently, a slow/stalled non-SSE connection can still keep PID 1 alive until Docker sends SIGKILL, contradicting the hard signal-behavior and rehearsal criteria. Define the deadline and forced-close/abort policy explicitly, and require a real-process test whose ordinary connection cannot finish voluntarily.\n\n2. **F2 — Medium, advisory:** Workflow ownership overlaps between “Implement immutable candidate and final-tag authority” and “Implement gated candidate, rehearsal, tag, and publication orchestration.” The first owns candidate orchestration triggers, final-publication resume behavior, preparation/final-release workflow definitions, identity verification, and fixtures ([plan](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:136)); the second again owns all release-execution workflows, the final-tag transition, evidence protocol, permissions, and fixtures ([plan](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:172)). Narrow the authority leaf to account-side configuration and reusable tag/identity primitives, or merge the overlapping workflow work into the orchestration leaf, with explicit file/interface ownership.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The release protocol and prior evidence/locking defects are repaired, but bounded server shutdown remains technically undefined and cannot guarantee clean PID-1 exit under stalled traffic.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Cancellation closes SSE, but the plan specifies no application-enforced deadline or forced-close policy for other connections, so Axum graceful shutdown can still wait indefinitely and end in container SIGKILL.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":187,\"references\":[\"@/issue/8b05a612/requirement/REQ-06\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The authority and orchestration leaves duplicate ownership of candidate/final-tag workflow definitions, transition behavior, identity verification, and fixtures.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":136,\"references\":[\"@/issue/8b05a612/requirement/REQ-03\",\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 3970 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f64e8-e56a-7c20-82bd-059338896fbc\n--------\nuser\n--- 3957 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The release protocol and prior evidence/locking defects are repaired, but bounded server shutdown remains technically undefined and cannot guarantee clean PID-1 exit under stalled traffic.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Cancellation closes SSE, but the plan specifies no application-enforced deadline or forced-close policy for other connections, so Axum graceful shutdown can still wait indefinitely and end in container SIGKILL.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 187,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-06",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "The authority and orchestration leaves duplicate ownership of candidate/final-tag workflow definitions, transition behavior, identity verification, and fixtures.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 136,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-03",
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      }
+    ]
+  }
+}
