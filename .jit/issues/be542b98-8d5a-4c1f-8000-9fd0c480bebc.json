@@ -14,20 +14,20 @@
     "repo-validate"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
+    "code-review": {
+      "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T16:47:53.478050219Z"
+      "updated_at": "2026-07-15T16:51:57.349196916Z"
     },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T16:51:49.614937122Z"
     },
-    "code-review": {
+    "cargo-ci": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T16:51:57.349196916Z"
+      "updated_at": "2026-07-15T17:37:05.221854627Z"
     }
   },
   "context": {},
@@ -41,7 +41,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.038371485Z",
-  "updated_at": "2026-07-15T16:54:22.420581069Z",
+  "updated_at": "2026-07-15T17:37:05.324519911Z",
   "first_ready_at": "2026-07-14T22:28:46.038371865Z",
   "claimed_at": "2026-07-15T12:21:49.102062506Z"
 }

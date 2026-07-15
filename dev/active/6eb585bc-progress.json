@@ -2,7 +2,7 @@
   "epic_id": "6eb585bc-998d-4778-906d-415fcdc1916e",
   "epic_short_id": "6eb585bc",
   "batch": "core-maintenance-2026-07-14 (18 open children: 14 filed since the usability batch, carryovers 1d59070d/0daba57d/c505031a, adopted 16402e14; prior batch report dev/active/6eb585bc-batch-report-2026-07-05.md, handoff dev/active/6eb585bc-handoff.md)",
-  "current_wave": 2,
+  "current_wave": 3,
   "note": "No inter-sibling deps; wave order is risk-driven: wave 1 hardens the verification loop (validator registry authority, merged-commit gate evidence, stale-binary detection, mcp CI coverage) so later waves' gate results are trustworthy; wave 2 settles CLI output/exit contracts; wave 3 gate-surface semantics with alias removal last as the one breaking sweep; wave 4 dead paths + validation correctness; wave 5 enhancements (45a140ae needs invoker interview on the semantic model before dispatch). One wave at a time per invoker directive (2026-07-14); parallel worktree dispatch within a wave where footprints are disjoint (protocol: skill scripts dispatch-worker-worktree.sh + check-leak-into-main.sh), sub-serialized where contended (wave 1: 45e1b7e8 before 7446af34, shared scripts/gate machinery; wave 2: main.rs cluster; wave 3: 1d59070d before c505031a in cli.rs). Standing directives from batch 1 remain: worker model per difficulty (sonnet easy, opus hard); workers self-verify with ./scripts/cargo-ci.sh; new public APIs need # Examples doctests; reinstall jit (cargo install --path crates/jit) after waves changing output/storage shapes; DOGFOOD newly landed surfaces lead-side and log friction here; help/doc text states current behavior only (no legacy narration); post-merge mainline build check after every merge (this is 45e1b7e8's subject \u2014 until it lands, verify manually). INTERLEAVE (invoker 2026-07-14): story 73482aa1 (rust-build-efficiency, filed by a parallel session under this epic) executes as wave 2, before the remaining CLI/gate/validation waves; former waves 2-5 renumbered 3-6.",
   "waves": [
     {
@@ -50,8 +50,8 @@
           "title": "Bound Rust build artifacts and compilation cost",
           "classification": "container",
           "model": "-",
-          "status": "in_progress",
-          "note": "driven wave-by-wave via dev/active/73482aa1-progress.json (6 sub-waves over 8 pre-wired children)"
+          "status": "done",
+          "note": "COMPLETE 2026-07-15: 9 children (8 planned + 83efbcb4 nested mid-story), 2 invoker escalations, story gates green; headline: clean compile -87.3%, rebuild -94.6%, 144->11 test targets, bounded-rust-build-footprint invariant enforced by cargo-ci. Report: dev/active/73482aa1-completion-report.md"
         }
       ]
     },

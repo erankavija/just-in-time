@@ -2,7 +2,7 @@
   "id": "73482aa1-aa6b-46f6-9d6f-3152a102e558",
   "title": "Bound Rust build artifacts and compilation cost",
   "description": "Reduce the Rust validation build from hundreds of oversized executables to a bounded, maintainable artifact set, and make compilation materially faster. The result must include automated budgets so test-target and debug-artifact bloat cannot silently return.\n\n## Background\n\nThe current workspace declares 140 integration-test targets because almost every top-level file under `crates/jit/tests/` is compiled as an independent crate. The accumulated `target/` directory is 92 GiB: 72 GiB under `debug/deps` and 19 GiB of incremental state. Representative test executables are 200–260 MiB; one 247 MiB executable contains 194 MiB of debug sections. Cargo currently reports 712 accumulated ELF executables, while the manifest has no development or test profile controls.\n\nDefault dependency features also compile unused HTTP and TLS infrastructure. `jsonschema` pulls `reqwest`, Hyper, Rustls, and AWS-LC even though repository schemas use only local fragment references. `ureq` enables its default Rustls backend in addition to the explicitly selected native-TLS backend. The package build script watches Git metadata and embeds a wall-clock timestamp, so staging or committing can invalidate package targets and trigger widespread relinking.\n\n## Success Criteria\n\n- [hard] REQ-01: The project registry contains an enforced `bounded-rust-build-footprint` invariant stating that Rust test topology, build profiles, and dependency features stay within automated artifact-count and clean-build-size budgets; the invariant resolves through the item API and its `AGENTS.md` projection is mechanically fresh.\n- [hard] REQ-02: Cargo metadata exposes no more than 12 integration-test targets across the workspace, shared helpers do not become standalone test targets, and cohesive suites preserve targeted test selection and parallel execution.\n- [hard] REQ-03: A documented benchmark runs the Rust validation compile sequence in a fresh isolated target directory on the recorded Linux host and pinned Rust toolchain; after clippy for all targets and workspace test compilation, the complete directory is at most 10 GiB and the active test executables total at most 2 GiB.\n- [hard] REQ-04: A committed deterministic checker derives the current integration-target count and active test-executable footprint from Cargo output, fails when either REQ-02 or REQ-03 exceeds its budget, has positive and over-budget regression fixtures, and runs as part of the `cargo-ci` gate without performing a second cold build.\n- [hard] REQ-05: Test and development profiles retain line-number backtraces while avoiding full debug payloads in every test executable; gate builds do not accumulate incremental state, while ordinary interactive development retains an explicitly documented incremental-compilation policy.\n- [hard] REQ-06: Under a documented same-host, same-toolchain protocol using at least three samples per case, median clean workspace test-compilation wall time is at least 40% below the recorded baseline and median rebuild time after a `jit` library source change is at least 60% below the recorded baseline.\n- [hard] REQ-07: Staging or committing unchanged source does not by itself recompile or relink Rust test targets; build provenance remains reproducible, release builds can report injected commit metadata, and tests cover the invalidation contract.\n- [hard] REQ-08: The default dependency graph contains no remote JSON Schema resolver and exactly one intentionally selected TLS backend for remote document access; automated dependency-feature assertions prevent either unused stack from returning.\n- [hard] REQ-09: Every pre-change non-ignored and ignored test remains discoverable with equivalent behavior unless its removal has a separately documented justification; the consolidated suite passes workspace tests, zero-warning all-target clippy, and all configured Rust feature checks.\n- [hard] REQ-10: Contributor testing guidance explains the suite layout, where shared helpers and new integration cases belong, the artifact budgets, the benchmark protocol, and how to diagnose a budget failure before adding a new test target or dependency feature.\n\n## Notes\n\nThe baseline measurements above were collected on 2026-07-14 before filing. Test-suite consolidation, reduced debug information, dependency-feature pruning, stable build provenance, and faster linker use are candidate techniques; the observable budgets and benchmark improvements are the contract.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
   "assignee": null,
   "dependencies": [
@@ -17,25 +17,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "repo-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T17:25:52.063670982Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T17:19:07.905221498Z"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:36:54.002352378Z"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T17:25:52.063670982Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-15T17:20:49.357802602Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T17:31:17.905890517Z"
     },
     "docs-mechanical": {
       "status": "passed",
@@ -51,6 +51,13 @@
       "label": "Rust build efficiency design",
       "doc_type": "design",
       "format": "markdown"
+    },
+    {
+      "path": "dev/active/73482aa1-completion-report.md",
+      "commit": null,
+      "label": "Story completion report",
+      "doc_type": null,
+      "format": "markdown"
     }
   ],
   "labels": [
@@ -61,6 +68,7 @@
     "type:story"
   ],
   "created_at": "2026-07-14T12:51:41.227102198Z",
-  "updated_at": "2026-07-15T17:34:08.651604979Z",
-  "first_ready_at": "2026-07-14T12:51:41.227106348Z"
+  "updated_at": "2026-07-15T17:39:25.818008345Z",
+  "first_ready_at": "2026-07-14T12:51:41.227106348Z",
+  "done_at": "2026-07-15T17:39:24.653807378Z"
 }

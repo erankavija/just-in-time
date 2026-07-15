@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "6e203a2f-792a-4fb4-a23f-53ff1af91fb7",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "73482aa1-aa6b-46f6-9d6f-3152a102e558",
+  "commit": "9c9faf0595ee93f647a48f75337fa58d9ea27603",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T17:36:54.002352378Z",
+  "completed_at": "2026-07-15T17:38:28.828842194Z",
+  "duration_ms": 94826,
+  "exit_code": 0,
+  "stdout": "Attribution used the story’s tagged patches plus all nine DAG-resolved, done leaf children (84 tagged commits total); every included issue had commit-based attribution, and uncommitted changes were excluded. The prior README finding is resolved at [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:51). Current provenance, gate, and reference documentation match the implementation; targeted mechanical checks pass.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered build-efficiency story’s combined documentation contract is accurate, discoverable, and concise; the prior blocking source-install finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The delivered build-efficiency story’s combined documentation contract is accurate, discoverable, and concise; the prior blocking source-install finding is resolved.",
+    "findings": []
+  }
+}
