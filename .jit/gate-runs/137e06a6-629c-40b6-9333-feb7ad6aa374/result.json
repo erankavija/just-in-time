@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "137e06a6-629c-40b6-9333-feb7ad6aa374",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "57d0eb79-f3c5-408a-9322-758099a60e49",
+  "commit": "f41eccc1e3916898c0d87d95a710d5f0894806bc",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T08:38:29.005509405Z",
+  "completed_at": "2026-07-15T08:44:10.569890143Z",
+  "duration_ms": 341564,
+  "exit_code": 0,
+  "stdout": "Attribution: `jit:57d0eb79` commits 599aa2a8, 8091edca, 359f32cf, 77862dfc, 979df241, f41eccc1\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-2 and @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T08:13:37Z; fmt, clippy, workspace tests, provenance, incremental-state); prior code-review failed (exit 1; its isolated-target finding is superseded by amended REQ-04)\nTruncation recovery: Narrowed an overbroad `.jit` search to context records and re-read each tagged patch, including both merge-parent diffs; unrelated historic gate records were outside the issue cone.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied in the attributable current tree; the prior isolated-target finding was superseded by the approved REQ-04 amendment.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard criteria are satisfied in the attributable current tree; the prior isolated-target finding was superseded by the approved REQ-04 amendment.",
+    "findings": []
+  }
+}

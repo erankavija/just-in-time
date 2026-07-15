@@ -53,8 +53,8 @@
           "title": "Bound debug information and gate incremental state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_rework",
-          "note": "merged to main 359f32cf; cargo-ci passed; code-review FAILED round 1 (F1 high: REQ-04 must be deterministic in the gate, not a one-off isolated run; F2: hand-copied 246.7/193.7 MiB + ~19 GiB figures violate @/inv/single-source-prose). Rework dispatched to same worker/worktree"
+          "status": "done",
+          "note": "1 worker rework round (deterministic incremental-state gate step + single-source-prose citations) + 1 invoker escalation: review round 2 read REQ-04 as requiring always-isolated gate runs; invoker approved amending REQ-04 to codify the plan's routine-gate vs benchmark-protocol split (2026-07-15). Amended criterion passed review with 0 findings. NOTE for later waves: the incremental-state step fails on pre-existing interactive incremental state; clear target/*/incremental once per worktree (lead cleared 22G+571M in main)"
         },
         {
           "short_id": "3398bc19",
@@ -107,7 +107,15 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "57d0eb79",
+      "date": "2026-07-15",
+      "policy": "3+5 (criteria amendment; architectural trade-off)",
+      "question": "code-review round 2 read REQ-04 as requiring every cargo-ci run to create a fresh isolated CARGO_TARGET_DIR (always-cold gate runs)",
+      "resolution": "invoker chose: amend REQ-04 to codify the delivered deterministic incremental-state step over the run's actual target dir; isolated fresh dirs remain the benchmark protocol's territory"
+    }
+  ],
   "rework_counts": {
     "4e22a20d": 2,
     "5d862134": 1,
