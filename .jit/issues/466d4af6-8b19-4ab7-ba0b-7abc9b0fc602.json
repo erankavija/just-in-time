@@ -6,13 +6,13 @@
   "priority": "high",
   "assignee": null,
   "dependencies": [
+    "570a0cab-5d63-4df2-ba79-c104b441766b",
     "7ee2efb5-ad81-4cef-8e36-bf2cc9d87e7e",
     "d65d4864-633a-49f9-a510-028f0713ac4c",
     "b8a961a6-b0ee-48f7-a79a-0af673e476f9",
-    "0f2e1b12-227a-4816-919c-de4158ded338",
+    "b91a1972-5027-41b0-a669-87db9f0f3eac",
     "60862c14-74f6-4e8f-96dd-6e6e4034a51f",
-    "d7930fa7-36c1-4268-8ccc-3fa7e5999ddf",
-    "570a0cab-5d63-4df2-ba79-c104b441766b"
+    "d7930fa7-36c1-4268-8ccc-3fa7e5999ddf"
   ],
   "gates_required": [
     "repo-validate",
@@ -33,6 +33,6 @@
     "satisfies:REQ-10"
   ],
   "created_at": "2026-07-15T11:19:56.077595303Z",
-  "updated_at": "2026-07-15T11:19:56.808072664Z",
+  "updated_at": "2026-07-15T11:37:10.483163738Z",
   "first_ready_at": "2026-07-15T11:19:56.077595563Z"
 }

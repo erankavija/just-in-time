@@ -1,17 +1,13 @@
 {
   "id": "0f2e1b12-227a-4816-919c-de4158ded338",
-  "title": "Implement candidate handoff, validation, producer, and root workflows",
-  "description": "The immutable source freeze is authenticated into one candidate-tag event whose exact completion identity gates validation, all producers, and root assembly.\n\n## Success Criteria\n\n- [hard] REQ-01: Protected workflows implement freeze-ID dispatch, annotated candidate-tag handoff, push-owned event completion, reusable normal/security/MSRV validation, native/source/MCP/OCI producers, and exact candidate-root assembly with least privilege.\n- [hard] REQ-02: Every producer consumes the same authenticated event-completion and freeze identities; workflow fixtures reject source-ref overrides, movable identity, caller/checkout/OIDC mismatch, failed validation, missing producer evidence, or public-channel mutation.\n- [hard] REQ-03: Candidate workflow YAML composes the fixed-ref authority and reusable producer interfaces without reimplementing either, and records overwrite-forbidden 90-day exact-ID transitions.\n\n## Notes\n\nBlast radius: candidate handoff, validation, producer-caller, and root workflow YAML plus focused contract fixtures.",
+  "title": "Implement candidate handoff and event-completion workflows",
+  "description": "An authenticated numeric source-freeze identity is converted into one protected candidate tag whose push records the sole candidate-event completion identity.\n\n## Success Criteria\n\n- [hard] REQ-01: Reviewer-authorized dispatch accepts only a numeric freeze artifact ID, verifies its exact non-expired digest, schema, attestation, trusted run, protected remote SHA/tree, repository, actor, and workflow identities, and uploads one overwrite-forbidden 90-day handoff/prepared record before ref mutation.\n- [hard] REQ-02: The fixed-ref authority creates the annotated candidate tag with the exact handoff and freeze-root identities; creator readback verifies the tag object and peeled SHA without acting as the push run's authority.\n- [hard] REQ-03: The App-authored push workflow verifies event, tag, SHA, actor, repository, workflow, and embedded handoff/root identities, then uploads one candidate-event-completed or exact recovery-completed record and exposes its ID through typed outputs.\n- [hard] REQ-04: Fixtures reject missing, foreign, expired, listed-by-name, mismatched, movable, human-created, or conflicting identity, unsafe retry, source modification, and any validation, candidate-byte, escrow, registry, or release operation.\n\n## Notes\n\nBlast radius: freeze-ID dispatch, candidate handoff and protected tag workflow YAML, push-owned completion plumbing, and identity/crash fixtures only.\n",
   "state": "backlog",
   "priority": "high",
   "assignee": null,
   "dependencies": [
-    "03b89b77-fdb9-443c-a491-441ae9447286",
-    "82bab119-cf80-4531-8a5e-0b435169c010",
-    "f7f80d53-508e-4b03-b045-5209061c8d0a",
-    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
-    "68c1f2f3-6620-4770-b6f3-395cc38219b7",
-    "cdee58b3-1428-4874-9814-dacefc517605"
+    "5cb1a9a6-8dfb-431d-b018-58cdb364b6ca",
+    "82bab119-cf80-4531-8a5e-0b435169c010"
   ],
   "gates_required": [
     "repo-validate",
@@ -31,6 +27,6 @@
     "satisfies:REQ-07"
   ],
   "created_at": "2026-07-15T11:19:56.073479670Z",
-  "updated_at": "2026-07-15T11:20:19.470195574Z",
+  "updated_at": "2026-07-15T11:37:10.280139520Z",
   "first_ready_at": "2026-07-15T11:19:56.073479960Z"
 }
