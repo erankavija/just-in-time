@@ -93,10 +93,10 @@ fn test_show_summary_omits_description() {
 }
 
 #[test]
-fn test_show_summary_includes_gates_status() {
+fn test_show_summary_exposes_gates_array() {
     let (temp, id) = setup_repo_with_issue("short");
 
-    // Add a gate so gates_status is non-empty.
+    // Add a gate so the projected `gates` array is non-empty.
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
@@ -129,15 +129,17 @@ fn test_show_summary_includes_gates_status() {
 
     let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let data = &json;
+    // Summary shares the `gates` field name with the full `issue show`, projected
+    // to `{key, status}` per gate — never the raw storage fields.
+    let gates = data["gates"]
+        .as_array()
+        .unwrap_or_else(|| panic!("--summary must expose a `gates` array; got: {data}"));
+    assert_eq!(gates.len(), 1, "one entry per required gate; got: {data}");
+    assert_eq!(gates[0]["key"].as_str(), Some("manual-gate"));
+    assert!(gates[0]["status"].is_string());
     assert!(
-        data["gates_status"].is_object(),
-        "--summary must include gates_status; got: {}",
-        data
-    );
-    assert!(
-        data["gates_status"].get("manual-gate").is_some(),
-        "--summary gates_status must list configured gates; got: {}",
-        data
+        data.get("gates_required").is_none() && data.get("gates_status").is_none(),
+        "--summary must not carry the raw storage gate fields; got: {data}"
     );
 
     // Confirm summary also includes the minimal-issue fields it should keep.
