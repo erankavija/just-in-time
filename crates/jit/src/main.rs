@@ -6401,12 +6401,15 @@ fn run() -> Result<()> {
                 let (integrity_error, rule_report) =
                     match jit::validation::repository::validate_repository(&repository_view) {
                         Ok(report) => (None, report.rule_report),
-                        Err(error) => (
-                            Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
-                                format!("Invalid repository: {error:#}"),
-                            ))),
-                            jit::validation::report::RuleReport::default(),
-                        ),
+                        Err(failure) => {
+                            let (error, report) = failure.into_parts();
+                            (
+                                Some(anyhow::Error::new(jit::errors::ValidationFailedError::new(
+                                    format!("Invalid repository: {error:#}"),
+                                ))),
+                                report.rule_report,
+                            )
+                        }
                     };
                 let integrity_message = integrity_error.as_ref().map(|e| e.to_string());
 

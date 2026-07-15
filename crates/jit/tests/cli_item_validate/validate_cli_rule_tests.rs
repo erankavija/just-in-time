@@ -477,6 +477,44 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
 }
 
 #[test]
+fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
+    let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
+    let id = create_epic(&temp, false);
+    let issue_path = temp.path().join(".jit/issues").join(format!("{id}.json"));
+    let mut issue: Value = serde_json::from_str(&fs::read_to_string(&issue_path).unwrap()).unwrap();
+    issue["dependencies"] = serde_json::json!(["nonexistent"]);
+    fs::write(&issue_path, serde_json::to_vec_pretty(&issue).unwrap()).unwrap();
+
+    bin()
+        .current_dir(temp.path())
+        .arg("validate")
+        .assert()
+        .code(4)
+        .stdout(predicate::str::contains("[epic-needs-req]"))
+        .stdout(predicate::str::contains("does not exist"));
+
+    let output = bin()
+        .current_dir(temp.path())
+        .args(["validate", "--json"])
+        .assert()
+        .code(4)
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["valid"], false);
+    assert!(json["integrity_error"]
+        .as_str()
+        .is_some_and(|message| message.contains("does not exist")));
+    assert_eq!(json["error_count"], 1);
+    assert!(json["rule_findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|finding| finding["rule"] == "epic-needs-req"));
+}
+
+#[test]
 fn test_validate_id_with_fix_is_rejected() {
     // Finding #2: `--fix` is repo-wide and must not be silently scoped to an id.
     let temp = setup_repo_with_rules(EPIC_NEEDS_REQ);
