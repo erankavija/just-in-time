@@ -17,11 +17,26 @@ pub enum TransactionDecision {
     RolledBack,
 }
 
+/// Durable progress for one reverse action in a prepared transaction.
+///
+/// `Restored` is recorded only after the target and its parent are synchronized.
+/// Recovery skips such actions, so a later reverse failure cannot replay work
+/// whose backup has already been consumed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RollbackActionState {
+    #[default]
+    Pending,
+    Restored,
+}
+
 /// One identity-checked forward/reverse action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct JournalAction {
     pub(crate) action: JournalActionKind,
     pub(crate) original: TargetIdentity,
+    #[serde(default)]
+    pub(crate) rollback_state: RollbackActionState,
 }
 
 /// Complete recovery state. Paths are repository-relative and opaque stage or
