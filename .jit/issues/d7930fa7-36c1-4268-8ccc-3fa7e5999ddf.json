@@ -1,0 +1,39 @@
+{
+  "id": "d7930fa7-36c1-4268-8ccc-3fa7e5999ddf",
+  "title": "Implement clean-room rehearsal workflows",
+  "description": "A reviewer-authorized clean-room workflow rehearses only authenticated immutable escrow bytes while every final v1 channel remains absent.\n\n## Success Criteria\n\n- [hard] REQ-01: Dispatch accepts the exact candidate release/root identity, downloads assets by numeric ID, verifies checksums, attestations, and provenance, and runs native, extracted-source, MCP, OCI, server/API/web/SSE, profile quickstart, schema, persistence, and frozen-doc procedures.\n- [hard] REQ-02: Preflight proves final npm 1.0.0, v1.0.0 tag/release, and GHCR :1.0.0 are absent; rehearsal rejects Actions ZIPs as byte authority, source refs, repacks, rebuilt inputs, or altered frozen instructions.\n- [hard] REQ-03: The workflow emits one attested rehearsal envelope tied to exact escrow assets and covers failure, substitution, and public-channel-conflict fixtures without publishing anything.\n\n## Notes\n\nBlast radius: clean-room rehearsal workflow YAML and hosted rehearsal fixtures only.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "cdee58b3-1428-4874-9814-dacefc517605",
+    "03b89b77-fdb9-443c-a491-441ae9447286",
+    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
+    "82bab119-cf80-4531-8a5e-0b435169c010",
+    "68c1f2f3-6620-4770-b6f3-395cc38219b7"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-orchestration",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06",
+    "satisfies:REQ-07",
+    "satisfies:REQ-08",
+    "satisfies:REQ-09",
+    "satisfies:REQ-10",
+    "satisfies:REQ-11"
+  ],
+  "created_at": "2026-07-15T11:19:56.074640171Z",
+  "updated_at": "2026-07-15T11:20:19.583391186Z",
+  "first_ready_at": "2026-07-15T11:19:56.074640441Z"
+}

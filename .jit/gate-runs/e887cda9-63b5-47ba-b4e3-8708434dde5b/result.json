@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "run_id": "e887cda9-63b5-47ba-b4e3-8708434dde5b",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "89f16b9c8b69629a1622ebe02d52e957b65143ea",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T21:10:36.800982893Z",
+  "completed_at": "2026-07-14T21:17:24.737902165Z",
+  "duration_ms": 407936,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The planning issue requires `dev/active/8b05a612-plan.md` at `.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:4`; the non-empty 261-line document exists and is linked as `doc_type: design` at lines 118–122.\n\nThe linked investigation and research documents are also present and substantively support the plan.\n\n## Completeness against the criteria\n\nBlocking. REQ-10 is not satisfied at the required release-candidate stage.\n\nThe scope requires a fresh-checkout release-candidate rehearsal covering native initialization, profiles, schema, server/web/API, MCP, Docker persistence, and every supported instruction (`dev/active/v1-production-readiness-scope-brief.md:24`). The candidate producers at `dev/active/8b05a612-plan.md:120-175` perform component-level smoke tests, but omit the profile quickstart and complete documented install/upgrade paths.\n\nThose checks appear only in the final leaf, whose stated sequence is to publish and then perform end-to-end acceptance (`dev/active/8b05a612-plan.md:199-210`). This permits immutable npm/GHCR artifacts to become public before the full REQ-10 rehearsal has passed.\n\n## Technical soundness and architectural fit\n\nThe core architecture is otherwise accurately understood:\n\n- `/repo/.jit` is the correct storage argument, since repository-relative paths resolve from the storage directory’s parent (`crates/jit/src/storage/json.rs:1129-1171`).\n- The API is nested beneath `/api` and exposes `/api/health` (`crates/server/src/main.rs:104-107`, `crates/server/src/routes.rs:33-73`).\n- Embedded web assets are build-order-sensitive (`crates/server/build.rs:4-18`).\n- Replacing the current root, nginx/Node, multi-process image is architecturally appropriate (`Dockerfile:39-88`, `docker/entrypoint.sh:11-24`).\n\nBlocking npm defect: the bootstrap leaf requires a “dry-run OIDC authentication check” (`dev/active/8b05a612-plan.md:73-80`). npm’s current trusted-publisher documentation says configuration errors surface only when publishing is attempted, `npm whoami` cannot verify OIDC, and OIDC applies only to `npm publish` or `npm stage publish`. Therefore the proposed dry-run proof has no defined implementable mechanism. A real staged publication is the available non-public verification primitive. See [npm trusted publishing documentation](https://docs.npmjs.com/trusted-publishers/).\n\n## Decomposition and dependencies\n\nThe ecosystem remediation ordering, Docker replacement-before-removal edge, version/bootstrap ordering, and final dependencies on `6eb585bc` and `9b7b5f9c` are coherent.\n\nThe REQ-10 defect requires changing the decomposition: create a pre-publication clean-room rehearsal leaf depending on candidates, canonical documentation, and both external epics. The publication leaf must depend on that rehearsal and restrict itself to identity preflight, exact-byte publication, and post-publication channel verification.\n\nNo dependency history exists on the planning issue itself, so there is no missing declared prerequisite to assess there.\n\n## Risks and actionability\n\nThe plan identifies the important dependency, Docker, documentation, external-state, and partial-publication risks. Two remain unresolved:\n\n- The claimed npm OIDC preflight is not executable as designed.\n- Four critical workflow leaves defer verification to an unspecified “workflow contract test or controlled failing fixture” (`dev/active/8b05a612-plan.md:70,88,144,174`). The repository has no corresponding deterministic harness: `scripts/test-ci-local.sh:36-73` is an interactive `act` launcher limited to the ordinary CI workflow, while `scripts/validate-setup.sh:9-34` only checks file presence and still encodes the topology the plan removes. Workers would have to invent the release/security workflow test architecture independently.\n\nThe plan should select one shared verification design—for example, actionlint plus deterministic YAML/graph assertions for static contracts and disposable GitHub PR/tag fixtures for actual caller-failure propagation—and make that harness an explicit prerequisite of the workflow leaves.\n\n## Prior review feedback\n\n`run_history` is empty; there is no prior feedback to reconcile.\n\n## Findings\n\n1. **F1 — Blocking/high:** The complete clean-room rehearsal occurs after public publication, so REQ-10 is not proven before immutable v1 artifacts are released. Split `Publish and run clean-room v1.0 release acceptance` into a pre-publication rehearsal and a dependent publication/channel-verification leaf.\n2. **F2 — Blocking/high:** The npm bootstrap requires an undefined and unsupported “dry-run OIDC authentication check.” Replace it with a defined `npm stage publish` verification flow or explicitly redesign publication around staged approval.\n3. **F3 — Blocking/medium:** Critical workflow tasks leave their contract-test mechanism unresolved despite there being no reusable repository harness. Specify and order a shared static plus controlled-event workflow verification primitive before fan-out.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan is well-grounded but publishes before full clean-room rehearsal, relies on an unsupported npm OIDC dry run, and leaves critical workflow verification architecture unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Full clean-room acceptance is sequenced after public publication instead of gating it.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":199,\"references\":[\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The required npm dry-run OIDC authentication proof has no supported implementation mechanism.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":78,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Critical workflow leaves do not define the shared contract-test or controlled-fixture mechanism they depend on.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":70,\"references\":[\"@/issue/8b05a612/requirement/REQ-03\",\"@/issue/8b05a612/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5500 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6277-a9de-7261-837a-27699f2c7285\n--------\nuser\n--- 5487 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan is well-grounded but publishes before full clean-room rehearsal, relies on an unsupported npm OIDC dry run, and leaves critical workflow verification architecture unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Full clean-room acceptance is sequenced after public publication instead of gating it.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 199,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The required npm dry-run OIDC authentication proof has no supported implementation mechanism.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 78,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Critical workflow leaves do not define the shared contract-test or controlled-fixture mechanism they depend on.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 70,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-03",
+          "@/issue/8b05a612/requirement/REQ-07"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "run_id": "66d27b9d-822a-45cf-a7b9-1038d0117bf1",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "65853163ff66b16cb04cc756e1903d0319881771",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-14T21:55:43.693204100Z",
+  "completed_at": "2026-07-14T22:00:16.225586100Z",
+  "duration_ms": 272532,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The required plan exists at [dev/active/8b05a612-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:1) and is linked as the planning issue’s `design` document. The linked investigation and research documents are also present and substantive.\n\n## Completeness against the criteria\n\nBlocking failure. REQ-01 through REQ-08 and REQ-10 through REQ-11 are addressed with concrete acceptance criteria. However, the plan does not implement the pre-tag timing required by `[hard]` REQ-09.\n\nThe scope requires the stable-recency comparison “immediately before the v1.0 tag” ([scope brief, line 23](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/v1-production-readiness-scope-brief.md:23)). The plan instead describes a “tag-time” or “release” check ([plan, lines 110–116](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:110)) and permits candidate assembly only after the exact `v1.0.0` tag already exists ([plan, lines 147–153](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:147)). No pre-tag command, protected tag-creation procedure, or evidence handoff is defined. A failure at that point would require changing the commit and replacing the release tag.\n\n## Technical soundness and architectural fit\n\nBlocking failure in the OCI release design.\n\nThe server and Docker application architecture is otherwise accurately grounded: `jit-server` validates the existing `.jit` directory, nests routes under `/api`, and uses embedded web assets ([main.rs, lines 61–129](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/main.rs:61)); `/api/health` is correct ([routes.rs, lines 33–73](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/routes.rs:33)); and the empty-asset build hazard is real ([build.rs, lines 4–18](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/build.rs:4)).\n\nThe OCI contract, however, combines requirements without specifying a supported round trip. It requires one archive carrying max provenance and an SBOM, loading and smoking that exact archive, and later copying it to GHCR without changing its authoritative digest ([plan, lines 186–193](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:186), [lines 223–235](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:223)). Docker’s documented local image store does not support loaded attestations; `load: true` omits them, while attached attestations normally require registry-compatible image/index handling ([Docker attestation documentation](https://docs.docker.com/build/ci/github-actions/attestations/)). The plan does not select an OCI-capable runtime/copy tool, distinguish the runnable manifest digest from the attested index digest, or define how digest preservation is verified. An engineer must re-derive this load-bearing release architecture.\n\n## Decomposition and dependencies\n\nThe issue-task DAG is otherwise coherent: remediation precedes audit enforcement; version alignment serializes manifest changes; the replacement Docker image precedes topology removal; candidate assembly precedes npm staging; and rehearsal precedes public publication.\n\nThe pre-tag gate omission is nevertheless an ordering gap: there is no leaf responsible for validating MSRV recency and authorizing creation of the immutable `v1.0.0` tag before tag-triggered candidate work begins.\n\n## Risks and actionability\n\nBlocking failure. The risk table covers dependency remediation, npm ownership, workflow failure propagation, Docker runtime behavior, external epics, and partial publication. It does not mitigate:\n\n- Failure of the stable-recency check after the release tag has already been created.\n- Loss or mutation of OCI attestations/digests across archive export, runtime smoke, and registry publication.\n\nBoth are load-bearing release-identity questions and need explicit decisions and executable mechanisms.\n\n## Prior review feedback\n\nAll three prior blockers were substantively addressed:\n\n- The clean-room rehearsal now precedes every public v1 channel mutation.\n- OIDC is proved with supported `npm stage publish`, followed by staged-package inspection and 2FA approval.\n- A shared static-and-dynamic workflow verification harness is now defined with controlled failure injection and disposable fixtures.\n\nThe present failures are separate from those prior findings.\n\n## Findings\n\n1. **F1 — High, blocking:** `[hard]` REQ-09 requires the stable-recency comparison immediately before creating `v1.0.0`, but the plan only defines tag-time/release checks after the exact tag has entered candidate assembly. Add an explicit pre-tag gate and immutable SHA/evidence handoff so a failed recency check never requires moving a release tag. File: `dev/active/8b05a612-plan.md`, line 147. Reference: `@/issue/8b05a612/requirement/REQ-09`.\n2. **F2 — High, blocking:** The exact OCI candidate contract is under-specified and is incompatible with the ordinary Docker local-load path: the plan requires attached max-provenance/SBOM attestations, exact-archive runtime loading, and digest-preserving later publication without naming an OCI-capable load/copy mechanism or defining subject versus index digests. Select and test the registry/archive transport and digest model explicitly. File: `dev/active/8b05a612-plan.md`, line 186. References: `@/issue/8b05a612/requirement/REQ-05`, `@/issue/8b05a612/requirement/REQ-07`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior blockers are resolved, but the plan still lacks the required pre-tag MSRV gate and a technically executable exact-attested-OCI transport contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The MSRV recency check is sequenced after v1.0.0 tag creation instead of immediately before it.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":147,\"references\":[\"@/issue/8b05a612/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan does not define a supported mechanism for loading, smoking, and later publishing the exact attested OCI candidate while preserving its digest.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":186,\"references\":[\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2538 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62a0-f988-78f3-9745-3c05e548de8c\n--------\nuser\n--- 2525 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior blockers are resolved, but the plan still lacks the required pre-tag MSRV gate and a technically executable exact-attested-OCI transport contract.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The MSRV recency check is sequenced after v1.0.0 tag creation instead of immediately before it.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 147,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-09"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The plan does not define a supported mechanism for loading, smoking, and later publishing the exact attested OCI candidate while preserving its digest.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 186,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-07"
+        ]
+      }
+    ]
+  }
+}

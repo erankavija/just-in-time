@@ -1,0 +1,31 @@
+{
+  "id": "5f8ba80b-2d17-4eb0-9491-6bef917255dd",
+  "title": "Verify release authority isolation and acceptance",
+  "description": "Repository configuration and the fixed-ref primitive are accepted together as a narrow, disjoint authority contract.\n\n## Success Criteria\n\n- [hard] REQ-01: Acceptance verifies ruleset enforcement, App scope, protected environment separation, immutable-release state, read-only defaults, and the primitive's constant-ref and exact-readback behavior against the runbook.\n- [hard] REQ-02: Adversarial acceptance proves other actors and credential types cannot create, update, delete, or cross-use candidate/final refs and that no credential survives the operation.\n- [hard] REQ-03: The recorded handoff documents the stable primitive interface consumed by release workflows and confirms that this work creates no execution workflow, tag, release, or candidate byte.\n\n## Notes\n\nBlast radius: release-authority acceptance fixtures and evidence only.\n",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "847237ef-95b2-4b61-9b3d-8a470554c863",
+    "12d338f7-6235-4d7f-a681-e25750e4c098"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-authority-foundation",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T11:19:56.072302769Z",
+  "updated_at": "2026-07-15T11:35:44.185430464Z",
+  "first_ready_at": "2026-07-15T11:19:56.072303059Z"
+}

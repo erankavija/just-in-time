@@ -1,0 +1,32 @@
+{
+  "id": "348b34f5-a103-4bbf-a0be-3df954f7b971",
+  "title": "Build and attest the frozen native and source candidates",
+  "description": "One native archive and one deterministic source archive are produced, installed/smoked, attested, and retained from the freeze SHA without changing it.\n\n## Success Criteria\n\n- [hard] REQ-01: After identity preflight, web/dist is built before jit-server; one Linux x86_64 musl archive contains jit, jit-server and licenses, and extracted smoke verifies both binaries, real embedded SPA fallback, and /api/health.\n- [hard] REQ-02: The pinned toolchain runs normalized git archive at the freeze SHA under the committed export-ignore policy and deterministic compression. Two isolated builds are byte-identical; the archive inventory/tree matches the frozen commit after documented exclusions and retains every input required by the supported source procedure.\n- [hard] REQ-03: In a clean extracted directory with no .git or checkout fallback, cargo install --path crates/jit --locked --root <prefix> and the frozen canonical source procedure pass, followed by jit version/init/profile quickstart and representative JSON/schema behavior.\n- [hard] REQ-04: Exact archive bytes, SHA-256 manifests, SPDX inventories, licenses, freeze SHA/tree, export policy/tool versions, and attestations are uploaded once under unique candidate/SHA/producer-run/attempt names with 90-day retention. Upload outputs record artifact IDs/ZIP digests/expiry; subject/source/caller/called-workflow verification must match before producer success, and any upload variance/ambiguity rejects both candidates.\n\n## Notes\n\nBlast radius: candidate artifacts/evidence only; no repository commit, tag beyond the existing candidate ref, or public channel mutation.",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "2d225728-bae1-45bc-b7f3-2d81c789c422"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "npm-ci",
+    "mcp-ci",
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-01",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T09:12:53.179138773Z",
+  "updated_at": "2026-07-15T09:12:54.166795151Z",
+  "first_ready_at": "2026-07-15T09:12:53.179139003Z"
+}

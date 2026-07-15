@@ -1,0 +1,29 @@
+{
+  "id": "b2d7d4b3-c1c9-4f6d-b4ae-78a091d65a6b",
+  "title": "Create the immutable candidate event from the source freeze",
+  "description": "Required approval supplies only the freeze artifact ID; after authenticating it and atomically publishing the candidate handoff, the dedicated App creates exactly one candidate tag whose push starts the only candidate-production run.\n\n## Success Criteria\n\n- [hard] REQ-01: Reviewer-authorized workflow_dispatch accepts one numeric freeze_artifact_id and no ref/SHA/name/URL. With actions:read, contents:read, and attestations:read it verifies the exact non-expired artifact/digest/schema/attestation and sole successful trusted freeze run/attempt, then proves the protected remote tip/tree still equal its 40-hex SHA.\n- [hard] REQ-02: Before token/ref mutation, dispatch uploads one 90-day handoff/prepared artifact with freeze ID/digest and fixed ref, then App creates annotated candidate tag embedding that exact artifact ID/digest and freeze-root digest. Creator readback records its operation but is not the push run's authority.\n- [hard] REQ-03: The App push run verifies event/tag/SHA/App, reads handoff ID/root digest from the annotated object, downloads that ID directly, reconciles the exact existing tag, and always uploads its own candidate-event-completed or recovery-completed artifact. That exact output ID is passed via same-run job outputs into validation, every producer, and root assembly; no completion listing/discovery occurs. All event/workflow/repository/checkout/OIDC identities must equal tag/handoff/root.\n- [hard] REQ-04: This workflow changes no source or product/public channel. Fixtures cover handoff/tag/push-owned completion crashes and reject missing handoff, embedded mismatch, listing authority, human ref, conflicting/moved tag, wrong actor/environment/workflow, or validation or producer workflows without the exact push-owned completion ID. Alternate records remain non-authoritative unless explicitly selected pre-tag.\n\n## Notes\n\nBlast radius: one artifact-ID reviewer dispatch, one immutable candidate-handoff artifact, one candidate-tag environment approval, one short-lived App token, and one candidate ref.\n\n",
+  "state": "backlog",
+  "priority": "normal",
+  "assignee": null,
+  "dependencies": [
+    "0f2dbe50-7d6b-4fa2-948c-a8c121e2bb5a"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T09:12:53.178232752Z",
+  "updated_at": "2026-07-15T11:35:44.226306524Z",
+  "first_ready_at": "2026-07-15T09:12:53.178232982Z"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "b8a961a6-b0ee-48f7-a79a-0af673e476f9",
+  "title": "Implement final GitHub release and recovery workflows",
+  "description": "The final immutable GitHub Release copies the authenticated escrow asset set exactly once and verifies every public identity.\n\n## Success Criteria\n\n- [hard] REQ-01: A protected final-GitHub workflow authenticates tag, npm, GHCR, and escrow completion, enters the constant publication mutex, and creates or resumes only the matching draft without editing candidate escrow.\n- [hard] REQ-02: Every escrow asset is copied without regeneration, verified by numeric ID, checksum, attestation, and public URL, then the draft is published once and exact readback precedes completion or recovery-completion.\n- [hard] REQ-03: Endpoint/crash fixtures deny edit/delete/replace of published candidate or final assets, reject conflicts and foreign evidence, and recover from escrow/tag/live state without rebuild.\n\n## Notes\n\nBlast radius: final GitHub release/recovery workflow YAML and endpoint fixtures only.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
+    "68c1f2f3-6620-4770-b6f3-395cc38219b7",
+    "82bab119-cf80-4531-8a5e-0b435169c010",
+    "03b89b77-fdb9-443c-a491-441ae9447286"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-orchestration",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-07",
+    "satisfies:REQ-10",
+    "satisfies:REQ-11"
+  ],
+  "created_at": "2026-07-15T11:19:56.077028533Z",
+  "updated_at": "2026-07-15T11:20:19.777220587Z",
+  "first_ready_at": "2026-07-15T11:19:56.077028823Z"
+}

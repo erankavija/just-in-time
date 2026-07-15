@@ -1,0 +1,30 @@
+{
+  "id": "12d338f7-6235-4d7f-a681-e25750e4c098",
+  "title": "Configure protected release authority and environments",
+  "description": "The repository's account-side release authority is narrowly configured before any release workflow can consume it.\n\n## Success Criteria\n\n- [hard] REQ-01: One repository-only GitHub App with contents:write is the sole bypass actor for the candidate and final-tag rulesets; all other actors are denied create, update, and delete on those namespaces.\n- [hard] REQ-02: Candidate-tag, final-release, candidate-escrow, npm-publish, final-GitHub, and secret-free release-resume environments have distinct documented reviewers and owners, with immutable releases enabled and repository workflow permissions read-only by default.\n- [hard] REQ-03: A release-admin runbook and read-only acceptance evidence verify the App installation, rulesets, environment isolation, immutable-release setting, and absence of credential crossover without adding release-execution workflow YAML.\n\n## Notes\n\nBlast radius: GitHub repository settings and release-admin runbooks only; no fixed-ref primitive, execution workflow, tag, release, or candidate byte.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "e0fed1bb-dd07-49d1-8321-79a2d93805dc"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-authority-foundation",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05"
+  ],
+  "created_at": "2026-07-15T11:19:56.071021308Z",
+  "updated_at": "2026-07-15T11:20:19.325379908Z",
+  "first_ready_at": "2026-07-15T11:19:56.071021808Z"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "b91a1972-5027-41b0-a669-87db9f0f3eac",
+  "title": "Implement candidate-root assembly workflow",
+  "description": "Exact producer evidence is authenticated and assembled into one attested, overwrite-forbidden candidate-root artifact.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow downloads validation and producer evidence only by exact artifact ID, verifies REST/run metadata, schemas, expiry, ZIP and subject digests, candidate/freeze identities, workflow provenance, and attestations, and never selects by name or latest success.\n- [hard] REQ-02: The root records the authenticated handoff/event/validation parents and every native, source, SPDX, MCP, OCI, documentation, release-metadata, identity, digest, expiry, and protocol field without inference or substitution.\n- [hard] REQ-03: The root manifest is attested and uploaded once with overwrite disabled and 90-day retention; its exact artifact ID, digest, expiry, attestation, run, and parent identities are exposed for escrow.\n- [hard] REQ-04: Fixtures reject missing or substituted evidence, insufficient retention, failed upload or attestation, source change, public mutation, and assembly that rebuilds or modifies any candidate byte.\n\n## Notes\n\nBlast radius: candidate-root workflow YAML, manifest assembly, exact-evidence verification, and root fixtures only; escrow publication is outside scope.",
+  "state": "backlog",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "5d0ab945-3c8e-472c-9a54-92f2270c4d12"
+  ],
+  "gates_required": [
+    "repo-validate",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:production-readiness",
+    "story:release-orchestration",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "satisfies:REQ-05",
+    "satisfies:REQ-07"
+  ],
+  "created_at": "2026-07-15T11:36:54.472784726Z",
+  "updated_at": "2026-07-15T11:37:10.420935903Z",
+  "first_ready_at": "2026-07-15T11:36:54.472785146Z"
+}
