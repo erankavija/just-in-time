@@ -7773,3 +7773,4 @@
 {"type":"issue_claimed","id":"1205b7ad-6b42-4e34-a3c3-15c0fb2c8b15","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-15T12:21:49.067289250Z","assignee":"agent:worker"}
 {"type":"issue_state_changed","id":"b6d6680b-8fc9-427b-ae7e-c4d73bc7ec98","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T12:21:49.101956296Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"f4623b56-2db4-41cb-9616-03616c7605f0","issue_id":"be542b98-8d5a-4c1f-8000-9fd0c480bebc","timestamp":"2026-07-15T12:21:49.102308356Z","assignee":"agent:worker"}
+{"type":"gate_passed","id":"5829890e-cf63-49fa-b8f9-b34909c8013c","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T12:22:30.221775777Z","gate_key":"security-review","updated_by":"human:authorized-invoker"}
