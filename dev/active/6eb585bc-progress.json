@@ -233,7 +233,15 @@
       "note": "Write default-rule membership through to rules.toml on config refresh; split from af4c901a round-3 (dangling @/rule/namespace-unique-brackets); slotted into wave 6 (former wave 5)"
     }
   ],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "3c4d6fe8",
+      "date": "2026-07-15",
+      "policy": "7 (shared infrastructure)",
+      "question": "secret-detection gate (production-stream-defined) unpassable in this checkout: whole-working-dir gitleaks scan takes 92s vs 20s timeout and reports 37 findings, all in .agents/worktrees + target residue, none in tracked content",
+      "resolution": "invoker approved amending the gate: scripts/secret-scan.sh stages working-tree versions of tracked files and scans that copy fail-closed (25 MB, ~2s); production stream notified via commit message bda8ca92"
+    }
+  ],
   "rework_counts": {
     "950256ae": 1,
     "45e1b7e8": 2,
