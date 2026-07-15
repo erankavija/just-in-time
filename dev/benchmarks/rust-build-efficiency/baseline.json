@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-15T01:39:44Z",
+  "generated_at": "2026-07-15T01:49:16Z",
   "environment": {
     "git_revision": "56d737891129babf9571eb4de5659295bce8d827",
     "os": "Arch Linux",
@@ -39,7 +39,7 @@
         "test_case_count": 3306,
         "doctest_case_count": 66,
         "ignored_test_case_count": 14,
-        "correction_note": "Corrected twice post-hoc (code-review rework, jit:4e22a20d): (1) profile.test filter — the original sum 15314841704 mis-included the two ordinary non-test `jit`/`jit-server` binaries; (2) the corrected value is a MEASUREMENT from a fresh isolated `git archive` build of the same commit (56d73789) with the same toolchain: 148 profile.test executables summing to 14816926968 bytes (excluded non-test bins measured jit=259803096, jit-server=237935048). test_case_count includes 66 doctests via `cargo test --workspace --doc -- --list` (doctest_case_count). Timing and RSS fields are original in-sample measurements. See report.md for the full derivation."
+        "correction_note": "Corrected twice post-hoc (code-review rework, jit:4e22a20d): (1) profile.test filter — the original sum 15314841704 mis-included the two ordinary non-test `jit`/`jit-server` binaries; (2) the corrected value is a MEASUREMENT from a fresh isolated `git archive` build of the same commit (56d73789) with the same toolchain: 148 profile.test executables summing to 14816926968 bytes (excluded non-test bins measured jit=259803096, jit-server=237935048). test_case_count includes 66 doctests via `cargo test --workspace --doc -- --list` (doctest_case_count). Timing and RSS fields are original in-sample measurements. Per-executable raw evidence is committed at raw/clean-1/executable-remeasure.json; see report.md for the full derivation."
       },
       "success": true
     },

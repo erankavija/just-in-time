@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "6c472cc5-ff54-4d5a-878b-f01bc07f3a72",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "e26d4624687e11d2df8a40d5f699e5f8d143a173",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T01:46:34.616762972Z",
+  "completed_at": "2026-07-15T01:47:36.180394749Z",
+  "duration_ms": 61563,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a configured leaf (level 4) with no resolved children. I inspected all nine reachable `jit:4e22a20d` commits individually with rename detection. No fallback attribution was needed; uncommitted JIT gate-state changes were excluded.\n\nThe combined footprint adds repository-internal benchmark tooling and `dev/benchmarks` artifacts only. It does not change the adopter-facing JIT CLI, configuration, storage contract, or documented workflow. The prior review had no unresolved blockers.\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf attribution covers only internal Rust benchmark tooling and dev artifacts; it introduces no adopter-facing documentation impact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Leaf attribution covers only internal Rust benchmark tooling and dev artifacts; it introduces no adopter-facing documentation impact.",
+    "findings": []
+  }
+}

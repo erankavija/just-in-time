@@ -60,8 +60,6 @@ set -euo pipefail
 #                           (default crates/jit/src/lib.rs)
 #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh / verify-commit-builds.sh
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock)
-#   BENCH_NO_LOCK=1         skip the host-wide build lock (e.g. an isolated CI
-#                           container that already owns the machine)
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -177,10 +175,15 @@ trap restore_probe_if_pending EXIT
 trap 'restore_probe_if_pending; exit 130' INT
 trap 'restore_probe_if_pending; exit 143' TERM
 
+# The lock is MANDATORY (REQ-01: the benchmark refuses to overlap another
+# repository Cargo build). There is no opt-out, and a host without flock is a
+# hard environment error rather than a silent unlocked run.
 LOCK_FD=""
 acquire_lock() {
-  [[ -n "${BENCH_NO_LOCK:-}" ]] && return 0
-  command -v flock >/dev/null 2>&1 || return 0
+  command -v flock >/dev/null 2>&1 || {
+    echo "ERROR: 'flock' is required (the benchmark must not run unlocked alongside other Cargo builds)." >&2
+    exit 2
+  }
   exec {LOCK_FD}>"$BUILD_LOCK"
   if ! flock -n "$LOCK_FD" 2>/dev/null; then
     echo "[benchmark] waiting for exclusive build lock ($BUILD_LOCK): another Cargo build is in progress" >&2
@@ -188,7 +191,6 @@ acquire_lock() {
   fi
 }
 release_lock() {
-  [[ -n "${BENCH_NO_LOCK:-}" ]] && return 0
   [[ -n "$LOCK_FD" ]] || return 0
   flock -u "$LOCK_FD"
   exec {LOCK_FD}>&-

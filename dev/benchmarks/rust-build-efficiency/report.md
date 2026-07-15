@@ -172,7 +172,10 @@ fresh, fully isolated build of the identical commit — `git archive
 matches the recorded inventory exactly (148 `profile.test` executables;
 the two excluded non-test bins measured `jit` 259,803,096 bytes and
 `jit-server` 237,935,048 bytes), summing to 14,816,926,968 bytes. The
-provenance of this value is recorded alongside the sample itself in
+per-executable measurements are committed as raw evidence at
+[`raw/clean-1/executable-remeasure.json`](raw/clean-1/executable-remeasure.json)
+(148 entries plus the two excluded non-test binaries, with method
+metadata), and the provenance is recorded alongside the sample itself in
 `raw/clean-samples.jsonl` (sample 1, `correction_note`); timing and RSS
 fields everywhere remain the original in-sample measurements.
 
