@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "83f54bc4-642f-462b-aead-a686c7f30b84",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "4c709b7f85cf46e3454b78976fc3591bf6316bac",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T18:10:08.817557940Z",
+  "completed_at": "2026-07-15T18:12:37.439990025Z",
+  "duration_ms": 148622,
+  "exit_code": 0,
+  "stdout": "Attribution: `bug` is a level-4 leaf and has no resolved children. I inspected the three reachable `jit:f40f1b0a` commits individually with rename detection. All had tags; no fallback was needed.\n\nThe current contract is accurate and discoverable: projected issue views use `gates`; raw `query --full` and `graph export --full` records use `gates_required`/`gates_status`. The affected reference pages cross-link this distinction. The focused contract test passes (5/5).\n\n1. No documentation findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s gate-field documentation accurately matches the current machine-readable projections and raw-record outputs.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The issue’s gate-field documentation accurately matches the current machine-readable projections and raw-record outputs.",
+    "findings": []
+  }
+}

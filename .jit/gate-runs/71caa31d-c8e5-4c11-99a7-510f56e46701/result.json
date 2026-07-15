@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "71caa31d-c8e5-4c11-99a7-510f56e46701",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "4c709b7f85cf46e3454b78976fc3591bf6316bac",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T18:12:37.476246001Z",
+  "completed_at": "2026-07-15T18:17:05.724848765Z",
+  "duration_ms": 268248,
+  "exit_code": 1,
+  "stdout": "Attribution: 4c709b7f, b156df88, a92dc223 (`jit:f40f1b0a`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-6 — dev/vision/9db27a3a-charter.md; @/invariant/single-source-prose, gate-semantics — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (0); doc-review passed (0); docs-mechanical passed (0); code-review pending (no recorded run)\nTruncation recovery: Per-file patches for all tagged commits; narrowed reads of affected source, docs, tests, schemas, and gate policy\n\n1. **F1 — blocking, issue-impact (high):** The contract excludes other current full-record outputs. `jit issue list --full` serializes the same `IssueListFullResponse` as `query all` ([main.rs:1348](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1348)), and top-level `jit list` normalizes to that command ([main.rs:1871](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1871)); `issue search --full` also emits storage gate fields. Yet the new schema only declares the query variants and graph export ([schema.rs:515](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/schema.rs:515)), while the new docs name only graph/query raw-record outputs ([storage-format.md:110](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:110)). The added contract test exercises only `query all` ([gate_field_contract_test.rs:165](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:165)). Thus consumers of those aliases cannot discover the projection via `jit --schema`, documentation is incomplete, and the test suite cannot catch their drift—leaving REQ-01 through REQ-04 unmet. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Full-record list and search outputs remain undocumented, unschematized, and uncovered by the gate-field contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue-list/top-level-list and search full outputs are omitted from the gate-field schema, documentation, and contract coverage.\",\"file\":\"docs/reference/storage-format.md\",\"line\":110,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 12986 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f66fb-1211-7380-8485-d68afd802386\n--------\nuser\n--- 12973 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Full-record list and search outputs remain undocumented, unschematized, and uncovered by the gate-field contract.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Issue-list/top-level-list and search full outputs are omitted from the gate-field schema, documentation, and contract coverage.",
+        "file": "docs/reference/storage-format.md",
+        "line": 110,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}
