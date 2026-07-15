@@ -175,4 +175,4 @@ exactly one entry and that entry is in the boundary → **collapsed single tier*
 
 Result: **anchor = `goal`, boundary = `goal`, one strategic tier** (satisfies
 REQ-02). The steward's scope is the portfolio of top-level `goal` containers,
-one execution lead per breakable `goal`.
+one planning lead followed by one execution lead per breakable `goal`.

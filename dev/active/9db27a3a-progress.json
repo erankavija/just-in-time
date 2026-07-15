@@ -89,7 +89,7 @@
           "short_id": "8b05a612",
           "title": "v1.0 production readiness and release hardening",
           "wave": 1,
-          "status": "backlog"
+          "status": "planning"
         },
         {
           "id": "90a2dbfd-be54-46f2-b84a-b19382c6b0f2",
@@ -124,7 +124,7 @@
           "short_id": "9b7b5f9c",
           "title": "Versioned repository profiles and portable JIT dogfood setup",
           "wave": 1,
-          "status": "backlog"
+          "status": "executing"
         },
         {
           "id": "9d427a6b-a8f7-4478-a0e1-1637781e00f6",
@@ -172,11 +172,18 @@
       "coherence_review": "not-run"
     }
   ],
-  "escalations": [],
+  "escalations": [
+    {
+      "container_short_id": "8b05a612",
+      "status": "resolved",
+      "decision": "@/charter/D-15",
+      "summary": "Scoped coverage exposed core bug ef0065ad; preserve failed evidence and fix the validator in core maintenance before rerunning coverage-preview."
+    }
+  ],
   "notes": [
     "Roster S = the 23 direct epic children of milestone 9db27a3a carrying milestone:v1.0, rederived from the current dependency DAG on 2026-07-14.",
-    "Twenty direct epics are done and d7bfd4a4 is rejected. The active release frontier is 9b7b5f9c (profiles MVP) plus 8b05a612 (production readiness).",
-    "Core maintenance 6eb585bc is an upstream dependency of 8b05a612 and remains owned by the parallel Claude execution lead; it is intentionally not duplicated or dispatched here.",
+    "Twenty direct epics are done and d7bfd4a4 is rejected. Profiles MVP 9b7b5f9c passed planning and breakdown review and entered execution on 2026-07-15; production readiness 8b05a612 has an approved plan and a 32-leaf breakdown awaiting its deterministic coverage gate.",
+    "Core maintenance 6eb585bc is an upstream dependency of the production source-freeze leaf and remains owned by the parallel Claude execution lead; core bug ef0065ad now also blocks a valid production coverage-preview rerun per @/charter/D-15.",
     "Historical rows that are no longer direct milestone children were removed during roster reconciliation. Cross-container coherence review remains not-run for the current frontier."
   ],
   "started_at": "2026-07-03"

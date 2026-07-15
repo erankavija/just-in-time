@@ -354,7 +354,8 @@ impl ClaimRequiresGitError {
 /// specifically to be trusted later, and a verdict from a binary that
 /// predates the tree under review is not evidence about that tree; a warning
 /// would still let a wrong verdict get recorded and acted on. The fix
-/// (`cargo install --path crates/jit`) is one command away, which is a low
+/// (`scripts/install-jit.sh`, which injects build provenance around
+/// `cargo install --path crates/jit`) is one command away, which is a low
 /// price against a wasted review round chasing a defect that does not exist
 /// in the working tree (or missing one that does) — the incident that
 /// motivated this check.
@@ -422,7 +423,10 @@ impl StaleBinaryError {
             "A gate verdict produced by a stale binary is not evidence about the \
              change under review",
         )
-        .with_remedy("Rebuild and reinstall: cargo install --path crates/jit")
+        .with_remedy(
+            "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
+             (wraps cargo install --path crates/jit)",
+        )
         .with_remedy(format!(
             "Verify with: jit --version (should show commit {built_from})"
         ));

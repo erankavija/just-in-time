@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "85e8195b-595c-433a-9fe7-0fdd7a941a51",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "57d0eb79-f3c5-408a-9322-758099a60e49",
+  "commit": "359f32cf81c9be3d6cad2275229ec284a28a838f",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T07:34:22.086319267Z",
+  "completed_at": "2026-07-15T07:38:53.246768669Z",
+  "duration_ms": 271160,
+  "exit_code": 1,
+  "stdout": "Attribution: 599aa2a8, 8091edca, 359f32cf (`jit:57d0eb79`)\nPolicy sources: AGENTS.md; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0; fmt, clippy, 3295 tests, provenance); code-review pending/no prior run\nTruncation recovery: reviewed scripts/cargo-ci.sh:160-199 and numbered relevant ranges; no tool-output truncation\n\n1. F1 — high — blocking, issue-impact: REQ-04 remains unverified and unimplemented as a deterministic gate property. [`scripts/cargo-ci.sh:179`](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci.sh:179) runs Cargo without selecting an isolated `CARGO_TARGET_DIR` or checking that its incremental directory is absent/empty. The new regression test only verifies the placement of `CARGO_INCREMENTAL=0` ([`build_profile_policy_tests.rs:71`](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/scratch_build/build_profile_policy_tests.rs:71)); it cannot detect loss of target isolation or non-empty incremental state. The passing recorded gate confirms the suite ran, not the hard isolated-target condition.\n\n2. F2 — medium — blocking, issue-impact: The new manifest comment and changelog hand-copy measurement claims without a citation or projection to a maintained measurement source: [`Cargo.toml:11`](/home/vkaskivuo/Projects/just-in-time/Cargo.toml:11) and [`CHANGELOG.md:25`](/home/vkaskivuo/Projects/just-in-time/CHANGELOG.md:25). This creates attributable duplicate prose for the 246.7 MiB, 193.7 MiB, and ~19 GiB figures, contrary to `@/invariant/single-source-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The profile and CI override are present, but the isolated-target/incremental-state criterion and single-source prose policy remain unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci neither uses an isolated CARGO_TARGET_DIR nor verifies absent incremental state, leaving hard REQ-04 unverified.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":179,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"New Cargo and changelog prose duplicates uncited measurement claims instead of projecting or citing their source.\",\"file\":\"CHANGELOG.md\",\"line\":25,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 2238 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f64b2-bc4d-78c2-8f06-f4de3768f622\n--------\nuser\n--- 2225 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The profile and CI override are present, but the isolated-target/incremental-state criterion and single-source prose policy remain unresolved.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "cargo-ci neither uses an isolated CARGO_TARGET_DIR nor verifies absent incremental state, leaving hard REQ-04 unverified.",
+        "file": "scripts/cargo-ci.sh",
+        "line": 179
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "New Cargo and changelog prose duplicates uncited measurement claims instead of projecting or citing their source.",
+        "file": "CHANGELOG.md",
+        "line": 25,
+        "references": [
+          "@/invariant/single-source-prose"
+        ]
+      }
+    ]
+  }
+}

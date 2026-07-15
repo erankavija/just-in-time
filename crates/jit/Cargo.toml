@@ -29,13 +29,29 @@ git2 = "0.18"
 which = "6.0"
 similar = "2.6"
 regex = "1.12.2"
-jsonschema = "0.46"
+# Local-only JSON Schema validation: repository schemas use same-document
+# fragment refs (`#/types/...`), which the core validator resolves without any
+# external retriever. Default features pull remote-resolution infrastructure
+# (`resolve-http`/`resolve-file`/`tls-aws-lc-rs`, and transitively reqwest,
+# hyper, and aws-lc-rs) that this crate never exercises (jit:3398bc19).
+jsonschema = { version = "0.46", default-features = false }
 toml = "0.8"
 toml_edit = "0.22"
 sha2 = "0.10"
 tar = "0.4"
 pulldown-cmark = { workspace = true }
-ureq = { version = "3", features = ["native-tls"] }
+# Remote document access (external-link reachability checks, commands::document)
+# needs exactly one TLS backend (jit:3398bc19), and Rustls is the only reachable
+# one: ureq's `Agent::new_with_defaults()` — the only call site — builds its
+# `TlsConfig` from `TlsProvider::default()`, which is unconditionally Rustls, and
+# ureq's native-tls provider docs state that choice "is never picked up
+# automatically" (selecting it would take an explicit `.provider(...)` code
+# change). Rustls needs no system TLS library: it shares the pure-Rust `ring`
+# crypto backend pulled in via its own `_ring` feature, independent of the system
+# OpenSSL that git2 links for its own purposes. `gzip` is named explicitly because
+# content-decoding is a deliberate capability of the remote-document path, not an
+# implicit default.
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 tempfile = { workspace = true }
 dirs = "5.0"
 nix = { version = "0.31.1", features = ["fs", "signal"] }
@@ -58,3 +74,14 @@ assert_cmd = { workspace = true }
 predicates = { workspace = true }
 proptest = { workspace = true }
 ulid = { workspace = true }
+# Test-only local HTTPS server for the remote-document TLS/gzip coverage
+# (jit:3398bc19 REQ-05): generates an ephemeral self-signed certificate so the
+# test never touches the network. `rcgen` is trimmed to exactly its `ring`
+# feature so certificate generation selects the crypto backend already present
+# in the graph via ureq, never aws-lc-rs. `rustls`/`flate2` are already
+# transitive dependencies of `ureq` (rustls, gzip features); declared directly
+# here so the test can drive the server side of the same TLS/gzip capability
+# the client uses.
+rcgen = { version = "0.14", default-features = false, features = ["ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+flate2 = "1"

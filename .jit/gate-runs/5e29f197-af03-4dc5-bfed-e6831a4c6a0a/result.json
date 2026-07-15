@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "run_id": "5e29f197-af03-4dc5-bfed-e6831a4c6a0a",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "d2bca24816dec8aea78dd6b5da0f36d3984ed503",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T21:55:57.153926429Z",
+  "completed_at": "2026-07-14T22:00:04.020865195Z",
+  "duration_ms": 246866,
+  "exit_code": 1,
+  "stdout": "Attribution: d2bca248, 32b6cfc4, fc12c648 (`jit:4e22a20d`)\nPolicy sources: AGENTS.md (repository root; no nested AGENTS.md)\nResolved items: @/gate/cargo-ci, @/gate/doc-review, @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/gate-semantics (.jit/invariants.toml); @/charter/D-2, @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-14T21:52:06Z); doc-review pending (no run)\nTruncation recovery: bounded per-commit/path reads; inventory inspected via schema/count queries and exact offending line intervals\n\n1. [blocking][issue-impact] **F1** — The harness exits during final JSON assembly when no `CARGO_*`/`RUST*` variables exist: with `set -euo pipefail`, the `grep` in [`scripts/benchmark-rust-build.sh`](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-rust-build.sh:492) returns 1 for the recorded `{}` environment. The report confirms this run did not complete assembly and required manual regeneration ([report.md](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/report.md:113)). This fails reproducible baseline production under REQ-01/REQ-02.\n\n2. [blocking][issue-impact] **F2** — The inventory accepts every Cargo `compiler-artifact` with an executable instead of filtering `profile.test == true` ([script](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-rust-build.sh:251)). It consequently counts ordinary `debug/jit` and `debug/jit-server` binaries as test targets; both `--list` calls exited 2 ([inventory.json](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json:10969), [inventory.json](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json:14475)). The reported 150 targets and “unique active test-executable” bytes are therefore not the required test-only inventory under REQ-04.\n\n3. [advisory][issue-impact] **F3** — Benchmark outputs are overwritten directly, including inventory generation ([script](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-rust-build.sh:310)) and `baseline.json` publication ([script](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-rust-build.sh:540)), rather than staged and atomically published. An interrupted rerun can leave partial measurement artifacts. References: @/invariant/atomic-writes.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The harness cannot reproducibly assemble its baseline in the recorded empty-environment case, and its inventory includes non-test binaries.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Empty Cargo/Rust environment makes the pipefail-protected final assembly exit, requiring manual baseline regeneration.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":492,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Inventory includes two profile.test=false binaries, so test-target and active-test-executable-byte metrics are inaccurate.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":251,\"references\":[]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Benchmark artifacts are replaced directly rather than atomically published.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":540,\"references\":[\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4353 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: never\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62a1-2c23-7ae3-ad18-0831524688d9\n--------\nuser\n--- 4340 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The harness cannot reproducibly assemble its baseline in the recorded empty-environment case, and its inventory includes non-test binaries.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Empty Cargo/Rust environment makes the pipefail-protected final assembly exit, requiring manual baseline regeneration.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 492
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Inventory includes two profile.test=false binaries, so test-target and active-test-executable-byte metrics are inaccurate.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 251
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Benchmark artifacts are replaced directly rather than atomically published.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 540,
+        "references": [
+          "@/invariant/atomic-writes"
+        ]
+      }
+    ]
+  }
+}

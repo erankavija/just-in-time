@@ -50,7 +50,7 @@
           "title": "Bound Rust build artifacts and compilation cost",
           "classification": "container",
           "model": "-",
-          "status": "pending",
+          "status": "in_progress",
           "note": "driven wave-by-wave via dev/active/73482aa1-progress.json (6 sub-waves over 8 pre-wired children)"
         }
       ]
@@ -121,6 +121,28 @@
           "model": "sonnet",
           "status": "pending",
           "note": "last in wave: breaking sweep over the final verb surface (CLI, MCP schema, docs)"
+        }
+      ]
+    },
+    {
+      "wave_number": 2.5,
+      "theme": "Charter-priority interleave: scoped validation fix (@/charter/D-15: production-readiness breakdown is blocked on it)",
+      "issues": [
+        {
+          "short_id": "ef0065ad",
+          "title": "Scope bracket validation to the requested container",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "done",
+          "note": "filed 2026-07-15 by the project-lead session; adopted per @/charter/D-15; dispatch immediately after 73482aa1 wave 3 (3398bc19) closes, ahead of the remaining 73482aa1 waves. DONE 2026-07-15: first-pass green (cargo-ci + code-review 0 findings) on merge ac56c1e2; jit validate --scope 8b05a612 passes on main; production stream unblocked"
+        },
+        {
+          "short_id": "3c4d6fe8",
+          "title": "Remove secret-like label example from reference docs",
+          "classification": "documentation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "routed by the project-lead session 2026-07-15 (commit 84b0b36d, jit:3c4d6fe8); blocks 0aec3b1e in the production stream; gates secret-detection/repo-validate/doc-review; dispatch after ef0065ad settles"
         }
       ]
     },
@@ -198,6 +220,10 @@
     }
   ],
   "created_during_execution": [
+    {
+      "short_id": "ef0065ad",
+      "note": "Scope bracket validation to the requested container; filed by the project-lead session 2026-07-15 (@/charter/D-15); interleaved as wave 2.5. STANDING CHANGE (@/charter/D-14, commit 57ec9eb7): the epic is now a finite v1.0 prerequisite \u2014 close 6eb585bc when this scope completes, before production-readiness source freeze; the living-container decision is superseded"
+    },
     {
       "short_id": "554ad07f",
       "note": "Record working-tree cleanliness in gate-run evidence; split from 45e1b7e8 REQ-04 (aspirational) per worker recommendation; wired under epic; slotted into wave 5"

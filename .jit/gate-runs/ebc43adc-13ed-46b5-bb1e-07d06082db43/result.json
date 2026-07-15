@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_id": "ebc43adc-13ed-46b5-bb1e-07d06082db43",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "ca024a2b-561d-432c-99f0-3a9ded3451d5",
+  "commit": "a7eb8219a7403902f1063d494a56901b463cde88",
+  "branch": "worktree-agent-9b7b5f9c",
+  "status": "failed",
+  "started_at": "2026-07-14T21:55:43.784893677Z",
+  "completed_at": "2026-07-14T22:03:31.754588354Z",
+  "duration_ms": 467969,
+  "exit_code": 1,
+  "stdout": "# Plan Review — FAIL\n\n## Plan document present and linked\n\nPass. The required plan exists at [dev/active/9b7b5f9c-plan.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/dev/active/9b7b5f9c-plan.md:1) and is linked as a design document in the [planning issue](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/.jit/issues/ca024a2b-561d-432c-99f0-3a9ded3451d5.json:133). The investigation and research documents are also present and linked. The planning issue has no dependencies.\n\n## Completeness against the criteria\n\nBlocking: REQ-10 is not executable through the defined manifest.\n\nThe manifest contract supports map contributions only for `type_hierarchy.types`, `label_associations`, `namespaces`, and `item_kinds`, plus selected registries ([plan §2](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/dev/active/9b7b5f9c-plan.md:27)). It omits the root `[invariant_projection]` and `[rules_gates_projection]` tables, despite declaring unknown target/kind combinations invalid.\n\nThose tables are the actual persistent configuration used for managed projections in [.jit/config.toml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/.jit/config.toml:205) and [config.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/crates/jit/src/config.rs:42). The existing renderer obtains its target and mode from that configuration ([projection.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/crates/jit/src/validation/projection.rs:251)). A `[[region]]` operation can bootstrap bytes but cannot install the ongoing configuration consumed by `jit invariant render` and `jit reference render`.\n\nThus the payload task’s promise to install “empty invariants, and projections” at line 117 lacks a representable manifest operation. The manifest must define identity and merge behavior for these singleton projection tables.\n\nThe other eleven hard criteria are substantively covered without obvious scope narrowing.\n\n## Technical soundness and architectural fit\n\nTwo blocking recovery defects remain.\n\nFirst, the fresh-init rollback protocol is self-hosted inside the tree it must remove. The plan confines recovery metadata to `.jit/tmp/` ([plan §2](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/dev/active/9b7b5f9c-plan.md:31)), while profiled init promises all-old recovery and permits only the bootstrap lock as a sibling artifact (line 34). After rolling back created files, the implementation cannot remove the fresh `.jit/` directory while its journal remains inside it. It must unlink the journal before removing `.jit/tmp/` and `.jit/`, creating an interruption window with no recovery record and a residual `.jit/`. That is not all-old: repository discovery treats the presence of `.jit/` as a repository boundary ([main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/crates/jit/src/main.rs:1703)), and startup then fails if `index.json` is absent. The plan needs an external bootstrap journal or an atomic fresh-root publication protocol.\n\nSecond, mandatory recovery is sequenced after startup validation. The recovery task only recovers when the mutation guard is acquired ([plan Group B](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/dev/active/9b7b5f9c-plan.md:76)). Currently every non-init command runs `storage.validate()` before dispatch ([main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/crates/jit/src/main.rs:1855)), and validation rejects a partially created repository with no index ([json.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c/crates/jit/src/storage/json.rs:182)). Other mutators can also load config or rules before their eventual storage write acquires the guard. A crash can therefore prevent a later mutation from ever reaching mandatory recovery. The plan must explicitly introduce pre-validation recovery dispatch for mutating commands and ensure recovery precedes command-layer configuration caches.\n\nThe pure-domain/storage/command/CLI layering, overlay validation approach, event transaction participation, and capability-oriented publication otherwise fit the architecture.\n\n## Decomposition and dependencies\n\nThe twelve-leaf DAG is transitively coherent, and the previous overlapping package ownership has been resolved: generic embedding/projection leaves use synthetic fixtures, while the payload leaf alone owns `profiles/jit-dogfood/`.\n\nHowever, the fresh-root recovery gap crosses the transaction-kernel and init-integration leaves without a defined owner. The kernel fixes journal placement under `.jit/tmp/`, while the init leaf fixes the bootstrap sibling set to the lock alone. No leaf can implement the required all-old cleanup without changing that design decision.\n\nThe projection-table omission similarly leaves the payload leaf depending on a manifest vocabulary its prerequisite package/planning leaves do not define.\n\n## Risks and actionability\n\nThe risk table covers publication failure, symlink races, validation overlays, writer bypass, source drift, and platform differences well.\n\nIt does not surface or mitigate:\n\n- The impossibility of durably removing a fresh `.jit/` that contains its own recovery journal.\n- Startup validation preventing pending recovery from being reached.\n- The missing semantic representation for the two installed projection configuration tables.\n\nThese are load-bearing protocol/interface decisions, not implementation details workers can safely derive independently.\n\n## Prior review feedback\n\nAll five prior findings were directly addressed in the revised text:\n\n- Profiled init now plans neutral and profile state before publication.\n- Field-level merge and conflict rules are specified.\n- Absent and unmarked managed-region targets have deterministic bootstrap rules.\n- Publication is capability-relative with parent-race tests.\n- Production package ownership belongs only to the payload leaf.\n\nNone of those prior blockers remains unresolved. The failures above are newly exposed consequences of the revised design.\n\n## Findings\n\n1. **F1 — High, blocking:** The manifest contribution vocabulary cannot install `[invariant_projection]` or `[rules_gates_projection]`, so REQ-10’s ongoing managed projections are not implementable as designed. `[[region]]` only installs bytes and does not configure the existing render commands. File: `dev/active/9b7b5f9c-plan.md:27`.\n2. **F2 — High, blocking:** A fresh profiled init stores its recovery journal inside `.jit/tmp/` while promising exact all-old rollback of the newly created `.jit/`. Removing that root necessarily creates an unjournaled interruption window, contradicting REQ-04 recovery and the “no published scaffold” test contract. File: `dev/active/9b7b5f9c-plan.md:31`.\n3. **F3 — High, blocking:** Recovery at repository-write-lock acquisition occurs too late for current CLI startup: non-init commands validate the repository before dispatch and can reject a partial fresh init before any writer reaches the recovery boundary. The plan does not assign or specify pre-validation recovery sequencing. File: `dev/active/9b7b5f9c-plan.md:76`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking defects remain in projection configuration, fresh-root journal placement, and pre-validation recovery sequencing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The manifest cannot represent the invariant and rules/gates projection configuration required for ongoing managed projections.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":27,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-03\",\"@/issue/9b7b5f9c/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A fresh init cannot durably remove .jit while its only recovery journal lives inside .jit/tmp, leaving an unjournaled interruption window.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":31,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-04\",\"@/issue/9b7b5f9c/requirement/REQ-12\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recovery at write-guard acquisition is unreachable when startup repository validation rejects partial state before command dispatch.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":76,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-04\",\"@/issue/9b7b5f9c/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5605 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62a0-f97e-7771-94e8-e64710e94985\n--------\nuser\n--- 5592 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Three blocking defects remain in projection configuration, fresh-root journal placement, and pre-validation recovery sequencing.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The manifest cannot represent the invariant and rules/gates projection configuration required for ongoing managed projections.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 27,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-03",
+          "@/issue/9b7b5f9c/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "A fresh init cannot durably remove .jit while its only recovery journal lives inside .jit/tmp, leaving an unjournaled interruption window.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 31,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-04",
+          "@/issue/9b7b5f9c/requirement/REQ-12"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Recovery at write-guard acquisition is unreachable when startup repository validation rejects partial state before command dispatch.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 76,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-04",
+          "@/issue/9b7b5f9c/requirement/REQ-12"
+        ]
+      }
+    ]
+  }
+}

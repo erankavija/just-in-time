@@ -1,10 +1,10 @@
 # Parent-escalation policy
 
 The steward's decision tree for an escalation it **receives** from a dispatched
-execution lead. It is the receiving side, one tier up, of
-`../../jit-execution-lead/references/escalation-policy.md`: that policy is how an
-execution lead decides what to escalate to its invoker; this policy is how the
-invoking steward decides what to do with what arrives.
+planning or execution lead. It is the receiving side, one tier up, of the lead
+skills' escalation contracts: those skills decide what to escalate to their
+invoker; this policy is how the invoking steward decides what to do with what
+arrives.
 
 The default is **resolve it yourself against the vision and decision log**, and
 record the resolution as a new charter decision-log entry. Only three categories
@@ -14,10 +14,10 @@ involvement.
 
 ## The invoker relationship
 
-A dispatched execution lead names the steward as its invoker (per
-`container-dispatch.md` step 4 and the execution lead's own escalation policy).
-So the lead reports every escalation to the steward, not to the human. The
-steward is the party that resolves it against the vision or raises it onward.
+Every dispatched planning and execution lead names the steward as its invoker
+(per `container-dispatch.md` steps 4 and 5). So each lead reports every
+escalation to the steward, not to the human. The steward is the party that
+resolves it against the vision or raises it onward.
 
 When the steward itself runs standalone, the steward's own invoker is the human.
 "Forward to the human" therefore means the steward raises the escalation

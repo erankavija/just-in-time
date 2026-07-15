@@ -550,7 +550,10 @@ fn stale_binary_json_error(
             "reason": reason_code,
             "built_from": built_from,
         }))
-        .with_suggestion("Rebuild and reinstall: cargo install --path crates/jit")
+        .with_suggestion(
+            "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
+             (wraps cargo install --path crates/jit)",
+        )
         .with_suggestion(format!(
             "Verify with: jit --version (should show commit {built_from})"
         ))

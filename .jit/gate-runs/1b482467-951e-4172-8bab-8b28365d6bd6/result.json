@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "run_id": "1b482467-951e-4172-8bab-8b28365d6bd6",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "ca024a2b-561d-432c-99f0-3a9ded3451d5",
+  "commit": "9aff38ad2d4289f013e75c1774e2c08b9d11822a",
+  "branch": "worktree-agent-9b7b5f9c",
+  "status": "failed",
+  "started_at": "2026-07-14T21:18:35.189808906Z",
+  "completed_at": "2026-07-14T21:26:00.512637344Z",
+  "duration_ms": 445322,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The issue requires `dev/active/9b7b5f9c-plan.md`; that 189-line document exists and is linked as `doc_type: design`. The linked investigation and research documents are also present and substantive. The planning issue has no dependencies, so there are no unmet prerequisites to evaluate.\n\n## Completeness against the criteria\n\nFail. The plan maps all twelve `[hard]` container requirements in `§1` and again in the coverage map at `dev/active/9b7b5f9c-plan.md:135`. It also correctly preserves the post-1.0 deferral boundary.\n\nHowever, mapping a requirement to a task is not sufficient where the load-bearing behavior remains undefined. The manifest’s semantic merge contract and the managed-region bootstrap behavior for existing repositories are still left for implementers to design (F2, F3). The proposed init ordering also contradicts the failure-before-mutation guarantee in REQ-04 (F1).\n\n## Technical soundness and architectural fit\n\nFail.\n\nThe broad domain → storage → command → CLI separation in `§2` fits the repository architecture. The durable journal, event participation, overlay validation, and embedded-package choices are generally credible.\n\nThree technical defects remain:\n\n- Current initialization creates `.jit/issues`, `index.json`, `gates.toml`, and `events.jsonl` in `crates/jit/src/storage/json.rs:596-629`, followed by config and rule scaffolding in `crates/jit/src/main.rs:1761-1799`. Therefore the plan’s “initialize, then apply” ordering cannot satisfy command-level no-mutation behavior when profile preflight subsequently fails.\n- Existing managed-region projection requires both an existing target and pre-existing markers: `crates/jit/src/validation/projection.rs:191-213` and `:259-276`. The plan does not define how an ordinary adopter’s unmarked `AGENTS.md` becomes managed without clobbering prose.\n- The symlink mitigation remains check-then-path-operation. Existing code explicitly uses descriptor-relative no-follow traversal for safe reads at `crates/jit/src/storage/artifact_mutation.rs:146-151`, but publication resolves a pathname and later calls `hard_link` at `:243-277`. The proposed path rechecks followed by `std::fs::rename` retain that parent-component TOCTOU window. Rust documents `rename` as a path-based, platform-dependent operation rather than a descriptor-confined publication API. [Rust `std::fs::rename` documentation](https://doc.rust-lang.org/stable/std/fs/fn.rename.html)\n\n## Decomposition and dependencies\n\nFail. The dependency graph itself is acyclic and sensibly ordered:\n\n`package/overlay/transaction/checkers → planner/recovery/projection → apply → payload → commands → docs → acceptance`\n\nBut production-package ownership overlaps. “Embed and validate the versioned profile package” owns the checked-in package tree at `dev/active/9b7b5f9c-plan.md:43-47`, while “Author the portable dogfood workflow package” later owns the same manifest/assets at `:112-116`. This contradicts D4 at `:180` and prevents clean independent implementation and review.\n\n## Risks and actionability\n\nFail. The risk register is extensive, but its mitigations do not resolve the findings below:\n\n- The symlink-race entry at `dev/active/9b7b5f9c-plan.md:163` promises adversarial race safety without selecting a race-safe publication primitive.\n- No decision specifies field-level semantic merge behavior for the heterogeneous registries in `.jit/config.toml`, `.jit/gates.toml`, `.jit/rules.toml`, and `.jit/templates.toml`.\n- No decision specifies first-install behavior for absent or unmarked managed-region targets.\n\nAn engineer would still need to make architectural decisions about conflict identity, formatting preservation, marker insertion, and race-safe filesystem operations.\n\n## Prior review feedback\n\nNo prior runs were supplied.\n\n## Findings\n\n1. **F1 — High, blocking: `init --profile` mutates before profile preflight.** D5 at `dev/active/9b7b5f9c-plan.md:181` requires neutral initialization to finish before calling profile application. Existing init writes multiple `.jit/` artifacts and scaffolds config/rules before that call (`crates/jit/src/storage/json.rs:596-629`; `crates/jit/src/main.rs:1761-1799`). A conflict, invalid package, or final-state validation failure would therefore return after repository mutation, violating hard REQ-04. The design must plan and publish initialization plus profile targets as one recoverable operation, or provide exact rollback of initialization.\n\n2. **F2 — High, blocking: the manifest and semantic merge contract are not actionable.** `§2` says the manifest declares “semantic registry contributions” and the planner computes registry merges (`dev/active/9b7b5f9c-plan.md:27-28`), but it never defines the manifest tables or merge/conflict rules. The actual targets have materially different structures: type maps, ordered strategic-type arrays, label associations, namespace tables, item kinds (`.jit/config.toml:16-203`), and keyed template arrays (`.jit/templates.toml:9-47`). The plan must define identity, identical-versus-conflicting comparison, ordering, deletion prohibition, and preservation/serialization behavior for each supported contribution type.\n\n3. **F3 — High, blocking: managed-region first-install behavior is undefined.** The plan promises installation into fresh and existing repositories while preserving unmanaged `AGENTS.md` prose (`dev/active/9b7b5f9c-plan.md:18`, `:112-114`), but the cited primitive fails when the target or markers are absent (`crates/jit/src/validation/projection.rs:191-213`, `:262-276`). The plan must decide absent-file creation, marker insertion location and newline rules, duplicate/foreign marker handling, and idempotent reapplication. Otherwise REQ-10 cannot be implemented without redesign during execution.\n\n4. **F4 — High, blocking: path rechecks do not close the symlink race promised by the plan.** The publication design relies on identity/symlink checks immediately before pathname-based rename or hard-link operations (`dev/active/9b7b5f9c-plan.md:29-30`, `:163`). An uncooperative writer can replace a checked parent with a symlink between those steps. The plan must select descriptor/handle-relative no-follow publication primitives on supported platforms, or provide an equivalent containment proof and tests; merely repeating pathname checks cannot satisfy REQ-06 and the promised adversarial concurrency coverage.\n\n5. **F5 — High, blocking: two leaves own the production package tree.** The initial embedding leaf includes the checked-in `jit-dogfood` manifest/assets in its blast radius (`dev/active/9b7b5f9c-plan.md:43-47`), while the payload leaf later authors that same manifest/assets (`:112-116`). This conflicts with the synthetic-first ownership decision at `:180`. Assign generic embedding to synthetic fixtures and make the payload leaf the sole production-package owner, or author the complete payload in the first leaf and remove it from the later leaf.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Five blocking defects remain in init atomicity, merge semantics, managed-region installation, symlink-race safety, and package-task ownership.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"init --profile performs neutral initialization writes before profile preflight, violating the no-mutation-on-preflight-failure contract.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":181,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-01\",\"@/issue/9b7b5f9c/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The manifest shape and field-level semantic merge/conflict rules for existing registries are not specified.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":27,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-03\",\"@/issue/9b7b5f9c/requirement/REQ-04\",\"@/issue/9b7b5f9c/requirement/REQ-08\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Managed-region installation does not define how absent or unmarked AGENTS.md targets are created while preserving unmanaged prose.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":18,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-10\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Check-then-pathname publication leaves a parent-symlink TOCTOU race and cannot support the promised path-safety concurrency guarantee.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":29,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-06\",\"@/issue/9b7b5f9c/requirement/REQ-12\"]},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The embedding leaf and payload leaf both own profiles/jit-dogfood/manifest.toml and its assets, creating overlapping implementation ownership.\",\"file\":\"dev/active/9b7b5f9c-plan.md\",\"line\":43,\"references\":[\"@/issue/9b7b5f9c/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5252 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b7b5f9c\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f627e-f742-7590-b2cb-09a5ae6c5e55\n--------\nuser\n--- 5239 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Five blocking defects remain in init atomicity, merge semantics, managed-region installation, symlink-race safety, and package-task ownership.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "init --profile performs neutral initialization writes before profile preflight, violating the no-mutation-on-preflight-failure contract.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 181,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-01",
+          "@/issue/9b7b5f9c/requirement/REQ-04"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The manifest shape and field-level semantic merge/conflict rules for existing registries are not specified.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 27,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-03",
+          "@/issue/9b7b5f9c/requirement/REQ-04",
+          "@/issue/9b7b5f9c/requirement/REQ-08"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Managed-region installation does not define how absent or unmarked AGENTS.md targets are created while preserving unmanaged prose.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 18,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F4",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Check-then-pathname publication leaves a parent-symlink TOCTOU race and cannot support the promised path-safety concurrency guarantee.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 29,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-06",
+          "@/issue/9b7b5f9c/requirement/REQ-12"
+        ]
+      },
+      {
+        "id": "F5",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The embedding leaf and payload leaf both own profiles/jit-dogfood/manifest.toml and its assets, creating overlapping implementation ownership.",
+        "file": "dev/active/9b7b5f9c-plan.md",
+        "line": 43,
+        "references": [
+          "@/issue/9b7b5f9c/requirement/REQ-12"
+        ]
+      }
+    ]
+  }
+}

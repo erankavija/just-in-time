@@ -1,0 +1,28 @@
+//! `cli_repo_workflow` integration-test suite. Aggregates former per-file
+//! integration targets as modules under one Cargo test target so Cargo links
+//! and runs them as a single executable (jit:8d4f7084).
+
+mod apply_cli_tests;
+mod archive_preview_cli_tests;
+mod claim_integration_tests;
+mod config_get_tests;
+mod cross_substrate_generality_tests;
+mod cross_worktree_integration_tests;
+mod doc_show_tests;
+mod document_history_tests;
+mod first_guess_residuals_test;
+mod format_compat_cli_tests;
+mod help_cross_reference_tests;
+mod init_item_kinds_golden;
+mod init_tests;
+mod integration_schema;
+mod integration_test;
+mod project_config_tests;
+mod repo_discovery_tests;
+mod serve_cli_tests;
+mod steering_scenarios;
+mod template_binding_cli_tests;
+mod test_cli_consistency;
+mod workflow_tests;
+mod worktree_cli_tests;
+mod worktree_identity_tests;

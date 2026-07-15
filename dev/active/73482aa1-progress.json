@@ -4,9 +4,9 @@
   "container_type": "story",
   "parent_epic": "6eb585bc",
   "batch": "rust-build-efficiency (filed 2026-07-14 by a parallel planning session; 8 pre-wired children; design doc dev/active/73482aa1-rust-build-efficiency.md)",
-  "status": "planned \u2014 execution starts after core-maintenance wave 1 completes (invoker directive 2026-07-14)",
-  "current_wave": 0,
-  "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol.",
+  "status": "executing (wave 2 of core-maintenance batch)",
+  "current_wave": 4,
+  "note": "Dependency chain is authoritative: 4e22a20d -> {8d4f7084,57d0eb79,3398bc19,5d862134} -> 3f73423b -> 26f97dc2 -> 362e3fec -> story. Wave grouping additionally serializes Cargo.toml contention: 57d0eb79 and 3398bc19 both edit workspace/crate manifests and run AFTER the test-tree restructure (8d4f7084) to avoid manifest merge churn; within wave B3 they run as serial sub-waves. Children carry cargo-ci, code-review, repo-validate, doc-review, docs-mechanical. Post-merge verify-commit-builds.sh applies to every merge. Budgets/benchmarks (REQ-03/06) measure on this host with the pinned toolchain per 4e22a20d's protocol. INTERLEAVE (charter D-15, 2026-07-15): ef0065ad (scoped bracket validation, epic wave 2.5) dispatches after wave 3, before 73482aa1 wave 4.",
   "waves": [
     {
       "wave_number": 1,
@@ -17,27 +17,30 @@
           "title": "Establish reproducible Rust build measurements and baseline",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "2 worker rework rounds + lead terminal pass (invoker-approved); 6 review rounds total; measured evidence committed"
         }
       ]
     },
     {
       "wave_number": 2,
-      "theme": "Test topology + provenance (disjoint footprints)",
+      "theme": "Provenance then test topology (serialized: consolidation must fold in provenance tests; REQ-01 target count)",
       "issues": [
         {
           "short_id": "8d4f7084",
           "title": "Consolidate Rust integration tests into cohesive suites",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done",
+          "note": "first-pass green: cargo-ci (3292 passed) + code-review (1 advisory pre-existing finding) on merged commit 1f2a5bf8; 11 test targets (REQ-01<=12); REQ-04 machine-verified (1366 cases, verify-consolidation-inventory.py); lead repaired one doc link the moves broke (d0f88ee2 -> cli_issue/verb_hint_tests.rs)"
         },
         {
           "short_id": "5d862134",
           "title": "Stabilize build provenance inputs",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "1 rework round (CI wiring); guard reconciled via install-jit.sh provenance injection"
         }
       ]
     },
@@ -50,15 +53,30 @@
           "title": "Bound debug information and gate incremental state",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done",
+          "note": "1 worker rework round (deterministic incremental-state gate step + single-source-prose citations) + 1 invoker escalation: review round 2 read REQ-04 as requiring always-isolated gate runs; invoker approved amending REQ-04 to codify the plan's routine-gate vs benchmark-protocol split (2026-07-15). Amended criterion passed review with 0 findings. NOTE for later waves: the incremental-state step fails on pre-existing interactive incremental state; clear target/*/incremental once per worktree (lead cleared 22G+571M in main)"
         },
         {
           "short_id": "3398bc19",
           "title": "Remove unused resolver and duplicate TLS features",
           "classification": "implementation",
           "model": "sonnet",
+          "status": "done",
+          "note": "worker delivered clean core (rustls-only ureq, jsonschema default-features off, reqwest/hyper-on-jsonschema-path/aws-lc-rs/native-tls all dropped); 3 lead-direct review rounds: cargo-tree error handling (skip only on missing binary), unverified rcgen default-feature claim removed, explicit resolve-*/tls-* features forbidden by assertion. Gates green on merged commit 8b6ed75b"
+        }
+      ]
+    },
+    {
+      "wave_number": 3.5,
+      "theme": "Gate-fixture hygiene (filed by project-lead session, nested here; must precede footprint budgets)",
+      "issues": [
+        {
+          "short_id": "83efbcb4",
+          "title": "Bound provenance test source snapshots",
+          "classification": "implementation",
+          "model": "sonnet",
           "status": "pending",
-          "note": "serial after 57d0eb79 within the wave"
+          "note": "filed 2026-07-15 (commits ebec1039/8da80c52); unbounded ~23 GiB fixture copy traversing .agents/worktrees + target dirs; lands before 3f73423b so budgets measure a sane gate"
         }
       ]
     },
@@ -103,7 +121,20 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {},
-  "started_at": null
+  "escalations": [
+    {
+      "issue": "57d0eb79",
+      "date": "2026-07-15",
+      "policy": "3+5 (criteria amendment; architectural trade-off)",
+      "question": "code-review round 2 read REQ-04 as requiring every cargo-ci run to create a fresh isolated CARGO_TARGET_DIR (always-cold gate runs)",
+      "resolution": "invoker chose: amend REQ-04 to codify the delivered deterministic incremental-state step over the run's actual target dir; isolated fresh dirs remain the benchmark protocol's territory"
+    }
+  ],
+  "rework_counts": {
+    "4e22a20d": 2,
+    "5d862134": 1,
+    "57d0eb79": 1,
+    "3398bc19": 3
+  },
+  "started_at": "2026-07-14T20:00:00Z"
 }

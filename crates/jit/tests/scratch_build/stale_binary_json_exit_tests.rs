@@ -1,0 +1,281 @@
+//! REQ-01/02 JSON-mode regression for jit:7446af34.
+//!
+//! The stale-binary refusal (`crate::errors::StaleBinaryError`) must exit `10`
+//! and carry a structured, `STALE_BINARY`-coded envelope under `--json`,
+//! exactly matching the exit code the non-`--json` path already produced.
+//! Before that fix, `render_gate_pass_error` (main.rs) had no branch for
+//! `StaleBinaryError`, so it fell through to the generic `GATE_ERROR` code,
+//! which `ErrorCode::to_exit_code` maps to exit `1` — silently breaking the
+//! documented exit-10 contract under `--json` only.
+//!
+//! Reproducing a genuine EVALUATOR-path refusal needs a binary whose own build
+//! commit is a commit the repository under review knows but has advanced past.
+//! Since build provenance no longer tracks ambient git (jit:5d862134), an
+//! ordinary `cargo test` binary reports `git_commit == "unknown"` and could
+//! never be objectively stale against any repository. This test therefore
+//! builds a SECOND `jit` binary via `build.rs`'s `JIT_BUILD_GIT_*` override
+//! (the intentional release-injection interface — a real, separately-compiled
+//! binary, not a mock), told it was built from a real ancestor commit, and
+//! runs THAT binary as the evaluator inside a scratch repo whose `HEAD` sits
+//! one commit past that ancestor. The assertions — exit 10 in both modes and a
+//! structured `STALE_BINARY` envelope — are unchanged; only the way a
+//! genuinely-stale evaluator is obtained differs.
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use tempfile::TempDir;
+
+fn jit_binary() -> &'static str {
+    env!("CARGO_BIN_EXE_jit")
+}
+
+fn workspace_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root is two levels above the jit crate manifest")
+        .to_path_buf()
+}
+
+/// A `jit` invocation with the gate-context variables scrubbed. When this test
+/// suite itself executes under a `cargo-ci` gate evaluation, the whole process
+/// tree inherits `JIT_GATE_RUN=1` from the evaluator; left in place, it would
+/// turn every spawned `jit` into a self-checking gate child (main's startup
+/// precheck) and refuse before the EVALUATOR-path (`check_gate`) behavior under
+/// test is ever reached.
+fn scrub_gate_context(cmd: &mut Command) {
+    cmd.env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY");
+}
+
+/// Resolve a real, well-in-the-past commit in the workspace's own history
+/// (`HEAD~8`), used as the stale evaluator binary's injected build commit.
+/// `None` when the workspace has fewer than 9 commits or git is unavailable.
+fn ancestor_commit(workspace_root: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD~8"])
+        .current_dir(workspace_root)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Build a second `jit` binary that reports `ancestor` as its OWN build commit
+/// (clean, not dirty) via `build.rs`'s env-var override — a real,
+/// separately-compiled binary. Cached under a stable directory (shared with
+/// `stale_binary_child_process_tests`) so repeat runs are incremental. Returns
+/// its path, or `None` (skip) when `cargo` is unavailable or the build fails.
+fn build_stale_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> {
+    let short = Command::new("git")
+        .args(["rev-parse", "--short=8", ancestor])
+        .current_dir(workspace_root)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
+
+    let target_dir = workspace_root
+        .join("target")
+        .join("jit-stale-child-test-cache");
+    let status = Command::new("cargo")
+        .args(["build", "-p", "jit", "--bin", "jit"])
+        .current_dir(workspace_root)
+        .env("JIT_BUILD_GIT_HASH", ancestor)
+        .env("JIT_BUILD_GIT_SHORT_HASH", &short)
+        .env("JIT_BUILD_GIT_DIRTY", "false")
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .status()
+        .ok()?;
+    if !status.success() {
+        return None;
+    }
+    let binary = target_dir.join("debug").join("jit");
+    binary.is_file().then_some(binary)
+}
+
+/// Build a scratch git repository whose `HEAD` is one commit past `ancestor`:
+/// `ancestor` is a known commit here (fetched from the real workspace, with its
+/// history), but no longer at `HEAD`. Entirely inside the disposable scratch
+/// repo — no ref in the real workspace is read, moved, or written. Returns
+/// `None` (skip) if any local git step fails.
+fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    let temp = TempDir::new().ok()?;
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(temp.path())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    };
+    if !run(&["init", "-q"]) {
+        return None;
+    }
+    if !run(&["fetch", "-q", workspace_root.to_str()?, ancestor]) {
+        return None;
+    }
+    if !run(&["checkout", "-q", "FETCH_HEAD"]) {
+        return None;
+    }
+    if !run(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "--allow-empty",
+        "-q",
+        "-m",
+        "advance past the build commit",
+    ]) {
+        return None;
+    }
+    Some(temp)
+}
+
+/// `jit init` + one automated gate (key `g`, always-passing checker) + one
+/// issue requiring it, all inside `repo_root`, using the real (fresh) test
+/// binary with gate context scrubbed (its own build commit is `unknown`, so it
+/// is never objectively stale). Returns the issue id.
+fn setup_gated_issue(repo_root: &Path) -> String {
+    let mut cmd = Command::new(jit_binary());
+    scrub_gate_context(&mut cmd);
+    let status = cmd.current_dir(repo_root).arg("init").status().unwrap();
+    assert!(status.success());
+
+    let mut cmd = Command::new(jit_binary());
+    scrub_gate_context(&mut cmd);
+    let status = cmd
+        .current_dir(repo_root)
+        .args([
+            "gate",
+            "define",
+            "g",
+            "--title",
+            "G",
+            "--description",
+            "G",
+            "--mode",
+            "auto",
+            "--checker-command",
+            "echo ran",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let mut cmd = Command::new(jit_binary());
+    scrub_gate_context(&mut cmd);
+    let output = cmd
+        .current_dir(repo_root)
+        .args(["issue", "create", "--title", "Test", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let created: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let issue_id = created["id"].as_str().unwrap().to_string();
+
+    let mut cmd = Command::new(jit_binary());
+    scrub_gate_context(&mut cmd);
+    let status = cmd
+        .current_dir(repo_root)
+        .args(["gate", "add", &issue_id, "g"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    issue_id
+}
+
+/// REQ-01/02: text mode and `--json` mode agree on exit code 10 for the
+/// EVALUATOR-path stale-binary refusal, and the JSON envelope is a structured,
+/// `STALE_BINARY` error carrying the reinstall hint — not the generic fallback
+/// `GATE_ERROR` (which would exit 1).
+#[test]
+fn test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes() {
+    let workspace_root = workspace_root();
+    let Some(ancestor) = ancestor_commit(&workspace_root) else {
+        eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
+        return;
+    };
+    let Some(stale_binary) = build_stale_binary(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not build the stale binary (cargo unavailable?)");
+        return;
+    };
+    let Some(scratch) = scratch_repo_stale_for(&workspace_root, &ancestor) else {
+        eprintln!("SKIP: could not construct the scratch repo (git unavailable?)");
+        return;
+    };
+
+    let issue_id = setup_gated_issue(scratch.path());
+
+    // Text mode: the stale binary is the evaluator; its own build commit is
+    // known in `scratch` but no longer at HEAD, so `check_gate` refuses.
+    let mut cmd = Command::new(&stale_binary);
+    scrub_gate_context(&mut cmd);
+    let text_output = cmd
+        .current_dir(scratch.path())
+        .args(["gate", "evaluate", &issue_id, "g"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        text_output.status.code(),
+        Some(10),
+        "text mode: stderr={}",
+        String::from_utf8_lossy(&text_output.stderr)
+    );
+    let text_stderr = String::from_utf8_lossy(&text_output.stderr);
+    assert!(
+        text_stderr.contains("predates the tree under review"),
+        "text mode stderr should explain the refusal: {text_stderr}"
+    );
+
+    // JSON mode: same exit code, plus a structured envelope.
+    let mut cmd = Command::new(&stale_binary);
+    scrub_gate_context(&mut cmd);
+    let json_output = cmd
+        .current_dir(scratch.path())
+        .args(["gate", "evaluate", &issue_id, "g", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        json_output.status.code(),
+        Some(10),
+        "json mode must exit 10, matching text mode and docs/reference/exit-codes.md; \
+         got stdout={} stderr={}",
+        String::from_utf8_lossy(&json_output.stdout),
+        String::from_utf8_lossy(&json_output.stderr)
+    );
+
+    let body: serde_json::Value = serde_json::from_slice(&json_output.stdout).unwrap_or_else(|e| {
+        panic!(
+            "stdout should be valid JSON: {e}\nstdout={}",
+            String::from_utf8_lossy(&json_output.stdout)
+        )
+    });
+    assert_eq!(body["error"]["code"], "STALE_BINARY");
+    assert_eq!(body["error"]["details"]["issue_id"], issue_id);
+    assert_eq!(body["error"]["details"]["key"], "g");
+    assert_eq!(body["error"]["details"]["built_from"], ancestor);
+    // Pre-verdict: no `verdict` field, unlike a completed (post-verdict)
+    // GATE_FAILED/checker-error envelope.
+    assert!(
+        body["error"]["details"]["verdict"].is_null(),
+        "a refused, never-run checker must not carry a verdict: {body}"
+    );
+    let suggestions = body["error"]["suggestions"]
+        .as_array()
+        .expect("suggestions should be an array");
+    assert!(
+        suggestions.iter().any(|s| s
+            .as_str()
+            .unwrap_or_default()
+            .contains("cargo install --path crates/jit")),
+        "suggestions should include the reinstall hint: {suggestions:?}"
+    );
+}

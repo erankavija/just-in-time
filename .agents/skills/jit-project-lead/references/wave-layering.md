@@ -190,8 +190,9 @@ Every child of `M` appears once; `X0` appears nowhere.
 
 ## Consumers
 
-The ordered wave list is the input to sub-strategic dispatch: each wave's
-containers are driven by a dispatched `jit-execution-lead`, and a wave completes
+The ordered wave list is the input to sub-strategic dispatch: each wave's open
+containers are planned by `jit-planning-lead` and, only after their brackets are
+fully complete, executed by fresh `jit-execution-lead` agents. A wave completes
 before the next begins (wave discipline). Persist the wave list into the
 container-level progress file so a resumed session reads back the plan. Dispatch
 and the cross-container coherence review are defined separately; this reference

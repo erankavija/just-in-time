@@ -1,0 +1,31 @@
+{
+  "id": "92039d9c-1433-4b24-b3f6-2c206648cc8f",
+  "title": "Provide portable deterministic checks and review warnings",
+  "description": "Generic built-in checker operations run deterministic JIT validation and coverage without subprocess/JIT-source/`jq` dependencies, while the default external-review placeholder records a visible structured warning on a passing run.\n\n## Background\n\nThe embedded workflow needs portable deterministic checks and truthful placeholder review behavior. These operations remain generic and data-neutral; this task does not select or author the production profile payload.\n\n## Success Criteria\n\n- [hard] REQ-01: Built-in checker types, execution, JSON/schema representation, findings, and tests remain data-neutral and can be assigned arbitrary configured gate keys.\n- [hard] REQ-02: The editable review command and embedded placeholder emit an unmistakable warning in human and structured findings, and repository validation warns while a placeholder remains configured.\n- [hard] REQ-03: `./scripts/docs-mechanical.sh docs/reference/gate-presets.md docs/reference/rules-and-gates.md` passes for every generated checker/reference change.\n\n## Scope\n\n**Blast radius:** checker domain enum, gate execution/manager, schema/output/findings, validation warning rule, preset consumers, tests, and reference projection; deterministic operations do not shell back into `jit`.\n\n**Green landing:** Generic checker operations and placeholder findings are independently usable by existing gate configuration before the profile package selects them.",
+  "state": "ready",
+  "priority": "high",
+  "assignee": null,
+  "dependencies": [
+    "96326159-43e5-4a36-8cab-de8d858fae13"
+  ],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "doc-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "context": {},
+  "documents": [],
+  "labels": [
+    "type:task",
+    "epic:jit-profiles",
+    "milestone:v1.0",
+    "satisfies:REQ-09",
+    "satisfies:REQ-12"
+  ],
+  "created_at": "2026-07-14T22:28:46.041332657Z",
+  "updated_at": "2026-07-14T22:57:51.914953014Z",
+  "first_ready_at": "2026-07-14T22:28:46.041332877Z"
+}

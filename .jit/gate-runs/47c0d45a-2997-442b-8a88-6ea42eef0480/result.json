@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "47c0d45a-2997-442b-8a88-6ea42eef0480",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "e26d4624687e11d2df8a40d5f699e5f8d143a173",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T01:42:31.704999682Z",
+  "completed_at": "2026-07-15T01:46:34.557133408Z",
+  "duration_ms": 242852,
+  "exit_code": 1,
+  "stdout": "Attribution: fc12c648, 32b6cfc4, d2bca248, 5ccefe0a, 75256abb, 5d2399dd, b5d8278a, 4090eef5, e26d4624 (`jit:4e22a20d`)\nPolicy sources: AGENTS.md; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/charter/D-1, @/charter/D-2, @/charter/D-3, @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T01:40:18Z); doc-review passed (exit 0, 2026-07-14T22:54:55Z); code-review failed (exit 1, 2026-07-14T22:54:54Z)\nTruncation recovery: narrowed reads by commit/path; re-read current script, baseline/raw records, policy sources, and inventory aggregates; voluminous per-test entries were consistency-checked by totals and list exit codes.\n\n1. **F1 — high, blocking, issue-impact:** The corrected `unique_active_test_executable_bytes` is still only asserted as a fresh post-hoc measurement; no raw Cargo JSON, artifact-size manifest, or command record for that remeasurement is committed. The original isolated directory was deleted, so REQ-04’s recorded byte metric remains materially unverifiable. `dev/benchmarks/rust-build-efficiency/report.md:164`\n\n2. **F2 — medium, blocking, issue-impact:** REQ-01’s non-overlap guarantee can be disabled with `BENCH_NO_LOCK=1`, and a missing `flock` silently disables it too. In either case the harness neither detects nor refuses a concurrent repository Cargo build. `scripts/benchmark-rust-build.sh:181`\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The baseline executable-size correction remains unverifiable and the harness can run without its required non-overlap lock.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The corrected active-test-executable byte total lacks committed raw measurement evidence, leaving REQ-04 materially unverifiable.\",\"file\":\"dev/benchmarks/rust-build-efficiency/report.md\",\"line\":164},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The benchmark can bypass or silently omit its build lock, so it does not always refuse overlap with another repository Cargo build.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":181}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10094 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6370-9da5-7f51-93b2-58e27ade78c8\n--------\nuser\n--- 10081 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The baseline executable-size correction remains unverifiable and the harness can run without its required non-overlap lock.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The corrected active-test-executable byte total lacks committed raw measurement evidence, leaving REQ-04 materially unverifiable.",
+        "file": "dev/benchmarks/rust-build-efficiency/report.md",
+        "line": 164
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The benchmark can bypass or silently omit its build lock, so it does not always refuse overlap with another repository Cargo build.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 181
+      }
+    ]
+  }
+}

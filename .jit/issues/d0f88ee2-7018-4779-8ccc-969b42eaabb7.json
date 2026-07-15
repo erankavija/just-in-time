@@ -11,15 +11,15 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T15:37:39.315555167Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-05T15:35:07.239518091Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-05T15:37:39.315555167Z"
     }
   },
   "context": {},
@@ -91,7 +91,7 @@
       ]
     },
     {
-      "path": "crates/jit/tests/verb_hint_tests.rs",
+      "path": "crates/jit/tests/cli_issue/verb_hint_tests.rs",
       "commit": null,
       "label": "Integration tests",
       "doc_type": "implementation"
@@ -103,7 +103,7 @@
     "component:cli"
   ],
   "created_at": "2026-07-05T10:02:41.559978499Z",
-  "updated_at": "2026-07-05T19:51:13.091473202Z",
+  "updated_at": "2026-07-15T07:06:30.033961701Z",
   "claimed_at": "2026-07-05T15:20:13.741370390Z",
   "done_at": "2026-07-05T15:39:24.541716955Z"
 }

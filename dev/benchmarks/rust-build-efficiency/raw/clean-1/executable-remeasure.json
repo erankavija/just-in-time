@@ -1,0 +1,1217 @@
+{
+  "purpose": "Committed raw evidence for the corrected unique_active_test_executable_bytes value (jit:4e22a20d). Per-executable sizes measured from a fresh isolated build of the baseline commit.",
+  "method": {
+    "source": "git archive 56d737891129babf9571eb4de5659295bce8d827 extracted to a scratch directory",
+    "command": "cargo test --workspace --no-run --message-format=json (fresh isolated CARGO_TARGET_DIR, shared build lock held)",
+    "measured_at": "2026-07-15",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "selection": "compiler-artifact messages with a non-null executable and profile.test == true"
+  },
+  "test_profile_executable_count": 148,
+  "unique_active_test_executable_bytes": 14816926968,
+  "excluded_non_test_artifacts": [
+    {
+      "target_name": "jit-server",
+      "target_kind": [
+        "bin"
+      ],
+      "executable_basename": "jit-server",
+      "bytes": 237935048
+    },
+    {
+      "target_name": "jit",
+      "target_kind": [
+        "bin"
+      ],
+      "executable_basename": "jit",
+      "bytes": 259803096
+    }
+  ],
+  "executables": [
+    {
+      "target_name": "ai_review_verdict_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "ai_review_verdict_tests-ddfed7ed0e1cc434",
+      "bytes": 9191376
+    },
+    {
+      "target_name": "apply_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "apply_cli_tests-9bbc66ac3727aa03",
+      "bytes": 28812272
+    },
+    {
+      "target_name": "archive_preview_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "archive_preview_cli_tests-ddd86ebfbf12f9b2",
+      "bytes": 186295832
+    },
+    {
+      "target_name": "artifact_discovery_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "artifact_discovery_tests-3bf8e413d92a5b8b",
+      "bytes": 190811072
+    },
+    {
+      "target_name": "artifact_inventory_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "artifact_inventory_tests-76649c2eb13e0ffe",
+      "bytes": 187226832
+    },
+    {
+      "target_name": "artifact_mutation_storage_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "artifact_mutation_storage_tests-db989f3031a325f8",
+      "bytes": 179133840
+    },
+    {
+      "target_name": "artifact_plan_model_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "artifact_plan_model_tests-876054c6346cd70b",
+      "bytes": 182161104
+    },
+    {
+      "target_name": "batch_create_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "batch_create_tests-9c98e228767b9210",
+      "bytes": 11728800
+    },
+    {
+      "target_name": "bracket_breakdown_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "bracket_breakdown_tests-d880811c46eba1a6",
+      "bytes": 224566928
+    },
+    {
+      "target_name": "bracket_coverage_gate_run_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "bracket_coverage_gate_run_test-4e2d441253e13959",
+      "bytes": 28817808
+    },
+    {
+      "target_name": "bulk_operations_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "bulk_operations_tests-ef02560d3793ae01",
+      "bytes": 222622600
+    },
+    {
+      "target_name": "bulk_update_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "bulk_update_cli_tests-e5a4414325a5ff18",
+      "bytes": 11113264
+    },
+    {
+      "target_name": "check_links_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "check_links_tests-31ce46ee9eddca08",
+      "bytes": 28901584
+    },
+    {
+      "target_name": "claim_integration_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "claim_integration_tests-8bd9a273b3f0baad",
+      "bytes": 29003920
+    },
+    {
+      "target_name": "cli_warnings_integration_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "cli_warnings_integration_tests-1405b6cb0b5f5316",
+      "bytes": 221296136
+    },
+    {
+      "target_name": "code_review_policy_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "code_review_policy_test-3186b263908b63a5",
+      "bytes": 19955200
+    },
+    {
+      "target_name": "command_alias_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "command_alias_tests-11f680b60ab4422b",
+      "bytes": 11140288
+    },
+    {
+      "target_name": "command_exit_code_projection_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "command_exit_code_projection_tests-e08c3e3a515179b3",
+      "bytes": 182907760
+    },
+    {
+      "target_name": "config_get_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "config_get_tests-f68630c213710a80",
+      "bytes": 11180360
+    },
+    {
+      "target_name": "config_loading_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "config_loading_tests-5157b9f368fdedbf",
+      "bytes": 221302896
+    },
+    {
+      "target_name": "container_rollup_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "container_rollup_tests-d86e8c81e70c0d86",
+      "bytes": 11931248
+    },
+    {
+      "target_name": "content_format_dispatch",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "content_format_dispatch-6bfd87cc765744db",
+      "bytes": 217200184
+    },
+    {
+      "target_name": "content_parser_cross_format",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "content_parser_cross_format-1a18d617a74e9bf0",
+      "bytes": 6987048
+    },
+    {
+      "target_name": "cross_substrate_generality_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "cross_substrate_generality_tests-e928f767d50683c9",
+      "bytes": 11348000
+    },
+    {
+      "target_name": "cross_worktree_integration_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "cross_worktree_integration_tests-07a6ac56c5b9bb5f",
+      "bytes": 11861536
+    },
+    {
+      "target_name": "decision_kind_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "decision_kind_tests-1ef8c96c40a8e865",
+      "bytes": 196388192
+    },
+    {
+      "target_name": "decision_risk_story_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "decision_risk_story_tests-06d7e62805979020",
+      "bytes": 196403816
+    },
+    {
+      "target_name": "default_rules_registry_derivation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "default_rules_registry_derivation_tests-29844622a5db0b33",
+      "bytes": 224816480
+    },
+    {
+      "target_name": "dep_add_atomic_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "dep_add_atomic_tests-8b8f9a03c279843d",
+      "bytes": 225407896
+    },
+    {
+      "target_name": "dep_add_redundancy_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "dep_add_redundancy_cli_tests-6860711bd4b56f6e",
+      "bytes": 11689656
+    },
+    {
+      "target_name": "dependency_display_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "dependency_display_tests-f99ed34b099c799b",
+      "bytes": 11060408
+    },
+    {
+      "target_name": "dependency_met_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "dependency_met_tests-c31dc46b16b38c8e",
+      "bytes": 224670504
+    },
+    {
+      "target_name": "doc_review_policy_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "doc_review_policy_test-e4266960281c6253",
+      "bytes": 19831704
+    },
+    {
+      "target_name": "doc_show_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "doc_show_tests-efc7866e6c1f0e90",
+      "bytes": 28394688
+    },
+    {
+      "target_name": "document_api_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "document_api_tests-029b98b607346556",
+      "bytes": 260265120
+    },
+    {
+      "target_name": "document_event_log_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "document_event_log_tests-38f951500fc23ede",
+      "bytes": 218951440
+    },
+    {
+      "target_name": "document_history_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "document_history_tests-a0714e510d96d8ac",
+      "bytes": 11179056
+    },
+    {
+      "target_name": "domain_queries_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "domain_queries_tests-afe790f453658f06",
+      "bytes": 185057424
+    },
+    {
+      "target_name": "effective_rules_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "effective_rules_tests-0a0cb0f4e898aad8",
+      "bytes": 192582200
+    },
+    {
+      "target_name": "error_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "error_json_tests-4c7760ad1151dc80",
+      "bytes": 11011216
+    },
+    {
+      "target_name": "example_rulesets_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "example_rulesets_tests-ad43037478c2eb6e",
+      "bytes": 222518040
+    },
+    {
+      "target_name": "exit_code_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "exit_code_tests-6a82b20bd02eaa5e",
+      "bytes": 11734216
+    },
+    {
+      "target_name": "first_guess_residuals_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "first_guess_residuals_test-20737807be07aae8",
+      "bytes": 28638560
+    },
+    {
+      "target_name": "format_compat_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "format_compat_cli_tests-c4ff1abd383c7ea6",
+      "bytes": 9043328
+    },
+    {
+      "target_name": "gate_check_all_lean_response_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_check_all_lean_response_test-336432a9b98ec2eb",
+      "bytes": 28770376
+    },
+    {
+      "target_name": "gate_check_history_flat_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_check_history_flat_test-48b17815bf13b318",
+      "bytes": 29060048
+    },
+    {
+      "target_name": "gate_cli_integration_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_cli_integration_test-6550b03b407d7c44",
+      "bytes": 29264168
+    },
+    {
+      "target_name": "gate_findings_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_findings_test-57aba7617959d95e",
+      "bytes": 28831368
+    },
+    {
+      "target_name": "gate_key_flag_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_key_flag_test-2eb7712b14dbaff0",
+      "bytes": 28894016
+    },
+    {
+      "target_name": "gate_modification_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_modification_cli_tests-cda2aaad0a7a9c9e",
+      "bytes": 11534264
+    },
+    {
+      "target_name": "gate_pass_all_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_pass_all_test-b07c7bb12a52e808",
+      "bytes": 28287040
+    },
+    {
+      "target_name": "gate_pass_exit_code_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_pass_exit_code_test-898c791aaca13215",
+      "bytes": 28213464
+    },
+    {
+      "target_name": "gate_pass_skip_at_head_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_pass_skip_at_head_test-c4f5f9954d19d6a0",
+      "bytes": 28283048
+    },
+    {
+      "target_name": "gate_status_all_strict_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_status_all_strict_test-1dae009aa025228a",
+      "bytes": 28737616
+    },
+    {
+      "target_name": "gate_update_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "gate_update_test-ccbf35592d3a17fe",
+      "bytes": 41356328
+    },
+    {
+      "target_name": "git_revision_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "git_revision_tests-b9be4da85ba647df",
+      "bytes": 178427776
+    },
+    {
+      "target_name": "graph_depth_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "graph_depth_tests-c9e920c54b2119af",
+      "bytes": 11164216
+    },
+    {
+      "target_name": "graph_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "graph_json_tests-7303f32d9898a9a0",
+      "bytes": 11215752
+    },
+    {
+      "target_name": "graph_rule_validation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "graph_rule_validation_tests-18e01819e5d25ace",
+      "bytes": 222989424
+    },
+    {
+      "target_name": "harness",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "harness-e82afe4fe630a5f3",
+      "bytes": 6986512
+    },
+    {
+      "target_name": "harness_demo",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "harness_demo-99ad65cd704ad6b5",
+      "bytes": 230892080
+    },
+    {
+      "target_name": "help_cross_reference_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "help_cross_reference_tests-31a9cb87bc3c06ec",
+      "bytes": 9709576
+    },
+    {
+      "target_name": "hierarchy_tree_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "hierarchy_tree_tests-7d5c6d4d3d9a98e8",
+      "bytes": 11475272
+    },
+    {
+      "target_name": "hierarchy_vectors_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "hierarchy_vectors_test-0e5828372e92067b",
+      "bytes": 179667672
+    },
+    {
+      "target_name": "init_item_kinds_golden",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "init_item_kinds_golden-9f39c21b96dfa81e",
+      "bytes": 11316376
+    },
+    {
+      "target_name": "init_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "init_tests-9ea7e1029fef0d58",
+      "bytes": 24060520
+    },
+    {
+      "target_name": "integration_schema",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "integration_schema-2e8bb32e8d4107ac",
+      "bytes": 27572520
+    },
+    {
+      "target_name": "integration_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "integration_test-2661524edf69cfbe",
+      "bytes": 13106352
+    },
+    {
+      "target_name": "invariant_check_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "invariant_check_cli_tests-6c0e00c6ced56330",
+      "bytes": 11223840
+    },
+    {
+      "target_name": "invariant_registry_story_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "invariant_registry_story_tests-c562885e70052fff",
+      "bytes": 184710176
+    },
+    {
+      "target_name": "invariant_render_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "invariant_render_cli_tests-bc7ef66f79e71457",
+      "bytes": 11098184
+    },
+    {
+      "target_name": "invariant_render_harness_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "invariant_render_harness_tests-f2b2dc783efd628f",
+      "bytes": 184247856
+    },
+    {
+      "target_name": "issue_create_json_contract_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_create_json_contract_test-fb35dc215701e5e7",
+      "bytes": 28259360
+    },
+    {
+      "target_name": "issue_create_positional_type_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_create_positional_type_tests-f28d2be5e3bbb8b5",
+      "bytes": 11293856
+    },
+    {
+      "target_name": "issue_search_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_search_json_tests-c2c2edcc4c7aaebb",
+      "bytes": 11038240
+    },
+    {
+      "target_name": "issue_search_label_filter_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_search_label_filter_tests-f175d48662a9aa83",
+      "bytes": 11380832
+    },
+    {
+      "target_name": "issue_show_projection_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_show_projection_test-25b48faeb2d60158",
+      "bytes": 28656144
+    },
+    {
+      "target_name": "issue_show_shape_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_show_shape_test-d58f0a96cc7a1b9b",
+      "bytes": 28585704
+    },
+    {
+      "target_name": "issue_show_summary_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_show_summary_test-6c7dd75173686827",
+      "bytes": 28680816
+    },
+    {
+      "target_name": "issue_status_projection_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_status_projection_tests-c3820a3f3ed70542",
+      "bytes": 28916000
+    },
+    {
+      "target_name": "issue_update_description_ops_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_update_description_ops_tests-c66192bf762f7498",
+      "bytes": 29101632
+    },
+    {
+      "target_name": "issue_update_lean_response_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "issue_update_lean_response_test-d420038c391341ee",
+      "bytes": 28662608
+    },
+    {
+      "target_name": "item_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "item_cli_tests-56c43626bb76898f",
+      "bytes": 11720448
+    },
+    {
+      "target_name": "jit",
+      "target_kind": [
+        "bin"
+      ],
+      "executable_basename": "jit-9ff9c067089606fe",
+      "bytes": 183506080
+    },
+    {
+      "target_name": "jit",
+      "target_kind": [
+        "lib"
+      ],
+      "executable_basename": "jit-f970e7988ddf2284",
+      "bytes": 284597448
+    },
+    {
+      "target_name": "jit-server",
+      "target_kind": [
+        "bin"
+      ],
+      "executable_basename": "jit_server-1d31f3880e9000d6",
+      "bytes": 274873592
+    },
+    {
+      "target_name": "jit_server",
+      "target_kind": [
+        "lib"
+      ],
+      "executable_basename": "jit_server-0f08e6ee4cc3fb13",
+      "bytes": 269997832
+    },
+    {
+      "target_name": "label_constraints_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_constraints_tests-bc14e14f63c2b26a",
+      "bytes": 225086496
+    },
+    {
+      "target_name": "label_filter_repeatable_query_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_filter_repeatable_query_tests-e2199fcb5324a20a",
+      "bytes": 11314432
+    },
+    {
+      "target_name": "label_hierarchy_e2e_test",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_hierarchy_e2e_test-15dc1ed3040617f0",
+      "bytes": 11129064
+    },
+    {
+      "target_name": "label_membership_validation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_membership_validation_tests-4a26526d6ebd0acd",
+      "bytes": 188180512
+    },
+    {
+      "target_name": "label_query_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_query_json_tests-4e2c268ddbaacb77",
+      "bytes": 11097440
+    },
+    {
+      "target_name": "label_query_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_query_tests-14cc461bc4dcbde2",
+      "bytes": 219341376
+    },
+    {
+      "target_name": "label_strategic_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "label_strategic_tests-a111e56d55a5e3c5",
+      "bytes": 219233912
+    },
+    {
+      "target_name": "lifecycle_timestamps_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "lifecycle_timestamps_tests-d6bd90ace8810ff3",
+      "bytes": 224578680
+    },
+    {
+      "target_name": "list_envelope_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "list_envelope_tests-9e412fc70290cbfa",
+      "bytes": 11223176
+    },
+    {
+      "target_name": "local_rule_enforcement_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "local_rule_enforcement_tests-4961986452235212",
+      "bytes": 222015568
+    },
+    {
+      "target_name": "lock_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "lock_tests-e2e466569d2b021b",
+      "bytes": 9311896
+    },
+    {
+      "target_name": "markdown_kind_source_path_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "markdown_kind_source_path_tests-33787c11d0840b26",
+      "bytes": 11274248
+    },
+    {
+      "target_name": "merged_commit_build_verification_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "merged_commit_build_verification_tests-28f449e8dc386f4b",
+      "bytes": 7327248
+    },
+    {
+      "target_name": "planning_preset_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "planning_preset_tests-4678518d5d16a1a9",
+      "bytes": 219788864
+    },
+    {
+      "target_name": "project_config_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "project_config_tests-769b674be03688e1",
+      "bytes": 184346360
+    },
+    {
+      "target_name": "query_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "query_json_tests-7860c468cb33d4a8",
+      "bytes": 11031264
+    },
+    {
+      "target_name": "query_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "query_tests-8e6c6ac53a5feec4",
+      "bytes": 11702192
+    },
+    {
+      "target_name": "quiet_mode_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "quiet_mode_tests-2586481c30d11617",
+      "bytes": 28800720
+    },
+    {
+      "target_name": "recover_command_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "recover_command_tests-729a943fa5a09cbb",
+      "bytes": 26971136
+    },
+    {
+      "target_name": "reference_render_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "reference_render_cli_tests-f2ebff546a3fde49",
+      "bytes": 11170112
+    },
+    {
+      "target_name": "registry_json_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "registry_json_tests-de9dd7159ca9a6cf",
+      "bytes": 11013904
+    },
+    {
+      "target_name": "repo_discovery_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "repo_discovery_tests-e16292db30438595",
+      "bytes": 9086400
+    },
+    {
+      "target_name": "research_bracket_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "research_bracket_tests-018e3b8984c056dc",
+      "bytes": 194293560
+    },
+    {
+      "target_name": "risk_kind_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "risk_kind_tests-0534a49ffc9f4337",
+      "bytes": 196372024
+    },
+    {
+      "target_name": "schema_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "schema_tests-838e5dd450ce62c0",
+      "bytes": 182551752
+    },
+    {
+      "target_name": "scope_validation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "scope_validation_tests-38185a674a716837",
+      "bytes": 225442216
+    },
+    {
+      "target_name": "sdd_bracket_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "sdd_bracket_tests-d9e2195fe5162458",
+      "bytes": 194289064
+    },
+    {
+      "target_name": "search_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "search_tests-37542a116708c8da",
+      "bytes": 179312560
+    },
+    {
+      "target_name": "serve_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "serve_cli_tests-20f1b54214e45847",
+      "bytes": 28706792
+    },
+    {
+      "target_name": "short_hash_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "short_hash_tests-efe8c0bc6d27bfbb",
+      "bytes": 234045200
+    },
+    {
+      "target_name": "snapshot_export_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "snapshot_export_tests-e128fd1128d42d86",
+      "bytes": 26898992
+    },
+    {
+      "target_name": "stale_binary_child_process_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "stale_binary_child_process_tests-c71eb57149d0c37c",
+      "bytes": 11260464
+    },
+    {
+      "target_name": "stale_binary_json_exit_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "stale_binary_json_exit_tests-96674b94c83a5c38",
+      "bytes": 178843312
+    },
+    {
+      "target_name": "state_transition_fix_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "state_transition_fix_tests-4dfbf04ad606f8a8",
+      "bytes": 224787488
+    },
+    {
+      "target_name": "steering_scenarios",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "steering_scenarios-f4fb58f6774797f6",
+      "bytes": 23542544
+    },
+    {
+      "target_name": "strictness_enforcement_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "strictness_enforcement_tests-e5dd1e757ac27f04",
+      "bytes": 218374520
+    },
+    {
+      "target_name": "strictness_transition_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "strictness_transition_tests-575abe306ec1aa8b",
+      "bytes": 198557400
+    },
+    {
+      "target_name": "template_apply_atomicity_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "template_apply_atomicity_tests-98fa5cc16f46bdde",
+      "bytes": 229943704
+    },
+    {
+      "target_name": "template_apply_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "template_apply_tests-8455c3950313be17",
+      "bytes": 239589432
+    },
+    {
+      "target_name": "template_binding_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "template_binding_cli_tests-3128841474ccef52",
+      "bytes": 28824960
+    },
+    {
+      "target_name": "template_binding_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "template_binding_tests-47cb9de58ba325d7",
+      "bytes": 224252128
+    },
+    {
+      "target_name": "templates_loader_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "templates_loader_tests-831ea7ec8caa0d19",
+      "bytes": 183893304
+    },
+    {
+      "target_name": "test_cli_consistency",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "test_cli_consistency-7ad9497d1ab7f5ce",
+      "bytes": 11115456
+    },
+    {
+      "target_name": "test_no_coordinator",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "test_no_coordinator-8cab7cc9f047bb6d",
+      "bytes": 224973296
+    },
+    {
+      "target_name": "transition_graph_enforcement_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "transition_graph_enforcement_tests-7920cb980ee759c5",
+      "bytes": 223899408
+    },
+    {
+      "target_name": "transitive_reduction_validation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "transitive_reduction_validation_tests-4e877946edb69ada",
+      "bytes": 224923880
+    },
+    {
+      "target_name": "type_hierarchy_fix_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "type_hierarchy_fix_tests-069761b9b3e61e3f",
+      "bytes": 11074072
+    },
+    {
+      "target_name": "type_hierarchy_schema_regen_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "type_hierarchy_schema_regen_tests-d5a48f4935ab7d6b",
+      "bytes": 219527664
+    },
+    {
+      "target_name": "type_taxonomy_custom_strategic_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "type_taxonomy_custom_strategic_tests-091d6f0604cf83e4",
+      "bytes": 184727512
+    },
+    {
+      "target_name": "type_taxonomy_warnings_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "type_taxonomy_warnings_tests-2d30023d0bd3f1c3",
+      "bytes": 184721680
+    },
+    {
+      "target_name": "validate_cli_rule_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validate_cli_rule_tests-5ff51aa79a679d34",
+      "bytes": 28965832
+    },
+    {
+      "target_name": "validate_document_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validate_document_tests-1ebbbc8e906b2755",
+      "bytes": 28396480
+    },
+    {
+      "target_name": "validate_drift_builtin_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validate_drift_builtin_tests-c4a479fa50001b98",
+      "bytes": 11251816
+    },
+    {
+      "target_name": "validate_rule_runner_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validate_rule_runner_tests-de001debaae3fd80",
+      "bytes": 221374680
+    },
+    {
+      "target_name": "validation_lease_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validation_lease_tests-d98d20752d279941",
+      "bytes": 13911608
+    },
+    {
+      "target_name": "validation_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "validation_tests-5f5857600c7b8e4d",
+      "bytes": 223823600
+    },
+    {
+      "target_name": "verb_hint_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "verb_hint_tests-2a97c20180a8964f",
+      "bytes": 11370576
+    },
+    {
+      "target_name": "version_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "version_cli_tests-b8513f25c04ea1ce",
+      "bytes": 28647792
+    },
+    {
+      "target_name": "workflow_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "workflow_tests-785aa17bfe323b8d",
+      "bytes": 9161360
+    },
+    {
+      "target_name": "worktree_cli_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "worktree_cli_tests-26e7403edc26c72e",
+      "bytes": 29222984
+    },
+    {
+      "target_name": "worktree_identity_tests",
+      "target_kind": [
+        "test"
+      ],
+      "executable_basename": "worktree_identity_tests-c638f3bafa716b8f",
+      "bytes": 179522592
+    }
+  ]
+}

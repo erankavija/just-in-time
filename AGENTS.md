@@ -13,12 +13,13 @@ Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for A
 cargo build                          # Debug build (all workspace crates)
 cargo build --release                # Release build
 cargo install --path crates/jit      # Install jit binary to PATH
+./scripts/install-jit.sh             # Install WITH build provenance (dogfood default; keeps the stale-binary guard effective)
 
 # Test
 cargo test                           # All tests (unit + harness + integration)
 cargo test --lib                     # Unit tests only (fast)
-cargo test --test harness_demo       # Harness tests only (fast, in-process)
-cargo test --test integration_test   # CLI integration tests (subprocess)
+cargo test --test fast_docs_templates   # One in-process suite (fast)
+cargo test --test cli_repo_workflow     # One CLI integration suite (subprocess)
 cargo test test_name                 # Single test by name
 cargo test -- --nocapture            # With stdout output
 
@@ -124,8 +125,8 @@ All commands support `--json` (envelope spec under Coding Conventions).
 Three-layer approach (see dev/TESTING.md for details):
 
 - **Unit tests** — In-source `#[cfg(test)]` modules. Fast, test individual functions.
-- **Harness tests** (`tests/harness_demo.rs`) — Use `TestHarness` for isolated in-process tests with `CommandExecutor` directly. Fast and reliable.
-- **Integration tests** (`tests/*.rs`, e.g. `integration_test.rs`) — Spawn `jit` as subprocess, test actual CLI interface end-to-end.
+- **Harness tests** (in-process suites like `tests/fast_docs_templates/`, using `harness_demo.rs`) — Use `TestHarness` for isolated in-process tests with `CommandExecutor` directly. Fast and reliable.
+- **Integration tests** (CLI suites like `tests/cli_repo_workflow/`) — Spawn `jit` as subprocess, test actual CLI interface end-to-end.
 
 Tests cover relevant success, boundary, failure, and concurrency behavior. Depending on the affected subsystem, representative cases include empty graphs, cycles, missing issues, and concurrent claims.
 

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "51fa4621-0341-4c04-9794-5f2668ac3920",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "ef0065ad-3b33-4533-874c-65532350cc80",
+  "commit": "dadbbaf15b9cdb754757a8a0caca514b586c3a45",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T10:59:06.407295633Z",
+  "completed_at": "2026-07-15T11:01:52.250106139Z",
+  "duration_ms": 165842,
+  "exit_code": 0,
+  "stdout": "Attribution: bd50d880, 95767668, 081c2a84, ac56c1e2 (all `jit:ef0065ad`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-15 — dev/vision/9db27a3a-charter.md (markdown-first)\nGate evidence: cargo-ci — passed, exit 0, 2026-07-15T10:49:28Z\nTruncation recovery: narrowed merge patch, callers, rule, helper, and historical-record reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Scoped evaluation now resolves bracket pointers against the complete index while preserving the scoped coverage walk; regression and counter-tests cover the required behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Scoped evaluation now resolves bracket pointers against the complete index while preserving the scoped coverage walk; regression and counter-tests cover the required behavior.",
+    "findings": []
+  }
+}

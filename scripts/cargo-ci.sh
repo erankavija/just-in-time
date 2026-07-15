@@ -70,7 +70,7 @@ ensure_real_cargo() {
 
 ensure_real_cargo
 
-# Disk-backed TMPDIR: a few tests (version_cli_tests) compile the whole crate
+# Disk-backed TMPDIR: a few tests (provenance_contract suite) compile the whole crate
 # into a fresh temp target dir; on a small tmpfs /tmp that hits "Disk quota
 # exceeded". Use a disk-backed cache dir. It must live OUTSIDE any git repo:
 # tests such as test_get_current_branch_errors_when_git_fails create a temp dir
@@ -78,6 +78,17 @@ ensure_real_cargo
 # wrong). Overridable via CARGO_CI_TMPDIR.
 export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
 mkdir -p "$TMPDIR"
+
+# Disable incremental compilation for every step below (jit:57d0eb79). The
+# workspace manifest's [profile.dev]/[profile.test] leave incremental on for
+# ordinary interactive builds, where it earns back its disk cost across many
+# rebuilds of the same tree. A gate run compiles once and exits, so it has no
+# later rebuild to amortize that cost against; left on, incremental state
+# accumulated without bound across gate runs (baseline measurement:
+# dev/active/73482aa1-rust-build-efficiency.md, Baseline table). The
+# `incremental-state` step below turns "should be disabled" into a checked
+# fact rather than an assumption.
+export CARGO_INCREMENTAL=0
 
 # Parallel test harness across 20 threads. The suite is I/O-bound (the
 # storage::claim_coordinator proptests do real filesystem locking over hundreds
@@ -96,7 +107,7 @@ summary=""
 summarize_pass() {
   local name="$1"
   case "$name" in
-    test)
+    test | provenance)
       # cargo test runs many binaries, each printing its own
       # "test result: ok. N passed; M failed; K ignored; ...". Sum them.
       local p f i
@@ -117,7 +128,7 @@ summarize_pass() {
 summarize_fail() {
   local name="$1"
   case "$name" in
-    test)
+    test | provenance)
       echo "--- $name failures ---"
       # Failed test names and the captured panic/assert output blocks.
       grep -E '^test .* FAILED$' "$WORK/$name.out" || true
@@ -153,6 +164,45 @@ run_step() {
   fi
 }
 
+# REQ-04 (jit:57d0eb79): the target directory this run actually used —
+# CARGO_TARGET_DIR when the caller set one (e.g. the isolated-run
+# verification protocol), else Cargo's own resolved default. Reading it from
+# `cargo metadata` rather than assuming "$workspace_root/target" respects any
+# .cargo/config.toml override.
+gate_target_dir() {
+  if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    printf '%s\n' "$CARGO_TARGET_DIR"
+    return
+  fi
+  command -v jq >/dev/null 2>&1 || {
+    echo "gate_target_dir: 'jq' not found on PATH (needed to resolve Cargo's default target directory)" >&2
+    return 1
+  }
+  cargo metadata --format-version=1 --no-deps 2>/dev/null | jq -r '.target_directory'
+}
+
+# REQ-04 (jit:57d0eb79): CARGO_INCREMENTAL=0 above is the mechanism; this is
+# the deterministic check that it held. Runs after the compilation steps so
+# it observes what they actually left on disk. Suites that spawn scratch
+# builds into their own throwaway target dirs (scratch_build,
+# provenance_contract) are out of scope by construction: this only walks the
+# directory `gate_target_dir` resolves, never a suite's private scratch dir.
+check_no_incremental_state() {
+  local target_dir
+  target_dir=$(gate_target_dir) || return 1
+  if [ -z "$target_dir" ]; then
+    echo "could not resolve this run's Cargo target directory" >&2
+    return 1
+  fi
+  local hits
+  hits=$(find "$target_dir" -type d -name incremental -not -empty 2>/dev/null)
+  if [ -n "$hits" ]; then
+    echo "non-empty incremental directories under $target_dir:" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+}
+
 # Deprioritize the build/test work so an interactive shell preempts it under
 # contention — this is what keeps the host responsive while the gate runs, not
 # just the serialization above. nice -n 19 = lowest CPU priority; ionice -c2 -n7
@@ -171,6 +221,23 @@ fi
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
 run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
+
+# Build-provenance contract suites (jit:5d862134). These are #[ignore]d for plain
+# `cargo test` — each spawns cold scratch `cargo` builds into throwaway target
+# dirs to exercise the build script under real git states, costing ~3-4 min that
+# ordinary dev runs should not pay — so the `test` step above skips them. The gate
+# paying that cost is exactly the point: REQ-06's hard metadata-only-invalidation
+# and injected-provenance contracts are unexercised unless a required CI step runs
+# them, so this step does. No lock interaction: these tests spawn plain `cargo`
+# only (never scripts/cargo-ci.sh or verify-commit-builds.sh), so they do not
+# re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
+run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
+  --test provenance_contract -- --ignored
+
+# REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
+# left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
+# held.
+run_step incremental-state check_no_incremental_state
 
 echo "$summary"
 

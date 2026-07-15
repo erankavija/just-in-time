@@ -906,6 +906,7 @@ pub(crate) const SECTION_HEADING_ANNOTATION: &str = "x-jit-section-heading";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::State;
     use crate::validation::rules::RuleSet;
     use std::path::Path;
     use tempfile::TempDir;
@@ -980,6 +981,49 @@ mod tests {
         let findings = engine.validate(&set.rules[0], &projection).unwrap();
         assert_eq!(findings.len(), 2);
         assert!(findings.iter().all(|f| f.rule == "needs-both"));
+    }
+
+    #[test]
+    fn test_validate_resolves_local_fragment_refs_without_remote_resolution() {
+        // jsonschema is compiled with default-features = false (jit:3398bc19):
+        // no resolve-http/resolve-file remote retrievers are linked in.
+        // Same-document fragment refs — the pattern crate::schema's `Issue`
+        // type uses for `state`/`priority` (`$ref: "#/types/State"`) — are
+        // core JSON Pointer resolution, not gated by those features, so
+        // compiling and validating against a schema shaped that way must
+        // keep working unchanged.
+        let states: Vec<serde_json::Value> = State::all()
+            .iter()
+            .map(|s| serde_json::Value::String(s.as_str().to_string()))
+            .collect();
+        let schema_json = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "state": { "$ref": "#/$defs/State" },
+                "priority": { "$ref": "#/$defs/Priority" }
+            },
+            "required": ["state", "priority"],
+            "$defs": {
+                "State": { "enum": states },
+                "Priority": { "enum": ["low", "normal", "high", "critical"] }
+            }
+        })
+        .to_string();
+        let (_dir, set) = rule_set_with_schema("state-priority-shape", "error", &schema_json);
+        let engine = SchemaEngine::new();
+
+        let valid = serde_json::json!({ "state": "ready", "priority": "high" });
+        assert!(
+            engine.validate(&set.rules[0], &valid).unwrap().is_empty(),
+            "a value matching both local-ref definitions must validate cleanly"
+        );
+
+        let invalid = serde_json::json!({ "state": "not-a-real-state", "priority": "high" });
+        assert_eq!(
+            engine.validate(&set.rules[0], &invalid).unwrap().len(),
+            1,
+            "a value violating the ref'd State enum must be caught through the local ref"
+        );
     }
 
     #[test]

@@ -2,22 +2,142 @@
   "id": "ca024a2b-561d-432c-99f0-3a9ded3451d5",
   "title": "planning: Versioned repository profiles and portable JIT dogfood setup",
   "description": "Planning node for Versioned repository profiles and portable JIT dogfood setup (9b7b5f9c). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/9b7b5f9c-plan.md and link it to this node once written.",
-  "state": "ready",
+  "state": "done",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
   "dependencies": [],
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-14T18:54:15.155804406Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-14T22:14:09.079528541Z"
     }
   },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/9b7b5f9c-investigation.md",
+      "commit": null,
+      "label": "MVP Current-System Investigation",
+      "doc_type": "study",
+      "format": "markdown"
+    },
+    {
+      "path": "dev/active/9b7b5f9c-research.md",
+      "commit": null,
+      "label": "Profiles Architecture Research",
+      "doc_type": "research",
+      "format": "markdown",
+      "assets": [
+        {
+          "original_path": "https://docs.rs/include_dir/latest/include_dir/macro.include_dir.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap04.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.rs/schemars/latest/schemars/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://doc.rust-lang.org/stable/std/fs/fn.rename.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://doc.rust-lang.org/stable/std/fs/struct.File.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://doc.rust-lang.org/std/os/unix/fs/trait.PermissionsExt.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://doc.rust-lang.org/core/macro.include_bytes.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.rs/include_dir/latest/include_dir/",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://pubs.opengroup.org/onlinepubs/9799919799/functions/rename.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://www.sqlite.org/atomiccommit.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://docs.rs/rust-embed/latest/rust_embed/trait.RustEmbed.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        },
+        {
+          "original_path": "https://doc.rust-lang.org/cargo/reference/build-scripts.html",
+          "resolved_path": null,
+          "asset_type": "external",
+          "mime_type": null,
+          "content_hash": null,
+          "is_shared": false
+        }
+      ]
+    },
+    {
+      "path": "dev/active/9b7b5f9c-plan.md",
+      "commit": null,
+      "label": "Profiles MVP Plan",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:jit-profiles",
     "milestone:v1.0",
@@ -30,6 +150,8 @@
     "type:planning"
   ],
   "created_at": "2026-07-14T18:54:15.154577775Z",
-  "updated_at": "2026-07-14T18:54:15.155824596Z",
-  "first_ready_at": "2026-07-14T18:54:15.154578185Z"
+  "updated_at": "2026-07-14T22:21:49.756846605Z",
+  "first_ready_at": "2026-07-14T18:54:15.154578185Z",
+  "claimed_at": "2026-07-14T19:21:55.676950617Z",
+  "done_at": "2026-07-14T22:21:49.756845825Z"
 }

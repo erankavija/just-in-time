@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e06bf96d-4ce0-432d-81d7-c33a4fa055c6",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "cce04f0ed1d35fedee5994f02339fa94339cca13",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T22:26:07.177178954Z",
+  "completed_at": "2026-07-14T22:27:48.446736055Z",
+  "duration_ms": 101269,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is the configured maximum-level leaf type; its resolved tree node has no children. I inspected the four individually tagged `jit:4e22a20d` commits (including the tagged merge with parent diffs). Their union adds only benchmark tooling, `dev/benchmarks` artifacts, and issue metadata. Uncommitted changes were not attributed.\n\nDocumentation impact: no adopter-facing documentation file changed or directly references this repository-internal benchmark workflow. The prior doc-review passed with no unresolved blocking findings. No documentation update is required.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf footprint contains only repository-local benchmark tooling and developer artifacts; no adopter-facing documentation change is required.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Leaf footprint contains only repository-local benchmark tooling and developer artifacts; no adopter-facing documentation change is required.",
+    "findings": []
+  }
+}

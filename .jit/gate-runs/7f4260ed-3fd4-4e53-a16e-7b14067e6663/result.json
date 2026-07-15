@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "7f4260ed-3fd4-4e53-a16e-7b14067e6663",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "a9d039b0af4bdfd2dc4cd04931cc65bc8bf8cc70",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-14T22:54:55.243018293Z",
+  "completed_at": "2026-07-14T22:56:06.902610672Z",
+  "duration_ms": 71659,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a maximum-level leaf and has no resolved children. I inspected the six reachable `jit:4e22a20d` commits individually (with rename detection); their union changes the internal benchmark harness and `dev/` measurement artifacts only. Uncommitted `.jit/` changes were excluded.\n\nDecision: no adopter-visible JIT command, configuration, workflow, or documentation contract changed. No update to `docs/`, README, INSTALL, or MCP/web README is required. The prior passing review has no unresolved blocking findings.\n\nFindings\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf attribution is limited to repository-internal Rust benchmark tooling and dev artifacts; no adopter-facing documentation impact was introduced.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "Leaf attribution is limited to repository-internal Rust benchmark tooling and dev artifacts; no adopter-facing documentation impact was introduced.",
+    "findings": []
+  }
+}

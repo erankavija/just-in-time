@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "61e0a4b0-8b3e-4e50-802f-ff27e51724f2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3398bc19-61ba-4030-955c-f49d19bfebca",
+  "commit": "6b9ad09dddcee2ef02e64dad49496ecddf742d61",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T09:33:39.770448475Z",
+  "completed_at": "2026-07-15T09:36:55.120993209Z",
+  "duration_ms": 195350,
+  "exit_code": 1,
+  "stdout": "Attribution: 598ca05e, e9f7aed0, a933751c, 62ceec87 (`jit:3398bc19`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci — .jit/gates.toml (registry-first; direct source read after `jit item show` was refused by the stale-binary guard)\nGate evidence: cargo-ci passed (exit 0, 2026-07-15T09:25:02Z); code-review unrun; prior structured findings none\nTruncation recovery: re-read the attributable Cargo.lock patch in three bounded ranges; inspected each current affected source/test file separately\n\n1. **[blocking][issue-impact]** `cargo_tree_subtree` converts every nonzero `cargo tree` status into `Err(2)` at [dependency_feature_policy_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs:117), while both resolved-graph tests treat any error as a successful skip. A dependency-resolution or tree-query failure therefore passes without asserting REQ-06’s resolved-graph guard, despite the helper’s comment saying non-environment failures are hard failures.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The resolved dependency-feature regression checks can silently skip on any cargo-tree error.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Any nonzero cargo tree status is treated as a successful skip, leaving the required resolved-graph assertion unverified.\",\"file\":\"crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs\",\"line\":117,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 5470 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f651f-f361-7a21-b2dc-32d7a505c3eb\n--------\nuser\n--- 5457 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The resolved dependency-feature regression checks can silently skip on any cargo-tree error.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Any nonzero cargo tree status is treated as a successful skip, leaving the required resolved-graph assertion unverified.",
+        "file": "crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs",
+        "line": 117
+      }
+    ]
+  }
+}
