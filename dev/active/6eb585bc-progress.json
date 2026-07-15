@@ -141,8 +141,8 @@
           "title": "Remove secret-like label example from reference docs",
           "classification": "documentation",
           "model": "sonnet",
-          "status": "pending",
-          "note": "routed by the project-lead session 2026-07-15 (commit 84b0b36d, jit:3c4d6fe8); blocks 0aec3b1e in the production stream; gates secret-detection/repo-validate/doc-review; dispatch after ef0065ad settles"
+          "status": "done",
+          "note": "routed by the project-lead session 2026-07-15 (commit 84b0b36d, jit:3c4d6fe8); blocks 0aec3b1e in the production stream; gates secret-detection/repo-validate/doc-review; dispatch after ef0065ad settles. DONE 2026-07-15: docs fix merged (131338ca); gates secret-detection/repo-validate/doc-review green. Lead-side fallout fixes: stale example_rulesets_tests.rs doc link (8d4f7084 moves), rules-and-gates projection re-render, and an invoker-approved secret-detection gate amendment (scripts/secret-scan.sh scans tracked content; prior whole-dir scan hit timeout + 37 worktree/target false positives)"
         }
       ]
     },
