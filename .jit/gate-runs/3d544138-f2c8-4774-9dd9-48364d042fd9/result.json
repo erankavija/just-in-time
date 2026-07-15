@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "run_id": "3d544138-f2c8-4774-9dd9-48364d042fd9",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "b5d7a19568b7f88317f4e3d58e2e1c7f6e6d59d7",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-15T08:10:14.185174022Z",
+  "completed_at": "2026-07-15T08:15:57.121608958Z",
+  "duration_ms": 342936,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. The planning issue requires `dev/active/8b05a612-plan.md` and linkage at [e131f1dc…json:4](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:4). The non-empty plan exists and is linked as a design document at [e131f1dc…json:118](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/.jit/issues/e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f.json:118).\n\n## Completeness against the criteria\n\nPass at the criterion level. Section 1 addresses all eleven hard criteria from [v1-production-readiness-scope-brief.md:13](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/v1-production-readiness-scope-brief.md:13), and the coverage map at [8b05a612-plan.md:354](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:354) shows no obvious scope omission.\n\n## Technical soundness and architectural fit\n\nFail because of Finding 1.\n\nThe storage, routing, working-directory, embedded-web build-order, and audit assessments match the codebase. However, the proposed shutdown design overlooks an active production connection: the web client always opens `/api/events/stream` at [useEventStream.ts:61](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/web/src/hooks/useEventStream.ts:61), backed by a non-terminating broadcast stream with 15-second keepalives at [sse.rs:16](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/crates/server/src/sse.rs:16). Merely adding `with_graceful_shutdown` at the current server boundary does not cause that stream to finish.\n\n## Decomposition and dependencies\n\nThe principal ordering is coherent: remediation precedes enforcement, shutdown precedes the image, replacement precedes Docker removal, source-changing work precedes freeze, and candidate production flows through assembly, rehearsal, tag authorization, npm, then GHCR/GitHub publication.\n\nFinding 1 nevertheless understates the shutdown leaf’s blast radius: [8b05a612-plan.md:191](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:191) excludes the router/SSE state that must participate in shutdown. Finding 2 also leaves separate publication workflows without an executable coordination contract.\n\n## Risks and actionability\n\nFail because of Findings 2 and 3.\n\nThe revised plan now specifies GitHub Actions artifacts, exact numeric IDs, attestations, parent chains, API lookup, permissions, and environment-gated direct npm publication. Those additions substantially address the previous review.\n\nTwo load-bearing points remain unresolved:\n\n- “The v1 lock” is invoked but never defined.\n- The sole pre-publication store expires, while final-tag creation makes continued publication mandatory even if that store is subsequently lost.\n\n## Prior review feedback\n\nPartially addressed. The prior finding’s store, authentication, exact lookup, 90-day retention, and npm reviewer-handoff components are now specified at [8b05a612-plan.md:171](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:171) and [8b05a612-plan.md:333](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:333). Its atomic-coordination requirement remains unresolved, and the retention design has an unrecoverable post-tag boundary.\n\n## Findings\n\n1. **F1 — High, blocking, issue-impact:** The shutdown design cannot guarantee the required clean PID-1 exit while the supported web UI is connected. The leaf proposes only signal registration plus Axum `with_graceful_shutdown`, and its process test waits for health before sending SIGTERM ([8b05a612-plan.md:184](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:184)). In reality, the web UI holds an SSE request open, and `change_stream` has no shutdown/cancellation branch. The test can therefore pass with no active client while a real container hangs draining SSE until Docker/Podman sends SIGKILL. The plan must define server-wide cancellation or bounded drain behavior, include `AppState`/`routes.rs`/`sse.rs` in the leaf, and test SIGTERM with an active SSE client. This blocks REQ-06 and the Docker rehearsal in REQ-10.\n\n2. **F2 — High, blocking, issue-impact:** The publication state machine still has no specified atomic coordination primitive. The plan says final authorization “acquires the v1 lock” at [8b05a612-plan.md:326](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:326) and npm recovery retries “under the v1 lock” at [8b05a612-plan.md:339](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:339), but nowhere defines its owner, shared key, scope across final-tag/npm/GHCR/GitHub workflows, acquisition and release behavior, or cancellation/recovery semantics. Unique append-only artifacts are evidence, not compare-and-swap or mutual exclusion. If GitHub Actions concurrency is intended, the plan must specify one shared group and queue/cancellation policy; GitHub otherwise permits concurrent runs and, by default, replaces an existing pending run with the newest one ([GitHub concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)). This leaves the prior review’s atomicity concern unresolved.\n\n3. **F3 — High, blocking, issue-impact:** Post-tag recovery becomes impossible if the Actions artifacts expire or are deleted before publication finishes. Candidate bytes and transition records are retained for 90 days, final authorization is allowed through day 60, and tag creation is declared irreversible ([8b05a612-plan.md:175](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:175), [8b05a612-plan.md:323](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:323)). Yet the public GitHub Release becomes the long-term record only at the final publication leaf, while [8b05a612-plan.md:350](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612/dev/active/8b05a612-plan.md:350) says evidence loss after tagging merely halts for exact-version recovery. GitHub explicitly returns `410 Gone` for expired artifact downloads and permits deletion by Actions-write principals ([GitHub artifact API](https://docs.github.com/en/rest/actions/artifacts)). With the sole exact-byte store gone, native/source/OCI publication cannot be recovered. Before irreversible tag creation, the plan must establish durable availability of all exact bytes and transition parents or define an enforceable promotion/expiry protocol that cannot enter this dead state.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan covers all hard criteria, but shutdown with active SSE and the release protocol's undefined lock and post-tag evidence-loss state remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shutdown design does not terminate the web UI's active SSE stream, so graceful PID-1 exit is not guaranteed or tested under real usage.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":184,\"references\":[\"@/issue/8b05a612/requirement/REQ-06\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The cross-workflow publication protocol relies on an undefined v1 lock and therefore lacks an executable atomic coordination contract.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":326,\"references\":[\"@/issue/8b05a612/requirement/REQ-03\",\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"After irreversible tag creation, expiry or deletion of the sole Actions-artifact store makes mandatory exact-byte release recovery impossible.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":350,\"references\":[\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4774 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f64d3-9205-7ee0-8fe1-3cb43791aab6\n--------\nuser\n--- 4761 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The plan covers all hard criteria, but shutdown with active SSE and the release protocol's undefined lock and post-tag evidence-loss state remain blocking.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The shutdown design does not terminate the web UI's active SSE stream, so graceful PID-1 exit is not guaranteed or tested under real usage.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 184,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-06",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The cross-workflow publication protocol relies on an undefined v1 lock and therefore lacks an executable atomic coordination contract.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 326,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-03",
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "After irreversible tag creation, expiry or deletion of the sole Actions-artifact store makes mandatory exact-byte release recovery impossible.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 350,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      }
+    ]
+  }
+}
