@@ -7507,3 +7507,5 @@
 {"type":"gate_passed","id":"4812d2e6-902d-4ae4-8e56-c9a245ef7300","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T11:48:16.631338225Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"issue_state_changed","id":"0ab4dd77-cc84-4939-ae1e-219294c27d5f","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T11:48:39.625667196Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"c06cfd13-a410-450d-baf1-b895bb20ea33","issue_id":"83efbcb4-c852-4e8a-9d5e-d742f13b2ca6","timestamp":"2026-07-15T11:48:39.625708186Z"}
+{"type":"issue_state_changed","id":"58c5d279-3855-4a4f-8d1e-0d994b3419ab","issue_id":"3f73423b-fc24-4725-9fa3-dfbd2994f790","timestamp":"2026-07-15T11:49:05.968095542Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"d4fd74c2-807f-4cab-bfbd-8db3afd9fb79","issue_id":"3f73423b-fc24-4725-9fa3-dfbd2994f790","timestamp":"2026-07-15T11:49:05.968296592Z","assignee":"agent:worker"}
