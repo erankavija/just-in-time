@@ -7796,3 +7796,4 @@
 {"type":"gate_passed","id":"11f4f28d-4e4a-4228-b88b-82fcf2a5cdb3","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-15T14:38:48.091367479Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"0d14cd3a-a540-45a9-ae23-f5595832b7bc","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-15T14:38:49.589119048Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"61da9c2c-0a2d-436a-bcdd-cd5a69d4b41f","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-15T14:43:44.360519259Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"319e6238-349a-4433-99ad-25eb0c476e36","issue_id":"92039d9c-1433-4b24-b3f6-2c206648cc8f","timestamp":"2026-07-15T14:47:23.431410752Z","gate_key":"doc-review","updated_by":"auto:executor"}
