@@ -5,12 +5,18 @@
 //!
 //! - Projected ISSUE VIEWS expose it as a `gates` array of `{key, status, ...}`
 //!   objects, never the raw storage names. Covered here: `issue show`,
-//!   `issue show --summary`, `issue status`.
-//! - Raw RECORD DUMPS (any `--full` surface) emit the on-disk issue record
-//!   verbatim, so the gate list stays under `gates_required` / `gates_status`,
-//!   and their default summary shape omits it. Covered here: `graph export
-//!   --full`, `query all --full`, `issue list --full`, top-level `list --full`,
-//!   `issue search --full`.
+//!   `issue show --summary`, `issue status`, and `issue create` (which returns
+//!   the same enriched projection as `issue show`).
+//! - Raw RECORD DUMPS echo the on-disk issue record verbatim, so the gate list
+//!   stays under `gates_required` / `gates_status`. Covered here: the `--full`
+//!   list dumps (`graph export --full`, `query all --full`, `issue list --full`,
+//!   top-level `list --full`, `issue search --full`) and the single-issue
+//!   lifecycle mutation confirmations (`issue assign`, `unassign`, `reject`,
+//!   `release`, `claim`, `claim-next`). The `--full` list dumps additionally
+//!   omit the gate list from their default summary shape.
+//!
+//! A help-text assert guards the generated `issue show --help` against
+//! reintroducing the storage names.
 //!
 //! These asserts pin the emitted side; `crate::schema` unit tests pin the
 //! matching `jit --schema` declaration, so a rename on either side fails the
@@ -251,4 +257,114 @@ fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
 
     let summary = json(&temp, &["issue", "search", "Gated", "--json"]);
     assert_summary_omits_gates(find_issue(&summary, &id, "issue search"), "issue search");
+}
+
+// ---------------------------------------------------------------------------
+// Single-issue mutation confirmations echo the raw stored record, so the gate
+// list stays under the storage names. `issue create` is the exception: it
+// returns the same enriched projection as `issue show`, so it exposes `gates`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_issue_create_exposes_gates_array() {
+    let temp = TempDir::new().unwrap();
+    jit(&temp, &["init"]);
+    jit(
+        &temp,
+        &[
+            "gate",
+            "define",
+            "manual-gate",
+            "--title",
+            "Manual",
+            "--description",
+            "Manual gate",
+            "--mode",
+            "manual",
+        ],
+    );
+    // `issue create --json` returns the `issue show` projection, so it exposes
+    // the required gate under `gates`, never the storage split.
+    let view = json(
+        &temp,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Fresh",
+            "--description",
+            "Body",
+            "--gate",
+            "manual-gate",
+            "--json",
+        ],
+    );
+    assert_gates_array(&view, "issue create --json");
+}
+
+#[test]
+fn test_issue_assign_keeps_storage_gate_fields() {
+    let (temp, id) = setup_repo_with_gated_issue();
+    let record = json(&temp, &["issue", "assign", &id, "agent:worker-1", "--json"]);
+    assert_storage_record(&record, "issue assign");
+}
+
+#[test]
+fn test_issue_unassign_keeps_storage_gate_fields() {
+    let (temp, id) = setup_repo_with_gated_issue();
+    jit(&temp, &["issue", "assign", &id, "agent:worker-1"]);
+    let record = json(&temp, &["issue", "unassign", &id, "--json"]);
+    assert_storage_record(&record, "issue unassign");
+}
+
+#[test]
+fn test_issue_reject_keeps_storage_gate_fields() {
+    let (temp, id) = setup_repo_with_gated_issue();
+    let record = json(&temp, &["issue", "reject", &id, "--json"]);
+    assert_storage_record(&record, "issue reject");
+}
+
+#[test]
+fn test_issue_claim_keeps_storage_gate_fields_and_carries_warnings() {
+    let (temp, id) = setup_repo_with_gated_issue();
+    let record = json(&temp, &["issue", "claim", &id, "agent:worker-1", "--json"]);
+    assert_storage_record(&record, "issue claim");
+    assert!(
+        record.get("warnings").is_some(),
+        "issue claim record carries the advisory warnings array; got: {record}"
+    );
+}
+
+#[test]
+fn test_issue_claim_next_keeps_storage_gate_fields() {
+    let (temp, _id) = setup_repo_with_gated_issue();
+    // The freshly created dependency-free issue auto-promotes to ready, so it is
+    // the next claimable issue.
+    let record = json(&temp, &["issue", "claim-next", "agent:worker-1", "--json"]);
+    assert_storage_record(&record, "issue claim-next");
+}
+
+#[test]
+fn test_issue_release_keeps_storage_gate_fields() {
+    let (temp, id) = setup_repo_with_gated_issue();
+    jit(&temp, &["issue", "claim", &id, "agent:worker-1"]);
+    let record = json(&temp, &["issue", "release", &id, "timeout", "--json"]);
+    assert_storage_record(&record, "issue release");
+}
+
+#[test]
+fn test_issue_show_summary_help_names_gates_not_storage_fields() {
+    let temp = TempDir::new().unwrap();
+    // `--help` exits 0 and prints the generated command help, including the
+    // `--summary` description that must promise `gates`, not the storage split.
+    let out = jit(&temp, &["issue", "show", "--help"]);
+    let text = String::from_utf8_lossy(&out);
+    assert!(
+        text.contains("gates"),
+        "issue show --help should name the `gates` field; got: {text}"
+    );
+    assert!(
+        !text.contains("gates_required") && !text.contains("gates_status"),
+        "issue show --help must not promise the storage gate fields; got: {text}"
+    );
 }
