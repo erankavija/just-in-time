@@ -408,6 +408,132 @@ assert = { label-coverage = { } }
     );
 }
 
+// ---------------------------------------------------------------------------
+// Container-pointer resolution under scope (ef0065ad): a `container-from-label`
+// coverage rule (the repo's `coverage-preview` shape) fires on a breakdown node
+// and redirects to the bracketed container. Under `--scope`, the pointer must
+// resolve against the COMPLETE repository index — not the partial slice — so an
+// unrelated breakdown that entered the closure without its container is
+// recognized and skipped rather than mis-reported as a dangling pointer, while a
+// genuinely dangling pointer still fails precisely.
+// ---------------------------------------------------------------------------
+
+/// A `label-coverage` rule keyed on the breakdown node that redirects to the
+/// bracketed container via `container-from-label = "brackets"` — the shape the
+/// repo's `coverage-preview` rule uses. Error severity, enforcing.
+const COVERAGE_VIA_BRACKETS: &str = r#"
+[[rules]]
+name = "brackets-coverage-preview"
+when = { type = "breakdown" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
+"#;
+
+/// Save a breakdown node carrying an explicit `brackets:<pointer>` label in the
+/// given state, returning its id. Used to plant a breakdown whose container is
+/// out of scope (or absent) without going through the plan-bracket helper.
+fn seed_breakdown_bracketing(
+    executor: &CommandExecutor<InMemoryStorage>,
+    pointer: &str,
+    state: State,
+    deps: &[String],
+) -> String {
+    let mut b = Issue::new("breakdown".to_string(), String::new());
+    b.labels = vec!["type:breakdown".to_string(), format!("brackets:{pointer}")];
+    b.dependencies = deps.to_vec();
+    b.state = state;
+    let id = b.id.clone();
+    executor.storage().save_issue(b).unwrap();
+    id
+}
+
+#[test]
+fn test_scope_skips_unrelated_breakdown_whose_container_is_out_of_scope() {
+    // REQ-02 (ef0065ad): a completed, UNRELATED breakdown B2 enters the scoped
+    // slice through the dependency closure (as a breakdown boundary node), but
+    // the container it brackets (C2) is not in the slice. Its `brackets:` pointer
+    // resolves against the FULL repository index, so the out-of-scope container is
+    // recognized and B2's coverage is simply not the requested bracket — no false
+    // missing-pointer finding. Before the fix, resolving `brackets:C2` against the
+    // partial slice found nothing and raised a spurious `config error`.
+    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
+
+    // C2 lives OUTSIDE the scoped container's closure (unreachable from C1).
+    let c2 = seed(
+        &executor,
+        "other-container",
+        &["type:epic"],
+        "## Success Criteria\n\n- [hard] REQ-99: unrelated\n",
+        &[],
+    );
+    // B2 is completed and brackets C2; it is reachable from C1 via task1, so it
+    // enters C1's slice as a breakdown boundary node while C2 does not.
+    let b2 = seed_breakdown_bracketing(&executor, &c2[..8], State::Done, &[]);
+    let task1 = seed(
+        &executor,
+        "task1",
+        &["type:task"],
+        "",
+        std::slice::from_ref(&b2),
+    );
+    let c1 = seed(
+        &executor,
+        "scoped-container",
+        &["type:epic"],
+        "",
+        std::slice::from_ref(&task1),
+    );
+
+    let report = executor.validate_scope(&c1).expect("scope validation runs");
+
+    assert!(
+        !report.has_errors(),
+        "an out-of-scope bracketed container must not raise a config error: {:?}",
+        report.findings
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|f| f.message.contains("no known issue")),
+        "no false missing-pointer finding for the unrelated breakdown: {:?}",
+        report.findings
+    );
+}
+
+#[test]
+fn test_scope_dangling_brackets_pointer_still_fails_precisely() {
+    // REQ-03 (ef0065ad): a breakdown IN the requested scope whose `brackets:`
+    // pointer names no issue ANYWHERE (not merely outside the slice) is a genuine
+    // configuration error and must still fail with the precise finding. Full-index
+    // resolution must not mask a truly dangling pointer.
+    let executor = executor_with_rules(COVERAGE_VIA_BRACKETS);
+    let b1 = seed_breakdown_bracketing(&executor, "deadbeef", State::Done, &[]);
+    let c1 = seed(
+        &executor,
+        "scoped-container",
+        &["type:epic"],
+        "",
+        std::slice::from_ref(&b1),
+    );
+
+    let report = executor.validate_scope(&c1).expect("scope validation runs");
+
+    assert!(
+        report.has_errors(),
+        "a genuinely dangling brackets pointer must fail: {:?}",
+        report.findings
+    );
+    assert!(
+        report.findings.iter().any(
+            |f| f.message.contains("brackets:deadbeef") && f.message.contains("no known issue")
+        ),
+        "the finding must precisely name the dangling pointer: {:?}",
+        report.findings
+    );
+}
+
 #[test]
 fn test_scope_resolves_partial_container_id() {
     let executor = executor_with_rules(COVERAGE_ON_BREAKDOWN);
