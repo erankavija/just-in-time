@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-15T01:37:52Z",
+  "generated_at": "2026-07-15T01:39:44Z",
   "environment": {
     "git_revision": "56d737891129babf9571eb4de5659295bce8d827",
     "os": "Arch Linux",
@@ -39,10 +39,9 @@
         "test_case_count": 3306,
         "doctest_case_count": 66,
         "ignored_test_case_count": 14,
-        "correction_note": "Corrected post-hoc (code review rework, jit:4e22a20d): originally recorded unique_active_test_executable_bytes=15314841704 and test_case_count=3240 from a script version that (a) did not filter cargo compiler-artifact messages on profile.test, so two ordinary (non-test) `jit`/`jit-server` binaries were mis-included in the executable-byte sum, and (b) did not enumerate doctests. unique_active_test_executable_bytes is corrected by subtracting the two dropped binaries same-commit current sizes (259810472 + 237942472 = 497752944) from the original sum, since the originating isolated target directory no longer exists to re-measure directly. test_case_count now includes 66 doctests via cargo test --workspace --doc -- --list, added as doctest_case_count. See dev/benchmarks/rust-build-efficiency/pre-change-test-inventory.json and report.md for full detail."
+        "correction_note": "Corrected twice post-hoc (code-review rework, jit:4e22a20d): (1) profile.test filter — the original sum 15314841704 mis-included the two ordinary non-test `jit`/`jit-server` binaries; (2) the corrected value is a MEASUREMENT from a fresh isolated `git archive` build of the same commit (56d73789) with the same toolchain: 148 profile.test executables summing to 14816926968 bytes (excluded non-test bins measured jit=259803096, jit-server=237935048). test_case_count includes 66 doctests via `cargo test --workspace --doc -- --list` (doctest_case_count). Timing and RSS fields are original in-sample measurements. See report.md for the full derivation."
       },
-      "success": true,
-      "correction_note": "unique_active_test_executable_bytes is a post-hoc MEASUREMENT, not the in-sample value: the original isolated sample target dir was removed by design before the profile.test filter landed, so the metric was re-measured on 2026-07-15 from a fresh isolated `git archive` build of the same commit (56d73789) with the same toolchain via `cargo test --workspace --no-run --message-format=json`; the artifact set matched the recorded inventory exactly (148 profile.test executables; excluded non-test bins jit 259803096 B, jit-server 237935048 B). All timing and RSS fields are the original in-sample measurements."
+      "success": true
     },
     {
       "sample": 2,
