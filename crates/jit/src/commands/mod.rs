@@ -85,7 +85,7 @@ pub use template_expand::{
     TemplateDelta,
 };
 pub(crate) use validate::{find_planning_node, planning_node_plan_path};
-pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE};
+pub use validate::{DANGLING_LINK_RULE, ENFORCEMENT_DRIFT_RULE, REVIEW_PLACEHOLDER_RULE};
 
 // Re-export WorktreeIdentity for init return type
 pub use crate::storage::worktree_identity::WorktreeIdentity;

@@ -133,8 +133,9 @@ impl<T> FieldEdit<T> {
 /// hand-editing the registry. The gate KEY is the gate's identity and is
 /// therefore not part of this struct. The checker fields (`checker_command`,
 /// `timeout`, `working_dir`, `pass_context`, `prompt`, `prompt_file`, `env`)
-/// are merged onto the gate's existing checker so an unprovided field is
-/// preserved.
+/// are merged onto an existing exec checker. Editing one of those fields on a
+/// built-in checker replaces it with an exec checker; otherwise an unprovided
+/// checker field is preserved.
 #[derive(Debug, Default, Clone)]
 pub struct GateUpdate {
     /// New human-readable title.
@@ -408,6 +409,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                         warnings,
                     }
                     .into());
+                }
+                if let Some(message) = result.message {
+                    warnings.push(message);
                 }
                 return Ok(GatePassOutcome {
                     warnings,
@@ -703,8 +707,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Updating a key that is not in the registry is a typed
     /// [`GateNotFoundError`](crate::storage::GateNotFoundError) (exit code `3`).
     /// Mirroring [`define_gate`](Self::define_gate): a gate that ends up in
-    /// automated mode must have a checker command, and a manual gate carries no
-    /// checker.
+    /// automated mode must have a configured checker (and an exec checker must
+    /// have a non-empty command), while a manual gate carries no checker.
     ///
     /// Returns the updated [`Gate`] so callers can render it.
     ///
@@ -780,15 +784,82 @@ impl<S: IssueStore> CommandExecutor<S> {
             || !update.env.is_keep();
 
         let merged_checker = if current.checker.is_some() || any_checker_field {
-            let (
-                mut command,
-                mut timeout_seconds,
-                mut working_dir,
-                mut env,
-                mut pass_context,
-                mut prompt,
-                mut prompt_file,
-            ) = match current.checker.clone() {
+            if !any_checker_field
+                && matches!(
+                    current.checker,
+                    Some(GateChecker::RepositoryValidation)
+                        | Some(GateChecker::IssueValidation)
+                        | Some(GateChecker::LabelTargetValidation { .. })
+                        | Some(GateChecker::ReviewPlaceholder)
+                )
+            {
+                current.checker.clone()
+            } else {
+                let (
+                    mut command,
+                    mut timeout_seconds,
+                    mut working_dir,
+                    mut env,
+                    mut pass_context,
+                    mut prompt,
+                    mut prompt_file,
+                ) = match current.checker.clone() {
+                    Some(GateChecker::Exec {
+                        command,
+                        timeout_seconds,
+                        working_dir,
+                        env,
+                        pass_context,
+                        prompt,
+                        prompt_file,
+                    }) => (
+                        command,
+                        timeout_seconds,
+                        working_dir,
+                        env,
+                        pass_context,
+                        prompt,
+                        prompt_file,
+                    ),
+                    Some(_) | None => (
+                        String::new(),
+                        300u64,
+                        None,
+                        std::collections::HashMap::new(),
+                        false,
+                        None,
+                        None,
+                    ),
+                };
+                if let Some(c) = update.checker_command {
+                    command = c;
+                }
+                if let Some(t) = update.timeout {
+                    timeout_seconds = t;
+                }
+                if let Some(pc) = update.pass_context {
+                    pass_context = pc;
+                }
+                working_dir = match update.working_dir {
+                    FieldEdit::Keep => working_dir,
+                    FieldEdit::Set(v) => Some(v),
+                    FieldEdit::Clear => None,
+                };
+                prompt = match update.prompt {
+                    FieldEdit::Keep => prompt,
+                    FieldEdit::Set(v) => Some(v),
+                    FieldEdit::Clear => None,
+                };
+                prompt_file = match update.prompt_file {
+                    FieldEdit::Keep => prompt_file,
+                    FieldEdit::Set(v) => Some(v),
+                    FieldEdit::Clear => None,
+                };
+                env = match update.env {
+                    FieldEdit::Keep => env,
+                    FieldEdit::Set(m) => m,
+                    FieldEdit::Clear => std::collections::HashMap::new(),
+                };
                 Some(GateChecker::Exec {
                     command,
                     timeout_seconds,
@@ -797,63 +868,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     pass_context,
                     prompt,
                     prompt_file,
-                }) => (
-                    command,
-                    timeout_seconds,
-                    working_dir,
-                    env,
-                    pass_context,
-                    prompt,
-                    prompt_file,
-                ),
-                None => (
-                    String::new(),
-                    300u64,
-                    None,
-                    std::collections::HashMap::new(),
-                    false,
-                    None,
-                    None,
-                ),
-            };
-            if let Some(c) = update.checker_command {
-                command = c;
+                })
             }
-            if let Some(t) = update.timeout {
-                timeout_seconds = t;
-            }
-            if let Some(pc) = update.pass_context {
-                pass_context = pc;
-            }
-            working_dir = match update.working_dir {
-                FieldEdit::Keep => working_dir,
-                FieldEdit::Set(v) => Some(v),
-                FieldEdit::Clear => None,
-            };
-            prompt = match update.prompt {
-                FieldEdit::Keep => prompt,
-                FieldEdit::Set(v) => Some(v),
-                FieldEdit::Clear => None,
-            };
-            prompt_file = match update.prompt_file {
-                FieldEdit::Keep => prompt_file,
-                FieldEdit::Set(v) => Some(v),
-                FieldEdit::Clear => None,
-            };
-            env = match update.env {
-                FieldEdit::Keep => env,
-                FieldEdit::Set(m) => m,
-                FieldEdit::Clear => std::collections::HashMap::new(),
-            };
-            Some(GateChecker::Exec {
-                command,
-                timeout_seconds,
-                working_dir,
-                env,
-                pass_context,
-                prompt,
-                prompt_file,
-            })
         } else {
             None
         };
@@ -865,10 +881,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             merged_checker
         };
 
-        // Automated gates must have a checker command (mirror define_gate).
-        if final_mode == GateMode::Auto
-            && !matches!(&final_checker, Some(GateChecker::Exec { command, .. }) if !command.is_empty())
-        {
+        // Automated gates must have a valid checker (mirror define_gate).
+        let has_valid_checker = match &final_checker {
+            Some(GateChecker::Exec { command, .. }) => !command.is_empty(),
+            Some(_) => true,
+            None => false,
+        };
+        if final_mode == GateMode::Auto && !has_valid_checker {
             return Err(anyhow!(
                 "Automated gates must have a checker configured. Add --checker-command or use --mode manual"
             ));
@@ -999,14 +1018,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
             // Apply timeout override if specified
             if let Some(timeout) = timeout_override {
-                if let Some(checker) = &mut gate.checker {
-                    match checker {
-                        GateChecker::Exec {
-                            timeout_seconds, ..
-                        } => {
-                            *timeout_seconds = timeout;
-                        }
-                    }
+                if let Some(GateChecker::Exec {
+                    timeout_seconds, ..
+                }) = &mut gate.checker
+                {
+                    *timeout_seconds = timeout;
                 }
             }
 

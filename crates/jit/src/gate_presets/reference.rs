@@ -41,12 +41,17 @@ fn cell(text: &str) -> String {
 /// Render one gate's checker configuration as a table cell: every field of the
 /// checker, or the manual-gate note when the gate carries none.
 ///
-/// [`GateChecker`] has a single variant, `exec`, and every one of its fields —
-/// command, timeout, working directory, environment, context passing, inline
-/// prompt, prompt file — is projected, so the cell fully determines how the gate
-/// runs.
+/// Every checker variant and all of its configured fields are projected, so the
+/// cell fully determines how the gate runs.
 fn checker_cell(gate: &GateTemplate) -> String {
-    let Some(GateChecker::Exec {
+    let Some(checker) = gate.checker.as_ref() else {
+        // `GatePresetDefinition::validate` rejects an auto gate without a
+        // checker, so a checker-less gate is always manual: it is passed by
+        // attestation (`jit gate evaluate <id> <gate>`), never by a command.
+        return "none — manual attestation".to_string();
+    };
+
+    let GateChecker::Exec {
         command,
         timeout_seconds,
         working_dir,
@@ -54,12 +59,25 @@ fn checker_cell(gate: &GateTemplate) -> String {
         pass_context,
         prompt,
         prompt_file,
-    }) = gate.checker.as_ref()
+    } = checker
     else {
-        // `GatePresetDefinition::validate` rejects an auto gate without a
-        // checker, so a checker-less gate is always manual: it is passed by
-        // attestation (`jit gate evaluate <id> <gate>`), never by a command.
-        return "none — manual attestation".to_string();
+        return match checker {
+            GateChecker::RepositoryValidation => {
+                "`repository_validation` — built-in whole-repository validation".to_string()
+            }
+            GateChecker::IssueValidation => {
+                "`issue_validation` — built-in validation of the gated issue".to_string()
+            }
+            GateChecker::LabelTargetValidation { label_namespace } => format!(
+                "`label_target_validation` — built-in scoped validation; target label namespace: `{}`",
+                cell(label_namespace)
+            ),
+            GateChecker::ReviewPlaceholder => format!(
+                "`review_placeholder` — {}",
+                crate::domain::REVIEW_PLACEHOLDER_WARNING
+            ),
+            GateChecker::Exec { .. } => unreachable!(),
+        };
     };
 
     // Sort the environment by key: `env` is a `HashMap`.
@@ -186,6 +204,25 @@ pub fn render_reference_markdown() -> Result<String> {
          `.jit/config.toml`; render those with `jit reference render` (see\n\
          [Rules and Gates](rules-and-gates.md)).\n\
          \n\
+         ## Portable checker types\n\
+         \n\
+         Automated gate definitions can use `exec` or one of four in-process checker types.\n\
+         The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the\n\
+         configured gate key does not change their behavior:\n\
+         \n\
+         - `repository_validation` runs structural and declarative validation for the whole\n\
+           repository.\n\
+         - `issue_validation` runs declarative validation for the gated issue.\n\
+         - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
+           from the gated issue and runs scoped validation for that target. Its checker table\n\
+           must set `label_namespace`.\n\
+         - `review_placeholder` passes so a workflow can be installed before an external\n\
+           reviewer is selected, but records an advisory structured finding and prints\n\
+           `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns\n\
+           while any gate uses it. Replace it with an `exec` checker (for example, `jit gate\n\
+           update <key> --checker-command <command>`) before treating the gate as review\n\
+           evidence.\n\
+         \n\
          A project can also define its own presets: `jit gate preset create <issue> <name>`\n\
          captures an issue's gates into `.jit/config/gate-presets/<name>.json`, and every\n\
          JSON file in that directory loads alongside the built-ins. `jit gate preset create`\n\
@@ -282,6 +319,19 @@ mod tests {
                             gate.key
                         );
                     }
+                    Some(checker) => assert!(
+                        doc.contains(match checker {
+                            GateChecker::RepositoryValidation => "`repository_validation`",
+                            GateChecker::IssueValidation => "`issue_validation`",
+                            GateChecker::LabelTargetValidation { .. } => {
+                                "`label_target_validation`"
+                            }
+                            GateChecker::ReviewPlaceholder => "`review_placeholder`",
+                            GateChecker::Exec { .. } => unreachable!(),
+                        }),
+                        "checker of {} missing",
+                        gate.key
+                    ),
                     None => assert_eq!(gate.mode, GateMode::Manual),
                 }
             }

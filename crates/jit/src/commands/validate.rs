@@ -19,6 +19,10 @@ pub const DANGLING_LINK_RULE: &str = "dangling-item-link";
 /// grouping and rendering.
 pub const ENFORCEMENT_DRIFT_RULE: &str = "enforcement-drift";
 
+/// Rule name carried by the built-in advisory finding emitted while one or
+/// more gate definitions still use [`GateChecker::ReviewPlaceholder`].
+pub const REVIEW_PLACEHOLDER_RULE: &str = "review-placeholder";
+
 impl<S: IssueStore> CommandExecutor<S> {
     /// Validate with optional fix mode.
     ///
@@ -831,6 +835,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 for gf in self.enforcement_drift_findings()? {
                     findings.push(ReportedFinding::new(gf.issue_id.clone(), &gf.finding));
                 }
+                if id.is_none() {
+                    findings.extend(self.review_placeholder_findings()?);
+                }
                 // Surface the unparseable ruleset as an error-severity finding so
                 // the report still fails (config-error prefix keeps it grouped).
                 findings.push(ReportedFinding::new(
@@ -921,10 +928,52 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .iter()
                         .map(|gf| ReportedFinding::new(gf.issue_id.clone(), &gf.finding)),
                 );
+                findings.extend(self.review_placeholder_findings()?);
             }
         }
 
         Ok(RuleReport { findings })
+    }
+
+    /// Report configured passing review placeholders as project-scoped warnings.
+    ///
+    /// The registry keys are sorted before rendering so the finding is stable
+    /// across hash-map iteration order. This pass is advisory: placeholders make
+    /// repository validation noisy and truthful without making an otherwise
+    /// valid repository unusable before its external reviewer is configured.
+    pub fn review_placeholder_findings(
+        &self,
+    ) -> Result<Vec<crate::validation::report::ReportedFinding>> {
+        use crate::domain::GateChecker;
+        use crate::validation::engine::Finding;
+        use crate::validation::report::ReportedFinding;
+        use crate::validation::rules::Severity;
+
+        let registry = self.storage.load_gate_registry()?;
+        let mut keys: Vec<&str> = registry
+            .gates
+            .iter()
+            .filter_map(|(key, gate)| {
+                matches!(gate.checker, Some(GateChecker::ReviewPlaceholder)).then_some(key.as_str())
+            })
+            .collect();
+        keys.sort_unstable();
+
+        Ok(if keys.is_empty() {
+            Vec::new()
+        } else {
+            vec![ReportedFinding::new(
+                None,
+                &Finding {
+                    rule: REVIEW_PLACEHOLDER_RULE.to_string(),
+                    severity: Severity::Warn,
+                    message: format!(
+                        "WARNING: passing external-review placeholder still configured for gate(s): {}. Replace each placeholder with a real review checker before relying on these gates.",
+                        keys.join(", ")
+                    ),
+                },
+            )]
+        })
     }
 
     /// Run the declarative rule set over a **container bracket subtree** for use

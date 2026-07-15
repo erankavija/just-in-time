@@ -39,6 +39,7 @@ fn test_apply_plan_review_attaches_agent_gate_to_planning_node() {
     assert_eq!(gate.mode, GateMode::Auto);
     match gate.checker.as_ref().expect("agent gate has a checker") {
         GateChecker::Exec { command, .. } => assert_eq!(command, "./scripts/ai-review.sh"),
+        other => panic!("expected exec checker, got {other:?}"),
     }
 }
 
@@ -83,6 +84,7 @@ fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node()
         GateChecker::Exec { command, .. } => {
             assert_eq!(command, "./scripts/coverage-preview.sh")
         }
+        other => panic!("expected exec checker, got {other:?}"),
     }
 }
 

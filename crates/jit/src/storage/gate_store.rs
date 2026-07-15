@@ -194,6 +194,50 @@ mod tests {
     }
 
     #[test]
+    fn test_save_then_load_round_trips_all_builtin_checker_schemas() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkers = [
+            (
+                "repo-any-key",
+                crate::domain::GateChecker::RepositoryValidation,
+            ),
+            ("issue-any-key", crate::domain::GateChecker::IssueValidation),
+            (
+                "coverage-any-key",
+                crate::domain::GateChecker::LabelTargetValidation {
+                    label_namespace: "parent-pointer".to_string(),
+                },
+            ),
+            (
+                "review-any-key",
+                crate::domain::GateChecker::ReviewPlaceholder,
+            ),
+        ];
+        let mut registry = GateRegistry::default();
+        for (key, checker) in checkers {
+            let mut gate = sample_gate(key);
+            gate.mode = GateMode::Auto;
+            gate.auto = true;
+            gate.checker = Some(checker);
+            registry.gates.insert(key.to_string(), gate);
+        }
+
+        save_gate_registry(dir.path(), &registry).unwrap();
+        let encoded = std::fs::read_to_string(dir.path().join("gates.toml")).unwrap();
+        for checker_type in [
+            "repository_validation",
+            "issue_validation",
+            "label_target_validation",
+            "review_placeholder",
+        ] {
+            assert!(encoded.contains(&format!("type = \"{checker_type}\"")));
+        }
+
+        let loaded = load_gate_registry(dir.path()).unwrap();
+        assert_eq!(loaded.gates, registry.gates);
+    }
+
+    #[test]
     fn test_save_gate_registry_writes_array_of_tables_not_keyed_table() {
         let dir = tempfile::tempdir().unwrap();
         let mut registry = GateRegistry::default();

@@ -937,7 +937,11 @@ impl std::fmt::Display for GateMode {
 }
 
 /// Gate checker configuration
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The built-in variants execute inside the current process and therefore do
+/// not depend on a `jit` executable, shell, or JSON command-line parser. Their
+/// behavior is independent of the gate key that selects them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum GateChecker {
     /// Execute a shell command
@@ -961,7 +965,23 @@ pub enum GateChecker {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         prompt_file: Option<String>,
     },
+    /// Run the repository's structural and declarative validation in-process.
+    RepositoryValidation,
+    /// Run the repository's declarative validation for the gated issue in-process.
+    IssueValidation,
+    /// Resolve a validation target from a label on the gated issue, then run
+    /// scoped validation for that target in-process.
+    LabelTargetValidation {
+        /// Namespace of the `namespace:<target-id>` label carrying the target.
+        label_namespace: String,
+    },
+    /// Passing placeholder for an external review integration that has not yet
+    /// been configured. The run always carries a visible advisory warning.
+    ReviewPlaceholder,
 }
+
+/// Human and structured warning emitted by [`GateChecker::ReviewPlaceholder`].
+pub const REVIEW_PLACEHOLDER_WARNING: &str = "WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate.";
 
 /// Structured context passed to gate checker processes
 ///

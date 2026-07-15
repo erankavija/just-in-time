@@ -1,7 +1,10 @@
 //! Gate checking and execution operations
 
 use super::*;
-use crate::domain::{GateContext, GateMode, GateRunResult, GateRunStatus, GateStage, GateStatus};
+use crate::domain::{
+    GateContext, GateFinding, GateFindings, GateMode, GateRunResult, GateRunStatus, GateStage,
+    GateStatus, REVIEW_PLACEHOLDER_WARNING,
+};
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
 use crate::output::IssueShowResponse;
@@ -40,6 +43,36 @@ fn omit_current_gate_projection(issue: &mut serde_json::Value, gate_key: &str) {
     {
         gates.retain(|gate| gate.get("key").and_then(serde_json::Value::as_str) != Some(gate_key));
     }
+}
+
+/// Convert validation findings into the gate-run finding contract.
+fn gate_findings_from_rule_report(
+    report: &crate::validation::report::RuleReport,
+) -> Vec<GateFinding> {
+    use crate::validation::rules::Severity;
+
+    report
+        .findings
+        .iter()
+        .filter(|finding| finding.severity != Severity::Off)
+        .map(|finding| GateFinding {
+            id: String::new(),
+            severity: if finding.is_error() { "high" } else { "low" }.to_string(),
+            disposition: Some(
+                if finding.is_error() {
+                    "blocking"
+                } else {
+                    "advisory"
+                }
+                .to_string(),
+            ),
+            origin: Some("issue-impact".to_string()),
+            summary: format!("[{}] {}", finding.rule, finding.message),
+            file: None,
+            line: None,
+            references: Vec::new(),
+        })
+        .collect()
 }
 
 /// Compare the running binary's own build provenance
@@ -184,7 +217,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Determine working directory: repo root (parent of .jit dir).
         let repo_root = self.checker_repo_root();
 
-        // REQ-01/02: refuse to produce a gate verdict from a binary that
+        // REQ-01/02: refuse to produce an EXEC checker verdict from a binary that
         // predates, or no longer matches, the tree under review — checked
         // BEFORE the checker process is spawned, so a stale binary never
         // produces (or persists) a verdict at all. This covers the
@@ -194,8 +227,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         // via `JIT_GATE_RUN` (see `gate_execution::execute_gate_checker_with_context`
         // and the binary crate's startup dispatch). See `domain::build_provenance`
         // for the identity predicate (REQ-03) and the warn-vs-fail rationale.
-        if let Some(reason) = self.stale_binary_reason() {
-            return Err(crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into());
+        if matches!(checker, crate::domain::GateChecker::Exec { .. }) {
+            if let Some(reason) = self.stale_binary_reason() {
+                return Err(
+                    crate::errors::StaleBinaryError::new(&full_id, gate_key, &reason).into(),
+                );
+            }
         }
 
         let working_dir = match checker {
@@ -209,15 +246,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Build context if pass_context is enabled
         let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
 
-        let result = gate_execution::execute_gate_checker_with_context(
-            gate_key,
-            &full_id,
-            gate.stage,
-            checker,
-            &working_dir,
-            context.as_ref(),
-            &issue.documents,
-        )?;
+        let result = match checker {
+            crate::domain::GateChecker::Exec { .. } => {
+                gate_execution::execute_gate_checker_with_context(
+                    gate_key,
+                    &full_id,
+                    gate.stage,
+                    checker,
+                    &working_dir,
+                    context.as_ref(),
+                    &issue.documents,
+                )?
+            }
+            _ => self.execute_builtin_checker(gate_key, &full_id, gate.stage, checker)?,
+        };
 
         // Save run result
         self.storage.save_gate_run_result(&result)?;
@@ -258,6 +300,188 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(result)
     }
 
+    /// Execute a portable checker without spawning a subprocess.
+    fn execute_builtin_checker(
+        &self,
+        gate_key: &str,
+        issue_id: &str,
+        stage: GateStage,
+        checker: &crate::domain::GateChecker,
+    ) -> Result<GateRunResult> {
+        use crate::domain::GateChecker;
+        use crate::validation::report::RuleReport;
+
+        let started_at = chrono::Utc::now();
+        let start = std::time::Instant::now();
+
+        let (command, mut findings, explicit_failure) = match checker {
+            GateChecker::RepositoryValidation => {
+                let integrity = self
+                    .validate_integrity_silent()
+                    .err()
+                    .map(|error| GateFinding {
+                        id: "repository-integrity".to_string(),
+                        severity: "high".to_string(),
+                        disposition: Some("blocking".to_string()),
+                        origin: Some("issue-impact".to_string()),
+                        summary: error.to_string(),
+                        file: None,
+                        line: None,
+                        references: Vec::new(),
+                    });
+                let integrity_failed = integrity.is_some();
+                let report = self.run_rules(None)?;
+                let mut findings = gate_findings_from_rule_report(&report);
+                findings.extend(integrity);
+                (
+                    "builtin:repository_validation",
+                    findings,
+                    report.has_errors() || integrity_failed,
+                )
+            }
+            GateChecker::IssueValidation => {
+                let report = self.run_rules(Some(issue_id))?;
+                let failed = report.has_errors();
+                (
+                    "builtin:issue_validation",
+                    gate_findings_from_rule_report(&report),
+                    failed,
+                )
+            }
+            GateChecker::LabelTargetValidation { label_namespace } => {
+                let issue = self.storage.load_issue(issue_id)?;
+                let prefix = format!("{label_namespace}:");
+                let targets: Vec<&str> = issue
+                    .labels
+                    .iter()
+                    .filter_map(|label| label.strip_prefix(&prefix))
+                    .collect();
+                if label_namespace.is_empty() || targets.len() != 1 || targets[0].is_empty() {
+                    let detail = if label_namespace.is_empty() {
+                        "label_namespace is empty".to_string()
+                    } else {
+                        format!(
+                            "expected exactly one non-empty '{}:<target-id>' label on issue {}, found {}",
+                            label_namespace,
+                            issue_id,
+                            targets.len()
+                        )
+                    };
+                    (
+                        "builtin:label_target_validation",
+                        vec![GateFinding {
+                            id: "label-target".to_string(),
+                            severity: "high".to_string(),
+                            disposition: Some("blocking".to_string()),
+                            origin: Some("issue-impact".to_string()),
+                            summary: detail,
+                            file: None,
+                            line: None,
+                            references: Vec::new(),
+                        }],
+                        true,
+                    )
+                } else {
+                    let report: RuleReport = self.validate_scope(targets[0])?;
+                    let failed = report.has_errors();
+                    (
+                        "builtin:label_target_validation",
+                        gate_findings_from_rule_report(&report),
+                        failed,
+                    )
+                }
+            }
+            GateChecker::ReviewPlaceholder => (
+                "builtin:review_placeholder",
+                vec![GateFinding {
+                    id: "review-placeholder".to_string(),
+                    severity: "high".to_string(),
+                    disposition: Some("advisory".to_string()),
+                    origin: Some("pre-existing".to_string()),
+                    summary: REVIEW_PLACEHOLDER_WARNING.to_string(),
+                    file: None,
+                    line: None,
+                    references: Vec::new(),
+                }],
+                false,
+            ),
+            GateChecker::Exec { .. } => unreachable!("exec checker is dispatched separately"),
+        };
+
+        // Stable ids make findings useful as data regardless of the configured
+        // gate key. Preserve explicit ids used for configuration/integrity
+        // failures and number ordinary rule findings in evaluation order.
+        for (index, finding) in findings.iter_mut().enumerate() {
+            if finding.id.is_empty() {
+                finding.id = format!("F{}", index + 1);
+            }
+        }
+
+        let status = if explicit_failure {
+            GateRunStatus::Failed
+        } else {
+            GateRunStatus::Passed
+        };
+        let finding_count = findings.len();
+        let summary = match checker {
+            GateChecker::ReviewPlaceholder => REVIEW_PLACEHOLDER_WARNING.to_string(),
+            _ if status == GateRunStatus::Passed => {
+                format!("Built-in validation passed with {finding_count} advisory finding(s)")
+            }
+            _ => format!("Built-in validation failed with {finding_count} finding(s)"),
+        };
+        let stdout = if findings.is_empty() {
+            summary.clone()
+        } else {
+            std::iter::once(summary.clone())
+                .chain(findings.iter().map(|finding| {
+                    let label = if finding.disposition.as_deref() == Some("blocking") {
+                        "ERROR"
+                    } else {
+                        "WARNING"
+                    };
+                    format!("{label} [{}] {}", finding.id, finding.summary)
+                }))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let message = matches!(checker, GateChecker::ReviewPlaceholder)
+            .then(|| REVIEW_PLACEHOLDER_WARNING.to_string());
+
+        Ok(GateRunResult {
+            schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
+            run_id: uuid::Uuid::new_v4().to_string(),
+            gate_key: gate_key.to_string(),
+            stage,
+            issue_id: issue_id.to_string(),
+            commit: None,
+            branch: None,
+            status,
+            started_at,
+            completed_at: Some(chrono::Utc::now()),
+            duration_ms: Some(start.elapsed().as_millis() as u64),
+            exit_code: Some(if status == GateRunStatus::Passed {
+                0
+            } else {
+                4
+            }),
+            stdout,
+            stderr: String::new(),
+            command: command.to_string(),
+            by: Some("auto:executor".to_string()),
+            message,
+            findings: Some(GateFindings {
+                verdict: if status == GateRunStatus::Passed {
+                    "pass".to_string()
+                } else {
+                    "fail".to_string()
+                },
+                summary,
+                findings,
+            }),
+        })
+    }
+
     /// Return the most recent gate run result for a given issue and gate key.
     ///
     /// Returns `Ok(None)` if no runs have been recorded yet.
@@ -294,6 +518,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 prompt_file,
                 ..
             } => (*pass_context, prompt.as_deref(), prompt_file.as_deref()),
+            _ => return Ok(None),
         };
 
         if !pass_context {
@@ -564,6 +789,39 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
 
+    fn add_builtin_gate(
+        executor: &CommandExecutor<InMemoryStorage>,
+        gate_key: &str,
+        checker: GateChecker,
+        labels: Vec<String>,
+    ) -> String {
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            gate_key.to_string(),
+            crate::domain::Gate {
+                version: 1,
+                key: gate_key.to_string(),
+                title: "Portable check".to_string(),
+                description: "Portable check".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(checker),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+            },
+        );
+        executor.storage.save_gate_registry(&registry).unwrap();
+
+        let mut issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        issue.labels = labels;
+        issue.gates_required.push(gate_key.to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        issue_id
+    }
+
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         storage.init().unwrap();
@@ -721,6 +979,150 @@ enforce_leases = "off"
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         let gate_state = issue.gates_status.get("test-gate").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
+    }
+
+    #[test]
+    fn test_review_placeholder_passes_with_unmistakable_structured_warning() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "arbitrary-review-key",
+            GateChecker::ReviewPlaceholder,
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "arbitrary-review-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert!(result
+            .stdout
+            .contains("WARNING: EXTERNAL REVIEW PLACEHOLDER"));
+        assert!(result
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("WITHOUT RUNNING A REVIEWER"));
+        let findings = result.findings.unwrap();
+        assert_eq!(findings.verdict, "pass");
+        assert_eq!(findings.findings.len(), 1);
+        assert_eq!(
+            findings.findings[0].disposition.as_deref(),
+            Some("advisory")
+        );
+        assert!(findings.findings[0]
+            .summary
+            .contains("Replace this checker"));
+    }
+
+    #[test]
+    fn test_pass_gate_surfaces_review_placeholder_warning_on_success() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "editable-review",
+            GateChecker::ReviewPlaceholder,
+            vec!["type:task".to_string()],
+        );
+
+        let outcome = executor
+            .pass_gate(&issue_id, "editable-review".to_string(), None, true)
+            .unwrap();
+
+        assert!(!outcome.already_passed);
+        assert_eq!(outcome.warnings.len(), 1);
+        assert!(outcome.warnings[0].contains("WITHOUT RUNNING A REVIEWER"));
+    }
+
+    #[test]
+    fn test_issue_validation_runs_in_process_under_arbitrary_gate_key() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "not-a-reserved-validation-key",
+            GateChecker::IssueValidation,
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "not-a-reserved-validation-key")
+            .unwrap();
+
+        assert_eq!(result.command, "builtin:issue_validation");
+        assert_ne!(result.status, GateRunStatus::Error);
+        assert!(result.findings.is_some());
+    }
+
+    #[test]
+    fn test_repository_validation_runs_in_process_under_arbitrary_gate_key() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "not-a-reserved-repository-key",
+            GateChecker::RepositoryValidation,
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "not-a-reserved-repository-key")
+            .unwrap();
+
+        assert_eq!(result.command, "builtin:repository_validation");
+        assert_ne!(result.status, GateRunStatus::Error);
+        assert!(result.findings.is_some());
+    }
+
+    #[test]
+    fn test_repository_validation_warns_for_sorted_placeholder_gate_keys() {
+        let executor = setup();
+        add_builtin_gate(
+            &executor,
+            "z-review",
+            GateChecker::ReviewPlaceholder,
+            vec!["type:task".to_string()],
+        );
+        add_builtin_gate(
+            &executor,
+            "a-review",
+            GateChecker::ReviewPlaceholder,
+            vec!["type:task".to_string()],
+        );
+
+        let findings = executor.review_placeholder_findings().unwrap();
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, crate::commands::REVIEW_PLACEHOLDER_RULE);
+        assert_eq!(
+            findings[0].severity,
+            crate::validation::rules::Severity::Warn
+        );
+        assert!(findings[0].message.contains("a-review, z-review"));
+    }
+
+    #[test]
+    fn test_label_target_validation_reports_missing_configured_pointer_as_finding() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "arbitrary-coverage-key",
+            GateChecker::LabelTargetValidation {
+                label_namespace: "parent-pointer".to_string(),
+            },
+            vec!["type:task".to_string()],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Failed);
+        assert_eq!(result.exit_code, Some(4));
+        let findings = result.findings.unwrap();
+        assert_eq!(findings.verdict, "fail");
+        assert!(findings.findings[0]
+            .summary
+            .contains("parent-pointer:<target-id>"));
     }
 
     #[test]

@@ -2021,6 +2021,9 @@ pub struct GateDefinition {
     pub stage: GateStage,
     /// Execution mode; serializes as `"manual"` or `"auto"`.
     pub mode: GateMode,
+    /// Checker configuration for automated gates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checker: Option<crate::domain::GateChecker>,
 }
 
 impl From<crate::domain::Gate> for GateDefinition {
@@ -2033,6 +2036,7 @@ impl From<crate::domain::Gate> for GateDefinition {
             example_integration: gate.example_integration,
             stage: gate.stage,
             mode: gate.mode,
+            checker: gate.checker,
         }
     }
 }
@@ -2067,6 +2071,30 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_gate_definition_json_includes_builtin_checker_configuration() {
+        let gate = crate::domain::Gate {
+            version: 1,
+            key: "anything".to_string(),
+            title: "Coverage".to_string(),
+            description: "Configured indirection".to_string(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Auto,
+            checker: Some(crate::domain::GateChecker::LabelTargetValidation {
+                label_namespace: "owner".to_string(),
+            }),
+            priority: 100,
+            reserved: Default::default(),
+            auto: true,
+            example_integration: None,
+        };
+
+        let encoded = serde_json::to_value(GateDefinition::from(gate)).unwrap();
+        assert_eq!(encoded["key"], "anything");
+        assert_eq!(encoded["checker"]["type"], "label_target_validation");
+        assert_eq!(encoded["checker"]["label_namespace"], "owner");
+    }
 
     #[test]
     fn test_show_response_root_shape_short_id_and_arrays() {
@@ -2578,6 +2606,7 @@ mod tests {
             example_integration: None,
             stage: GateStage::Postcheck,
             mode: GateMode::Auto,
+            checker: None,
         };
         let v = serde_json::to_value(&def).unwrap();
         assert_eq!(v["stage"], "postcheck", "stage must be snake_case");
@@ -2591,6 +2620,7 @@ mod tests {
             example_integration: None,
             stage: GateStage::Precheck,
             mode: GateMode::Manual,
+            checker: None,
         };
         let v2 = serde_json::to_value(&def_pre).unwrap();
         assert_eq!(v2["stage"], "precheck");
