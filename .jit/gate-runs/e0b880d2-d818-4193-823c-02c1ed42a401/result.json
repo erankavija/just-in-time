@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e0b880d2-d818-4193-823c-02c1ed42a401",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3f73423b-fc24-4725-9fa3-dfbd2994f790",
+  "commit": "91b90b89fa0824631de72547e29ea83c55a7d56f",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T12:10:39.826782945Z",
+  "completed_at": "2026-07-15T12:13:26.043058493Z",
+  "duration_ms": 166216,
+  "exit_code": 0,
+  "stdout": "Attribution: 0325e804, 15b0bb13, 91b90b89 (`jit:3f73423b`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/invariant/gate-semantics (.jit/invariants.toml); @/charter/D-1, D-2, D-3, D-4, D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed, exit 0, 2026-07-15T12:09:09Z; code-review unrun\nTruncation recovery: none\n\n1. No blocking or advisory findings. The committed checker, fixtures, warm gate integration, policy checks, and concise summary satisfy the scoped criteria; the recorded gate reports 11/12 targets and 975,299,904/2,147,483,648 bytes.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "No unresolved issue-impact findings.",
+    "findings": []
+  }
+}
