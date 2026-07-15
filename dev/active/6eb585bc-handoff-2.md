@@ -11,7 +11,7 @@
 - Epic interleaves DONE this session: ef0065ad (scoped bracket validation — unblocked production planning per @/charter/D-15), 3c4d6fe8 (secret-like label example; also produced the invoker-approved secret-detection gate rescope to scripts/secret-scan.sh).
 - **Wave 3 (CLI contracts): `f40f1b0a` DONE** (invoker extended the session to finish it) — all four gates green on dc8df01e after 6 review rounds; see the epic progress note for the final scope (unified gates array, per-command schema declarations incl. mutation echoes and bare query, phantom `query ready` purged, three projection rules, doc-consuming schema cross-check test).
 - Wave 3 NOT started: 6f881a85, 0daba57d, 8917c558. Waves 4–6 pending (incl. 45a140ae's required invoker interview). Two carryover decisions from handoff-1 remain open (c505031a slot; archived-resurrection question).
-- Active claims: f40f1b0a (agent:worker). All other workers relieved; their worktrees remain under .agents/worktrees/ (agent-8d4f7084/57d0eb79/3398bc19/ef0065ad/3c4d6fe8/83efbcb4/3f73423b/26f97dc2/362e3fec/f40f1b0a — all merged, safe to prune).
+- Active claims: none (f40f1b0a done; assignment record retained on the issue). All workers relieved; their worktrees remain under .agents/worktrees/ (agent-8d4f7084/57d0eb79/3398bc19/ef0065ad/3c4d6fe8/83efbcb4/3f73423b/26f97dc2/362e3fec/f40f1b0a — all merged, safe to prune).
 - Progress files: dev/active/6eb585bc-progress.json (epic; wave 2.5/3 statuses current), dev/active/73482aa1-progress.json (story; COMPLETE).
 
 ## What to do next
