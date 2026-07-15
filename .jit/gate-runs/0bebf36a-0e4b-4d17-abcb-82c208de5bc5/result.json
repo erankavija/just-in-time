@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_id": "0bebf36a-0e4b-4d17-abcb-82c208de5bc5",
+  "gate_key": "plan-review",
+  "stage": "postcheck",
+  "issue_id": "e131f1dc-c5a9-41eb-a6e4-ee9e1d5ba57f",
+  "commit": "8030b8846b5d1acc8e8f9e495f7a38c40641f062",
+  "branch": "worktree-agent-8b05a612",
+  "status": "failed",
+  "started_at": "2026-07-15T06:45:13.888604298Z",
+  "completed_at": "2026-07-15T06:54:42.892647255Z",
+  "duration_ms": 569004,
+  "exit_code": 1,
+  "stdout": "## Plan document present and linked\n\nPass. `dev/active/8b05a612-plan.md` exists, is substantive, and is linked as the planning issue’s design document. The investigation and research documents are also linked and complete.\n\n## Completeness against criteria\n\nThe plan explicitly addresses all eleven `[hard]` container criteria in §1 and provides a coherent coverage map at lines 345–359. It does not silently remove the CLI, server/API, web UI, or MCP capability.\n\nOne implementation-level omission still prevents confidence in REQ-01/REQ-06: the proposed container verification does not cover repository-root search behavior, as detailed in F2.\n\n## Technical soundness and architectural fit\n\nThe dependency remediation, server shutdown, embedded-web build ordering, deterministic source archive, audit enforcement, and OCI identity designs match the existing repository architecture.\n\nThe server’s storage and document paths correctly derive from `/repo/.jit`, as stated at plan line 25. However, `/api/search` is an exception: `crates/server/src/routes.rs:297-299` searches from the process current directory, and the web UI actively consumes that endpoint through `web/src/api/client.ts:41-49`. The Docker design neither fixes this boundary nor specifies `/repo` as the runtime working directory.\n\n## Decomposition and dependencies\n\nMost task edges are coherent: remediation precedes enforcement, server shutdown precedes Docker, the replacement image precedes removal, producer definitions precede source freeze, and all candidate execution follows the freeze.\n\nThe final-release ordering is unsound. “Authorize and create the immutable v1.0.0 tag” runs before the publication task, but publication line 337 performs immutable-release and cross-channel conflict preflights while claiming they occur before any irreversible mutation. By then the protected release tag already exists. These checks must move before tag creation.\n\n## Risks and actionability\n\nThe plan covers the principal dependency, identity, provenance, signal, documentation, and credential risks with observable acceptance criteria.\n\nIt does not mitigate the partial-release state created when post-tag publication preflight discovers conflicting npm, GHCR, or GitHub state. The repository also retains stale core-maintenance instructions that contradict the new charter decision; D-14 is authoritative, but the stale operational handoff should be superseded before execution.\n\n## Prior review feedback\n\nThe previous blockers were substantively addressed:\n\n- The freeze now directly depends on core epic `6eb585bc` reaching `Done` (`dev/active/8b05a612-plan.md:242-250`).\n- Charter D-14 now exists and explicitly requires terminal core completion while rejecting the former living-container decision (`dev/vision/9db27a3a-charter.md:221-237`).\n\nThe older core handoff remains inconsistent with that decision, captured as advisory F3.\n\n## Findings\n\n1. **F1 — High, blocking:** Cross-channel and immutable-release preflights occur after the irreversible `v1.0.0` tag is created. `dev/active/8b05a612-plan.md:324-334` creates a protected, non-movable release tag, while line 337 only afterward verifies immutable releases and checks npm, GHCR, and GitHub release conflicts, despite claiming this happens before any irreversible channel mutation. A conflict leaves a public release tag with no completable release. Move these preflights into the serialized tag-authorizer before its final MSRV check and tag command.\n\n2. **F2 — Medium, blocking:** The one-image design does not preserve the existing repository search API. The image criteria at `dev/active/8b05a612-plan.md:190-198` and runtime matrix at lines 209–217 test routing and linked-document reads but neither require `WORKDIR /repo` nor exercise `/api/search`. The endpoint searches `Path::new(\".\")` at `crates/server/src/routes.rs:297-299`, while the shipped web UI calls it at `web/src/api/client.ts:41-49`. Specify `/repo` as the runtime working directory and smoke repository issue/document search, or allow a server-boundary fix that derives the search root from storage.\n\n3. **F3 — Low, advisory:** Active core-maintenance handoff prose still directs executors to keep `6eb585bc` open as a living container (`dev/active/6eb585bc-handoff.md:9,33`; `dev/active/6eb585bc-batch-report-2026-07-05.md:3-6`), contradicting the newer authoritative D-14 decision. Mark those instructions superseded or update the current handoff before fan-out.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior blockers are resolved, but release preflight is ordered after irreversible tag creation and the Docker contract omits repository-root search behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Cross-channel and immutable-release preflights run only after the protected v1.0.0 tag has already been created.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":337,\"references\":[\"@/issue/8b05a612/requirement/REQ-04\",\"@/issue/8b05a612/requirement/REQ-05\",\"@/issue/8b05a612/requirement/REQ-10\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The one-image design neither fixes nor tests the API search endpoint's dependence on the process working directory.\",\"file\":\"dev/active/8b05a612-plan.md\",\"line\":193,\"references\":[\"@/issue/8b05a612/requirement/REQ-01\",\"@/issue/8b05a612/requirement/REQ-06\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Current core-maintenance handoff instructions still require the epic to remain open, contradicting the newer authoritative D-14 decision.\",\"file\":\"dev/active/6eb585bc-handoff.md\",\"line\":33,\"references\":[\"@/charter/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4405 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-8b05a612\nmodel: gpt-5.6-sol\nprovider: openai\napproval: never\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6485-bfe9-7dd2-b94f-bb97dcb6e0c0\n--------\nuser\n--- 4392 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The prior blockers are resolved, but release preflight is ordered after irreversible tag creation and the Docker contract omits repository-root search behavior.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Cross-channel and immutable-release preflights run only after the protected v1.0.0 tag has already been created.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 337,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-04",
+          "@/issue/8b05a612/requirement/REQ-05",
+          "@/issue/8b05a612/requirement/REQ-10"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The one-image design neither fixes nor tests the API search endpoint's dependence on the process working directory.",
+        "file": "dev/active/8b05a612-plan.md",
+        "line": 193,
+        "references": [
+          "@/issue/8b05a612/requirement/REQ-01",
+          "@/issue/8b05a612/requirement/REQ-06"
+        ]
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "pre-existing",
+        "summary": "Current core-maintenance handoff instructions still require the epic to remain open, contradicting the newer authoritative D-14 decision.",
+        "file": "dev/active/6eb585bc-handoff.md",
+        "line": 33,
+        "references": [
+          "@/charter/D-14"
+        ]
+      }
+    ]
+  }
+}
