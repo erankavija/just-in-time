@@ -191,7 +191,9 @@ echo "Custom env: REVIEWER_AGENT=$REVIEWER_AGENT"
 
 ## Write Gate Checker Scripts
 
-Automated gates execute shell commands. Follow these patterns for reliable checkers.
+`exec`-type automated gates execute shell commands. Native in-process checker types
+need no script; see [Portable checker types](../reference/gate-presets.md#portable-checker-types).
+Follow these patterns when writing an `exec` checker.
 
 ### Exit Codes
 

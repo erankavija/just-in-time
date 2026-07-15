@@ -40,6 +40,66 @@ while any gate uses it. Replace it with an `exec` checker (for example, `jit gat
 update <key> --checker-command <command>`) before treating the gate as review
 evidence.
 
+Native checker types are selected in the gate registry; `jit gate define` does not
+have a checker-type option. These four independent definitions show the canonical
+`.jit/gates.toml` syntax. The keys are examples and can be replaced with any
+configured gate keys:
+
+```toml
+[[gates]]
+version = 1
+key = "repository-policy"
+title = "Repository validation"
+description = "Validate the whole repository"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "repository_validation"
+
+[[gates]]
+version = 1
+key = "work-item-policy"
+title = "Issue validation"
+description = "Validate the gated issue"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "issue_validation"
+
+[[gates]]
+version = 1
+key = "container-coverage"
+title = "Container coverage"
+description = "Validate the container named by the covers label"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "label_target_validation"
+label_namespace = "covers"
+
+[[gates]]
+version = 1
+key = "external-review"
+title = "External review"
+description = "Passing placeholder until a reviewer is configured"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+```
+
 A project can also define its own presets: `jit gate preset create <issue> <name>`
 captures an issue's gates into `.jit/config/gate-presets/<name>.json`, and every
 JSON file in that directory loads alongside the built-ins. `jit gate preset create`

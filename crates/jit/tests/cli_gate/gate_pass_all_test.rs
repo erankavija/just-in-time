@@ -67,6 +67,31 @@ fn define_gate(root: &Path, key: &str, command: &str) {
         .unwrap();
 }
 
+/// Add a registry-configured native review placeholder.
+fn define_review_placeholder_gate(root: &Path, key: &str) {
+    let registry_path = root.join(".jit/gates.toml");
+    fs::write(
+        registry_path,
+        format!(
+            r#"
+[[gates]]
+version = 1
+key = "{key}"
+title = "Review"
+description = "External review placeholder"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+"#
+        ),
+    )
+    .unwrap();
+}
+
 /// Create an issue requiring the listed gates (in order). Returns its id.
 fn create_issue_with_gates(root: &Path, gates: &[&str]) -> String {
     let mut args = vec!["issue", "create", "--title", "Work"];
@@ -116,6 +141,40 @@ fn test_pass_all_all_gates_pass_exit_0() {
     assert_eq!(gates[1]["key"], "g2");
     assert_eq!(run_count(&root, "g1"), 1);
     assert_eq!(run_count(&root, "g2"), 1);
+}
+
+#[test]
+fn test_pass_all_json_includes_native_placeholder_warning_per_gate() {
+    let (_temp, root) = setup_git_jit_repo();
+    define_review_placeholder_gate(&root, "review-any-key");
+    let id = create_issue_with_gates(&root, &["review-any-key"]);
+
+    let out = jit()
+        .current_dir(&root)
+        .args(["gate", "evaluate-all", &id, "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "JSON mode must not leak warnings to stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let gates = json["gates"].as_array().unwrap();
+    assert_eq!(gates.len(), 1);
+    assert_eq!(gates[0]["key"], "review-any-key");
+    assert_eq!(
+        gates[0]["warnings"],
+        serde_json::json!([jit::domain::REVIEW_PLACEHOLDER_WARNING])
+    );
 }
 
 #[test]

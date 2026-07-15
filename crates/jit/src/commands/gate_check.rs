@@ -1126,6 +1126,36 @@ enforce_leases = "off"
     }
 
     #[test]
+    fn test_label_target_validation_passes_for_configured_target() {
+        let executor = setup();
+        let mut target =
+            crate::domain::Issue::new("Container".to_string(), "Container".to_string());
+        target.labels = vec!["type:task".to_string()];
+        let target_id = target.id.clone();
+        executor.storage.save_issue(target).unwrap();
+
+        let issue_id = add_builtin_gate(
+            &executor,
+            "arbitrary-coverage-key",
+            GateChecker::LabelTargetValidation {
+                label_namespace: "coverage-target".to_string(),
+            },
+            vec![
+                "type:task".to_string(),
+                format!("coverage-target:{target_id}"),
+            ],
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "arbitrary-coverage-key")
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert_eq!(result.command, "builtin:label_target_validation");
+        assert_eq!(result.findings.unwrap().verdict, "pass");
+    }
+
+    #[test]
     fn test_check_gate_automated_failure() {
         let executor = setup();
 

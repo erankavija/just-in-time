@@ -4071,6 +4071,7 @@ fn run() -> Result<()> {
                                         "status": "passed",
                                         "verdict": "pass",
                                         "already_passed": entry.already_passed,
+                                        "warnings": entry.warnings,
                                     })
                                 })
                                 .collect();
