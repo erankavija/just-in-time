@@ -108,7 +108,7 @@ Each issue is stored as `issues/<uuid>.json`:
 #### Gate fields in command output
 
 The `gates_required` / `gates_status` split above is the **on-disk record
-shape**. Two rules govern how it reaches a command's `--json` output:
+shape**. Three rules govern how it reaches a command's `--json` output:
 
 - **Every command that hands back a stored issue record verbatim emits it
   under `gates_required` / `gates_status`.** Current members: the `--full`
@@ -124,7 +124,14 @@ shape**. Two rules govern how it reaches a command's `--json` output:
   `gates_status`. Current members: `jit issue create`, `jit issue show`, `jit
   issue show --summary`, `jit issue status`, and `jit issue children`.
 
-`jit query blocked` belongs to neither rule: both its shapes (default, and the
+- **Every lean list summary omits the gate list entirely, under every
+  spelling.** The default (non-`--full`) output of `jit query` and its
+  subcommands, `jit issue list` / `jit list`, and `jit issue search` carries
+  no `gates`, `gates_required`, or `gates_status` field at all; consult
+  `jit --schema` for the exact per-command projection, so an absent field is
+  attributable to this rule rather than to an ungated issue.
+
+`jit query blocked` belongs to none of the record-shape rules: both its shapes (default, and the
 reason-enriched `--full`) build on the lean summary projection and carry no
 gate-list fields at all — a blocking gate appears only as a `blocked_reasons`
 entry.

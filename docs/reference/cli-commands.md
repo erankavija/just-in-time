@@ -813,7 +813,7 @@ carries each gate's `last_run_at` / `exit_code`). It never emits the on-disk
 record's `gates_required` / `gates_status`; those appear only where a command
 hands back the raw stored record (any `--full` record dump, the single-issue
 lifecycle mutation confirmations, and `jit apply`'s `created_issues`). See the
-two projection rules and their current members in
+projection rules and their current members in
 [Storage Format](storage-format.md#gate-fields-in-command-output).
 
 **Field projection (`--field` / `--fields`):**

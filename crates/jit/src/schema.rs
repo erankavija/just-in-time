@@ -1588,4 +1588,113 @@ mod tests {
             );
         }
     }
+
+    /// REQ-03/REQ-04: the storage reference's gate-field rules and this
+    /// schema must not drift apart. The test reads the actual section text
+    /// from docs/reference/storage-format.md and cross-checks every member
+    /// spelling it documents against the live schema declaration for that
+    /// command, so renaming a field or dropping a surface on EITHER side
+    /// fails the build instead of silently de-synchronizing prose and code.
+    #[test]
+    fn test_schema_matches_storage_reference_gate_field_rules() {
+        let doc_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/reference/storage-format.md");
+        let doc = std::fs::read_to_string(&doc_path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", doc_path.display()));
+        let section_start = doc
+            .find("#### Gate fields in command output")
+            .expect("storage-format.md must keep the gate-fields section");
+        let section_end = doc[section_start + 4..]
+            .find("\n#")
+            .map(|i| section_start + 4 + i)
+            .unwrap_or(doc.len());
+        // Collapse whitespace so hard-wrapped member spellings match.
+        let section = doc[section_start..section_end]
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        for field in ["`gates_required`", "`gates_status`", "`gates`"] {
+            assert!(
+                section.contains(field),
+                "the gate-fields section must name {field}"
+            );
+        }
+
+        // (documented member spelling, schema command path, family)
+        enum Family {
+            RecordDump,
+            Projected,
+        }
+        let members: &[(&str, &[&str], Family)] = &[
+            (
+                "`jit graph export --format json --full`",
+                &["graph", "export"],
+                Family::RecordDump,
+            ),
+            ("`jit query all`", &["query", "all"], Family::RecordDump),
+            ("`available`", &["query", "available"], Family::RecordDump),
+            ("`strategic`", &["query", "strategic"], Family::RecordDump),
+            ("`closed`", &["query", "closed"], Family::RecordDump),
+            ("bare `jit query --full`", &["query"], Family::RecordDump),
+            (
+                "`jit issue list --full`",
+                &["issue", "list"],
+                Family::RecordDump,
+            ),
+            ("`jit list --full`", &["list"], Family::RecordDump),
+            (
+                "`jit issue search --full`",
+                &["issue", "search"],
+                Family::RecordDump,
+            ),
+            (
+                "`jit issue assign`",
+                &["issue", "assign"],
+                Family::RecordDump,
+            ),
+            ("`unassign`", &["issue", "unassign"], Family::RecordDump),
+            ("`reject`", &["issue", "reject"], Family::RecordDump),
+            ("`release`", &["issue", "release"], Family::RecordDump),
+            ("`claim`", &["issue", "claim"], Family::RecordDump),
+            ("`claim-next`", &["issue", "claim-next"], Family::RecordDump),
+            ("`jit apply`", &["apply"], Family::RecordDump),
+            (
+                "`jit issue create`",
+                &["issue", "create"],
+                Family::Projected,
+            ),
+            ("`jit issue show`", &["issue", "show"], Family::Projected),
+            (
+                "`jit issue status`",
+                &["issue", "status"],
+                Family::Projected,
+            ),
+            (
+                "`jit issue children`",
+                &["issue", "children"],
+                Family::Projected,
+            ),
+        ];
+        for (spelling, path, family) in members {
+            assert!(
+                section.contains(spelling),
+                "the gate-fields section must list the member {spelling}"
+            );
+            let props = declared_property_names(&published_output_schema(path));
+            match family {
+                Family::RecordDump => assert!(
+                    props.contains("gates_required") && props.contains("gates_status"),
+                    "{spelling}: documented as a record dump but the schema for \
+                     {path:?} does not declare the storage gate fields; got {props:?}"
+                ),
+                Family::Projected => assert!(
+                    props.contains("gates") && !props.contains("gates_required"),
+                    "{spelling}: documented as a projected view but the schema \
+                     for {path:?} does not declare the gates array (or leaks \
+                     the storage names); got {props:?}"
+                ),
+            }
+        }
+    }
 }

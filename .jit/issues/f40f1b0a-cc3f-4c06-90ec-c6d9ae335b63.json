@@ -13,25 +13,25 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T19:11:21.577259913Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T19:27:45.423339783Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T19:11:22.117270636Z"
-    },
     "code-review": {
       "status": "failed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T19:29:55.691887741Z"
+      "updated_at": "2026-07-15T19:44:39.819800958Z"
+    },
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T19:40:03.634303682Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T19:42:08.932748876Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-15T19:40:03.093740279Z"
     }
   },
   "context": {},
@@ -42,7 +42,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-12T13:45:16.391314261Z",
-  "updated_at": "2026-07-15T19:34:13.913884744Z",
+  "updated_at": "2026-07-15T19:48:45.327204165Z",
   "first_ready_at": "2026-07-12T13:45:16.391320001Z",
   "claimed_at": "2026-07-15T17:39:49.756473502Z"
 }

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "24ca83e6-d9d4-4059-a7c5-9038a743ad51",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "6e3280f5bb1b9b9dca7d76030d7dfbf3f74f2d35",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:40:03.634303682Z",
+  "completed_at": "2026-07-15T19:42:08.872104572Z",
+  "duration_ms": 125237,
+  "exit_code": 1,
+  "stdout": "--- fmt diff ---\nDiff in /home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:282:\n         \"query strategic --full\",\n     );\n \n\u001b[31m-    jit(\n\u001b[m\u000f\u001b[31m-        &temp,\n\u001b[m\u000f\u001b[31m-        &[\n\u001b[m\u000f\u001b[31m-            \"issue\",\n\u001b[m\u000f\u001b[31m-            \"update\",\n\u001b[m\u000f\u001b[31m-            &id,\n\u001b[m\u000f\u001b[31m-            \"--state\",\n\u001b[m\u000f\u001b[31m-            \"rejected\",\n\u001b[m\u000f\u001b[31m-        ],\n\u001b[m\u000f\u001b[31m-    );\n\u001b[m\u000f\u001b[32m+    jit(&temp, &[\"issue\", \"update\", &id, \"--state\", \"rejected\"]);\n\u001b[m\u000f     let closed = json(&temp, &[\"query\", \"closed\", \"--full\", \"--json\"]);\n     assert_storage_record(\n         find_issue(&closed, &id, \"query closed --full\"),\n  ✗ fmt: FAILED (exit 1)\n  ✓ clippy: ok\n  ✓ test: 3390 passed, 0 failed, 14 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1028 bytes=17636732)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1036081320/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

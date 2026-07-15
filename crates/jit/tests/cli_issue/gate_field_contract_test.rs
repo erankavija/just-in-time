@@ -282,16 +282,7 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
         "query strategic --full",
     );
 
-    jit(
-        &temp,
-        &[
-            "issue",
-            "update",
-            &id,
-            "--state",
-            "rejected",
-        ],
-    );
+    jit(&temp, &["issue", "update", &id, "--state", "rejected"]);
     let closed = json(&temp, &["query", "closed", "--full", "--json"]);
     assert_storage_record(
         find_issue(&closed, &id, "query closed --full"),

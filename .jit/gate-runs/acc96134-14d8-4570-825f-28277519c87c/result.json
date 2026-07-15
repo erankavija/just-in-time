@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "acc96134-14d8-4570-825f-28277519c87c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "f40f1b0a-cc3f-4c06-90ec-c6d9ae335b63",
+  "commit": "6e3280f5bb1b9b9dca7d76030d7dfbf3f74f2d35",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-15T19:44:39.819800958Z",
+  "completed_at": "2026-07-15T19:48:45.327002245Z",
+  "duration_ms": 245507,
+  "exit_code": 1,
+  "stdout": "Attribution: a92dc223, b156df88, 4c709b7f, 90b306da, e8f5d25e, 1a65c313, 60c8efd7, 7c2e0876, e330557a, 2b7db09e, f36d64c2, 6e3280f5 (`jit:f40f1b0a`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-4, D-6 — dev/vision/9db27a3a-charter.md; @/inv/gate-semantics, @/inv/single-source-prose — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci failed (exit 1, 2026-07-15T19:40:03Z); doc-review failed (exit 1, 2026-07-15T19:42:08Z); docs-mechanical passed (exit 0, 2026-07-15T19:40:03Z)\nTruncation recovery: narrowed the truncated gate-field search to current emitter/schema ranges, contract tests, and relevant reference sections\n\n1. **F1 — high, blocking, issue-impact:** REQ-04 remains unmet. [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:110) describes only two gate shapes, while default query/list/search summaries are a third, gate-free projection. More importantly, [gate_field_contract_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:21) tests emitted values and separate schema code but never reads or asserts the reference text; changing either documentation field name or its surface list would still pass. This leaves the prior structured coverage finding unresolved. References: `@/inv/single-source-prose`.\n\n2. **F2 — medium, blocking, issue-impact:** The latest `cargo-ci` evidence shows rustfmt failing on the attributable test addition at [gate_field_contract_test.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/gate_field_contract_test.rs:285). The recorded run confirms clippy and tests passed, but the formatting failure prevents the required CI gate from passing.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Documentation-to-output coverage remains uncoupled, and the attributable test file fails rustfmt.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 remains unmet because the storage reference is neither complete for gate-free summaries nor asserted against emitted output/schema.\",\"file\":\"docs/reference/storage-format.md\",\"line\":110,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The attributable contract test is not rustfmt-formatted, causing the latest cargo-ci run to fail.\",\"file\":\"crates/jit/tests/cli_issue/gate_field_contract_test.rs\",\"line\":285,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7408 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f674f-554f-7112-9c56-45bc7d0d95e4\n--------\nuser\n--- 7395 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Documentation-to-output coverage remains uncoupled, and the attributable test file fails rustfmt.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-04 remains unmet because the storage reference is neither complete for gate-free summaries nor asserted against emitted output/schema.",
+        "file": "docs/reference/storage-format.md",
+        "line": 110,
+        "references": [
+          "@/inv/single-source-prose"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The attributable contract test is not rustfmt-formatted, causing the latest cargo-ci run to fail.",
+        "file": "crates/jit/tests/cli_issue/gate_field_contract_test.rs",
+        "line": 285
+      }
+    ]
+  }
+}
