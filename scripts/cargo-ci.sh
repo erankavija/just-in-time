@@ -129,6 +129,14 @@ summarize_pass() {
       fi
       echo "${p:-0} passed, ${f:-0} failed, ${i:-0} ignored${fixture}"
       ;;
+    budget)
+      # REQ-06 (jit:3f73423b): fold the checker's one-line build-footprint
+      # summary into the persisted gate summary (its $WORK/budget.out is deleted
+      # by the EXIT trap). The "rust-build-budget: " prefix is stripped since the
+      # "✓ budget:" label already identifies the step.
+      grep -o 'rust-build-budget: integration-targets=.*' "$WORK/$name.out" \
+        | tail -1 | sed 's/^rust-build-budget: //'
+      ;;
     *)
       echo "ok"
       ;;
@@ -247,6 +255,20 @@ run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
 # the persisted gate summary below, on a passing run and not just a failure.
 run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
   --test provenance_contract -- --ignored --nocapture
+
+# Build-footprint budget enforcement (jit:3f73423b). Runs AFTER the test step so
+# its `cargo metadata` and `cargo test --workspace --no-run --message-format=json`
+# reuse this run's warm target directory rather than triggering a second cold
+# build (REQ-05): metadata performs no build, and --no-run only re-resolves and
+# reports the test executables the `test` step already linked. The checker
+# derives the integration-target count and unique active-executable bytes from
+# that Cargo output, and asserts the debug-profile, gate-incremental, and
+# dependency-feature policies against the committed manifests and this script.
+# It self-locates the workspace root from its own path, so no argument is needed
+# for a live gate run. CARGO_INCREMENTAL=0 (exported above) is inherited, so its
+# warm --no-run leaves no incremental state for the check below.
+CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+run_step budget "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh"
 
 # REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
 # left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
