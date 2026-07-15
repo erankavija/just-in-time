@@ -7779,3 +7779,7 @@
 {"type":"gate_failed","id":"3cc4270c-651b-4e7d-8da0-89a6ec46813a","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:03:18.975062912Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"4d7e73fe-303c-49ac-b9e5-ebac9d95efb2","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:18:23.446940152Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"7c32b771-ead5-4194-820c-fd46eb847474","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:29:30.026366183Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"4d988bd6-748a-4494-b306-e4f958013de6","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:33:58.233034346Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"bcfdbcb1-cff4-475b-84b8-88c139321e15","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:14.325347258Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"773db5fb-4eea-4d72-8e7a-7627e6f60ab2","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:16.341229194Z","gate_key":"secret-detection","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"58893e3c-987d-41fb-9fd9-3ca71e3e52c4","issue_id":"866a5bbd-c98d-4588-83e8-7423f3b12005","timestamp":"2026-07-15T13:34:17.958286290Z","gate_key":"dependency-audit","updated_by":"auto:executor"}
