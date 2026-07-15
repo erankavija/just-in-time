@@ -76,13 +76,12 @@ proptest = { workspace = true }
 ulid = { workspace = true }
 # Test-only local HTTPS server for the remote-document TLS/gzip coverage
 # (jit:3398bc19 REQ-05): generates an ephemeral self-signed certificate so the
-# test never touches the network. `rcgen` is trimmed to its `ring` feature —
-# the crypto backend already present in the graph via ureq, not aws-lc-rs —
-# because its full default set (`crypto, pem, ring`) transitively pulls an
-# ASN.1/x509 parsing stack this test never uses (certs are generated, never
-# parsed). `rustls`/`flate2` are already transitive dependencies of `ureq`
-# (rustls, gzip features); declared directly here so the test can drive the
-# server side of the same TLS/gzip capability the client uses.
+# test never touches the network. `rcgen` is trimmed to exactly its `ring`
+# feature so certificate generation selects the crypto backend already present
+# in the graph via ureq, never aws-lc-rs. `rustls`/`flate2` are already
+# transitive dependencies of `ureq` (rustls, gzip features); declared directly
+# here so the test can drive the server side of the same TLS/gzip capability
+# the client uses.
 rcgen = { version = "0.14", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 flate2 = "1"
