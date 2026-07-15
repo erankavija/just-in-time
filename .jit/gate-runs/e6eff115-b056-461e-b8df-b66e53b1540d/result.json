@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "run_id": "e6eff115-b056-461e-b8df-b66e53b1540d",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a",
+  "commit": "a9d039b0af4bdfd2dc4cd04931cc65bc8bf8cc70",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-14T22:50:01.338185472Z",
+  "completed_at": "2026-07-14T22:54:54.889417926Z",
+  "duration_ms": 293551,
+  "exit_code": 1,
+  "stdout": "Attribution: fc12c648, 32b6cfc4, d2bca248, 5ccefe0a, 75256abb, 5d2399dd, b5d8278a\nPolicy sources: AGENTS.md; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/invariant/atomic-writes (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-07-14T22:45:32Z); doc-review passed (exit 0, 2026-07-14T22:26:07Z)\nTruncation recovery: Per-commit name-status and bounded script, JSON, report, raw-data, and equality reads.\n\n1. **F1 — high, blocking, issue-impact:** REQ-04’s recorded active-test-executable byte total is an acknowledged post-hoc estimate, not a measurement from the original isolated sample. The report says the original per-file sizes cannot be recovered and substitutes ordinary `target/debug` sizes that may differ because debug information embeds the build path. This leaves the required baseline metric materially unverified. [report.md](dev/benchmarks/rust-build-efficiency/report.md:164)\n\n2. **F2 — medium, blocking, issue-impact:** A SIGINT/SIGTERM after the probe append can exit the harness before the restore at line 550; there is no cleanup trap. That can leave `crates/jit/src/lib.rs` modified, violating REQ-03’s worktree-cleanliness requirement. [benchmark-rust-build.sh](scripts/benchmark-rust-build.sh:541)\n\n3. **F3 — low, advisory, issue-impact:** Re-running into an existing output directory directly truncates raw logs and inventory-capture files (`open(..., \"wb\")` and shell redirection), rather than atomically replacing them. The JSONL, inventory, and baseline publications were fixed, but these remaining raw artifacts still violate the replacement policy. [benchmark-rust-build.sh](scripts/benchmark-rust-build.sh:205) References: @/invariant/atomic-writes\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The committed baseline has an unverifiable post-hoc size correction and lacks interruption-safe probe restoration.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The recorded unique active test-executable byte total is a post-hoc estimate, so REQ-04's original-sample metric is materially unverified.\",\"file\":\"dev/benchmarks/rust-build-efficiency/report.md\",\"line\":164,\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No cleanup trap restores the probe file if the harness is interrupted after appending it.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":541,\"references\":[]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Raw logs and inventory-capture files are directly truncated on rerun rather than atomically replaced.\",\"file\":\"scripts/benchmark-rust-build.sh\",\"line\":205,\"references\":[\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6831 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f62d2-ae4e-7151-962b-395f890d3241\n--------\nuser\n--- 6818 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The committed baseline has an unverifiable post-hoc size correction and lacks interruption-safe probe restoration.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The recorded unique active test-executable byte total is a post-hoc estimate, so REQ-04's original-sample metric is materially unverified.",
+        "file": "dev/benchmarks/rust-build-efficiency/report.md",
+        "line": 164
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "No cleanup trap restores the probe file if the harness is interrupted after appending it.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 541
+      },
+      {
+        "id": "F3",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "Raw logs and inventory-capture files are directly truncated on rerun rather than atomically replaced.",
+        "file": "scripts/benchmark-rust-build.sh",
+        "line": 205,
+        "references": [
+          "@/invariant/atomic-writes"
+        ]
+      }
+    ]
+  }
+}

@@ -161,6 +161,22 @@ mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 # samples. A blocking flock queues our request rather than running concurrently
 # with another lock holder, satisfying "refuses to overlap another repository
 # Cargo build" (REQ-01) without needing an explicit conflict check.
+# --- interruption safety for the rebuild probe ---
+# While a rebuild sample holds the probe appended to $PROBE_FILE, an
+# interruption (INT/TERM) or unexpected exit must not leave the tree modified:
+# the EXIT trap restores the captured original whenever a restore is pending.
+PROBE_PENDING_BACKUP=""
+restore_probe_if_pending() {
+  if [[ -n "$PROBE_PENDING_BACKUP" && -f "$PROBE_PENDING_BACKUP" ]]; then
+    mv -f "$PROBE_PENDING_BACKUP" "$PROBE_FILE"
+    PROBE_PENDING_BACKUP=""
+    echo "[benchmark] interrupted: probe file restored from backup" >&2
+  fi
+}
+trap restore_probe_if_pending EXIT
+trap 'restore_probe_if_pending; exit 130' INT
+trap 'restore_probe_if_pending; exit 143' TERM
+
 LOCK_FD=""
 acquire_lock() {
   [[ -n "${BENCH_NO_LOCK:-}" ]] && return 0
@@ -194,6 +210,7 @@ run_measured() {
   shift
   python3 - "$log_file" "$@" <<'PYEOF'
 import json
+import os
 import resource
 import subprocess
 import sys
@@ -202,10 +219,15 @@ import time
 log_file = sys.argv[1]
 cmd = sys.argv[2:]
 
-with open(log_file, "wb") as lf:
+# Atomic publication (@/inv/atomic-writes): stream the command's output to a
+# temp file beside the destination, rename into place only when the command
+# has finished — a rerun or interruption never truncates an existing log.
+log_tmp = f"{log_file}.tmp.{os.getpid()}"
+with open(log_tmp, "wb") as lf:
     start = time.monotonic()
     proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT)
     elapsed = time.monotonic() - start
+os.replace(log_tmp, log_file)
 
 ru = resource.getrusage(resource.RUSAGE_CHILDREN)
 print(json.dumps({
@@ -230,8 +252,15 @@ generate_test_inventory() {
   local list_json="$sample_raw_dir/cargo-test-list.json"
 
   echo "[benchmark] deriving pre-change test inventory from $target_dir" >&2
+  # Atomic publication (@/inv/atomic-writes): capture to temp files beside the
+  # destinations, rename only after the command completes.
+  local list_tmp stderr_tmp
+  list_tmp=$(mktemp "$list_json.XXXXXX")
+  stderr_tmp=$(mktemp "$sample_raw_dir/cargo-test-list.stderr.log.XXXXXX")
   CARGO_TARGET_DIR="$target_dir" cargo test --workspace --no-run --message-format=json \
-    >"$list_json" 2>"$sample_raw_dir/cargo-test-list.stderr.log"
+    >"$list_tmp" 2>"$stderr_tmp"
+  mv "$list_tmp" "$list_json"
+  mv "$stderr_tmp" "$sample_raw_dir/cargo-test-list.stderr.log"
 
   python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" "$sample_raw_dir" <<'PYEOF'
 import json
@@ -341,10 +370,18 @@ def parse_doctest_sections(text):
 doctest_all = run_doctest_list()
 doctest_ignored = run_doctest_list("--ignored")
 
-with open(os.path.join(sample_raw_dir, "cargo-doctest-list.log"), "w") as f:
-    f.write(doctest_all.stdout)
-with open(os.path.join(sample_raw_dir, "cargo-doctest-list-ignored.log"), "w") as f:
-    f.write(doctest_ignored.stdout)
+def write_atomic(path, text):
+    # @/inv/atomic-writes: temp file beside the destination + rename.
+    tmp = f"{path}.tmp.{os.getpid()}"
+    with open(tmp, "w") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+write_atomic(os.path.join(sample_raw_dir, "cargo-doctest-list.log"), doctest_all.stdout)
+write_atomic(
+    os.path.join(sample_raw_dir, "cargo-doctest-list-ignored.log"), doctest_ignored.stdout
+)
 
 all_doctests_by_crate = parse_doctest_sections(doctest_all.stdout)
 ignored_doctests_by_crate = parse_doctest_sections(doctest_ignored.stdout)
@@ -538,6 +575,7 @@ run_rebuild_sample() {
   local backup
   backup=$(mktemp "$TARGET_BASE/probe-backup.XXXXXX")
   cp "$PROBE_FILE" "$backup"
+  PROBE_PENDING_BACKUP="$backup"
   printf '\n%s\n' "$PROBE_COMMENT" >>"$PROBE_FILE"
 
   echo "[benchmark] rebuild sample $idx/$REBUILD_SAMPLES: probe applied, timing incremental rebuild" >&2
@@ -548,6 +586,7 @@ run_rebuild_sample() {
   release_lock
 
   mv "$backup" "$PROBE_FILE"
+  PROBE_PENDING_BACKUP=""
   local restore_ok=true
   if ! cmp -s <(git show "HEAD:$PROBE_FILE") "$PROBE_FILE"; then
     restore_ok=false

@@ -143,7 +143,7 @@ per-sample data in `baseline.json` for any deeper comparison.
 | | |
 |---|---|
 | Complete target-directory bytes | 21,089,820,236 (~19.6 GiB) |
-| Unique active test-executable bytes | 14,817,088,760 (~13.8 GiB) |
+| Unique active test-executable bytes | 14,816,926,968 (~13.8 GiB) |
 | Integration-test targets (Cargo `target.kind == ["test"]`) | 144 |
 | Total test targets (lib + bin + integration) | 148 |
 | Doctest-owning crates (kind: `"doctest"`) | 2 (`jit`, `jit_server`) |
@@ -161,19 +161,20 @@ false`). Both contributed zero test cases (`jit --list` and `jit-server
 --list` simply fail as unrecognized CLI invocations, `list_exit_code: 2`),
 so `test_case_count` and `ignored_test_case_count` are unaffected; only
 `test_target_count` (150 → 148) and `unique_active_test_executable_bytes`
-needed correction. The two dropped binaries' original sizes from the
-isolated sample's target directory cannot be recovered post hoc — that
-directory was removed immediately after the sample per the harness's own
-isolation design, and only the aggregate byte sum was persisted, not
-per-file sizes. The correction instead subtracts the equivalent same-commit,
-same-toolchain, same-profile binaries' current sizes from the ordinary
-(non-isolated) `target/debug/` directory — `jit`: 259,810,472 bytes;
-`jit-server`: 237,942,472 bytes; combined 497,752,944 bytes — from the
-original aggregate (15,314,841,704 − 497,752,944 = 14,817,088,760). A
-same-commit, same-profile debug build is expected to match the original
-isolated build's size closely (debug info can embed the build directory
-path, which differs between the two target directories, but this does not
-materially change binary size).
+needed correction. The corrected byte total is a MEASUREMENT, not an
+estimate: the original isolated sample's target directory was removed
+immediately after the sample per the harness's own isolation design (only
+the aggregate sum was persisted), so the metric was re-measured from a
+fresh, fully isolated build of the identical commit — `git archive
+56d73789` extracted to a scratch directory, `cargo test --workspace
+--no-run --message-format=json` with the same toolchain into a fresh
+`CARGO_TARGET_DIR`, under the shared build lock. The rebuilt artifact set
+matches the recorded inventory exactly (148 `profile.test` executables;
+the two excluded non-test bins measured `jit` 259,803,096 bytes and
+`jit-server` 237,935,048 bytes), summing to 14,816,926,968 bytes. The
+provenance of this value is recorded alongside the sample itself in
+`raw/clean-samples.jsonl` (sample 1, `correction_note`); timing and RSS
+fields everywhere remain the original in-sample measurements.
 
 **Doctests are included in the inventory**, not excluded: `cargo test
 --no-run` cannot compile doctest binaries ("can't skip running doc tests with

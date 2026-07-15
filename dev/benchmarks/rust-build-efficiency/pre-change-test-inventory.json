@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_at_git_revision": "56d737891129babf9571eb4de5659295bce8d827",
-  "notes": "'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target), except \"doctest\": a synthetic label this harness assigns (not a Cargo target.kind value) for one entry per crate matching Cargo's own \"Doc-tests <crate>\" grouping, derived via `cargo test --workspace --doc -- --list` / `-- --list --ignored` since `cargo test --no-run` cannot compile doctest binaries. Doctests count toward test_case_count and ignored_test_case_count (every discoverable test case) but not toward test_target_count, integration_test_target_count, or unique_active_test_executable_bytes: Cargo compiles each doctest as an ephemeral per-case binary with no stable path to size, unlike lib/bin/integration-test targets which persist under target/debug/deps for the run's duration. Ignored status for both regular tests and doctests is the set difference between the full `--list` output and `--list --ignored`.",
+  "notes": "'kind' mirrors Cargo's target.kind (e.g. [\"lib\"], [\"bin\"], [\"test\"] for a tests/*.rs integration target), except \"doctest\": a synthetic label this harness assigns (not a Cargo target.kind value) for one entry per crate matching Cargo's own \"Doc-tests <crate>\" grouping, derived via `cargo test --workspace --doc -- --list` / `-- --list --ignored` since `cargo test --no-run` cannot compile doctest binaries. Doctests count toward test_case_count and ignored_test_case_count (every discoverable test case) but not toward test_target_count, integration_test_target_count, or unique_active_test_executable_bytes: Cargo compiles each doctest as an ephemeral per-case binary with no stable path to size, unlike lib/bin/integration-test targets which persist under target/debug/deps for the run's duration. Ignored status for both regular tests and doctests is the set difference between the full `--list` output and `--list --ignored`. unique_active_test_executable_bytes is measured from an isolated same-commit rebuild (see raw/clean-samples.jsonl sample 1 correction_note).",
   "targets": [
     {
       "name": "jit",
@@ -15184,5 +15184,5 @@
     "ignored_test_case_count": 14
   },
   "target_dir_bytes": 21089820236,
-  "unique_active_test_executable_bytes": 14817088760
+  "unique_active_test_executable_bytes": 14816926968
 }
