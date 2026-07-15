@@ -190,8 +190,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     pub fn validate_silent(&self) -> Result<()> {
         // File-backed repositories execute the byte-exact repository-view
-        // pipeline. The overlay implementation feeds this same function during
-        // final-state planning; selecting the filesystem view here preserves
+        // pipeline. The reusable boundary also accepts an overlay when a future
+        // planner supplies one; selecting the filesystem view here preserves
         // existing callers while preventing validation readers from forking.
         // Pure in-memory stores have no persisted index and retain the legacy
         // storage-backed path below for command unit tests.
@@ -1911,15 +1911,30 @@ fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
 ///
 /// Returns vector of corruption issues found (empty if structurally valid)
 pub fn validate_claims_index() -> Result<Vec<String>> {
-    use crate::storage::claim_coordinator::ClaimsIndex;
     use crate::storage::worktree_paths::WorktreePaths;
-    use std::collections::HashSet;
 
     let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
+    validate_claims_index_with_paths(&paths)
+}
+
+/// Validate claims-index consistency for an explicitly selected repository.
+pub(crate) fn validate_claims_index_at(repository_root: &std::path::Path) -> Result<Vec<String>> {
+    use crate::storage::worktree_paths::WorktreePaths;
+
+    let paths =
+        WorktreePaths::detect_from(repository_root).context("Failed to detect worktree paths")?;
+    validate_claims_index_with_paths(&paths)
+}
+
+fn validate_claims_index_with_paths(
+    paths: &crate::storage::worktree_paths::WorktreePaths,
+) -> Result<Vec<String>> {
+    use crate::storage::claim_coordinator::ClaimsIndex;
+    use std::collections::HashSet;
 
     // Load the active-lease index through storage (an absent index yields an
     // empty one, i.e. no claims coordination active).
-    let index = ClaimsIndex::load(&paths)?;
+    let index = ClaimsIndex::load(paths)?;
 
     let mut issues = Vec::new();
 

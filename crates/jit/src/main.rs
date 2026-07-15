@@ -6387,9 +6387,9 @@ fn run() -> Result<()> {
                 }
             } else {
                 // Standard whole-repo validation. Load every repository-dependent
-                // input through the one read-only filesystem view. Profile
-                // planning injects an overlay view into this identical pipeline,
-                // so no parser can reopen live `.jit` bytes while judging a
+                // input through the one read-only filesystem view. The same
+                // boundary accepts an overlay for a future profile planner, so
+                // no parser needs to reopen live `.jit` bytes while judging a
                 // proposed final state. Capture (do NOT `?`-propagate) any
                 // integrity error so it can be rendered before the exit status is
                 // decided below.

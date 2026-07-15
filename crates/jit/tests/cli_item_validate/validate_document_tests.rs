@@ -95,6 +95,26 @@ fn test_validate_passes_for_uncommitted_document() {
     ctx.jit_assert(&["validate"]).success();
 }
 
+/// A filesystem validation may resolve an unpinned document from Git `HEAD`
+/// when it is absent from the working tree.
+#[test]
+fn test_validate_passes_for_document_only_in_head() {
+    let ctx = TestContext::new();
+    ctx.init_git();
+    ctx.jit_assert(&["init"]).success();
+
+    let issue_id = ctx.create_issue("Task with tracked doc");
+    let doc_path = "docs/tracked.md";
+    fs::create_dir_all(ctx.repo_path.join("docs")).unwrap();
+    fs::write(ctx.repo_path.join(doc_path), "# Tracked\n").unwrap();
+    ctx.jit_assert(&["doc", "add", &issue_id, doc_path])
+        .success();
+    ctx.commit_all("tracked document");
+    fs::remove_file(ctx.repo_path.join(doc_path)).unwrap();
+
+    ctx.jit_assert(&["validate"]).success();
+}
+
 /// `jit doc add` on an `.html` file stores `format == "html"` in the issue.
 #[test]
 fn test_doc_add_html_stores_format_html() {
