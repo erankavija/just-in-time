@@ -96,7 +96,7 @@ summary=""
 summarize_pass() {
   local name="$1"
   case "$name" in
-    test)
+    test | provenance)
       # cargo test runs many binaries, each printing its own
       # "test result: ok. N passed; M failed; K ignored; ...". Sum them.
       local p f i
@@ -117,7 +117,7 @@ summarize_pass() {
 summarize_fail() {
   local name="$1"
   case "$name" in
-    test)
+    test | provenance)
       echo "--- $name failures ---"
       # Failed test names and the captured panic/assert output blocks.
       grep -E '^test .* FAILED$' "$WORK/$name.out" || true
@@ -171,6 +171,19 @@ fi
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
 run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
+
+# Build-provenance contract suites (jit:5d862134). These are #[ignore]d for plain
+# `cargo test` — each spawns cold scratch `cargo` builds into throwaway target
+# dirs to exercise the build script under real git states, costing ~3-4 min that
+# ordinary dev runs should not pay — so the `test` step above skips them. The gate
+# paying that cost is exactly the point: REQ-06's hard metadata-only-invalidation
+# and injected-provenance contracts are unexercised unless a required CI step runs
+# them, so this step does. No lock interaction: these tests spawn plain `cargo`
+# only (never scripts/cargo-ci.sh or verify-commit-builds.sh), so they do not
+# re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
+run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
+  --test build_provenance_metadata_stability_tests \
+  --test version_cli_tests -- --ignored
 
 echo "$summary"
 

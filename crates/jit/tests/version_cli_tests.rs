@@ -71,8 +71,10 @@ fn test_version_command_reports_json_provenance_without_repo() {
 // Ignored from the default suite: these spawn `cargo run` into dedicated
 // CARGO_TARGET_DIRs, forcing a cold compile (~85s) to exercise the build script
 // under specific provenance environments. Compilation is intrinsic to what they
-// test, so they cannot meet the per-test speed budget. Run on demand / in CI
-// with:
+// test, so they cannot meet the per-test speed budget and plain `cargo test`
+// skips them. `scripts/cargo-ci.sh`'s `provenance` step runs them (with the
+// metadata-stability suite) under `--ignored` on every gate, so these REQ-03/04/05
+// contracts are exercised by CI. Run them directly with:
 //   cargo test -p jit --test version_cli_tests -- --ignored
 
 // REQ-05: a build that injects NO provenance succeeds and reports the
