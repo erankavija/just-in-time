@@ -32,6 +32,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
+- D-14: Gate source freeze on completed profiles MVP and core maintenance
 
 ## Decision Details
 
@@ -216,3 +217,21 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - **Reasoning:** Linking preserves navigation while pruning maintenance cost and
   enforces `@/inv/single-source-prose` across the public documentation surface.
 - **Date:** 2026-07-14
+
+### D-14: Source freeze consumes the two completed upstream delivery streams
+
+- **Chosen:** Keep the production-readiness source-freeze boundary directly
+  dependent on profiles MVP `9b7b5f9c` and core maintenance `6eb585bc`. Complete
+  core maintenance as a terminal v1.0 prerequisite before production readiness
+  crosses that boundary; the release work consumes both delivered contracts
+  without changing or duplicating them.
+- **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
+  to make the dependency terminal; keeping core maintenance intentionally open
+  as a living epic; and copying either upstream stream's work into production
+  readiness, which creates competing ownership.
+- **Reasoning:** The existing DAG expresses the intended ordering. Planning and
+  independent release hardening can proceed while core maintenance finishes,
+  but source freezing and candidate production require the completed core fixes
+  and profile quickstart. A synthetic checkpoint would add lifecycle ceremony
+  without changing that contract.
+- **Date:** 2026-07-15
