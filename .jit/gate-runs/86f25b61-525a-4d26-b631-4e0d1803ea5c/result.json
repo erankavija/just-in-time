@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "86f25b61-525a-4d26-b631-4e0d1803ea5c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "5d862134-2424-4a1c-b9f4-204e3b53801b",
+  "commit": "f27b240645d3ac3b2ef533939f31f0ccba216e68",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-15T03:07:40.378279167Z",
+  "completed_at": "2026-07-15T03:11:20.873429776Z",
+  "duration_ms": 220495,
+  "exit_code": 0,
+  "stdout": "Attribution: 4d3b0d48, 7282d631, 0dee4a6b, 6edd0837, 79c3fb94 (`jit:5d862134`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0); code-review previously failed (exit 1, F1 addressed by 6edd0837/79c3fb94)\nTruncation recovery: per-path re-reads of implementation, test, CI, documentation, gate-record, and dependency patches\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard provenance criteria are implemented, covered, and the prior CI-coverage finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All hard provenance criteria are implemented, covered, and the prior CI-coverage finding is addressed.",
+    "findings": []
+  }
+}

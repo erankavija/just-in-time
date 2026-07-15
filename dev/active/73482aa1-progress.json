@@ -31,7 +31,7 @@
           "title": "Consolidate Rust integration tests into cohesive suites",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
+          "status": "in_progress",
           "note": "dispatch AFTER 5d862134 merges: its consolidation must include 5d862134 new provenance tests or the <=12-target REQ breaks post-merge; both touch the tests/ tree"
         },
         {
@@ -39,7 +39,8 @@
           "title": "Stabilize build provenance inputs",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "in_progress"
+          "status": "done",
+          "note": "1 rework round (CI wiring); guard reconciled via install-jit.sh provenance injection"
         }
       ]
     },
