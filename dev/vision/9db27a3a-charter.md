@@ -33,6 +33,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
 - D-14: Gate source freeze on completed profiles MVP and core maintenance
+- D-15: Fix scoped validation in core rather than weakening bracket evidence
 
 ## Decision Details
 
@@ -234,4 +235,23 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   but source freezing and candidate production require the completed core fixes
   and profile quickstart. A synthetic checkpoint would add lifecycle ceremony
   without changing that contract.
+- **Date:** 2026-07-15
+
+### D-15: Scoped bracket validation is a core-maintenance prerequisite
+
+- **Chosen:** Capture the scoped-validation defect under core maintenance and
+  fix it before production-readiness breakdown can pass. Scoped rules evaluate
+  only issues in the requested container subtree while resolving legitimate
+  pointers against the complete issue index; production planning retains the
+  failed coverage evidence and reruns the gate with the fixed engine.
+- **Rejected:** Removing the valid historical `brackets:2821e177` label,
+  inventing a cross-epic dependency, treating the coverage failure as a missing
+  production criterion, or bypassing the gate. Each alternative would corrupt
+  authoritative project data or weaken the plan-before-fan-out guarantee instead
+  of correcting the validator.
+- **Reasoning:** Global validation is clean, both referenced historical issues
+  exist, and the failure appears only under `jit validate --scope 8b05a612` when
+  an unrelated bracket is checked against a partial issue map. Fixing that
+  project-wide validation primitive belongs to the already-prioritized core
+  maintenance stream, consistent with D-3 and D-14.
 - **Date:** 2026-07-15
