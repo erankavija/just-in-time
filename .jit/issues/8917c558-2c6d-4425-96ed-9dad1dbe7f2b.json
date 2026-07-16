@@ -2,9 +2,9 @@
   "id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
   "title": "Make jit doc add idempotent for an existing identical link",
   "description": "Re-running `jit doc add` with a path already linked to the issue appends a duplicate document reference and a duplicate event instead of re-pointing the existing link.\n\n## Background\n\nObserved while dogfooding charter linkage: the v1.0 charter was already doc-linked to its milestone, and a second `jit doc add` with the same path appended a second reference rather than updating the first. The vision-charter workflow explicitly re-runs `jit doc add` after updates (\"re-running jit doc add after an update re-points the link at the current commit\"), so the append behavior contradicts the documented steward workflow and accretes duplicate rows in `jit doc list`.\n\n## Success Criteria\n\n- [hard] REQ-01: Running `jit doc add` for an issue and path that are already linked updates the existing reference in place; `jit doc list` shows one entry for that path afterwards.\n- [hard] REQ-02: The idempotent re-add records the refresh in the event log as an update, not a second add.\n- [hard] REQ-03: Adding a genuinely new path still appends a new reference, and a regression test covers both behaviors.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -13,15 +13,15 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.941064175Z"
-    },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-12T13:38:45.949797371Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.941064175Z"
     }
   },
   "context": {},
@@ -32,6 +32,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-07T07:52:08.539780520Z",
-  "updated_at": "2026-07-12T13:38:45.949851471Z",
-  "first_ready_at": "2026-07-07T07:52:08.539790120Z"
+  "updated_at": "2026-07-16T08:40:04.575416666Z",
+  "first_ready_at": "2026-07-07T07:52:08.539790120Z",
+  "claimed_at": "2026-07-16T08:40:04.575416376Z"
 }

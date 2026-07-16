@@ -2,9 +2,9 @@
   "id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
   "title": "Scoped batch-shape graph export as the batch-create inverse",
   "description": "Give `jit graph export` a scoped, batch-shaped output mode so a container's subgraph can be captured in the exact schema `jit issue batch-create --from-json` consumes — a first-class inverse of batch creation.\n\n## Background\n\nBatch creation reads an array of issue definitions with symbolic keys and per-node `depends_on`, pre-validates the whole file, and creates the subgraph in one operation. No export produces that shape: `jit graph export --format json` emits the whole graph as UUID-keyed nodes with a separate edge list, has no subgraph selection, and carries lifecycle fields (state, assignee, timestamps) and identity-bound labels that batch creation neither accepts nor should recreate. Round-tripping a subtree today means hand-written jq over the full export, with silently improvised answers to boundary edges, bracket-infrastructure nodes, and label hygiene.\n\nThe membership closure needed for scoping already exists: per-container DAG-authoritative membership is computed by the scoped validation path. The batch schema is fixed by batch creation: `key`, `title`, `description`, `type`, `priority`, `labels`, `gates`, `depends_on` (symbolic keys).\n\nA scoped batch export is also the capture dual of graph templates: `jit apply <template> <container>` instantiates an abstract parameterized subgraph from the registry, while this export captures a concrete subgraph as a replayable seed. Promoting a captured seed into a registered template (parameterizing titles and labels) is a natural follow-up and out of scope here; the linked use-cases document develops the relationship.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit graph export --scope <container>` restricts export to the container's DAG-authoritative membership closure and composes with every existing format (json, dot, mermaid).\n- [hard] REQ-02: `jit graph export --format batch` emits a JSON array in the batch-create input schema: per node a symbolic `key` (the short id), `title`, `description`, `type` (from the node's type label), `priority`, `labels`, `gates` (the node's gate set), and `depends_on` listing in-scope symbolic keys.\n- [hard] REQ-03: Batch output carries no lifecycle fields (state, assignee, timestamps), and every in-scope node exports regardless of its state.\n- [hard] REQ-04: Batch output strips identity-bound labels — membership labels per `[type_hierarchy.label_associations]`, the coverage rule's satisfies-namespace labels, and `brackets:*` — while generic labels survive.\n- [hard] REQ-05: Nodes whose type matches a template's planning- or breakdown-role node type are excluded from batch output together with their edges.\n- [hard] REQ-06: Edges crossing the scope boundary are excluded from batch output and reported in the command's output (count and node pairs); none are dropped silently.\n- [hard] REQ-07: Round-trip holds: the batch export of a container's subtree, fed to batch creation in a fresh repository with compatible configuration, recreates an isomorphic subgraph (same titles, types, priorities, gates, and in-scope edges) and passes repository validation; a harness test covers this.\n- [hard] REQ-08: `--format batch` without `--scope` exports the whole graph in batch shape; existing formats and flags behave unchanged when the new flags are absent.\n\n## Notes\n\nDecisions pinned during intake:\n\n- **CLI shape: extend `jit graph export`** with orthogonal `--scope` and `--format batch`. Rejected: a dedicated capture subcommand — scoping benefits every existing format (scoped Mermaid and DOT diagrams fall out free), and one export surface stays discoverable.\n- **Lifecycle policy: strip all, include all.** The output is a pure structural seed; batch creation always makes fresh backlog issues. Rejected: default state filtering — excluding done nodes punches holes in dependency chains and forces edge contraction; a state filter can be added later if a use case demands it.\n- **Boundary and bracket policy: exclude and report.** Boundary-crossing edges are listed, bracket-infrastructure nodes are excluded so the target re-scaffolds its own bracket via the graph template. Rejected: verbatim export — every import would need manual pruning and duplicate bracket nodes.\n- **Label policy: strip identity-bound, keep generic.** Membership and satisfies labels reference the source container's identity and criteria ids; recreating them in a target is guaranteed-wrong. Rejected: verbatim labels.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -13,15 +13,15 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.859084795Z"
-    },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-12T13:38:45.867466541Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.859084795Z"
     }
   },
   "context": {},
@@ -40,6 +40,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-07T09:07:13.958951843Z",
-  "updated_at": "2026-07-12T13:38:45.867510972Z",
-  "first_ready_at": "2026-07-07T09:07:13.958962083Z"
+  "updated_at": "2026-07-16T08:40:04.675513069Z",
+  "first_ready_at": "2026-07-07T09:07:13.958962083Z",
+  "claimed_at": "2026-07-16T08:40:04.675512859Z"
 }
