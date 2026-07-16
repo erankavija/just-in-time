@@ -145,7 +145,7 @@ proceeds and the bypass is logged, at every level.
 > (a hand-declared namespace takes effect on the next command, no regeneration;
 > the next jit-driven config write — `jit config set` or re-init — also writes
 > the matching `namespace-unique-*` row through to `rules.toml` so its
-> `@/rule/…` address resolves)
+> `@/rule/<name>` address resolves)
 > step), and author new conventions as custom rules in `rules.toml`. `strictness`
 > tunes how all of these gate operations globally.
 

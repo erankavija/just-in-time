@@ -454,8 +454,8 @@ Idempotent: re-running over an existing repository never overwrites
 keeps every custom rule and hand-edited policy field byte-exact; the one
 synchronization re-init performs (when default-origin rules remain enabled) is
 the default `namespace-unique-*` row set, appended or dropped to match the
-current `[namespaces]`/`[type_hierarchy]` registry so `@/rule/namespace-unique-<ns>`
-stays addressable.
+current `[namespaces]`/`[type_hierarchy]` registry so each row's `@/rule/<name>`
+address stays resolvable.
 
 ```bash
 jit init [--hierarchy-template <name>] [--json]
