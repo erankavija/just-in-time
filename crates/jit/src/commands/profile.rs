@@ -327,7 +327,7 @@ impl CommandExecutor<JsonFileStorage> {
     }
 }
 
-fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedProfileRecord {
+pub(super) fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedProfileRecord {
     let metadata = &package.manifest().profile;
     AppliedProfileRecord {
         id: metadata.id.clone(),
@@ -377,7 +377,7 @@ fn profile_plan_result(
     }
 }
 
-fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
+pub(super) fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
     if events.is_empty() || events.ends_with(b"\n") {
         return false;
     }
@@ -388,7 +388,7 @@ fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(final_line).is_err()
 }
 
-fn inspect_installed_record(
+pub(super) fn inspect_installed_record(
     snapshot: &crate::profile::RepositorySnapshot,
     path: &str,
     expected: &AppliedProfileRecord,
@@ -415,7 +415,9 @@ fn inspect_installed_record(
     }
 }
 
-fn ensure_profile_directory(snapshot: &crate::profile::RepositorySnapshot) -> Result<()> {
+pub(super) fn ensure_profile_directory(
+    snapshot: &crate::profile::RepositorySnapshot,
+) -> Result<()> {
     match snapshot.entry(".jit/profiles") {
         None | Some(SnapshotEntry::Directory) => Ok(()),
         Some(_) => Err(ProfileApplyError::UnsupportedMetadataPath {

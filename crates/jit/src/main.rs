@@ -1860,32 +1860,19 @@ fn run() -> Result<()> {
             let index_existed = jit_dir.join("index.json").exists();
             let gates_existed = jit_dir.join("gates.toml").exists();
             let events_existed = jit_dir.join("events.jsonl").exists();
+            let config_existed = jit_dir.join("config.toml").exists();
+            let rules_existed = jit_dir.join("rules.toml").exists();
             let fresh = !jit_dir.exists();
             let fresh_result = profile_result(
-                fresh
-                    .then(|| {
-                        executor.initialize_fresh_repository(
-                            &current_dir,
-                            &chosen,
-                            profile.as_deref(),
-                        )
-                    })
-                    .transpose(),
+                if let Some(id) = profile.as_deref() {
+                    Some(executor.initialize_profiled_repository(&current_dir, &chosen, id))
+                } else {
+                    fresh.then(|| executor.initialize_fresh_repository(&current_dir, &chosen, None))
+                }
+                .transpose(),
                 "init",
                 *json,
             )?;
-            let existing_profile_result = if !fresh {
-                profile_result(
-                    profile
-                        .as_deref()
-                        .map(|id| executor.apply_profile(id))
-                        .transpose(),
-                    "init",
-                    *json,
-                )?
-            } else {
-                None
-            };
             let (worktree_identity, init_warnings) = if fresh || profile.is_some() {
                 executor.initialize_worktree_identity()?
             } else {
@@ -1919,9 +1906,7 @@ fn run() -> Result<()> {
             // store write — and is idempotent, so a re-init leaves an existing
             // `[project]` table untouched.
             let project_name = if let Some(result) = &fresh_result {
-                Some(result.project_name.clone())
-            } else if profile.is_some() {
-                None
+                (!config_existed).then(|| result.project_name.clone())
             } else {
                 executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?
             };
@@ -1930,10 +1915,8 @@ fn run() -> Result<()> {
             // default ruleset derived from the repo's namespace registry + type
             // hierarchy. A no-op when rules.toml already exists (re-init
             // never clobbers user edits).
-            let scaffolded = if fresh {
-                true
-            } else if profile.is_some() {
-                false
+            let scaffolded = if fresh_result.is_some() {
+                !rules_existed
             } else {
                 executor.scaffold_default_rules()?
             };
@@ -1943,7 +1926,7 @@ fn run() -> Result<()> {
             let profile_result = if let Some(result) = fresh_result {
                 result.profile
             } else {
-                existing_profile_result
+                None
             };
 
             let message = if let Some(ref t) = template {

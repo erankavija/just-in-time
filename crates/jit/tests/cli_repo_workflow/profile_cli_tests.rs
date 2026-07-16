@@ -165,3 +165,46 @@ fn test_existing_partial_profiled_init_conflict_does_not_plain_init_first() {
         );
     }
 }
+
+#[test]
+fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
+    let repo = TempDir::new().unwrap();
+    fs::create_dir_all(repo.path().join(".jit")).unwrap();
+    let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
+    fs::write(repo.path().join(".jit/index.json"), index).unwrap();
+
+    let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+
+    assert!(
+        output.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for path in [
+        "gates.toml",
+        "events.jsonl",
+        "config.toml",
+        "rules.toml",
+        "issues",
+        "profiles/jit-dogfood.json",
+    ] {
+        assert!(
+            repo.path().join(".jit").join(path).exists(),
+            "missing {path}"
+        );
+    }
+    assert_eq!(
+        fs::read(repo.path().join(".jit/index.json")).unwrap(),
+        index,
+        "existing neutral bytes must be preserved"
+    );
+    assert_eq!(
+        fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+            .unwrap()
+            .lines()
+            .count(),
+        1
+    );
+    assert!(jit(repo.path(), &["validate", "--json"]).status.success());
+}

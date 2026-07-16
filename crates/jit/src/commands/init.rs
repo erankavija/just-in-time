@@ -4,10 +4,9 @@ use crate::config_manager::ConfigManager;
 use crate::domain::Event;
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    append_profile_event_image, plan_profile_application_against, AppliedProfileRecord,
-    EmbeddedProfilePackage, ProfileApplicationStatus, ProfileApplicationWarning,
-    ProfileApplyResult, ProfileOrigin, ProjectedFileMode, RepositorySnapshot, SnapshotEntry,
-    SnapshotFile,
+    append_profile_event_image, plan_profile_application_against, EmbeddedProfilePackage,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileOrigin,
+    ProjectedFileMode, RepositorySnapshot, SnapshotEntry, SnapshotFile,
 };
 use crate::storage::{
     FileTransactionKernel, FileTransactionPlan, GateRegistry, IssueStore, JsonFileStorage,
@@ -53,6 +52,10 @@ impl InitScaffold {
             &template.generate_config_toml(),
             &project_name,
         );
+        Self::from_config(repo_dir, config, project_name)
+    }
+
+    fn from_config(repo_dir: &Path, config: String, project_name: ProjectName) -> Result<Self> {
         let parsed: JitConfig =
             toml::from_str(&config).context("Failed to parse generated init configuration")?;
         let namespaces = ConfigManager::new(repo_dir.join(".jit")).namespaces_from_config(&parsed);
@@ -88,6 +91,66 @@ impl InitScaffold {
         })
     }
 
+    fn missing_from_existing(
+        storage: &JsonFileStorage,
+        repo_dir: &Path,
+        template: &HierarchyTemplate,
+    ) -> Result<Self> {
+        let generated = Self::generate(repo_dir, template)?;
+        let config_snapshot = storage.capture_profile_snapshot([".jit/config.toml"])?;
+        let scaffold = match config_snapshot.entry(".jit/config.toml") {
+            None => generated,
+            Some(SnapshotEntry::File(file)) => {
+                let config = String::from_utf8(file.bytes.clone())
+                    .context("existing .jit/config.toml is not UTF-8")?;
+                let parsed: JitConfig = toml::from_str(&config)
+                    .context("Failed to parse existing init configuration")?;
+                let project_name = parsed
+                    .project
+                    .and_then(|project| project.name)
+                    .unwrap_or(generated.project_name);
+                Self::from_config(repo_dir, config, project_name)?
+            }
+            Some(_) => anyhow::bail!("existing .jit/config.toml is not a regular file"),
+        };
+        let paths = scaffold
+            .files
+            .keys()
+            .map(String::as_str)
+            .chain(scaffold.directories.iter().map(String::as_str));
+        let snapshot = storage.capture_profile_snapshot(paths)?;
+        let files = scaffold
+            .files
+            .into_iter()
+            .filter_map(|(path, bytes)| match snapshot.entry(&path) {
+                None => Some(Ok((path, bytes))),
+                Some(SnapshotEntry::File(_)) if path.starts_with(".jit/schemas/") => {
+                    Some(Ok((path, bytes)))
+                }
+                Some(SnapshotEntry::File(_)) => None,
+                Some(_) => Some(Err(anyhow::anyhow!(
+                    "neutral scaffold path '{path}' is not a regular file"
+                ))),
+            })
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        let directories = scaffold
+            .directories
+            .into_iter()
+            .filter_map(|path| match snapshot.entry(&path) {
+                None => Some(Ok(path)),
+                Some(SnapshotEntry::Directory) => None,
+                Some(_) => Some(Err(anyhow::anyhow!(
+                    "neutral scaffold path '{path}' is not a directory"
+                ))),
+            })
+            .collect::<Result<BTreeSet<_>>>()?;
+        Ok(Self {
+            files,
+            directories,
+            project_name: scaffold.project_name,
+        })
+    }
+
     fn overlay(&self) -> impl Iterator<Item = (PathBuf, Option<Vec<u8>>)> + '_ {
         self.files
             .iter()
@@ -101,6 +164,28 @@ struct FreshProfilePlan {
 }
 
 impl CommandExecutor<JsonFileStorage> {
+    /// Atomically complete neutral initialization and apply one profile.
+    ///
+    /// An absent data directory uses the external bootstrap journal. An
+    /// existing partial repository contributes its current bytes as the base;
+    /// only missing neutral scaffold state and profile changes enter one
+    /// repository-local transaction.
+    pub fn initialize_profiled_repository(
+        &self,
+        repo_dir: &Path,
+        template: &HierarchyTemplate,
+        profile_id: &str,
+    ) -> Result<FreshInitResult> {
+        let _recovery_session = RecoveryCoordinator::recover_before_services(&self.storage)?;
+        let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
+        let scaffold = if self.storage.root().exists() {
+            InitScaffold::missing_from_existing(&self.storage, repo_dir, template)?
+        } else {
+            InitScaffold::generate(repo_dir, template)?
+        };
+        self.publish_init_scaffold(repo_dir, scaffold, Some(profile_id), &kernel)
+    }
+
     /// Publish a fresh neutral or profiled repository in one recoverable
     /// fresh-root transaction.
     ///
@@ -122,9 +207,11 @@ impl CommandExecutor<JsonFileStorage> {
             );
         }
         let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
-        self.initialize_fresh_repository_with_kernel(repo_dir, template, profile_id, &kernel)
+        let scaffold = InitScaffold::generate(repo_dir, template)?;
+        self.publish_init_scaffold(repo_dir, scaffold, profile_id, &kernel)
     }
 
+    #[cfg(test)]
     fn initialize_fresh_repository_with_kernel(
         &self,
         repo_dir: &Path,
@@ -132,8 +219,29 @@ impl CommandExecutor<JsonFileStorage> {
         profile_id: Option<&str>,
         kernel: &FileTransactionKernel,
     ) -> Result<FreshInitResult> {
-        let bootstrap_guard = self.storage.acquire_bootstrap_write_lock()?;
         let scaffold = InitScaffold::generate(repo_dir, template)?;
+        self.publish_init_scaffold(repo_dir, scaffold, profile_id, kernel)
+    }
+
+    fn publish_init_scaffold(
+        &self,
+        _repo_dir: &Path,
+        scaffold: InitScaffold,
+        profile_id: Option<&str>,
+        kernel: &FileTransactionKernel,
+    ) -> Result<FreshInitResult> {
+        let bootstrap_guard = self.storage.acquire_bootstrap_write_lock()?;
+        let repository_guard = self
+            .storage
+            .root()
+            .exists()
+            .then(|| self.storage.acquire_repo_write_lock_raw())
+            .transpose()?;
+        let _events_guard = repository_guard
+            .as_ref()
+            .map(|_| self.storage.acquire_events_write_lock())
+            .transpose()?;
+        let transaction_guard = repository_guard.as_ref().unwrap_or(&bootstrap_guard);
 
         let validation_base: Arc<dyn RepositoryView> = Arc::new(
             FilesystemRepositoryView::from_jit_root(self.storage.root())?,
@@ -171,12 +279,6 @@ impl CommandExecutor<JsonFileStorage> {
                 unix_mode: Some(0o755),
             })
             .collect::<Vec<_>>();
-        if profile.is_some() {
-            actions.push(TransactionAction::CreateDirectory {
-                path: super::profile::transaction_path(self.storage.root(), ".jit/profiles"),
-                unix_mode: Some(0o755),
-            });
-        }
         actions.extend(files.into_iter().map(|(path, (contents, mode))| {
             TransactionAction::WriteFile {
                 path: super::profile::transaction_path(self.storage.root(), &path),
@@ -187,7 +289,7 @@ impl CommandExecutor<JsonFileStorage> {
 
         let transaction_id = format!("init-{}", Uuid::new_v4());
         let outcome = kernel.execute(
-            &bootstrap_guard,
+            transaction_guard,
             FileTransactionPlan {
                 transaction_id: transaction_id.clone(),
                 actions,
@@ -219,7 +321,9 @@ impl CommandExecutor<JsonFileStorage> {
                     },
                 );
             }
-            profile.apply_result.transaction_id = Some(transaction_id);
+            if profile.apply_result.status == ProfileApplicationStatus::Applied {
+                profile.apply_result.transaction_id = Some(transaction_id);
+            }
             profile.apply_result
         });
 
@@ -242,12 +346,11 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         let record_path = format!(".jit/profiles/{}.json", metadata.id);
         let captured = self.storage.capture_profile_snapshot(
-            package
-                .hashes()
-                .targets
-                .keys()
-                .map(String::as_str)
-                .chain([record_path.as_str(), ".jit/profiles"]),
+            package.hashes().targets.keys().map(String::as_str).chain([
+                record_path.as_str(),
+                ".jit/profiles",
+                ".jit/events.jsonl",
+            ]),
         )?;
         let mut entries = captured.entries().clone();
         entries.extend(
@@ -267,26 +370,33 @@ impl CommandExecutor<JsonFileStorage> {
             )
         }));
         let snapshot = RepositorySnapshot::new(captured.root(), entries)?;
+        super::profile::ensure_profile_directory(&snapshot)?;
         let neutral_view: Arc<dyn RepositoryView> =
             Arc::new(OverlayRepositoryView::new(filesystem, scaffold.overlay())?);
         let plan = plan_profile_application_against(package, &snapshot, neutral_view)?;
 
-        let record = AppliedProfileRecord {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            origin: ProfileOrigin::Embedded,
-            package_hash: package.hashes().package.clone(),
-            target_hashes: package.hashes().targets.clone(),
+        let record = super::profile::expected_record(package);
+        let record_matches =
+            super::profile::inspect_installed_record(&snapshot, &record_path, &record)?;
+        let profile_changed = !plan.is_no_op() || !record_matches;
+        let prior_events = snapshot
+            .file(".jit/events.jsonl")
+            .map_or(&[][..], |file| file.bytes.as_slice());
+        let events = if profile_changed {
+            let isolated_torn_tail =
+                super::profile::has_malformed_unterminated_event_tail(prior_events);
+            let event = Event::new_profile_applied(
+                metadata.id.clone(),
+                metadata.version.clone(),
+                ProfileOrigin::Embedded,
+                package.hashes().package.clone(),
+                package.hashes().targets.clone(),
+                isolated_torn_tail,
+            );
+            append_profile_event_image(prior_events, &event)?
+        } else {
+            prior_events.to_vec()
         };
-        let event = Event::new_profile_applied(
-            metadata.id.clone(),
-            metadata.version.clone(),
-            ProfileOrigin::Embedded,
-            package.hashes().package.clone(),
-            package.hashes().targets.clone(),
-            false,
-        );
-        let events = append_profile_event_image(&[], &event)?;
 
         let mut final_overlay = scaffold.overlay().collect::<BTreeMap<_, _>>();
         final_overlay.extend(plan.overlay_changes());
@@ -312,20 +422,28 @@ impl CommandExecutor<JsonFileStorage> {
             .filter(|target| target.action != crate::profile::PlannedTargetAction::NoOp)
             .map(|target| (target.path.clone(), (target.bytes.clone(), target.mode)))
             .collect::<BTreeMap<_, _>>();
-        changed_files.insert(
-            record_path,
-            (record.to_bytes()?, ProjectedFileMode::Regular),
-        );
-        changed_files.insert(
-            ".jit/events.jsonl".to_string(),
-            (events, ProjectedFileMode::Regular),
-        );
+        if !record_matches {
+            changed_files.insert(
+                record_path,
+                (record.to_bytes()?, ProjectedFileMode::Regular),
+            );
+        }
+        if profile_changed {
+            changed_files.insert(
+                ".jit/events.jsonl".to_string(),
+                (events, ProjectedFileMode::Regular),
+            );
+        }
 
         Ok(FreshProfilePlan {
             apply_result: ProfileApplyResult {
                 id: metadata.id.clone(),
                 version: metadata.version.clone(),
-                status: ProfileApplicationStatus::Applied,
+                status: if profile_changed {
+                    ProfileApplicationStatus::Applied
+                } else {
+                    ProfileApplicationStatus::Unchanged
+                },
                 plan_hash: plan.identity.plan_hash,
                 transaction_id: None,
                 warnings: Vec::new(),
@@ -481,6 +599,35 @@ mod tests {
         assert!(!repo.path().join(".jit").exists());
         assert!(!repo.path().join(".agents").exists());
         assert!(!repo.path().join(".jit-bootstrap").exists());
+    }
+
+    #[test]
+    fn test_partial_profile_init_rolls_back_to_exact_existing_state() {
+        let repo = TempDir::new().unwrap();
+        fs::create_dir_all(repo.path().join(".jit")).unwrap();
+        let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
+        fs::write(repo.path().join(".jit/index.json"), index).unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let executor = CommandExecutor::new(storage.clone());
+        let scaffold = InitScaffold::missing_from_existing(
+            &storage,
+            repo.path(),
+            &HierarchyTemplate::default(),
+        )
+        .unwrap();
+        let kernel = first_publish_kernel(&storage, false);
+
+        assert!(executor
+            .publish_init_scaffold(repo.path(), scaffold, Some("jit-dogfood"), &kernel,)
+            .is_err());
+
+        assert_eq!(
+            fs::read(repo.path().join(".jit/index.json")).unwrap(),
+            index
+        );
+        for path in ["gates.toml", "events.jsonl", "config.toml", "rules.toml"] {
+            assert!(!repo.path().join(".jit").join(path).exists());
+        }
     }
 
     #[test]
