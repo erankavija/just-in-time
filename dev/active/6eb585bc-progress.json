@@ -238,6 +238,10 @@
     {
       "short_id": "d74a9ed1",
       "note": "Write default-rule membership through to rules.toml on config refresh; split from af4c901a round-3 (dangling @/rule/namespace-unique-brackets); slotted into wave 6 (former wave 5)"
+    },
+    {
+      "short_id": "94096aac",
+      "note": "Foreground serve deadlocks: parent retains bootstrap recovery lock while blocking on child; pre-existing, flagged by 894337e2 rework worker 2026-07-16; wired under epic, gates cargo-ci+code-review; ready for dispatch"
     }
   ],
   "escalations": [
@@ -269,8 +273,9 @@
     "7446af34": 2,
     "af4c901a": 3,
     "f40f1b0a": 6,
-    "894337e2": 1
+    "894337e2": 1,
+    "8917c558": 1
   },
   "started_at": "2026-07-14T00:00:00Z",
-  "session_4": "2026-07-16 session 4: 8d7fc762 DONE (docs-mechanical passed post-46657f6f). Desk-reviewed+merged 5 wave-A worktrees onto main: 16402e14 (4e7dc03e), 8917c558 (1e72fbf1), 52665a07 (74071a9c), 3e12ffbd (1c26833b, design doc linked 7ca34a54), 45a140ae (ffde113d, leaked .jit-bootstrap.lock untracked c03d1ba9); all verify-commit-builds green; gate sweep (4 gates x 5 issues) running detached (scratchpad/gate-sweep.log). 894337e2 code-review FAILED post-merge (listener dropped before child re-bind); rework worker dispatched on fresh anchor e24de47f. Continuation workers dispatched into existing worktrees: 6f881a85, 0daba57d, 1d59070d, d74a9ed1. Wave B: 450db193 dispatched (anchor 7ca34a54, opus) after 52665a07 merged; c505031a waits on 1d59070d; 554ad07f waits on 1d59070d; 0283ce74 waits on 0daba57d."
+  "session_4": "2026-07-16 session 4 CLOSED, handoff dev/active/6eb585bc-handoff-4.md. DONE this session: 8d7fc762, 16402e14. MERGED awaiting gates (sweep take 5 running at handoff): 8917c558 (lead fixes f23479ed+2a5aff7e, 3/4 green), 52665a07 (+d3d64146), 3e12ffbd, 45a140ae, 0daba57d, d74a9ed1, 1d59070d, 894337e2 (rework merge dbe1a50b). IN-FLIGHT workers at handoff: 450db193 (committed 8aa61b84), 0283ce74 (4 commits), c505031a (29 dirty, functionally complete), 554ad07f (committed 99072933, desk-review PASS \u2014 merge directly), 6f881a85-r1 (replacement, no commits yet). Filed 94096aac (foreground-serve deadlock, ready). Gate-sweep recipe + traps in handoff-4."
 }
