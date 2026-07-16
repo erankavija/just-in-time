@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "6136bae2-94b0-4644-9423-c304e43291e1",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "700288f62dd40768e78e96f6581b17d3519d4db6",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "passed",
+  "started_at": "2026-07-16T16:38:03.383373021Z",
+  "completed_at": "2026-07-16T16:39:35.187442669Z",
+  "duration_ms": 91804,
+  "exit_code": 0,
+  "stdout": "Attribution used the six individually inspected reachable `jit:7ad4019b` commits. This is a leaf (`task`, maximum level 4), so no dependency or child commits were included. The prior preset-source finding is resolved: the reference now identifies the package-derived projection, matching current code and its passing conformance test.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's documentation impact is accurate and the prior blocking preset-source finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf issue's documentation impact is accurate and the prior blocking preset-source finding is resolved.",
+    "findings": []
+  }
+}
