@@ -100,7 +100,7 @@ impl CommandExecutor<JsonFileStorage> {
         let prior_events = snapshot
             .file(".jit/events.jsonl")
             .map_or(&[][..], |file| file.bytes.as_slice());
-        let isolated_torn_tail = !prior_events.is_empty() && !prior_events.ends_with(b"\n");
+        let isolated_torn_tail = has_malformed_unterminated_event_tail(prior_events);
         let event = Event::new_profile_applied(
             metadata.id.clone(),
             metadata.version.clone(),
@@ -219,6 +219,17 @@ impl CommandExecutor<JsonFileStorage> {
     }
 }
 
+fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
+    if events.is_empty() || events.ends_with(b"\n") {
+        return false;
+    }
+    let final_line = events
+        .rsplit(|byte| *byte == b'\n')
+        .next()
+        .unwrap_or(events);
+    serde_json::from_slice::<serde_json::Value>(final_line).is_err()
+}
+
 fn inspect_installed_record(
     snapshot: &crate::profile::RepositorySnapshot,
     path: &str,
@@ -302,7 +313,7 @@ mod tests {
         RecoveryCoordinator, TransactionFailureInjector, TransactionFailurePoint,
     };
     use include_dir::{include_dir, Dir};
-    use std::collections::HashSet;
+    use std::collections::{BTreeMap, HashSet};
     use std::fs;
     use std::io;
     use std::sync::Arc;
@@ -487,6 +498,37 @@ mod tests {
                 isolated_torn_tail: true,
                 ..
             }]
+        ));
+    }
+
+    #[test]
+    fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
+        let (temp, storage, package) = fixture();
+        let prior_event = Event::new_profile_applied(
+            "prior".to_string(),
+            "1.0.0".to_string(),
+            ProfileOrigin::Embedded,
+            "prior-package".to_string(),
+            BTreeMap::new(),
+            false,
+        );
+        fs::write(
+            temp.path().join(".jit/events.jsonl"),
+            serde_json::to_vec(&prior_event).unwrap(),
+        )
+        .unwrap();
+        let executor = CommandExecutor::new(storage.clone());
+
+        executor.apply_embedded_profile(&package).unwrap();
+
+        let events = storage.read_events().unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(matches!(
+            events.last().unwrap(),
+            Event::ProfileApplied {
+                isolated_torn_tail: false,
+                ..
+            }
         ));
     }
 
