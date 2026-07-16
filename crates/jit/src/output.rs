@@ -382,8 +382,8 @@ fn writeln_safe(msg: &str) -> io::Result<()> {
     match writeln!(io::stdout(), "{}", msg) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
-            // Silently exit on broken pipe (expected when piping to head, etc.)
-            std::process::exit(0);
+            // Quiet exit on broken pipe (expected when piping to head, etc.)
+            std::process::exit(ExitCode::BrokenPipe.code());
         }
         Err(e) => Err(e),
     }
@@ -394,11 +394,25 @@ fn writeln_safe_stderr(msg: &str) -> io::Result<()> {
     match writeln!(io::stderr(), "{}", msg) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {
-            // Silently exit on broken pipe
-            std::process::exit(0);
+            // Quiet exit on broken pipe
+            std::process::exit(ExitCode::BrokenPipe.code());
         }
         Err(e) => Err(e),
     }
+}
+
+/// True when `message` is the panic text std's `print!`/`println!`/`eprint!`/
+/// `eprintln!` machinery raises when a stream write fails
+/// (`library/std/src/io/stdio.rs`: `panic!("failed printing to {label}: {e}")`,
+/// where `label` is `"stdout"` or `"stderr"`), and the underlying failure is
+/// specifically a closed pipe. Detected by message text because a panic
+/// payload is an opaque `dyn Any`, not a typed [`io::Error`] — this matches
+/// std's exact, long-stable wording rather than approximating the general
+/// panic path. Used by `main`'s top-level panic hook to suppress the panic
+/// banner for the hundreds of raw `println!`/`print!` call sites that cannot
+/// individually check an `io::Result` (jit:6f881a85).
+pub fn is_broken_pipe_write_panic(message: &str) -> bool {
+    message.starts_with("failed printing to std") && message.contains("Broken pipe")
 }
 
 // ============================================================================
@@ -550,6 +564,15 @@ pub enum ExitCode {
 
     /// External dependency failed - git, file system, etc. (10)
     ExternalError = 10,
+
+    /// A downstream reader closed the pipe while jit was writing (141)
+    ///
+    /// `128 + SIGPIPE (13) = 141`: the exit status a shell reports for a
+    /// process terminated by SIGPIPE, adopted here as a direct
+    /// `std::process::exit` code rather than by altering this process's own
+    /// signal disposition (resetting SIGPIPE disposition needs an unsafe
+    /// FFI call, and this crate forbids unsafe code).
+    BrokenPipe = 141,
 }
 
 #[allow(dead_code)] // Part of public API
@@ -572,6 +595,9 @@ impl ExitCode {
             ExitCode::PermissionDenied => "Permission denied",
             ExitCode::AlreadyExists => "Resource already exists",
             ExitCode::ExternalError => "External dependency failed (git, file system, etc.)",
+            ExitCode::BrokenPipe => {
+                "Downstream reader closed the pipe while jit was writing (128 + SIGPIPE)"
+            }
         }
     }
 
@@ -586,6 +612,7 @@ impl ExitCode {
              {}  - {}\n\
              {}  - {}\n\
              {}  - {}\n\
+             {} - {}\n\
              {} - {}",
             ExitCode::Success.code(),
             ExitCode::Success.description(),
@@ -603,6 +630,8 @@ impl ExitCode {
             ExitCode::AlreadyExists.description(),
             ExitCode::ExternalError.code(),
             ExitCode::ExternalError.description(),
+            ExitCode::BrokenPipe.code(),
+            ExitCode::BrokenPipe.description(),
         )
     }
 }
@@ -2287,6 +2316,35 @@ mod tests {
         assert_eq!(legacy.state_symbol(), "○");
         let serialized = serde_json::to_value(&legacy).unwrap();
         assert!(serialized.get("archived_from").is_none());
+    }
+
+    #[test]
+    fn test_is_broken_pipe_write_panic_matches_stdout_and_stderr_messages() {
+        assert!(is_broken_pipe_write_panic(
+            "failed printing to stdout: Broken pipe (os error 32)"
+        ));
+        assert!(is_broken_pipe_write_panic(
+            "failed printing to stderr: Broken pipe (os error 32)"
+        ));
+    }
+
+    #[test]
+    fn test_is_broken_pipe_write_panic_rejects_unrelated_panics() {
+        assert!(!is_broken_pipe_write_panic("index out of bounds"));
+        assert!(!is_broken_pipe_write_panic(
+            "failed printing to stdout: Permission denied (os error 13)"
+        ));
+        assert!(!is_broken_pipe_write_panic(
+            "some other message mentions Broken pipe in passing"
+        ));
+    }
+
+    #[test]
+    fn test_exit_code_broken_pipe_is_128_plus_sigpipe() {
+        // 128 + SIGPIPE(13) = 141: the exit status a shell reports for a
+        // process terminated by SIGPIPE, adopted here without altering this
+        // process's own signal disposition.
+        assert_eq!(ExitCode::BrokenPipe.code(), 141);
     }
 
     #[test]
