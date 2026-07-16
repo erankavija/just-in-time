@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "38a7872e-efd9-45b3-bfdd-8b9fe33694b7",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06",
+  "commit": "277e596d74b70c14446b468d4e4cef135c5d3a06",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T09:30:28.179821139Z",
+  "completed_at": "2026-07-16T09:30:33.687983215Z",
+  "duration_ms": 5508,
+  "exit_code": 2,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\n\n",
+  "stderr": "Error: Lock timeout: could not acquire exclusive lock on /home/vkaskivuo/Projects/just-in-time/.jit-bootstrap.lock after 5s\ndocs-check-projections: 'jit invariant render' failed\n",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}
