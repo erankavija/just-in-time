@@ -1501,7 +1501,7 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 
 **Options:**
 - `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
-- `--by <WHO>` - Record who passed the gate (e.g., `human:alice`, `ci:github-actions`)
+- `--by <WHO>` - Who is passing the gate (e.g., `human:alice`, `ci:github-actions`). Required for a manual gate; ignored for an automated gate, whose verdict comes from the checker.
 - `--force` - Re-run the checker even if the gate already passed at the current HEAD commit
 
 **Examples:**
@@ -1512,10 +1512,7 @@ jit gate evaluate abc123 code-review --by "human:alice"
 # Same command using the flag form
 jit gate evaluate abc123 --gate code-review --by "human:alice"
 
-# Evaluate without attribution
-jit gate evaluate abc123 tdd-reminder
-
-# Evaluate an automated gate — runs its checker (no manual override)
+# Evaluate an automated gate — runs its checker (no --by needed)
 jit gate evaluate abc123 tests
 
 # Force a re-run even if it already passed at HEAD
@@ -1524,8 +1521,8 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: updates gate status to `passed`, records who passed it and timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
-- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes. This evaluation records a run; it does not itself complete the issue.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, it updates gate status to `passed`, records who passed it and the timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
 - After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
 
 **Skip when already passed at HEAD:**
@@ -1546,9 +1543,9 @@ jit gate evaluate abc123 --gate tests --force
 for every code `jit gate evaluate` returns. The command-specific split it
 records: a checker that ran and returned verdict `fail` exits `4`; a checker that
 ran but could not produce a verdict (timeout, command-not-found, or crash) exits
-`10`. Pre-verdict argument errors (e.g. the gate is not required for the issue)
-and lookup errors (issue not found) are classified before the run path and are
-never reported as a runner error.
+`10`. Pre-verdict argument errors (e.g. the gate is not required for the issue,
+or a manual gate evaluated without `--by`) and lookup errors (issue not found)
+are classified before the run path and are never reported as a runner error.
 
 **Stale-binary refusal for `exec` checkers (jit:7446af34):** a `jit` binary that
 predates the repository it is validating must not produce — or let an `exec`

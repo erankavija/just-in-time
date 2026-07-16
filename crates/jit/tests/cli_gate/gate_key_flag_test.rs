@@ -135,7 +135,14 @@ fn test_gate_pass_positional_key_still_works() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "code-review"])
+        .args([
+            "gate",
+            "pass",
+            &issue_id,
+            "code-review",
+            "--by",
+            "human:reviewer",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Passed gate 'code-review'"));
@@ -150,7 +157,15 @@ fn test_gate_pass_flag_key_accepted() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "--gate", "code-review"])
+        .args([
+            "gate",
+            "pass",
+            &issue_id,
+            "--gate",
+            "code-review",
+            "--by",
+            "human:reviewer",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Passed gate 'code-review'"));
@@ -162,7 +177,15 @@ fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
     let (temp_pos, id_pos) = setup_manual_gate_issue("code-review");
     let out_pos = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_pos.path())
-        .args(["gate", "pass", &id_pos, "code-review", "--json"])
+        .args([
+            "gate",
+            "pass",
+            &id_pos,
+            "code-review",
+            "--by",
+            "human:reviewer",
+            "--json",
+        ])
         .assert()
         .success()
         .get_output()
@@ -173,7 +196,16 @@ fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
     let (temp_flag, id_flag) = setup_manual_gate_issue("code-review");
     let out_flag = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_flag.path())
-        .args(["gate", "pass", &id_flag, "--gate", "code-review", "--json"])
+        .args([
+            "gate",
+            "pass",
+            &id_flag,
+            "--gate",
+            "code-review",
+            "--by",
+            "human:reviewer",
+            "--json",
+        ])
         .assert()
         .success()
         .get_output()

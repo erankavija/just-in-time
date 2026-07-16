@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use crate::domain::{GateStatus, Issue, State, SHORT_ID_LENGTH};
+use crate::domain::{GateMode, GateStatus, Issue, State, SHORT_ID_LENGTH};
 
 /// An error with diagnostic context and remediation steps.
 ///
@@ -598,6 +598,10 @@ pub(crate) enum TransitionBlocker {
     Gate {
         gate_key: String,
         status: GateStatus,
+        /// The gate's registry mode, so the remediation hint can name the
+        /// `--by <attestor>` form for a manual gate (jit:1d59070d REQ-03)
+        /// rather than a bare `evaluate` that now fails without one.
+        mode: GateMode,
     },
     /// An enforcing graph rule (`enforce = true`, severity error) produced a
     /// finding attributed to this issue in its target state, blocking the
@@ -628,7 +632,7 @@ impl TransitionBlockedError {
         issue_id: String,
         requested_state: State,
         actual_state: State,
-        gates: Vec<(String, GateStatus)>,
+        gates: Vec<(String, GateStatus, GateMode)>,
     ) -> Self {
         Self {
             issue_id,
@@ -636,7 +640,11 @@ impl TransitionBlockedError {
             actual_state,
             blockers: gates
                 .into_iter()
-                .map(|(gate_key, status)| TransitionBlocker::Gate { gate_key, status })
+                .map(|(gate_key, status, mode)| TransitionBlocker::Gate {
+                    gate_key,
+                    status,
+                    mode,
+                })
                 .collect(),
             warnings: Vec::new(),
         }
@@ -767,9 +775,21 @@ impl TransitionBlockedError {
                         issue_id
                     )]
                 }
-                TransitionBlocker::Gate { gate_key, .. } => {
+                TransitionBlocker::Gate { gate_key, mode, .. } => {
+                    // A manual gate's evaluate now requires --by (jit:1d59070d
+                    // REQ-03); name the attested form so the remediation stays
+                    // actionable rather than pointing at a call that fails.
+                    let evaluate_hint = match mode {
+                        GateMode::Manual => format!(
+                            "jit gate evaluate {} {} --by <attestor>",
+                            self.issue_id, gate_key
+                        ),
+                        GateMode::Auto => {
+                            format!("jit gate evaluate {} {}", self.issue_id, gate_key)
+                        }
+                    };
                     vec![
-                        format!("jit gate evaluate {} {}", self.issue_id, gate_key),
+                        evaluate_hint,
                         format!(
                             "jit gate status {} {} --all  # run history",
                             self.issue_id, gate_key
@@ -867,7 +887,9 @@ impl fmt::Display for TransitionBlocker {
             Self::MissingDependency { issue_id } => {
                 write!(f, "{} (missing issue) [missing]", short_id(issue_id))
             }
-            Self::Gate { gate_key, status } => {
+            Self::Gate {
+                gate_key, status, ..
+            } => {
                 write!(f, "{} [{}]", gate_key, gate_status_name(*status))
             }
             Self::GraphRule { rule, message } => {
@@ -1111,10 +1133,53 @@ mod tests {
             "issue-123".to_string(),
             State::Done,
             State::Gated,
-            vec![("code-review".to_string(), GateStatus::Pending)],
+            vec![(
+                "code-review".to_string(),
+                GateStatus::Pending,
+                GateMode::Auto,
+            )],
         );
 
         assert!(!error.to_string().contains("jit issue assign"));
+    }
+
+    /// REQ-03 (jit:1d59070d): a manual gate's remediation names the attested
+    /// `--by` form, since a bare `gate evaluate` on it is now a usage error.
+    #[test]
+    fn test_gate_block_remediation_names_by_for_manual_gate() {
+        let error = TransitionBlockedError::gates(
+            "issue-123".to_string(),
+            State::Done,
+            State::Gated,
+            vec![(
+                "code-review".to_string(),
+                GateStatus::Pending,
+                GateMode::Manual,
+            )],
+        );
+
+        let commands = error.remediation_commands();
+        assert!(commands
+            .iter()
+            .any(|cmd| cmd == "jit gate evaluate issue-123 code-review --by <attestor>"));
+    }
+
+    /// The auto-gate counterpart: no `--by` in the remediation, since the
+    /// checker supplies the verdict.
+    #[test]
+    fn test_gate_block_remediation_omits_by_for_auto_gate() {
+        let error = TransitionBlockedError::gates(
+            "issue-123".to_string(),
+            State::Done,
+            State::Gated,
+            vec![("tests".to_string(), GateStatus::Pending, GateMode::Auto)],
+        );
+
+        let commands = error.remediation_commands();
+        assert!(commands
+            .iter()
+            .any(|cmd| cmd == "jit gate evaluate issue-123 tests"));
+        assert!(!commands.iter().any(|cmd| cmd.contains("--by")));
     }
 
     #[test]

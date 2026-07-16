@@ -26,9 +26,10 @@ jit issue claim <short-hash> agent:your-id
 # Check status
 jit issue show <short-hash> --json
 
-# Evaluate gates, inspect their statuses, then complete explicitly
+# Evaluate gates, inspect their statuses, then complete explicitly. A manual
+# gate's evaluate requires --by <attestor>; an automated gate runs its checker.
 jit gate evaluate <short-hash> tests
-jit gate evaluate <short-hash> code-review
+jit gate evaluate <short-hash> code-review --by "human:reviewer"
 jit gate status-all <short-hash>
 
 # Complete
@@ -148,8 +149,9 @@ jit gate add $TASK3 code-review
 jit issue update $TASK3 --state done
 # Transitions to 'gated' instead
 
-# Record manual approval. A manual pass may complete an already gated issue.
-jit gate evaluate $TASK3 code-review
+# Record manual approval; --by names the attestor. A manual pass may
+# complete an already gated issue.
+jit gate evaluate $TASK3 code-review --by "human:reviewer"
 
 # Inspect status; if it is still gated, retry explicit completion.
 jit gate status-all $TASK3

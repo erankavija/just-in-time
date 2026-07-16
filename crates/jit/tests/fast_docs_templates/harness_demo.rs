@@ -168,7 +168,12 @@ fn test_harness_gates() {
 
     // Pass gate
     h.executor
-        .pass_gate(&id, "review".to_string(), None, false)
+        .pass_gate(
+            &id,
+            "review".to_string(),
+            Some("human:reviewer".to_string()),
+            false,
+        )
         .unwrap();
 
     // Issue gates should be passed now
@@ -196,10 +201,20 @@ fn test_harness_complex_workflow() {
 
     // Pass gates for dependencies
     h.executor
-        .pass_gate(&dep1, "tests".to_string(), None, false)
+        .pass_gate(
+            &dep1,
+            "tests".to_string(),
+            Some("human:reviewer".to_string()),
+            false,
+        )
         .unwrap();
     h.executor
-        .pass_gate(&dep2, "tests".to_string(), None, false)
+        .pass_gate(
+            &dep2,
+            "tests".to_string(),
+            Some("human:reviewer".to_string()),
+            false,
+        )
         .unwrap();
 
     // Complete dependencies
@@ -236,7 +251,12 @@ fn test_harness_complex_workflow() {
 
     // Pass epic's gate
     h.executor
-        .pass_gate(&epic, "review".to_string(), None, false)
+        .pass_gate(
+            &epic,
+            "review".to_string(),
+            Some("human:reviewer".to_string()),
+            false,
+        )
         .unwrap();
 
     // Epic should now be unblocked

@@ -1515,9 +1515,15 @@ pub enum GateCommands {
     /// Exactly one of the two forms must be used; supplying both or neither is
     /// an error.
     ///
+    /// A manual gate has no checker to run, so `--by <attestor>` is required:
+    /// bare evaluate on a manual gate is a usage error rather than a silent,
+    /// unattributed pass. An automated gate ignores `--by`; its verdict comes
+    /// from the checker.
+    ///
     /// Exit codes:
     ///   0  - pass (checker passed or manual attestation recorded)
-    ///   2  - bad arguments (gate not required for this issue)
+    ///   2  - bad arguments (gate not required for this issue; a manual gate
+    ///        evaluated without --by)
     ///   3  - issue not found
     ///   4  - checker failure (the checker ran and the verdict was fail)
     ///   10 - runner error (timeout, command-not-found, crash; infra failure)
@@ -1541,7 +1547,9 @@ pub enum GateCommands {
         #[arg(long = "gate")]
         gate_flag: Option<String>,
 
-        /// Who passed the gate (optional)
+        /// Who is passing the gate. Required for a manual gate (bare evaluate
+        /// on a manual gate is a usage error); ignored for an automated gate,
+        /// whose verdict comes from the checker.
         #[arg(short, long)]
         by: Option<String>,
 
@@ -1561,6 +1569,14 @@ pub enum GateCommands {
     /// checker-failed / 10 runner-error). Later gates are not attempted once one
     /// fails. The legacy verb `pass-all` is a silent alias.
     ///
+    /// Each required gate is passed via the same `gate evaluate` semantics: a
+    /// manual gate requires `--by <attestor>`, applied to every manual gate in
+    /// the set. If the set mixes manual and automated gates and `--by` is
+    /// omitted, evaluation fails fast at the first manual gate reached in
+    /// priority order (auto gates before it still run and record their
+    /// verdict; later gates are not attempted) — it never silently passes a
+    /// manual gate.
+    ///
     /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
     /// passed at the current HEAD commit is not re-run. Use --force to re-run
     /// every gate's checker unconditionally. An issue with no required gates
@@ -1570,7 +1586,8 @@ pub enum GateCommands {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
 
-        /// Who passed the gates (optional)
+        /// Who is passing the gates. Required for every manual gate in the
+        /// required set (applied uniformly); ignored for automated gates.
         #[arg(short, long)]
         by: Option<String>,
 

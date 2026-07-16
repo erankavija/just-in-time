@@ -2,8 +2,10 @@
 //!
 //! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
 //! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
-//! -> exit 10; and inheritance of the skip-if-passed-at-HEAD behaviour from
-//! `gate pass` (already-passed gates are not re-run).
+//! -> exit 10; inheritance of the skip-if-passed-at-HEAD behaviour from
+//! `gate pass` (already-passed gates are not re-run); and, for a mixed
+//! auto/manual gate set, fail-fast at an unattested manual gate rather than a
+//! silent pass (jit:1d59070d REQ-03).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -62,6 +64,25 @@ fn define_gate(root: &Path, key: &str, command: &str) {
             &checker,
             "--timeout",
             "10",
+        ])
+        .output()
+        .unwrap();
+}
+
+/// Define a manual gate `key` (no checker).
+fn define_manual_gate(root: &Path, key: &str) {
+    jit()
+        .current_dir(root)
+        .args([
+            "gate",
+            "define",
+            key,
+            "--title",
+            key,
+            "--description",
+            "test",
+            "--mode",
+            "manual",
         ])
         .output()
         .unwrap();
@@ -304,4 +325,86 @@ fn test_pass_all_issue_not_found_exit_3() {
     assert_eq!(out.status.code(), Some(3));
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
+}
+
+/// REQ-03 (jit:1d59070d): `evaluate-all` over a mixed gate set must not
+/// silently pass a manual gate. Each required gate is passed through the
+/// same `pass_gate` a bare `evaluate` uses, so evaluate-all inherits its
+/// fail-fast, --by-required behavior for free: the auto gate ahead of the
+/// manual one in priority order still runs and records its verdict, then the
+/// manual gate fails with the same usage error and hint — evaluate-all never
+/// reports an all-green result that includes an unattested manual gate.
+#[test]
+fn test_pass_all_mixed_gates_without_by_fails_fast_at_manual_gate() {
+    let (_temp, root) = setup_git_jit_repo();
+    define_gate(&root, "auto-gate", "true"); // runs first (declared first)
+    define_manual_gate(&root, "manual-gate");
+    let id = create_issue_with_gates(&root, &["auto-gate", "manual-gate"]);
+
+    let out = jit()
+        .current_dir(&root)
+        .args(["gate", "evaluate-all", &id, "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json.get("verdict").is_none());
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("manual-gate"));
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("--by <attestor>"));
+
+    // The auto gate ahead of it still ran and recorded a pass (fail-fast is
+    // per-gate, not atomic across the whole set — same as a checker failure).
+    assert_eq!(run_count(&root, "auto-gate"), 1);
+}
+
+/// The same mixed set with `--by` supplied: every gate passes, auto via its
+/// checker and manual via attestation.
+#[test]
+fn test_pass_all_mixed_gates_with_by_all_pass() {
+    let (_temp, root) = setup_git_jit_repo();
+    define_gate(&root, "auto-gate", "true");
+    define_manual_gate(&root, "manual-gate");
+    let id = create_issue_with_gates(&root, &["auto-gate", "manual-gate"]);
+
+    let out = jit()
+        .current_dir(&root)
+        .args([
+            "gate",
+            "evaluate-all",
+            &id,
+            "--by",
+            "human:reviewer",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["verdict"], "pass");
+    let gates = json["gates"].as_array().unwrap();
+    assert_eq!(gates.len(), 2);
+    assert_eq!(gates[0]["key"], "auto-gate");
+    assert_eq!(gates[1]["key"], "manual-gate");
+    assert_eq!(run_count(&root, "auto-gate"), 1);
 }
