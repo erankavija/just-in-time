@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "f22ddfac-83f6-4cd5-ad18-1416a1700f68",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06",
+  "commit": "ec8e6ebe1033f823621537f840f21b2dea175710",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T09:06:46.035566300Z",
+  "completed_at": "2026-07-16T09:13:42.606207500Z",
+  "duration_ms": 416570,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest storage::json::tests::schema_v2_tests::test_index_v2_save_and_load ... FAILED\ntest storage::json::tests::schema_v2_tests::test_delete_issue_adds_to_deleted_ids ... FAILED\ntest result: FAILED. 1761 passed; 2 failed; 4 ignored; 0 measured; 0 filtered out; finished in 27.55s\n---- storage::json::tests::schema_v2_tests::test_index_v2_save_and_load stdout ----\n\nthread 'storage::json::tests::schema_v2_tests::test_index_v2_save_and_load' (518561) panicked at crates/jit/src/storage/json.rs:2300:28:\ncalled `Result::unwrap()` on an `Err` value: Lock timeout: could not acquire exclusive lock on /home/vkaskivuo/.cache/jit-cargo-ci-tmp/.jit-bootstrap.lock after 5s\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- storage::json::tests::schema_v2_tests::test_delete_issue_adds_to_deleted_ids stdout ----\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1031 bytes=17704776)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=993205168/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
