@@ -1,0 +1,77 @@
+[profile]
+manifest-version = 1
+id = "synthetic-workflow"
+version = "1.2.3"
+jit = ">=0.2.0, <2.0.0"
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "initiative"
+value = 1
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "initiative"
+value = "initiative"
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "stream"
+value = { description = "Synthetic stream", unique = false }
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "promise"
+value = { section = "Promises", id-pattern = "P-[0-9]+", markers = ["P-"], link-namespaces = ["promise"], scope = "project", source-of-truth = "markdown-first" }
+
+[[contribution]]
+kind = "set-string"
+target = "strategic-types"
+value = "initiative"
+
+[[contribution]]
+kind = "keyed-array"
+target = "rules"
+identity = "synthetic-rule"
+value = { name = "synthetic-rule", description = "Synthetic rule" }
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "synthetic-review"
+value = { key = "synthetic-review", title = "Synthetic review" }
+
+[[contribution]]
+kind = "keyed-array"
+target = "templates"
+identity = "synthetic-plan"
+value = { name = "synthetic-plan", description = "Synthetic plan" }
+
+[[contribution]]
+kind = "singleton-table"
+target = "invariant-projection"
+value = { mode = "region", target = "AGENTS.md", style = "id-anchor" }
+
+[[contribution]]
+kind = "singleton-table"
+target = "rules-gates-projection"
+value = { mode = "region", target = "docs/reference.md", style = "full" }
+
+[[asset]]
+source = "assets/workflow.txt"
+target = "docs/workflow.txt"
+
+[[asset]]
+source = "nested/scripts/check.sh"
+target = "bin/check.sh"
+executable = true
+
+[[region]]
+source = "regions/agents.md"
+target = "AGENTS.md"
+region-id = "synthetic-guidance"
+placement = "append"

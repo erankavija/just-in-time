@@ -20,6 +20,7 @@ pub mod graph;
 pub mod hierarchy_templates;
 pub mod labels;
 pub mod output;
+pub mod profile;
 pub mod query_engine;
 pub mod runtime_defaults;
 pub mod schema;

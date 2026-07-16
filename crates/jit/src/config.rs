@@ -958,7 +958,9 @@ impl InvariantProjectionConfig {
 /// serde rename; an unrecognized value is a descriptive parse error rather than a
 /// silent default. The shipped default (no `[invariant_projection]` table) is
 /// [`ProjectionMode::SeparateFile`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
+)]
 pub enum ProjectionMode {
     /// Write the rendered invariants to a separate jit-owned file (the default).
     #[default]
@@ -980,7 +982,9 @@ pub enum ProjectionMode {
 /// bullets. [`ProjectionStyle::IdAnchor`] renders a heading-less bullet list of
 /// `- **{id}** — {statement}` lines (no kind tag, no enforced-by), suited to a
 /// region beneath a hand-authored heading.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
+)]
 pub enum ProjectionStyle {
     /// Reproduce the original render: a `## Project invariants` header followed by
     /// `- **{id}** [{kind}]{enforced_by}: {statement}` bullets (the default).

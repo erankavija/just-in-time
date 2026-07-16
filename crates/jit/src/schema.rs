@@ -711,6 +711,10 @@ impl CommandSchema {
             "GateChecker".to_string(),
             serde_json::to_value(schema_for!(GateChecker)).unwrap_or(json!({})),
         );
+        types.insert(
+            "ProfileManifest".to_string(),
+            serde_json::to_value(crate::profile::profile_manifest_schema()).unwrap_or(json!({})),
+        );
 
         types.insert(
             "Issue".to_string(),
@@ -1262,6 +1266,20 @@ mod tests {
             );
         }
         assert!(encoded.contains("label_namespace"));
+    }
+
+    #[test]
+    fn test_schema_publishes_profile_manifest_runtime_contract() {
+        let schema = CommandSchema::generate();
+        let profile = schema
+            .types
+            .get("ProfileManifest")
+            .expect("ProfileManifest schema");
+        let text = profile.to_string();
+        assert!(text.contains("manifest-version"));
+        assert!(text.contains("map-entry"));
+        assert!(text.contains("singleton-table"));
+        assert!(text.contains("rules-gates-projection"));
     }
 
     /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,
