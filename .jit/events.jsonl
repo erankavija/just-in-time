@@ -8010,3 +8010,5 @@
 {"type":"issue_completed","id":"6ea25b06-bf4d-44e3-9368-538f0acaf804","issue_id":"8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06","timestamp":"2026-07-16T13:36:14.646683708Z"}
 {"type":"issue_updated","id":"8b996692-92f3-4418-9248-bbfd1272c0ec","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-16T09:07:26.648509483Z","updated_by":"doc-add","fields":["documents"]}
 {"type":"issue_updated","id":"4a0e9b82-d468-44d9-852c-5fa1482ca439","issue_id":"3e12ffbd-694e-44b3-81c9-5a24ebf17340","timestamp":"2026-07-16T14:04:38.601781084Z","updated_by":"doc-add","fields":["documents"]}
+{"type":"issue_state_changed","id":"56a8639c-daad-4802-9e0d-8a97db1be2f3","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-16T14:06:20.526034141Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"260ef9ec-bc32-46c3-8b87-ff313ef0fe95","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-16T14:06:20.526565061Z","assignee":"agent:worker"}
