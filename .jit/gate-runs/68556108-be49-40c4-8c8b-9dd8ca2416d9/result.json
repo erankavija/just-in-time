@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "68556108-be49-40c4-8c8b-9dd8ca2416d9",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+  "commit": "48797901b4250bce7a307c6d2985325b515d0861",
+  "branch": "worktree-agent-9b0a997e",
+  "status": "passed",
+  "started_at": "2026-07-16T14:17:00.451052969Z",
+  "completed_at": "2026-07-16T14:21:10.095304104Z",
+  "duration_ms": 249644,
+  "exit_code": 0,
+  "stdout": "Attribution: 6216f7e9, f0891941, 566423b4, 48797901 (`jit:9b0a997e`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes,event-log,gate-semantics,single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); docs-mechanical passed (exit 0); doc-review pending; repo-validate passed (exit 0)\nTruncation recovery: partitioned tagged patches by commit/path and read targeted current-source ranges; discarded unrelated issue-search matches outside this issue’s impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable profile-application criteria and the prior torn-tail finding are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable profile-application criteria and the prior torn-tail finding are addressed.",
+    "findings": []
+  }
+}

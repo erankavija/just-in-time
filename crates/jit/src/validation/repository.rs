@@ -14,7 +14,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{Event, EventTag, GateChecker, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, GateChecker, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
@@ -645,26 +645,9 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
 
     let mut event_count = 0;
     if let Some(events) = read_text(view, ".jit/events.jsonl")? {
-        for (offset, line) in events.lines().enumerate() {
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: serde_json::Value = serde_json::from_str(line)
-                .with_context(|| format!("invalid .jit/events.jsonl line {}", offset + 1))?;
-            let tag = value
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| anyhow!("event line {} is missing a string type", offset + 1))?;
-            if EventTag::ALL.iter().any(|known| known.as_str() == tag) {
-                let _: Event = serde_json::from_value(value).with_context(|| {
-                    format!(
-                        "invalid known event on .jit/events.jsonl line {}",
-                        offset + 1
-                    )
-                })?;
-                event_count += 1;
-            }
-        }
+        event_count = parse_known_events(&events)
+            .context("invalid .jit/events.jsonl")?
+            .len();
     }
     Ok(Records {
         issues,

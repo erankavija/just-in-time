@@ -5,7 +5,7 @@ use super::{
 };
 use crate::validation::repository::{
     validate_repository, OverlayRepositoryView, RepositoryValidationFailure,
-    RepositoryValidationReport,
+    RepositoryValidationReport, RepositoryView,
 };
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -131,6 +131,21 @@ pub fn plan_profile_application(
     package: &EmbeddedProfilePackage<'_>,
     snapshot: &RepositorySnapshot,
 ) -> Result<ProfileApplicationPlan, ProfilePlanError> {
+    plan_profile_application_against(package, snapshot, Arc::new(snapshot.clone()))
+}
+
+/// Build a pure target plan while validating its exact overlay against a
+/// separately supplied read-only repository view.
+///
+/// The application boundary uses this form to avoid copying unrelated build
+/// trees into memory. The target snapshot remains immutable and authoritative
+/// for every planned mutation; the validation view supplies only non-target
+/// repository context while the caller holds the repository write lock.
+pub fn plan_profile_application_against(
+    package: &EmbeddedProfilePackage<'_>,
+    snapshot: &RepositorySnapshot,
+    validation_base: Arc<dyn RepositoryView>,
+) -> Result<ProfileApplicationPlan, ProfilePlanError> {
     validate_interpolation(package)?;
     validate_target_layout(package, snapshot)?;
 
@@ -206,7 +221,7 @@ pub fn plan_profile_application(
         .collect::<BTreeMap<_, _>>();
 
     let overlay = OverlayRepositoryView::new(
-        Arc::new(snapshot.clone()),
+        validation_base,
         targets
             .values()
             .map(|target| (PathBuf::from(&target.path), Some(target.bytes.clone()))),

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "3d478e27-e710-4fa4-96e1-e6b84b665dea",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+  "commit": "566423b47390adb608bf6e126d9757cba30bb608",
+  "branch": "worktree-agent-9b0a997e",
+  "status": "failed",
+  "started_at": "2026-07-16T14:08:37.315284800Z",
+  "completed_at": "2026-07-16T14:13:48.798137853Z",
+  "duration_ms": 311482,
+  "exit_code": 1,
+  "stdout": "Attribution: 6216f7e9, f0891941, 566423b4 (`jit:9b0a997e`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-1, @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/inv/event-log, @/inv/atomic-writes, @/inv/single-source-prose (.jit/invariants.toml); @/gate/jit-validate, @/gate/repo-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0, 2026-07-16T13:43:31Z); docs-mechanical passed (0, 2026-07-16T14:08:26Z); doc-review pending; repo-validate passed (0, 2026-07-16T14:07:47Z)\nTruncation recovery: narrowed reads by commit and affected path; recovered profile, event, storage, validation, catalog, and parent-criterion evidence. Issue-scoped `jit item show` could not create its read lock in this read-only sandbox; its markdown source was inspected directly.\n\n1. **F1 — medium — blocking — issue-impact:** [`crates/jit/src/commands/profile.rs:103`](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:103) marks every non-empty, non-newline-terminated event prefix as `isolated_torn_tail`, even when its final record is valid JSON and `parse_known_events` accepts it. The emitted audit event therefore falsely claims it isolated a malformed tail, contrary to the field’s documented meaning. Detect an actually malformed final line before setting the flag, and cover a valid unterminated event record.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profile application falsely labels valid unterminated event records as malformed torn tails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A valid event record without a trailing newline is incorrectly recorded as an isolated malformed torn tail.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":103,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8956 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b42-0a1e-7662-bae3-5c2ddf743eca\n--------\nuser\n--- 8943 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Profile application falsely labels valid unterminated event records as malformed torn tails.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "A valid event record without a trailing newline is incorrectly recorded as an isolated malformed torn tail.",
+        "file": "crates/jit/src/commands/profile.rs",
+        "line": 103
+      }
+    ]
+  }
+}
