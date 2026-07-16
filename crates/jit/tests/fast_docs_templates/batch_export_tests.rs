@@ -290,6 +290,48 @@ fn test_batch_export_omits_lifecycle_and_includes_all_states() {
 }
 
 #[test]
+fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
+    // REQ-01 (jit:3e12ffbd code-review F1 regression): a scoped export in every
+    // graph-rendering format lists only in-scope nodes AND only edges between
+    // them — the boundary-crossing dependency c1 → ext must not leak into
+    // json/dot/mermaid output as a dangling edge to an unlisted node.
+    use jit::commands::GraphExportFormat;
+
+    let h = TestHarness::new();
+    let s = build_scenario(&h);
+
+    for format in [
+        GraphExportFormat::Json,
+        GraphExportFormat::Dot,
+        GraphExportFormat::Mermaid,
+    ] {
+        let output = h.executor.export_graph(format, false, Some(&s.e)).unwrap();
+        assert!(
+            output.contains(&s.c1),
+            "{format:?}: in-scope node c1 must be exported"
+        );
+        assert!(
+            !output.contains(&s.ext),
+            "{format:?}: out-of-scope node ext must not appear as node or edge:\n{output}"
+        );
+    }
+
+    // The full-record JSON shape shares the same edges list.
+    let full = h
+        .executor
+        .export_graph(GraphExportFormat::Json, true, Some(&s.e))
+        .unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&full).unwrap();
+    let edges = parsed["edges"].as_array().unwrap();
+    assert!(
+        edges
+            .iter()
+            .all(|e| e["to"].as_str() != Some(s.ext.as_str())),
+        "full JSON edges must not reference the out-of-scope node"
+    );
+}
+
+#[test]
 fn test_batch_export_whole_graph_without_scope() {
     // REQ-08: no --scope exports the whole graph in batch shape (still minus
     // bracket nodes). Every non-bracket issue, including E2 and ext, appears.
