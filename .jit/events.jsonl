@@ -8005,3 +8005,6 @@
 {"type":"issue_state_changed","id":"907dff38-2a86-42a4-907b-5980b5ee22cf","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:22:07.473168494Z","from":"backlog","to":"ready"}
 {"type":"issue_state_changed","id":"0562649a-c0f9-43cb-b9ab-2f83c29ca0bf","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:23:38.923854055Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"97fa005c-27b2-45a9-9fdc-312ea81e0751","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:23:38.924334225Z","assignee":"agent:codex-profile-application"}
+{"type":"gate_passed","id":"ade7303b-1f22-4f32-b863-4ff539529bfc","issue_id":"8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06","timestamp":"2026-07-16T13:35:27.796608190Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"57ea21d7-b194-4091-b278-773debe8539d","issue_id":"8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06","timestamp":"2026-07-16T13:36:14.646658398Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"6ea25b06-bf4d-44e3-9368-538f0acaf804","issue_id":"8d7fc762-0a6d-4ef0-b1bd-6b5eb6a77d06","timestamp":"2026-07-16T13:36:14.646683708Z"}
