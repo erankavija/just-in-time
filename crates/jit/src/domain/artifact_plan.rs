@@ -292,12 +292,26 @@ pub struct ArtifactOwner {
     pub document_index: usize,
     /// Lifecycle state used for terminal-owner classification.
     pub state: State,
+    /// Pre-archive origin, so an `Archived` owner classifies by its effective
+    /// terminal state (`@/issue/45a140ae`). `Some` only for an `Archived` owner
+    /// that recorded its origin; absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
     /// Whether the owner belongs to the selected resolved subtree.
     pub inside_subtree: bool,
     /// Whether this particular direct reference is commit-pinned.
     pub pinned: bool,
     /// Whether execution will durably relink this direct reference.
     pub selected_for_relink: bool,
+}
+
+impl ArtifactOwner {
+    /// Whether this owner is terminal for archival classification, accounting for
+    /// terminality-preserving `Archived`
+    /// ([`crate::domain::is_effectively_terminal`]).
+    pub fn is_effectively_terminal(&self) -> bool {
+        crate::domain::is_effectively_terminal(self.state, self.archived_from)
+    }
 }
 
 /// Planner classification for an embedded edge.
@@ -444,6 +458,28 @@ impl BlockerCode {
             Self::UnsupportedArtifactType => "unsupported-artifact-type",
         }
     }
+
+    /// The permitted next action when a blocker is caused by lifecycle state,
+    /// or `None` for blockers unrelated to state (`@/issue/45a140ae`, REQ-05).
+    ///
+    /// Carried into both human and JSON diagnostics so an operator sees, at the
+    /// point of refusal, how to make the container or document eligible — without
+    /// conflating the lifecycle state with the filesystem relocation the archive
+    /// command performs.
+    pub const fn guidance(self) -> Option<&'static str> {
+        match self {
+            Self::NonTerminalTarget => Some(
+                "artifact archival requires a terminal container: complete it \
+                 (jit issue update <id> --state done) or reject it (jit issue reject <id>), \
+                 then re-run archival. Successful archival then retires the container to archived.",
+            ),
+            Self::DocumentNonTerminalOwner => Some(
+                "this document has an owning issue that is not terminal: complete or reject \
+                 every owning issue before archiving it.",
+            ),
+            _ => None,
+        }
+    }
 }
 
 /// Stable non-blocking diagnostics emitted by planning or execution.
@@ -489,7 +525,7 @@ impl WarningCode {
 }
 
 /// A target- or artifact-level blocker with an optional normalized path.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct PlanBlocker {
     /// Stable schema-v1 blocker code.
     pub code: BlockerCode,
@@ -504,6 +540,28 @@ impl PlanBlocker {
             code,
             path: path.map(Into::into).map(|path| normalize_path(&path)),
         }
+    }
+}
+
+/// Serialize `code` and `path` (as the derive would) plus a computed `guidance`
+/// field for a state-caused blocker ([`BlockerCode::guidance`], REQ-05), so JSON
+/// consumers get the permitted next action alongside the code. `guidance` is a
+/// pure projection of `code` and is ignored on deserialize.
+impl Serialize for PlanBlocker {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let guidance = self.code.guidance();
+        let field_count = if guidance.is_some() { 3 } else { 2 };
+        let mut state = serializer.serialize_struct("PlanBlocker", field_count)?;
+        state.serialize_field("code", &self.code)?;
+        state.serialize_field("path", &self.path)?;
+        if let Some(guidance) = guidance {
+            state.serialize_field("guidance", guidance)?;
+        }
+        state.end()
     }
 }
 

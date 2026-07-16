@@ -203,10 +203,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         if let Some(container_id) = root_container_id.as_deref() {
+            // Coupled retirement (`@/issue/45a140ae`): artifact archival requires an
+            // effectively terminal container (Done/Rejected, or already Archived
+            // from one of those for an idempotent rerun). An Archived container
+            // retired from a non-terminal state, or any active state, is blocked.
             if issues
                 .iter()
                 .find(|issue| issue.id == container_id)
-                .is_some_and(|issue| !issue.state.is_terminal())
+                .is_some_and(|issue| !issue.is_effectively_terminal())
             {
                 blockers.push(PlanBlocker::new(
                     BlockerCode::NonTerminalTarget,
@@ -391,6 +395,31 @@ impl CommandExecutor<JsonFileStorage> {
         // through the final deletion attempt.
         let _repo_write_guard = self.storage.acquire_repo_write_lock()?;
         let plan = self.plan_archive_target(target)?;
+        // REQ-05 (`@/issue/45a140ae`): when a blocker is caused by lifecycle state,
+        // refuse with a diagnostic that names the permitted next action instead of
+        // the generic ineligibility from `executable_artifacts` below. The same
+        // guidance is carried in the plan JSON a preview emits.
+        if let Some((code, guidance)) = plan
+            .blockers()
+            .iter()
+            .chain(
+                plan.artifacts()
+                    .iter()
+                    .flat_map(|artifact| artifact.blockers()),
+            )
+            .find_map(|blocker| {
+                blocker
+                    .code
+                    .guidance()
+                    .map(|guidance| (blocker.code, guidance))
+            })
+        {
+            let target = match plan.target() {
+                PlanTarget::Container { id } => format!("container {}", &id[..id.len().min(8)]),
+                PlanTarget::Document { path } => format!("document {path}"),
+            };
+            bail!("cannot archive {target}: {} — {guidance}", code.as_str());
+        }
         let artifacts = plan.executable_artifacts()?;
 
         let prior_events = self.storage.read_artifact_archive_events()?;
@@ -605,6 +634,26 @@ impl CommandExecutor<JsonFileStorage> {
             }
         }
         canonicalize_warnings(&mut warnings);
+
+        // Coupled retirement (`@/issue/45a140ae`): a successful container archival
+        // retires the container into Archived as its final durable step, recording
+        // its pre-archive terminal state. Idempotent — a reconciling rerun finds it
+        // already Archived and the transition chokepoint's no-op guard does
+        // nothing. Document archival has no container to retire. This runs after
+        // the artifact commit point, so a rerun after a mid-flight failure (which
+        // left the container Done/Rejected) still reaches Archived.
+        if let PlanTarget::Container { id } = plan.target() {
+            let mut container = self.storage.load_issue(id)?;
+            if container.state != crate::domain::State::Archived {
+                self.apply_state_transition(
+                    &mut container,
+                    crate::domain::State::Archived,
+                    false,
+                    true,
+                    |_| {},
+                )?;
+            }
+        }
 
         Ok(ArchiveExecutionResult {
             schema_version: 1,

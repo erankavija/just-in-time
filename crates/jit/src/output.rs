@@ -199,6 +199,12 @@ fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagno
             .and_then(Value::as_str)
             .unwrap_or("target");
         let _ = writeln!(rendered, "  - {code}: {path}");
+        // A state-caused blocker carries a `guidance` field (REQ-05): show the
+        // permitted next action right under the blocker so the operator does not
+        // have to look the code up.
+        if let Some(guidance) = value.get("guidance").and_then(Value::as_str) {
+            let _ = writeln!(rendered, "      next action: {guidance}");
+        }
     }
 }
 
@@ -248,6 +254,7 @@ mod archive_render_tests {
             issue: "12345678-1234-1234-1234-123456789abc".into(),
             document_index: 2,
             state: State::Done,
+            archived_from: None,
             inside_subtree: true,
             pinned: false,
             selected_for_relink: false,
