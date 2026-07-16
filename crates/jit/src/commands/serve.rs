@@ -140,12 +140,28 @@ pub fn is_process_alive(pid: u32) -> bool {
 // Port selection
 // ────────────────────────────────────────────────────────────────────────────
 
-/// Returns the first free TCP port in `start..=start+99`, or an error.
+/// Selects an available TCP port and returns it as an owned, already-bound
+/// listener.
 ///
-/// A port is "free" if we can successfully bind a `TcpListener` to it.
-pub fn find_available_port(start: u16) -> Result<u16> {
+/// When `start` is `0`, binds directly to an OS-assigned ephemeral port —
+/// there is no preferred port to range-walk from, so any free port will do.
+/// Otherwise probes `start..=start+99` in order and returns the first port
+/// that binds.
+///
+/// The returned listener is already bound, so nothing else can claim the
+/// port between selection and use — this is what closes the probe-then-bind
+/// race at the type level. Read the chosen port with
+/// `listener.local_addr()?.port()`, and keep the listener alive until the
+/// moment the caller actually hands the port off (e.g. drop it immediately
+/// before spawning a child process that will bind the same port itself).
+/// Dropping it early and re-deriving the port number reopens the race this
+/// API exists to close.
+pub fn find_available_port(start: u16) -> Result<TcpListener> {
+    if start == 0 {
+        return TcpListener::bind(("127.0.0.1", 0)).context("Failed to bind an OS-assigned port");
+    }
     (start..=start.saturating_add(99))
-        .find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+        .find_map(|port| TcpListener::bind(("127.0.0.1", port)).ok())
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "No available port found in range {start}–{}",
@@ -240,9 +256,10 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// starts a new daemonized `jit-server` process and returns `Started`.
 ///
 /// Foreground mode is handled by the caller, not this function. Use
-/// [`find_server_binary`] and [`find_available_port`] to build the command,
-/// then invoke it with `Command::status()` so the caller can print the URL
-/// before blocking.
+/// [`find_server_binary`] and [`find_available_port`] to build the command —
+/// keep the returned listener alive until immediately before spawning, the
+/// same way this function does — then invoke it with `Command::status()` so
+/// the caller can print the URL before blocking.
 pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     let data_dir = &opts.data_dir;
 
@@ -258,7 +275,16 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         remove_pid_file(data_dir)?;
     }
 
-    let port = find_available_port(opts.preferred_port)?;
+    // Hold the probed listener open through all of the setup below and
+    // release it only immediately before spawning the child (REQ-2). The
+    // child does its own bind — some window is unavoidable across the
+    // process boundary — but nothing in between here and the spawn call
+    // re-binds or otherwise widens it.
+    let listener = find_available_port(opts.preferred_port)?;
+    let port = listener
+        .local_addr()
+        .context("Failed to read bound port")?
+        .port();
     let log_file = opts.log_file.unwrap_or_else(|| data_dir.join("server.log"));
     let server_bin = match opts.server_binary {
         Some(p) => p,
@@ -303,6 +329,9 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
+
+    // Release the port right before spawning: the child binds it next.
+    drop(listener);
 
     let mut child = cmd.spawn().context("Failed to spawn jit-server")?;
 
@@ -529,24 +558,41 @@ mod tests {
     // ── Port selection ───────────────────────────────────────────────────────
 
     #[test]
-    fn test_find_available_port_returns_free_port() {
-        let port = find_available_port(3000).unwrap();
-        assert!((3000..=3099).contains(&port));
-        // Verify we can actually bind to it.
-        TcpListener::bind(("127.0.0.1", port)).unwrap();
+    fn test_find_available_port_returns_bound_listener() {
+        // start=0 requests an OS-assigned port with no fixed range to walk,
+        // so this test never contends with a sibling over shared port
+        // numbers under parallel execution.
+        let listener = find_available_port(0).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(port > 0, "OS should assign a nonzero ephemeral port");
+
+        // The listener returned is already bound and live — a peer can
+        // connect to it without any further bind call on our part. This is
+        // the type-level guarantee: the caller never has to (and must not)
+        // re-bind to learn whether the port is usable.
+        std::net::TcpStream::connect(("127.0.0.1", port))
+            .expect("should connect to the already-bound listener");
     }
 
     #[test]
     fn test_find_available_port_skips_bound_port() {
-        // Bind the preferred port so find_available_port must skip it.
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let bound_port = listener.local_addr().unwrap().port();
+        // Hold an OS-assigned ephemeral port open, then scan starting from
+        // it. Since we still own the listener, find_available_port must
+        // skip it and return a different, still-free port. Starting from a
+        // freshly OS-assigned port (rather than a fixed low range like
+        // 3000-3099) means this test never shares a hardcoded range with a
+        // sibling test running concurrently.
+        let held = TcpListener::bind("127.0.0.1:0").unwrap();
+        let held_port = held.local_addr().unwrap().port();
 
-        // Ask for that specific port; it should return a different one (if any free).
-        if (3000..=3099).contains(&bound_port) {
-            let port = find_available_port(bound_port).unwrap();
-            assert_ne!(port, bound_port);
-        }
+        let listener = find_available_port(held_port).unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        assert_ne!(port, held_port, "must skip the already-bound port");
+        assert!(
+            (held_port..=held_port.saturating_add(99)).contains(&port),
+            "chosen port {port} should be within the scanned range starting at {held_port}"
+        );
     }
 
     // ── server_status with stale PID ─────────────────────────────────────────
@@ -621,7 +667,10 @@ mod tests {
         // jit-server that fails to bind its port.
         let opts = ServeOptions {
             data_dir: data_dir.to_path_buf(),
-            preferred_port: 3000,
+            // 0 = any OS-assigned free port; this test doesn't care which
+            // port is chosen, and using 0 avoids sharing a fixed range with
+            // any sibling test running in parallel.
+            preferred_port: 0,
             log_file: None,
             web_dir: None,
             server_binary: Some(PathBuf::from("/bin/false")),
@@ -670,7 +719,8 @@ mod tests {
 
         let opts = ServeOptions {
             data_dir: data_dir.to_path_buf(),
-            preferred_port: 3000,
+            // See the sibling startup-failure test above for why 0.
+            preferred_port: 0,
             log_file: None,
             web_dir: None,
             server_binary: Some(fake_server),
