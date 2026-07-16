@@ -1,4 +1,4 @@
-//! Verify `jit gate check-all --json` omits stdout/stderr for passing runs
+//! Verify `jit gate status-all --json` omits stdout/stderr for passing runs
 //! by default, retains them for failing runs, and restores them under --full.
 
 use assert_cmd::prelude::*;
@@ -63,19 +63,19 @@ fn create_issue_with_gate(temp: &TempDir, gate_key: &str, checker_command: &str)
 }
 
 #[test]
-fn test_check_all_omits_stdout_for_passing_runs_by_default() {
+fn test_status_all_omits_stdout_for_passing_runs_by_default() {
     let temp = setup_repo();
     let issue_id = create_issue_with_gate(&temp, "noisy-pass", "printf SECRET_OUTPUT && exit 0");
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "noisy-pass"])
+        .args(["gate", "evaluate", &issue_id, "noisy-pass"])
         .assert()
         .success();
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id, "--json"])
+        .args(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .success()
         .get_output()
@@ -98,22 +98,22 @@ fn test_check_all_omits_stdout_for_passing_runs_by_default() {
 }
 
 #[test]
-fn test_check_all_includes_stdout_for_failing_runs_even_without_full() {
+fn test_status_all_includes_stdout_for_failing_runs_even_without_full() {
     let temp = setup_repo();
     let issue_id = create_issue_with_gate(&temp, "noisy-fail", "printf FAILURE_DETAIL && exit 1");
 
-    // Run the gate so a failed result is recorded. `gate pass` for an auto
+    // Run the gate so a failed result is recorded. `gate evaluate` for an auto
     // gate executes the checker and records the run regardless of status.
     let _ = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "noisy-fail"])
+        .args(["gate", "evaluate", &issue_id, "noisy-fail"])
         .output()
         .unwrap();
 
-    // A failed required gate makes `status-all` (alias `check-all`) exit 4.
+    // A failed required gate makes `status-all` exit 4.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id, "--json"])
+        .args(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .failure()
         .code(4)
@@ -133,19 +133,19 @@ fn test_check_all_includes_stdout_for_failing_runs_even_without_full() {
 }
 
 #[test]
-fn test_check_all_full_flag_restores_stdout_for_passing_runs() {
+fn test_status_all_full_flag_restores_stdout_for_passing_runs() {
     let temp = setup_repo();
     let issue_id = create_issue_with_gate(&temp, "noisy-pass2", "printf RESTORED && exit 0");
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "noisy-pass2"])
+        .args(["gate", "evaluate", &issue_id, "noisy-pass2"])
         .assert()
         .success();
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id, "--json", "--full"])
+        .args(["gate", "status-all", &issue_id, "--json", "--full"])
         .assert()
         .success()
         .get_output()

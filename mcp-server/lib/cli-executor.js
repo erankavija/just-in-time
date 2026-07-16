@@ -147,9 +147,9 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
 // `evaluate`/`evaluate-all` execute a gate's checker command (or record a
 // manual attestation); `fail` only writes gate state with no subprocess, and
 // `status`/`status-all` only read recorded results — both stay on the
-// default timeout. Legacy aliases (`eval`, `pass`, `pass-all`, `check`,
-// `check-all`) never reach this function: the MCP server builds cmdPath from
-// the CLI's `--schema` output, which lists canonical verbs only.
+// default timeout. Visible aliases (e.g. `eval` for `evaluate`) never reach
+// this function: the MCP server builds cmdPath from the CLI's `--schema`
+// output, which lists canonical verbs only.
 const LONG_TIMEOUT_GATE_VERBS = new Set(['evaluate', 'evaluate-all']);
 
 /**

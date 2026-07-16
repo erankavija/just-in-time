@@ -535,7 +535,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             stdout,
             stderr: String::new(),
             command: command.to_string(),
-            by: Some("auto:executor".to_string()),
+            by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
             message,
             findings: Some(GateFindings {
                 verdict: if status == GateRunStatus::Passed {

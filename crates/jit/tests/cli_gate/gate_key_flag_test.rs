@@ -1,4 +1,4 @@
-//! REQ-03: gate pass and gate check accept --gate <key> in addition to the positional key.
+//! REQ-03: gate evaluate and gate status accept --gate <key> in addition to the positional key.
 //!
 //! Tests confirm:
 //!   1. Positional form still works (regression guard).
@@ -127,17 +127,17 @@ fn setup_auto_gate_issue(gate_key: &str) -> (TempDir, String) {
 }
 
 // ---------------------------------------------------------------------------
-// gate pass — positional (regression guard)
+// gate evaluate — positional (regression guard)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_pass_positional_key_still_works() {
+fn test_gate_evaluate_positional_key_still_works() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &issue_id,
             "code-review",
             "--by",
@@ -149,17 +149,17 @@ fn test_gate_pass_positional_key_still_works() {
 }
 
 // ---------------------------------------------------------------------------
-// gate pass — flag form
+// gate evaluate — flag form
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_pass_flag_key_accepted() {
+fn test_gate_evaluate_flag_key_accepted() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &issue_id,
             "--gate",
             "code-review",
@@ -172,14 +172,14 @@ fn test_gate_pass_flag_key_accepted() {
 }
 
 #[test]
-fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
+fn test_gate_evaluate_flag_and_positional_produce_identical_outcome() {
     // Positional form
     let (temp_pos, id_pos) = setup_manual_gate_issue("code-review");
     let out_pos = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_pos.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &id_pos,
             "code-review",
             "--by",
@@ -198,7 +198,7 @@ fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
         .current_dir(temp_flag.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &id_flag,
             "--gate",
             "code-review",
@@ -222,17 +222,17 @@ fn test_gate_pass_flag_and_positional_produce_identical_outcome() {
 }
 
 // ---------------------------------------------------------------------------
-// gate pass — both positional and --gate: actionable error
+// gate evaluate — both positional and --gate: actionable error
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_pass_both_positional_and_flag_errors() {
+fn test_gate_evaluate_both_positional_and_flag_errors() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &issue_id,
             "code-review",
             "--gate",
@@ -244,77 +244,77 @@ fn test_gate_pass_both_positional_and_flag_errors() {
 }
 
 // ---------------------------------------------------------------------------
-// gate pass — neither: actionable error
+// gate evaluate — neither: actionable error
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_pass_neither_positional_nor_flag_errors() {
+fn test_gate_evaluate_neither_positional_nor_flag_errors() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id])
+        .args(["gate", "evaluate", &issue_id])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").or(predicate::str::contains("gate key")));
 }
 
 // ---------------------------------------------------------------------------
-// gate check — positional (regression guard)
+// gate status — positional (regression guard)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_check_positional_key_still_works() {
+fn test_gate_status_positional_key_still_works() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
 
-    // Run gate first so check has something to show
+    // Run gate first so status has something to show
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "tests"])
+        .args(["gate", "evaluate", &issue_id, "tests"])
         .assert()
         .success();
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "tests"])
+        .args(["gate", "status", &issue_id, "tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
 }
 
 // ---------------------------------------------------------------------------
-// gate check — flag form
+// gate status — flag form
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_check_flag_key_accepted() {
+fn test_gate_status_flag_key_accepted() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "tests"])
+        .args(["gate", "evaluate", &issue_id, "tests"])
         .assert()
         .success();
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "--gate", "tests"])
+        .args(["gate", "status", &issue_id, "--gate", "tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
 }
 
 #[test]
-fn test_gate_check_flag_and_positional_produce_identical_outcome() {
+fn test_gate_status_flag_and_positional_produce_identical_outcome() {
     // Positional form
     let (temp_pos, id_pos) = setup_auto_gate_issue("tests");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_pos.path())
-        .args(["gate", "pass", &id_pos, "tests"])
+        .args(["gate", "evaluate", &id_pos, "tests"])
         .assert()
         .success();
     let out_pos = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_pos.path())
-        .args(["gate", "check", &id_pos, "tests", "--json"])
+        .args(["gate", "status", &id_pos, "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -325,12 +325,12 @@ fn test_gate_check_flag_and_positional_produce_identical_outcome() {
     let (temp_flag, id_flag) = setup_auto_gate_issue("tests");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_flag.path())
-        .args(["gate", "pass", &id_flag, "tests"])
+        .args(["gate", "evaluate", &id_flag, "tests"])
         .assert()
         .success();
     let out_flag = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_flag.path())
-        .args(["gate", "check", &id_flag, "--gate", "tests", "--json"])
+        .args(["gate", "status", &id_flag, "--gate", "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -345,30 +345,30 @@ fn test_gate_check_flag_and_positional_produce_identical_outcome() {
 }
 
 // ---------------------------------------------------------------------------
-// gate check — both positional and --gate: actionable error
+// gate status — both positional and --gate: actionable error
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_check_both_positional_and_flag_errors() {
+fn test_gate_status_both_positional_and_flag_errors() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "tests", "--gate", "tests"])
+        .args(["gate", "status", &issue_id, "tests", "--gate", "tests"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").and(predicate::str::contains("positional")));
 }
 
 // ---------------------------------------------------------------------------
-// gate check — neither: actionable error
+// gate status — neither: actionable error
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_check_neither_positional_nor_flag_errors() {
+fn test_gate_status_neither_positional_nor_flag_errors() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id])
+        .args(["gate", "status", &issue_id])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--gate").or(predicate::str::contains("gate key")));
@@ -380,13 +380,13 @@ fn test_gate_check_neither_positional_nor_flag_errors() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_gate_pass_both_with_json_emits_machine_readable_error() {
+fn test_gate_evaluate_both_with_json_emits_machine_readable_error() {
     let (temp, issue_id) = setup_manual_gate_issue("code-review");
     let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &issue_id,
             "code-review",
             "--gate",
@@ -399,22 +399,22 @@ fn test_gate_pass_both_with_json_emits_machine_readable_error() {
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&out)
-        .expect("`gate pass --json` argument error must be valid JSON on stdout");
+        .expect("`gate evaluate --json` argument error must be valid JSON on stdout");
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]
-fn test_gate_check_neither_with_json_emits_machine_readable_error() {
+fn test_gate_status_neither_with_json_emits_machine_readable_error() {
     let (temp, issue_id) = setup_auto_gate_issue("tests");
     let out = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "--json"])
+        .args(["gate", "status", &issue_id, "--json"])
         .assert()
         .failure()
         .get_output()
         .stdout
         .clone();
     let json: serde_json::Value = serde_json::from_slice(&out)
-        .expect("`gate check --json` argument error must be valid JSON on stdout");
+        .expect("`gate status --json` argument error must be valid JSON on stdout");
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }

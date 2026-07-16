@@ -133,13 +133,13 @@ fn setup_multi_auto_gate_issue(gates: &[(&str, &str)]) -> (TempDir, String) {
 }
 
 #[test]
-fn test_gate_check_no_prior_runs_shows_not_run_message() {
+fn test_gate_status_no_prior_runs_shows_not_run_message() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
-    // gate check before any pass — should say not run yet, no mutation
+    // gate status before any evaluate — should say not run yet, no mutation
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "test-gate"])
+        .args(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
         .stdout(predicate::str::contains("not been run").or(predicate::str::contains("no run")));
@@ -203,20 +203,20 @@ fn test_issue_show_errors_on_corrupt_gate_run() {
 }
 
 #[test]
-fn test_gate_check_shows_last_run_after_pass() {
+fn test_gate_status_shows_last_run_after_evaluate() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
     // Execute the gate via pass
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .success();
 
-    // gate check now shows last run
+    // gate status now shows last run
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "test-gate"])
+        .args(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")))
@@ -224,27 +224,27 @@ fn test_gate_check_shows_last_run_after_pass() {
 }
 
 #[test]
-fn test_gate_check_shows_last_run_after_failure() {
+fn test_gate_status_shows_last_run_after_failure() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");
 
     // Execute (will fail)
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Gate 'test-gate' failed"))
         .stderr(predicate::str::contains("jit gate status"));
 
-    // gate check shows the failure
+    // gate status shows the failure
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "test-gate"])
+        .args(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
         .stdout(predicate::str::contains("failed").or(predicate::str::contains("Failed")));
 
-    // Non-mutating: gate check itself didn't change status further
+    // Non-mutating: gate status itself didn't change status further
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(["issue", "show", &issue_id, "--json"])
@@ -259,13 +259,13 @@ fn test_gate_check_shows_last_run_after_failure() {
 }
 
 #[test]
-fn test_gate_pass_json_failure_matches_persisted_status() {
+fn test_gate_evaluate_json_failure_matches_persisted_status() {
     let (temp, issue_id) =
         setup_auto_gate_issue("printf checker-out && printf checker-err >&2 && exit 1");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
         .code(4)
@@ -312,12 +312,12 @@ fn test_gate_pass_json_failure_matches_persisted_status() {
 // (`gate status <id> <gate> --all`), which mining found agents rebuilding by
 // hand instead of discovering.
 #[test]
-fn test_gate_pass_json_failure_suggests_run_history_view() {
+fn test_gate_evaluate_json_failure_suggests_run_history_view() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
         .code(4)
@@ -340,12 +340,12 @@ fn test_gate_pass_json_failure_suggests_run_history_view() {
 }
 
 #[test]
-fn test_gate_pass_stderr_failure_suggests_run_history_view() {
+fn test_gate_evaluate_stderr_failure_suggests_run_history_view() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .output()
         .unwrap();
     assert!(!output.status.success());
@@ -357,13 +357,13 @@ fn test_gate_pass_stderr_failure_suggests_run_history_view() {
 }
 
 #[test]
-fn test_gate_pass_json_failure_includes_lease_warnings() {
+fn test_gate_evaluate_json_failure_includes_lease_warnings() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");
     enable_warn_leases(&temp);
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &issue_id, "test-gate", "--json"])
         .assert()
         .failure()
         .code(4)
@@ -382,13 +382,13 @@ fn test_gate_pass_json_failure_includes_lease_warnings() {
 }
 
 #[test]
-fn test_gate_pass_human_failure_prints_lease_warnings() {
+fn test_gate_evaluate_human_failure_prints_lease_warnings() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 1");
     enable_warn_leases(&temp);
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("Warning: No active lease"))
@@ -396,14 +396,14 @@ fn test_gate_pass_human_failure_prints_lease_warnings() {
 }
 
 #[test]
-fn test_gate_check_is_non_mutating() {
+fn test_gate_status_is_non_mutating() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
-    // Two gate check calls — neither should mutate
+    // Two gate status calls — neither should mutate
     for _ in 0..2 {
         Command::new(assert_cmd::cargo::cargo_bin!("jit"))
             .current_dir(temp.path())
-            .args(["gate", "check", &issue_id, "test-gate"])
+            .args(["gate", "status", &issue_id, "test-gate"])
             .assert()
             .success();
     }
@@ -425,19 +425,19 @@ fn test_gate_check_is_non_mutating() {
 }
 
 #[test]
-fn test_gate_check_json_output() {
+fn test_gate_status_json_output() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
     // Run the gate first so there's a result to show
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .success();
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "test-gate", "--json"])
+        .args(["gate", "status", &issue_id, "test-gate", "--json"])
         .assert()
         .success()
         .get_output()
@@ -455,12 +455,12 @@ fn test_gate_check_json_output() {
 }
 
 #[test]
-fn test_gate_pass_auto_executes_checker() {
+fn test_gate_evaluate_auto_executes_checker() {
     let (temp, issue_id) = setup_auto_gate_issue("exit 0");
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .success();
 
@@ -919,7 +919,7 @@ fn test_gate_remove_appends_event() {
 }
 
 #[test]
-fn test_gate_check_single() {
+fn test_gate_status_single() {
     let temp = setup_repo();
 
     // Define an automated gate that succeeds
@@ -970,24 +970,24 @@ fn test_gate_check_single() {
         .last()
         .unwrap();
 
-    // Run the gate first (gate pass executes the checker for auto gates)
+    // Run the gate first (gate evaluate executes the checker for auto gates)
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(["gate", "pass", issue_id, "quick-check"])
+        .args(["gate", "evaluate", issue_id, "quick-check"])
         .assert()
         .success();
 
-    // Now inspect the last run result (gate check is inspection-only)
+    // Now inspect the last run result (gate status is inspection-only)
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(["gate", "check", issue_id, "quick-check"])
+        .args(["gate", "status", issue_id, "quick-check"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed"));
 }
 
 #[test]
-fn test_gate_check_all() {
+fn test_gate_status_all() {
     let (temp, issue_id) = setup_multi_auto_gate_issue(&[
         ("gate-1", "printf gate-1-out && exit 0"),
         ("gate-2", "printf gate-2-out && exit 0"),
@@ -995,18 +995,18 @@ fn test_gate_check_all() {
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "gate-1"])
+        .args(["gate", "evaluate", &issue_id, "gate-1"])
         .assert()
         .success();
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "gate-2"])
+        .args(["gate", "evaluate", &issue_id, "gate-2"])
         .assert()
         .success();
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id])
+        .args(["gate", "status-all", &issue_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Gate 'gate-1' last run: passed"))
@@ -1016,14 +1016,14 @@ fn test_gate_check_all() {
 }
 
 #[test]
-fn test_gate_check_all_no_prior_runs_is_non_mutating() {
+fn test_gate_status_all_no_prior_runs_is_non_mutating() {
     let (temp, issue_id) =
         setup_multi_auto_gate_issue(&[("gate-1", "exit 0"), ("gate-2", "exit 0")]);
 
     // All required gates pending -> strict `status-all` exits 4 (non-mutating).
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id])
+        .args(["gate", "status-all", &issue_id])
         .assert()
         .failure()
         .code(4)
@@ -1055,7 +1055,7 @@ fn test_gate_check_all_no_prior_runs_is_non_mutating() {
 }
 
 #[test]
-fn test_gate_check_all_json_output_reports_not_run_gates() {
+fn test_gate_status_all_json_output_reports_not_run_gates() {
     let (temp, issue_id) = setup_multi_auto_gate_issue(&[
         ("gate-1", "printf gate-1-out && exit 0"),
         ("gate-2", "printf gate-2-out && exit 0"),
@@ -1063,14 +1063,14 @@ fn test_gate_check_all_json_output_reports_not_run_gates() {
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "gate-1"])
+        .args(["gate", "evaluate", &issue_id, "gate-1"])
         .assert()
         .success();
 
     // gate-1 passed, gate-2 still pending -> strict `status-all` exits 4.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check-all", &issue_id, "--json"])
+        .args(["gate", "status-all", &issue_id, "--json"])
         .assert()
         .failure()
         .code(4)
@@ -1219,10 +1219,10 @@ fn test_gate_env_vars_passed_to_checker() {
         .last()
         .unwrap();
 
-    // Run the gate (gate pass executes checker for auto gates)
+    // Run the gate (gate evaluate executes checker for auto gates)
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path())
-        .args(["gate", "pass", issue_id, "env-test"])
+        .args(["gate", "evaluate", issue_id, "env-test"])
         .assert()
         .success();
 
@@ -1230,7 +1230,7 @@ fn test_gate_env_vars_passed_to_checker() {
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     let output = cmd
         .current_dir(temp.path())
-        .args(["gate", "check", issue_id, "env-test", "--json"])
+        .args(["gate", "status", issue_id, "env-test", "--json"])
         .assert()
         .success()
         .get_output()
@@ -1252,7 +1252,7 @@ fn test_gate_env_vars_passed_to_checker() {
 }
 
 #[test]
-fn test_gate_check_shows_complete_report_without_truncation() {
+fn test_gate_status_shows_complete_report_without_truncation() {
     // Checker that produces 25 lines of stdout (more than the old 20-line truncation limit)
     let checker_cmd =
         "sh -c 'i=1; while [ $i -le 25 ]; do echo \"output-line-$i\"; i=$((i+1)); done'";
@@ -1261,14 +1261,14 @@ fn test_gate_check_shows_complete_report_without_truncation() {
     // Run the gate to record a result with 25 lines of stdout
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &issue_id, "test-gate"])
+        .args(["gate", "evaluate", &issue_id, "test-gate"])
         .assert()
         .success();
 
-    // gate check must emit the full stored report — line 21 must appear
+    // gate status must emit the full stored report — line 21 must appear
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "check", &issue_id, "test-gate"])
+        .args(["gate", "status", &issue_id, "test-gate"])
         .assert()
         .success()
         .get_output()
@@ -1279,13 +1279,13 @@ fn test_gate_check_shows_complete_report_without_truncation() {
 
     assert!(
         stdout_str.contains("output-line-21"),
-        "gate check must emit the full report; line 21 was absent. Output:\n{}",
+        "gate status must emit the full report; line 21 was absent. Output:\n{}",
         stdout_str
     );
 
     assert!(
         !stdout_str.contains("Full output:"),
-        "gate check must not substitute a file path for the report body. Output:\n{}",
+        "gate status must not substitute a file path for the report body. Output:\n{}",
         stdout_str
     );
 }

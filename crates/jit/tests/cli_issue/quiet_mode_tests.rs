@@ -281,12 +281,12 @@ fn test_quiet_with_gate_commands() {
         .success()
         .stdout(predicate::str::contains("Added").not());
 
-    // Pass gate in quiet mode
+    // Evaluate gate in quiet mode
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_dir.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &issue_id,
             "test-gate",
             "--by",

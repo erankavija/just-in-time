@@ -190,16 +190,15 @@ Mutating the registry, attaching gates to issues, and managing presets.
 **2. Execution** *produces a verdict and may advance issue state*. These are the
 only gate verbs that mutate gate-run state.
 
-- `gate evaluate` (alias `eval`), `gate evaluate-all`, `gate fail`. `pass` /
-  `pass-all` are silent aliases of `evaluate` / `evaluate-all`.
+- `gate evaluate` (alias `eval`), `gate evaluate-all`, `gate fail`.
 
 **3. Inspection** *reports definitions or run results with no side effects*.
 Strictly read-only.
 
 - Registry reads: `gate list`, `gate show`.
-- Run-result reads: `gate status`, `gate status-all` (aliases `check` /
-  `check-all`). `gate status-all` is read-only but exits nonzero (4) unless every
-  required gate has passed: a readiness signal, not a mutation.
+- Run-result reads: `gate status`, `gate status-all`. `gate status-all` is
+  read-only but exits nonzero (4) unless every required gate has passed: a
+  readiness signal, not a mutation.
 
 ### The load-bearing invariant
 

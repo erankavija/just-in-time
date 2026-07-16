@@ -1,14 +1,12 @@
-//! REQ-08: `gate check` is the unified gate-run inspection surface.
+//! REQ-08: `gate status` is the unified gate-run inspection surface.
 //!
-//! Beyond the existing latest-run view, `gate check` now exposes:
+//! Beyond the latest-run view, `gate status` exposes:
 //!   - History (`--all` / `--limit <N>`): prior runs newest-first, filterable
 //!     by `--gate <key>` and `--status <passed|failed|...>`.
 //!   - Flat report text (`--stdout` / `--stderr` / `--tail <N>`): the stored
 //!     report text printed verbatim with no wrapping or decoration.
 //!
 //! Every view supports `--json`, and argument errors are machine-readable.
-//!
-//! `gate check-all` is retained unchanged (latest-run snapshot across gates).
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
@@ -82,12 +80,12 @@ fn create_issue(temp: &TempDir, gate_keys: &[&str]) -> String {
         .to_string()
 }
 
-/// Run `gate pass --force` for a gate (records a fresh run regardless of verdict).
+/// Run `gate evaluate --force` for a gate (records a fresh run regardless of verdict).
 fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
     // Verdict may be pass or fail; we only need the run recorded.
     jit()
         .current_dir(temp.path())
-        .args(["gate", "pass", issue_id, gate_key, "--force"])
+        .args(["gate", "evaluate", issue_id, gate_key, "--force"])
         .assert();
 }
 
@@ -96,7 +94,7 @@ fn run_gate(temp: &TempDir, issue_id: &str, gate_key: &str) {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_check_latest_by_default_unchanged() {
+fn test_status_latest_by_default_unchanged() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo hello; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -104,7 +102,7 @@ fn test_check_latest_by_default_unchanged() {
 
     jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests"])
+        .args(["gate", "status", &id, "tests"])
         .assert()
         .success()
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
@@ -115,7 +113,7 @@ fn test_check_latest_by_default_unchanged() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_check_all_history_lists_prior_runs() {
+fn test_status_history_lists_prior_runs() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo run; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -125,7 +123,7 @@ fn test_check_all_history_lists_prior_runs() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "--all", "--json"])
+        .args(["gate", "status", &id, "--all", "--json"])
         .assert()
         .success()
         .get_output()
@@ -147,7 +145,7 @@ fn test_check_all_history_lists_prior_runs() {
 }
 
 #[test]
-fn test_check_limit_caps_history() {
+fn test_status_limit_caps_history() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo run; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -157,7 +155,7 @@ fn test_check_limit_caps_history() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "--limit", "2", "--json"])
+        .args(["gate", "status", &id, "--limit", "2", "--json"])
         .assert()
         .success()
         .get_output()
@@ -173,7 +171,7 @@ fn test_check_limit_caps_history() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_check_history_gate_filter() {
+fn test_status_history_gate_filter() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo t; exit 0");
     define_auto_gate(&temp, "clippy", "echo c; exit 0");
@@ -183,7 +181,7 @@ fn test_check_history_gate_filter() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "--all", "--gate", "tests", "--json"])
+        .args(["gate", "status", &id, "--all", "--gate", "tests", "--json"])
         .assert()
         .success()
         .get_output()
@@ -196,7 +194,7 @@ fn test_check_history_gate_filter() {
 }
 
 #[test]
-fn test_check_history_status_filter() {
+fn test_status_history_status_filter() {
     let temp = setup_repo();
     define_auto_gate(&temp, "passing", "echo ok; exit 0");
     define_auto_gate(&temp, "failing", "echo boom; exit 1");
@@ -207,7 +205,7 @@ fn test_check_history_status_filter() {
     let out = jit()
         .current_dir(temp.path())
         .args([
-            "gate", "check", &id, "--all", "--status", "failed", "--json",
+            "gate", "status", &id, "--all", "--status", "failed", "--json",
         ])
         .assert()
         .success()
@@ -221,7 +219,7 @@ fn test_check_history_status_filter() {
 }
 
 #[test]
-fn test_check_history_invalid_status_json_error() {
+fn test_status_history_invalid_status_json_error() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -229,7 +227,9 @@ fn test_check_history_invalid_status_json_error() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "--all", "--status", "bogus", "--json"])
+        .args([
+            "gate", "status", &id, "--all", "--status", "bogus", "--json",
+        ])
         .assert()
         .failure()
         .get_output()
@@ -245,7 +245,7 @@ fn test_check_history_invalid_status_json_error() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_check_stdout_flat_verbatim() {
+fn test_status_stdout_flat_verbatim() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo FLAT_MARKER_LINE; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -253,7 +253,7 @@ fn test_check_stdout_flat_verbatim() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--stdout"])
+        .args(["gate", "status", &id, "tests", "--stdout"])
         .assert()
         .success()
         .get_output()
@@ -269,7 +269,7 @@ fn test_check_stdout_flat_verbatim() {
 }
 
 #[test]
-fn test_check_stdout_flat_is_byte_exact_no_injected_newline() {
+fn test_status_stdout_flat_is_byte_exact_no_injected_newline() {
     // The flat view must emit the stored report text byte-for-byte. A checker
     // whose stdout has NO trailing newline must come back with NO trailing
     // newline — `print!`, not `println!` (which would append one).
@@ -281,7 +281,7 @@ fn test_check_stdout_flat_is_byte_exact_no_injected_newline() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--stdout"])
+        .args(["gate", "status", &id, "tests", "--stdout"])
         .assert()
         .success()
         .get_output()
@@ -296,7 +296,7 @@ fn test_check_stdout_flat_is_byte_exact_no_injected_newline() {
 }
 
 #[test]
-fn test_check_stderr_flat_verbatim() {
+fn test_status_stderr_flat_verbatim() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo ERRLINE 1>&2; exit 1");
     let id = create_issue(&temp, &["tests"]);
@@ -304,7 +304,7 @@ fn test_check_stderr_flat_verbatim() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--stderr"])
+        .args(["gate", "status", &id, "tests", "--stderr"])
         .assert()
         .success()
         .get_output()
@@ -315,7 +315,7 @@ fn test_check_stderr_flat_verbatim() {
 }
 
 #[test]
-fn test_check_tail_limits_lines() {
+fn test_status_tail_limits_lines() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "printf 'a\\nb\\nc\\nd\\ne\\n'; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -323,7 +323,7 @@ fn test_check_tail_limits_lines() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--stdout", "--tail", "2"])
+        .args(["gate", "status", &id, "tests", "--stdout", "--tail", "2"])
         .assert()
         .success()
         .get_output()
@@ -338,7 +338,7 @@ fn test_check_tail_limits_lines() {
 }
 
 #[test]
-fn test_check_stdout_flat_json() {
+fn test_status_stdout_flat_json() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo JSONFLAT; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -346,7 +346,7 @@ fn test_check_stdout_flat_json() {
 
     let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--stdout", "--json"])
+        .args(["gate", "status", &id, "tests", "--stdout", "--json"])
         .assert()
         .success()
         .get_output()
@@ -365,26 +365,7 @@ fn test_check_stdout_flat_json() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_check_history_and_flat_conflict_json_error() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "tests", "echo ok; exit 0");
-    let id = create_issue(&temp, &["tests"]);
-    run_gate(&temp, &id, "tests");
-
-    let out = jit()
-        .current_dir(temp.path())
-        .args(["gate", "check", &id, "tests", "--all", "--stdout", "--json"])
-        .assert()
-        .failure()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
-    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
-}
-
-#[test]
-fn test_check_status_without_history_json_error() {
+fn test_status_history_and_flat_conflict_json_error() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
     let id = create_issue(&temp, &["tests"]);
@@ -393,7 +374,7 @@ fn test_check_status_without_history_json_error() {
     let out = jit()
         .current_dir(temp.path())
         .args([
-            "gate", "check", &id, "tests", "--status", "passed", "--json",
+            "gate", "status", &id, "tests", "--all", "--stdout", "--json",
         ])
         .assert()
         .failure()
@@ -404,21 +385,23 @@ fn test_check_status_without_history_json_error() {
     assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }
 
-// ---------------------------------------------------------------------------
-// gate check-all is retained
-// ---------------------------------------------------------------------------
-
 #[test]
-fn test_check_all_command_retained() {
+fn test_status_flag_requires_history_json_error() {
     let temp = setup_repo();
     define_auto_gate(&temp, "tests", "echo ok; exit 0");
     let id = create_issue(&temp, &["tests"]);
     run_gate(&temp, &id, "tests");
 
-    jit()
+    let out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check-all", &id, "--json"])
+        .args([
+            "gate", "status", &id, "tests", "--status", "passed", "--json",
+        ])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("results"));
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
 }

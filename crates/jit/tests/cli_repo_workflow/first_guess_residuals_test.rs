@@ -113,7 +113,7 @@ fn test_doc_add_title_alias_sets_label() {
 
 // 3. Transposed gate-inspection args yield an actionable did-you-mean (non-zero).
 #[test]
-fn test_gate_check_transposed_args_did_you_mean() {
+fn test_gate_status_transposed_args_did_you_mean() {
     let temp = setup_repo();
     let id = create_issue(&temp, "Gated issue");
     jit()
@@ -133,7 +133,7 @@ fn test_gate_check_transposed_args_did_you_mean() {
     // Canonical form is `jit gate status <issue> <gate-key>`. Pass them transposed.
     let assert = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", "tests", &id])
+        .args(["gate", "status", "tests", &id])
         .assert()
         .failure();
     let stderr = String::from_utf8_lossy(&assert.get_output().stderr).to_lowercase();
@@ -145,7 +145,7 @@ fn test_gate_check_transposed_args_did_you_mean() {
     // The --json surface carries the same actionable suggestion and a non-zero exit.
     let json_out = jit()
         .current_dir(temp.path())
-        .args(["gate", "check", "tests", &id, "--json"])
+        .args(["gate", "status", "tests", &id, "--json"])
         .assert()
         .failure()
         .get_output()
