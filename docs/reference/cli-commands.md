@@ -2659,7 +2659,8 @@ repository:
 - **Boundary edges are reported.** A dependency on an issue outside the `--scope`
   membership is excluded from `depends_on` and reported on stderr (count plus
   `from -> to` short-id pairs), never dropped silently. `stdout` therefore stays
-  a clean array you can pipe straight into batch creation.
+  a clean batch-create payload: write it to a file (`--output` or shell
+  redirection) and feed that file to `jit issue batch-create --from-json`.
 
 Without `--scope` the whole graph is exported in batch shape (still minus bracket
 nodes). Round-tripping the same-scope export through batch creation in a fresh
