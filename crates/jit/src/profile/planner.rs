@@ -464,13 +464,15 @@ fn merge_map_entry(
 ) -> Result<(), ProfilePlanError> {
     let existing = match target {
         MapEntryTarget::TypeHierarchyTypes => {
-            semantic.pointer(&format!("/type_hierarchy/types/{identity}"))
+            semantic_map_entry(semantic, &["type_hierarchy", "types"], identity)
         }
-        MapEntryTarget::LabelAssociations => {
-            semantic.pointer(&format!("/type_hierarchy/label_associations/{identity}"))
-        }
-        MapEntryTarget::Namespaces => semantic.pointer(&format!("/namespaces/{identity}")),
-        MapEntryTarget::ItemKinds => semantic.pointer(&format!("/item_kinds/{identity}")),
+        MapEntryTarget::LabelAssociations => semantic_map_entry(
+            semantic,
+            &["type_hierarchy", "label_associations"],
+            identity,
+        ),
+        MapEntryTarget::Namespaces => semantic_map_entry(semantic, &["namespaces"], identity),
+        MapEntryTarget::ItemKinds => semantic_map_entry(semantic, &["item_kinds"], identity),
     };
     if let Some(existing) = existing {
         return equal_or_conflict(registry, identity, existing, candidate);
@@ -504,6 +506,17 @@ fn merge_map_entry(
         }
     }
     Ok(())
+}
+
+fn semantic_map_entry<'a>(
+    semantic: &'a JsonValue,
+    path: &[&str],
+    identity: &str,
+) -> Option<&'a JsonValue> {
+    path.iter()
+        .try_fold(semantic, |value, key| value.get(*key))?
+        .as_object()?
+        .get(identity)
 }
 
 fn merge_set_string(
@@ -546,7 +559,8 @@ fn merge_keyed_array(
 ) -> Result<(), ProfilePlanError> {
     let array_name = target.array_name();
     let field = target.identity_field();
-    let array = ensure_array_of_tables(document.as_table_mut(), array_name, registry)?;
+    let (array, preserved_comment) =
+        ensure_array_of_tables(document.as_table_mut(), array_name, registry)?;
     let mut identities = BTreeSet::new();
     let mut existing = None;
     for table in array.iter() {
@@ -569,7 +583,11 @@ fn merge_keyed_array(
     if let Some(existing) = existing {
         return equal_or_conflict(registry, identity, &existing, candidate);
     }
-    array.push(json_object_to_table(candidate, registry)?);
+    let mut table = json_object_to_table(candidate, registry)?;
+    if let Some(comment) = preserved_comment {
+        table.decor_mut().set_prefix(comment);
+    }
+    array.push(table);
     Ok(())
 }
 
@@ -662,7 +680,8 @@ fn ensure_array_of_tables<'a>(
     parent: &'a mut Table,
     key: &str,
     registry: &str,
-) -> Result<&'a mut ArrayOfTables, ProfilePlanError> {
+) -> Result<(&'a mut ArrayOfTables, Option<String>), ProfilePlanError> {
+    let preserved_comment = empty_array_comments(parent, key);
     let needs_array_of_tables = !parent.contains_key(key)
         || parent
             .get(key)
@@ -671,10 +690,35 @@ fn ensure_array_of_tables<'a>(
     if needs_array_of_tables {
         parent.insert(key, Item::ArrayOfTables(ArrayOfTables::new()));
     }
-    parent
+    let array = parent
         .get_mut(key)
         .and_then(Item::as_array_of_tables_mut)
-        .ok_or_else(|| invalid_registry(registry, format!("'{key}' is not an array of tables")))
+        .ok_or_else(|| invalid_registry(registry, format!("'{key}' is not an array of tables")))?;
+    Ok((array, preserved_comment))
+}
+
+fn empty_array_comments(parent: &Table, key: &str) -> Option<String> {
+    let array = parent.get(key)?.as_array()?;
+    if !array.is_empty() {
+        return None;
+    }
+    let key_decor = parent.key(key)?.leaf_decor();
+    let fragments = [
+        key_decor.prefix(),
+        key_decor.suffix(),
+        array.decor().prefix(),
+        array.decor().suffix(),
+    ]
+    .into_iter()
+    .filter_map(comment_fragment)
+    .collect::<String>();
+    (!fragments.is_empty()).then_some(fragments)
+}
+
+fn comment_fragment(raw: Option<&toml_edit::RawString>) -> Option<String> {
+    let text = raw?.as_str()?;
+    let comment = text.get(text.find('#')?..)?.trim_end_matches(['\r', '\n']);
+    Some(format!("{comment}\n"))
 }
 
 fn json_object_to_table(value: &JsonValue, registry: &str) -> Result<Table, ProfilePlanError> {
@@ -913,6 +957,54 @@ mod tests {
             merge_contribution(".jit/gates.toml", &mut document, &conflict),
             Err(ProfilePlanError::ContributionConflict { .. })
         ));
+    }
+
+    #[test]
+    fn test_empty_keyed_registry_preserves_comments_when_appending_first_table() {
+        let mut document: DocumentMut = "# registry note\ngates = [] # keep inline\n"
+            .parse()
+            .unwrap();
+        let contribution = Contribution::KeyedArray {
+            target: KeyedArrayTarget::Gates,
+            identity: "review".to_string(),
+            value: serde_json::json!({"key": "review", "title": "Review"}),
+        };
+        merge_contribution(".jit/gates.toml", &mut document, &contribution).unwrap();
+        let rendered = document.to_string();
+        assert!(rendered.contains("# registry note"));
+        assert!(rendered.contains("# keep inline"));
+        assert!(rendered.contains("[[gates]]"));
+        assert!(rendered.find("# keep inline").unwrap() < rendered.find("[[gates]]").unwrap());
+        assert_eq!(
+            toml_edit::de::from_str::<JsonValue>(&rendered).unwrap()["gates"][0]["key"],
+            "review"
+        );
+    }
+
+    #[test]
+    fn test_map_identity_with_json_pointer_characters_never_bypasses_conflict() {
+        let original =
+            "[namespaces]\n\"team/red~blue\" = { description = \"Keep\", unique = false }\n";
+        let mut document: DocumentMut = original.parse().unwrap();
+        let equal = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "team/red~blue".to_string(),
+            value: serde_json::json!({"description": "Keep", "unique": false}),
+        };
+        merge_contribution(".jit/config.toml", &mut document, &equal).unwrap();
+        assert_eq!(document.to_string(), original);
+
+        let conflict = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "team/red~blue".to_string(),
+            value: serde_json::json!({"description": "Different", "unique": false}),
+        };
+        assert!(matches!(
+            merge_contribution(".jit/config.toml", &mut document, &conflict),
+            Err(ProfilePlanError::ContributionConflict { identity, .. })
+                if identity == "team/red~blue"
+        ));
+        assert_eq!(document.to_string(), original);
     }
 
     #[test]
