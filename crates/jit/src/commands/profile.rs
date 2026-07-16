@@ -72,7 +72,7 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = &package.manifest().profile;
         let applied = self
             .inspect_applied_record(&package)?
-            .is_some_and(|record| record.package_hash == package.hashes().package);
+            .is_some_and(|record| record == expected_record(&package));
         let profiles = vec![ProfileSummary {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
@@ -111,6 +111,12 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn apply_profile(&self, id: &str) -> Result<ProfileApplyResult> {
         let package = embedded_profile(id)?;
         self.apply_embedded_profile(&package)
+    }
+
+    /// Validate an embedded profile identifier without reading or mutating a
+    /// repository.
+    pub fn validate_profile_id(&self, id: &str) -> Result<()> {
+        embedded_profile(id).map(|_| ())
     }
 
     /// Apply one validated embedded profile package under a single write lock.
@@ -253,11 +259,7 @@ impl CommandExecutor<JsonFileStorage> {
         ]);
         let snapshot = self.storage.capture_profile_snapshot(snapshot_paths)?;
         let record = AppliedProfileRecord {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            origin: ProfileOrigin::Embedded,
-            package_hash: package.hashes().package.clone(),
-            target_hashes: package.hashes().targets.clone(),
+            ..expected_record(package)
         };
         let record_matches = inspect_installed_record(&snapshot, &record_path, &record)?;
         let prior_events = snapshot
@@ -325,7 +327,18 @@ impl CommandExecutor<JsonFileStorage> {
     }
 }
 
-fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedProfileRecord {
+    let metadata = &package.manifest().profile;
+    AppliedProfileRecord {
+        id: metadata.id.clone(),
+        version: metadata.version.clone(),
+        origin: ProfileOrigin::Embedded,
+        package_hash: package.hashes().package.clone(),
+        target_hashes: package.hashes().targets.clone(),
+    }
+}
+
+pub(super) fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
     let package = jit_dogfood_package()?;
     if package.manifest().profile.id == id {
         Ok(package)
@@ -412,7 +425,7 @@ fn ensure_profile_directory(snapshot: &crate::profile::RepositorySnapshot) -> Re
     }
 }
 
-fn reject_reserved_application_targets<'a>(
+pub(super) fn reject_reserved_application_targets<'a>(
     targets: impl IntoIterator<Item = &'a str>,
 ) -> Result<()> {
     if let Some(path) = targets.into_iter().find(|path| {
@@ -432,14 +445,14 @@ fn reject_reserved_application_targets<'a>(
     Ok(())
 }
 
-fn unix_mode(mode: ProjectedFileMode) -> Option<u32> {
+pub(super) fn unix_mode(mode: ProjectedFileMode) -> Option<u32> {
     Some(match mode {
         ProjectedFileMode::Regular => 0o644,
         ProjectedFileMode::Executable => 0o755,
     })
 }
 
-fn transaction_path(storage_root: &Path, virtual_path: &str) -> String {
+pub(super) fn transaction_path(storage_root: &Path, virtual_path: &str) -> String {
     let storage_name = storage_root
         .file_name()
         .and_then(|name| name.to_str())

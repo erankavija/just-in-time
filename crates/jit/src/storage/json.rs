@@ -115,6 +115,11 @@ impl Default for Index {
     }
 }
 
+/// Render the byte-exact empty index created by a fresh repository.
+pub(crate) fn fresh_index_bytes() -> Result<Vec<u8>> {
+    serde_json::to_vec_pretty(&Index::default()).context("Failed to serialize fresh index")
+}
+
 /// Reject an index whose on-disk format version is newer than this binary
 /// supports; otherwise pass it through unchanged.
 ///

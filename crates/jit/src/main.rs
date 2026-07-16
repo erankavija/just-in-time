@@ -751,6 +751,18 @@ fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::Json
     }
 }
 
+fn profile_result<T>(result: anyhow::Result<T>, command: &str, json: bool) -> anyhow::Result<T> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if json => {
+            let json_error = profile_json_error(&error, command);
+            println!("{}", json_error.to_json_string()?);
+            std::process::exit(json_error.exit_code().code());
+        }
+        Err(error) => Err(error),
+    }
+}
+
 /// Wrong-verb guess -> canonical-command hint, keyed by (group, guessed verb).
 /// Backs the hidden stub subcommands in `cli.rs` (`IssueCommands::Rm`,
 /// `DepCommands::Remove`, ...): each stub always fails through
@@ -1834,16 +1846,46 @@ fn run() -> Result<()> {
                 None
             };
 
+            let chosen = template
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
+            if let Some(id) = profile.as_deref() {
+                profile_result(executor.validate_profile_id(id), "init", *json)?;
+            }
+
             // Snapshot which core repository files already exist so the `--json`
             // envelope can report exactly what THIS run created, rather than the
             // full idempotent set `executor.init()` always ensures.
             let index_existed = jit_dir.join("index.json").exists();
             let gates_existed = jit_dir.join("gates.toml").exists();
             let events_existed = jit_dir.join("events.jsonl").exists();
-
-            let (worktree_identity, init_warnings) = executor.init()?;
+            let fresh = !jit_dir.exists();
+            let fresh_result = profile_result(
+                fresh
+                    .then(|| {
+                        executor.initialize_fresh_repository(
+                            &current_dir,
+                            &chosen,
+                            profile.as_deref(),
+                        )
+                    })
+                    .transpose(),
+                "init",
+                *json,
+            )?;
+            let (worktree_identity, init_warnings) = if fresh {
+                executor.initialize_worktree_identity()?
+            } else {
+                executor.init()?
+            };
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
+            }
+            if let Some(result) = &fresh_result {
+                for warning in &result.warnings {
+                    eprintln!("Warning: {warning}");
+                }
             }
 
             // Set up .gitattributes for merge drivers (if in git repo). The
@@ -1860,33 +1902,40 @@ fn run() -> Result<()> {
                 }
             };
 
-            // The chosen template defines the on-disk config.toml (namespace
-            // registry + type hierarchy) from which the fixed default rules.toml
-            // is derived.
-            let chosen = template
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
-
             // Seed the `[project]` identity (REQ-01). The command layer owns the
             // orchestration — existence check, default-name computation, and the
             // store write — and is idempotent, so a re-init leaves an existing
             // `[project]` table untouched.
-            let project_name =
-                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?;
+            let project_name = if let Some(result) = &fresh_result {
+                Some(result.project_name.clone())
+            } else {
+                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?
+            };
 
             // Scaffold .jit/rules.toml (the operative ruleset) with the FIXED
             // default ruleset derived from the repo's namespace registry + type
             // hierarchy. A no-op when rules.toml already exists (re-init
             // never clobbers user edits).
-            let scaffolded = executor.scaffold_default_rules()?;
+            let scaffolded = if fresh {
+                true
+            } else {
+                executor.scaffold_default_rules()?
+            };
             if scaffolded {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
-            let profile_result = profile
-                .as_deref()
-                .map(|id| executor.apply_profile(id))
-                .transpose()?;
+            let profile_result = if let Some(result) = fresh_result {
+                result.profile
+            } else {
+                profile_result(
+                    profile
+                        .as_deref()
+                        .map(|id| executor.apply_profile(id))
+                        .transpose(),
+                    "init",
+                    *json,
+                )?
+            };
 
             let message = if let Some(ref t) = template {
                 format!("Initialized with '{}' hierarchy template", t.name)

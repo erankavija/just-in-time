@@ -4,8 +4,8 @@ use super::{
     SingletonTableTarget, SnapshotEntry,
 };
 use crate::validation::repository::{
-    validate_repository, OverlayRepositoryView, RepositoryValidationFailure,
-    RepositoryValidationReport, RepositoryView,
+    render_rules_gates_projection, rules_gates_projection_target, validate_repository,
+    OverlayRepositoryView, RepositoryValidationFailure, RepositoryValidationReport, RepositoryView,
 };
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -118,6 +118,9 @@ pub enum ProfilePlanError {
     /// Embedded projection failed.
     #[error(transparent)]
     Projection(#[from] ProjectionError),
+    /// A configured registry projection could not be rebuilt from final bytes.
+    #[error("profile registry projection failed: {0}")]
+    RegistryProjection(#[source] anyhow::Error),
     /// Exact overlay image is structurally invalid.
     #[error("planned repository validation failed: {0}")]
     Validation(#[from] RepositoryValidationFailure),
@@ -175,10 +178,21 @@ pub fn plan_profile_application_against(
         .collect::<BTreeSet<_>>();
 
     let mut desired = semantic;
+    let semantic_view = OverlayRepositoryView::new(
+        validation_base.clone(),
+        desired
+            .iter()
+            .map(|(path, (bytes, _))| (PathBuf::from(path), Some(bytes.clone()))),
+    )
+    .expect("validated semantic target paths remain repository-relative");
+    let managed_rules_gates_target = rules_gates_projection_target(&semantic_view)
+        .map_err(ProfilePlanError::RegistryProjection)?;
     for (path, projected_file) in projected.files() {
         if asset_targets.contains(path.as_str()) {
             if let Some(existing) = snapshot.file(path) {
-                if existing.bytes != projected_file.bytes {
+                if managed_rules_gates_target.as_deref() != Some(Path::new(path))
+                    && existing.bytes != projected_file.bytes
+                {
                     return Err(ProfilePlanError::AssetConflict {
                         target: path.clone(),
                     });
@@ -193,6 +207,21 @@ pub fn plan_profile_application_against(
             projected_file.mode
         };
         desired.insert(path.clone(), (projected_file.bytes.clone(), mode));
+    }
+    let projected_view = OverlayRepositoryView::new(
+        validation_base.clone(),
+        desired
+            .iter()
+            .map(|(path, (bytes, _))| (PathBuf::from(path), Some(bytes.clone()))),
+    )
+    .expect("validated projected target paths remain repository-relative");
+    if let Some((target, bytes)) = render_rules_gates_projection(&projected_view)
+        .map_err(ProfilePlanError::RegistryProjection)?
+    {
+        let target = target.to_string_lossy().into_owned();
+        if let Some((existing, _)) = desired.get_mut(&target) {
+            *existing = bytes;
+        }
     }
 
     let targets = desired

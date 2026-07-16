@@ -66,15 +66,24 @@ pub fn seed_repo_config(
     base_config_toml: &str,
     project_name: &ProjectName,
 ) -> Result<()> {
+    let content = render_repo_config(base_config_toml, project_name);
+    write_file_atomic(&repo_config_path(jit_root), &content)
+}
+
+/// Render the byte-exact fresh repository configuration without performing I/O.
+///
+/// Both ordinary and profiled initialization consume this image so the
+/// transactional fresh-root path cannot drift from the established plain-init
+/// file contract.
+pub fn render_repo_config(base_config_toml: &str, project_name: &ProjectName) -> String {
     // The exact scaffold format: template body, then the project-identity table
     // with its guiding comment. Kept byte-for-byte to preserve the generated
     // file a user first sees after `jit init`.
-    let content = format!(
+    format!(
         "{}\n# =============================================================================\n# PROJECT IDENTITY\n# =============================================================================\n# Canonical, human-editable project name: the `@<project>` scope token in the\n# multi-jit addressing scheme. Must match ^[a-z][a-z0-9-]*$. Defaults to a\n# slug of this repository's directory name; edit freely.\n[project]\nname = \"{}\"\n",
         base_config_toml,
         project_name.as_str()
-    );
-    write_file_atomic(&repo_config_path(jit_root), &content)
+    )
 }
 
 #[cfg(test)]
