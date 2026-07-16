@@ -55,6 +55,15 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     {
         return ExitCode::InvalidArgument;
     }
+    // A manual gate evaluated without --by (jit:1d59070d REQ-03): a usage
+    // error, raised before any write, in the same family as gate define's
+    // manual+checker-command conflict.
+    if error
+        .downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
+        .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
         .is_some()
@@ -510,6 +519,22 @@ fn render_gate_pass_error(
             .with_suggestion(format!(
                 "Add the gate first: jit gate add {} {}",
                 not_required.issue_id, not_required.gate_key
+            ))
+    } else if let Some(needs_attestor) =
+        e.downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
+    {
+        // Pre-verdict argument error (jit:1d59070d REQ-03): a manual gate has
+        // no checker to run, so a bare evaluate would silently record an
+        // unattributed pass. No write happened, so — like `GateNotRequiredError`
+        // above — this carries no `verdict` field.
+        JsonError::new("INVALID_ARGUMENT", e.to_string(), command)
+            .with_details(serde_json::json!({
+                "issue_id": needs_attestor.issue_id,
+                "key": needs_attestor.gate_key,
+            }))
+            .with_suggestion(format!(
+                "Record the pass with: jit gate evaluate {} {} --by <attestor>",
+                needs_attestor.issue_id, needs_attestor.gate_key
             ))
     } else if e
         .downcast_ref::<jit::storage::IssueNotFoundError>()
@@ -3199,11 +3224,32 @@ fn run() -> Result<()> {
                 use jit::domain::GateChecker;
 
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
-                // over `--mode` when both are supplied.
+                // over `--mode` when both are supplied. Otherwise resolve the
+                // omitted-`--mode` case: a checker command with no explicit
+                // mode infers `auto` (REQ-01), so the checker is never
+                // silently discarded by a defaulted-to-manual gate. An
+                // EXPLICIT `--mode manual` combined with `--checker-command`
+                // is a usage error (REQ-02) rather than a silent drop — a
+                // manual gate cannot carry a checker.
+                let has_checker_command = checker_command.is_some();
                 let mode = if auto {
                     jit::domain::GateMode::Auto
                 } else {
-                    mode
+                    match mode {
+                        Some(jit::domain::GateMode::Manual) if has_checker_command => {
+                            return Err(invalid_argument(
+                                format!(
+                                    "--mode manual conflicts with --checker-command for gate '{}': a manual gate cannot have a checker. Drop --checker-command, or omit --mode to define an automated gate.",
+                                    key
+                                ),
+                                "gate define",
+                                json,
+                            ));
+                        }
+                        Some(explicit) => explicit,
+                        None if has_checker_command => jit::domain::GateMode::Auto,
+                        None => jit::domain::GateMode::Manual,
+                    }
                 };
 
                 let output_ctx = OutputContext::new(quiet, json);

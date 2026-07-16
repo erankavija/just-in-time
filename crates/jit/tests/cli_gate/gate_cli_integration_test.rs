@@ -594,6 +594,149 @@ fn test_gate_define_auto_without_checker_fails() {
         .stderr(predicate::str::contains("checker"));
 }
 
+/// REQ-01: `--checker-command` with no explicit `--mode` yields an automated
+/// gate — the checker must actually run rather than being silently discarded
+/// by a defaulted-to-manual gate.
+#[test]
+fn test_gate_define_checker_command_without_mode_infers_auto() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "inferred-auto",
+            "--title",
+            "Inferred Auto",
+            "--description",
+            "No --mode, just a checker command",
+            "--checker-command",
+            "echo ok",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Defined gate 'inferred-auto'"));
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "show", "inferred-auto", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["mode"], "auto");
+    assert_eq!(json["checker"]["command"], "echo ok");
+}
+
+/// REQ-02: an explicit `--mode manual` combined with `--checker-command` is a
+/// usage error (exit 2) naming the conflict, not a silent checker drop.
+#[test]
+fn test_gate_define_explicit_manual_with_checker_command_is_usage_error() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "conflicted",
+            "--title",
+            "Conflicted",
+            "--description",
+            "Explicit manual + checker",
+            "--mode",
+            "manual",
+            "--checker-command",
+            "echo ok",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("manual"))
+        .stderr(predicate::str::contains("checker"));
+
+    // Nothing should have been persisted to the registry.
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "show", "conflicted"])
+        .assert()
+        .failure();
+}
+
+/// REQ-02 (JSON path): the same conflict, machine-readable.
+#[test]
+fn test_gate_define_explicit_manual_with_checker_command_json_error() {
+    let temp = setup_repo();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "conflicted-json",
+            "--title",
+            "Conflicted",
+            "--description",
+            "Explicit manual + checker",
+            "--mode",
+            "manual",
+            "--checker-command",
+            "echo ok",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .code(2)
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output).expect("error must be valid JSON");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+}
+
+/// REQ-01: `--auto` still wins over an explicit `--mode manual` (documented
+/// convenience-flag precedence) even when a checker command is present, so it
+/// is not treated as the REQ-02 conflict.
+#[test]
+fn test_gate_define_auto_flag_overrides_explicit_manual_mode() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "auto-wins",
+            "--title",
+            "Auto Wins",
+            "--description",
+            "auto overrides mode manual",
+            "--mode",
+            "manual",
+            "--auto",
+            "--checker-command",
+            "echo ok",
+        ])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "show", "auto-wins", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(json["mode"], "auto");
+}
+
 #[test]
 fn test_gate_list_json() {
     let temp = setup_repo();

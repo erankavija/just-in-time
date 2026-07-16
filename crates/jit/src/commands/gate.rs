@@ -41,6 +41,27 @@ pub struct GateNotRequiredError {
     pub gate_key: String,
 }
 
+/// Error returned when `jit gate evaluate`/`pass` targets a MANUAL gate with no
+/// `--by` attestor.
+///
+/// A manual gate has no checker to run, so its "evaluation" is a human
+/// attestation — recording it without saying who attested is indistinguishable
+/// from a silent, unverified pass (the exact failure mode this type closes: see
+/// `@/issue/1d59070d`). This is an argument/usage error (exit code `2`, the
+/// same family as an explicit `--mode manual` + `--checker-command` conflict
+/// on `gate define`), raised before any write happens. Automated gates are
+/// unaffected — their verdict comes from the checker, not `--by`.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "Gate '{gate_key}' is manual and requires an attestor. Record the pass with: jit gate evaluate {issue_id} {gate_key} --by <attestor>"
+)]
+pub struct ManualGateAttestationRequiredError {
+    /// Issue whose gate was targeted.
+    pub issue_id: String,
+    /// Manual gate key that was targeted without `--by`.
+    pub gate_key: String,
+}
+
 /// Outcome of a successful [`pass_gate`](CommandExecutor::pass_gate) call.
 ///
 /// Carries any warnings gathered along the way (e.g. lease warnings) plus
@@ -420,12 +441,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
+        // Manual gate: a pass must be attributable (jit:1d59070d REQ-03). A
+        // manual gate has no checker to run, so evaluating it bare would
+        // silently record a pass with no evidence of who attested — the same
+        // "silent success" failure mode REQ-01/REQ-02 close for gate define.
+        // Require --by before writing anything.
+        let Some(by) = by else {
+            return Err(ManualGateAttestationRequiredError {
+                issue_id: full_id,
+                gate_key,
+            }
+            .into());
+        };
+
         // Manual gate: mark as passed
         issue.gates_status.insert(
             gate_key.clone(),
             GateState {
                 status: GateStatus::Passed,
-                updated_by: by.clone(),
+                updated_by: Some(by.clone()),
                 updated_at: Utc::now(),
             },
         );
@@ -434,7 +468,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.save_issue(issue)?;
 
         // Log event
-        let event = Event::new_gate_passed(issue_id, gate_key, by);
+        let event = Event::new_gate_passed(issue_id, gate_key, Some(by));
         self.storage.append_event(&event)?;
 
         // Check if Gated issue can now transition to Done
@@ -1396,6 +1430,42 @@ enforce_leases = "off"
         assert_eq!(
             issue.gates_status.get("manual-gate").unwrap().status,
             crate::domain::GateStatus::Passed
+        );
+    }
+
+    /// REQ-03 (jit:1d59070d): a bare pass_gate on a manual gate — no `by` —
+    /// must not silently record a pass. A manual gate has no checker to run,
+    /// so evaluating it without an attestor is indistinguishable from an
+    /// unverified pass.
+    #[test]
+    fn test_manual_pass_of_manual_gate_without_by_fails() {
+        let executor = setup();
+        define_manual_gate(&executor, "manual-gate");
+
+        let issue = crate::domain::Issue::new("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        executor.storage.save_issue(issue).unwrap();
+        executor
+            .add_gate(&issue_id, "manual-gate".to_string())
+            .unwrap();
+
+        let result = executor.pass_gate(&issue_id, "manual-gate".to_string(), None, false);
+        let err = result.expect_err("bare pass_gate on a manual gate must fail");
+        assert!(
+            err.downcast_ref::<ManualGateAttestationRequiredError>()
+                .is_some(),
+            "expected ManualGateAttestationRequiredError, got: {err}"
+        );
+        assert!(
+            err.to_string().contains("--by <attestor>"),
+            "error must hint the attested form: {err}"
+        );
+
+        // Nothing was written: the gate stays Pending.
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert!(
+            !issue.gates_status.contains_key("manual-gate"),
+            "a rejected bare pass must not write gates_status"
         );
     }
 }

@@ -829,10 +829,15 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "title": "(missing issue)",
             "state": "missing",
         }),
-        TransitionBlocker::Gate { gate_key, status } => serde_json::json!({
+        TransitionBlocker::Gate {
+            gate_key,
+            status,
+            mode,
+        } => serde_json::json!({
             "type": "gate",
             "key": gate_key,
             "status": gate_status_name(*status),
+            "mode": mode.as_str(),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
             "type": "graph_rule",

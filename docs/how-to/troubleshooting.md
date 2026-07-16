@@ -49,11 +49,15 @@ Blockers:
 
 To fix:
   - jit gate status-all def67890
-  - jit gate evaluate def67890 code-review
+  - jit gate evaluate def67890 code-review --by <attestor>
 
 Issue transitioned to `gated`. Evaluate or attest the listed gates, inspect
 `jit gate status-all`, then retry `jit issue update <issue-id> --state done`.
 ```
+
+A manual gate's `evaluate` requires `--by <attestor>` (e.g. `--by
+"human:reviewer"`) — the remediation above names it when the blocking gate is
+manual. Automated gates run their checker without `--by`.
 
 **Cause:** JIT enforces dependency and gate blockers before state transitions.
 Dependencies must be terminal (`done` or `rejected`) before dependent work can

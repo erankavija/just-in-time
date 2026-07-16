@@ -71,7 +71,7 @@ pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
-    PassAllOutcome,
+    ManualGateAttestationRequiredError, PassAllOutcome,
 };
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
@@ -94,7 +94,8 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 use crate::config::JitConfig;
 use crate::config_manager::ConfigManager;
 use crate::domain::{
-    is_dependency_met, Event, Gate, GateState, GateStatus, Issue, LabelNamespaces, Priority, State,
+    is_dependency_met, Event, Gate, GateMode, GateState, GateStatus, Issue, LabelNamespaces,
+    Priority, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -106,13 +107,22 @@ use chrono::Utc;
 use serde::Serialize;
 use std::sync::OnceLock;
 
-/// The unpassed gates of `issue` paired with their current status, in the order
-/// [`Issue::get_unpassed_gates`] reports them.
+/// The unpassed gates of `issue` paired with their current status and registry
+/// mode, in the order [`Issue::get_unpassed_gates`] reports them.
 ///
-/// A required gate with no recorded run counts as [`GateStatus::Pending`]. Shared
-/// by the transition guard and the gate-diversion path so both describe a
-/// gate-blocked completion with the same blockers.
-fn unpassed_gate_blockers(issue: &Issue) -> Vec<(String, GateStatus)> {
+/// A required gate with no recorded run counts as [`GateStatus::Pending`]. A
+/// gate key missing from `registry` (should not normally happen) defaults to
+/// [`GateMode::Manual`], matching [`CommandExecutor::pass_gate`]'s own
+/// fallback: an unregistered gate never matches the `Auto` branch there
+/// either, so it is treated as requiring `--by` just the same. Shared by the
+/// transition guard and the gate-diversion path so both describe a
+/// gate-blocked completion with the same blockers, and so the remediation
+/// hint can name the `--by <attestor>` form for a manual gate (jit:1d59070d
+/// REQ-03).
+fn unpassed_gate_blockers(
+    issue: &Issue,
+    registry: &crate::storage::GateRegistry,
+) -> Vec<(String, GateStatus, GateMode)> {
     issue
         .get_unpassed_gates()
         .into_iter()
@@ -122,7 +132,12 @@ fn unpassed_gate_blockers(issue: &Issue) -> Vec<(String, GateStatus)> {
                 .get(&gate_key)
                 .map(|gate| gate.status)
                 .unwrap_or(GateStatus::Pending);
-            (gate_key, status)
+            let mode = registry
+                .gates
+                .get(&gate_key)
+                .map(|gate| gate.mode)
+                .unwrap_or(GateMode::Manual);
+            (gate_key, status, mode)
         })
         .collect()
 }
@@ -794,11 +809,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         if target == State::Done && issue.has_unpassed_gates() {
+            let registry = self.storage.load_gate_registry()?;
             return Err(crate::errors::TransitionBlockedError::gates(
                 issue.id.clone(),
                 State::Done,
                 issue.state,
-                unpassed_gate_blockers(issue),
+                unpassed_gate_blockers(issue, &registry),
             )
             .into());
         }

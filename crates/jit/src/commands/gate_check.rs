@@ -793,7 +793,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                             full_id.clone(),
                             State::InProgress,
                             issue.state,
-                            vec![(gate_key.clone(), status)],
+                            vec![(gate_key.clone(), status, GateMode::Manual)],
                         )
                         .into());
                     }
@@ -808,7 +808,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 issue.state,
                 failed_gates
                     .into_iter()
-                    .map(|(key, _)| (key, GateStatus::Failed))
+                    .map(|(key, _)| (key, GateStatus::Failed, GateMode::Auto))
                     .collect(),
             )
             .into());
@@ -1547,7 +1547,12 @@ assert = { require-section = { heading = "Summary" } }
 
         // Attesting the manual gate makes every required gate green.
         executor
-            .pass_gate(&issue_id, "manual-gate".to_string(), None, false)
+            .pass_gate(
+                &issue_id,
+                "manual-gate".to_string(),
+                Some("human:tester".to_string()),
+                false,
+            )
             .unwrap();
         let statuses = executor
             .get_required_gate_statuses_for_issue(&issue_id)

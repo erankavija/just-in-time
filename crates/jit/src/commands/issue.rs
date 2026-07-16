@@ -1169,7 +1169,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         bypassed_rules: &[String],
         force: bool,
     ) -> Result<Vec<String>> {
-        let gate_blockers = unpassed_gate_blockers(issue);
+        let registry = self.storage.load_gate_registry()?;
+        let gate_blockers = unpassed_gate_blockers(issue, &registry);
         // The gate-diversion path lands the issue in `gated`, so it enforces
         // graph rules against THAT target state via the chokepoint, exactly
         // like an explicit `--state gated` transition. Rules keyed on the
