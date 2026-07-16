@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "ee636391-ba36-4cde-8d7e-442cf917b537",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "46657f6f-5ee5-42d8-aba0-652346c4e2e4",
+  "commit": "ed08f96a776048bef63f11435634639614cff39a",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T10:21:00.980579790Z",
+  "completed_at": "2026-07-16T10:24:47.002414167Z",
+  "duration_ms": 226021,
+  "exit_code": 0,
+  "stdout": "Attribution: 6ddf4fe3, e1860b05, a15a3d9e, 50c7e54b, ed08f96a\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-4, D-6, D-7 (dev/vision/9db27a3a-charter.md); @/inv/gate-semantics and @/inv/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/docs-mechanical (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T10:16:21Z); code-review pending/unrun; attributable docs-mechanical record passed (exit 0)\nTruncation recovery: Narrowed the truncated search to the shared evaluate-all path, recovery-session implementation/tests, and server startup; no relevant evidence remains omitted.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable implementation, regression coverage, recovery guarantees, and recorded live gate evidence satisfy the issue’s hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable implementation, regression coverage, recovery guarantees, and recorded live gate evidence satisfy the issue’s hard criteria.",
+    "findings": []
+  }
+}
