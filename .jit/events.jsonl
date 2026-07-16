@@ -8003,3 +8003,5 @@
 {"type":"issue_state_changed","id":"9021aa41-6f31-4217-8dfb-fb94de7f33b1","issue_id":"56838d99-dc9d-4028-9b41-6ba691fc4852","timestamp":"2026-07-16T13:22:05.763639681Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"c5027120-15eb-4b6d-8603-44ddee0fe879","issue_id":"56838d99-dc9d-4028-9b41-6ba691fc4852","timestamp":"2026-07-16T13:22:05.763682881Z"}
 {"type":"issue_state_changed","id":"907dff38-2a86-42a4-907b-5980b5ee22cf","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:22:07.473168494Z","from":"backlog","to":"ready"}
+{"type":"issue_state_changed","id":"0562649a-c0f9-43cb-b9ab-2f83c29ca0bf","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:23:38.923854055Z","from":"ready","to":"in_progress"}
+{"type":"issue_claimed","id":"97fa005c-27b2-45a9-9fdc-312ea81e0751","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T13:23:38.924334225Z","assignee":"agent:codex-profile-application"}
