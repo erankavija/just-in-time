@@ -115,7 +115,7 @@ class MCPTester {
             if (parsed.success === false) throw new Error(parsed.error?.message || 'Command failed');
             return parsed;
           } catch (err) {
-            if (err.message.includes('not found') || err.message.includes('Command failed')) throw err;
+            if (!(err instanceof SyntaxError)) throw err;
           }
         }
       }
@@ -196,8 +196,27 @@ async function main() {
       }
       // Core workflow tools must be present
       const names = new Set(tools.map(t => t.name));
-      for (const required of ['jit_status', 'jit_issue_create', 'jit_issue_show', 'jit_query_available', 'jit_dep_add', 'jit_gate_status-all']) {
+      for (const required of [
+        'jit_status',
+        'jit_issue_create',
+        'jit_issue_show',
+        'jit_query_available',
+        'jit_dep_add',
+        'jit_gate_status-all',
+        'jit_profile_list',
+        'jit_profile_show',
+        'jit_profile_apply',
+      ]) {
         assert.ok(names.has(required), `missing core tool: ${required}`);
+      }
+      for (const deferred of [
+        'jit_profile_install',
+        'jit_profile_compose',
+        'jit_profile_upgrade',
+        'jit_profile_remove',
+        'jit_profile_diff',
+      ]) {
+        assert.ok(!names.has(deferred), `deferred profile lifecycle tool leaked: ${deferred}`);
       }
     });
 
@@ -285,6 +304,50 @@ async function main() {
       assert.strictEqual(shown.id, created.id);
       assert.strictEqual(shown.title, 'Integration test issue');
       assert.ok(shown.labels.includes('type:task'));
+    });
+
+    await runTest('profile tools list, inspect, dry-run, apply, and reach exact no-op', async () => {
+      const profileTester = new MCPTester();
+      await profileTester.start();
+      const profileCall = async (name, args = {}) => {
+        try {
+          return await profileTester.callTool(name, args);
+        } catch (err) {
+          throw new Error(`${name}: ${err.message}`);
+        }
+      };
+
+      try {
+        await profileTester.callToolRaw('jit_init', {});
+
+        const listed = await profileCall('jit_profile_list');
+        assert.strictEqual(listed.count, 1);
+        assert.strictEqual(listed.profiles[0].id, 'jit-dogfood');
+        assert.strictEqual(listed.profiles[0].applied, false);
+
+        const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
+        assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
+        assert.strictEqual(shown.origin, 'embedded');
+
+        const preview = await profileCall('jit_profile_apply', {
+          id: 'jit-dogfood',
+          'dry-run': true,
+        });
+        assert.strictEqual(preview.status, 'would_apply');
+        assert.ok(preview.targets.some(target =>
+          target.path === 'scripts/ai-review.sh' && target.executable === true));
+
+        const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
+        assert.strictEqual(applied.status, 'applied');
+
+        const unchanged = await profileCall('jit_profile_apply', {
+          id: 'jit-dogfood',
+          'dry-run': true,
+        });
+        assert.strictEqual(unchanged.status, 'unchanged');
+      } finally {
+        await profileTester.stop();
+      }
     });
 
   } finally {

@@ -178,6 +178,36 @@ jobs:
       - name: Run tests with html + xml features
         run: cargo test -p jit --features html,xml --verbose
 
+  profile-adoption:
+    name: Profile adoption (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-profile-adoption-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-profile-adoption-
+            ${{ runner.os }}-cargo-
+
+      - name: Exercise offline profile adoption
+        run: cargo test --locked -p jit --test cli_repo_workflow profile_acceptance_tests:: -- --nocapture
+
   coverage:
     name: Coverage Badges
     runs-on: ubuntu-latest
