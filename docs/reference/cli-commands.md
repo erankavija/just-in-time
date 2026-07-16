@@ -2329,7 +2329,15 @@ a commit. The rest of the family works without git.
 
 ### `jit doc add`
 
-Attach a document reference to an issue.
+Attach a document reference to an issue. Identity is (issue, path): re-running
+`doc add` for a path already linked to the issue updates that reference in
+place rather than appending a duplicate — `jit doc list` still shows one entry
+for the path. An omitted `--commit`/`--label`/`--doc-type` on the re-add
+leaves the existing value alone; a supplied one overwrites it. The scanned
+`format`/assets are always the freshly computed result unless `--skip-scan` is
+given. The JSON result's `updated` field is `true` for a refresh and `false`
+for a genuinely new reference; the appended `issue_updated` event records the
+refresh under the `doc-update` tag rather than `doc-add`.
 
 ```bash
 jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_TYPE>] [--skip-scan] [--json]
@@ -2347,6 +2355,8 @@ jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_T
 ```bash
 jit doc add abc123 docs/design/auth.md --label "Auth design" --doc-type design
 jit doc add abc123 docs/design/auth.md --commit 44ee4610 --json
+# Re-running with the same path updates that reference instead of duplicating it
+jit doc add abc123 docs/design/auth.md --commit 9c2d1a7 --json
 ```
 
 ### `jit doc list`

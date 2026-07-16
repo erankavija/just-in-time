@@ -4652,13 +4652,14 @@ fn run() -> Result<()> {
                     output_ctx.print_warning(&warning)?;
                 }
 
+                let verb = if result.updated { "Updated" } else { "Added" };
                 if json {
                     use jit::output::JsonOutput;
-                    let msg = format!("Added document reference to issue {}", result.issue_id);
+                    let msg = format!("{} document reference on issue {}", verb, result.issue_id);
                     let output = JsonOutput::success(&result, "doc add").with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("Added document reference to issue {}", result.issue_id);
+                    println!("{} document reference on issue {}", verb, result.issue_id);
                     println!("  Path: {}", result.document.path);
                     if let Some(ref c) = result.document.commit {
                         println!("  Commit: {}", c);

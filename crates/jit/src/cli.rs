@@ -1811,6 +1811,11 @@ pub enum PresetCommands {
 pub enum DocCommands {
     /// Add a document reference to an issue
     ///
+    /// Idempotent on path: re-running this for a path already linked to the
+    /// issue updates that reference in place instead of appending a
+    /// duplicate. Omitted `--commit`/`--label`/`--doc-type` flags leave the
+    /// existing value untouched; supplied ones overwrite it.
+    ///
     /// To verify what was recorded, see `jit events query --issue-id <id>` or
     /// `jit events tail`.
     Add {
