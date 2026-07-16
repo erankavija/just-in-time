@@ -14,7 +14,15 @@
   ],
   "gates_status": {},
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/45a140ae-archived-semantics.md",
+      "commit": null,
+      "label": "Archived semantics decision",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:core-maintenance",
     "milestone:v1.0",
@@ -24,7 +32,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T07:16:43.938864310Z",
-  "updated_at": "2026-07-16T08:53:53.023075694Z",
+  "updated_at": "2026-07-16T09:07:26.648082312Z",
   "first_ready_at": "2026-07-14T07:16:43.938877770Z",
   "claimed_at": "2026-07-16T08:53:53.023075064Z"
 }

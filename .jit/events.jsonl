@@ -7923,3 +7923,4 @@
 {"type":"issue_claimed","id":"93de6b90-2e6c-4e57-8a58-724e44dfc275","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-16T08:53:53.024223015Z","assignee":"agent:worker"}
 {"type":"issue_state_changed","id":"121d43ac-bb86-4b0d-b146-b9533c29c5a5","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-16T08:53:53.042173738Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"c46931ad-edba-4828-a0b8-d4929f97e2b5","issue_id":"d74a9ed1-c27d-4cf9-93dc-ace0de890b9e","timestamp":"2026-07-16T08:53:53.042345568Z","assignee":"agent:worker"}
+{"type":"issue_updated","id":"8b996692-92f3-4418-9248-bbfd1272c0ec","issue_id":"45a140ae-1baa-4f32-96e2-b4dcf21d6694","timestamp":"2026-07-16T09:07:26.648509483Z","updated_by":"doc-add","fields":["documents"]}
