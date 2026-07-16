@@ -382,10 +382,10 @@ fn test_exit_code_state_transition_blocked_by_gates() {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["state"], "gated");
 
-    // Now pass the gate and verify transition to done succeeds
+    // Now evaluate the gate and verify transition to done succeeds
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["gate", "pass", id, "tests", "--by", "human:reviewer"])
+        .args(["gate", "evaluate", id, "tests", "--by", "human:reviewer"])
         .status()
         .unwrap();
     assert!(status.success());

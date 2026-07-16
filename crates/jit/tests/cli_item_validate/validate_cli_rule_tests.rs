@@ -323,7 +323,7 @@ fn test_gate_checker_via_jit_issue_id_env_var() {
 
     bin()
         .current_dir(temp.path())
-        .args(["gate", "pass", &good_id, "rules-gate"])
+        .args(["gate", "evaluate", &good_id, "rules-gate"])
         .assert()
         .success();
 }
@@ -385,7 +385,7 @@ fn test_gate_checker_via_jit_issue_id_fails_for_noncompliant() {
 
     bin()
         .current_dir(temp.path())
-        .args(["gate", "pass", &bad_id, "rules-gate"])
+        .args(["gate", "evaluate", &bad_id, "rules-gate"])
         .assert()
         .failure();
 }
