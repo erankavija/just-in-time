@@ -67,6 +67,8 @@ pub enum GateRunField {
     Commit,
     /// `branch`
     Branch,
+    /// `tree_dirty`
+    TreeDirty,
     /// `status`
     Status,
     /// `started_at`
@@ -93,7 +95,7 @@ pub enum GateRunField {
 
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
-    pub const ALL: [GateRunField; 18] = [
+    pub const ALL: [GateRunField; 19] = [
         GateRunField::SchemaVersion,
         GateRunField::RunId,
         GateRunField::GateKey,
@@ -101,6 +103,7 @@ impl GateRunField {
         GateRunField::IssueId,
         GateRunField::Commit,
         GateRunField::Branch,
+        GateRunField::TreeDirty,
         GateRunField::Status,
         GateRunField::StartedAt,
         GateRunField::CompletedAt,
@@ -124,6 +127,7 @@ impl GateRunField {
             GateRunField::IssueId => "issue_id",
             GateRunField::Commit => "commit",
             GateRunField::Branch => "branch",
+            GateRunField::TreeDirty => "tree_dirty",
             GateRunField::Status => "status",
             GateRunField::StartedAt => "started_at",
             GateRunField::CompletedAt => "completed_at",
@@ -170,6 +174,15 @@ impl GateRunField {
             GateRunField::Branch => {
                 "Git branch the run was taken on, when the working directory is a git \
                  repository."
+                    .to_string()
+            }
+            GateRunField::TreeDirty => {
+                "Whether the working tree differed from `commit` when the checker started: \
+                 `true` if it carried uncommitted or untracked changes, `false` if it matched \
+                 the commit exactly. A `true` run evidences that modified tree rather than the \
+                 commit alone. Absent when there was no commit to compare against — the working \
+                 directory is not a git repository, or the repository has no commits yet — in \
+                 which case a clean tree is never assumed."
                     .to_string()
             }
             GateRunField::Status => {
@@ -265,6 +278,7 @@ fn sample_gate_run() -> GateRunResult {
         issue_id: "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64".to_string(),
         commit: Some("9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910".to_string()),
         branch: Some("main".to_string()),
+        tree_dirty: Some(false),
         status: GateRunStatus::Passed,
         started_at: sample_timestamp(),
         completed_at: Some(sample_timestamp()),
@@ -301,6 +315,7 @@ fn sample_gate_run_minimal() -> GateRunResult {
     GateRunResult {
         commit: None,
         branch: None,
+        tree_dirty: None,
         completed_at: None,
         duration_ms: None,
         exit_code: None,
@@ -584,6 +599,7 @@ mod tests {
                 .map(|(_, presence)| *presence)
         };
         assert_eq!(of(GateRunField::Commit), Some(Presence::NullWhenUnset));
+        assert_eq!(of(GateRunField::TreeDirty), Some(Presence::NullWhenUnset));
         assert_eq!(of(GateRunField::Findings), Some(Presence::OmittedWhenUnset));
         assert_eq!(of(GateRunField::RunId), Some(Presence::Always));
 

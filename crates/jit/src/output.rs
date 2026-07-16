@@ -1961,6 +1961,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     issue_id: "i1".into(),
 ///     commit: None,
 ///     branch: None,
+///     tree_dirty: None,
 ///     status: GateRunStatus::Passed,
 ///     started_at: Utc::now(),
 ///     completed_at: None,
@@ -1998,6 +1999,14 @@ pub struct GateRunSummary {
     pub commit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// Whether the working tree differed from [`commit`](Self::commit) when the
+    /// checker started: `true` dirty, `false` clean, omitted when there was no
+    /// commit to compare against. Carries
+    /// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult) so a machine
+    /// reader can tell a pass evidencing the commit from one taken on a modified
+    /// tree.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tree_dirty: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2041,6 +2050,7 @@ impl GateRunSummary {
             command: r.command.clone(),
             commit: r.commit.clone(),
             branch: r.branch.clone(),
+            tree_dirty: r.tree_dirty,
             by: r.by.clone(),
             message: r.message.clone(),
             stdout: include_output.then(|| r.stdout.clone()),
@@ -2445,6 +2455,7 @@ mod tests {
             issue_id: issue.id.clone(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: run_at,
             completed_at: Some(run_at),
