@@ -1914,8 +1914,9 @@ jit gate preset list [--json]
 `jit gate preset show <name>` for a preset's actual gate list and count; the
 builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out (<N> gates)
-[builtin] coverage-preview - Deterministic coverage preview on the breakdown node (scoped validate) (<N> gates)
+[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out. (<N> gates)
+[builtin] breakdown-review - External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. (<N> gates)
+[builtin] coverage-preview - Validate the container named by the breakdown issue's brackets label. (<N> gates)
 [custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```
 

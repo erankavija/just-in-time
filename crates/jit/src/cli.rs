@@ -1791,7 +1791,7 @@ pub enum PresetCommands {
     /// Examples:
     ///   jit gate preset apply ci abc123                 # Single issue
     ///   jit gate preset apply ci abc123 def456          # Multiple issues
-    ///   jit query all | xargs jit gate preset apply ci  # From query
+    ///   jit query all --json | jq -r '.issues[].id' | xargs jit gate preset apply ci  # From query
     ///   jit gate preset apply ci abc123 --except lint   # Skip specific gates
     Apply {
         /// Preset name
