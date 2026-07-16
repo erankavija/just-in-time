@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "555fba66-6c47-4c77-836b-4256834d4a60",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
+  "commit": "26e42470e77b73d4ed72781954540e79b721a9e5",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:28:53.596626865Z",
+  "completed_at": "2026-07-16T15:30:19.981427902Z",
+  "duration_ms": 86384,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest resolve_listener_tests::test_resolve_listener_adopts_inherited_fd ... FAILED\ntest resolve_listener_tests::test_resolve_listener_binds_when_no_fd_inherited ... FAILED\ntest result: FAILED. 87 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s\n---- resolve_listener_tests::test_resolve_listener_adopts_inherited_fd stdout ----\n\nthread 'resolve_listener_tests::test_resolve_listener_adopts_inherited_fd' (3997924) panicked at crates/server/src/lib.rs:162:9:\nassertion `left == right` failed\n  left: Bound\n right: Inherited\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- resolve_listener_tests::test_resolve_listener_binds_when_no_fd_inherited stdout ----\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1061 bytes=18112721)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1030299328/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}
