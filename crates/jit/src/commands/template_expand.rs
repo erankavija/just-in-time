@@ -331,9 +331,12 @@ pub fn validate_delta_acyclic(
         .map(|(id, dependencies)| ProspectiveNode { id, dependencies })
         .collect();
     let refs: Vec<&ProspectiveNode> = nodes.iter().collect();
+    // Propagate the typed `GraphError::CycleDetected` (not a bare message) so the
+    // failure classifies as a validation error (exit 4) through the shared
+    // `error_to_exit_code` downcast, matching `dep add`'s cycle rejection.
     crate::graph::DependencyGraph::new(&refs)
         .validate_dag()
-        .map_err(|_| anyhow!("the template's edges would create a dependency cycle"))
+        .map_err(anyhow::Error::new)
 }
 
 /// The simulation id of a not-yet-created role node. Prefixed so it cannot
