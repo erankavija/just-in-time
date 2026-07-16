@@ -1,7 +1,7 @@
 {
   "epic_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
   "epic_short_id": "9b7b5f9c",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -68,7 +68,7 @@
           "short_id": "56838d99",
           "title": "Plan safe deterministic profile application",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -80,7 +80,7 @@
           "short_id": "9b0a997e",
           "title": "Apply profiles with transactional provenance and audit",
           "classification": "implementation",
-          "status": "pending"
+          "status": "ready"
         }
       ]
     },

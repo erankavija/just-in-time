@@ -2,7 +2,7 @@
   "id": "56838d99-dc9d-4028-9b41-6ba691fc4852",
   "title": "Plan safe deterministic profile application",
   "description": "Pure profile planning converts the embedded package plus repository snapshot into exact final bytes/modes, semantic registry and managed-region merges, conflicts, overlay validation input, and a stable dry-run plan without mutation.\n\n## Background\n\nThe profile MVP must calculate and validate its complete result before staging. The planner stays domain-pure and contains no dogfood vocabulary, repository writes, or deferred lifecycle concepts.\n\n## Success Criteria\n\n- [hard] REQ-01: For map entries, set-like strings, keyed array tables, and root singleton tables, absence adds, canonical structural equality is a no-op, differing same-identity values conflict, deletions/overrides/partial singleton merges are forbidden, existing comments/order remain, and new values append in manifest order.\n- [hard] REQ-02: Assets and managed regions preserve identical/unmanaged bytes and reject differing files, unknown contribution identities, malformed markers, unsafe/overlapping paths, symlink escapes, invalid interpolation, and unsupported filesystem assumptions before staging.\n- [hard] REQ-03: Planning is input-order deterministic, validates exact output through the shared overlay view, contains no dogfood vocabulary/source-checkout access, and exposes identities for locked rebuild.\n\n## Scope\n\n**Blast radius:** profile domain/planner types, semantic config/gate/template/projection adapters, path checks, errors/results, and owned unit/property tests. Repository-view implementation and validation-reader migration are outside this task.\n\n**Green landing:** Pure profile plans and dry-run representations are tested behind an internal API; lock acquisition, commands, and repository writes remain unchanged.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "high",
   "assignee": "agent:codex-profile-planner",
   "dependencies": [
@@ -20,15 +20,15 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T13:14:59.765602095Z"
     },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T13:12:33.707821125Z"
-    },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T13:14:45.299963686Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T13:12:33.707821125Z"
     }
   },
   "context": {},
@@ -43,7 +43,8 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.038922045Z",
-  "updated_at": "2026-07-16T13:19:55.041939023Z",
+  "updated_at": "2026-07-16T13:22:05.763175900Z",
   "first_ready_at": "2026-07-14T22:28:46.038922295Z",
-  "claimed_at": "2026-07-16T12:00:28.229499731Z"
+  "claimed_at": "2026-07-16T12:00:28.229499731Z",
+  "done_at": "2026-07-16T13:22:05.763173720Z"
 }
