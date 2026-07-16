@@ -237,6 +237,13 @@
   ],
   "escalations": [
     {
+      "issue": "45a140ae",
+      "date": "2026-07-16",
+      "policy": "6 (architectural decision), pre-dispatch interview per batch plan",
+      "question": "Archived lifecycle semantic model: terminality, coupling with artifact archival, revive transitions (subsumes handoff-1's archived-resurrection open question)",
+      "resolution": "invoker chose: terminality-preserving overlay; coupled retirement (archive execution requires Done/Rejected, success transitions to Archived); revive restores the exact pre-archive state, closing the done->archived->ready loophole. Pinned into the issue description; 45a140ae is now dispatchable in wave B"
+    },
+    {
       "issue": "3c4d6fe8",
       "date": "2026-07-15",
       "policy": "7 (shared infrastructure)",
