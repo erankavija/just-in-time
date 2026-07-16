@@ -2100,25 +2100,41 @@ pub enum GraphCommands {
 
     /// Export dependency graph in various formats
     Export {
-        /// Output format (dot, mermaid, json)
+        /// Output format (dot, mermaid, json, batch)
+        ///
+        /// `batch` emits the `jit issue batch-create` input schema (a JSON
+        /// array of issue definitions) — the structural inverse of batch
+        /// creation. It strips lifecycle fields and identity-bound labels and
+        /// excludes template bracket nodes; see `--scope` for capturing one
+        /// container's subtree.
         #[arg(short, long, value_enum)]
         format: Option<crate::commands::GraphExportFormat>,
 
         /// Emit JSON to stdout — sugar for `--format json`.
         ///
         /// Equivalent to `--format json`; combining it with an explicit
-        /// `--format dot`/`--format mermaid` is a usage error. Composes with
-        /// `--full`.
+        /// `--format dot`/`--format mermaid`/`--format batch` is a usage error.
+        /// Composes with `--full`.
         #[arg(long)]
         json: bool,
 
         /// Emit complete issue records for each node (JSON only).
         ///
         /// Only valid with `--format json` (or `--json`); combining it with
-        /// `dot`/`mermaid` is a usage error. Without this flag the JSON
+        /// `dot`/`mermaid`/`batch` is a usage error. Without this flag the JSON
         /// output keeps the lean summary node shape.
         #[arg(long)]
         full: bool,
+
+        /// Restrict the export to a container's DAG-authoritative containment
+        /// membership (the container and its subtree).
+        ///
+        /// Composes with every format: `dot`/`mermaid`/`json` list only the
+        /// in-scope nodes; `batch` additionally excludes bracket nodes and
+        /// reports edges that cross the scope boundary. Omitted, the whole graph
+        /// is exported.
+        #[arg(long)]
+        scope: Option<String>,
 
         /// Output file (optional - prints to stdout if omitted)
         #[arg(short, long)]

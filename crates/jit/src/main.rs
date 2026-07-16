@@ -4538,16 +4538,17 @@ fn run() -> Result<()> {
                 format,
                 json,
                 full,
+                scope,
                 output,
             } => {
                 use jit::commands::GraphExportFormat;
 
                 // `--json` is sugar for `--format json`; combining it with an
-                // explicit conflicting `--format` (dot/mermaid) is a usage error
-                // (exit 2), classified by the typed InvalidArgumentError.
+                // explicit conflicting `--format` (dot/mermaid/batch) is a usage
+                // error (exit 2), classified by the typed InvalidArgumentError.
                 if json && matches!(format, Some(f) if f != GraphExportFormat::Json) {
                     return Err(jit::errors::InvalidArgumentError::new(
-                        "--json conflicts with --format dot/mermaid; use one or the other",
+                        "--json conflicts with --format dot/mermaid/batch; use one or the other",
                     )
                     .into());
                 }
@@ -4559,8 +4560,8 @@ fn run() -> Result<()> {
 
                 // `--full` selects the complete-record JSON node shape and applies
                 // only to `--format json` (or `--json`); pairing it with
-                // dot/mermaid is a usage error (exit 2), classified by the typed
-                // InvalidArgumentError.
+                // dot/mermaid/batch is a usage error (exit 2), classified by the
+                // typed InvalidArgumentError.
                 if full && format != GraphExportFormat::Json {
                     return Err(jit::errors::InvalidArgumentError::new(
                         "--full is only valid with --format json",
@@ -4568,7 +4569,27 @@ fn run() -> Result<()> {
                     .into());
                 }
                 let output_ctx = OutputContext::new(quiet, false);
-                let graph_output = executor.export_graph(format, full)?;
+
+                // `batch` runs a distinct projection (issue definitions plus
+                // reported boundary edges); every other format renders the graph.
+                let graph_output = if format == GraphExportFormat::Batch {
+                    let export = executor.export_graph_batch(scope.as_deref())?;
+                    // Boundary edges never join the array (it must stay a clean
+                    // batch-create payload); they are reported to stderr so no
+                    // crossing edge is dropped silently (REQ-06).
+                    if !export.boundary_edges.is_empty() {
+                        eprintln!(
+                            "Excluded {} edge(s) crossing the scope boundary:",
+                            export.boundary_edges.len()
+                        );
+                        for edge in &export.boundary_edges {
+                            eprintln!("  {} -> {}", edge.from, edge.to);
+                        }
+                    }
+                    serde_json::to_string_pretty(&export.defs)?
+                } else {
+                    executor.export_graph(format, full, scope.as_deref())?
+                };
 
                 if let Some(path) = output {
                     // Write through the shared atomic primitive (temp file +

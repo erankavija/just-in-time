@@ -136,6 +136,11 @@ reason-enriched `--full`) build on the lean summary projection and carry no
 gate-list fields at all — a blocking gate appears only as a `blocked_reasons`
 entry.
 
+`jit graph export --format batch` is not an issue-view projection but a
+[batch-create seed](cli-commands.md#batch-format): its `gates` field is the
+plain array of gate **keys** each node requires (the shape batch creation
+consumes), carrying no per-gate status, so none of the three rules above apply.
+
 So reading `gates_required` from `jit issue show --json` finds nothing. `jit
 --schema` declares, per command, which of the two shapes it emits; see
 [`jit issue show`](cli-commands.md#inspecting-issues-jit-issue-show).
