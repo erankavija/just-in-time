@@ -225,6 +225,22 @@ impl JsonFileStorage {
         Ok(())
     }
 
+    /// Release the retained startup recovery boundary, dropping its lock guards.
+    ///
+    /// Returns `true` when a session was retained and has now been dropped.
+    /// The foreground `serve` path uses this to hand the bootstrap → repository
+    /// chain to the server child before blocking on it: pre-service recovery
+    /// has already run on this process, and the child performs its own recovery
+    /// under the ordinary cross-process chain, so retaining the guards while
+    /// waiting on the child would deadlock the child against the parent.
+    pub fn release_recovery_session(&self) -> bool {
+        let mut retained = self
+            .recovery_session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        retained.take().is_some()
+    }
+
     /// Acquire only the repository-sibling bootstrap lock.
     ///
     /// Startup recovery uses this before touching `.jit/`, because a prepared
