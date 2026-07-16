@@ -3151,11 +3151,32 @@ fn run() -> Result<()> {
                 use jit::domain::GateChecker;
 
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
-                // over `--mode` when both are supplied.
+                // over `--mode` when both are supplied. Otherwise resolve the
+                // omitted-`--mode` case: a checker command with no explicit
+                // mode infers `auto` (REQ-01), so the checker is never
+                // silently discarded by a defaulted-to-manual gate. An
+                // EXPLICIT `--mode manual` combined with `--checker-command`
+                // is a usage error (REQ-02) rather than a silent drop — a
+                // manual gate cannot carry a checker.
+                let has_checker_command = checker_command.is_some();
                 let mode = if auto {
                     jit::domain::GateMode::Auto
                 } else {
-                    mode
+                    match mode {
+                        Some(jit::domain::GateMode::Manual) if has_checker_command => {
+                            return Err(invalid_argument(
+                                format!(
+                                    "--mode manual conflicts with --checker-command for gate '{}': a manual gate cannot have a checker. Drop --checker-command, or omit --mode to define an automated gate.",
+                                    key
+                                ),
+                                "gate define",
+                                json,
+                            ));
+                        }
+                        Some(explicit) => explicit,
+                        None if has_checker_command => jit::domain::GateMode::Auto,
+                        None => jit::domain::GateMode::Manual,
+                    }
                 };
 
                 let output_ctx = OutputContext::new(quiet, json);

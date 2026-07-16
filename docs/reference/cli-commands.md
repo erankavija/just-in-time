@@ -1141,7 +1141,11 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 
 **Optional:**
 - `--stage <STAGE>` - When gate runs: `precheck` or `postcheck` (default: `postcheck`)
-- `--mode <MODE>` - How gate is checked: `manual` or `auto` (default: `manual`)
+- `--mode <MODE>` - How gate is checked: `manual` or `auto`. When omitted, the
+  mode is inferred: `auto` if `--checker-command` is given, `manual`
+  otherwise. An explicit `--mode manual` combined with `--checker-command` is
+  a usage error (exit 2) — a manual gate cannot carry a checker, so the
+  conflict is rejected rather than silently dropping the checker.
 - `--auto` - Convenience flag for `--mode auto` (overrides `--mode` when both are given)
 - `--checker-command <COMMAND>` - Command to run for automated gates
 - `--timeout <SECONDS>` - Checker timeout in seconds (default: 300)
@@ -1160,12 +1164,11 @@ jit gate define code-review \
   --stage postcheck \
   --mode manual
 
-# Automated test gate
+# Automated test gate — --checker-command with no --mode infers auto
 jit gate define tests \
   --title "All Tests Pass" \
   --description "Full test suite must succeed" \
   --stage postcheck \
-  --mode auto \
   --checker-command "cargo test --lib" \
   --timeout 300
 
@@ -1178,6 +1181,11 @@ jit gate define review \
   --prompt-file "docs/review-prompt.md" \
   --checker-command "./scripts/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command"
+
+# Usage error: explicit manual mode conflicts with a checker command
+jit gate define bad --title "Bad" --description "Bad" \
+  --mode manual --checker-command "cargo test"
+# error: --mode manual conflicts with --checker-command for gate 'bad': ...
 ```
 
 ### `jit gate update`

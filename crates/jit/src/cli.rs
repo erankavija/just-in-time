@@ -1286,6 +1286,12 @@ pub enum DepCommands {
 pub enum GateCommands {
     // ===== Configuration: define what gates exist and which issues require them =====
     /// Define a new gate in the registry
+    ///
+    /// Mode resolution when `--mode` is not given: a gate defined with
+    /// `--checker-command` becomes automated; otherwise it defaults to manual.
+    /// An explicit `--mode manual` combined with `--checker-command` is a
+    /// usage error (exit 2) — a manual gate cannot carry a checker, so the
+    /// conflict is rejected rather than silently dropping the checker.
     Define {
         /// Unique gate key
         key: String,
@@ -1302,9 +1308,11 @@ pub enum GateCommands {
         #[arg(long, value_enum, default_value_t = crate::domain::GateStage::Postcheck)]
         stage: crate::domain::GateStage,
 
-        /// Gate mode: manual or auto
-        #[arg(short, long, value_enum, default_value_t = crate::domain::GateMode::Manual)]
-        mode: crate::domain::GateMode,
+        /// Gate mode: manual or auto. Defaults to auto when --checker-command
+        /// is given, manual otherwise. Explicit `--mode manual` with
+        /// --checker-command is a usage error (exit 2).
+        #[arg(short, long, value_enum)]
+        mode: Option<crate::domain::GateMode>,
 
         /// Convenience flag for `--mode auto`: define the gate as automated.
         /// When set it overrides `--mode`.
