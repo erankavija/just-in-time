@@ -8014,3 +8014,4 @@
 {"type":"issue_claimed","id":"260ef9ec-bc32-46c3-8b87-ff313ef0fe95","issue_id":"450db193-a94b-447d-bb14-902e0b3136cd","timestamp":"2026-07-16T14:06:20.526565061Z","assignee":"agent:worker"}
 {"type":"gate_failed","id":"9c79a90c-4e11-4aa2-8afa-11a4179cb202","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:08:24.670686666Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"2e4243f9-5538-4710-8372-e776469a034c","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:16:16.093028483Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"be835c56-fa77-47e3-aea9-cb2bf4ce1510","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:16:49.283919858Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}

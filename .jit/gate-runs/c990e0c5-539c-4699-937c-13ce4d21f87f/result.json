@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "c990e0c5-539c-4699-937c-13ce4d21f87f",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "16402e14-d7cc-4f40-b4a3-1b372979be67",
+  "commit": "a41539cf4d69aad81c834921119637b5e27cb9d2",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T14:16:48.680777050Z",
+  "completed_at": "2026-07-16T14:16:49.283538188Z",
+  "duration_ms": 602,
+  "exit_code": 1,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nMISSING: .jit/config/gate-presets/rust-ci.json\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "stderr": "",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}
