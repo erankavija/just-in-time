@@ -2,9 +2,9 @@
   "id": "56838d99-dc9d-4028-9b41-6ba691fc4852",
   "title": "Plan safe deterministic profile application",
   "description": "Pure profile planning converts the embedded package plus repository snapshot into exact final bytes/modes, semantic registry and managed-region merges, conflicts, overlay validation input, and a stable dry-run plan without mutation.\n\n## Background\n\nThe profile MVP must calculate and validate its complete result before staging. The planner stays domain-pure and contains no dogfood vocabulary, repository writes, or deferred lifecycle concepts.\n\n## Success Criteria\n\n- [hard] REQ-01: For map entries, set-like strings, keyed array tables, and root singleton tables, absence adds, canonical structural equality is a no-op, differing same-identity values conflict, deletions/overrides/partial singleton merges are forbidden, existing comments/order remain, and new values append in manifest order.\n- [hard] REQ-02: Assets and managed regions preserve identical/unmanaged bytes and reject differing files, unknown contribution identities, malformed markers, unsafe/overlapping paths, symlink escapes, invalid interpolation, and unsupported filesystem assumptions before staging.\n- [hard] REQ-03: Planning is input-order deterministic, validates exact output through the shared overlay view, contains no dogfood vocabulary/source-checkout access, and exposes identities for locked rebuild.\n\n## Scope\n\n**Blast radius:** profile domain/planner types, semantic config/gate/template/projection adapters, path checks, errors/results, and owned unit/property tests. Repository-view implementation and validation-reader migration are outside this task.\n\n**Green landing:** Pure profile plans and dry-run representations are tested behind an internal API; lock acquisition, commands, and repository writes remain unchanged.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "high",
-  "assignee": null,
+  "assignee": "agent:codex-profile-planner",
   "dependencies": [
     "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
     "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563"
@@ -27,6 +27,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.038922045Z",
-  "updated_at": "2026-07-16T11:59:23.736273723Z",
-  "first_ready_at": "2026-07-14T22:28:46.038922295Z"
+  "updated_at": "2026-07-16T12:00:28.229500311Z",
+  "first_ready_at": "2026-07-14T22:28:46.038922295Z",
+  "claimed_at": "2026-07-16T12:00:28.229499731Z"
 }

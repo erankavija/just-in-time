@@ -2,9 +2,9 @@
   "id": "0d8f20a8-db02-43ba-ad9e-8f219b427690",
   "title": "Build package projection and drift mechanics",
   "description": "Generic renderer, preset-projection, and drift-check APIs can materialize manifest-declared targets and compare regenerated output without owning or changing the production dogfood payload or live consumers.\n\n## Background\n\nThis task proves reusable projection mechanics against synthetic fixtures. Production package content and live-consumer migration are outside this task.\n\n## Success Criteria\n\n- [hard] REQ-01: Synthetic fixture packages prove exact file projection, managed-region preservation, executable modes, temporary-tree byte comparison, stale/extra/missing target findings, and deterministic ordering.\n- [hard] REQ-02: A synthetic preset fixture derives gate definitions/assets through the same package API and detects an independent-inventory mismatch.\n- [hard] REQ-03: The leaf changes only projection mechanics and fixtures; it does not author production skills/prompts/standards/gates or rewrite `.agents`, scripts, `.jit/reference`, presets, examples, or adopter docs.\n\n## Scope\n\n**Blast radius:** generic renderer, drift, and preset-projection modules plus synthetic fixtures only. Production package content and live-consumer migration are outside this task.\n\n**Green landing:** Synthetic packages prove the reusable mechanics while every production dogfood asset and live path remains byte-unchanged.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:codex-profile-renderer",
   "dependencies": [
     "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563"
   ],
@@ -24,6 +24,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.041804597Z",
-  "updated_at": "2026-07-16T11:59:22.889862147Z",
-  "first_ready_at": "2026-07-14T22:28:46.041804817Z"
+  "updated_at": "2026-07-16T12:00:28.261474774Z",
+  "first_ready_at": "2026-07-14T22:28:46.041804817Z",
+  "claimed_at": "2026-07-16T12:00:28.261474214Z"
 }
