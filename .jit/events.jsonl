@@ -8015,3 +8015,8 @@
 {"type":"gate_failed","id":"9c79a90c-4e11-4aa2-8afa-11a4179cb202","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:08:24.670686666Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"2e4243f9-5538-4710-8372-e776469a034c","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:16:16.093028483Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"be835c56-fa77-47e3-aea9-cb2bf4ce1510","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:16:49.283919858Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"fbfdecca-d8f0-4089-b23c-6e87dddb06ae","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:21:05.730233260Z","gate_key":"code-review","updated_by":"auto:executor"}
+{"type":"issue_created","id":"94fa5e9c-d507-4846-8d1e-455c3ee7097b","issue_id":"94096aac-a5b8-471e-a183-7c374256c5df","timestamp":"2026-07-16T14:21:12.425850709Z","title":"Foreground serve deadlocks: parent retains bootstrap recovery lock while blocking on child","priority":"normal"}
+{"type":"issue_updated","id":"beb3bcd3-750c-45da-981b-e81b3a606eea","issue_id":"6eb585bc-998d-4778-906d-415fcdc1916e","timestamp":"2026-07-16T14:21:28.350808799Z","updated_by":"dependency-add","fields":["dependencies"]}
+{"type":"gate_added","id":"6293463c-44e9-4b4b-ab78-05b65ba5f79d","issue_id":"94096aac-a5b8-471e-a183-7c374256c5df","timestamp":"2026-07-16T14:21:28.364858339Z","gate_key":"cargo-ci"}
+{"type":"gate_added","id":"918dbe68-60c4-4824-9eda-4ad479fe1d51","issue_id":"94096aac-a5b8-471e-a183-7c374256c5df","timestamp":"2026-07-16T14:21:28.373512406Z","gate_key":"code-review"}

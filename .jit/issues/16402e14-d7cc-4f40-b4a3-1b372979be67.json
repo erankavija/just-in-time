@@ -14,24 +14,24 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-16T08:40:04.507981607Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T14:17:14.497719453Z"
     },
     "doc-review": {
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-16T08:40:04.516106093Z"
     },
-    "cargo-ci": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T14:10:45.864798629Z"
-    },
     "docs-mechanical": {
       "status": "failed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T14:16:48.680777050Z"
+    },
+    "cargo-ci": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T14:10:45.864798629Z"
     }
   },
   "context": {},
@@ -43,6 +43,6 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-07-02T23:07:41.824789482Z",
-  "updated_at": "2026-07-16T14:16:49.283738288Z",
+  "updated_at": "2026-07-16T14:21:05.730038590Z",
   "claimed_at": "2026-07-16T08:40:04.625450443Z"
 }
