@@ -1,4 +1,5 @@
 use super::{EmbeddedProfilePackage, RegionDeclaration};
+use crate::storage::atomic_write::write_file_atomic_bytes_with_permissions;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -77,7 +78,7 @@ pub enum ProjectionError {
         /// Repository-relative projected target.
         target: String,
         /// Filesystem error.
-        source: std::io::Error,
+        source: anyhow::Error,
     },
 }
 
@@ -192,14 +193,15 @@ pub fn write_projection_tree(
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(|source| ProjectionError::Materialize {
                 target: file.target.clone(),
-                source,
+                source: source.into(),
             })?;
         }
-        fs::write(&target, &file.bytes).map_err(|source| ProjectionError::Materialize {
-            target: file.target.clone(),
-            source,
-        })?;
-        apply_mode(&target, file.mode).map_err(|source| ProjectionError::Materialize {
+        write_file_atomic_bytes_with_permissions(
+            &target,
+            &file.bytes,
+            projected_permissions(file.mode),
+        )
+        .map_err(|source| ProjectionError::Materialize {
             target: file.target.clone(),
             source,
         })?;
@@ -250,19 +252,18 @@ fn malformed(region: &RegionDeclaration, reason: &str) -> ProjectionError {
 }
 
 #[cfg(unix)]
-fn apply_mode(path: &Path, mode: ProjectedFileMode) -> std::io::Result<()> {
+fn projected_permissions(mode: ProjectedFileMode) -> Option<fs::Permissions> {
     use std::os::unix::fs::PermissionsExt;
 
-    let permissions = fs::Permissions::from_mode(match mode {
+    Some(fs::Permissions::from_mode(match mode {
         ProjectedFileMode::Regular => 0o644,
         ProjectedFileMode::Executable => 0o755,
-    });
-    fs::set_permissions(path, permissions)
+    }))
 }
 
 #[cfg(not(unix))]
-fn apply_mode(_path: &Path, _mode: ProjectedFileMode) -> std::io::Result<()> {
-    Ok(())
+fn projected_permissions(_mode: ProjectedFileMode) -> Option<fs::Permissions> {
+    None
 }
 
 #[cfg(test)]
@@ -370,6 +371,32 @@ mod tests {
             b"# Existing\n\nKeep this text.\n\n<!-- jit:synthetic-guidance:begin -->\n\
               Use the synthetic workflow contract.\n\
               <!-- jit:synthetic-guidance:end -->\n"
+        );
+    }
+
+    #[test]
+    fn test_write_projection_tree_failure_leaves_occupied_target_and_no_temp_file() {
+        let temp = tempfile::tempdir().unwrap();
+        let target = temp.path().join("occupied");
+        fs::create_dir(&target).unwrap();
+        let projection = PackageProjection::from_files(BTreeMap::from([(
+            "occupied".to_string(),
+            ProjectedFile {
+                target: "occupied".to_string(),
+                bytes: b"replacement".to_vec(),
+                mode: ProjectedFileMode::Regular,
+            },
+        )]));
+
+        assert!(write_projection_tree(temp.path(), &projection).is_err());
+
+        assert!(target.is_dir());
+        assert_eq!(
+            fs::read_dir(temp.path())
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect::<Vec<_>>(),
+            vec![std::ffi::OsString::from("occupied")]
         );
     }
 }

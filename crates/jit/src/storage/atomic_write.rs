@@ -1,14 +1,17 @@
 //! The shared atomic file-write primitive (temp file + rename).
 //!
-//! All storage writes go through [`write_file_atomic`] so a reader never
+//! Storage writes go through the helpers in this module so a reader never
 //! observes a partially written file (the JIT "atomic file writes" invariant).
-//! It lives in the storage layer because persistence is storage's
-//! responsibility: command/validation/output callers produce content and hand
-//! it here rather than touching the filesystem themselves.
+//! It lives in the storage layer because persistence is storage's responsibility:
+//! command/validation/output callers produce content and hand it here rather
+//! than touching the filesystem themselves.
 
 use anyhow::{Context, Result};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Write `content` to `path` atomically (temp file + rename).
 ///
@@ -21,10 +24,28 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// within a single filesystem (the temp file stays in the target's directory to
 /// guarantee that).
 pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
+    write_file_atomic_bytes(path, content.as_bytes())
+}
+
+/// Write arbitrary bytes to `path` atomically (temp file + rename).
+pub fn write_file_atomic_bytes(path: &Path, content: &[u8]) -> Result<()> {
+    write_file_atomic_bytes_with_permissions(path, content, None)
+}
+
+/// Write bytes and optional permissions to `path` as one atomic publication.
+///
+/// Content and permissions are applied to the same-directory temporary file
+/// before it is renamed onto the target. A failed write, permission update, or
+/// rename removes the temporary file on a best-effort basis and leaves an
+/// existing target untouched.
+pub fn write_file_atomic_bytes_with_permissions(
+    path: &Path,
+    content: &[u8],
+    permissions: Option<fs::Permissions>,
+) -> Result<()> {
     // Per-process monotonic counter so two calls within the same process get
     // distinct temp names even at the same instant; combined with the process id
     // it is unique across concurrent writers to the same target.
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
     let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
 
     let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("write");
@@ -36,10 +57,27 @@ pub fn write_file_atomic(path: &Path, content: &str) -> Result<()> {
         None => PathBuf::from(tmp_name),
     };
 
-    std::fs::write(&tmp, content).with_context(|| format!("writing {}", tmp.display()))?;
-    std::fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
+    if let Err(source) = fs::write(&tmp, content) {
+        cleanup_temp(&tmp);
+        return Err(source).with_context(|| format!("writing {}", tmp.display()));
+    }
+    if let Some(permissions) = permissions {
+        if let Err(source) = fs::set_permissions(&tmp, permissions) {
+            cleanup_temp(&tmp);
+            return Err(source)
+                .with_context(|| format!("setting permissions on {}", tmp.display()));
+        }
+    }
+    if let Err(source) = fs::rename(&tmp, path) {
+        cleanup_temp(&tmp);
+        return Err(source)
+            .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()));
+    }
     Ok(())
+}
+
+fn cleanup_temp(path: &Path) {
+    let _ = fs::remove_file(path);
 }
 
 #[cfg(test)]
@@ -79,5 +117,34 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
         // Still exactly one file: the overwrite left no temp residue.
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn test_write_file_atomic_bytes_preserves_non_utf8_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("asset.bin");
+        let content = [0, 159, 146, 150, 255];
+
+        write_file_atomic_bytes(&path, &content).unwrap();
+
+        assert_eq!(std::fs::read(path).unwrap(), content);
+    }
+
+    #[test]
+    fn test_write_file_atomic_cleans_temp_after_rename_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("occupied");
+        std::fs::create_dir(&target).unwrap();
+
+        assert!(write_file_atomic_bytes(&target, b"replacement").is_err());
+
+        assert!(target.is_dir());
+        assert_eq!(
+            std::fs::read_dir(dir.path())
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect::<Vec<_>>(),
+            vec![std::ffi::OsString::from("occupied")]
+        );
     }
 }
