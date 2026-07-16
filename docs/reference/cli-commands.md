@@ -2377,7 +2377,7 @@ jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_T
 |-----------------|-------------|
 | `<ID>` | Issue id (full, short, or a unique prefix). |
 | `<PATH>` | Document path relative to the repository root. |
-| `-c`, `--commit <COMMIT>` | Git commit to pin the reference to. Defaults to `HEAD`. |
+| `-c`, `--commit <COMMIT>` | Git commit to pin the reference to. Omitted, the reference is stored unpinned and reads as the current version. |
 | `-l`, `--label <LABEL>` | Human-readable label for the reference (alias `--title`). |
 | `--doc-type <DOC_TYPE>` | Free-form document type, e.g. `design`, `implementation`, `notes`. |
 | `--skip-scan` | Skip scanning the document for asset references. |

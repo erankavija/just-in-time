@@ -1854,7 +1854,8 @@ pub enum DocCommands {
         /// Path to document relative to repository root
         path: String,
 
-        /// Git commit hash (optional, defaults to HEAD)
+        /// Git commit to pin the reference to; omitted, the reference is
+        /// stored unpinned (reads as the current version)
         #[arg(short, long)]
         commit: Option<String>,
 
