@@ -12,6 +12,18 @@ use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::path::Path;
 
+fn origin_remote_url(repo: &git2::Repository) -> Option<String> {
+    repo.find_remote("origin")
+        .ok()
+        .and_then(|remote| remote.url().ok().map(str::to_owned))
+}
+
+fn current_branch_name(repo: &git2::Repository) -> Option<String> {
+    repo.head()
+        .ok()
+        .and_then(|head| head.shorthand().ok().map(str::to_owned))
+}
+
 /// Options for snapshot export
 #[allow(dead_code)]
 pub struct SnapshotExportOptions {
@@ -347,16 +359,10 @@ impl<S: IssueStore> SnapshotExporter<S> {
                 let repo = git2::Repository::open(".")?;
 
                 // Get remote URL
-                let remote = repo
-                    .find_remote("origin")
-                    .ok()
-                    .and_then(|r| r.url().map(|s| s.to_string()));
+                let remote = origin_remote_url(&repo);
 
                 // Get branch name
-                let branch = repo
-                    .head()
-                    .ok()
-                    .and_then(|h| h.shorthand().map(|s| s.to_string()));
+                let branch = current_branch_name(&repo);
 
                 // Check if working tree is dirty
                 let statuses = repo.statuses(None)?;
@@ -955,5 +961,33 @@ mod tests {
         let default = exporter.determine_output_path(None).unwrap();
         let name = default.file_name().unwrap().to_str().unwrap();
         assert!(name.starts_with("snapshot-"));
+    }
+
+    #[test]
+    fn test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = git2::Repository::init(temp.path()).unwrap();
+        repo.remote("origin", "https://example.com/repository.git")
+            .unwrap();
+        repo.set_head("refs/heads/main").unwrap();
+
+        let tree_id = repo.index().unwrap().write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let signature = git2::Signature::now("JIT Test", "jit@example.com").unwrap();
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "initial commit",
+            &tree,
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            origin_remote_url(&repo).as_deref(),
+            Some("https://example.com/repository.git")
+        );
+        assert_eq!(current_branch_name(&repo).as_deref(), Some("main"));
     }
 }
