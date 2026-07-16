@@ -616,10 +616,15 @@ Gate presets are pre-configured bundles of quality gates that dramatically reduc
 
 The `jit` binary ships exactly the three
 [planning-bracket](../concepts/planning-bracket.md) presets — `plan-review`,
-`coverage-preview`, and `breakdown-review` — which the `plan` graph template
-resolves to gate the planning and breakdown nodes. They are listed in
+`coverage-preview`, and `breakdown-review`. They are listed in
 [Built-in Gate Presets](../reference/gate-presets.md), a reference generated from
 the preset definitions themselves.
+
+A `plan`-style graph template resolves these presets by name to gate its planning
+and breakdown nodes, but the template itself is optional, project-declared
+configuration: `jit init` does not scaffold `templates.toml`. A project that wants
+the plan bracket declares its own `plan` template in `.jit/templates.toml` (this
+repository does so).
 
 Gate keys, titles, and checkers (a test runner, a linter, a formatter, a security
 audit) are domain vocabulary, so language- or workflow-specific bundles are
