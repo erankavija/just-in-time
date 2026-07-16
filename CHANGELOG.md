@@ -374,6 +374,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `jit issue assign`/`claim`/`release`/`unassign` (assignee bookkeeping) and
   `jit claim acquire`/`release` (exclusive, time-boxed leases) share verbs but
   are different mechanisms; each command's `--help` now names its counterpart.
+- **A downstream reader closing the pipe mid-write no longer panics.** Piping
+  any command into something that exits early (`jit query all | head -1`,
+  `jit --schema | head -c1`) used to surface Rust's raw panic banner (`thread
+  'main' panicked ...: Broken pipe (os error 32)`, plus a backtrace hint) and
+  exit `101`, because most of `main.rs`'s output goes through direct
+  `println!`/`print!` calls that panic on a write error. `jit` now exits
+  quietly with `141` (`128 + SIGPIPE`, the exit status a shell reports for a
+  process a signal actually terminated), matching how everyday Unix pipelines
+  compose.
 
 ### Migration
 

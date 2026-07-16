@@ -25,7 +25,8 @@
 use jit::commands::serve::foreground_exit_code;
 use jit::schema::CommandSchema;
 use std::fs;
-use std::process::Command;
+use std::io::Read;
+use std::process::{Command, Stdio};
 use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
@@ -686,6 +687,55 @@ fn test_command_exit_codes_claim_without_git_emits_10() {
     documented_row("claim", Some(10), false);
 }
 
+/// A downstream reader that closes the pipe mid-write (e.g. `| head`) makes jit
+/// exit quietly with the SIGPIPE exit-status convention (`128 + 13 = 141`)
+/// instead of panicking through std's `print!`/`println!` machinery — matching
+/// `*`/141 (jit:6f881a85). Mirrors `jit --schema | head -c1`: `--schema` dumps
+/// several hundred KB of JSON well past a pipe's kernel buffer (64KiB on
+/// Linux), so the write reliably blocks and then fails once the read end
+/// closes — reading only the first line, as `query all` with a handful of
+/// issues does, races the child's own (near-instant, sub-buffer-size) exit
+/// and does not reproduce reliably.
+#[test]
+fn test_command_exit_codes_broken_pipe_emits_141() {
+    let temp = setup();
+
+    let mut child = Command::new(jit_binary())
+        .current_dir(&temp)
+        .arg("--schema")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let mut stdout = child.stdout.take().unwrap();
+    let mut first_byte = [0u8; 1];
+    stdout
+        .read_exact(&mut first_byte)
+        .expect("child should write at least one byte before the pipe closes");
+    drop(stdout);
+
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
+    let status = child.wait().unwrap();
+
+    assert_eq!(
+        status.code(),
+        Some(141),
+        "broken-pipe exit must use the SIGPIPE convention (128 + 13); stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains("panicked") && !stderr.contains("RUST_BACKTRACE"),
+        "broken-pipe exit must not print a panic banner; stderr: {stderr}"
+    );
+    documented_row("*", Some(141), true);
+}
+
 /// Guard: **every** row in the projection — exception and standard alike — must be
 /// bound to runtime behavior, either by a subprocess test in this file or by the
 /// classifier test in `main.rs` (`exit_code_projection_tests`), which runs the
@@ -724,6 +774,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("doc check-links", Some(2)),
         ("gate preset apply", Some(1)),
         ("serve, serve --stop, serve --status", Some(1)),
+        ("*", Some(141)),
         // Reserved / pass-through: asserted against the production sites they cite.
         ("config validate", Some(2)),
         ("serve --fg", None),

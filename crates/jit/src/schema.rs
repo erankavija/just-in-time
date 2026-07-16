@@ -787,6 +787,12 @@ impl CommandSchema {
                 code: 10,
                 description: "External dependency failed (git, file system, etc.)".to_string(),
             },
+            ExitCodeDoc {
+                code: 141,
+                description: "Downstream reader closed the pipe while jit was writing \
+                    (128 + SIGPIPE)"
+                    .to_string(),
+            },
         ]
     }
 
@@ -989,6 +995,16 @@ impl CommandSchema {
                 "The daemon start, stop, or status operation failed (exits 0 on \
                  success).",
                 false,
+            ),
+            // Every command reaches this if its stdout write outlives the
+            // downstream reader (`| head`, etc.): a direct process::exit site
+            // (main's panic hook + catch_unwind), not the typed-error
+            // classifier.
+            row(
+                "*",
+                141,
+                "A downstream reader closed the pipe while jit was still writing.",
+                true,
             ),
             // `serve --fg` passes the inline server child's own code through.
             CommandExitCode {

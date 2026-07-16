@@ -178,9 +178,9 @@ fn test_schema_flag_documents_json_shapes_and_exit_codes() {
 // ============================================================================
 // REQ-02 (jit:1a63ef75): `jit --schema`'s `exit_codes` array is the canonical
 // source `docs/reference/cli-commands.md`'s "Exit Codes" table is kept in
-// sync with (`crate::output::ExitCode`, 0 through 6 and 10). Pins the full
-// set so a code added to the enum without a matching schema/doc update fails
-// this test instead of silently drifting.
+// sync with (`crate::output::ExitCode`, 0 through 6, 10, and 141). Pins the
+// full set so a code added to the enum without a matching schema/doc update
+// fails this test instead of silently drifting.
 // ============================================================================
 
 #[test]
@@ -196,7 +196,7 @@ fn test_schema_exit_codes_match_full_taxonomy() {
         .map(|entry| entry["code"].as_i64().expect("code should be an integer"))
         .collect();
 
-    let expected = [0, 1, 2, 3, 4, 5, 6, 10];
+    let expected = [0, 1, 2, 3, 4, 5, 6, 10, 141];
     for code in expected {
         assert!(
             codes.contains(&code),
