@@ -18,7 +18,7 @@ reads its scope from `.jit/config.toml`; it works against any jit project.
 
 - stdout: one JSON finding per line (schema below), totally ordered.
 - stderr: a one-line count summary; never mixed into stdout.
-- exit 0 on completion; exit 2 on bad invocation (`.jit/` missing; `jq`,
+- exit 0 on completion; exit 2 on bad invocation (`.jit/` missing; `python3`,
   `gawk`, or `jit` absent; or the CLI issue listing failing).
 
 Feed `findings.jsonl` to the mechanical auto-fixer (it consumes the
@@ -165,6 +165,6 @@ Each stdout line is a JSON object:
 
 ## Requirements
 
-- `jit`, `jq`, and `gawk` on PATH.
+- `jit`, `python3`, `base64`, and `gawk` on PATH.
 - Read access to `.jit/` and the in-scope document trees. The scanner never
   writes project state.

@@ -79,7 +79,7 @@ The node types and gate preset names come from the template's node declarations.
 
 6. **Determine the project's gate tiers.** Run `jit gate list` and
    `jit gate preset list`, and sample existing issues
-   (`jit issue show <id> --json | jq .gates_required`) to learn the convention.
+   (`jit issue status <id>`) to learn the convention.
    Define a small set of named tiers — at minimum a **primary/full** tier and a
    lighter tier for clearly supporting work. Present the tiers with their gate
    sets and confirm with the user once. These become `[GATE_TIERS]` for the
@@ -101,16 +101,16 @@ any children.
 2. **Require a scaffolded bracket (`P` and `B`).** `jit apply plan <id>` must
    already have created both nodes and wired `B → P`. Locate them:
    ```bash
-   jit issue show <C> --json | jq -r '.depends_on[]'
+   jit issue show <C> --field dependencies
    # B: the dependency typed <breakdown_type> carrying brackets:<C-short-id>
-   jit issue show <B> --json | jq -r '.depends_on[]'
+   jit issue show <B> --field dependencies
    # P: B's dependency typed <planning_type>
    ```
    No breakdown node → STOP: direct the user to scaffold with
    `jit apply plan <id>`, produce and review the plan, then re-run breakdown.
 
-3. **Require an APPROVED plan.** Check
-   `jit issue show <P> --json | jq '{state, gates_required, gates_status}'`.
+3. **Require an APPROVED plan.** Check `jit issue status <P>` and
+   `jit gate status <P> <plan-quality-gate>`.
    Proceed only when `P`'s plan-quality gate status is `passed` (and `P` is Done
    or Gated-passing); otherwise STOP and direct the user to pass the plan gate
    first.

@@ -29,7 +29,7 @@ scanner, it works against any jit project.
 
 - stdout: one JSON record per correction (schema below), applied or skipped.
 - stderr: a one-line count summary; never mixed into stdout.
-- exit 0 on completion; exit 2 on bad invocation (`.jit/` missing; `jq`,
+- exit 0 on completion; exit 2 on bad invocation (`.jit/` missing; `python3`,
   `gawk`, or `jit` absent; or an internal scan failing).
 
 Findings precedence: an explicit `--findings <file>`, then a pipe on stdin,
@@ -117,6 +117,6 @@ finding it names why nothing was done.
 
 ## Requirements
 
-- `jit`, `jq`, and `gawk` on PATH.
+- `jit`, `python3`, `base64`, and `gawk` on PATH.
 - Read/write access to the target `.jit/` through the jit CLI. The fixer writes
   no project file directly.

@@ -219,7 +219,7 @@ Stop immediately and report to the invoker when:
   that `references/parent-escalation.md` classifies as forward-to-human, or a
   prior wave's results that cannot be landed on `main` before a dependent wave.
 - Standards sweep stops (see `references/standards-sweep.md`): the scanner or
-  fixer exits 2 (missing `.jit/`, missing `jq`/`gawk`/`jit`, or an internal scan
+  fixer exits 2 (missing `.jit/`, missing `python3`/`gawk`/`jit`, or an internal scan
   failure), or the config-derived report path cannot be resolved.
 
 ## Red flags

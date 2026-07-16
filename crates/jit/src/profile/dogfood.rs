@@ -352,6 +352,23 @@ mod tests {
     }
 
     #[test]
+    fn test_installed_paths_do_not_require_jq() {
+        let package = jit_dogfood_package().unwrap();
+        for asset in &package.manifest().assets {
+            let text = std::str::from_utf8(package.source_bytes(&asset.source).unwrap())
+                .unwrap_or_default();
+            let mentions_jq = text
+                .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+                .any(|token| token == "jq");
+            assert!(
+                !mentions_jq,
+                "{} still exposes a jq dependency",
+                asset.target
+            );
+        }
+    }
+
+    #[test]
     fn test_live_projection_excludes_install_only_state() {
         let projection = jit_dogfood_live_projection(&BTreeMap::new()).unwrap();
         assert!(projection

@@ -14,22 +14,22 @@ Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's quality 
 
 ```bash
 # 1. Enumerate every prior code-review failure for this issue
-jit gate status [SHORT_ID] --gate code-review --all --status failed --json \
-  | jq -r '.results[].run_id' \
-  | while read run; do
-      echo "=== prior run $run ==="
-      jq -r '.findings.findings[]? | "[\(.severity)] \(.id): \(.summary) (\(.file // "-"):\(.line // "-"))"' \
-        ".jit/gate-runs/$run/result.json"
-    done
+jit gate status [SHORT_ID] code-review --all
+python3 -c 'import json,sys
+for path in sys.argv[2:]:
+    record=json.load(open(path, encoding="utf-8"))
+    if record.get("gate_key")=="code-review" and record.get("status")=="failed" and record.get("issue_id","").startswith(sys.argv[1]):
+        for finding in (record.get("findings") or {}).get("findings",[]):
+            print("[{}] {}: {} ({}:{})".format(finding.get("severity","-"),finding.get("id","-"),finding.get("summary",""),finding.get("file","-"),finding.get("line","-")))' \
+  [SHORT_ID] .jit/gate-runs/*/result.json
 
 # 2. List every design doc the worker produced for this issue
 jit doc list [SHORT_ID]
 
 # 3. Grep each linked doc for deferred-item markers
-for doc in $(jit doc list [SHORT_ID] --json | jq -r '.documents[].path'); do
-  echo "=== $doc ==="
-  grep -inE '\b(deferred|todo|future work|open question|not (yet )?implemented|follow-?up|out of scope|won'\''t (do|fix)|stays (available|open).*generic|punt(ed)?)\b' "$doc"
-done
+jit doc list [SHORT_ID]
+# Run this for each linked path printed above:
+grep -inE '\b(deferred|todo|future work|open question|not (yet )?implemented|follow-?up|out of scope|won'\''t (do|fix)|stays (available|open).*generic|punt(ed)?)\b' [LINKED_PATH]
 ```
 
 **For every match** from steps 1 and 3, a row MUST appear in the resolution table below. Step 1 gives you every finding that has ever been raised, not just the latest round — you must show closure at HEAD for all of them. Step 3 gives you the worker's own deferred-item notes, which are silent scope gaps the reviewer will catch sooner or later.

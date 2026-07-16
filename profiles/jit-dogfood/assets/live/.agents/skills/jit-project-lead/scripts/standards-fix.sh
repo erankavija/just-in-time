@@ -49,7 +49,7 @@
 #
 # Exit codes:
 #   0 — completed (corrections, if any, reported on stdout)
-#   2 — bad invocation (.jit/ missing; jq/gawk/jit unavailable; scan failed)
+#   2 — bad invocation (.jit/ missing; python3/base64/gawk/jit unavailable; scan failed)
 
 set -euo pipefail
 
@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-for tool in jq gawk jit; do
+for tool in python3 base64 gawk jit; do
     if ! command -v "$tool" > /dev/null 2>&1; then
         echo "ERROR: required tool '$tool' not found on PATH." >&2
         exit 2
@@ -113,7 +113,16 @@ else
 fi
 
 # Keep only mechanical findings; everything else is left untouched by design.
-jq -c 'select(.classification == "mechanical")' "$findings" > "$mech" 2> /dev/null || true
+python3 -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("classification") == "mechanical":
+            print(json.dumps(record, separators=(",", ":"), ensure_ascii=False))
+' "$findings" > "$mech"
 
 # --- gawk description transform -------------------------------------------
 # Applies the body-level mechanical corrections (heading level, criterion
@@ -297,11 +306,87 @@ strip_title() {
 
 # --- Record emitter -------------------------------------------------------
 emit_record() { # kind target rule line action detail
-    jq -nc --arg k "$1" --arg t "$2" --arg r "$3" --arg l "$4" --arg a "$5" --arg d "$6" \
-        '{target_kind: $k, target: $t, rule: $r, line: ($l | tonumber), action: $a, detail: $d}'
+    python3 -c '
+import json, sys
+print(json.dumps({
+    "target_kind": sys.argv[1],
+    "target": sys.argv[2],
+    "rule": sys.argv[3],
+    "line": int(sys.argv[4]),
+    "action": sys.argv[5],
+    "detail": sys.argv[6],
+}, separators=(",", ":"), ensure_ascii=False))
+' "$1" "$2" "$3" "$4" "$5" "$6"
 }
 
 action_word() { [[ "$dry_run" -eq 1 ]] && echo "dry-run" || echo "applied"; }
+
+jsonl_has_rule() { # file kind target rule
+    python3 -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    found = any(
+        (record := json.loads(line)).get("target_kind") == sys.argv[2]
+        and record.get("target") == sys.argv[3]
+        and record.get("rule") == sys.argv[4]
+        for line in stream if line.strip()
+    )
+raise SystemExit(0 if found else 1)
+' "$1" "$2" "$3" "$4"
+}
+
+jsonl_directives() { # file target
+    python3 -c '
+import json, sys
+rules = {
+    "STD-HEADING-H1", "STD-HEADING-DEEP", "STD-CRIT-UNMARKED",
+    "STD-CRIT-REQID", "STD-ANTIPATTERN-SECTION",
+}
+values = []
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if (
+            record.get("target_kind") == "issue"
+            and record.get("target") == sys.argv[2]
+            and record.get("rule") in rules
+        ):
+            values.append("{}|{}".format(record["rule"], record["line"]))
+print(";".join(values))
+' "$1" "$2"
+}
+
+jsonl_targets() { # file kind
+    python3 -c '
+import json, sys
+values = set()
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("target_kind") == sys.argv[2]:
+            values.add(record.get("target", ""))
+for value in sorted(values):
+    if value:
+        print(value)
+' "$1" "$2"
+}
+
+jsonl_document_rules() { # file target
+    python3 -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for line in stream:
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("target_kind") == "document" and record.get("target") == sys.argv[2]:
+            print("{}\t{}".format(record.get("rule", ""), record.get("line", 0)))
+' "$1" "$2"
+}
 
 issues_changed=0
 fixes_applied=0
@@ -310,7 +395,6 @@ fixes_skipped=0
 # --- Issue pass -----------------------------------------------------------
 while IFS= read -r sid; do
     [[ -z "$sid" ]] && continue
-    obj="$(jq -c --arg t "$sid" 'select(.target_kind == "issue" and .target == $t)' "$mech")"
 
     # STD-LABEL-SLUG is a judgment finding (an 8-hex short id yields no
     # meaningful kebab slug, so a human chooses the bucket name); the mechanical
@@ -318,7 +402,7 @@ while IFS= read -r sid; do
 
     # Whole-item: embedded-id title.
     has_title_finding=0
-    if printf '%s\n' "$obj" | jq -e 'select(.rule == "STD-TITLE-EMBEDDED-ID")' > /dev/null 2>&1; then
+    if jsonl_has_rule "$mech" issue "$sid" STD-TITLE-EMBEDDED-ID; then
         has_title_finding=1
     fi
     new_title=""
@@ -337,13 +421,9 @@ while IFS= read -r sid; do
     fi
 
     # Body-level directives + missing Success Criteria.
-    directives="$(printf '%s\n' "$obj" | jq -r '
-        select(.rule == "STD-HEADING-H1" or .rule == "STD-HEADING-DEEP"
-            or .rule == "STD-CRIT-UNMARKED" or .rule == "STD-CRIT-REQID"
-            or .rule == "STD-ANTIPATTERN-SECTION")
-        | "\(.rule)|\(.line)"' | paste -sd ';' -)"
+    directives="$(jsonl_directives "$mech" "$sid")"
     sc_missing=0
-    if printf '%s\n' "$obj" | jq -e 'select(.rule == "STD-SC-MISSING")' > /dev/null 2>&1; then
+    if jsonl_has_rule "$mech" issue "$sid" STD-SC-MISSING; then
         sc_missing=1
     fi
 
@@ -388,7 +468,7 @@ while IFS= read -r sid; do
         emit_record issue "$sid" "$srule" "$sline" skipped "$sdetail"
         fixes_skipped=$((fixes_skipped + 1))
     done < "$skipfile"
-done < <(jq -r 'select(.target_kind == "issue") | .target' "$mech" | LC_ALL=C sort -u)
+done < <(jsonl_targets "$mech" issue)
 
 # --- Document pass --------------------------------------------------------
 # No mechanical rule targets documents; any mechanical document finding is
@@ -400,8 +480,8 @@ while IFS= read -r dpath; do
         emit_record document "$dpath" "$drule" "$dline" skipped \
             "no mechanical correction defined for a document target"
         fixes_skipped=$((fixes_skipped + 1))
-    done < <(jq -r --arg t "$dpath" 'select(.target_kind == "document" and .target == $t) | "\(.rule)\t\(.line)"' "$mech")
-done < <(jq -r 'select(.target_kind == "document") | .target' "$mech" | LC_ALL=C sort -u)
+    done < <(jsonl_document_rules "$mech" "$dpath")
+done < <(jsonl_targets "$mech" document)
 
 if [[ "$dry_run" -eq 1 ]]; then
     echo "[fix] dry-run: ${issues_changed} issues would change, ${fixes_applied} corrections, ${fixes_skipped} skipped" >&2

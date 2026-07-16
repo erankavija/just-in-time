@@ -66,8 +66,7 @@ method, then keep only the accepted, non-candidate members.
    set is exactly the accepted subset of the parent's children.
 
    ```bash
-   jit issue list --label <membership-label> --state done --json \
-     | jq -r '.issues[] | [.short_id, .title] | @tsv'
+   jit issue list --label <membership-label> --state done
    ```
 
    Every id this returns whose type is in `D`, minus `K`, must equal `A`. A
@@ -93,7 +92,7 @@ in `A`. Gather each container's artifact set once, then run the checks.
 
 ```bash
 # Documents linked to the container (design docs, plan docs, reports)
-jit doc list <container-short-id> --json | jq -r '.documents[].path'
+jit doc list <container-short-id>
 ```
 
 Add any produced files the container's completion report records (scripts,

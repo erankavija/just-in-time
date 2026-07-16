@@ -127,8 +127,12 @@ Auto-fixed: <N> correction(s). Needs a decision: <M> item(s).
 doc path), `Rule` its `rule`, `Correction applied` its `detail` (what the fixer
 did). Select and stably order:
 
-```
-jq -r 'select(.action=="applied") | [.target_kind, .target, .rule, .line, .detail] | @tsv' \
+```bash
+python3 -c 'import json,sys
+for line in open(sys.argv[1], encoding="utf-8"):
+    r=json.loads(line)
+    if r.get("action")=="applied":
+        print("\t".join(map(str,[r["target_kind"],r["target"],r["rule"],r["line"],r["detail"]])))' \
     applied.jsonl | sort
 ```
 
@@ -143,10 +147,14 @@ never drop the skipped-mechanical rows, or a finding the fixer could not correct
 vanishes from the report entirely. Select both and stably order the combined
 set:
 
-```
-{ jq -r 'select(.classification=="judgment") | [.target_kind, .target, .rule, .line, .detail] | @tsv' findings.jsonl
-  jq -r 'select(.action=="skipped")        | [.target_kind, .target, .rule, .line, .detail] | @tsv' applied.jsonl
-} | sort
+```bash
+python3 -c 'import json,sys
+for path in sys.argv[1:]:
+    for line in open(path, encoding="utf-8"):
+        r=json.loads(line)
+        if r.get("classification")=="judgment" or r.get("action")=="skipped":
+            print("\t".join(map(str,[r["target_kind"],r["target"],r["rule"],r["line"],r["detail"]])))' \
+    findings.jsonl applied.jsonl | sort
 ```
 
 Both sections are empty when their selection is empty; the section heading still
@@ -189,10 +197,10 @@ Stop the mode and report to the invoker (the human when the steward runs
 standalone) when:
 
 - **Scanner exit 2** — bad invocation: `.jit/` missing at the project root, or
-  `jq`, `gawk`, or `jit` absent from PATH, or the CLI issue listing failed. The
+  `python3`, `base64`, `gawk`, or `jit` absent from PATH, or the CLI issue listing failed. The
   scan produced no findings; do not proceed to fix or report.
 - **Fixer exit 2** — the same class of bad invocation for the fixer (missing
-  `.jit/`, missing `jq`/`gawk`/`jit`, or an internal scan failing). Mechanical
+  `.jit/`, missing `python3`/`base64`/`gawk`/`jit`, or an internal scan failing). Mechanical
   corrections did not complete; report the scan result and stop.
 - **Report path cannot be resolved** — `development_root` is missing or
   `[documentation]` is unreadable, so the active root has no location. Stop

@@ -40,14 +40,14 @@
 #
 # Exit codes:
 #   0 — scan completed (findings, if any, on stdout)
-#   2 — bad invocation (.jit/ missing, jq/gawk/jit unavailable, or the CLI
+#   2 — bad invocation (.jit/ missing, python3/base64/gawk/jit unavailable, or the CLI
 #       issue listing failed)
 
 set -euo pipefail
 
 root="${1:-.}"
 
-for tool in jq gawk jit; do
+for tool in python3 base64 gawk jit; do
     if ! command -v "$tool" > /dev/null 2>&1; then
         echo "ERROR: required tool '$tool' not found on PATH." >&2
         exit 2
@@ -107,8 +107,8 @@ fi
 # --- Load every issue through the jit CLI (sanctioned storage path) --------
 # `jit issue list --full --json` returns each issue's title, description,
 # labels, state, and linked documents in a single call. We never parse
-# .jit/issues/*.json directly. Cached in a temp file and reused; jq sorts by
-# id so the output order is byte-stable across runs.
+# .jit/issues/*.json directly. Cached in a temp file and reused; the embedded
+# Python JSON reader sorts by id so output order is byte-stable across runs.
 raw="$(mktemp)"
 issues_json="$(mktemp)"
 trap 'rm -f "$raw" "$issues_json"' EXIT
@@ -126,10 +126,19 @@ declare -A docpath_state  # repo-relative doc path -> owning issue state
 
 while IFS=$'\t' read -r sid st; do
     [[ -n "$sid" ]] && issue_state["$sid"]="$st"
-done < <(jq -r '.issues[] | [(.id[0:8]), .state] | @tsv' "$issues_json")
+done < <(python3 -c '
+import json, sys
+for issue in json.load(open(sys.argv[1], encoding="utf-8")).get("issues", []):
+    print("{}\t{}".format(issue.get("id", "")[:8], issue.get("state", "")))
+' "$issues_json")
 while IFS=$'\t' read -r dp st; do
     [[ -n "$dp" ]] && docpath_state["$dp"]="$st"
-done < <(jq -r '.issues[] | .state as $s | (.documents // [])[] | [.path, $s] | @tsv' "$issues_json")
+done < <(python3 -c '
+import json, sys
+for issue in json.load(open(sys.argv[1], encoding="utf-8")).get("issues", []):
+    for document in issue.get("documents") or []:
+        print("{}\t{}".format(document.get("path", ""), issue.get("state", "")))
+' "$issues_json")
 
 # is_live_active_doc <repo-relative-path> <basename> -> 0 live, 1 exempt
 is_live_active_doc() {
@@ -333,12 +342,11 @@ scan_body() {
 }
 
 # --- Issue pass -----------------------------------------------------------
-# Each `obj` is one issue as compact JSON, streamed from the cached CLI
-# listing (sorted by id). Fields are extracted from that object — no file read.
-while IFS= read -r obj; do
-    sid="$(printf '%s' "$obj" | jq -r '.id[0:8]')"
-    title="$(printf '%s' "$obj" | jq -r '.title // ""')"
-    desc="$(printf '%s' "$obj" | jq -r '.description // ""')"
+# Each row is one issue from the cached CLI listing, sorted by id. Python
+# base64-encodes free-form fields so tabs and newlines survive the shell stream.
+while IFS=$'\t' read -r sid title64 desc64 labels64; do
+    title="$(printf '%s' "$title64" | base64 --decode)"
+    desc="$(printf '%s' "$desc64" | base64 --decode)"
 
     # Title: embedded id / ordinal / conventional-commit prefix (mechanical).
     if [[ "$title" =~ ^[0-9a-fA-F]{6,}[/:] ]] \
@@ -362,10 +370,23 @@ while IFS= read -r obj; do
         if [[ -n "${strategic_ns[$ns]:-}" ]] && [[ "$val" =~ ^[0-9a-f]{8}$ ]]; then
             emit issue "$sid" STD-LABEL-SLUG judgment 0 "$lbl"
         fi
-    done < <(printf '%s' "$obj" | jq -r '(.labels // [])[]')
+    done < <(printf '%s' "$labels64" | base64 --decode)
 
     scan_body issue "$sid" "$sid" "$desc"
-done < <(jq -c '.issues | sort_by(.id) | .[]' "$issues_json")
+done < <(python3 -c '
+import base64, json, sys
+def enc(value):
+    return base64.b64encode(value.encode("utf-8")).decode("ascii")
+issues = json.load(open(sys.argv[1], encoding="utf-8")).get("issues", [])
+for issue in sorted(issues, key=lambda value: value.get("id", "")):
+    labels = "\n".join(issue.get("labels") or [])
+    print("\t".join([
+        issue.get("id", "")[:8],
+        enc(issue.get("title") or ""),
+        enc(issue.get("description") or ""),
+        enc(labels),
+    ]))
+' "$issues_json")
 
 # --- Document pass --------------------------------------------------------
 scan_doc_dir() {
@@ -388,19 +409,28 @@ done
 scan_doc_dir "$active_dir" 1
 
 # --- Total-order the findings and print JSONL -----------------------------
-jq -R -s '
-    split("\n") | map(select(length > 0)) | map(split("\t")) |
-    map({
-        target_kind: .[0],
-        target: .[1],
-        rule: .[2],
-        classification: .[3],
-        line: (.[4] | tonumber),
-        detail: .[5]
-    }) |
-    sort_by(.target_kind, .target, .rule, .line, .detail) |
-    .[]
-' "$raw" | jq -c '.'
+python3 -c '
+import json, sys
+records = []
+with open(sys.argv[1], encoding="utf-8") as stream:
+    for raw in stream:
+        fields = raw.rstrip("\n").split("\t", 5)
+        if len(fields) != 6:
+            continue
+        records.append({
+            "target_kind": fields[0],
+            "target": fields[1],
+            "rule": fields[2],
+            "classification": fields[3],
+            "line": int(fields[4]),
+            "detail": fields[5],
+        })
+for record in sorted(records, key=lambda value: (
+    value["target_kind"], value["target"], value["rule"],
+    value["line"], value["detail"],
+)):
+    print(json.dumps(record, separators=(",", ":"), ensure_ascii=False))
+' "$raw"
 
 total="$(wc -l < "$raw" | tr -d ' ')"
 mech="$(cut -f4 "$raw" | grep -c '^mechanical$' || true)"

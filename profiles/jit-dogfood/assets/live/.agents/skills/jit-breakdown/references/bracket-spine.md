@@ -13,9 +13,9 @@ its gates (`coverage-preview` + `breakdown-review`) and already depends on `P`
 (`jit apply plan` wired `B → P`). Find `P` through `B`:
 
 ```bash
-jit issue show <C> --json | jq -r '.depends_on[]'
+jit issue show <C> --field dependencies
 # B is the dependency typed <breakdown_type> carrying brackets:<C-short-id>
-jit issue show <B> --json | jq -r '.depends_on[]'
+jit issue show <B> --field dependencies
 # P is B's dependency typed <planning_type>
 ```
 
@@ -42,7 +42,7 @@ jit dep add <C-UUID> <sink-child-UUID>
 `jit` keeps the DAG transitively reduced, so the scaffold's direct `C → B` anchor
 edge and any redundant `C → non-sink` edge are dropped automatically once the spine
 connects `C` to the sinks. Verify with
-`jit issue show <C> --json | jq .depends_on` (should list sinks only).
+`jit issue show <C> --field dependencies` (should list sinks only).
 
 **4. Run the coverage-preview gate via the standard runner, then block on it.**
 
@@ -76,7 +76,7 @@ the `[hard]` criteria it covers (pass them via the child's `labels`, or
 not just the exit code — the project convention):
 
 ```bash
-jit gate check <B-UUID> <coverage-gate> --json | jq -r .status   # coverage-preview in the default ruleset
+jit gate status <B-UUID> <coverage-gate>   # coverage-preview in the default ruleset
 ```
 
 - **Coverage-preview FAILS** (a `[hard]` criterion uncovered → exit 4, status

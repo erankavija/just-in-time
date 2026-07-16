@@ -19,14 +19,15 @@ If this issue has previously failed code-review (any prior `code-review` gate ru
 Run:
 
 ```bash
-# Enumerate prior failing runs for this issue's code-review gate
-jit gate status <issue-id> --gate code-review --all --status failed --json \
-  | jq -r '.results[].run_id' \
-  | while read run; do
-      echo "=== run $run ==="
-      jq -r '.findings.findings[]? | "[\(.severity)] \(.id): \(.summary) (\(.file // "-"):\(.line // "-"))"' \
-        ".jit/gate-runs/$run/result.json"
-    done
+# Show every prior run, then print every failed run's structured findings.
+jit gate status <issue-id> code-review --all
+python3 -c 'import json,sys
+for path in sys.argv[2:]:
+    record=json.load(open(path, encoding="utf-8"))
+    if record.get("gate_key")=="code-review" and record.get("status")=="failed" and record.get("issue_id","").startswith(sys.argv[1]):
+        for finding in (record.get("findings") or {}).get("findings",[]):
+            print("[{}] {}: {} ({}:{})".format(finding.get("severity","-"),finding.get("id","-"),finding.get("summary",""),finding.get("file","-"),finding.get("line","-")))' \
+  <issue-id> .jit/gate-runs/*/result.json
 ```
 
 The gate-run envelope is `{"count": N, "results": [...]}`, and each `result.json`
@@ -77,10 +78,9 @@ This tier is cheap to run — a single grep — and eliminates the single larges
 Open every design doc linked to this issue (`jit doc list <issue-id>`). In each doc, grep for patterns that signal the worker punted on a surface rather than completing it:
 
 ```bash
-for doc in $(jit doc list <issue-id> --json | jq -r '.documents[].path'); do
-  echo "=== $doc ==="
-  grep -inE '\b(deferred|todo|future work|open question|not (yet )?implemented|follow-?up|out of scope|won'\''t (do|fix)|stays (available|open).*generic|punt(ed)?)\b' "$doc"
-done
+jit doc list <issue-id>
+# Run this for each linked path printed above:
+grep -inE '\b(deferred|todo|future work|open question|not (yet )?implemented|follow-?up|out of scope|won'\''t (do|fix)|stays (available|open).*generic|punt(ed)?)\b' <linked-path>
 ```
 
 For each match, categorize:
