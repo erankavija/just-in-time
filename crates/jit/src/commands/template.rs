@@ -13,8 +13,8 @@
 //!    projected issue would pass write validation, the prospective graph is
 //!    acyclic) and then commits it, all while holding ONE repository write lock:
 //!    [`IssueStore::acquire_repo_write_lock`](crate::storage::IssueStore::acquire_repo_write_lock),
-//!    the outermost lock of every ordinary issue/dependency write, so no other
-//!    writer can interleave with the apply. A validation or write failure inside
+//!    the outer serialization guard of every ordinary issue/dependency write, so
+//!    no other writer can interleave with the apply. A validation or write failure inside
 //!    the lock leaves the issue store as it was: created nodes are deleted and
 //!    mutated issues are rewritten from a pre-mutation snapshot, field for field
 //!    down to `updated_at`, before the error is returned. Because no concurrent
@@ -216,7 +216,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // depends on (the store snapshot the cycle check simulates over, the
         // already-applied probe) and every write that follows are serialized
         // against every other writer. It is the SAME lock the ordinary
-        // issue/dependency write path takes as its outermost lock, so no
+        // issue/dependency write path takes as its outer serialization guard, so no
         // concurrent `jit issue create` / `jit dep add` can interleave: a mutation
         // landing between the snapshot and the writes could otherwise invalidate
         // the checks the writes rely on, and the compensating rollback would

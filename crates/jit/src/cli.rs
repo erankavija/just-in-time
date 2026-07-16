@@ -2770,3 +2770,230 @@ pub enum HooksCommands {
         json: bool,
     },
 }
+
+impl Commands {
+    /// Whether this invocation must run transaction recovery before repository
+    /// validation or command-service construction.
+    ///
+    /// These matches are deliberately exhaustive. Adding any CLI enum variant
+    /// fails compilation until its mutation classification is chosen, providing
+    /// the generated-command guard required by the universal recovery boundary.
+    pub fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } | Self::Migrate(_) => {
+                true
+            }
+            Self::Issue(command) => command.requires_recovery_dispatch(),
+            Self::Dep(command) => command.requires_recovery_dispatch(),
+            Self::Gate(command) => command.requires_recovery_dispatch(),
+            Self::Doc(command) => command.requires_recovery_dispatch(),
+            Self::Archive(command) => command.requires_recovery_dispatch(),
+            Self::Config(command) => command.requires_recovery_dispatch(),
+            Self::Claim(command) => command.requires_recovery_dispatch(),
+            Self::Hooks(command) => command.requires_recovery_dispatch(),
+            Self::Invariant(command) => command.requires_recovery_dispatch(),
+            Self::Reference(command) => command.requires_recovery_dispatch(),
+            Self::Validate { fix, dry_run, .. } => *fix && !*dry_run,
+            Self::Serve { status, .. } => !*status,
+            Self::List { .. }
+            | Self::Events(_)
+            | Self::Graph(_)
+            | Self::Rdeps { .. }
+            | Self::Query { .. }
+            | Self::Label(_)
+            | Self::Snapshot(_)
+            | Self::Worktree(_)
+            | Self::Item(_)
+            | Self::Search { .. }
+            | Self::Version { .. }
+            | Self::Status { .. } => false,
+        }
+    }
+}
+
+impl IssueCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Create { .. }
+            | Self::BatchCreate { .. }
+            | Self::Update { .. }
+            | Self::Delete { .. }
+            | Self::Assign { .. }
+            | Self::Claim { .. }
+            | Self::Unassign { .. }
+            | Self::Reject { .. }
+            | Self::Release { .. }
+            | Self::ClaimNext { .. } => true,
+            Self::Search { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::Children { .. }
+            | Self::Progress { .. }
+            | Self::List { .. }
+            | Self::Rm { .. }
+            | Self::Remove { .. }
+            | Self::Complete { .. }
+            | Self::Edit { .. } => false,
+        }
+    }
+}
+
+impl DepCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Add { .. } | Self::Rm { .. } => true,
+            Self::Remove { .. } | Self::Delete { .. } => false,
+        }
+    }
+}
+
+impl GateCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Define { .. }
+            | Self::Update { .. }
+            | Self::Remove { .. }
+            | Self::Add { .. }
+            | Self::Evaluate { .. }
+            | Self::EvaluateAll { .. }
+            | Self::Fail { .. } => true,
+            Self::Preset(command) => command.requires_recovery_dispatch(),
+            Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::List { .. }
+            | Self::Show { .. }
+            | Self::Status { .. }
+            | Self::StatusAll { .. } => false,
+        }
+    }
+}
+
+impl PresetCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Apply { .. } | Self::Create { .. } => true,
+            Self::List { .. } | Self::Show { .. } => false,
+        }
+    }
+}
+
+impl DocCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Add { .. } | Self::Remove { .. } => true,
+            Self::Assets { command } => command.requires_recovery_dispatch(),
+            Self::List { .. }
+            | Self::Rm { .. }
+            | Self::Delete { .. }
+            | Self::Show { .. }
+            | Self::History { .. }
+            | Self::Diff { .. }
+            | Self::CheckLinks { .. } => false,
+        }
+    }
+}
+
+impl AssetCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::List { rescan, .. } => *rescan,
+        }
+    }
+}
+
+impl ArchiveCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Document { execute, .. } | Self::Container { execute, .. } => *execute,
+            Self::Candidates { .. } => false,
+        }
+    }
+}
+
+impl ConfigCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Set { .. } => true,
+            Self::Show { .. }
+            | Self::Get { .. }
+            | Self::Validate { .. }
+            | Self::ShowHierarchy { .. }
+            | Self::ListTemplates { .. } => false,
+        }
+    }
+}
+
+impl ClaimCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Acquire { .. }
+            | Self::Release { .. }
+            | Self::Renew { .. }
+            | Self::Heartbeat { .. }
+            | Self::ForceEvict { .. } => true,
+            Self::Status { .. } | Self::List { .. } => false,
+        }
+    }
+}
+
+impl HooksCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Install { .. } => true,
+        }
+    }
+}
+
+impl InvariantCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Render { .. } => true,
+            Self::Check { .. } => false,
+        }
+    }
+}
+
+impl ReferenceCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Render { .. } => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod recovery_dispatch_tests {
+    use super::*;
+
+    #[test]
+    fn test_representative_writer_and_reader_classification() {
+        assert!(Commands::Init {
+            hierarchy_template: None,
+            json: false,
+        }
+        .requires_recovery_dispatch());
+        assert!(Commands::Validate {
+            id: None,
+            json: false,
+            explain: false,
+            scope: None,
+            fix: true,
+            dry_run: false,
+            branch_drift: false,
+            divergence: false,
+            leases: false,
+        }
+        .requires_recovery_dispatch());
+        assert!(!Commands::Status { json: false }.requires_recovery_dispatch());
+        assert!(!Commands::Serve {
+            port: 3000,
+            stop: false,
+            status: true,
+            fg: false,
+            log: None,
+            web_dir: None,
+            json: false,
+        }
+        .requires_recovery_dispatch());
+    }
+}

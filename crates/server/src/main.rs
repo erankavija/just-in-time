@@ -20,7 +20,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
-use jit::storage::JsonFileStorage;
+use jit_server::prepare_server_storage;
 use routes::AppState;
 
 /// JIT REST API Server
@@ -58,21 +58,21 @@ async fn main() -> Result<()> {
 
     info!("Starting JIT API Server...");
 
-    // Initialize storage and command executor
-    let storage = JsonFileStorage::new(&args.data_dir);
-
-    // Validate repository exists
-    storage.validate().map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to initialize storage: {}\n\n\
-             The server requires a JIT repository to be initialized.\n\
-             Run 'jit init' in the repository directory, or use --data-dir to point to an existing repository.",
-            e
-        )
-    })?;
+    // Recover before validation or command-service construction.
+    let (storage, recovery_session) = prepare_server_storage(&args.data_dir)?;
 
     info!("Using JIT repository at: {}", args.data_dir);
     let executor = Arc::new(CommandExecutor::new(storage));
+    if recovery_session.report().recovered_count() > 0 {
+        info!(
+            "Recovered {} pending transaction(s) before server startup",
+            recovery_session.report().recovered_count()
+        );
+    }
+    // The current HTTP surface is read-only. Release startup serialization
+    // after validation and executor construction; any future mutation route
+    // must enter through the same repository mutation boundary as the CLI.
+    drop(recovery_session);
 
     // Start file watcher for live updates
     let (tracker, _watcher) = watcher::start_watching(&args.data_dir)?;

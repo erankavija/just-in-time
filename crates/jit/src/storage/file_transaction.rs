@@ -49,6 +49,15 @@ pub struct FileTransactionOutcome {
     pub recovery_state: RecoveryState,
 }
 
+/// Machine-local control location containing pending transaction journals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionControlLocation {
+    /// Repository-sibling `.jit-bootstrap/`, used when `.jit/` was absent.
+    ExternalBootstrap,
+    /// Repository-local `.jit/tmp/transactions/`.
+    InternalRepository,
+}
+
 /// Capability-based transaction service rooted at an already-open repository
 /// parent directory. No publication operation accepts an ambient path.
 pub struct FileTransactionKernel {
@@ -174,6 +183,123 @@ impl FileTransactionKernel {
             return Ok(None);
         };
         Ok(Some(read_journal(&control.transaction)?.decision.into()))
+    }
+
+    /// Enumerate pending transaction ids in one control location.
+    ///
+    /// Results are sorted so recovery order is deterministic. Invalid protocol
+    /// contents fail closed instead of being skipped.
+    pub fn pending_transaction_ids(
+        &self,
+        location: TransactionControlLocation,
+    ) -> Result<Vec<String>> {
+        let transactions = match location {
+            TransactionControlLocation::ExternalBootstrap => {
+                let Some(metadata) = metadata_optional(&self.root, BOOTSTRAP_DIR)? else {
+                    return Ok(Vec::new());
+                };
+                if !metadata.is_dir() {
+                    return Err(FileTransactionError::UnexpectedBootstrapOccupant.into());
+                }
+                let bootstrap = open_existing_dir(&self.root, BOOTSTRAP_DIR)?;
+                if directory_is_empty(&bootstrap)? {
+                    return Ok(Vec::new());
+                }
+                ensure_existing_protocol_marker(&bootstrap)?;
+                let Some(metadata) = metadata_optional(&bootstrap, "transactions")? else {
+                    return Ok(Vec::new());
+                };
+                if !metadata.is_dir() {
+                    return Err(FileTransactionError::UnexpectedBootstrapOccupant.into());
+                }
+                open_existing_dir(&bootstrap, "transactions")?
+            }
+            TransactionControlLocation::InternalRepository => {
+                let Some(jit) = metadata_optional(&self.root, ".jit")? else {
+                    return Ok(Vec::new());
+                };
+                if !jit.is_dir() {
+                    return Err(FileTransactionError::UnsupportedTarget {
+                        path: ".jit".to_string(),
+                    }
+                    .into());
+                }
+                let jit = open_existing_dir(&self.root, ".jit")?;
+                let Some(tmp) = metadata_optional(&jit, "tmp")? else {
+                    return Ok(Vec::new());
+                };
+                if !tmp.is_dir() {
+                    return Err(FileTransactionError::UnsupportedTarget {
+                        path: ".jit/tmp".to_string(),
+                    }
+                    .into());
+                }
+                let tmp = open_existing_dir(&jit, "tmp")?;
+                let Some(transactions) = metadata_optional(&tmp, "transactions")? else {
+                    return Ok(Vec::new());
+                };
+                if !transactions.is_dir() {
+                    return Err(FileTransactionError::UnsupportedTarget {
+                        path: ".jit/tmp/transactions".to_string(),
+                    }
+                    .into());
+                }
+                open_existing_dir(&tmp, "transactions")?
+            }
+        };
+
+        let mut ids = transactions
+            .entries()?
+            .map(|entry| {
+                let entry = entry?;
+                if !entry.file_type()?.is_dir() {
+                    return Err(FileTransactionError::UnexpectedOccupant {
+                        path: entry.file_name().to_string_lossy().into_owned(),
+                    }
+                    .into());
+                }
+                let id = entry.file_name().to_string_lossy().into_owned();
+                validate_transaction_id(&id)?;
+                Ok(id)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        ids.sort();
+        Ok(ids)
+    }
+
+    /// Remove an empty or marker-only external control directory.
+    ///
+    /// This is safe only while the bootstrap lock is held. A non-empty
+    /// transaction directory is left intact for ordinary journal recovery.
+    pub fn cleanup_empty_external_control(&self, _guard: &RepoWriteGuard) -> Result<()> {
+        let Some(_) = metadata_optional(&self.root, BOOTSTRAP_DIR)? else {
+            return Ok(());
+        };
+        let bootstrap = open_existing_dir(&self.root, BOOTSTRAP_DIR)?;
+        if directory_is_empty(&bootstrap)? {
+            drop(bootstrap);
+            self.root.remove_dir(BOOTSTRAP_DIR)?;
+            sync_directory(&self.root)?;
+            return Ok(());
+        }
+        ensure_existing_protocol_marker(&bootstrap)?;
+        if let Some(metadata) = metadata_optional(&bootstrap, "transactions")? {
+            if !metadata.is_dir() {
+                return Err(FileTransactionError::UnexpectedBootstrapOccupant.into());
+            }
+            let transactions = open_existing_dir(&bootstrap, "transactions")?;
+            if transactions.entries()?.next().is_some() {
+                return Ok(());
+            }
+            drop(transactions);
+            bootstrap.remove_dir("transactions")?;
+        }
+        remove_optional_file(&bootstrap, PROTOCOL_MARKER)?;
+        sync_directory(&bootstrap)?;
+        drop(bootstrap);
+        self.root.remove_dir(BOOTSTRAP_DIR)?;
+        sync_directory(&self.root)?;
+        Ok(())
     }
 
     /// Resume one prepared, committed, or rolled-back transaction.

@@ -3,6 +3,7 @@
 
 # Jit lock files (temporary coordination)
 .jit/**/*.lock
+.jit-bootstrap.lock
 
 # Jit server runtime files (ephemeral, machine-specific)
 .jit/server.log

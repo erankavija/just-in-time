@@ -142,9 +142,10 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 /// All file writes are atomic (write to temp file, then rename).
 ///
 /// File locking is used to prevent race conditions in concurrent access:
-/// - Every mutating path first takes the repository write lock
-///   ([`RepoWriteLock`], `.repo-write.lock`), so a caller holding it across a
-///   multi-write sequence excludes all other writers for the whole sequence
+/// - Every mutating path takes the repository-sibling bootstrap lock before the
+///   repository write lock ([`RepoWriteLock`], `.repo-write.lock`), so a caller
+///   holding the chain across a multi-write sequence excludes all other writers
+///   for the whole sequence
 /// - Index updates are protected with exclusive locks
 /// - Individual issue updates use per-file locks
 /// - Gate registry and event log use exclusive locks for writes
@@ -152,6 +153,12 @@ fn ensure_supported_index_version(index: Index) -> Result<Index> {
 pub struct JsonFileStorage {
     root: PathBuf,
     locker: FileLocker,
+    /// Repository-sibling lock acquired before `.jit/.repo-write.lock`.
+    ///
+    /// It deliberately lives outside `.jit-bootstrap/`: fresh-root recovery
+    /// removes that control directory while retaining this guard, and deleting
+    /// the backing lock inode would let another process lock a replacement.
+    bootstrap_lock: Arc<RepoWriteLock>,
     /// Shared by every clone of this instance, so a nested write inside a
     /// sequence that already holds the lock reenters it instead of deadlocking.
     repo_lock: Arc<RepoWriteLock>,
@@ -170,11 +177,38 @@ impl JsonFileStorage {
             ));
 
         let root = root.as_ref().to_path_buf();
+        let bootstrap_lock_path = root
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(".jit-bootstrap.lock");
+        let bootstrap_lock = RepoWriteLock::for_lock_path(bootstrap_lock_path, timeout);
         Self {
-            repo_lock: RepoWriteLock::for_storage_root(&root, timeout),
+            repo_lock: RepoWriteLock::for_storage_root_after(
+                &root,
+                timeout,
+                Some(Arc::clone(&bootstrap_lock)),
+            ),
+            bootstrap_lock,
             root,
             locker: FileLocker::new(timeout),
         }
+    }
+
+    /// Acquire only the repository-sibling bootstrap lock.
+    ///
+    /// Startup recovery uses this before touching `.jit/`, because a prepared
+    /// fresh-root transaction may need to restore the complete absence of that
+    /// directory.
+    pub(crate) fn acquire_bootstrap_write_lock(&self) -> Result<RepoWriteGuard> {
+        self.bootstrap_lock.acquire()
+    }
+
+    /// Acquire the repository lock after the bootstrap lock.
+    ///
+    /// The lock instance is shared by every storage clone, allowing startup
+    /// recovery to retain it while command-layer writes re-enter it.
+    pub(crate) fn acquire_repo_write_lock_raw(&self) -> Result<RepoWriteGuard> {
+        self.repo_lock.acquire()
     }
 
     /// Check if the storage directory exists and is initialized.
@@ -594,6 +628,7 @@ impl JsonFileStorage {
 
 impl IssueStore for JsonFileStorage {
     fn init(&self) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
         // `init` is the one command that does not pass through `validate()`, so
         // it must run the same format guard itself: re-initializing over an
         // EXISTING repository whose `index.json` is newer than this binary

@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 /// Marker file that distinguishes an initialized `.jit` repository from a bare
 /// or partial `.jit` directory. Kept in sync with `json::INDEX_FILE`.
 const INDEX_FILE: &str = "index.json";
+const TRANSACTION_PROTOCOL_MARKER: &str = "transaction-protocol-v1";
 
 /// Walk upward from `start`, using `exists` to probe each candidate path, to
 /// find the nearest ancestor directory containing an initialized `.jit`
@@ -65,6 +66,38 @@ pub fn discover_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<Pat
 /// first, as it always takes precedence over discovery.
 pub fn discover_jit_dir(start: &Path) -> Option<PathBuf> {
     discover_from(start, Path::exists)
+}
+
+/// Discover the nearest repository that may need mutation-time recovery.
+///
+/// In addition to an initialized `.jit/index.json`, this recognizes the two
+/// durable journal locations that must remain reachable before normal
+/// validation: `.jit-bootstrap/transaction-protocol-v1` and
+/// `.jit/tmp/transactions`. A random bare `.jit/` still does not capture
+/// discovery.
+pub fn discover_recovery_jit_dir(start: &Path) -> Option<PathBuf> {
+    discover_recovery_from(start, Path::exists)
+}
+
+/// Pure core of [`discover_recovery_jit_dir`].
+pub fn discover_recovery_from(start: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    for ancestor in start.ancestors() {
+        let jit = ancestor.join(".jit");
+        let initialized = exists(&jit.join(INDEX_FILE));
+        let internal_recovery = exists(&jit.join("tmp").join("transactions"));
+        let external_recovery = exists(
+            &ancestor
+                .join(".jit-bootstrap")
+                .join(TRANSACTION_PROTOCOL_MARKER),
+        );
+        if initialized || internal_recovery || external_recovery {
+            return Some(jit);
+        }
+        if exists(&ancestor.join(".git")) {
+            break;
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -210,6 +243,33 @@ mod tests {
         fs::create_dir_all(&nested).unwrap();
 
         let found = discover_jit_dir(&nested);
+        assert_eq!(found, None);
+    }
+
+    #[test]
+    fn test_recovery_discovery_finds_external_fresh_root_journal() {
+        let set = HashSet::from([
+            PathBuf::from("/repo/.git"),
+            PathBuf::from("/repo/.jit-bootstrap/transaction-protocol-v1"),
+        ]);
+        let found = discover_recovery_from(Path::new("/repo/sub"), exists_in(set));
+        assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
+    }
+
+    #[test]
+    fn test_recovery_discovery_finds_internal_no_index_journal() {
+        let set = HashSet::from([
+            PathBuf::from("/repo/.git"),
+            PathBuf::from("/repo/.jit/tmp/transactions"),
+        ]);
+        let found = discover_recovery_from(Path::new("/repo/sub"), exists_in(set));
+        assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
+    }
+
+    #[test]
+    fn test_recovery_discovery_still_skips_unrelated_bare_jit() {
+        let set = HashSet::from([PathBuf::from("/repo/.git"), PathBuf::from("/repo/.jit")]);
+        let found = discover_recovery_from(Path::new("/repo/sub"), exists_in(set));
         assert_eq!(found, None);
     }
 }
