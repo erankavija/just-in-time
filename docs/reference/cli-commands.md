@@ -1141,6 +1141,30 @@ jit issue reject $GATED_ISSUE --reason "wont-fix"
 jit issue reject $ISSUE --reason "out-of-scope"
 ```
 
+### Deleting Issues (`jit issue delete`)
+
+Deletion permanently removes an issue record. It is a destructive, discouraged
+operation — prefer `jit issue reject` — and requires explicit operator
+confirmation via the environment:
+
+```bash
+JIT_ALLOW_DELETION=1 jit issue delete <ID>
+```
+
+**Key behaviors:**
+
+- **Refusal exits nonzero.** Without `JIT_ALLOW_DELETION=1` the command refuses
+  before writing anything and exits `2` (invalid-argument family) in both text
+  and JSON modes, so a script can distinguish "refused" from "deleted".
+- **JSON refusal envelope.** Under `--json` the refusal uses the standard
+  top-level `error` object with code `DELETION_NOT_CONFIRMED`, `details.id`
+  naming the issue, and a `suggestions` entry carrying the exact
+  `JIT_ALLOW_DELETION=1 jit issue delete <ID>` remediation command.
+- **Confirmed deletion is unchanged**: it removes the issue, logs the deletion
+  event, and reports the removal (exit `0`).
+- **Main worktree only.** Deletion is refused from secondary git worktrees to
+  keep worktree state consistent.
+
 ## Gate Commands
 
 Gates are quality checkpoints that enforce process requirements. See [How-To: Custom Gates](../how-to/custom-gates.md) for practical examples and [Core Model - Gates](../concepts/core-model.md#gates) for conceptual understanding.
