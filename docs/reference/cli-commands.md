@@ -1777,8 +1777,8 @@ jit gate preset list [--json]
 `jit gate preset show <name>` for a preset's actual gate list and count; the
 builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] rust-tdd - Test-driven development workflow for Rust projects (<N> gates)
-[builtin] minimal - Minimal workflow with just code review (<N> gates)
+[builtin] plan-review - Agent plan-quality review on the planning node before fan-out (<N> gates)
+[builtin] coverage-preview - Deterministic coverage preview on the breakdown node (scoped validate) (<N> gates)
 [custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```
 
@@ -1801,16 +1801,15 @@ jit gate preset show <NAME> [--json]
 ```
 
 **Arguments:**
-- `NAME` - Preset name (e.g., `rust-tdd`, `minimal`)
+- `NAME` - Preset name (e.g., the builtin `plan-review`, or a project preset like `rust-ci`)
 
-**Output** (illustrative layout — the builtin registry is authoritative, so run
-the command for a preset's actual gates, commands, and timeouts):
+**Output** (illustrative layout — run the command for a preset's actual gates,
+commands, and timeouts):
 ```
-Preset: rust-tdd
-Description: Test-driven development workflow for Rust projects
+Preset: rust-ci
+Description: Custom preset created from issue abc123
 
 Gates:
-  tdd-reminder - Write tests first (TDD) (precheck:manual)
   tests - All tests pass (postcheck:auto)
     Command: <command>
     Timeout: <N>s
@@ -1820,14 +1819,14 @@ Gates:
 
 **Examples:**
 ```bash
-# Show preset details
-jit gate preset show rust-tdd
+# Show a project preset's details
+jit gate preset show rust-ci
 
-# Show custom preset
-jit gate preset show my-workflow
+# Show a builtin preset
+jit gate preset show plan-review
 
 # JSON output
-jit gate preset show rust-tdd --json
+jit gate preset show rust-ci --json
 ```
 
 ### `jit gate preset apply`
@@ -1855,32 +1854,32 @@ jit gate preset apply <NAME> [ISSUE_ID]... [OPTIONS]
 **Examples:**
 ```bash
 # Apply preset to single issue
-jit gate preset apply rust-tdd abc123
+jit gate preset apply rust-ci abc123
 
 # Apply to multiple issues (batch mode)
-jit gate preset apply minimal abc123 def456 ghi789
+jit gate preset apply rust-ci abc123 def456 ghi789
 
 # Apply from query results (JSON is the xargs-safe source of ids)
-jit query all --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-tdd
+jit query all --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-ci
 
 # Apply with filtering - skip precheck gates
-jit gate preset apply rust-tdd abc123 --no-precheck
+jit gate preset apply rust-ci abc123 --no-precheck
 
 # Skip specific gates
-jit gate preset apply rust-tdd abc123 --except clippy --except fmt
+jit gate preset apply rust-ci abc123 --except clippy --except fmt
 
 # Override timeout for all automated gates
-jit gate preset apply rust-tdd abc123 --timeout 600
+jit gate preset apply rust-ci abc123 --timeout 600
 
 # Combine filters
-jit gate preset apply rust-tdd abc123 --no-precheck --except clippy --timeout 120
+jit gate preset apply rust-ci abc123 --no-precheck --except clippy --timeout 120
 ```
 
 **Batch Output:**
 ```
-Applied preset 'rust-tdd' to 2 issue(s):
-  abc123 - gates added: tdd-reminder, tests, clippy, fmt, code-review
-  def456 - gates added: tdd-reminder, tests, clippy, fmt, code-review
+Applied preset 'rust-ci' to 2 issue(s):
+  abc123 - gates added: tests, clippy, fmt, code-review
+  def456 - gates added: tests, clippy, fmt, code-review
 
 Errors (1):
   xyz999 - Issue not found: xyz999
@@ -1936,18 +1935,19 @@ Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are auto
 
 ### Builtin Presets
 
-JIT embeds a set of builtin presets in the binary. Their definitions are the
-source of truth for what each one bundles;
-[Built-in Gate Presets](gate-presets.md) is generated from those definitions and
-lists every preset with each of its gates (key, title, stage, mode, description,
-checker). The live commands introspect the same set: `jit gate preset list` prints
-every preset with a one-line summary, and `jit gate preset show <name>` prints one
-preset's gate list.
-
-Among them are the planning-bracket presets, which attach to the planning (`P`)
+The binary embeds exactly the three planning-bracket presets — `plan-review`,
+`coverage-preview`, and `breakdown-review` — which attach to the planning (`P`)
 and breakdown (`B`) nodes when a breakable container is
 [bracketed](../concepts/planning-bracket.md), reviewing the plan and the
-decomposition before fan-out.
+decomposition before fan-out. Their definitions are the source of truth for what
+each one bundles; [Built-in Gate Presets](gate-presets.md) is generated from those
+definitions and lists each gate (key, title, stage, mode, description, checker).
+The live commands introspect the same set: `jit gate preset list` prints every
+preset with a one-line summary, and `jit gate preset show <name>` prints one
+preset's gate list.
+
+Language- and workflow-specific bundles are declared per project, not built in;
+see [Declaring a project preset](../how-to/custom-gates.md#declaring-a-project-preset).
 
 **Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
 
@@ -1987,12 +1987,12 @@ Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
 
 ### Preset Workflow Examples
 
-**Quick Start with Builtin:**
+**Quick Start with a Project Preset:**
 ```bash
-# Apply standard workflow to new issue
+# Apply your project's CI workflow to a new issue
 jit issue create --title "Add user login"
-jit gate preset apply rust-tdd abc123
-# Issue now carries the rust-tdd preset's gates (run `jit gate preset show rust-tdd` for the current set)
+jit gate preset apply rust-ci abc123
+# Issue now carries the rust-ci preset's gates (run `jit gate preset show rust-ci` for the current set)
 ```
 
 **Create Team Standard:**
@@ -2010,13 +2010,13 @@ jit query all --label epic:v2.0 --json | jq -r '.issues[].id' | xargs jit gate p
 **Customize for Special Cases:**
 ```bash
 # Apply without precheck for hotfix
-jit gate preset apply rust-tdd hotfix-123 --no-precheck
+jit gate preset apply rust-ci hotfix-123 --no-precheck
 
 # Apply with faster timeout for CI
-jit gate preset apply rust-tdd abc123 --timeout 60
+jit gate preset apply rust-ci abc123 --timeout 60
 
 # Apply subset of gates
-jit gate preset apply rust-tdd abc123 --except tdd-reminder --except clippy
+jit gate preset apply rust-ci abc123 --except fmt --except clippy
 ```
 
 ### Exit Codes

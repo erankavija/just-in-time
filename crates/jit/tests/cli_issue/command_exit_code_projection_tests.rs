@@ -307,7 +307,7 @@ fn test_command_exit_codes_gate_preset_apply_emits_1() {
     let temp = setup();
     let output = Command::new(jit_binary())
         .current_dir(&temp)
-        .args(["gate", "preset", "apply", "minimal", "0000000000000000"])
+        .args(["gate", "preset", "apply", "plan-review", "0000000000000000"])
         .output()
         .unwrap();
 
