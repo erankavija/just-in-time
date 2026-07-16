@@ -2513,30 +2513,38 @@ JSON uses the list envelope `{"count": N, "roots": [...]}`.
 
 ### `jit graph export`
 
-Export the whole-repository dependency graph.
+Export the dependency graph, optionally scoped to one container's subtree.
 
 ```
-jit graph export [--format dot|mermaid|json] [--json] [--full] [--output <file>]
+jit graph export [--format dot|mermaid|json|batch] [--json] [--full] [--scope <container>] [--output <file>]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--format` | Output format: `dot` (default), `mermaid`, or `json`. |
-| `--json` | Sugar for `--format json`. Combining it with an explicit `--format dot`/`--format mermaid` is a usage error (exit 2); combining it with `--format json` is redundant but not an error. |
-| `--full` | Emit complete issue records per node. **JSON only** (`--format json` or `--json`) — combining it with `dot`/`mermaid` is a usage error (exit 2). |
+| `--format` | Output format: `dot` (default), `mermaid`, `json`, or `batch`. |
+| `--json` | Sugar for `--format json`. Combining it with an explicit `--format dot`/`--format mermaid`/`--format batch` is a usage error (exit 2); combining it with `--format json` is redundant but not an error. |
+| `--full` | Emit complete issue records per node. **JSON only** (`--format json` or `--json`) — combining it with `dot`/`mermaid`/`batch` is a usage error (exit 2). |
+| `--scope` | Restrict the export to the container's DAG-authoritative containment membership (the container and its subtree). Composes with every format. |
 | `--output` | Write to a file instead of stdout. |
 
 `dot` and `mermaid` render the graph for Graphviz / Mermaid. `json` (or
 `--json`) emits a `{ "nodes": [...], "edges": [...] }` document for
 programmatic consumers, in one of two node shapes; the `edges` list
 (`{ "from": <id>, "to": <dep-id> }`, one per dependency edge) is identical in
-both.
+both. `batch` emits the [batch-create seed shape](#batch-format) described below.
 
 ```bash
 jit graph export --json                # == --format json
 jit graph export --json --full         # composes with --full
 jit graph export --json --format dot   # usage error (exit 2): conflicting formats
+jit graph export --scope <epic> --json # only the epic's subtree
 ```
+
+`--scope` restricts the **listed** nodes to the container's containment
+membership; `dot`/`mermaid`/`json` render only those nodes and the edges among
+them. As with [`jit graph tree`](#jit-graph-tree), resolution still runs over the
+whole repository, so a scoped node's `parent`/`cluster` may name an issue outside
+the subtree.
 
 **Summary shape (default `--format json`)** — lean nodes for orchestration
 loops:
@@ -2584,6 +2592,54 @@ The default (no `--full`) output stays in the lean summary shape; the four
 hierarchy fields appear only in the `--full` shape. See
 [storage-format § Issue JSON Schema](storage-format.md#issue-json-schema) for the
 full field reference.
+
+#### Batch format
+
+`--format batch` emits the exact JSON array
+[`jit issue batch-create --from-json`](#batch-create-with-dependency-wiring-jit-issue-batch-create) consumes — the
+structural inverse of batch creation. Each in-scope node becomes one definition
+keyed by its short id:
+
+```json
+[
+  {
+    "key": "003f9f83",
+    "title": "Login",
+    "type": "task",
+    "priority": "normal",
+    "labels": ["component:core"],
+    "gates": ["code-review"],
+    "depends_on": ["a1b2c3d4"]
+  }
+]
+```
+
+The output is a **structural seed**, not a snapshot: it carries no lifecycle
+fields (state, assignee, timestamps), and every in-scope node exports regardless
+of its state. Three projections make a captured subtree replayable in a fresh
+repository:
+
+- **Identity-bound labels are stripped.** The `type:*` label is lifted into the
+  `type` field; membership-label namespaces (`[type_hierarchy.label_associations]`),
+  the coverage rule's `satisfies-namespace`, and its `container-from-label`
+  namespace (`brackets:`) are dropped. Generic labels survive.
+- **Template bracket nodes are excluded** together with every edge touching them
+  — planning- and breakdown-role node types — so the importing container
+  scaffolds its own bracket via [`jit apply`](#jit-apply).
+- **Boundary edges are reported.** A dependency on an issue outside the `--scope`
+  membership is excluded from `depends_on` and reported on stderr (count plus
+  `from -> to` short-id pairs), never dropped silently. `stdout` therefore stays
+  a clean array you can pipe straight into batch creation.
+
+Without `--scope` the whole graph is exported in batch shape (still minus bracket
+nodes). Round-tripping the same-scope export through batch creation in a fresh
+repository with compatible configuration recreates an isomorphic subgraph (same
+titles, types, priorities, gates, and in-scope edges).
+
+```bash
+jit graph export --scope <epic> --format batch --output epic-seed.json
+jit issue batch-create --from-json epic-seed.json   # replay it elsewhere
+```
 
 ### `jit graph tree`
 

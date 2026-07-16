@@ -73,7 +73,7 @@ pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
     PassAllOutcome,
 };
-pub use graph::GraphExportFormat;
+pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};

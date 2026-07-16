@@ -60,7 +60,12 @@ use thiserror::Error;
 /// assert!(minimal.r#type.is_none());
 /// assert!(minimal.depends_on.is_empty());
 /// ```
-#[derive(Debug, Clone, serde::Deserialize)]
+/// The type also *serializes* so it doubles as the output shape of `jit graph
+/// export --format batch`: the export is the exact array batch creation
+/// consumes, giving schema symmetry (the batch-create inverse). Defaultable
+/// fields are skipped when empty so a serialized def re-parses identically to a
+/// hand-written one.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct BatchIssueDef {
     /// Symbolic key, unique within the file. Other entries reference it via
     /// `depends_on`.
@@ -68,24 +73,24 @@ pub struct BatchIssueDef {
     /// Issue title (required).
     pub title: String,
     /// Issue description body. Defaults to the empty string.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
     /// Issue type, applied as a `type:<t>` label. Defaults to the project's
     /// configured default type when omitted.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
     /// Priority string (e.g. `low`, `normal`, `high`, `critical`). Defaults to
     /// `normal`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
     /// Additional labels in `namespace:value` format.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
     /// Quality gate keys to require; each must exist in the gate registry.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gates: Vec<String>,
     /// Symbolic `key`s of other entries in the same file this issue depends on.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub depends_on: Vec<String>,
 }
 
