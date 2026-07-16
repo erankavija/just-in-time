@@ -532,7 +532,39 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         expected_keys(&["dry-run", "json"])
     );
 
+    let list_schema = &commands["list"]["output"]["success_schema"];
+    assert_eq!(
+        list_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["count", "profiles"])
+    );
+    assert_eq!(
+        property_keys(list_schema, "ProfileSummary"),
+        expected_keys(&["applied", "id", "jit", "origin", "version"])
+    );
+
     let show_schema = &commands["show"]["output"]["success_schema"];
+    assert_eq!(
+        show_schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&[
+            "applied",
+            "byte_size",
+            "file_count",
+            "manifest",
+            "origin",
+            "package_hash",
+            "target_hashes",
+        ])
+    );
     assert_eq!(
         property_keys(show_schema, "ProfileManifest"),
         expected_keys(&["asset", "contribution", "profile", "region"])
