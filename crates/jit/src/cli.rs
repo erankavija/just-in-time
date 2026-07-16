@@ -429,7 +429,8 @@ pub enum Commands {
     ///   jit serve --fg             # Run in foreground (for debugging)
     ///   jit serve --json           # Machine-readable output
     Serve {
-        /// Preferred port to listen on (auto-selects from 3000–3099 if taken)
+        /// Preferred port to listen on (auto-selects from 3000–3099 if
+        /// taken; pass 0 for any OS-assigned free port)
         #[arg(long, default_value = "3000")]
         port: u16,
 

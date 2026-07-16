@@ -6815,7 +6815,11 @@ fn run() -> Result<()> {
                         }
                     }
 
-                    let p = find_available_port(port)?;
+                    let listener = find_available_port(port)?;
+                    let p = listener
+                        .local_addr()
+                        .context("Failed to read bound port")?
+                        .port();
                     let url = format!("http://localhost:{p}");
                     let server_bin = find_server_binary()?;
                     let data_dir_str = jit_dir
@@ -6846,6 +6850,8 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
+                    // Release the port right before spawning: the child binds it next.
+                    drop(listener);
                     let status = cmd.status().context("Failed to run jit-server")?;
                     if json {
                         println!(
