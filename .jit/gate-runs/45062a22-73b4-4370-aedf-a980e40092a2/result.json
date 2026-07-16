@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "45062a22-73b4-4370-aedf-a980e40092a2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "56838d99-dc9d-4028-9b41-6ba691fc4852",
+  "commit": "c4cb8a8d2aa54755a4c77f155c343191ded10136",
+  "branch": "worktree-agent-56838d99",
+  "status": "failed",
+  "started_at": "2026-07-16T13:01:06.226912346Z",
+  "completed_at": "2026-07-16T13:06:41.972636332Z",
+  "duration_ms": 335745,
+  "exit_code": 1,
+  "stdout": "Attribution: c4cb8a8d (implementation); 989e2146 (claim metadata)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); repo-validate passed (exit 0); code-review none\nTruncation recovery: reread the implementation patch and current planner/snapshot files in bounded ranges\n\n1. **[blocking][issue-impact]** `ensure_array_of_tables` replaces an existing empty ordinary array with a new array-of-tables, discarding that item’s comments/decor. A valid `gates = [] # note` input loses the user comment when the first profile gate is appended, violating the hard preservation requirement. [crates/jit/src/profile/planner.rs:672](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-56838d99/crates/jit/src/profile/planner.rs:672)\n\n2. **[blocking][issue-impact]** Map-entry lookup builds JSON Pointers with unescaped identities. A manifest-valid identity containing `/` or `~` is misread as absent even when the corresponding quoted TOML key exists; the subsequent table insertion can overwrite it without equality/conflict detection. Escape JSON-Pointer tokens or reject such identities. [crates/jit/src/profile/planner.rs:467](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-56838d99/crates/jit/src/profile/planner.rs:467)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two semantic-merge cases can overwrite or discard user-authored configuration content.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Converting an empty ordinary registry array to an array-of-tables discards user comments.\",\"file\":\"crates/jit/src/profile/planner.rs\",\"line\":672,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Unescaped JSON-Pointer map identities can bypass conflict detection and overwrite an existing key.\",\"file\":\"crates/jit/src/profile/planner.rs\",\"line\":467,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 15045 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-56838d99\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b04-37f5-7e52-a96a-69d6a1463b8b\n--------\nuser\n--- 15032 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Two semantic-merge cases can overwrite or discard user-authored configuration content.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Converting an empty ordinary registry array to an array-of-tables discards user comments.",
+        "file": "crates/jit/src/profile/planner.rs",
+        "line": 672
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Unescaped JSON-Pointer map identities can bypass conflict detection and overwrite an existing key.",
+        "file": "crates/jit/src/profile/planner.rs",
+        "line": 467
+      }
+    ]
+  }
+}

@@ -5,7 +5,8 @@ use std::fs;
 use std::path::Path;
 
 /// Platform-neutral file-mode intent carried by a package projection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProjectedFileMode {
     /// Ordinary non-executable file.
     Regular,

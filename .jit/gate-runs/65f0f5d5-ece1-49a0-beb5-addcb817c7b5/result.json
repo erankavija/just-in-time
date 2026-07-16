@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "65f0f5d5-ece1-49a0-beb5-addcb817c7b5",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "56838d99-dc9d-4028-9b41-6ba691fc4852",
+  "commit": "8c2c7aee5196f735921822f4f09fe208d3a85880",
+  "branch": "worktree-agent-56838d99",
+  "status": "passed",
+  "started_at": "2026-07-16T13:14:59.765602095Z",
+  "completed_at": "2026-07-16T13:19:55.041447773Z",
+  "duration_ms": 295275,
+  "exit_code": 0,
+  "stdout": "Attribution: 989e2146, c4cb8a8d, aa419c09, 8c2c7aee (`jit:56838d99`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/cargo-ci, @/gate/repo-validate (.jit/gates.toml); REQ-02/04/06/12 (markdown-first parent issue source)\nGate evidence: cargo-ci passed (exit 0, 8c2c7aee); repo-validate passed (exit 0, 8c2c7aee); code-review failed (exit 1, prior c4cb8a8d review; both findings fixed)\nTruncation recovery: reread planner patch/current merge ranges, parent requirement source, package validation, render/overlay contracts, and latest gate records in bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-attributable planner changes meet the scoped criteria; prior semantic-merge findings are fixed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All issue-attributable planner changes meet the scoped criteria; prior semantic-merge findings are fixed.",
+    "findings": []
+  }
+}
