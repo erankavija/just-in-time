@@ -100,6 +100,7 @@ mod tests {
             ProfileOrigin::Embedded,
             "package".to_string(),
             BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
+            false,
         )
     }
 

@@ -411,6 +411,7 @@ impl EventTag {
                     "docs/example.md".to_string(),
                     "target-hash".to_string(),
                 )]),
+                isolated_torn_tail: false,
             },
         }
     }

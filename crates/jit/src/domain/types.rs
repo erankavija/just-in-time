@@ -1389,6 +1389,9 @@ pub enum Event {
         package_hash: String,
         /// Package contribution hashes keyed by repository target.
         target_hashes: std::collections::BTreeMap<String, String>,
+        /// Whether the transaction isolated a pre-existing non-newline,
+        /// malformed event tail immediately before this record.
+        isolated_torn_tail: bool,
     },
 }
 
@@ -1670,6 +1673,7 @@ impl Event {
         origin: ProfileOrigin,
         package_hash: String,
         target_hashes: std::collections::BTreeMap<String, String>,
+        isolated_torn_tail: bool,
     ) -> Self {
         Event::ProfileApplied {
             id: Uuid::new_v4().to_string(),
@@ -1679,6 +1683,7 @@ impl Event {
             origin,
             package_hash,
             target_hashes,
+            isolated_torn_tail,
         }
     }
 

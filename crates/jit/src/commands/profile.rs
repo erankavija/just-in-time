@@ -6,12 +6,12 @@ use crate::profile::{
     ProfileApplicationWarning, ProfileApplyResult, ProfileOrigin, ProjectedFileMode, SnapshotEntry,
 };
 use crate::storage::{
-    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryRequiredError,
-    RecoveryState, TransactionAction,
+    FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
+    RecoveryRequiredError, RecoveryState, TransactionAction,
 };
 use crate::validation::repository::{
     validate_repository, FilesystemRepositoryView, OverlayRepositoryView,
-    RepositoryValidationFailure,
+    RepositoryValidationFailure, RepositoryView,
 };
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -60,13 +60,17 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         package: &EmbeddedProfilePackage<'_>,
     ) -> Result<ProfileApplyResult> {
+        // Direct library callers receive the same universal recovery boundary
+        // as CLI mutation dispatch. The retained CLI session, when present, is
+        // reentrant on this thread; otherwise this session closes the
+        // recovery-to-first-write race for the duration of application.
+        let _recovery_session = RecoveryCoordinator::recover_before_services(&self.storage)?;
         let kernel = FileTransactionKernel::new(self.storage.open_repository_capability()?)?;
         self.apply_embedded_profile_with_kernel(package, &kernel)
     }
 
-    /// Test seam for deterministic transaction interruption and cleanup failure.
-    #[doc(hidden)]
-    pub fn apply_embedded_profile_with_kernel(
+    /// Internal test seam for deterministic interruption and cleanup failure.
+    fn apply_embedded_profile_with_kernel(
         &self,
         package: &EmbeddedProfilePackage<'_>,
         kernel: &FileTransactionKernel,
@@ -85,10 +89,6 @@ impl CommandExecutor<JsonFileStorage> {
             ".jit/events.jsonl",
         ]);
         let snapshot = self.storage.capture_profile_snapshot(snapshot_paths)?;
-        let validation_base = Arc::new(FilesystemRepositoryView::from_jit_root(
-            self.storage.root(),
-        )?);
-        let plan = plan_profile_application_against(package, &snapshot, validation_base.clone())?;
         let record = AppliedProfileRecord {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
@@ -97,6 +97,34 @@ impl CommandExecutor<JsonFileStorage> {
             target_hashes: package.hashes().targets.clone(),
         };
         let record_matches = inspect_installed_record(&snapshot, &record_path, &record)?;
+        let prior_events = snapshot
+            .file(".jit/events.jsonl")
+            .map_or(&[][..], |file| file.bytes.as_slice());
+        let isolated_torn_tail = !prior_events.is_empty() && !prior_events.ends_with(b"\n");
+        let event = Event::new_profile_applied(
+            metadata.id.clone(),
+            metadata.version.clone(),
+            ProfileOrigin::Embedded,
+            package.hashes().package.clone(),
+            package.hashes().targets.clone(),
+            isolated_torn_tail,
+        );
+        let next_events = append_profile_event_image(prior_events, &event)?;
+        let validation_base: Arc<dyn RepositoryView> = Arc::new(
+            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
+        );
+        let planning_validation_base: Arc<dyn RepositoryView> = if isolated_torn_tail {
+            Arc::new(OverlayRepositoryView::new(
+                validation_base.clone(),
+                [(
+                    PathBuf::from(".jit/events.jsonl"),
+                    Some(next_events.clone()),
+                )],
+            )?)
+        } else {
+            validation_base.clone()
+        };
+        let plan = plan_profile_application_against(package, &snapshot, planning_validation_base)?;
 
         if plan.is_no_op() && record_matches {
             return Ok(ProfileApplyResult {
@@ -110,17 +138,6 @@ impl CommandExecutor<JsonFileStorage> {
         }
 
         ensure_profile_directory(&snapshot)?;
-        let event = Event::new_profile_applied(
-            metadata.id.clone(),
-            metadata.version.clone(),
-            ProfileOrigin::Embedded,
-            package.hashes().package.clone(),
-            package.hashes().targets.clone(),
-        );
-        let prior_events = snapshot
-            .file(".jit/events.jsonl")
-            .map_or(&[][..], |file| file.bytes.as_slice());
-        let next_events = append_profile_event_image(prior_events, &event)?;
         let record_bytes = record.to_bytes()?;
 
         let mut overlay = plan.overlay_changes();
@@ -449,5 +466,56 @@ mod tests {
         assert!(!temp.path().join("docs/profile.txt").exists());
         assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_profile_application_preserves_and_certifies_torn_event_tail_end_to_end() {
+        let (temp, storage, package) = fixture();
+        let torn = b"{\"torn\":";
+        fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
+        let executor = CommandExecutor::new(storage.clone());
+
+        executor.apply_embedded_profile(&package).unwrap();
+
+        let image = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        assert!(image.starts_with(b"{\"torn\":\n"));
+        assert_eq!(&image[..torn.len()], torn);
+        let events = storage.read_events().unwrap();
+        assert!(matches!(
+            events.as_slice(),
+            [Event::ProfileApplied {
+                isolated_torn_tail: true,
+                ..
+            }]
+        ));
+    }
+
+    #[test]
+    fn test_public_profile_application_recovers_pending_journal_before_publish() {
+        let (temp, storage, package) = fixture();
+        let executor = CommandExecutor::new(storage.clone());
+        let kernel = kernel(
+            &storage,
+            [
+                TransactionFailurePoint::AfterPublish { action: 1 },
+                TransactionFailurePoint::ReverseAction { action: 1 },
+            ],
+        );
+        let error = executor
+            .apply_embedded_profile_with_kernel(&package, &kernel)
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RecoveryRequiredError>().unwrap().state,
+            RecoveryState::Prepared
+        );
+
+        let applied = executor.apply_embedded_profile(&package).unwrap();
+
+        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
+        assert_eq!(
+            fs::read(temp.path().join("docs/profile.txt")).unwrap(),
+            package.source_bytes("assets/profile.txt").unwrap()
+        );
+        assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 }

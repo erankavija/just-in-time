@@ -6,7 +6,7 @@
 //! layout). The directory location can be overridden with the `JIT_DATA_DIR`
 //! environment variable.
 
-use crate::domain::{Event, EventTag, Issue};
+use crate::domain::{parse_known_events, Event, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
     IssueNotFoundError, IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard,
@@ -1102,30 +1102,8 @@ impl IssueStore for JsonFileStorage {
         let events_lock_path = self.root.join(".events.lock");
         let _lock = self.locker.lock_shared(&events_lock_path)?;
 
-        let file = fs::File::open(&events_path).context("Failed to open events file")?;
-        let reader = BufReader::new(file);
-
-        let mut events = Vec::new();
-        for line in reader.lines() {
-            let line = line.context("Failed to read line from events file")?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: serde_json::Value =
-                serde_json::from_str(&line).context("Failed to deserialize event")?;
-            let event_type = value
-                .as_object()
-                .and_then(|object| object.get("type"))
-                .and_then(serde_json::Value::as_str)
-                .context("Event record is missing a string type")?;
-            if EventTag::ALL.iter().any(|tag| tag.as_str() == event_type) {
-                events.push(
-                    serde_json::from_value(value).context("Failed to deserialize known event")?,
-                );
-            }
-        }
-
-        Ok(events)
+        let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
+        parse_known_events(&contents).context("Failed to deserialize event log")
     }
 
     fn read_artifact_archive_events(&self) -> Result<Vec<Event>> {
