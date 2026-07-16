@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "7e8b103a-c56e-4575-b547-095c48dedcfe",
+  "gate_key": "repo-validate",
+  "stage": "postcheck",
+  "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+  "commit": "3ceed7597de6563f186853544acda505ffcfe803",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T11:52:51.072096307Z",
+  "completed_at": "2026-07-16T11:52:51.174834961Z",
+  "duration_ms": 102,
+  "exit_code": 10,
+  "stdout": "",
+  "stderr": "Error: Refusing to run gate 'repo-validate' for issue 0aec3b1e-ccd3-4f12-96c6-3750ed7e8563: this jit binary predates the tree under review\n\nPossible causes:\n  • This jit binary was built from commit 30e74734ab182cc0c515c5a3b03b870c20790891, but the repository's current HEAD is 3ceed7597de6563f186853544acda505ffcfe803\n  • A gate verdict produced by a stale binary is not evidence about the change under review\n\nTo fix:\n  • Rebuild and reinstall with build provenance: scripts/install-jit.sh (wraps cargo install --path crates/jit)\n  • Verify with: jit --version (should show commit 30e74734ab182cc0c515c5a3b03b870c20790891)\n\n",
+  "command": "jit validate",
+  "by": "auto:executor",
+  "message": null
+}
