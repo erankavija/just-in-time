@@ -538,9 +538,10 @@ jit profile list [--json]
 ```
 
 Human output shows each profile's ID, version, compatible JIT range, embedded
-origin, and whether an exact installed record exists. JSON uses the standard
-list envelope `{"count": N, "profiles": [...]}`. Each profile entry carries
-`id`, `version`, `origin`, `jit`, and `applied`.
+origin, and whether a matching stored provenance record exists. This record
+check does not read every installed target. JSON uses the standard list envelope
+`{"count": N, "profiles": [...]}`. Each profile entry carries `id`, `version`,
+`origin`, `jit`, and `applied`.
 
 The running binary is authoritative for the live values; scripts should inspect
 the returned fields rather than copy package identity or compatibility values
@@ -557,8 +558,10 @@ jit profile show <PROFILE_ID> [--json]
 Human output summarizes package identity, compatibility, hashes, contribution
 and asset counts, and installed state. JSON returns `ProfileShowResult`: the
 complete parsed manifest, `origin`, `package_hash`, `target_hashes`,
-`file_count`, `byte_size`, and an `applied` provenance record when the current
-repository exactly matches one.
+`file_count`, `byte_size`, and the parseable stored `applied` provenance record
+when one is present. `show` does not compare that record with current target
+bytes; use `jit profile apply <PROFILE_ID> --dry-run` for exact current-state
+verification.
 
 ### `jit profile apply`
 

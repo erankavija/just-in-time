@@ -36,8 +36,10 @@ jit profile apply jit-dogfood
 
 All profile commands support `--json`. `profile list` uses the standard
 count-wrapped list shape. `profile show` returns the manifest, package identity,
-target hashes, size, and matching installed record when present. A dry run
-returns the deterministic plan hash and every target's `create`, `update`, or
+target hashes, size, and the stored provenance record when present. Showing that
+record does not re-verify current target bytes. Use
+`jit profile apply jit-dogfood --dry-run` for exact current-state verification:
+it returns the deterministic plan hash and every target's `create`, `update`, or
 `unchanged` action without writing. Successful reapplication of an exact
 installation returns `unchanged`.
 
