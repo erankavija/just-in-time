@@ -1072,3 +1072,57 @@ fn test_item_show_rule_renders_description_and_name_fallback() {
         "a description-less rule must fall back to its name as display text"
     );
 }
+
+#[test]
+fn test_namespace_unique_rule_addressable_after_config_driven_write() {
+    // REQ-02 (jit:d74a9ed1): a namespace hand-declared unique in config.toml —
+    // with no intervening jit write to regenerate rules.toml — becomes
+    // resolvable at `@/rule/namespace-unique-<ns>` once the NEXT jit-driven
+    // write (here, `jit config set`) runs. The registry-first `rule` item kind
+    // reads `.jit/rules.toml` straight off disk, not the in-memory-reconciled
+    // ruleset, so this only holds because the write-through actually persists
+    // the row.
+    let temp = setup_test_repo();
+    let config_path = temp.path().join(".jit").join("config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap();
+    config.push_str("\n[namespaces.squad]\ndescription = \"Owning squad\"\nunique = true\n");
+    std::fs::write(&config_path, config).unwrap();
+
+    // Precondition: the freshly hand-edited registry has NOT yet reached
+    // rules.toml.
+    let rules_path = temp.path().join(".jit").join("rules.toml");
+    assert!(
+        !std::fs::read_to_string(&rules_path)
+            .unwrap()
+            .contains("namespace-unique-squad"),
+        "precondition: rules.toml has not been synced yet"
+    );
+
+    // Any jit-driven config write triggers the sync, regardless of the key set.
+    let set = Command::new(jit_binary())
+        .args(["config", "set", "project.name", "demo-project"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        set.status.success(),
+        "config set failed: {}",
+        String::from_utf8_lossy(&set.stderr)
+    );
+
+    let shown = Command::new(jit_binary())
+        .args(["item", "show", "@/rule/namespace-unique-squad", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        shown.status.success(),
+        "@/rule/namespace-unique-squad must resolve after the write-through: {}",
+        String::from_utf8_lossy(&shown.stderr)
+    );
+    let shown_json: Value = serde_json::from_slice(&shown.stdout).unwrap();
+    assert_eq!(
+        shown_json["item"]["qualified_id"].as_str().unwrap(),
+        "@/rule/namespace-unique-squad"
+    );
+}
