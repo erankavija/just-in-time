@@ -1028,6 +1028,8 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn save_gate_run_result(&self, result: &crate::domain::GateRunResult) -> Result<()> {
+        let _repo_lock = self.repo_lock.acquire()?;
+
         // Single source for the run's location; create its parent directory.
         let result_path = self.result_path(&result.run_id);
         let run_dir = result_path
@@ -1136,6 +1138,7 @@ impl IssueStore for JsonFileStorage {
         // the same shape-level inputs as the read path (empty, absolute,
         // `..`-escaping) before any I/O.
         validate_repo_relative_input(rel_path)?;
+        let _repo_lock = self.repo_lock.acquire().map_err(PathReadError::Other)?;
 
         // Resolve repo root (parent of `.jit`) and join the validated relative
         // path. Shape validation alone is not enough: a symlinked directory
@@ -1197,6 +1200,7 @@ impl IssueStore for JsonFileStorage {
     ) -> Result<std::path::PathBuf> {
         // Validate preset
         preset.validate()?;
+        let _repo_lock = self.repo_lock.acquire()?;
 
         // Create presets directory if needed
         let presets_dir = self.root.join("config").join("gate-presets");
@@ -1353,6 +1357,34 @@ mod tests {
     use crate::storage::IssueStore;
     use tempfile::TempDir;
 
+    fn assert_direct_writer_waits_for_repository_guard(
+        storage: &JsonFileStorage,
+        writer: impl FnOnce(JsonFileStorage) -> Result<()> + Send + 'static,
+    ) {
+        let guard = storage.repo_lock.acquire().unwrap();
+        let writer_storage = storage.clone();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            done_tx.send(writer(writer_storage)).unwrap();
+        });
+
+        started_rx.recv().unwrap();
+        assert!(
+            done_rx
+                .recv_timeout(std::time::Duration::from_millis(100))
+                .is_err(),
+            "direct storage writer bypassed the held repository guard"
+        );
+        drop(guard);
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("writer did not resume after repository guard release")
+            .unwrap();
+        handle.join().unwrap();
+    }
+
     fn setup_storage() -> (TempDir, JsonFileStorage) {
         let temp_dir = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp_dir.path());
@@ -1481,6 +1513,24 @@ mod tests {
         assert!(!temp.path().join("../escape.md").exists());
     }
 
+    #[test]
+    fn test_write_repo_file_waits_for_repository_guard() {
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+
+        assert_direct_writer_waits_for_repository_guard(&storage, |storage| {
+            storage
+                .write_repo_file("docs/serialized.md", "serialized")
+                .map_err(anyhow::Error::from)
+        });
+
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/serialized.md")).unwrap(),
+            "serialized"
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_write_repo_file_rejects_symlinked_parent_escape() {
@@ -1592,6 +1642,77 @@ mod tests {
         let loaded = storage.list_gate_runs_for_issue("issue-1").unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].run_id, "run-atomic");
+    }
+
+    #[test]
+    fn test_save_gate_run_result_waits_for_repository_guard() {
+        use crate::domain::{GateRunResult, GateRunStatus, GateStage};
+        use chrono::Utc;
+
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+        let now = Utc::now();
+        let result = GateRunResult {
+            schema_version: 1,
+            run_id: "run-serialized".to_string(),
+            gate_key: "tests".to_string(),
+            stage: GateStage::Postcheck,
+            issue_id: "issue-serialized".to_string(),
+            commit: None,
+            branch: None,
+            status: GateRunStatus::Passed,
+            started_at: now,
+            completed_at: Some(now),
+            duration_ms: Some(1),
+            exit_code: Some(0),
+            stdout: String::new(),
+            stderr: String::new(),
+            command: "true".to_string(),
+            by: None,
+            message: None,
+            findings: None,
+        };
+
+        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
+            storage.save_gate_run_result(&result)
+        });
+
+        assert!(temp
+            .path()
+            .join(".jit/gate-runs/run-serialized/result.json")
+            .exists());
+    }
+
+    #[test]
+    fn test_save_gate_preset_waits_for_repository_guard() {
+        use crate::domain::{GateMode, GateStage};
+        use crate::gate_presets::{GatePresetDefinition, GateTemplate};
+
+        let temp = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        storage.init().unwrap();
+        let preset = GatePresetDefinition {
+            name: "serialized".to_string(),
+            description: "Serialized preset".to_string(),
+            gates: vec![GateTemplate {
+                key: "review".to_string(),
+                title: "Review".to_string(),
+                description: "Review gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+            }],
+        };
+
+        assert_direct_writer_waits_for_repository_guard(&storage, move |storage| {
+            storage.save_gate_preset(&preset).map(|_| ())
+        });
+
+        assert!(temp
+            .path()
+            .join(".jit/config/gate-presets/serialized.json")
+            .exists());
     }
 
     #[test]
