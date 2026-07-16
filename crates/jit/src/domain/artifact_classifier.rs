@@ -107,7 +107,7 @@ pub struct EmbeddedArtifactOwner {
     /// Current lifecycle state of the owner.
     pub state: State,
     /// Pre-archive origin, so an `Archived` owner classifies by its effective
-    /// terminal state (`@/issue/45a140ae`).
+    /// terminal state (`jit:45a140ae`).
     pub archived_from: Option<State>,
     /// Whether the owner belongs to the selected resolved subtree.
     pub inside_subtree: bool,

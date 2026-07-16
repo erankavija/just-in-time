@@ -97,7 +97,7 @@ impl State {
 /// The terminal state an issue counts as for dependency, readiness, and
 /// delivery-accounting purposes — its *effective* terminal state.
 ///
-/// `Archived` is terminality-preserving (`@/issue/45a140ae`): archiving preserves
+/// `Archived` is terminality-preserving (`jit:45a140ae`): archiving preserves
 /// whatever was true before it. So the effective terminal state is:
 ///
 /// - `Some(Done)` / `Some(Rejected)` for a literally terminal issue,
@@ -467,7 +467,7 @@ pub struct Issue {
     pub done_at: Option<DateTime<Utc>>,
     /// The lifecycle state this issue held immediately before entering
     /// [`State::Archived`], making `Archived` terminality-preserving
-    /// (`@/issue/45a140ae`).
+    /// (`jit:45a140ae`).
     ///
     /// Set when the issue transitions into `Archived` (recording the state it
     /// left) and cleared on revive, so it is `Some` only while `state ==

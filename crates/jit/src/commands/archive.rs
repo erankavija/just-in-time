@@ -203,7 +203,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         if let Some(container_id) = root_container_id.as_deref() {
-            // Coupled retirement (`@/issue/45a140ae`): artifact archival requires an
+            // Coupled retirement (`jit:45a140ae`): artifact archival requires an
             // effectively terminal container (Done/Rejected, or already Archived
             // from one of those for an idempotent rerun). An Archived container
             // retired from a non-terminal state, or any active state, is blocked.
@@ -395,7 +395,7 @@ impl CommandExecutor<JsonFileStorage> {
         // through the final deletion attempt.
         let _repo_write_guard = self.storage.acquire_repo_write_lock()?;
         let plan = self.plan_archive_target(target)?;
-        // REQ-05 (`@/issue/45a140ae`): when a blocker is caused by lifecycle state,
+        // REQ-05 (`jit:45a140ae`): when a blocker is caused by lifecycle state,
         // refuse with a diagnostic that names the permitted next action instead of
         // the generic ineligibility from `executable_artifacts` below. The same
         // guidance is carried in the plan JSON a preview emits.
@@ -635,7 +635,7 @@ impl CommandExecutor<JsonFileStorage> {
         }
         canonicalize_warnings(&mut warnings);
 
-        // Coupled retirement (`@/issue/45a140ae`): a successful container archival
+        // Coupled retirement (`jit:45a140ae`): a successful container archival
         // retires the container into Archived as its final durable step, recording
         // its pre-archive terminal state. Idempotent — a reconciling rerun finds it
         // already Archived and the transition chokepoint's no-op guard does

@@ -293,7 +293,7 @@ pub struct ArtifactOwner {
     /// Lifecycle state used for terminal-owner classification.
     pub state: State,
     /// Pre-archive origin, so an `Archived` owner classifies by its effective
-    /// terminal state (`@/issue/45a140ae`). `Some` only for an `Archived` owner
+    /// terminal state (`jit:45a140ae`). `Some` only for an `Archived` owner
     /// that recorded its origin; absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_from: Option<State>,
@@ -460,7 +460,7 @@ impl BlockerCode {
     }
 
     /// The permitted next action when a blocker is caused by lifecycle state,
-    /// or `None` for blockers unrelated to state (`@/issue/45a140ae`, REQ-05).
+    /// or `None` for blockers unrelated to state (`jit:45a140ae`, REQ-05).
     ///
     /// Carried into both human and JSON diagnostics so an operator sees, at the
     /// point of refusal, how to make the container or document eligible — without

@@ -733,10 +733,19 @@ stateDiagram-v2
     Ready --> InProgress: claim / prechecks pass
     InProgress --> Gated: completion attempted
     Gated --> Done: done retried after gates pass
+    Done --> Archived: retire (records origin)
+    Rejected --> Archived: retire (records origin)
+    Archived --> Done: revive to recorded origin
+    Archived --> Rejected: revive to recorded origin
     note right of Gated
-        This diagram shows the ordinary workflow.
-        The update handler does not enforce it as
-        an exhaustive source-to-target transition graph.
+        Ordinary workflow. Any state may also transition to
+        Rejected or Archived; the update handler does not
+        enforce an exhaustive source-to-target transition graph.
+    end note
+    note left of Archived
+        Archived records the state it was entered from.
+        Reviving restores that origin exactly, so the
+        round-trip never resurrects work into an active state.
     end note
 ```
 
@@ -758,7 +767,7 @@ gate statuses before entering this state.
 **Rejected**: Closure outcome for work not implemented. It bypasses dependency
 and gate checks. Common reasons: duplicate, won't-fix, invalid, out-of-scope.
 
-**Archived**: Parked out of active views. Reachable from any state and not terminal. An archived issue can be revived by transitioning it back into the lifecycle. Archived issues are excluded from readiness queries but still count as open in container rollups.
+**Archived**: A retired issue, parked out of active views. Reachable from any state, and **terminality-preserving**: it records the state it was entered from (its origin) and keeps whatever that state meant for dependents. An issue archived from a terminal state (`Done`/`Rejected`) stays effectively terminal — it keeps satisfying its dependents and counts toward delivery in container rollups by its origin. An issue archived from a non-terminal state does not satisfy dependents and counts as open. Archived issues are never themselves in the readiness set. Reviving an archived issue restores its recorded origin state exactly (a completed issue archived from `Done` revives only to `Done`), so the archive round-trip cannot move work back into an active state. `Archived` is a lifecycle state and is distinct from `jit archive`, which relocates linked documents on disk (see [Archive planning and execution](../reference/cli-commands.md#archive-planning-and-execution)).
 
 ### Completion and Rejection Outcomes
 
@@ -789,7 +798,8 @@ do not rely on it to prohibit a later explicit state update.
 - `→ Done`: `jit issue update --state done` checks dependencies and gate statuses
 - `→ Gated`: A `done` request with unpassed gates is diverted here
 - `Any State → Rejected`: Via `jit issue reject` (bypasses gates)
-- `Any State → Archived`: Via `jit issue update --state archived` (parks the issue; bypasses gates)
+- `Any State → Archived`: Via `jit issue update --state archived` (retires the issue and records its origin; bypasses gates). A successful `jit archive container` also retires its container to `Archived` as its final step.
+- `Archived → origin`: Reviving via `jit issue update --state <origin>` restores the recorded pre-archive state exactly. Any other target is refused, naming the origin as the only legal revive target. (A legacy archived record from before origins were recorded has no origin to restore, so its revive is unconstrained and carries an advisory warning.)
 
 ### Gate Bypass for Rejected
 

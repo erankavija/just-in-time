@@ -148,8 +148,9 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockingReason {
     /// An unmet dependency: the issue waits on `id` (titled `title`), which is in
-    /// `state`, a state that [`is_dependency_met`] rejects (anything short of the
-    /// terminal `Done` or `Rejected`).
+    /// `state`, a state that [`is_dependency_met`] rejects (anything short of an
+    /// effective terminal state — `Done`, `Rejected`, or `Archived` retired from
+    /// one of those).
     Dependency {
         /// Id of the depended-on issue.
         id: String,

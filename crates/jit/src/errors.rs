@@ -608,7 +608,7 @@ pub(crate) enum TransitionBlocker {
     },
     /// A revive out of [`State::Archived`] targeted a state other than the
     /// recorded pre-archive origin. `Archived` is terminality-preserving
-    /// (`@/issue/45a140ae`): reviving restores the pre-archive state exactly, so
+    /// (`jit:45a140ae`): reviving restores the pre-archive state exactly, so
     /// the round-trip cannot resurrect a completed issue into the active
     /// lifecycle. Carries the only legal revive target.
     ArchivedRevive {
@@ -675,7 +675,7 @@ impl TransitionBlockedError {
     }
 
     /// A revive out of [`State::Archived`] refused because it targeted a state
-    /// other than the recorded pre-archive origin (`@/issue/45a140ae`).
+    /// other than the recorded pre-archive origin (`jit:45a140ae`).
     ///
     /// `requested_state` is the attempted target, `origin` the only legal revive
     /// target. Maps to exit 4 like the other transition refusals.

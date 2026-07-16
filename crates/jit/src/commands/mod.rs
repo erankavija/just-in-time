@@ -590,7 +590,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **No-op guard.** If `issue.state == target` there is nothing to
     ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
-    /// 1a. **Archived revive guard (`@/issue/45a140ae`).** Leaving
+    /// 1a. **Archived revive guard (`jit:45a140ae`).** Leaving
     ///    [`State::Archived`] is a revive: it may only restore the recorded
     ///    pre-archive origin ([`Issue::archived_from`]). Targeting any other state
     ///    returns a
@@ -660,7 +660,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(Vec::new());
         }
 
-        // Archived is terminality-preserving (`@/issue/45a140ae`): a revive out of
+        // Archived is terminality-preserving (`jit:45a140ae`): a revive out of
         // Archived may only restore the recorded pre-archive origin, so the
         // archive round-trip cannot resurrect a completed issue into the active
         // lifecycle. A legacy Archived record (no recorded origin) keeps the prior
@@ -704,7 +704,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Enforcement passed (or was bypassed/skipped): land the new state.
         issue.state = target;
 
-        // Maintain the pre-archive origin (`@/issue/45a140ae`): entering Archived
+        // Maintain the pre-archive origin (`jit:45a140ae`): entering Archived
         // records the state left behind (never Archived — the no-op guard above
         // rules that out); leaving Archived (revive) clears it, so `archived_from`
         // is `Some` only while the issue is Archived.
