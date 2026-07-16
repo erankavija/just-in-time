@@ -31,6 +31,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 clap = { version = "4.5", features = ["derive", "env"] }
+# Adopts a listening socket handed down by the launching `jit` process via the
+# listenfd protocol, so the server never re-binds a port `jit` already probed
+# (closes the cross-process probe-then-bind race). Contains the sole `unsafe`
+# `FromRawFd` adoption this crate needs, keeping `#![deny(unsafe_code)]` intact.
+listenfd = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 git2 = "0.21"
