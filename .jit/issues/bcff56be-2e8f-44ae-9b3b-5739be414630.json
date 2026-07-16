@@ -2,7 +2,7 @@
   "id": "bcff56be-2e8f-44ae-9b3b-5739be414630",
   "title": "Exercise cross-platform profile adoption",
   "description": "A thin black-box acceptance suite proves that the independently tested package, transaction, command, documentation, and portable-workflow seams compose into the supported adopter journey.\n\n## Background\n\nThis final proof consumes public surfaces only. Product defects are reported separately and do not expand this acceptance task; lower-level component tests remain outside this suite.\n\n## Success Criteria\n\n- [hard] REQ-01: On Unix and Windows, fresh and existing Git-free repositories produce equivalent final state through init delegation and direct apply, including dry-run/no-op behavior and platform-specific executable semantics.\n- [hard] REQ-02: One offline black-box journey applies the embedded profile, creates and approves a planning bracket, validates managed prose/projections and portable checker warnings, and reaches implementation-ready breakdown without a source checkout or `jq`.\n- [hard] REQ-03: The suite consumes only public CLI, schema, and MCP surfaces and asserts that no deferred lifecycle command or field is exposed; lower-level component tests remain outside this suite.\n\n## Scope\n\n**Blast radius:** new black-box fixtures and platform CI invocation only. Product defects are reported separately and do not expand this acceptance task.\n\n**Green landing:** The bounded cross-platform adopter journey passes over already-green components without duplicating their internal test matrices.",
-  "state": "in_progress",
+  "state": "done",
   "priority": "normal",
   "assignee": "agent:codex-profile-acceptance",
   "dependencies": [
@@ -17,35 +17,35 @@
     "repo-validate"
   ],
   "gates_status": {
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:04:51.975404903Z"
-    },
     "doc-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:32:21.799319836Z"
     },
-    "code-review": {
+    "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:27:47.322891393Z"
+      "updated_at": "2026-07-16T20:04:51.975404903Z"
     },
     "mcp-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:19:51.658284931Z"
     },
+    "repo-validate": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T20:20:15.068748165Z"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T20:20:03.790437783Z"
     },
-    "repo-validate": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T20:20:15.068748165Z"
+      "updated_at": "2026-07-16T20:27:47.322891393Z"
     }
   },
   "context": {},
@@ -59,7 +59,8 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.043186518Z",
-  "updated_at": "2026-07-16T20:34:21.026305485Z",
+  "updated_at": "2026-07-16T20:35:12.633194132Z",
   "first_ready_at": "2026-07-14T22:28:46.043186728Z",
-  "claimed_at": "2026-07-16T19:27:02.704532624Z"
+  "claimed_at": "2026-07-16T19:27:02.704532624Z",
+  "done_at": "2026-07-16T20:35:12.633190512Z"
 }
