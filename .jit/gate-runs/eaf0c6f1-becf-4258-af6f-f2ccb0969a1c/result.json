@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "eaf0c6f1-becf-4258-af6f-f2ccb0969a1c",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+  "commit": "32a6e66a97257daa808e88a6cca484b0004dcb0a",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T07:45:17.633948484Z",
+  "completed_at": "2026-07-16T07:49:40.427088671Z",
+  "duration_ms": 262793,
+  "exit_code": 1,
+  "stdout": "Attribution: 9a072149, 3e02db29, f2df3982, af432931, 2d935a6b (all `jit:d3709cc6`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/event-log (.jit/invariants.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/cargo-ci-features, @/gate/dependency-audit, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T07:33:28Z); jit-validate passed (exit 0, 2026-07-16T07:36:07Z); code-review pending (no prior run)\nTruncation recovery: re-read each affected commit/path separately; segmented Cargo.lock diff; narrowed manifests, gate script, feature consumer, and tests\n\n1. **[blocking][issue-impact]** REQ-02’s all-feature requirement is unverified. The change upgrades optional `quick-xml` at [crates/jit/Cargo.toml](/home/vkaskivuo/Projects/just-in-time/crates/jit/Cargo.toml:64), but the issue does not require `cargo-ci-features` ([issue record](/home/vkaskivuo/Projects/just-in-time/.jit/issues/d3709cc6-0366-4e85-961b-b47f20cfdfb7.json:12)). Recorded Cargo CI only runs default-feature clippy and tests ([script](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci.sh:240)); the canonical feature gate specifically requires feature-enabled clippy and tests for changes touching feature-gated code ([gate registry](/home/vkaskivuo/Projects/just-in-time/.jit/gates.toml:45)).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The optional XML dependency update lacks the required all-feature validation evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-02 all-feature validation is missing for the upgraded optional quick-xml dependency.\",\"file\":\"crates/jit/Cargo.toml\",\"line\":64,\"references\":[\"@/gate/cargo-ci-features\",\"@/gate/cargo-ci\",\"@/invariant/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8334 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f69e3-1780-7e33-a181-1532c3548097\n--------\nuser\n--- 8321 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The optional XML dependency update lacks the required all-feature validation evidence.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "REQ-02 all-feature validation is missing for the upgraded optional quick-xml dependency.",
+        "file": "crates/jit/Cargo.toml",
+        "line": 64,
+        "references": [
+          "@/gate/cargo-ci-features",
+          "@/gate/cargo-ci",
+          "@/invariant/bounded-rust-build-footprint"
+        ]
+      }
+    ]
+  }
+}

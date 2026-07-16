@@ -24,6 +24,11 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T07:36:07.452661876Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T07:45:17.633948484Z"
     }
   },
   "context": {},
@@ -35,7 +40,7 @@
     "satisfies:REQ-02"
   ],
   "created_at": "2026-07-15T09:12:53.166170434Z",
-  "updated_at": "2026-07-16T07:36:07.755761206Z",
+  "updated_at": "2026-07-16T07:49:40.427294361Z",
   "first_ready_at": "2026-07-15T09:12:53.166170684Z",
   "claimed_at": "2026-07-15T17:53:57.655577204Z"
 }

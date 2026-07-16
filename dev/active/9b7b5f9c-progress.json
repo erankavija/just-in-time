@@ -67,7 +67,7 @@
       "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
       "short_id": "d3709cc6",
       "title": "Remediate Rust dependency advisories",
-      "status": "deterministic_gates_passed_external_review_blocked",
+      "status": "code_review_failed_requires_cargo_ci_features_gate_approval",
       "branch": "worktree-agent-d3709cc6",
       "commit": "f2df39827576f443c7dba0d454fa64760d3fbb9f",
       "merge_commit": "af432931d532f8e550b2b720e408f14c99a63b2d"
@@ -114,8 +114,15 @@
     {
       "category": "external AI review data export",
       "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-      "status": "awaiting informed invoker approval after sandbox rejection; no data sent",
+      "status": "approved by invoker; first code review completed",
       "scope": "configured JIT code-review and later doc-review gates invoke codex exec with repository code and issue context"
+    },
+    {
+      "category": "issue gate scope change",
+      "issue_id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
+      "status": "awaiting invoker approval",
+      "requested_gate": "cargo-ci-features",
+      "finding": "code review eaf0c6f1-becf-4258-af6f-f2ccb0969a1c requires canonical feature-enabled clippy/test evidence for the optional quick-xml upgrade"
     }
   ],
   "rework_counts": {
