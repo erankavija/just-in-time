@@ -620,4 +620,14 @@ mod tests {
             expected.as_bytes()
         );
     }
+
+    #[test]
+    fn test_public_content_standards_redirect_does_not_promise_profile_installation() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let redirect =
+            fs::read_to_string(root.join("docs/reference/jit-content-standards.md")).unwrap();
+        assert!(redirect.contains("contributors to the JIT source repository"));
+        assert!(redirect.contains("ordinary `jit init` does not install it"));
+        assert!(redirect.contains("does not expose a public profile-install command"));
+    }
 }

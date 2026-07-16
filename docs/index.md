@@ -56,7 +56,6 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Claim System](reference/claim.md) - Leases and coordination
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
-- [Content Standards](reference/jit-content-standards.md) - Authoring standards for issue descriptions and markdown documents
 - [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
 - [Built-in Gate Presets](reference/gate-presets.md) - The gate bundles the binary ships, with each preset's gates and checkers
 - [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
@@ -96,4 +95,3 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 **Development documentation** (`dev/`) covers how we build JIT itself - see [dev/index.md](../dev/index.md) for contributor resources.
 
 ---
-
