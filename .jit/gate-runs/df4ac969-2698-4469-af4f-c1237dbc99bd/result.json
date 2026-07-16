@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "run_id": "df4ac969-2698-4469-af4f-c1237dbc99bd",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "070ca05f-f7a9-4922-b796-3376a0b813b2",
+  "commit": "f45030f26d403ba84673cdf886c6ffd3ed2b8ed3",
+  "branch": "worktree-agent-070ca05f",
+  "status": "failed",
+  "started_at": "2026-07-16T18:41:58.054091506Z",
+  "completed_at": "2026-07-16T18:45:32.132717929Z",
+  "duration_ms": 214078,
+  "exit_code": 1,
+  "stdout": "Attribution: f59e74b4, 977d331c, d78ea864, 59a1f7fe, f45030f2 (`jit:070ca05f`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/070ca05f/requirement/REQ-01, @/issue/070ca05f/requirement/REQ-02, @/issue/9b7b5f9c/requirement/REQ-01, @/issue/9b7b5f9c/requirement/REQ-12 — markdown-first issue sources\nGate evidence: cargo-ci passed (0); mcp-ci passed (0); repo-validate pending (no exit code)\nTruncation recovery: split truncated combined commit/current-file reads into bounded path and line-range reads\n\n1. **F1 — high, blocking, issue-impact:** `init --profile` on an existing partial `.jit/` now applies only the profile, then skips `executor.init()`. At [main.rs:1877](/tmp/jit-agent-070ca05f/crates/jit/src/main.rs:1877), it calls `apply_profile`; at [main.rs:1889](/tmp/jit-agent-070ca05f/crates/jit/src/main.rs:1889), any profile selects only worktree-identity setup. Thus a successful run can leave out the neutral scaffold (including `.jit/issues` and the byte-compatible neutral configuration) rather than atomically combining neutral and profile bytes. The new test covers only a conflicting partial repository, not this success path. This is a regression from the prior finding’s fix and violates the profiled-init and existing-repository test criteria. References: `@/issue/070ca05f/requirement/REQ-01`, `@/issue/9b7b5f9c/requirement/REQ-01`, `@/issue/9b7b5f9c/requirement/REQ-12`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Existing partial repositories can complete profiled init without receiving the required neutral scaffold.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"init --profile skips neutral initialization after successfully applying a profile to an existing partial .jit directory.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1877,\"references\":[\"@/issue/070ca05f/requirement/REQ-01\",\"@/issue/9b7b5f9c/requirement/REQ-01\",\"@/issue/9b7b5f9c/requirement/REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11939 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /tmp/jit-agent-070ca05f\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6c3c-49e4-7bc1-a5b3-16d03b24796f\n--------\nuser\n--- 11926 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Existing partial repositories can complete profiled init without receiving the required neutral scaffold.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "init --profile skips neutral initialization after successfully applying a profile to an existing partial .jit directory.",
+        "file": "crates/jit/src/main.rs",
+        "line": 1877,
+        "references": [
+          "@/issue/070ca05f/requirement/REQ-01",
+          "@/issue/9b7b5f9c/requirement/REQ-01",
+          "@/issue/9b7b5f9c/requirement/REQ-12"
+        ]
+      }
+    ]
+  }
+}
