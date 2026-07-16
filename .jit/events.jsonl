@@ -7977,3 +7977,4 @@
 {"type":"gate_passed","id":"3c157a02-58b4-4009-9fa4-73bf36da1ffd","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:52:14.342691008Z","gate_key":"secret-detection","updated_by":"auto:executor"}
 {"type":"gate_failed","id":"0f23d4cb-4a83-4d8c-acb8-ecea683d1495","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:52:51.177347903Z","gate_key":"repo-validate","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"e39348d7-efbf-4ca6-b885-18d959465cf5","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:53:33.597341950Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"c3fac1ad-1cf7-4640-a7a1-f85583f84472","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:58:34.080006364Z","gate_key":"code-review","updated_by":"auto:executor"}

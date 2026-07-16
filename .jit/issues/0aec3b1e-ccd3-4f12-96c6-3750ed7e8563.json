@@ -24,25 +24,30 @@
       "updated_by": "agent:codex-profiles-mvp",
       "updated_at": "2026-07-16T11:25:32.111728634Z"
     },
-    "cargo-ci": {
+    "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T11:49:15.873296359Z"
-    },
-    "dependency-audit": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T11:51:33.070728976Z"
+      "updated_at": "2026-07-16T11:54:07.833493166Z"
     },
     "secret-detection": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T11:52:12.135074323Z"
     },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:49:15.873296359Z"
+    },
     "repo-validate": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T11:53:31.791681377Z"
+    },
+    "dependency-audit": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:51:33.070728976Z"
     }
   },
   "context": {},
@@ -56,7 +61,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.034762002Z",
-  "updated_at": "2026-07-16T11:53:33.596759390Z",
+  "updated_at": "2026-07-16T11:58:34.079459134Z",
   "first_ready_at": "2026-07-14T22:28:46.034762432Z",
   "claimed_at": "2026-07-16T11:26:16.927975453Z"
 }
