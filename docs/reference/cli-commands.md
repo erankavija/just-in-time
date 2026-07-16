@@ -2359,8 +2359,11 @@ a commit. The rest of the family works without git.
 Attach a document reference to an issue. Identity is (issue, path): re-running
 `doc add` for a path already linked to the issue updates that reference in
 place rather than appending a duplicate — `jit doc list` still shows one entry
-for the path. An omitted `--commit`/`--label`/`--doc-type` on the re-add
-leaves the existing value alone; a supplied one overwrites it. The scanned
+for the path. The commit pin always reflects the invocation, exactly as on a
+fresh add: a supplied `--commit` pins the reference, an omitted one records it
+unpinned (the current version), so a re-run re-points a stale pin. An omitted
+`--label`/`--doc-type` on the re-add leaves the existing value alone; a
+supplied one overwrites it. The scanned
 `format`/assets are always the freshly computed result unless `--skip-scan` is
 given. The JSON result's `updated` field is `true` for a refresh and `false`
 for a genuinely new reference; the appended `issue_updated` event records the

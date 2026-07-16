@@ -8043,3 +8043,10 @@
 {"type":"issue_state_changed","id":"ff44ff4d-174c-4d72-935f-2c0148796a63","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T14:31:15.003257619Z","from":"in_progress","to":"done"}
 {"type":"issue_completed","id":"78a0d3dd-9b9f-49e9-a874-d4f9293a1ebe","issue_id":"9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004","timestamp":"2026-07-16T14:31:15.003299169Z"}
 {"type":"issue_state_changed","id":"67826fc5-578f-4046-a034-8461d81975af","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T14:31:16.430791737Z","from":"backlog","to":"ready"}
+{"type":"gate_passed","id":"6fc1b498-c260-424f-8595-f388fceb53c6","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:31:51.047074789Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"issue_claimed","id":"edcb370e-d732-4a8e-b344-d3185db78179","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T14:32:44.869545597Z","assignee":"agent:codex-dogfood-profile"}
+{"type":"issue_state_changed","id":"5ac47c5a-1feb-42bf-9314-b9733c73a6d6","issue_id":"7ad4019b-2998-424b-9ea0-6d8ce3ff402c","timestamp":"2026-07-16T14:32:45.256181399Z","from":"ready","to":"in_progress"}
+{"type":"gate_passed","id":"f43c304b-006a-4a5d-b1b1-0fd535a046d9","issue_id":"16402e14-d7cc-4f40-b4a3-1b372979be67","timestamp":"2026-07-16T14:33:02.783935144Z","gate_key":"doc-review","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"54bec435-2d53-427f-b26b-fcd365038872","issue_id":"8917c558-2c6d-4425-96ed-9dad1dbe7f2b","timestamp":"2026-07-16T14:35:20.946424643Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"d0e41eba-8a31-40a7-b067-468a13c338c1","issue_id":"8917c558-2c6d-4425-96ed-9dad1dbe7f2b","timestamp":"2026-07-16T14:35:21.605033932Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"31a5efff-9ca6-4926-87f3-3c0805b4d0dc","issue_id":"8917c558-2c6d-4425-96ed-9dad1dbe7f2b","timestamp":"2026-07-16T14:39:24.805889282Z","gate_key":"code-review","updated_by":"auto:executor"}

@@ -18,20 +18,20 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T14:22:31.649488098Z"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T14:31:51.209576107Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T14:31:50.244109285Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T14:17:14.497719453Z"
-    },
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-16T08:40:04.516106093Z"
-    },
-    "docs-mechanical": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T14:16:48.680777050Z"
     }
   },
   "context": {},
@@ -43,6 +43,6 @@
     "epic:core-maintenance"
   ],
   "created_at": "2026-07-02T23:07:41.824789482Z",
-  "updated_at": "2026-07-16T14:24:51.195237453Z",
+  "updated_at": "2026-07-16T14:33:02.696718621Z",
   "claimed_at": "2026-07-16T08:40:04.625450443Z"
 }

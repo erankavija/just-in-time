@@ -62,11 +62,13 @@ fn test_remove_document_reference_logs_issue_updated_event() {
 // ========== Idempotent re-add (jit:8917c558) ==========
 //
 // Identity is (issue, path): re-adding a path already linked to the issue
-// updates that entry in place instead of appending a duplicate. `commit`,
-// `label`, and `doc_type` follow the same partial-update convention as
-// `issue update` — an omitted flag (`None`) leaves the existing value alone
-// rather than clearing it — while the scanned `format`/`assets` are always
-// the freshly computed result, mirroring a fresh add.
+// updates that entry in place instead of appending a duplicate. The commit
+// pin always reflects the invocation, as on a fresh add (supplied pins,
+// omitted records unpinned, re-pointing a stale pin). `label` and `doc_type`
+// follow the partial-update convention of `issue update` — an omitted flag
+// (`None`) leaves the existing value alone rather than clearing it — while
+// the scanned `format`/`assets` are always the freshly computed result,
+// mirroring a fresh add.
 
 #[test]
 fn test_add_document_reference_same_path_updates_in_place() {
@@ -168,7 +170,7 @@ fn test_add_document_reference_same_path_refreshes_given_metadata() {
 }
 
 #[test]
-fn test_add_document_reference_same_path_preserves_omitted_metadata() {
+fn test_add_document_reference_same_path_refreshes_pin_preserves_metadata() {
     let h = TestHarness::new();
     let id = h.create_issue("Doc re-add metadata preserved");
 
@@ -183,14 +185,20 @@ fn test_add_document_reference_same_path_preserves_omitted_metadata() {
         )
         .unwrap();
 
-    // Re-add with no metadata flags: the prior label/doc_type/commit must
-    // survive rather than being blanked out.
+    // Re-add with no metadata flags: descriptive metadata (label/doc_type)
+    // survives, while the commit pin behaves exactly as on a fresh add — an
+    // omitted --commit records the reference unpinned, re-pointing a stale pin
+    // at the current version instead of preserving it (the steward re-run
+    // workflow: refresh the link after the document changed).
     let (result, _) = h
         .executor
         .add_document_reference(&id, "docs/spec.md", None, None, None, true)
         .unwrap();
 
-    assert_eq!(result.document.commit.as_deref(), Some("abc1234"));
+    assert_eq!(
+        result.document.commit, None,
+        "an omitted --commit on re-add must shed the stale pin, not preserve it"
+    );
     assert_eq!(result.document.label.as_deref(), Some("Draft"));
     assert_eq!(result.document.doc_type.as_deref(), Some("design"));
 }
