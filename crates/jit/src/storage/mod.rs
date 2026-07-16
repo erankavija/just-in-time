@@ -280,6 +280,15 @@ pub trait IssueStore: Clone {
     /// For in-memory storage, this returns a temporary path.
     fn root(&self) -> &std::path::Path;
 
+    /// Whether `root()` names a filesystem-backed JIT data directory.
+    ///
+    /// Consumers use this capability instead of inferring the backend from
+    /// files that may legitimately be absent in a structurally invalid partial
+    /// repository. Non-filesystem and test-double backends default to `false`.
+    fn is_file_backed(&self) -> bool {
+        false
+    }
+
     /// Read a repository-local text file by its path relative to the repository
     /// root (the parent of the `.jit` directory).
     ///

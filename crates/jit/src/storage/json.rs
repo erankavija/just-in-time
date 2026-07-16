@@ -1011,6 +1011,10 @@ impl IssueStore for JsonFileStorage {
         &self.root
     }
 
+    fn is_file_backed(&self) -> bool {
+        true
+    }
+
     fn read_repo_file(
         &self,
         rel_path: &str,
