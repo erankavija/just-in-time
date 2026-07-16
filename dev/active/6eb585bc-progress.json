@@ -221,7 +221,12 @@
       ]
     }
   ],
+  "session_3_boundary": "2026-07-16: handoff dev/active/6eb585bc-handoff-3.md. Wave A snapshot: 8d7fc762 merged (0a468803), 4/5 gates green, docs-mechanical blocked by 46657f6f; 894337e2 merged (9934f89d), gates evaluating; 46657f6f (recovery-lock hotfix, INVOKER: complete immediately) dispatched; 8917c558/16402e14/52665a07/45a140ae/d74a9ed1 committed in worktrees; 6f881a85/0daba57d/1d59070d/3e12ffbd mid-work in worktrees. Wave B not dispatched.",
   "created_during_execution": [
+    {
+      "short_id": "46657f6f",
+      "note": "Gate checkers cannot invoke mutating jit: recovery session lock (eceffc17, codex session) is not cross-process reentrant; blocks docs-mechanical for the whole wave. Filed+dispatched 2026-07-16 per invoker 'file + fix now'; COMPLETE THIS FIRST (invoker: fix must be completed immediately)"
+    },
     {
       "short_id": "ef0065ad",
       "note": "Scope bracket validation to the requested container; filed by the project-lead session 2026-07-15 (@/charter/D-15); interleaved as wave 2.5. STANDING CHANGE (@/charter/D-14, commit 57ec9eb7): the epic is now a finite v1.0 prerequisite \u2014 close 6eb585bc when this scope completes, before production-readiness source freeze; the living-container decision is superseded"
@@ -236,6 +241,13 @@
     }
   ],
   "escalations": [
+    {
+      "issue": "46657f6f",
+      "date": "2026-07-16",
+      "policy": "7 (shared infrastructure) / 6 (blocker outside epic scope)",
+      "question": "eceffc17 (codex session) made the recovery bootstrap lock non-reentrant across processes; gate checkers spawning mutating jit (docs-mechanical M5) always time out. Who fixes?",
+      "resolution": "invoker chose 'I file + fix now': bug filed under epic, opus fix worker dispatched with env-handshake design; invoker follow-up directive: the fix must be completed immediately"
+    },
     {
       "issue": "45a140ae",
       "date": "2026-07-16",
