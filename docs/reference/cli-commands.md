@@ -450,7 +450,12 @@ Use `jit version` when you need the full provenance record.
 
 Initialize (or re-initialize) the `.jit/` repository in the current directory.
 Idempotent: re-running over an existing repository never overwrites
-`config.toml` or `rules.toml`, and leaves `index.json`/`events.jsonl` intact.
+`config.toml`, and leaves `index.json`/`events.jsonl` intact. `rules.toml`
+keeps every custom rule and hand-edited policy field byte-exact; the one
+synchronization re-init performs (when default-origin rules remain enabled) is
+the default `namespace-unique-*` row set, appended or dropped to match the
+current `[namespaces]`/`[type_hierarchy]` registry so `@/rule/namespace-unique-<ns>`
+stays addressable.
 
 ```bash
 jit init [--hierarchy-template <name>] [--json]
@@ -467,8 +472,10 @@ doesn't already carry it. Lease/claim coordination state lives under `.git/jit/`
 (an untracked per-worktree control plane), not in the versioned `.jit/` tree.
 
 `--json` reports what this run actually did rather than the full idempotent
-set init always ensures — `created_paths` and `modified_paths` are both empty
-on a re-init:
+set init always ensures — on a re-init `created_paths` is empty and
+`modified_paths` lists only a `.gitattributes` the run had to amend (the
+in-place refreshes init performs, such as the `namespace-unique-*` row sync
+and projection republishing, are not path-listed):
 
 ```json
 {
@@ -3307,7 +3314,10 @@ jit config show [--json]
 ### `jit config set`
 
 Set a `section.field` key in the repository (or, with `--global`, the
-user-global) `config.toml`.
+user-global) `config.toml`. A repository-level set that changes the namespace
+registry also synchronizes the default `namespace-unique-*` rows in
+`rules.toml` (same write-through as re-init; custom rules and policy edits are
+untouched).
 
 ```bash
 jit config set <KEY> <VALUE> [--global] [--json]

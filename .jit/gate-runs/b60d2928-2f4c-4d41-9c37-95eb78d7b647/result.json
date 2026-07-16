@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "b60d2928-2f4c-4d41-9c37-95eb78d7b647",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "d74a9ed1-c27d-4cf9-93dc-ace0de890b9e",
+  "commit": "e9676c8d44f1e861f8f20a7f2989c692e22d97fd",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T16:00:47.706977351Z",
+  "completed_at": "2026-07-16T16:04:35.096766303Z",
+  "duration_ms": 227389,
+  "exit_code": 1,
+  "stdout": "Attribution: 271c650b, 0500ef34, b876f3b7 (`jit:d74a9ed1`; uncommitted changes excluded)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/inv/single-source-prose (.jit/invariants.toml); @/rule/namespace-unique-brackets (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending (no run); docs-mechanical passed (exit 0)\nTruncation recovery: narrowed reads of rules loading, default-diff ordering, serialization, and write-through tests after broad searches truncated; excluded the merge’s unrelated second-parent integration delta\n\n1. **Blocking · issue-impact** — `sync_default_rule_membership` fully loads and validates every rule before performing its intended identity-only splice. A custom `json-schema` rule with an unavailable/invalid schema therefore aborts the sync at [commands/mod.rs:1218](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:1218), even though only `name` and `origin` are needed. Because `config.toml` has already been saved at [config.rs:255](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/config.rs:255), this can leave the changed registry ahead of `rules.toml`, retaining the addressability gap REQ-01–03 were meant to eliminate. The added tests cover only readily loadable custom rules.\n\n2. **Advisory · issue-impact** — `default_rule_membership_diff` documents deterministic output but builds `to_drop` by iterating a randomized `HashSet` at [defaults.rs:466](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/defaults.rs:466). Multiple removed namespaces can produce unstable `RuleMembershipSync.dropped` ordering. Sort before returning or remove the deterministic contract.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The sync path can fail after persisting config because it fully validates unrelated custom rules before identity-only membership splicing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Full RuleSet loading can abort membership sync after config.toml is already saved, leaving rules.toml stale for custom-rule assertion failures.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":1218,\"references\":[\"@/charter/D-6\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"to_drop ordering is nondeterministic despite the public function's deterministic contract.\",\"file\":\"crates/jit/src/validation/defaults.rs\",\"line\":466,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 4458 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6ba8-bb1e-76b2-946f-a89eac4914e8\n--------\nuser\n--- 4445 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The sync path can fail after persisting config because it fully validates unrelated custom rules before identity-only membership splicing.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Full RuleSet loading can abort membership sync after config.toml is already saved, leaving rules.toml stale for custom-rule assertion failures.",
+        "file": "crates/jit/src/commands/mod.rs",
+        "line": 1218,
+        "references": [
+          "@/charter/D-6"
+        ]
+      },
+      {
+        "id": "F2",
+        "severity": "low",
+        "disposition": "advisory",
+        "origin": "issue-impact",
+        "summary": "to_drop ordering is nondeterministic despite the public function's deterministic contract.",
+        "file": "crates/jit/src/validation/defaults.rs",
+        "line": 466
+      }
+    ]
+  }
+}

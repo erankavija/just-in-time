@@ -131,6 +131,30 @@ struct RuleIdentitiesFile {
     rules: Vec<RuleIdentity>,
 }
 
+/// Read every rule's `(name, origin)` identity from `<jit_root>/rules.toml`.
+///
+/// Identity-only parsing: assertion tables are never deserialized and schema
+/// references never resolved, so this succeeds on a file whose full
+/// [`RuleSet`](crate::validation::rules::RuleSet) load would fail on a custom
+/// rule — the membership write-through must not be strandable by an unrelated
+/// rule's defect (jit:d74a9ed1 review F1). Returns an empty list when the file
+/// is absent.
+pub fn read_rule_identities(jit_root: &Path) -> Result<Vec<(String, Option<String>)>> {
+    let path = jit_root.join(RULES_FILE);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let identities: RuleIdentitiesFile = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse rule identities from {}", path.display()))?;
+    Ok(identities
+        .rules
+        .into_iter()
+        .map(|r| (r.name, r.origin))
+        .collect())
+}
+
 /// Split `rules.toml` content into its leading header (everything before the
 /// first `[[rules]]` table) and the raw text of each `[[rules]]` block, in
 /// file order.

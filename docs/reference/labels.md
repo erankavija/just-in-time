@@ -209,7 +209,8 @@ enforce several items.
 > `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
 > `[namespaces.<name>]` table's `unique` flag and its membership drive them
 > directly (declaring a namespace enforces it on the next command, no
-> regeneration). To add constraints the defaults do not cover — allowed values,
+> regeneration; the next jit-driven config write also syncs the matching
+> `namespace-unique-*` row into `rules.toml` for addressability). To add constraints the defaults do not cover — allowed values,
 > value patterns, required namespaces — author a custom rule in `rules.toml`,
 > e.g.:
 

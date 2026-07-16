@@ -97,7 +97,8 @@ content_format = "markdown"
 # `origin = "default"` rules derive their assertion — and the `namespace-unique-*`
 # membership — from the `[namespaces]` / `[type_hierarchy]` registry above, in
 # memory at load; the `schemas/default-*.json` files are regenerated projections,
-# not the authority. `strictness` above tunes how the rules gate operations
+# not the authority. jit-driven writes to this file (config set, re-init) also
+# sync the default `namespace-unique-*` rows in rules.toml to the registry. `strictness` above tunes how the rules gate operations
 # globally.
 
 # =============================================================================

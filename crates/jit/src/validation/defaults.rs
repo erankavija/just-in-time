@@ -429,25 +429,47 @@ pub fn default_rule_membership_diff(
     loaded: &RuleSet,
     namespaces: &LabelNamespaces,
 ) -> DefaultRuleMembershipDiff {
+    let identities: Vec<(String, Option<String>)> = loaded
+        .rules
+        .iter()
+        .map(|r| (r.name.clone(), r.origin.clone()))
+        .collect();
+    default_rule_membership_diff_from_identities(&identities, namespaces)
+}
+
+/// [`default_rule_membership_diff`] over bare `(name, origin)` identities.
+///
+/// This is the variant the write-through sync uses
+/// ([`sync_default_rule_membership`](crate::commands::CommandExecutor::sync_default_rule_membership)):
+/// the membership decision needs only each rule's identity, so reading
+/// identities directly (see `storage::ruleset_store`) keeps the sync
+/// independent of full [`RuleSet`] validation — a custom rule whose assertion
+/// fails to load (bad schema reference, malformed assert table) must not
+/// strand `rules.toml` out of sync after `config.toml` was already saved
+/// (jit:d74a9ed1 review F1).
+///
+/// Pure: no I/O, deterministic — `to_add` and `to_drop` are sorted by rule
+/// name.
+pub fn default_rule_membership_diff_from_identities(
+    existing_rules: &[(String, Option<String>)],
+    namespaces: &LabelNamespaces,
+) -> DefaultRuleMembershipDiff {
     // A file with no default-origin rule has deliberately opted out of the
     // fixed defaults, mirroring `reconcile_default_rules_with_config`: nothing
     // to add or drop.
-    if !loaded
-        .rules
+    if !existing_rules
         .iter()
-        .any(|r| r.origin.as_deref() == Some(DEFAULT_ORIGIN))
+        .any(|(_, origin)| origin.as_deref() == Some(DEFAULT_ORIGIN))
     {
         return DefaultRuleMembershipDiff::default();
     }
 
-    let existing: HashSet<&str> = loaded
-        .rules
+    let existing: HashSet<&str> = existing_rules
         .iter()
-        .filter(|r| {
-            r.origin.as_deref() == Some(DEFAULT_ORIGIN)
-                && r.name.starts_with(NAMESPACE_UNIQUE_PREFIX)
+        .filter(|(name, origin)| {
+            origin.as_deref() == Some(DEFAULT_ORIGIN) && name.starts_with(NAMESPACE_UNIQUE_PREFIX)
         })
-        .map(|r| r.name.as_str())
+        .map(|(name, _)| name.as_str())
         .collect();
 
     let derived = default_ruleset(namespaces);
@@ -458,16 +480,18 @@ pub fn default_rule_membership_diff(
         .collect();
     let desired_names: HashSet<&str> = desired.iter().map(|r| r.name.as_str()).collect();
 
-    let to_add = desired
+    let mut to_add: Vec<Rule> = desired
         .into_iter()
         .filter(|r| !existing.contains(r.name.as_str()))
         .cloned()
         .collect();
-    let to_drop = existing
+    to_add.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut to_drop: Vec<String> = existing
         .into_iter()
         .filter(|name| !desired_names.contains(name))
         .map(|s| s.to_string())
         .collect();
+    to_drop.sort();
 
     DefaultRuleMembershipDiff { to_add, to_drop }
 }

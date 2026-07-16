@@ -1215,10 +1215,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(RuleMembershipSync::default());
         }
 
-        let loaded = RuleSet::load(jit_root)?;
+        // Identity-only read (never full RuleSet validation): a custom rule
+        // whose assertion fails to load must not strand this sync after
+        // config.toml was already saved (jit:d74a9ed1 review F1).
+        let identities = crate::storage::ruleset_store::read_rule_identities(jit_root)?;
         let config = self.config_manager.load()?;
         let namespaces = self.config_manager.namespaces_from_config(&config);
-        let diff = crate::validation::defaults::default_rule_membership_diff(&loaded, &namespaces);
+        let diff = crate::validation::defaults::default_rule_membership_diff_from_identities(
+            &identities,
+            &namespaces,
+        );
         if diff.is_empty() {
             return Ok(RuleMembershipSync::default());
         }

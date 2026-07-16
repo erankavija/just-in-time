@@ -142,7 +142,10 @@ proceeds and the bypass is logged, at every level.
 > `[type_hierarchy]` registry in `config.toml`, in memory at load; the
 > `schemas/default-*.json` files are regenerated projections, not the validation
 > authority. So you change what a default rule checks by editing that registry
-> (a hand-declared namespace takes effect on the next command, no regeneration
+> (a hand-declared namespace takes effect on the next command, no regeneration;
+> the next jit-driven config write — `jit config set` or re-init — also writes
+> the matching `namespace-unique-*` row through to `rules.toml` so its
+> `@/rule/…` address resolves)
 > step), and author new conventions as custom rules in `rules.toml`. `strictness`
 > tunes how all of these gate operations globally.
 

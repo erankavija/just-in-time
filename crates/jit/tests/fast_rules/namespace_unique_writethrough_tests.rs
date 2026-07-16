@@ -89,6 +89,46 @@ fn test_direct_sync_appends_row_for_hand_declared_unique_namespace() {
     assert!(rules.contains("origin = \"default\""));
 }
 
+/// jit:d74a9ed1 review F1 regression: the sync is identity-only, so a custom
+/// rule whose FULL load fails (here: an unresolvable schema file reference)
+/// cannot strand the membership write-through after config.toml was already
+/// edited.
+#[test]
+fn test_sync_survives_custom_rule_that_fails_full_load() {
+    let (_temp, jit_dir) = setup_initialized_repo();
+
+    // Append a custom rule that full RuleSet loading rejects.
+    let mut rules = read_rules(&jit_dir);
+    rules.push_str(
+        "\n[[rules]]\n\
+         name = \"broken-custom\"\n\
+         origin = \"custom\"\n\
+         description = \"references a schema file that does not exist\"\n\
+         when = { type = \"task\" }\n\
+         severity = \"error\"\n\
+         enforce = false\n\
+         assert = { schema = { file = \"schemas/does-not-exist.json\" } }\n",
+    );
+    fs::write(jit_dir.join("rules.toml"), &rules).unwrap();
+    assert!(
+        jit::validation::rules::RuleSet::load(&jit_dir).is_err(),
+        "premise: the broken custom rule must fail a full RuleSet load"
+    );
+
+    declare_unique_squad_namespace(&jit_dir);
+    let outcome = CommandExecutor::new(JsonFileStorage::new(&jit_dir))
+        .sync_default_rule_membership()
+        .expect("identity-only sync must not depend on full rule validation");
+    assert_eq!(outcome.added, vec!["namespace-unique-squad".to_string()]);
+
+    let after = read_rules(&jit_dir);
+    assert!(after.contains("name = \"namespace-unique-squad\""));
+    assert!(
+        after.contains("name = \"broken-custom\""),
+        "the failing custom rule survives byte-exact"
+    );
+}
+
 #[test]
 fn test_direct_sync_drops_row_for_removed_unique_namespace() {
     let (_temp, jit_dir) = setup_initialized_repo();
