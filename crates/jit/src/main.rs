@@ -1425,7 +1425,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         let met_count = response
             .dependencies
             .iter()
-            .filter(|d| jit::domain::is_dependency_met(d.state))
+            .filter(|d| jit::domain::is_dependency_met(d.state, d.archived_from))
             .count();
         println!(
             "Dependencies ({}/{} met):",

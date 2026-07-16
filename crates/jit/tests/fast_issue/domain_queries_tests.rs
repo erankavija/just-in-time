@@ -26,6 +26,7 @@ fn make_issue(id: &str, title: &str, state: State) -> Issue {
         first_ready_at: None,
         claimed_at: None,
         done_at: None,
+        archived_from: None,
     }
 }
 
@@ -49,6 +50,7 @@ fn make_issue_with_deps(id: &str, title: &str, state: State, deps: Vec<String>) 
         first_ready_at: None,
         claimed_at: None,
         done_at: None,
+        archived_from: None,
     }
 }
 

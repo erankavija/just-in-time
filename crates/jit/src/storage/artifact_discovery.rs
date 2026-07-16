@@ -275,6 +275,7 @@ pub fn discover_repository_embedded_owners<S: IssueStore>(
                         root: root.clone(),
                         issue: issue.id.clone(),
                         state: issue.state,
+                        archived_from: issue.archived_from,
                         inside_subtree: selected_member_ids.contains(&issue.id),
                     });
                 }

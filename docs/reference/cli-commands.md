@@ -210,7 +210,10 @@ For a preview, `--json` prints the schema-version-1 artifact-plan object directl
 fields are `schema_version`, `target`, `destination_root`, `eligible`,
 `policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
 `warnings`; it does not add a `message` field. Artifact order is deterministic
-by normalized source path and version.
+by normalized source path and version. Each blocker carries `code` and `path`;
+a blocker caused by lifecycle state (`non-terminal-target`,
+`document-non-terminal-owner`) additionally carries a `guidance` string naming
+the permitted next action.
 
 `jit archive candidates` is the read-only container report. It lists every
 `Done` or `Rejected` issue whose `type:*` is configured at a non-leaf level of
@@ -260,10 +263,25 @@ execution is disabled.
 
 `--execute` never accepts a saved preview as input. It acquires the repository
 write guard, recomputes the plan from current issue and filesystem state, and
-refuses an ineligible result. Containers must be terminal. A document target is
-refused while any direct or supported embedded-closure owner is non-terminal;
-a managed document with no owner remains eligible and reports `no-owner` as
-informational evidence.
+refuses an ineligible result. A container must be effectively terminal
+(`Done`/`Rejected`, or already `Archived` retired from one of those, which keeps
+a reconciling rerun eligible); a non-terminal container is blocked with
+`non-terminal-target`. A document target is refused while any direct or supported
+embedded-closure owner is non-terminal (an owner archived from a terminal state
+counts as terminal); a managed document with no owner remains eligible and
+reports `no-owner` as informational evidence. When a blocker is caused by
+lifecycle state, the refusal — in both the human message and the JSON blocker's
+`guidance` field — names the permitted next action (complete or reject the
+container, then re-run archival).
+
+A successful container execution retires the container into the `Archived`
+lifecycle state as its final durable step, recording the terminal state it came
+from so it stays effectively terminal (see
+[States](../concepts/core-model.md#states)). This is the only place the archive
+command touches lifecycle state; the document relocation, `.jit-container`
+marker, and `artifact_archive_executed` event are otherwise independent of it. A
+rerun of an already-archived container reconciles to a no-op and does not
+re-emit the transition.
 
 For a container target, the preferred destination root is
 `<archive_root>/<container-short-id>-<slug>/`, where `<archive_root>` is the
@@ -1009,12 +1027,15 @@ jit issue progress epic123 --json
   text appends a `dangling: <id>` line) rather than counted or dropped — the
   same `issue show` precedent as `issue children`. A real storage error (not a
   missing id) propagates normally.
-- **Terminal-state semantics** (tied to `State::is_terminal`, i.e.
-  `done`/`rejected`): `done` and `rejected` are reported separately because a
-  rejected child is terminal but **not delivered**. `open` is every non-terminal
-  child (`total − done − rejected`; `archived`, which is not terminal, counts as
-  open). The `done/total` ratio and `percent` (rounded; `0` when `total` is `0`)
-  measure delivery — `done` against `total`.
+- **Effective-terminal semantics** (`done`/`rejected`): `done` and `rejected`
+  are reported separately because a rejected child is terminal but **not
+  delivered**. `archived` is terminality-preserving, so a child archived from
+  `done` folds into `done` and one archived from `rejected` folds into
+  `rejected`; a child archived from a non-terminal state (or a legacy archived
+  record) counts as `open`. `open` is every child that is not effectively
+  terminal (`total − done − rejected`). The exact `by state` counts still show
+  `archived` as its own bucket. The `done/total` ratio and `percent` (rounded;
+  `0` when `total` is `0`) measure delivery — `done` against `total`.
 - A bad id under `--json` returns the refined error envelope and matching exit
   code, like `issue show`.
 
@@ -2207,9 +2228,10 @@ header:
   value is a usage error (exit code `2`).
 - `by_state` lists every lifecycle state (zero-count states included), `count`
   is the number of state buckets (the `{count, by_state}` list envelope), and
-  the `done`/`rejected`/`open`/`percent` terminal-state semantics are identical
-  to `issue progress` (done and rejected distinct; open = non-terminal;
-  `done/total` measures delivery).
+  the `done`/`rejected`/`open`/`percent` effective-terminal semantics are
+  identical to `issue progress` (done and rejected distinct, folding `archived`
+  by its recorded origin; open = not effectively terminal; `done/total` measures
+  delivery).
 
 ### Membership divergence (`jit query divergence`)
 

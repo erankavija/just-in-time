@@ -176,7 +176,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             // bypasses the chokepoint deliberately. Only the ADDED edge can demote;
             // the reachability-preserving edges dropped below never do.
             let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if from_issue.state == State::Ready && !is_dependency_met(dep_issue.state) {
+            if from_issue.state == State::Ready
+                && !is_dependency_met(dep_issue.state, dep_issue.archived_from)
+            {
                 let old_state = from_issue.state;
                 from_issue.state = State::Backlog;
 
@@ -580,7 +582,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut any_unmet = false;
         for full_dep_id in reduced_from.difference(&old_from_deps) {
             let dep_issue = self.storage.load_issue(full_dep_id)?;
-            if !is_dependency_met(dep_issue.state) {
+            if !is_dependency_met(dep_issue.state, dep_issue.archived_from) {
                 any_unmet = true;
                 break;
             }

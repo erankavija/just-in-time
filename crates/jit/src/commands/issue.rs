@@ -404,7 +404,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             .dependencies
             .iter()
             .filter_map(|dep_id| match resolved_issues.get(dep_id).copied() {
-                Some(dependency) if is_dependency_met(dependency.state) => None,
+                Some(dependency)
+                    if is_dependency_met(dependency.state, dependency.archived_from) =>
+                {
+                    None
+                }
                 Some(dependency) => Some(TransitionBlocker::dependency(dependency.clone())),
                 None => Some(TransitionBlocker::missing_dependency(dep_id.clone())),
             })

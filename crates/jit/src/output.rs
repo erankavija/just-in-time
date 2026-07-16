@@ -199,6 +199,12 @@ fn render_diagnostics<T: Serialize>(rendered: &mut String, heading: &str, diagno
             .and_then(Value::as_str)
             .unwrap_or("target");
         let _ = writeln!(rendered, "  - {code}: {path}");
+        // A state-caused blocker carries a `guidance` field (REQ-05): show the
+        // permitted next action right under the blocker so the operator does not
+        // have to look the code up.
+        if let Some(guidance) = value.get("guidance").and_then(Value::as_str) {
+            let _ = writeln!(rendered, "      next action: {guidance}");
+        }
     }
 }
 
@@ -248,6 +254,7 @@ mod archive_render_tests {
             issue: "12345678-1234-1234-1234-123456789abc".into(),
             document_index: 2,
             state: State::Done,
+            archived_from: None,
             inside_subtree: true,
             pinned: false,
             selected_for_relink: false,
@@ -828,6 +835,14 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "rule": rule,
             "message": message,
         }),
+        TransitionBlocker::ArchivedRevive { origin } => serde_json::json!({
+            "type": "archived_revive",
+            "origin": state_name(*origin),
+            "message": format!(
+                "an archived issue only revives to its pre-archive state '{}'",
+                state_name(*origin)
+            ),
+        }),
     }
 }
 
@@ -1313,10 +1328,12 @@ impl GateView {
 /// A single unmet dependency, as projected into `issue show --json` and the
 /// compact `issue status` view.
 ///
-/// A dependency is *unmet* when it is not in a terminal state (`Done` or
-/// `Rejected`) — the exact same readiness test as [`Issue::is_blocked`] and
-/// [`query_ready`](crate::domain::queries::query_ready): a terminal dependency
-/// unblocks its dependents, so it is never listed here. The shape is a subset of
+/// A dependency is *unmet* when it is not effectively terminal (`Done`,
+/// `Rejected`, or `Archived` retired from one of those —
+/// [`Issue::is_effectively_terminal`]) — the exact same readiness test as
+/// [`Issue::is_blocked`] and
+/// [`query_ready`](crate::domain::queries::query_ready): an effectively terminal
+/// dependency unblocks its dependents, so it is never listed here. The shape is a subset of
 /// the enriched `dependencies` entries (`id`, `short_id`, `title`, `state`),
 /// carrying only what an orchestrator needs to see what is still blocking work.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1363,7 +1380,7 @@ pub struct IssueShowResponse {
     /// hidden.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dangling_dependency_ids: Vec<String>,
-    /// The subset of `dependencies` that are not yet met (state is not terminal),
+    /// The subset of `dependencies` that are not yet met (not effectively terminal),
     /// consistent with readiness — see [`UnmetDependency`]. Always an array,
     /// empty when every dependency is `Done`/`Rejected` or there are none.
     pub unmet_dependencies: Vec<UnmetDependency>,
@@ -1431,7 +1448,7 @@ impl IssueShowResponse {
         // projected here.
         let unmet_dependencies: Vec<UnmetDependency> = enriched_deps
             .iter()
-            .filter(|dep| !crate::domain::is_dependency_met(dep.state))
+            .filter(|dep| !crate::domain::is_dependency_met(dep.state, dep.archived_from))
             .map(UnmetDependency::from)
             .collect();
 
@@ -1505,7 +1522,7 @@ pub struct IssueStatusResponse {
     pub state: State,
     /// One entry per required gate, `{key, status}` only.
     pub gates: Vec<GateStatusEntry>,
-    /// Short ids of the dependencies that are not yet met (state not terminal),
+    /// Short ids of the dependencies that are not yet met (not effectively terminal),
     /// consistent with readiness. Empty when nothing is blocking.
     pub unmet_dependencies: Vec<String>,
     pub title: String,
@@ -1590,12 +1607,15 @@ pub struct StateCount {
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
 /// `count` is `by_state.len()` (the list-envelope count, one entry per state).
 ///
-/// Terminal-state semantics, tied to [`State::is_terminal`] (`Done`/`Rejected`):
-/// `done` and `rejected` are reported separately because a rejected issue is
-/// terminal but not delivered; `open` is every non-terminal issue
-/// (`total − done − rejected`, so `Archived` — which is not terminal — counts
-/// as open). The `done`/`total` ratio and `percent` (rounded, `0` when `total`
-/// is `0`) measure delivery, i.e. `done` against `total`.
+/// Effective-terminal semantics ([`Issue::effective_terminal_state`],
+/// `Done`/`Rejected`): `done` and `rejected` are reported separately because a
+/// rejected issue is terminal but not delivered. `Archived` is
+/// terminality-preserving, so an issue archived from `Done` counts toward `done`
+/// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
+/// non-terminal (or unrecorded, legacy) origin is not effectively terminal and
+/// counts as `open`. `open` is every issue that is not effectively terminal
+/// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
+/// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StateRollup {
     /// Length of `by_state` (list-envelope count); equals the number of
@@ -1620,7 +1640,9 @@ impl StateRollup {
     ///
     /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
     /// (every variant, zero-count states kept); `done`/`rejected`/`open` and
-    /// `percent` follow the terminal-state semantics documented on the type.
+    /// `percent` follow the effective-terminal semantics documented on the type,
+    /// folding an `Archived` issue into `done`/`rejected` by its pre-archive
+    /// origin ([`Issue::effective_terminal_state`]).
     pub fn from_issues(issues: &[Issue]) -> Self {
         let by_state: Vec<StateCount> = crate::domain::queries::count_by_state(issues)
             .into_iter()
@@ -1628,8 +1650,17 @@ impl StateRollup {
             .collect();
 
         let total = issues.len();
-        let done = issues.iter().filter(|i| i.state == State::Done).count();
-        let rejected = issues.iter().filter(|i| i.state == State::Rejected).count();
+        // Delivery accounting folds by effective terminal state: an issue archived
+        // from Done counts as delivered, one archived from Rejected as rejected,
+        // so a fully-delivered-then-archived container still reports 100%.
+        let done = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Done))
+            .count();
+        let rejected = issues
+            .iter()
+            .filter(|i| i.effective_terminal_state() == Some(State::Rejected))
+            .count();
         let open = total - done - rejected;
         let percent = if total == 0 {
             0
@@ -2596,6 +2627,7 @@ mod tests {
             priority: Priority::Normal,
             assignee: None,
             labels: Vec::new(),
+            archived_from: None,
         }
     }
 

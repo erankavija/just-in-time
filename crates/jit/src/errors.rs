@@ -606,6 +606,15 @@ pub(crate) enum TransitionBlocker {
         rule: String,
         message: String,
     },
+    /// A revive out of [`State::Archived`] targeted a state other than the
+    /// recorded pre-archive origin. `Archived` is terminality-preserving
+    /// (`jit:45a140ae`): reviving restores the pre-archive state exactly, so
+    /// the round-trip cannot resurrect a completed issue into the active
+    /// lifecycle. Carries the only legal revive target.
+    ArchivedRevive {
+        /// The recorded pre-archive origin, the sole permitted revive target.
+        origin: State,
+    },
 }
 
 impl TransitionBlockedError {
@@ -665,6 +674,21 @@ impl TransitionBlockedError {
         }
     }
 
+    /// A revive out of [`State::Archived`] refused because it targeted a state
+    /// other than the recorded pre-archive origin (`jit:45a140ae`).
+    ///
+    /// `requested_state` is the attempted target, `origin` the only legal revive
+    /// target. Maps to exit 4 like the other transition refusals.
+    pub(crate) fn archived_revive(issue_id: String, requested_state: State, origin: State) -> Self {
+        Self {
+            issue_id,
+            requested_state,
+            actual_state: State::Archived,
+            blockers: vec![TransitionBlocker::ArchivedRevive { origin }],
+            warnings: Vec::new(),
+        }
+    }
+
     /// Attach non-blocking findings observed during the blocked transition.
     pub(crate) fn with_warnings(mut self, warnings: Vec<String>) -> Self {
         self.warnings = warnings;
@@ -706,7 +730,18 @@ impl TransitionBlockedError {
 
     pub(crate) fn summary(&self) -> String {
         let requested = state_name(self.requested_state);
-        if self
+        if let Some(TransitionBlocker::ArchivedRevive { origin }) = self
+            .blockers
+            .iter()
+            .find(|blocker| matches!(blocker, TransitionBlocker::ArchivedRevive { .. }))
+        {
+            format!(
+                "Cannot revive archived issue to '{}': an archived issue only revives to its \
+                 pre-archive state '{}'",
+                requested,
+                state_name(*origin)
+            )
+        } else if self
             .blockers
             .iter()
             .any(|blocker| matches!(blocker, TransitionBlocker::Gate { .. }))
@@ -742,6 +777,13 @@ impl TransitionBlockedError {
             }
             Some(TransitionBlocker::GraphRule { .. }) => {
                 format!("jit validate --explain {}", self.issue_id)
+            }
+            Some(TransitionBlocker::ArchivedRevive { origin }) => {
+                format!(
+                    "jit issue update {} --state {}  # revive restores the pre-archive state",
+                    self.issue_id,
+                    state_name(*origin)
+                )
             }
             _ => format!("jit graph deps {}", self.issue_id),
         };
@@ -780,6 +822,13 @@ impl TransitionBlockedError {
                     vec![format!(
                         "jit issue update {} ...  # satisfy or fix rule '{}', or re-run with --force",
                         self.issue_id, rule
+                    )]
+                }
+                TransitionBlocker::ArchivedRevive { origin } => {
+                    vec![format!(
+                        "jit issue update {} --state {}  # the only legal revive target",
+                        self.issue_id,
+                        state_name(*origin)
                     )]
                 }
             }))
@@ -872,6 +921,13 @@ impl fmt::Display for TransitionBlocker {
             }
             Self::GraphRule { rule, message } => {
                 write!(f, "[{}] {}", rule, message)
+            }
+            Self::ArchivedRevive { origin } => {
+                write!(
+                    f,
+                    "archived issue only revives to its pre-archive state [{}]",
+                    state_name(*origin)
+                )
             }
         }
     }
