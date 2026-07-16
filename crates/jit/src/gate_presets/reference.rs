@@ -442,7 +442,7 @@ mod tests {
             .into_iter()
             .map(|preset| preset.name)
             .collect();
-        let declared: HashSet<String> = BuiltinPresets::names().into_iter().collect();
+        let declared: HashSet<String> = BuiltinPresets::names().unwrap().into_iter().collect();
         assert_eq!(rendered, declared);
     }
 

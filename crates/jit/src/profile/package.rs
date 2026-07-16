@@ -912,15 +912,15 @@ mod tests {
     }
 
     #[test]
-    fn test_embedding_dependency_contract_has_no_optional_features_or_production_tree() {
+    fn test_embedding_dependency_contract_has_no_optional_features_and_production_tree() {
         let manifest = include_str!("../../Cargo.toml");
         assert!(
             manifest.contains("include_dir = { version = \"0.7.4\", default-features = false }"),
             "embedding dependency must remain pinned without optional features"
         );
-        assert!(!Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../profiles/jit-dogfood")
-            .exists());
+        let production_tree =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood");
+        assert!(production_tree.join(MANIFEST_FILE_NAME).is_file());
         assert!(!manifest_text().contains("jit-dogfood"));
     }
 }

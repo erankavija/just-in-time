@@ -1,0 +1,579 @@
+[profile]
+manifest-version = 1
+id = "jit-dogfood"
+version = "1.0.0"
+jit = ">=0.2.1, <0.3.0"
+
+# Repository-neutral workflow taxonomy. The four ordinary hierarchy entries
+# are shared with neutral `jit init`; the profile adds bracket and task
+# specialization without changing the engine's vocabulary.
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "milestone"
+value = 1
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "epic"
+value = 2
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "story"
+value = 3
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "planning"
+value = 3
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "breakdown"
+value = 3
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "task"
+value = 4
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "bug"
+value = 4
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "enhancement"
+value = 4
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "milestone"
+value = "milestone"
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "epic"
+value = "epic"
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "story"
+value = "story"
+
+[[contribution]]
+kind = "set-string"
+target = "strategic-types"
+value = "milestone"
+
+[[contribution]]
+kind = "set-string"
+target = "strategic-types"
+value = "epic"
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "epic"
+value = { description = "Feature or initiative membership.", unique = false, examples = ["epic:user-auth", "epic:release-readiness"] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "story"
+value = { description = "Story membership.", unique = false, examples = ["story:login-flow", "story:release-validation"] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "brackets"
+value = { description = "Planning-bracket container pointer.", unique = true, examples = ["brackets:0123abcd"] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "satisfies"
+value = { description = "Coverage credit for a container success criterion.", unique = false, examples = ["satisfies:REQ-01"] }
+
+# Advisory authoring structure plus enforced plan-time and completion coverage.
+[[contribution]]
+kind = "keyed-array"
+target = "rules"
+identity = "jit-content-standards"
+
+[contribution.value]
+name = "jit-content-standards"
+origin = "jit-dogfood"
+description = "Warn when an issue lacks marked, stable success criteria."
+severity = "warn"
+enforce = false
+assert = { json-schema = "schemas/jit-content-standards.json" }
+
+[[contribution]]
+kind = "keyed-array"
+target = "rules"
+identity = "hard-criteria-covered"
+
+[contribution.value]
+name = "hard-criteria-covered"
+origin = "jit-dogfood"
+description = "Before an epic completes, every hard requirement is credited to a completed implementation descendant."
+when = { type = "epic", state = "done" }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
+
+[[contribution]]
+kind = "keyed-array"
+target = "rules"
+identity = "coverage-preview"
+
+[contribution.value]
+name = "coverage-preview"
+origin = "jit-dogfood"
+description = "While breakdown is reviewed, every hard requirement is credited to a drafted implementation descendant."
+when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
+severity = "error"
+enforce = true
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
+
+# Review gates begin as unmistakable structured-warning placeholders. Adopters
+# can replace each checker independently without changing the workflow graph.
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "plan-review"
+
+[contribution.value]
+version = 1
+key = "plan-review"
+title = "Plan Review"
+description = "Review the linked plan before implementation work fans out."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "review_placeholder"
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "breakdown-review"
+
+[contribution.value]
+version = 1
+key = "breakdown-review"
+title = "Breakdown Review"
+description = "Review decomposition quality, issue content, and dependency ordering before implementation."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "review_placeholder"
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "code-review"
+
+[contribution.value]
+version = 1
+key = "code-review"
+title = "Code Review"
+description = "Review issue-attributable implementation changes against repository policy and success criteria."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "review_placeholder"
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "coverage-preview"
+
+[contribution.value]
+version = 1
+key = "coverage-preview"
+title = "Coverage Preview"
+description = "Validate the container named by the breakdown issue's brackets label."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "label_target_validation"
+label_namespace = "brackets"
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "jit-validate"
+
+[contribution.value]
+version = 1
+key = "jit-validate"
+title = "Issue Validation"
+description = "Run declarative validation for the gated issue."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "issue_validation"
+
+[[contribution]]
+kind = "keyed-array"
+target = "gates"
+identity = "repo-validate"
+
+[contribution.value]
+version = 1
+key = "repo-validate"
+title = "Repository Validation"
+description = "Run structural and declarative validation for the whole repository."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+reserved = {}
+
+[contribution.value.checker]
+type = "repository_validation"
+
+# Epic-only plan-before-fan-out bracket. Built-in compatibility presets derive
+# their node gate definitions from this template and the gate contributions.
+[[contribution]]
+kind = "keyed-array"
+target = "templates"
+identity = "plan"
+
+[contribution.value]
+name = "plan"
+description = "Plan-before-fan-out bracket with planning and breakdown review."
+applies_to = ["epic"]
+
+[[contribution.value.anchors]]
+name = "container"
+gates = ["repo-validate"]
+
+[[contribution.value.nodes]]
+role = "planning"
+type = "planning"
+gates = ["plan-review"]
+doc = "docs/plans/{container.short_id}-plan.md"
+description = "Plan {container.title} ({container.short_id}) against every hard success criterion, write the plan at {doc}, and link it to this planning issue."
+
+[[contribution.value.nodes]]
+role = "breakdown"
+type = "breakdown"
+gates = ["coverage-preview", "breakdown-review"]
+labels = ["brackets:{container.short_id}"]
+description = "Decompose the approved plan for {container.title} ({container.short_id}) into well-ordered implementation issues."
+depends_on = ["planning"]
+
+[[contribution.value.anchor_edges]]
+from = "container"
+to = "breakdown"
+
+[[contribution.value.transforms]]
+kind = "move-upstream-to-role"
+role = "planning"
+
+[[contribution]]
+kind = "singleton-table"
+target = "invariant-projection"
+value = { mode = "region", target = "AGENTS.md", style = "id-anchor" }
+
+[[contribution]]
+kind = "singleton-table"
+target = "rules-gates-projection"
+value = { mode = "separate-file", target = ".jit/reference/rules-and-gates.md", style = "full" }
+
+# Install-only adopter state.
+[[asset]]
+source = "assets/install/.jit/invariants.toml"
+target = ".jit/invariants.toml"
+
+[[asset]]
+source = "assets/install/.jit/schemas/jit-content-standards.json"
+target = ".jit/schemas/jit-content-standards.json"
+
+[[asset]]
+source = "assets/install/.jit/reference/rules-and-gates.md"
+target = ".jit/reference/rules-and-gates.md"
+
+# Package-authored live consumers. The `assets/live/` source prefix is also the
+# renderer's data-owned selection rule; targets remain ordinary repository paths.
+[[asset]]
+source = "assets/live/.agents/skills/jit-breakdown/SKILL.md"
+target = ".agents/skills/jit-breakdown/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-breakdown/references/analysis-prompt.md"
+target = ".agents/skills/jit-breakdown/references/analysis-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-breakdown/references/bracket-spine.md"
+target = ".agents/skills/jit-breakdown/references/bracket-spine.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-breakdown/references/plan-schema.md"
+target = ".agents/skills/jit-breakdown/references/plan-schema.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/SKILL.md"
+target = ".agents/skills/jit-execution-lead/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/architect-agent-prompt.md"
+target = ".agents/skills/jit-execution-lead/references/architect-agent-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/bracketed-breakdown.md"
+target = ".agents/skills/jit-execution-lead/references/bracketed-breakdown.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/completion-report-template.md"
+target = ".agents/skills/jit-execution-lead/references/completion-report-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/doc-agent-prompt.md"
+target = ".agents/skills/jit-execution-lead/references/doc-agent-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/escalation-policy.md"
+target = ".agents/skills/jit-execution-lead/references/escalation-policy.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/explorer-agent-prompt.md"
+target = ".agents/skills/jit-execution-lead/references/explorer-agent-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/handoff-template.md"
+target = ".agents/skills/jit-execution-lead/references/handoff-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/lead-review-protocol.md"
+target = ".agents/skills/jit-execution-lead/references/lead-review-protocol.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/progress-file.md"
+target = ".agents/skills/jit-execution-lead/references/progress-file.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/rework-prompt-template.md"
+target = ".agents/skills/jit-execution-lead/references/rework-prompt-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/task-classifier.md"
+target = ".agents/skills/jit-execution-lead/references/task-classifier.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md"
+target = ".agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh"
+target = ".agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh"
+target = ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-manage/SKILL.md"
+target = ".agents/skills/jit-manage/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-manage/references/design-doc-template.md"
+target = ".agents/skills/jit-manage/references/design-doc-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-manage/references/issue-extraction-prompt.md"
+target = ".agents/skills/jit-manage/references/issue-extraction-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-manage/references/state-commit-patterns.md"
+target = ".agents/skills/jit-manage/references/state-commit-patterns.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-migrate/SKILL.md"
+target = ".agents/skills/jit-migrate/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-migrate/references/analysis-prompt.md"
+target = ".agents/skills/jit-migrate/references/analysis-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-migrate/references/plan-schema.md"
+target = ".agents/skills/jit-migrate/references/plan-schema.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-parallel/SKILL.md"
+target = ".agents/skills/jit-parallel/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-parallel/references/agent-prompt-template.md"
+target = ".agents/skills/jit-parallel/references/agent-prompt-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-parallel/references/conflict-heuristics.md"
+target = ".agents/skills/jit-parallel/references/conflict-heuristics.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-parallel/references/worktree-mode.md"
+target = ".agents/skills/jit-parallel/references/worktree-mode.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/SKILL.md"
+target = ".agents/skills/jit-planning-lead/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/interview-protocol.md"
+target = ".agents/skills/jit-planning-lead/references/interview-protocol.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/investigator-prompt.md"
+target = ".agents/skills/jit-planning-lead/references/investigator-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/plan-doc-template.md"
+target = ".agents/skills/jit-planning-lead/references/plan-doc-template.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/researcher-prompt.md"
+target = ".agents/skills/jit-planning-lead/references/researcher-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/reviewer-prompt.md"
+target = ".agents/skills/jit-planning-lead/references/reviewer-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-planning-lead/references/synthesizer-prompt.md"
+target = ".agents/skills/jit-planning-lead/references/synthesizer-prompt.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/SKILL.md"
+target = ".agents/skills/jit-project-lead/SKILL.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/charter-facilitation.md"
+target = ".agents/skills/jit-project-lead/references/charter-facilitation.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/coherence-review.md"
+target = ".agents/skills/jit-project-lead/references/coherence-review.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/container-dispatch.md"
+target = ".agents/skills/jit-project-lead/references/container-dispatch.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/mode-routing.md"
+target = ".agents/skills/jit-project-lead/references/mode-routing.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/parent-escalation.md"
+target = ".agents/skills/jit-project-lead/references/parent-escalation.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/progress-artifact.md"
+target = ".agents/skills/jit-project-lead/references/progress-artifact.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/standards-fix.md"
+target = ".agents/skills/jit-project-lead/references/standards-fix.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/standards-scan.md"
+target = ".agents/skills/jit-project-lead/references/standards-scan.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/standards-sweep.md"
+target = ".agents/skills/jit-project-lead/references/standards-sweep.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/templates/vision-charter.md"
+target = ".agents/skills/jit-project-lead/references/templates/vision-charter.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/tier-derivation.md"
+target = ".agents/skills/jit-project-lead/references/tier-derivation.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/vision-charter.md"
+target = ".agents/skills/jit-project-lead/references/vision-charter.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/references/wave-layering.md"
+target = ".agents/skills/jit-project-lead/references/wave-layering.md"
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/scripts/standards-fix.sh"
+target = ".agents/skills/jit-project-lead/scripts/standards-fix.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/.agents/skills/jit-project-lead/scripts/standards-scan.sh"
+target = ".agents/skills/jit-project-lead/scripts/standards-scan.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/.jit/reference/content-standards.md"
+target = ".jit/reference/content-standards.md"
+
+[[asset]]
+source = "assets/live/scripts/ai-review.sh"
+target = "scripts/ai-review.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/contrib/gates/ai-review.sh"
+target = "contrib/gates/ai-review.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/scripts/breakdown-review-prompt.md"
+target = "scripts/breakdown-review-prompt.md"
+
+[[asset]]
+source = "assets/live/scripts/code-review-prompt.md"
+target = "scripts/code-review-prompt.md"
+
+[[asset]]
+source = "assets/live/scripts/plan-review-prompt.md"
+target = "scripts/plan-review-prompt.md"
+
+[[region]]
+source = "assets/live/regions/agents-jit-guidance.md"
+target = "AGENTS.md"
+region-id = "dogfood-guidance"
+placement = "append"

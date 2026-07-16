@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Advisory issue-body shape installed by the jit-dogfood profile.",
+  "type": "object",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "object",
+      "required": ["success_criteria"],
+      "properties": {
+        "success_criteria": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^\\[(hard|aspirational)\\]\\s+REQ-[0-9]+:\\s+\\S"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

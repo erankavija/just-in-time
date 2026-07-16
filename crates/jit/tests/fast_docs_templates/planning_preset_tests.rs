@@ -1,7 +1,7 @@
 //! Integration tests for the planning-bracket gate presets (T6).
 //!
 //! Exercises `apply_gate_preset` end-to-end via the in-process harness:
-//! applying `plan-review` attaches the agent gate to a planning node, and
+//! applying `plan-review` attaches the visible review placeholder to a planning node, and
 //! applying `coverage-preview` attaches the deterministic scoped-validate gate
 //! to a breakdown node.
 
@@ -30,17 +30,14 @@ fn test_apply_plan_review_attaches_agent_gate_to_planning_node() {
     );
 
     // The issue now requires the plan-review gate, and the registered gate is
-    // the agent (command-backed) review.
+    // the explicit review placeholder supplied by the production package.
     let issue = h.get_issue(&planning);
     assert!(issue.gates_required.contains(&"plan-review".to_string()));
 
     let registry = h.storage.load_gate_registry().expect("load registry");
     let gate = registry.gates.get("plan-review").expect("gate registered");
     assert_eq!(gate.mode, GateMode::Auto);
-    match gate.checker.as_ref().expect("agent gate has a checker") {
-        GateChecker::Exec { command, .. } => assert_eq!(command, "./scripts/ai-review.sh"),
-        other => panic!("expected exec checker, got {other:?}"),
-    }
+    assert_eq!(gate.checker, Some(GateChecker::ReviewPlaceholder));
 }
 
 #[test]
@@ -71,9 +68,8 @@ fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node()
         .gates_required
         .contains(&"coverage-preview".to_string()));
 
-    // The registered gate's checker runs the scoped-validate wrapper, which
-    // resolves the container from the brackets: label and runs
-    // `jit validate --scope <C>`.
+    // The registered native checker resolves the container from the brackets:
+    // label and runs scoped validation in-process.
     let registry = h.storage.load_gate_registry().expect("load registry");
     let gate = registry
         .gates
@@ -81,10 +77,10 @@ fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node()
         .expect("gate registered");
     assert_eq!(gate.mode, GateMode::Auto);
     match gate.checker.as_ref().expect("coverage gate has a checker") {
-        GateChecker::Exec { command, .. } => {
-            assert_eq!(command, "./scripts/coverage-preview.sh")
+        GateChecker::LabelTargetValidation { label_namespace } => {
+            assert_eq!(label_namespace, "brackets")
         }
-        other => panic!("expected exec checker, got {other:?}"),
+        other => panic!("expected label-target checker, got {other:?}"),
     }
 }
 

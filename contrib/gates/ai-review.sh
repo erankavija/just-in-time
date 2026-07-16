@@ -53,29 +53,31 @@ if [ -z "${REVIEWER_AGENT:-}" ]; then
   exit 1
 fi
 
-PROMPT=$(jq -r '.prompt // empty' "$JIT_CONTEXT_FILE")
-
-if [ -z "${PROMPT:-}" ]; then
+if ! grep -Eq '"prompt"[[:space:]]*:[[:space:]]*"[^"]+' "$JIT_CONTEXT_FILE"; then
   echo "ERROR: No prompt defined for this gate. Set --prompt or --prompt-file when defining the gate." >&2
   exit 1
 fi
-
-# Extract structured fields from context so the prompt leads the input.
-CONTEXT_JSON=$(jq -c 'del(.prompt)' "$JIT_CONTEXT_FILE")
 
 # Capture agent stderr to a temp file so we can surface it on errors.
 AGENT_STDERR=$(mktemp)
 trap 'rm -f "$AGENT_STDERR"' EXIT
 
-# Feed the agent: prompt first, then context data, then verdict instruction.
-REVIEW_OUTPUT=$(cat <<EOF | eval "$REVIEWER_AGENT" 2>"$AGENT_STDERR"
-${PROMPT}
+# Feed the complete context directly. The JSON contains the resolved `prompt`
+# plus the issue, gate, and prior-run data, so no external JSON parser is
+# required on the adopter host.
+REVIEW_OUTPUT=$(
+  {
+    cat <<'EOF'
+Read the complete JIT gate context below. Follow its top-level `prompt` field as
+the review policy and use the remaining fields as evidence.
 
 ## Context
 
-\`\`\`json
-${CONTEXT_JSON}
-\`\`\`
+```json
+EOF
+    cat "$JIT_CONTEXT_FILE"
+    cat <<'EOF'
+```
 
 Before the verdict line, output a numbered list of every finding across all categories, followed by a single line stating the total count (e.g., "Total findings: N"). All findings must appear in this single enumeration — none may be withheld for a later round.
 
@@ -96,6 +98,7 @@ VERDICT: PASS
 VERDICT: FAIL
 No text may follow the verdict line.
 EOF
+  } | eval "$REVIEWER_AGENT" 2>"$AGENT_STDERR"
 ) || true
 
 # A reviewer agent's stderr can be enormous -- it may echo its entire prompt and

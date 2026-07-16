@@ -14,10 +14,8 @@
 //! engine. [`super::PresetManager`] loads a project's own presets alongside
 //! these built-ins.
 
-use super::{
-    breakdown_review_preset, coverage_preview_preset, plan_review_preset, GatePresetDefinition,
-    BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
-};
+use super::{planning::package_gate_preset, GatePresetDefinition};
+use crate::profile::jit_dogfood_planning_gate_keys;
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -34,31 +32,23 @@ impl BuiltinPresets {
     /// the preview-rule constructor.
     pub fn load() -> Result<HashMap<String, GatePresetDefinition>> {
         let mut presets = HashMap::new();
-
-        let plan_review = plan_review_preset();
-        let coverage_preview = coverage_preview_preset();
-        let breakdown_review = breakdown_review_preset();
-
-        // Validate all presets
-        let all_presets = [&plan_review, &coverage_preview, &breakdown_review];
-        for preset in &all_presets {
+        for name in jit_dogfood_planning_gate_keys()? {
+            let preset = package_gate_preset(&name)?;
             preset.validate()?;
+            presets.insert(name, preset);
         }
-
-        presets.insert(plan_review.name.clone(), plan_review);
-        presets.insert(coverage_preview.name.clone(), coverage_preview);
-        presets.insert(breakdown_review.name.clone(), breakdown_review);
 
         Ok(presets)
     }
 
-    /// Get list of builtin preset names.
-    pub fn names() -> Vec<String> {
-        vec![
-            PLAN_REVIEW_PRESET.to_string(),
-            COVERAGE_PREVIEW_PRESET.to_string(),
-            BREAKDOWN_REVIEW_PRESET.to_string(),
-        ]
+    /// Get the package-derived list of built-in preset names.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded dogfood package or its planning
+    /// template is invalid.
+    pub fn names() -> Result<Vec<String>> {
+        jit_dogfood_planning_gate_keys().map_err(Into::into)
     }
 }
 
@@ -93,7 +83,9 @@ mod tests {
                 "{removed} must not be a built-in preset"
             );
             assert!(
-                !BuiltinPresets::names().contains(&removed.to_string()),
+                !BuiltinPresets::names()
+                    .unwrap()
+                    .contains(&removed.to_string()),
                 "{removed} must not be in the built-in name list"
             );
         }
@@ -118,9 +110,16 @@ mod tests {
         assert_eq!(breakdown_review.gates[0].key, "breakdown-review");
         assert_eq!(breakdown_review.gates[0].mode, GateMode::Auto);
 
-        assert!(BuiltinPresets::names().contains(&"plan-review".to_string()));
-        assert!(BuiltinPresets::names().contains(&"coverage-preview".to_string()));
-        assert!(BuiltinPresets::names().contains(&"breakdown-review".to_string()));
+        let names = BuiltinPresets::names().unwrap();
+        assert!(names.contains(&"plan-review".to_string()));
+        assert!(names.contains(&"coverage-preview".to_string()));
+        assert!(names.contains(&"breakdown-review".to_string()));
+    }
+
+    #[test]
+    fn test_compatibility_names_equal_package_template_node_gates() {
+        let derived = jit_dogfood_planning_gate_keys().unwrap();
+        assert_eq!(BuiltinPresets::names().unwrap(), derived);
     }
 
     #[test]
