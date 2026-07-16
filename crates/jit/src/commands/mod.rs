@@ -48,6 +48,7 @@ pub mod item;
 mod labels;
 pub mod migrate;
 pub mod plan_doc;
+mod profile;
 mod query;
 pub mod reference;
 mod search;
@@ -78,6 +79,7 @@ pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
+pub use profile::ProfileApplyError;
 pub use reference::RulesGatesRenderResult;
 pub use template::TemplateApplyResult;
 pub use template_expand::{
