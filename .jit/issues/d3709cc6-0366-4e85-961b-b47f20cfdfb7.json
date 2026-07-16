@@ -21,20 +21,20 @@
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T07:36:07.452661876Z"
     },
-    "code-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T07:45:17.633948484Z"
-    },
     "cargo-ci": {
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T07:33:28.593536947Z"
     },
     "cargo-ci-features": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-16T11:06:19.022178515Z"
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:07:05.625258523Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T11:08:18.970171748Z"
     }
   },
   "context": {},
@@ -46,7 +46,7 @@
     "satisfies:REQ-02"
   ],
   "created_at": "2026-07-15T09:12:53.166170434Z",
-  "updated_at": "2026-07-16T11:06:19.022267935Z",
+  "updated_at": "2026-07-16T11:12:27.610276593Z",
   "first_ready_at": "2026-07-15T09:12:53.166170684Z",
   "claimed_at": "2026-07-15T17:53:57.655577204Z"
 }
