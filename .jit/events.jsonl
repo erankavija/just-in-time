@@ -7972,3 +7972,4 @@
 {"type":"issue_state_changed","id":"5e2fa209-356a-44ba-9d2a-914f5d78ffcc","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:26:16.927837923Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"f6a2833b-6379-46b7-9041-1e52472e4b50","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:26:16.930673405Z","assignee":"agent:codex-profiles-mvp"}
 {"type":"gate_failed","id":"cf010b25-e88c-476c-8b02-c0d5b09549db","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:47:13.384265978Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"f46cc37d-a765-41e5-a2c6-89a19c29c6c9","issue_id":"0aec3b1e-ccd3-4f12-96c6-3750ed7e8563","timestamp":"2026-07-16T11:50:42.671333447Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
