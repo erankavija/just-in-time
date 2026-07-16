@@ -15,14 +15,14 @@
 #   Every issue mutation is routed through the jit CLI (`jit issue show` to
 #   read the current title/description, `jit issue update` to write the
 #   correction). We never parse or write .jit/issues/*.json directly, so
-#   @/inv/event-log and @/inv/atomic-writes stay intact for issue writes.
+#   issue writes preserve the CLI's configured event and atomicity contracts.
 #
 #   No mechanical rule in the scanner targets a document — every document
 #   finding is `judgment` (heading/criterion/title/label rules are all
 #   issue-only; the content rules that fire on documents are all judgment).
 #   The fixer therefore never mutates a document. Were a mechanical document
-#   rule ever added, its writer must use the temp-file + atomic-rename pattern
-#   (@/inv/atomic-writes); see the reference doc.
+#   rule ever added, its writer must use the repository's configured atomic
+#   publication contract; see the reference doc.
 #
 # Usage:
 #   .agents/skills/jit-project-lead/scripts/standards-fix.sh [<project-root>] [--findings <file>] [--dry-run]

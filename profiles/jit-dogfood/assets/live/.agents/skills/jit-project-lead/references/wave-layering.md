@@ -125,7 +125,7 @@ waved. Each fails the step-1 filter and is dropped:
 
 ## Invariant relied on
 
-**`@/inv/dag-acyclic`** — the graph stays acyclic, so the sub-DAG induced on `S`
+**Acyclic dependency graph** — the graph stays acyclic, so the sub-DAG induced on `S`
 is acyclic. The layering therefore terminates and
 places every child. If a pass ever leaves a non-empty remainder whose
 sibling-dependencies never all resolve into earlier waves, that would require a

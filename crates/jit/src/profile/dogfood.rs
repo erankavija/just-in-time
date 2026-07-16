@@ -369,6 +369,84 @@ mod tests {
     }
 
     #[test]
+    fn test_packaged_qualified_item_citations_resolve_from_installed_registries() {
+        let package = jit_dogfood_package().unwrap();
+        let mut known = BTreeMap::<String, BTreeSet<String>>::new();
+        for contribution in &package.manifest().contributions {
+            if let Contribution::KeyedArray {
+                target, identity, ..
+            } = contribution
+            {
+                let kind = match target {
+                    KeyedArrayTarget::Rules => Some("rule"),
+                    KeyedArrayTarget::Gates => Some("gate"),
+                    KeyedArrayTarget::Templates => None,
+                };
+                if let Some(kind) = kind {
+                    known
+                        .entry(kind.to_string())
+                        .or_default()
+                        .insert(identity.clone());
+                }
+            }
+        }
+        let invariants: toml::Value = toml::from_str(
+            std::str::from_utf8(
+                package
+                    .source_bytes("assets/install/.jit/invariants.toml")
+                    .unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        for invariant in invariants
+            .get("invariants")
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(id) = invariant.get("id").and_then(toml::Value::as_str) {
+                known
+                    .entry("invariant".to_string())
+                    .or_default()
+                    .insert(id.to_string());
+            }
+        }
+        let citation =
+            regex::Regex::new(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)").unwrap();
+
+        for (source, target) in package
+            .manifest()
+            .assets
+            .iter()
+            .map(|asset| (&asset.source, &asset.target))
+            .chain(
+                package
+                    .manifest()
+                    .regions
+                    .iter()
+                    .map(|region| (&region.source, &region.target)),
+            )
+        {
+            let text =
+                std::str::from_utf8(package.source_bytes(source).unwrap()).unwrap_or_default();
+            for capture in citation.captures_iter(text) {
+                let authored_kind = &capture[1];
+                let kind = if authored_kind == "inv" {
+                    "invariant"
+                } else {
+                    authored_kind
+                };
+                let id = &capture[2];
+                assert!(
+                    known.get(kind).is_some_and(|ids| ids.contains(id)),
+                    "{target} cites unresolved package item @/{authored_kind}/{id}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_live_projection_excludes_install_only_state() {
         let projection = jit_dogfood_live_projection(&BTreeMap::new()).unwrap();
         assert!(projection

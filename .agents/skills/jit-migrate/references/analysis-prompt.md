@@ -30,7 +30,7 @@ Read each of the following files in full, then extract all work items:
 
 ## Addressable context
 
-Cited `@/…` addresses (e.g. `@/inv/event-log`, `@/rule/label-format`, `@/gate/code-review`) are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained calls in one shell invocation (`jit item show @/inv/event-log; jit item show @/gate/code-review`) resolve several at once.
+Cited concrete qualified addresses are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
 
 ## Your task
 

@@ -39,8 +39,8 @@ otherwise the fixer runs the scanner against `<project-root>` itself.
 
 Every issue mutation is routed through the jit CLI: `jit issue show` reads the
 current title and description, `jit issue update` writes the correction. The
-fixer never parses or writes `.jit/issues/*.json` directly, so `@/inv/event-log`
-and `@/inv/atomic-writes` stay intact for issue writes. All `jit` calls run inside
+fixer never parses or writes `.jit/issues/*.json` directly, so issue writes
+preserve the CLI's configured event and atomicity contracts. All `jit` calls run inside
 the target root, so the fixer only ever touches the project it was pointed at.
 
 `jit issue update` is invoked with `--force` so a still-imperfect issue (one
@@ -85,7 +85,7 @@ documents (ASCII art, plain-text math, the LaTeX-notation rules) are all
 `judgment`. The fixer therefore never mutates a document — every document
 finding, being `judgment` or unsupported, is left byte-identical. Were a
 mechanical document rule ever added, its writer must use the temp-file +
-atomic-rename pattern (`@/inv/atomic-writes`) for files under `permanent_paths` and
+repository-configured atomic publication pattern for files under `permanent_paths` and
 live `dev/active`.
 
 ## Determinism and idempotence

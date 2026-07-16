@@ -119,7 +119,7 @@ Run these concrete checks, `K` against each `Ci` in `A`:
    standards, then confirm `K`'s artifacts match the register, structure, and
    invariant vocabulary the accepted siblings already established. FAIL on a
    convention `K` breaks that its siblings hold (heading structure, verdict/report
-   shape, label format `@/inv/label-format`, assignee format `@/inv/assignee-format`,
+   shape, and the repository's configured label and assignee formats,
    terse-imperative doc register, no em-dashes). Every `@/…` address `K`'s
    artifacts cite must resolve via `jit item show`; a dangling citation is a FAIL.
 

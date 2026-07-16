@@ -62,7 +62,7 @@ Every finding must include `disposition` (`blocking` or `advisory`) and `origin`
 
 Verify every hard success criterion and that completed dependencies are correctly integrated. Judge implementation behavior against the applicable canonical prose and resolved items rather than against an engineering rubric embedded here.
 
-When an addressable policy item governs a finding, include valid resolved qualified IDs in that finding's `references` array. A finding based only on ordinary code correctness may use an empty array. When PID-signaling behavior is governed by `@/inv/pid-safety`, the finding must cite that ID. Do not invent or emit unresolved references.
+When an addressable policy item governs a finding, include valid resolved qualified IDs in that finding's `references` array. A finding based only on ordinary code correctness may use an empty array. Resolve policy items from the repository's configured registries; do not invent, hardcode, or emit unresolved references.
 
 ## Evidence and report shape
 

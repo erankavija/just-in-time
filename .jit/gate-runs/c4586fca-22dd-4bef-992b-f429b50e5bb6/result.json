@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_id": "c4586fca-22dd-4bef-992b-f429b50e5bb6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "c13b6c0b37e7f969335eb480def897f7e6f1c300",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T16:21:38.649231136Z",
+  "completed_at": "2026-07-16T16:25:00.403513807Z",
+  "duration_ms": 201754,
+  "exit_code": 1,
+  "stdout": "Attribution: e3304357, 7a4362c4, 24282cb6, c13b6c0b (`jit:7ad4019b`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2, @/charter/D-3, @/charter/D-4, @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/pid-safety (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci pending; docs-mechanical passed (exit 0); doc-review pending; repo-validate passed (exit 0)\nTruncation recovery: Narrowed reads by commit, manifest range, profile module, preset changes, jq-removal scripts, and prior structured findings.\n\n1. **[blocking][issue-impact][high]** The packaged code-review prompt requires citing `@/inv/pid-safety` for PID findings, but the profile deliberately installs an empty invariant registry. In a fresh adopter repository that reference cannot resolve, leaving a project-local policy dependency in a supposedly portable asset and violating the hard no-project-local-content requirement. [`profiles/jit-dogfood/assets/live/scripts/code-review-prompt.md:65`](profiles/jit-dogfood/assets/live/scripts/code-review-prompt.md:65)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The portable code-review prompt retains a repository-local PID-safety invariant reference that fresh profile installs cannot resolve.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The packaged code-review prompt requires @/inv/pid-safety even though the profile installs an empty invariant registry, so the required citation cannot resolve in a fresh adopter repository.\",\"file\":\"profiles/jit-dogfood/assets/live/scripts/code-review-prompt.md\",\"line\":65,\"references\":[\"@/invariant/pid-safety\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10684 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6bbb-d197-7991-a809-03161fa049d2\n--------\nuser\n--- 10671 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "The portable code-review prompt retains a repository-local PID-safety invariant reference that fresh profile installs cannot resolve.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The packaged code-review prompt requires @/inv/pid-safety even though the profile installs an empty invariant registry, so the required citation cannot resolve in a fresh adopter repository.",
+        "file": "profiles/jit-dogfood/assets/live/scripts/code-review-prompt.md",
+        "line": 65,
+        "references": [
+          "@/invariant/pid-safety"
+        ]
+      }
+    ]
+  }
+}
