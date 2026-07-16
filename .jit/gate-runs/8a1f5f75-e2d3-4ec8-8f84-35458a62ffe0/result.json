@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "8a1f5f75-e2d3-4ec8-8f84-35458a62ffe0",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "be542b98-8d5a-4c1f-8000-9fd0c480bebc",
+  "commit": "bdc0cdb93e52b5c5eca20b98c679cff1fa451174",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T07:50:49.786173448Z",
+  "completed_at": "2026-07-16T07:54:57.949125736Z",
+  "duration_ms": 248162,
+  "exit_code": 1,
+  "stdout": "Attribution: f6373ecb, 5bad31d0, 6f2b0114, b1826200, fad3e5a0, f9cb4fa2, 3447c301, c2ca50d6, 94af248b, 3630ea43, 4595d534, 3e4f9c5c, e7939ce6, 259b7f03, 48526373, de101a5f, 2d935a6b (`jit:be542b98`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6,D-7,D-8 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,@/invariant/domain-agnostic,@/invariant/single-source-prose,@/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T07:36:18Z); code-review failed (exit 1, 2026-07-15T17:41:54Z; prior F1 is addressed); repo-validate passed (exit 0, 2026-07-16T07:37:53Z)\nTruncation recovery: re-read the initial repository-view add-file patch in bounded ranges, each later affected patch/current caller/test range, and replaced the truncated unqualified-REQ catalog search with the bracketing profile issue.\n\n1. **[blocking][issue-impact]** [`validate_silent`](crates/jit/src/commands/validate.rs:198) selects the repository-view pipeline only when `index.json` exists. A file-backed repository with a missing index—the structural case the new pipeline must validate—falls through to legacy storage-backed `validate_integrity_silent()` and `run_rules()` instead. `validate_silent` remains an existing caller (including export pre-validation), so this violates REQ-01’s all-callers/no-reopen requirement. Use the existing `IssueStore::is_file_backed()` capability, as the corrected built-in gate does.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A file-backed validation caller still bypasses the repository-view pipeline when index.json is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"validate_silent falls back to legacy storage-backed validation when a file-backed repository lacks index.json, bypassing the required repository-view pipeline.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":198,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 15925 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f69e8-27a2-73c1-a580-b40b6dac8ff4\n--------\nuser\n--- 15912 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "A file-backed validation caller still bypasses the repository-view pipeline when index.json is absent.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "validate_silent falls back to legacy storage-backed validation when a file-backed repository lacks index.json, bypassing the required repository-view pipeline.",
+        "file": "crates/jit/src/commands/validate.rs",
+        "line": 198
+      }
+    ]
+  }
+}
