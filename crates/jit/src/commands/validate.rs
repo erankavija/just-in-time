@@ -195,7 +195,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // existing callers while preventing validation readers from forking.
         // Pure in-memory stores have no persisted index and retain the legacy
         // storage-backed path below for command unit tests.
-        if self.storage.root().join("index.json").is_file() {
+        if self.storage.is_file_backed() {
             let view = crate::validation::repository::FilesystemRepositoryView::from_jit_root(
                 self.storage.root(),
             )?;
@@ -1974,11 +1974,28 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
     // Note: validate_leases() and validate_branch_drift() require git repository setup
     // and are integration-tested through manual testing and real usage.
     // Unit tests focus on pure functions like format_duration().
+
+    #[test]
+    fn test_validate_silent_file_backend_reports_missing_index_through_repository_view() {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        storage.init().unwrap();
+        std::fs::remove_file(repo.path().join(".jit/index.json")).unwrap();
+        let executor = CommandExecutor::new(storage);
+
+        let error = executor.validate_silent().unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains("index.json"),
+            "missing index must fail through repository-view validation: {error:#}"
+        );
+    }
 
     #[test]
     fn test_format_duration_seconds() {
