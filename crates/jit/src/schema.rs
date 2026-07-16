@@ -473,6 +473,28 @@ impl CommandSchema {
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
+            // Embedded profile commands.
+            "profile_list" => (
+                Some(schema_to_value::<crate::profile::ProfileListResult>()),
+                "ProfileListResult",
+            ),
+            "profile_show" => (
+                Some(schema_to_value::<crate::profile::ProfileShowResult>()),
+                "ProfileShowResult",
+            ),
+            "profile_apply" => {
+                let union = json!({
+                    "oneOf": [
+                        schema_to_value::<crate::profile::ProfileApplyResult>(),
+                        schema_to_value::<crate::profile::ProfilePlanResult>(),
+                    ],
+                    "description": "Normal execution returns ProfileApplyResult. \
+                        With --dry-run, returns the exact non-mutating \
+                        ProfilePlanResult."
+                });
+                (Some(union), "ProfileApplyResult")
+            }
+
             // Issue commands
             //
             // `issue show --json` returns `IssueShowResponse` by default and

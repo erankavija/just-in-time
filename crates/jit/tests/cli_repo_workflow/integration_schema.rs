@@ -51,8 +51,41 @@ fn test_schema_has_all_commands() {
     assert!(commands.contains_key("issue"));
     assert!(commands.contains_key("dep"));
     assert!(commands.contains_key("gate"));
+    assert!(commands.contains_key("profile"));
     assert!(commands.contains_key("status"));
     assert!(commands.contains_key("validate"));
+}
+
+#[test]
+fn test_schema_exposes_profile_commands_and_typed_outputs() {
+    let output = cmd!().arg("--schema").output().unwrap();
+    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let profile = parsed["commands"]["profile"]["subcommands"]
+        .as_object()
+        .unwrap();
+
+    assert_eq!(
+        profile
+            .keys()
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>(),
+        std::collections::BTreeSet::from([
+            "apply".to_string(),
+            "list".to_string(),
+            "show".to_string(),
+        ])
+    );
+    for command in ["list", "show", "apply"] {
+        assert!(
+            profile[command]["output"]["success_schema"].is_object(),
+            "profile {command} must expose a success schema"
+        );
+    }
+    assert!(profile["apply"]["flags"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|flag| flag["name"] == "dry-run"));
 }
 
 #[test]

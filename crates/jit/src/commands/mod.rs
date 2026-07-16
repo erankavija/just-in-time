@@ -42,6 +42,7 @@ mod gate_check;
 mod gate_cli_tests;
 pub mod graph;
 pub mod hooks;
+mod init;
 pub mod invariant;
 mod issue;
 pub mod item;
@@ -75,6 +76,7 @@ pub use gate::{
     ManualGateAttestationRequiredError, PassAllOutcome,
 };
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
+pub use init::FreshInitResult;
 pub use invariant::{InvariantCheckResult, InvariantRenderResult};
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
@@ -1039,10 +1041,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         Option<WorktreeIdentity>,
         Vec<crate::storage::StorageWarning>,
     )> {
+        self.storage.init()?;
+        self.initialize_worktree_identity()
+    }
+
+    /// Create or refresh machine-local worktree identity after repository
+    /// scaffold publication.
+    ///
+    /// Kept separate from [`Self::init`] so the fresh profiled path can publish
+    /// all repository bytes transactionally before performing optional Git host
+    /// integration.
+    pub fn initialize_worktree_identity(
+        &self,
+    ) -> Result<(
+        Option<WorktreeIdentity>,
+        Vec<crate::storage::StorageWarning>,
+    )> {
         use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
         use crate::storage::worktree_paths::WorktreePaths;
-
-        self.storage.init()?;
 
         // Check if we're actually in a git repository
         let in_git_repo = std::process::Command::new("git")

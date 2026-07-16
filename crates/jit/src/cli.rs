@@ -44,9 +44,17 @@ pub enum Commands {
         #[arg(long)]
         hierarchy_template: Option<String>,
 
+        /// Apply an embedded profile during initialization
+        #[arg(long)]
+        profile: Option<String>,
+
         #[arg(long)]
         json: bool,
     },
+
+    /// Inspect and apply embedded repository profiles
+    #[command(subcommand)]
+    Profile(ProfileCommands),
 
     /// Issue management commands
     #[command(subcommand)]
@@ -2822,6 +2830,41 @@ pub enum HooksCommands {
     },
 }
 
+/// Embedded repository profile commands.
+#[derive(Debug, Subcommand)]
+pub enum ProfileCommands {
+    /// List profiles embedded in this JIT binary
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show one embedded profile manifest and package identity
+    Show {
+        /// Stable embedded profile ID
+        id: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Apply an embedded profile to the current repository
+    Apply {
+        /// Stable embedded profile ID
+        id: String,
+
+        /// Build and validate the exact application plan without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
 impl Commands {
     /// Whether this invocation must run transaction recovery before repository
     /// validation or command-service construction.
@@ -2834,6 +2877,7 @@ impl Commands {
             Self::Init { .. } | Self::Apply { .. } | Self::Recover { .. } | Self::Migrate(_) => {
                 true
             }
+            Self::Profile(command) => command.requires_recovery_dispatch(),
             Self::Issue(command) => command.requires_recovery_dispatch(),
             Self::Dep(command) => command.requires_recovery_dispatch(),
             Self::Gate(command) => command.requires_recovery_dispatch(),
@@ -2858,6 +2902,15 @@ impl Commands {
             | Self::Search { .. }
             | Self::Version { .. }
             | Self::Status { .. } => false,
+        }
+    }
+}
+
+impl ProfileCommands {
+    fn requires_recovery_dispatch(&self) -> bool {
+        match self {
+            Self::Apply { dry_run, .. } => !*dry_run,
+            Self::List { .. } | Self::Show { .. } => false,
         }
     }
 }
@@ -3127,6 +3180,9 @@ mod recovery_dispatch_tests {
         "rdeps",
         "recover",
         "reference render",
+        "profile apply",
+        "profile list",
+        "profile show",
         "search",
         "serve",
         "snapshot export",
@@ -3180,6 +3236,7 @@ mod recovery_dispatch_tests {
     fn test_representative_writer_and_reader_classification() {
         assert!(Commands::Init {
             hierarchy_template: None,
+            profile: None,
             json: false,
         }
         .requires_recovery_dispatch());

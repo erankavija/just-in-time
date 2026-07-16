@@ -1,9 +1,11 @@
 use crate::domain::{Event, ProfileOrigin};
+use crate::profile::{ProfileManifest, ProjectedFileMode};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Minimal repository-local provenance for one installed profile.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AppliedProfileRecord {
     /// Stable profile package identifier.
@@ -28,7 +30,7 @@ impl AppliedProfileRecord {
 }
 
 /// Whether an application published a transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileApplicationStatus {
     /// Repository targets and audit state were already exact.
@@ -38,7 +40,7 @@ pub enum ProfileApplicationStatus {
 }
 
 /// Non-fatal application diagnostics.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProfileApplicationWarning {
     /// Final targets are committed, but machine-local transaction cleanup remains.
@@ -51,7 +53,7 @@ pub enum ProfileApplicationWarning {
 }
 
 /// Internal command-layer profile application result.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileApplyResult {
     /// Stable profile identifier.
     pub id: String,
@@ -66,6 +68,109 @@ pub struct ProfileApplyResult {
     pub transaction_id: Option<String>,
     /// Non-fatal cleanup diagnostics.
     pub warnings: Vec<ProfileApplicationWarning>,
+}
+
+/// One embedded profile exposed by `jit profile list`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileSummary {
+    /// Stable package identifier.
+    pub id: String,
+    /// Semantic package version.
+    pub version: String,
+    /// Package discovery origin.
+    pub origin: ProfileOrigin,
+    /// Compatible JIT version requirement authored by the manifest.
+    pub jit: String,
+    /// Whether an exact installed record exists in the selected repository.
+    pub applied: bool,
+}
+
+/// Count-wrapped profile-list response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileListResult {
+    /// Number of profiles in [`Self::profiles`].
+    pub count: usize,
+    /// Embedded profiles sorted by stable ID.
+    pub profiles: Vec<ProfileSummary>,
+}
+
+/// Complete embedded package inspection response.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ProfileShowResult {
+    /// Parsed immutable manifest.
+    pub manifest: ProfileManifest,
+    /// Package discovery origin.
+    pub origin: ProfileOrigin,
+    /// Hash of the complete canonical package.
+    pub package_hash: String,
+    /// Per-target package hashes.
+    pub target_hashes: BTreeMap<String, String>,
+    /// Embedded file count, including `manifest.toml`.
+    pub file_count: usize,
+    /// Total embedded byte size.
+    pub byte_size: usize,
+    /// Exact installed record when the selected repository has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub applied: Option<AppliedProfileRecord>,
+}
+
+/// Planned target operation exposed by profile dry-run output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileTargetAction {
+    /// Existing bytes and mode already match.
+    Unchanged,
+    /// Target is absent and would be created.
+    Create,
+    /// Existing target would be replaced by the package projection.
+    Update,
+}
+
+/// One deterministic profile target in a dry-run plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileTargetChange {
+    /// Repository-relative target path.
+    pub path: String,
+    /// Planned operation.
+    pub action: ProfileTargetAction,
+    /// Platform-neutral file-mode intent.
+    pub executable: bool,
+}
+
+impl ProfileTargetChange {
+    /// Construct a public target projection from internal planner vocabulary.
+    pub(crate) fn new(path: String, action: ProfileTargetAction, mode: ProjectedFileMode) -> Self {
+        Self {
+            path,
+            action,
+            executable: mode == ProjectedFileMode::Executable,
+        }
+    }
+}
+
+/// Whether a dry-run found work to publish.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfilePlanStatus {
+    /// Package targets and installed provenance already match.
+    Unchanged,
+    /// Applying the plan would publish at least one change.
+    WouldApply,
+}
+
+/// Deterministic, non-mutating profile application preview.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfilePlanResult {
+    /// Stable profile identifier.
+    pub id: String,
+    /// Semantic package version.
+    pub version: String,
+    /// Whether execution would publish.
+    pub status: ProfilePlanStatus,
+    /// Stable identity of the package-target plan.
+    pub plan_hash: String,
+    /// Every package target, sorted by path.
+    pub targets: Vec<ProfileTargetChange>,
 }
 
 /// Construct the exact next append-only event-log image.

@@ -1,9 +1,11 @@
 use super::CommandExecutor;
 use crate::domain::Event;
 use crate::profile::{
-    append_profile_event_image, plan_profile_application_against, AppliedProfileRecord,
-    EmbeddedProfilePackage, PlannedTargetAction, ProfileApplicationStatus,
-    ProfileApplicationWarning, ProfileApplyResult, ProfileOrigin, ProjectedFileMode, SnapshotEntry,
+    append_profile_event_image, jit_dogfood_package, plan_profile_application_against,
+    AppliedProfileRecord, EmbeddedProfilePackage, PlannedTargetAction, ProfileApplicationPlan,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
+    ProfileOrigin, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange, ProjectedFileMode, RepositorySnapshot, SnapshotEntry,
 };
 use crate::storage::{
     FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
@@ -17,6 +19,15 @@ use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
+
+struct PreparedProfileApplication {
+    record_path: String,
+    record: AppliedProfileRecord,
+    record_matches: bool,
+    snapshot: RepositorySnapshot,
+    next_events: Vec<u8>,
+    plan: ProfileApplicationPlan,
+}
 
 /// Profile application conflict detected before transaction preparation.
 #[derive(Debug, thiserror::Error)]
@@ -55,6 +66,59 @@ pub enum ProfileApplyError {
 }
 
 impl CommandExecutor<JsonFileStorage> {
+    /// List the immutable profiles embedded in this binary.
+    pub fn list_embedded_profiles(&self) -> Result<ProfileListResult> {
+        let package = jit_dogfood_package()?;
+        let metadata = &package.manifest().profile;
+        let applied = self
+            .inspect_applied_record(&package)?
+            .is_some_and(|record| record == expected_record(&package));
+        let profiles = vec![ProfileSummary {
+            id: metadata.id.clone(),
+            version: metadata.version.clone(),
+            origin: ProfileOrigin::Embedded,
+            jit: metadata.jit.clone(),
+            applied,
+        }];
+        Ok(ProfileListResult {
+            count: profiles.len(),
+            profiles,
+        })
+    }
+
+    /// Inspect one immutable embedded profile package.
+    pub fn show_embedded_profile(&self, id: &str) -> Result<ProfileShowResult> {
+        let package = embedded_profile(id)?;
+        Ok(ProfileShowResult {
+            manifest: package.manifest().clone(),
+            origin: ProfileOrigin::Embedded,
+            package_hash: package.hashes().package.clone(),
+            target_hashes: package.hashes().targets.clone(),
+            file_count: package.file_count(),
+            byte_size: package.byte_size(),
+            applied: self.inspect_applied_record(&package)?,
+        })
+    }
+
+    /// Build the exact non-mutating target plan for one embedded profile.
+    pub fn plan_embedded_profile(&self, id: &str) -> Result<ProfilePlanResult> {
+        let package = embedded_profile(id)?;
+        let prepared = self.prepare_embedded_profile(&package)?;
+        Ok(profile_plan_result(&package, &prepared))
+    }
+
+    /// Resolve and apply one embedded profile by stable ID.
+    pub fn apply_profile(&self, id: &str) -> Result<ProfileApplyResult> {
+        let package = embedded_profile(id)?;
+        self.apply_embedded_profile(&package)
+    }
+
+    /// Validate an embedded profile identifier without reading or mutating a
+    /// repository.
+    pub fn validate_profile_id(&self, id: &str) -> Result<()> {
+        embedded_profile(id).map(|_| ())
+    }
+
     /// Apply one validated embedded profile package under a single write lock.
     pub fn apply_embedded_profile(
         &self,
@@ -80,71 +144,33 @@ impl CommandExecutor<JsonFileStorage> {
 
         // Rebuild all plan inputs after serialization. Nothing computed before
         // this boundary is trusted for publication.
+        let prepared = self.prepare_embedded_profile(package)?;
         let metadata = &package.manifest().profile;
-        let record_path = format!(".jit/profiles/{}.json", metadata.id);
-        reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
-        let snapshot_paths = package.hashes().targets.keys().map(String::as_str).chain([
-            record_path.as_str(),
-            ".jit/profiles",
-            ".jit/events.jsonl",
-        ]);
-        let snapshot = self.storage.capture_profile_snapshot(snapshot_paths)?;
-        let record = AppliedProfileRecord {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            origin: ProfileOrigin::Embedded,
-            package_hash: package.hashes().package.clone(),
-            target_hashes: package.hashes().targets.clone(),
-        };
-        let record_matches = inspect_installed_record(&snapshot, &record_path, &record)?;
-        let prior_events = snapshot
-            .file(".jit/events.jsonl")
-            .map_or(&[][..], |file| file.bytes.as_slice());
-        let isolated_torn_tail = has_malformed_unterminated_event_tail(prior_events);
-        let event = Event::new_profile_applied(
-            metadata.id.clone(),
-            metadata.version.clone(),
-            ProfileOrigin::Embedded,
-            package.hashes().package.clone(),
-            package.hashes().targets.clone(),
-            isolated_torn_tail,
-        );
-        let next_events = append_profile_event_image(prior_events, &event)?;
-        let validation_base: Arc<dyn RepositoryView> = Arc::new(
-            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
-        );
-        let planning_validation_base: Arc<dyn RepositoryView> = if isolated_torn_tail {
-            Arc::new(OverlayRepositoryView::new(
-                validation_base.clone(),
-                [(
-                    PathBuf::from(".jit/events.jsonl"),
-                    Some(next_events.clone()),
-                )],
-            )?)
-        } else {
-            validation_base.clone()
-        };
-        let plan = plan_profile_application_against(package, &snapshot, planning_validation_base)?;
-
-        if plan.is_no_op() && record_matches {
+        if prepared.plan.is_no_op() && prepared.record_matches {
             return Ok(ProfileApplyResult {
                 id: metadata.id.clone(),
                 version: metadata.version.clone(),
                 status: ProfileApplicationStatus::Unchanged,
-                plan_hash: plan.identity.plan_hash,
+                plan_hash: prepared.plan.identity.plan_hash,
                 transaction_id: None,
                 warnings: Vec::new(),
             });
         }
 
-        ensure_profile_directory(&snapshot)?;
-        let record_bytes = record.to_bytes()?;
+        ensure_profile_directory(&prepared.snapshot)?;
+        let record_bytes = prepared.record.to_bytes()?;
 
-        let mut overlay = plan.overlay_changes();
-        overlay.insert(PathBuf::from(&record_path), Some(record_bytes.clone()));
+        let validation_base: Arc<dyn RepositoryView> = Arc::new(
+            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
+        );
+        let mut overlay = prepared.plan.overlay_changes();
+        overlay.insert(
+            PathBuf::from(&prepared.record_path),
+            Some(record_bytes.clone()),
+        );
         overlay.insert(
             PathBuf::from(".jit/events.jsonl"),
-            Some(next_events.clone()),
+            Some(prepared.next_events.clone()),
         );
         let final_view = OverlayRepositoryView::new(validation_base, overlay)?;
         let validation = validate_repository(&final_view).map_err(ProfileApplyError::from)?;
@@ -155,7 +181,8 @@ impl CommandExecutor<JsonFileStorage> {
             .into());
         }
 
-        let mut actions = plan
+        let mut actions = prepared
+            .plan
             .targets
             .values()
             .filter(|target| target.action != PlannedTargetAction::NoOp)
@@ -165,22 +192,22 @@ impl CommandExecutor<JsonFileStorage> {
                 unix_mode: unix_mode(target.mode),
             })
             .collect::<Vec<_>>();
-        if snapshot.entry(".jit/profiles").is_none() {
+        if prepared.snapshot.entry(".jit/profiles").is_none() {
             actions.push(TransactionAction::CreateDirectory {
                 path: transaction_path(self.storage.root(), ".jit/profiles"),
                 unix_mode: Some(0o755),
             });
         }
-        if !record_matches {
+        if !prepared.record_matches {
             actions.push(TransactionAction::WriteFile {
-                path: transaction_path(self.storage.root(), &record_path),
+                path: transaction_path(self.storage.root(), &prepared.record_path),
                 contents: record_bytes,
                 unix_mode: Some(0o644),
             });
         }
         actions.push(TransactionAction::WriteFile {
             path: transaction_path(self.storage.root(), ".jit/events.jsonl"),
-            contents: next_events,
+            contents: prepared.next_events,
             unix_mode: Some(0o644),
         });
 
@@ -212,14 +239,145 @@ impl CommandExecutor<JsonFileStorage> {
             id: metadata.id.clone(),
             version: metadata.version.clone(),
             status: ProfileApplicationStatus::Applied,
-            plan_hash: plan.identity.plan_hash,
+            plan_hash: prepared.plan.identity.plan_hash,
             transaction_id: Some(transaction_id),
             warnings,
         })
     }
+
+    fn prepare_embedded_profile(
+        &self,
+        package: &EmbeddedProfilePackage<'_>,
+    ) -> Result<PreparedProfileApplication> {
+        let metadata = &package.manifest().profile;
+        let record_path = format!(".jit/profiles/{}.json", metadata.id);
+        reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
+        let snapshot_paths = package.hashes().targets.keys().map(String::as_str).chain([
+            record_path.as_str(),
+            ".jit/profiles",
+            ".jit/events.jsonl",
+        ]);
+        let snapshot = self.storage.capture_profile_snapshot(snapshot_paths)?;
+        let record = AppliedProfileRecord {
+            ..expected_record(package)
+        };
+        let record_matches = inspect_installed_record(&snapshot, &record_path, &record)?;
+        let prior_events = snapshot
+            .file(".jit/events.jsonl")
+            .map_or(&[][..], |file| file.bytes.as_slice());
+        let isolated_torn_tail = has_malformed_unterminated_event_tail(prior_events);
+        let event = Event::new_profile_applied(
+            metadata.id.clone(),
+            metadata.version.clone(),
+            ProfileOrigin::Embedded,
+            package.hashes().package.clone(),
+            package.hashes().targets.clone(),
+            isolated_torn_tail,
+        );
+        let next_events = append_profile_event_image(prior_events, &event)?;
+        let validation_base: Arc<dyn RepositoryView> = Arc::new(
+            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
+        );
+        let planning_validation_base: Arc<dyn RepositoryView> = if isolated_torn_tail {
+            Arc::new(OverlayRepositoryView::new(
+                validation_base.clone(),
+                [(
+                    PathBuf::from(".jit/events.jsonl"),
+                    Some(next_events.clone()),
+                )],
+            )?)
+        } else {
+            validation_base
+        };
+        let plan = plan_profile_application_against(package, &snapshot, planning_validation_base)?;
+        Ok(PreparedProfileApplication {
+            record_path,
+            record,
+            record_matches,
+            snapshot,
+            next_events,
+            plan,
+        })
+    }
+
+    fn inspect_applied_record(
+        &self,
+        package: &EmbeddedProfilePackage<'_>,
+    ) -> Result<Option<AppliedProfileRecord>> {
+        let metadata = &package.manifest().profile;
+        let record_path = format!(".jit/profiles/{}.json", metadata.id);
+        let snapshot = self
+            .storage
+            .capture_profile_snapshot([record_path.as_str()])?;
+        match snapshot.entry(&record_path) {
+            None => Ok(None),
+            Some(SnapshotEntry::File(file)) => {
+                let record =
+                    serde_json::from_slice::<AppliedProfileRecord>(&file.bytes).map_err(|_| {
+                        ProfileApplyError::InstalledRecordConflict {
+                            path: record_path.clone(),
+                            id: metadata.id.clone(),
+                            version: metadata.version.clone(),
+                        }
+                    })?;
+                Ok(Some(record))
+            }
+            Some(_) => Err(ProfileApplyError::UnsupportedMetadataPath { path: record_path }.into()),
+        }
+    }
 }
 
-fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
+pub(super) fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedProfileRecord {
+    let metadata = &package.manifest().profile;
+    AppliedProfileRecord {
+        id: metadata.id.clone(),
+        version: metadata.version.clone(),
+        origin: ProfileOrigin::Embedded,
+        package_hash: package.hashes().package.clone(),
+        target_hashes: package.hashes().targets.clone(),
+    }
+}
+
+pub(super) fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+    let package = jit_dogfood_package()?;
+    if package.manifest().profile.id == id {
+        Ok(package)
+    } else {
+        Err(crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
+    }
+}
+
+fn profile_plan_result(
+    package: &EmbeddedProfilePackage<'_>,
+    prepared: &PreparedProfileApplication,
+) -> ProfilePlanResult {
+    let targets = prepared
+        .plan
+        .targets
+        .values()
+        .map(|target| {
+            let action = match target.action {
+                PlannedTargetAction::Create => ProfileTargetAction::Create,
+                PlannedTargetAction::Update => ProfileTargetAction::Update,
+                PlannedTargetAction::NoOp => ProfileTargetAction::Unchanged,
+            };
+            ProfileTargetChange::new(target.path.clone(), action, target.mode)
+        })
+        .collect();
+    ProfilePlanResult {
+        id: package.manifest().profile.id.clone(),
+        version: package.manifest().profile.version.clone(),
+        status: if prepared.plan.is_no_op() && prepared.record_matches {
+            ProfilePlanStatus::Unchanged
+        } else {
+            ProfilePlanStatus::WouldApply
+        },
+        plan_hash: prepared.plan.identity.plan_hash.clone(),
+        targets,
+    }
+}
+
+pub(super) fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
     if events.is_empty() || events.ends_with(b"\n") {
         return false;
     }
@@ -230,7 +388,7 @@ fn has_malformed_unterminated_event_tail(events: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(final_line).is_err()
 }
 
-fn inspect_installed_record(
+pub(super) fn inspect_installed_record(
     snapshot: &crate::profile::RepositorySnapshot,
     path: &str,
     expected: &AppliedProfileRecord,
@@ -257,7 +415,9 @@ fn inspect_installed_record(
     }
 }
 
-fn ensure_profile_directory(snapshot: &crate::profile::RepositorySnapshot) -> Result<()> {
+pub(super) fn ensure_profile_directory(
+    snapshot: &crate::profile::RepositorySnapshot,
+) -> Result<()> {
     match snapshot.entry(".jit/profiles") {
         None | Some(SnapshotEntry::Directory) => Ok(()),
         Some(_) => Err(ProfileApplyError::UnsupportedMetadataPath {
@@ -267,7 +427,7 @@ fn ensure_profile_directory(snapshot: &crate::profile::RepositorySnapshot) -> Re
     }
 }
 
-fn reject_reserved_application_targets<'a>(
+pub(super) fn reject_reserved_application_targets<'a>(
     targets: impl IntoIterator<Item = &'a str>,
 ) -> Result<()> {
     if let Some(path) = targets.into_iter().find(|path| {
@@ -287,14 +447,14 @@ fn reject_reserved_application_targets<'a>(
     Ok(())
 }
 
-fn unix_mode(mode: ProjectedFileMode) -> Option<u32> {
+pub(super) fn unix_mode(mode: ProjectedFileMode) -> Option<u32> {
     Some(match mode {
         ProjectedFileMode::Regular => 0o644,
         ProjectedFileMode::Executable => 0o755,
     })
 }
 
-fn transaction_path(storage_root: &Path, virtual_path: &str) -> String {
+pub(super) fn transaction_path(storage_root: &Path, virtual_path: &str) -> String {
     let storage_name = storage_root
         .file_name()
         .and_then(|name| name.to_str())
