@@ -590,6 +590,15 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **No-op guard.** If `issue.state == target` there is nothing to
     ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
+    /// 1a. **Archived revive guard (`@/issue/45a140ae`).** Leaving
+    ///    [`State::Archived`] is a revive: it may only restore the recorded
+    ///    pre-archive origin ([`Issue::archived_from`]). Targeting any other state
+    ///    returns a
+    ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
+    ///    4, `ArchivedRevive` blocker) and persists NOTHING, so the archive
+    ///    round-trip cannot resurrect a completed issue into the active lifecycle.
+    ///    A legacy Archived record with no recorded origin keeps the prior
+    ///    unconstrained revive but returns an advisory warning.
     /// 2. **Dependency and gate guards.** Runs
     ///    [`transition_blockers`](Self::transition_blockers): a transition into
     ///    [`State::Ready`] or [`State::Done`] requires every dependency met, and
@@ -604,13 +613,16 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// 3. **Graph-rule enforcement.** Runs
     ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
     ///    on the issue projected into its TARGET state, EXCEPT when `target` is
-    ///    [`State::Rejected`] — rejection deliberately bypasses validation
-    ///    (abandoning an issue must not be gated on coverage). That policy is
-    ///    encoded HERE, not at call sites, so no caller can accidentally enforce
-    ///    (or fail to skip) on rejection. A blocking enforce rule returns a
+    ///    [`State::Rejected`] or [`State::Archived`] — rejection and
+    ///    archival/parking deliberately bypass validation (abandoning or retiring
+    ///    an issue must not be gated on coverage). That policy is encoded HERE, not
+    ///    at call sites, so no caller can accidentally enforce (or fail to skip) on
+    ///    those targets. A blocking enforce rule returns a
     ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
     ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
-    /// 4. **State mutation.** Sets `issue.state = target`.
+    /// 4. **State mutation.** Sets `issue.state = target`, and maintains
+    ///    [`Issue::archived_from`]: entering [`State::Archived`] records the state
+    ///    left behind, reviving out of it clears the field.
     /// 5. **Persistence + audit (when `persist`).** When `persist` is true, saves
     ///    the issue and appends the `issue_state_changed` event (plus
     ///    `issue_completed` when landing [`State::Done`]). Including the event
@@ -648,12 +660,40 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(Vec::new());
         }
 
+        // Archived is terminality-preserving (`@/issue/45a140ae`): a revive out of
+        // Archived may only restore the recorded pre-archive origin, so the
+        // archive round-trip cannot resurrect a completed issue into the active
+        // lifecycle. A legacy Archived record (no recorded origin) keeps the prior
+        // unconstrained revive, with an advisory warning.
+        let mut revive_warnings = Vec::new();
+        if old_state == State::Archived {
+            match issue.archived_from {
+                Some(origin) if target != origin => {
+                    return Err(crate::errors::TransitionBlockedError::archived_revive(
+                        issue.id.clone(),
+                        target,
+                        origin,
+                    )
+                    .into());
+                }
+                None => revive_warnings.push(format!(
+                    "issue {} was archived before its pre-archive state was recorded; reviving to \
+                     '{}' without a verified origin",
+                    issue.short_id(),
+                    target.as_str()
+                )),
+                Some(_) => {}
+            }
+        }
+
         // Dependency and gate guards, ahead of any mutation.
         self.transition_blockers(issue, target)?;
 
-        // Rejection deliberately bypasses graph-rule enforcement; every other
-        // target runs it against the TARGET-state projection of the issue.
-        let warnings = if target == State::Rejected {
+        // Rejection and archival deliberately bypass graph-rule enforcement:
+        // abandoning or retiring/parking an issue must not be gated on rules such
+        // as coverage. Every other target runs enforcement against the TARGET-state
+        // projection of the issue.
+        let warnings = if matches!(target, State::Rejected | State::Archived) {
             Vec::new()
         } else {
             let mut projected = issue.clone();
@@ -663,6 +703,16 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Enforcement passed (or was bypassed/skipped): land the new state.
         issue.state = target;
+
+        // Maintain the pre-archive origin (`@/issue/45a140ae`): entering Archived
+        // records the state left behind (never Archived — the no-op guard above
+        // rules that out); leaving Archived (revive) clears it, so `archived_from`
+        // is `Some` only while the issue is Archived.
+        if target == State::Archived {
+            issue.archived_from = Some(old_state);
+        } else if old_state == State::Archived {
+            issue.archived_from = None;
+        }
 
         // Stamp the lifecycle timestamp for this transition (first-occurrence
         // only; see `Issue::mark_*`). Done HERE, at the single chokepoint every
@@ -690,7 +740,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(warnings)
+        // Surface the legacy-revive advisory ahead of any enforcement warnings.
+        revive_warnings.extend(warnings);
+        Ok(revive_warnings)
     }
 
     /// The dependency and gate guards a transition must clear, evaluated against

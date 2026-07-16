@@ -100,6 +100,7 @@ mod tests {
             first_ready_at: None,
             claimed_at: None,
             done_at: None,
+            archived_from: None,
         }
     }
 
