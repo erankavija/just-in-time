@@ -1538,7 +1538,11 @@ pub enum GateCommands {
     ///
     /// When the gate already passed at the current HEAD commit, the checker is
     /// skipped: the command exits 0 and reports `already_passed: true` in --json.
-    /// Use --force to re-run the checker unconditionally.
+    /// For a manual gate this skip applies only when the recorded pass is attested
+    /// (its attestor is a human or agent, not the automated executor); an
+    /// unattested auto-era pass — e.g. left behind when an auto gate is redefined
+    /// to manual — falls through and still requires `--by`. Use --force to re-run
+    /// the checker unconditionally.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1582,7 +1586,8 @@ pub enum GateCommands {
     /// manual gate.
     ///
     /// Each gate inherits the skip-if-passed-at-HEAD behaviour: a gate already
-    /// passed at the current HEAD commit is not re-run. Use --force to re-run
+    /// passed at the current HEAD commit is not re-run; for a manual gate the skip
+    /// applies only when the recorded pass is attested. Use --force to re-run
     /// every gate's checker unconditionally. An issue with no required gates
     /// succeeds (exit 0) with an empty result set.
     EvaluateAll {

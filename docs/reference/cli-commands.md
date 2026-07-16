@@ -1666,6 +1666,10 @@ jit gate evaluate abc123 --gate tests --force
   recorded run; both must be present and equal. When there is no git repository
   or no commit (`HEAD` unresolvable), the run is never skipped — the prior pass
   cannot be proven current.
+- For a manual gate the skip additionally requires the recorded pass to be
+  attested: its attestor must be a human or agent, not the automated executor. An
+  unattested auto-era pass — e.g. left behind when an auto gate is redefined to
+  manual — is never skipped; a bare `jit gate evaluate` still requires `--by`.
 - `--force` bypasses the check and re-runs the checker unconditionally.
 - On a normal run (manual attestation, or a freshly executed checker), `--json`
   reports `already_passed: false`.
@@ -1773,7 +1777,8 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
   every gate inherits the same exit-code taxonomy, `verdict` semantics, and the
   **skip-if-passed-at-HEAD** behaviour (an already-passed gate is not re-run;
-  its entry reports `already_passed: true`).
+  its entry reports `already_passed: true`). For a manual gate the skip applies
+  only when the recorded pass is attested.
 - **Fail-fast:** on the FIRST gate that does not pass, the command stops
   immediately and exits with that gate's code from the
   [`jit gate evaluate`](#jit-gate-evaluate) taxonomy (see the
