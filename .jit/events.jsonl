@@ -8144,3 +8144,8 @@
 {"type":"issue_claimed","id":"134ddaf1-1261-4714-a7c2-c02017510494","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:27:02.705030024Z","assignee":"agent:codex-profile-acceptance"}
 {"type":"issue_state_changed","id":"48a15b95-f30b-4aa7-824a-330881012519","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:27:17.221396110Z","from":"ready","to":"in_progress"}
 {"type":"issue_claimed","id":"c3e23104-8d57-4a42-887c-80b3ef381e20","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:27:17.221818790Z","assignee":"agent:codex-profile-acceptance"}
+{"type":"gate_passed","id":"3c5b0f59-fdc7-4a64-8860-c6755c0e9a23","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:48:27.510641924Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"6a3b6607-ba46-47b8-a9f7-8bbb0fd2aa3a","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:49:23.807232351Z","gate_key":"mcp-ci","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"b4f40b0f-3d61-4996-b4aa-917a46bd30ac","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:49:37.484236127Z","gate_key":"docs-mechanical","updated_by":"auto:executor"}
+{"type":"gate_passed","id":"38e77fcf-a200-45d4-be85-5250cba6c4f6","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:50:02.902730701Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"gate_failed","id":"3789dd2b-5f86-4410-90f4-a6eac06d7118","issue_id":"bcff56be-2e8f-44ae-9b3b-5739be414630","timestamp":"2026-07-16T19:54:36.145163906Z","gate_key":"code-review","updated_by":"auto:executor"}
