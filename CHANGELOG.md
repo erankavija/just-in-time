@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **The legacy gate-verb aliases `pass`, `pass-all`, `check`, and `check-all`
+  are gone.** Issue 949cd9d0 renamed these verbs to `evaluate`, `evaluate-all`,
+  `status`, and `status-all` and kept the old spellings as silent aliases so no
+  caller broke at rename time. This change drops the four aliases: invoking
+  any of them now fails with clap's standard unrecognized-subcommand error,
+  the same as any other unknown command. The short alias `eval` (for
+  `evaluate`) is unaffected and continues to work. `jit gate --help` and the
+  schema's `gate` subcommand listing now show only the canonical verbs
+  (`evaluate`/`eval`, `evaluate-all`, `fail`, `status`, `status-all`, plus the
+  configuration and inspection verbs), and in-repo docs and tests were swept
+  to the canonical spellings.
+
 ### Changed
 
 - **Build provenance no longer tracks Git metadata or the wall clock.**

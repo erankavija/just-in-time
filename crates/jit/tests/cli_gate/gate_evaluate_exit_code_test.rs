@@ -1,7 +1,7 @@
-//! Integration tests for the `jit gate pass` exit-code taxonomy and JSON `verdict`.
+//! Integration tests for the `jit gate evaluate` exit-code taxonomy and JSON `verdict`.
 //!
 //! Matrix:
-//!   pass                -> exit 0,  verdict "pass"
+//!   success             -> exit 0,  verdict "pass"
 //!   checker failure     -> exit 4,  verdict "fail"   (checker ran, non-zero exit)
 //!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code)
 //!   issue not found     -> exit 3,  no verdict
@@ -70,12 +70,12 @@ fn setup_auto_gate_issue(checker_command: &str) -> (TempDir, String) {
 }
 
 #[test]
-fn test_gate_pass_success_exit_0_verdict_pass() {
+fn test_gate_evaluate_success_exit_0_verdict_pass() {
     let (temp, id) = setup_auto_gate_issue("true");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
@@ -86,13 +86,13 @@ fn test_gate_pass_success_exit_0_verdict_pass() {
 }
 
 #[test]
-fn test_gate_pass_checker_failure_exit_4_verdict_fail() {
+fn test_gate_evaluate_checker_failure_exit_4_verdict_fail() {
     // `false` exits non-zero -> GateRunStatus::Failed -> checker failure.
     let (temp, id) = setup_auto_gate_issue("false");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
@@ -109,14 +109,14 @@ fn test_gate_pass_checker_failure_exit_4_verdict_fail() {
 }
 
 #[test]
-fn test_gate_pass_runner_error_exit_10_verdict_error() {
+fn test_gate_evaluate_runner_error_exit_10_verdict_error() {
     // A checker that kills itself with SIGKILL leaves no exit code, which the
     // runner classifies as GateRunStatus::Error (runner/infra failure).
     let (temp, id) = setup_auto_gate_issue("kill -9 $$");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
@@ -133,7 +133,7 @@ fn test_gate_pass_runner_error_exit_10_verdict_error() {
 }
 
 #[test]
-fn test_gate_pass_command_not_found_exit_10_verdict_error() {
+fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
     // A nonexistent executable makes `sh -c` exit 127 (command not found),
     // which the runner classifies as GateRunStatus::Error (runner/infra error),
     // not a checker failure.
@@ -141,7 +141,7 @@ fn test_gate_pass_command_not_found_exit_10_verdict_error() {
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate", "--json"])
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
         .output()
         .unwrap();
 
@@ -158,13 +158,13 @@ fn test_gate_pass_command_not_found_exit_10_verdict_error() {
 }
 
 #[test]
-fn test_gate_pass_runner_error_non_json_exit_10() {
+fn test_gate_evaluate_runner_error_non_json_exit_10() {
     // The non-JSON path must agree with the JSON path on exit 10.
     let (temp, id) = setup_auto_gate_issue("kill -9 $$");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate"])
+        .args(["gate", "evaluate", &id, "test-gate"])
         .output()
         .unwrap();
 
@@ -172,12 +172,12 @@ fn test_gate_pass_runner_error_non_json_exit_10() {
 }
 
 #[test]
-fn test_gate_pass_checker_failure_non_json_exit_4() {
+fn test_gate_evaluate_checker_failure_non_json_exit_4() {
     let (temp, id) = setup_auto_gate_issue("false");
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "test-gate"])
+        .args(["gate", "evaluate", &id, "test-gate"])
         .output()
         .unwrap();
 
@@ -185,12 +185,12 @@ fn test_gate_pass_checker_failure_non_json_exit_4() {
 }
 
 #[test]
-fn test_gate_pass_issue_not_found_exit_3() {
+fn test_gate_evaluate_issue_not_found_exit_3() {
     let temp = setup_repo();
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", "nonexistent", "test-gate", "--json"])
+        .args(["gate", "evaluate", "nonexistent", "test-gate", "--json"])
         .output()
         .unwrap();
 
@@ -202,7 +202,7 @@ fn test_gate_pass_issue_not_found_exit_3() {
 }
 
 #[test]
-fn test_gate_pass_gate_not_required_exit_2() {
+fn test_gate_evaluate_gate_not_required_exit_2() {
     let temp = setup_repo();
 
     // Create an issue with NO gates.
@@ -216,7 +216,7 @@ fn test_gate_pass_gate_not_required_exit_2() {
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "not-a-gate", "--json"])
+        .args(["gate", "evaluate", &id, "not-a-gate", "--json"])
         .output()
         .unwrap();
 
@@ -234,7 +234,7 @@ fn test_gate_pass_gate_not_required_exit_2() {
 }
 
 #[test]
-fn test_gate_pass_gate_not_required_non_json_exit_2() {
+fn test_gate_evaluate_gate_not_required_non_json_exit_2() {
     let temp = setup_repo();
 
     let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -247,7 +247,7 @@ fn test_gate_pass_gate_not_required_non_json_exit_2() {
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "not-a-gate"])
+        .args(["gate", "evaluate", &id, "not-a-gate"])
         .output()
         .unwrap();
 
@@ -255,7 +255,7 @@ fn test_gate_pass_gate_not_required_non_json_exit_2() {
 }
 
 #[test]
-fn test_gate_pass_manual_gate_success_verdict_pass() {
+fn test_gate_evaluate_manual_gate_success_verdict_pass() {
     let temp = setup_repo();
 
     // Define a manual gate.
@@ -289,7 +289,7 @@ fn test_gate_pass_manual_gate_success_verdict_pass() {
         .current_dir(temp.path())
         .args([
             "gate",
-            "pass",
+            "evaluate",
             &id,
             "review",
             "--by",
@@ -309,7 +309,7 @@ fn test_gate_pass_manual_gate_success_verdict_pass() {
 /// as a usage error (exit 2, no verdict) with a hint naming the attested
 /// form. Auto gates are unaffected by --by.
 #[test]
-fn test_gate_pass_manual_gate_without_by_exit_2_no_verdict() {
+fn test_gate_evaluate_manual_gate_without_by_exit_2_no_verdict() {
     let temp = setup_repo();
 
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -340,7 +340,7 @@ fn test_gate_pass_manual_gate_without_by_exit_2_no_verdict() {
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "review", "--json"])
+        .args(["gate", "evaluate", &id, "review", "--json"])
         .output()
         .unwrap();
 

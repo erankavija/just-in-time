@@ -2106,7 +2106,7 @@ impl GateStatusEntry {
     }
 }
 
-/// JSON payload of `jit gate status-all --json` (alias `gate check-all`).
+/// JSON payload of `jit gate status-all --json`.
 ///
 /// `results` contains one [`GateRunSummary`] per recorded AUTOMATED run;
 /// `gates` covers EVERY required gate (automated and manual) with its

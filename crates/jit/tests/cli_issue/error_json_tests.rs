@@ -192,9 +192,9 @@ fn test_gate_operation_error_json() {
         .unwrap()
         .to_string();
 
-    // Try to pass a gate that wasn't added to the issue
+    // Try to evaluate a gate that wasn't added to the issue
     let output = Command::new(jit)
-        .args(["gate", "pass", &id, "nonexistent-gate", "--json"])
+        .args(["gate", "evaluate", &id, "nonexistent-gate", "--json"])
         .current_dir(temp.path())
         .output()
         .unwrap();
