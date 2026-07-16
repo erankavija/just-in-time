@@ -560,9 +560,7 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{
-        profile_manifest_schema, Contribution, KeyedArrayTarget, MapEntryTarget,
-    };
+    use crate::profile::{profile_manifest_schema, Contribution, KeyedArrayTarget, MapEntryTarget};
     use include_dir::{include_dir, Dir};
 
     static VALID_PACKAGE: Dir<'_> =

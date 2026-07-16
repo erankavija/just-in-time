@@ -1058,8 +1058,9 @@ mod tests {
 
     #[test]
     fn test_partial_projection_and_unknown_keyed_identity_are_rejected() {
-        let mut projection: DocumentMut =
-            "[projection.invariants]\nmode = \"region\"\n".parse().unwrap();
+        let mut projection: DocumentMut = "[projection.invariants]\nmode = \"region\"\n"
+            .parse()
+            .unwrap();
         let contribution = Contribution::Projection {
             name: "invariants".to_string(),
             value: toml::from_str(
