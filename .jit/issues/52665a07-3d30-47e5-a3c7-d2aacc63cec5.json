@@ -19,9 +19,9 @@
       "updated_at": "2026-07-16T15:21:36.311479212Z"
     },
     "cargo-ci": {
-      "status": "failed",
+      "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T15:14:11.680484777Z"
+      "updated_at": "2026-07-16T20:39:49.643919438Z"
     },
     "docs-mechanical": {
       "status": "passed",
@@ -44,7 +44,7 @@
     "per:@/charter/D-2"
   ],
   "created_at": "2026-07-09T11:25:06.642012697Z",
-  "updated_at": "2026-07-16T15:28:26.269551234Z",
+  "updated_at": "2026-07-16T20:43:01.239536311Z",
   "first_ready_at": "2026-07-09T11:25:06.642021737Z",
   "claimed_at": "2026-07-16T08:40:04.659278837Z"
 }
