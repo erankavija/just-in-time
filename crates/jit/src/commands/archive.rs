@@ -2538,8 +2538,7 @@ epic = "epic"
         assert_eq!(artifact.action(), ArtifactAction::Move);
         assert!(!artifact
             .evidence()
-            .iter()
-            .any(|evidence| *evidence == crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
+            .contains(&crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
 
         // Contrast: the same descendant archived from a NON-terminal state is an
         // active owner, so the shared source is retained instead of moved.
@@ -2552,7 +2551,6 @@ epic = "epic"
         let artifact = &plan.artifacts()[0];
         assert!(artifact
             .evidence()
-            .iter()
-            .any(|evidence| *evidence == crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
+            .contains(&crate::domain::artifact_plan::EvidenceCode::ActiveOwner));
     }
 }

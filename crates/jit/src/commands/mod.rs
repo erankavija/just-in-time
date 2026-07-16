@@ -590,7 +590,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. **No-op guard.** If `issue.state == target` there is nothing to
     ///    transition: returns `Ok(vec![])` without enforcing, saving, or logging.
-    /// 1a. **Archived revive guard (`jit:45a140ae`).** Leaving
+    /// 2. **Archived revive guard (`jit:45a140ae`).** Leaving
     ///    [`State::Archived`] is a revive: it may only restore the recorded
     ///    pre-archive origin ([`Issue::archived_from`]). Targeting any other state
     ///    returns a
@@ -599,7 +599,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    round-trip cannot resurrect a completed issue into the active lifecycle.
     ///    A legacy Archived record with no recorded origin keeps the prior
     ///    unconstrained revive but returns an advisory warning.
-    /// 2. **Dependency and gate guards.** Runs
+    /// 3. **Dependency and gate guards.** Runs
     ///    [`transition_blockers`](Self::transition_blockers): a transition into
     ///    [`State::Ready`] or [`State::Done`] requires every dependency met, and
     ///    [`State::Done`] additionally requires every required gate passed
@@ -610,7 +610,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    calling in, so they reach the chokepoint with the target they intend to
     ///    land; the guard is a pure read, so running it there as well is
     ///    idempotent.
-    /// 3. **Graph-rule enforcement.** Runs
+    /// 4. **Graph-rule enforcement.** Runs
     ///    [`enforce_transition_graph_rules`](Self::enforce_transition_graph_rules)
     ///    on the issue projected into its TARGET state, EXCEPT when `target` is
     ///    [`State::Rejected`] or [`State::Archived`] — rejection and
@@ -620,10 +620,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///    those targets. A blocking enforce rule returns a
     ///    [`TransitionBlockedError`](crate::errors::TransitionBlockedError) (exit
     ///    4) and persists NOTHING; non-blocking findings are returned as warnings.
-    /// 4. **State mutation.** Sets `issue.state = target`, and maintains
+    /// 5. **State mutation.** Sets `issue.state = target`, and maintains
     ///    [`Issue::archived_from`]: entering [`State::Archived`] records the state
     ///    left behind, reviving out of it clears the field.
-    /// 5. **Persistence + audit (when `persist`).** When `persist` is true, saves
+    /// 6. **Persistence + audit (when `persist`).** When `persist` is true, saves
     ///    the issue and appends the `issue_state_changed` event (plus
     ///    `issue_completed` when landing [`State::Done`]). Including the event
     ///    write here — not only at call sites — means a future caller that forgets
