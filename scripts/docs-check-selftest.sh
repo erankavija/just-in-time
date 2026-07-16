@@ -67,8 +67,10 @@ echo "== M3 docs-check-citations.sh =="
 # Defect: a repo-rooted citation (first segment is a tracked top-level entry)
 # that does not exist, extensionless on purpose — proves the extension gate is
 # gone and a genuine dangling repo path is caught.
-# shellcheck disable=SC2016  # backticks/path are literal citation text, not expansion
-printf 'See `crates/jit/does_not_exist_zzz` for details.\n' >"$scratch/cite_bad.md"
+# Construct the deliberately absent path separately so this self-test source is
+# not itself reported as a dangling citation when the scripts tree is scanned.
+missing_path='crates/jit/does_not_exist_zzz'
+printf 'See `%s` for details.\n' "$missing_path" >"$scratch/cite_bad.md"
 "$citations" "$scratch/cite_bad.md" >/dev/null 2>&1
 assert_rc 1 $? "citations: dangling repo-rooted path is MISSING"
 # Clean: a real slashed path plus a placeholder that must stay suppressed.

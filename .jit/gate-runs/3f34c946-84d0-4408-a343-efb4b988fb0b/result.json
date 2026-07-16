@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "3f34c946-84d0-4408-a343-efb4b988fb0b",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+  "commit": "48797901b4250bce7a307c6d2985325b515d0861",
+  "branch": "worktree-agent-9b0a997e",
+  "status": "passed",
+  "started_at": "2026-07-16T14:21:20.832981332Z",
+  "completed_at": "2026-07-16T14:23:01.755326831Z",
+  "duration_ms": 100922,
+  "exit_code": 0,
+  "stdout": "Attribution: `task` is a leaf (configured maximum level 4; resolved children: none). I reviewed the four reachable `jit:9b0a997e` commits individually; no fallback attribution was needed.\n\nThe sole adopter-visible effect is the repository-scoped `profile_applied` event. Its generated reference entry at `docs/reference/events.md:21` and `:47` matches the current catalog, schema projection, and event filtering behavior. Public CLI behavior remains unchanged.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf's profile audit event is accurately and concisely documented in the generated event reference; no issue-impact documentation defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The leaf's profile audit event is accurately and concisely documented in the generated event reference; no issue-impact documentation defects found.",
+    "findings": []
+  }
+}

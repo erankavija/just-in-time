@@ -13,10 +13,13 @@ required gates. `--no-precheck`, `--no-postcheck`, and `--except <key>` narrow w
 of the preset's gates are applied. Each gate materializes into the registry with
 `version = 1`, `priority = 100`, and `auto` set from its mode.
 
-This page is generated from the preset definitions in
-`crates/jit/src/gate_presets/` and lists what the binary carries — not what any
-repository has configured. `jit init` writes an empty gate registry, so nothing
-below reaches a project until `jit gate preset apply` runs. The gates a project
+This page is generated from the binary's package-derived preset projection. The
+embedded `jit-dogfood` profile's plan template selects the built-in names, and its
+matching gate contributions provide their definitions. The page lists what the
+binary carries — not what any repository has configured. Plain `jit init` writes an
+empty gate registry; `jit init --profile jit-dogfood` installs the package's matching
+definitions directly, while manual adopters can use `jit gate preset apply`. See
+[Repository Profiles](profiles.md) for the profile contract. The gates a project
 actually enforces live in its own `.jit/gates.toml`, its settings in
 `.jit/config.toml`; render those with `jit project render` (see
 [Rules and Gates](rules-and-gates.md)).
@@ -109,30 +112,30 @@ name as project-local instead of `[builtin]`.
 
 | Preset | Description | Gates |
 | --- | --- | --- |
-| [`breakdown-review`](#breakdown-review) | Agent quality review of the decomposition on the breakdown node before fan-out | 1 |
-| [`coverage-preview`](#coverage-preview) | Deterministic coverage preview on the breakdown node (scoped validate) | 1 |
-| [`plan-review`](#plan-review) | Agent plan-quality review on the planning node before fan-out | 1 |
+| [`breakdown-review`](#breakdown-review) | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | 1 |
+| [`coverage-preview`](#coverage-preview) | Validate the container named by the breakdown issue's brackets label. | 1 |
+| [`plan-review`](#plan-review) | External-review placeholder for the linked plan before implementation work fans out. | 1 |
 
 ## `breakdown-review`
 
-Agent quality review of the decomposition on the breakdown node before fan-out
+External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation.
 
 | Gate key | Title | Stage | Mode | Description | Checker |
 | --- | --- | --- | --- | --- | --- |
-| `breakdown-review` | AI Breakdown Review | postcheck | auto | AI-powered adversarial review of a breakdown against the design doc and content standards: per-child content standards, dependency-DAG coherence, and right-sized decomposition (coverage of [hard] criteria is the separate coverage-preview gate) | `exec` — command `./scripts/ai-review.sh`; timeout 1800s; working dir: unset; env: `REVIEWER_AGENT=codex exec`; context passed: yes; prompt: unset; prompt file: `./scripts/breakdown-review-prompt.md` |
+| `breakdown-review` | Breakdown Review | postcheck | auto | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
 
 ## `coverage-preview`
 
-Deterministic coverage preview on the breakdown node (scoped validate)
+Validate the container named by the breakdown issue's brackets label.
 
 | Gate key | Title | Stage | Mode | Description | Checker |
 | --- | --- | --- | --- | --- | --- |
-| `coverage-preview` | Coverage Preview | postcheck | auto | Run scoped validation for the container resolved from the breakdown node's brackets: label; blocks when a [hard] criterion is uncovered at plan time | `exec` — command `./scripts/coverage-preview.sh`; timeout 300s; working dir: unset; env: empty; context passed: yes; prompt: unset; prompt file: unset |
+| `coverage-preview` | Coverage Preview | postcheck | auto | Validate the container named by the breakdown issue's brackets label. | `label_target_validation` — built-in scoped validation; target label namespace: `brackets` |
 
 ## `plan-review`
 
-Agent plan-quality review on the planning node before fan-out
+External-review placeholder for the linked plan before implementation work fans out.
 
 | Gate key | Title | Stage | Mode | Description | Checker |
 | --- | --- | --- | --- | --- | --- |
-| `plan-review` | AI Plan Review | postcheck | auto | AI-powered plan/design review before fan-out, against the planning issue's success criteria and linked design document | `exec` — command `./scripts/ai-review.sh`; timeout 1800s; working dir: unset; env: `REVIEWER_AGENT=codex exec`; context passed: yes; prompt: unset; prompt file: `./scripts/plan-review-prompt.md` |
+| `plan-review` | Plan Review | postcheck | auto | External-review placeholder for the linked plan before implementation work fans out. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |

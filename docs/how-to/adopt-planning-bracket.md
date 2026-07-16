@@ -1,4 +1,4 @@
-# How-To: Adopt the Planning Bracket
+# How-To: Manually Adopt the Planning Bracket
 
 > **Diátaxis Type:** How-To Guide
 > **Audience:** Ruleset authors who want plan review and a coverage check sequenced *before* work fans out
@@ -9,6 +9,13 @@ three gates, adding the preview and closure coverage rules, then scaffolding a
 container and breaking it down. For the *why* — the spine, the three gates, and the
 preview-vs-closure split — read
 [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) first.
+
+For JIT's portable recommended workflow, use
+`jit init --profile jit-dogfood` instead. The
+[Repository Profiles reference](../reference/profiles.md) owns that package's
+commands, inventory, and guarantees. Continue with this guide when you need an
+alternative container type, taxonomy, coverage convention, template, or gate
+integration.
 
 The bracket is **configuration**, not engine behaviour. Two complete, copy-ready
 rulesets ship it; this guide points you at the exact blocks to lift:
@@ -38,9 +45,10 @@ Existing issues are untouched until you bracket one with `jit apply plan <C>`.
   *adds to* a coverage ruleset; it does not replace one. If you are starting from
   scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale and
   skip to [Step 5](#step-5--scaffold-a-container).
-- `jq` and an agent CLI on `PATH` if you want the `plan-review` and
-  `breakdown-review` agent gates to actually invoke a reviewer (see
-  [Step 4](#step-4--supply-the-gate-checker-scripts)).
+- A repository-owned review integration if `plan-review` and
+  `breakdown-review` must provide real approval rather than the built-in
+  warning-only placeholders (see
+  [Step 4](#step-4--understand-and-replace-the-review-placeholders)).
 
 ## Step 1 — Declare the breakable container and the two bracket types
 
@@ -70,7 +78,7 @@ applies_to  = ["epic"]           # container types that require a bracket
   [[template.nodes]]
   role        = "planning"       # node P
   type        = "planning"       # P's issue type (must exist in [type_hierarchy])
-  gates       = ["plan-review"]  # agent gate applied to P
+  gates       = ["plan-review"]  # review checkpoint applied to P
   doc         = "dev/active/{container.id}-plan.md"   # where P's plan doc lives
 
   [[template.nodes]]
@@ -184,46 +192,37 @@ Verify the ruleset loads:
 jit validate --explain
 ```
 
-## Step 4 — Supply the gate checker scripts
+## Step 4 — Understand and replace the review placeholders
 
 The three gate presets (`plan-review`, `coverage-preview`, `breakdown-review`) are
-**built in** to JIT, so you do not define the gates by hand — but their checkers
-shell out to scripts that must exist at the root of **your** repository. The
-scripts ship in the JIT source tree, so copy them from a checkout of the JIT
-repository into your project. Point `JIT_SRC` at that checkout (clone it first if
-you do not already have one):
-
-```bash
-# In your adopting project's root. JIT_SRC = a local checkout of the jit repo.
-JIT_SRC=${JIT_SRC:-/path/to/jit}            # e.g. git clone https://…/jit /tmp/jit && JIT_SRC=/tmp/jit
-mkdir -p scripts
-cp "$JIT_SRC"/scripts/coverage-preview.sh scripts/        # deterministic coverage gate (on B)
-cp "$JIT_SRC"/scripts/ai-review.sh scripts/               # agent review runner (plan-review + breakdown-review)
-cp "$JIT_SRC"/scripts/plan-review-prompt.md scripts/      # the plan-review prompt (on P)
-cp "$JIT_SRC"/scripts/breakdown-review-prompt.md scripts/ # the breakdown-review prompt (on B)
-chmod +x scripts/coverage-preview.sh scripts/ai-review.sh
-```
-
-(If you are adopting the bracket *inside* the JIT repository itself, these scripts
-are already present at `scripts/` — skip this step.)
+**built in** to JIT, so you do not define them by hand and no checker scripts or
+JIT source checkout are required.
 
 What each does:
 
-- **`coverage-preview.sh`** (the `coverage-preview` gate's checker) reads the gated
-  breakdown node's `brackets:<C-short-id>` label via `jit issue show ... --json | jq`,
-  recovers the container `C`, and runs `jit validate --scope <C>`. That scoped
-  validation evaluates your **preview rule** from Step 3 and exits 4 — failing the
-  gate — when a `[hard]` criterion is left uncovered.
-- **`ai-review.sh`** (the checker shared by the `plan-review` and `breakdown-review`
-  gates) pipes the gate context into an agent CLI and parses a `VERDICT:
-  PASS`/`VERDICT: FAIL`. Set the reviewer agent via the `REVIEWER_AGENT` env var;
-  each preset points it at its own prompt file (`scripts/plan-review-prompt.md` for
-  `P`, `scripts/breakdown-review-prompt.md` for `B`). See
-  [Custom Gates](custom-gates.md#context-aware-gates) for the agent-gate mechanism.
-- **`breakdown-review-prompt.md`** drives the agent review of the *decomposition* on
-  `B`: per-child content standards, dependency-DAG coherence (missing **and**
-  over-constraining edges), right-sized depth, and blank-workspace reachability. It
-  does not re-check `[hard]` coverage — that is `coverage-preview.sh`'s job.
+- **`coverage-preview`** uses the in-process `label_target_validation` checker. It
+  reads `B`'s `brackets:<C-short-id>` label and runs scoped validation for `C`.
+  Your preview rule from Step 3 therefore blocks when a `[hard]` criterion is
+  uncovered.
+- **`plan-review`** and **`breakdown-review`** use the in-process
+  `review_placeholder` checker. Each passes with an advisory structured finding
+  and prints `WARNING: EXTERNAL REVIEW PLACEHOLDER`. This is an unmistakable
+  installation placeholder, not review evidence.
+
+Before relying on either review gate, replace its checker with your own external
+integration. For example:
+
+```bash
+jit gate update plan-review \
+  --checker-command './scripts/review-plan.sh'
+jit gate update breakdown-review \
+  --checker-command './scripts/review-breakdown.sh'
+```
+
+The commands and scripts are repository policy; JIT does not require a particular
+agent, JSON processor, or source checkout. See
+[Custom Gates](custom-gates.md#context-aware-gates) for passing gate context to an
+external reviewer.
 
 You can inspect any preset before applying it:
 
@@ -265,14 +264,17 @@ jit graph deps epic-123
 
 Author the plan document at the configured location (e.g.
 `dev/active/<C-id>-plan.md`), then drive `P` through its `plan-review` gate. The
-agent gate judges plan *quality* against `P`'s success criteria and the linked
-design document. A FAIL leaves the drafts in place for revision — nothing is
-archived on rejection. See [Custom Gates](custom-gates.md) for running and
-inspecting agent gates.
+built-in placeholder only records a warning and passes; it does not judge the
+plan. Replace its checker as described in Step 4 before treating that pass as
+approval. A real review failure leaves drafts in place for revision — nothing is
+archived on rejection.
 
-## Step 7 — Break down behind the approved plan
+## Step 7 — Break down after the plan checkpoint
 
-Once `P`'s plan-review gate passes, break the container down. The breakdown step
+Once `P`'s `plan-review` gate passes, break the container down. With the built-in
+placeholder, this means only that the sequencing checkpoint cleared; it is
+approval only after you install the real reviewer described in Step 4. The
+breakdown step
 **consumes the pre-created breakdown node `B`** (the one `jit apply plan` already
 scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
 `brackets:<C-short-id>` label) — it does not create `B`. It then:
@@ -287,13 +289,11 @@ scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
 `coverage-preview` runs `jit validate --scope <C>`, which fires your preview rule.
 If the drafted children leave a `[hard]` criterion with no satisfying child (in any
 state), the gate **blocks** (exit 4) and names the uncovered criteria. The
-`breakdown-review` agent gate separately judges the decomposition's *quality* —
-content standards, dependency-DAG coherence, right-sized depth — and reports
-concrete fixes on a FAIL. Because the impl subgraph transitively depends on `B`,
-**both** gates must pass before any implementation issue becomes ready, so jit's
-gate enforcement sequences the review without extra scripting. Fix what either gate
-flags (add a missing child or satisfies label; apply the review's proposed edge or
-content fixes) and re-run.
+`breakdown-review` placeholder separately reserves the decomposition-quality
+checkpoint but performs no judgment until you replace its checker. Because the
+impl subgraph transitively depends on `B`, all configured gates must pass before
+any implementation issue becomes ready. Replace the placeholder before relying
+on that sequencing as review approval.
 
 You can run the scoped check directly at any time:
 
@@ -307,12 +307,13 @@ automatically; if you wire it by hand, follow the source/sink edge geometry in
 
 ## Step 8 — Implement, then close
 
-With the breakdown approved, the impl children become ready in dependency order
-and the work proceeds normally. When the container finally transitions to `done`,
-your **closure** rule from Step 2 fires: every `[hard]` criterion must now be
-satisfied by a **done** child. An uncovered criterion blocks the `→ done`
-transition (exit 4); `--force` bypasses it and records a bypass event in the audit
-log.
+With the breakdown gates passed, the impl children become ready in dependency
+order and the work proceeds normally. The warning-only `breakdown-review`
+placeholder is not approval evidence until replaced with a real reviewer. When
+the container finally transitions to `done`, your **closure** rule from Step 2
+fires: every `[hard]` criterion must now be satisfied by a **done** child. An
+uncovered criterion blocks the `→ done` transition (exit 4); `--force` bypasses
+it and records a bypass event in the audit log.
 
 So coverage is checked at **both ends** of the bracket — *mapping exists* at the
 breakdown gate (plan time), *mapping done* at the container's done transition
@@ -320,6 +321,7 @@ breakdown gate (plan time), *mapping done* at the container's done transition
 
 ## See Also
 
+- [Repository Profiles](../reference/profiles.md) — preferred embedded workflow setup
 - [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) — the spine, the three gates, and the preview-vs-closure split
 - [How-To: Author Validation Rules](validation-rules.md) — the `label-coverage` rule kind and selectors
 - [How-To: Custom Gates](custom-gates.md) — the agent-gate mechanism and gate presets

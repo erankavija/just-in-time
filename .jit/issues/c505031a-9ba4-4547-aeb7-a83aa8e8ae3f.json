@@ -2,9 +2,9 @@
   "id": "c505031a-9ba4-4547-aeb7-a83aa8e8ae3f",
   "title": "Remove deprecated gate command aliases (pass/pass-all/check/check-all)",
   "description": "Follow-up to 949cd9d0, which renames the gate verbs to `evaluate`/`status` while retaining the legacy names `pass`, `pass-all`, `check`, `check-all` as silent aliases so no caller breaks at rename time.\n\nThis issue performs the one breaking change: dropping those four aliases once the new names have settled. It is a direct dependency of the 1.0 milestone so the CLI ships 1.0 with a single, truthful gate-verb surface.\n\nConcentrating the removal here keeps 949cd9d0 non-breaking and does all the alias-removal churn (CLI, MCP tool schema, in-repo docs) in one place.\n\n## Success Criteria\n- [hard] REQ-01: the gate subcommand aliases `pass`, `pass-all`, `check`, and `check-all` are removed; invoking any of them fails with clap's standard unknown-subcommand error.\n- [hard] REQ-02: only the canonical verbs `evaluate`/`eval`, `evaluate-all`, `status`, `status-all`, and `fail` remain on the write/read surface; help lists no removed alias.\n- [hard] REQ-03: live in-repo references to the removed aliases (current product docs under `docs/` and product help text) are swept to the canonical names. Out of scope: historical/archived dev docs (`dev/archive`, `dev/sessions`, prior plan documents) and existing issue descriptions in `.jit/`, which are historical records left as-authored.\n- [hard] REQ-04: the MCP tool schema exposes no `gate_pass`/`gate_pass_all`/`gate_check`/`gate_check_all` tools; regenerated tools use the canonical names only.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [
     "949cd9d0-8920-4feb-8f13-ff0e2eeca0ee"
   ],
@@ -20,11 +20,6 @@
       "updated_by": null,
       "updated_at": "2026-07-03T20:23:28.735437209Z"
     },
-    "doc-review": {
-      "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-12T13:38:45.989903451Z"
-    },
     "docs-mechanical": {
       "status": "pending",
       "updated_by": null,
@@ -34,6 +29,11 @@
       "status": "pending",
       "updated_by": null,
       "updated_at": "2026-07-03T20:23:28.735487729Z"
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_by": null,
+      "updated_at": "2026-07-12T13:38:45.989903451Z"
     }
   },
   "context": {},
@@ -44,6 +44,7 @@
     "milestone:v1.0"
   ],
   "created_at": "2026-07-03T20:22:08.287558909Z",
-  "updated_at": "2026-07-12T13:38:45.998295737Z",
-  "first_ready_at": "2026-07-03T21:51:01.335065644Z"
+  "updated_at": "2026-07-16T14:29:00.293184541Z",
+  "first_ready_at": "2026-07-03T21:51:01.335065644Z",
+  "claimed_at": "2026-07-16T14:29:00.293184361Z"
 }

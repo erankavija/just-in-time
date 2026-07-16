@@ -904,6 +904,30 @@ impl Serialize for ProjectionKinds {
     }
 }
 
+impl schemars::JsonSchema for ProjectionKinds {
+    fn schema_name() -> String {
+        "ProjectionKinds".to_string()
+    }
+
+    /// Mirrors the string-or-array serialization: the schema accepts either a
+    /// bare kind-name string or an array of kind-name strings, so a profile
+    /// manifest carrying `kind = "invariant"` or `kind = ["rule", "gate"]`
+    /// validates against the generated manifest schema.
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject {
+            subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
+                any_of: Some(vec![
+                    String::json_schema(generator),
+                    Vec::<String>::json_schema(generator),
+                ]),
+                ..Default::default()
+            })),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 /// One generic documentation projection declared as `[projection.<name>]`.
 ///
 /// Replaces the bespoke per-projection tables: any addressable item kind renders
@@ -1242,9 +1266,6 @@ pub struct CoordinationConfig {
     /// Default TTL for new leases in seconds (default:
     /// [`crate::runtime_defaults::CLAIM_TTL_SECS`]).
     pub default_ttl_secs: Option<u64>,
-    /// Heartbeat interval for automatic lease renewal in seconds (default:
-    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`]).
-    pub heartbeat_interval_secs: Option<u64>,
     /// Warn when lease has less than this percentage of TTL remaining (default: 10).
     pub lease_renewal_threshold_pct: Option<u8>,
     /// Staleness threshold for TTL=0 leases in seconds (default: 3600).
@@ -1253,19 +1274,12 @@ pub struct CoordinationConfig {
     pub max_indefinite_leases_per_agent: Option<u32>,
     /// Maximum concurrent TTL=0 leases per repository (default: 10).
     pub max_indefinite_leases_per_repo: Option<u32>,
-    /// Automatic lease renewal by heartbeat daemon (default: false).
-    pub auto_renew_leases: Option<bool>,
 }
 
 impl CoordinationConfig {
     pub fn default_ttl_secs(&self) -> u64 {
         self.default_ttl_secs
             .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
-    }
-
-    pub fn heartbeat_interval_secs(&self) -> u64 {
-        self.heartbeat_interval_secs
-            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 
     pub fn lease_renewal_threshold_pct(&self) -> u8 {
@@ -1282,10 +1296,6 @@ impl CoordinationConfig {
 
     pub fn max_indefinite_leases_per_repo(&self) -> u32 {
         self.max_indefinite_leases_per_repo.unwrap_or(10)
-    }
-
-    pub fn auto_renew_leases(&self) -> bool {
-        self.auto_renew_leases.unwrap_or(false)
     }
 }
 
@@ -1357,8 +1367,6 @@ impl EventsConfig {
 pub struct AgentConfig {
     /// Agent identity section.
     pub agent: AgentIdentity,
-    /// Agent behavior section (optional).
-    pub behavior: Option<AgentBehavior>,
 }
 
 /// Agent identity configuration.
@@ -1380,27 +1388,6 @@ impl AgentIdentity {
     pub fn default_ttl_secs(&self) -> u64 {
         self.default_ttl_secs
             .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
-    }
-}
-
-/// Agent behavior configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct AgentBehavior {
-    /// Auto-start heartbeat daemon for lease renewal (default: false).
-    pub auto_heartbeat: Option<bool>,
-    /// Heartbeat interval in seconds (default:
-    /// [`crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS`]).
-    pub heartbeat_interval: Option<u64>,
-}
-
-impl AgentBehavior {
-    pub fn auto_heartbeat(&self) -> bool {
-        self.auto_heartbeat.unwrap_or(false)
-    }
-
-    pub fn heartbeat_interval(&self) -> u64 {
-        self.heartbeat_interval
-            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 }
 
@@ -1914,12 +1901,10 @@ impl EffectiveConfig {
             "coordination".to_string(),
             serde_json::json!({
                 "default_ttl_secs": self.coordination().default_ttl_secs(),
-                "heartbeat_interval_secs": self.coordination().heartbeat_interval_secs(),
                 "lease_renewal_threshold_pct": self.coordination().lease_renewal_threshold_pct(),
                 "stale_threshold_secs": self.coordination().stale_threshold_secs(),
                 "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
                 "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
-                "auto_renew_leases": self.coordination().auto_renew_leases(),
             }),
         );
         map.insert(
@@ -1964,15 +1949,6 @@ impl MergedCoordinationConfig {
             .or_else(|| self.user.as_ref().and_then(|c| c.default_ttl_secs))
             .or_else(|| self.system.as_ref().and_then(|c| c.default_ttl_secs))
             .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
-    }
-
-    pub fn heartbeat_interval_secs(&self) -> u64 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.heartbeat_interval_secs)
-            .or_else(|| self.user.as_ref().and_then(|c| c.heartbeat_interval_secs))
-            .or_else(|| self.system.as_ref().and_then(|c| c.heartbeat_interval_secs))
-            .unwrap_or(crate::runtime_defaults::HEARTBEAT_INTERVAL_SECS)
     }
 
     pub fn lease_renewal_threshold_pct(&self) -> u8 {
@@ -2033,15 +2009,6 @@ impl MergedCoordinationConfig {
                     .and_then(|c| c.max_indefinite_leases_per_repo)
             })
             .unwrap_or(10)
-    }
-
-    pub fn auto_renew_leases(&self) -> bool {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.auto_renew_leases)
-            .or_else(|| self.user.as_ref().and_then(|c| c.auto_renew_leases))
-            .or_else(|| self.system.as_ref().and_then(|c| c.auto_renew_leases))
-            .unwrap_or(false)
     }
 }
 
@@ -3100,34 +3067,44 @@ mode = "maybe"
         let config_toml = r#"
 [coordination]
 default_ttl_secs = 600
-heartbeat_interval_secs = 30
 lease_renewal_threshold_pct = 10
 stale_threshold_secs = 3600
 max_indefinite_leases_per_agent = 2
 max_indefinite_leases_per_repo = 10
-auto_renew_leases = false
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let coord = config.coordination.unwrap();
         assert_eq!(coord.default_ttl_secs, Some(600));
-        assert_eq!(coord.heartbeat_interval_secs, Some(30));
         assert_eq!(coord.lease_renewal_threshold_pct, Some(10));
         assert_eq!(coord.stale_threshold_secs, Some(3600));
         assert_eq!(coord.max_indefinite_leases_per_agent, Some(2));
         assert_eq!(coord.max_indefinite_leases_per_repo, Some(10));
-        assert_eq!(coord.auto_renew_leases, Some(false));
     }
 
     #[test]
     fn test_coordination_config_defaults() {
         let coord = CoordinationConfig::default();
         assert_eq!(coord.default_ttl_secs(), 600);
-        assert_eq!(coord.heartbeat_interval_secs(), 30);
         assert_eq!(coord.lease_renewal_threshold_pct(), 10);
         assert_eq!(coord.stale_threshold_secs(), 3600);
         assert_eq!(coord.max_indefinite_leases_per_agent(), 2);
         assert_eq!(coord.max_indefinite_leases_per_repo(), 10);
-        assert!(!coord.auto_renew_leases());
+    }
+
+    /// A `[coordination]` block carrying the removed auto-heartbeat daemon keys
+    /// (`heartbeat_interval_secs`, `auto_renew_leases`) still parses: the unknown
+    /// keys are ignored, and the surviving keys resolve normally.
+    #[test]
+    fn test_coordination_config_ignores_legacy_heartbeat_keys() {
+        let config_toml = r#"
+[coordination]
+default_ttl_secs = 600
+heartbeat_interval_secs = 30
+auto_renew_leases = false
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        let coord = config.coordination.unwrap();
+        assert_eq!(coord.default_ttl_secs, Some(600));
     }
 
     #[test]
@@ -3202,7 +3179,6 @@ enforce_leases = "strict"
 
 [coordination]
 default_ttl_secs = 600
-heartbeat_interval_secs = 30
 
 [global_operations]
 require_main_history = true
@@ -3247,10 +3223,6 @@ id = "agent:copilot-1"
 created_at = "2026-01-03T12:00:00Z"
 description = "GitHub Copilot Workspace Session 1"
 default_ttl_secs = 900
-
-[behavior]
-auto_heartbeat = false
-heartbeat_interval = 30
 "#;
         let config: AgentConfig = toml::from_str(config_toml).unwrap();
 
@@ -3264,10 +3236,23 @@ heartbeat_interval = 30
             Some("GitHub Copilot Workspace Session 1".to_string())
         );
         assert_eq!(config.agent.default_ttl_secs, Some(900));
+    }
 
-        let behavior = config.behavior.unwrap();
-        assert_eq!(behavior.auto_heartbeat, Some(false));
-        assert_eq!(behavior.heartbeat_interval, Some(30));
+    /// An agent config carrying a legacy `[behavior]` section (the removed
+    /// auto-heartbeat daemon settings) still parses: the unknown section is
+    /// ignored rather than rejected.
+    #[test]
+    fn test_agent_config_ignores_legacy_behavior_section() {
+        let config_toml = r#"
+[agent]
+id = "agent:copilot-1"
+
+[behavior]
+auto_heartbeat = false
+heartbeat_interval = 30
+"#;
+        let config: AgentConfig = toml::from_str(config_toml).unwrap();
+        assert_eq!(config.agent.id, "agent:copilot-1");
     }
 
     #[test]
@@ -3282,7 +3267,6 @@ id = "agent:worker-1"
         assert!(config.agent.created_at.is_none());
         assert!(config.agent.description.is_none());
         assert!(config.agent.default_ttl_secs.is_none());
-        assert!(config.behavior.is_none());
     }
 
     #[test]
@@ -3294,13 +3278,6 @@ id = "agent:worker-1"
             default_ttl_secs: None,
         };
         assert_eq!(identity.default_ttl_secs(), 600); // Default from coordination
-    }
-
-    #[test]
-    fn test_agent_behavior_defaults() {
-        let behavior = AgentBehavior::default();
-        assert!(!behavior.auto_heartbeat());
-        assert_eq!(behavior.heartbeat_interval(), 30);
     }
 
     #[test]
@@ -3337,7 +3314,7 @@ description = "Test agent"
 
         // Should have all defaults
         assert_eq!(config.coordination().default_ttl_secs(), 600);
-        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+        assert_eq!(config.coordination().stale_threshold_secs(), 3600);
         assert!(config.global_operations().require_main_history());
         assert_eq!(config.locks().max_age_secs(), 3600);
         assert!(config.events().enable_sequences());
@@ -3360,7 +3337,7 @@ default_ttl_secs = 1200
         // Repo value overrides default
         assert_eq!(config.coordination().default_ttl_secs(), 1200);
         // Other defaults preserved
-        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+        assert_eq!(config.coordination().stale_threshold_secs(), 3600);
     }
 
     #[test]
@@ -3372,7 +3349,7 @@ default_ttl_secs = 1200
         let user_config = r#"
 [coordination]
 default_ttl_secs = 900
-heartbeat_interval_secs = 60
+stale_threshold_secs = 1800
 "#;
         std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
 
@@ -3392,8 +3369,8 @@ default_ttl_secs = 1200
 
         // Repo overrides user for TTL
         assert_eq!(config.coordination().default_ttl_secs(), 1200);
-        // User value used for heartbeat (not in repo config)
-        assert_eq!(config.coordination().heartbeat_interval_secs(), 60);
+        // User value used for stale threshold (not in repo config)
+        assert_eq!(config.coordination().stale_threshold_secs(), 1800);
     }
 
     #[test]
@@ -3406,7 +3383,7 @@ default_ttl_secs = 1200
         let system_config = r#"
 [coordination]
 default_ttl_secs = 300
-heartbeat_interval_secs = 15
+max_indefinite_leases_per_agent = 1
 stale_threshold_secs = 1800
 "#;
         std::fs::write(system_dir.path().join("config.toml"), system_config).unwrap();
@@ -3415,7 +3392,7 @@ stale_threshold_secs = 1800
         let user_config = r#"
 [coordination]
 default_ttl_secs = 600
-heartbeat_interval_secs = 30
+max_indefinite_leases_per_agent = 7
 "#;
         std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
 
@@ -3437,8 +3414,8 @@ default_ttl_secs = 1200
 
         // Repo wins for TTL
         assert_eq!(config.coordination().default_ttl_secs(), 1200);
-        // User wins for heartbeat (not in repo)
-        assert_eq!(config.coordination().heartbeat_interval_secs(), 30);
+        // User wins for the per-agent indefinite-lease cap (not in repo)
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 7);
         // System wins for stale_threshold (not in user or repo)
         assert_eq!(config.coordination().stale_threshold_secs(), 1800);
     }

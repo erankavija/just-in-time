@@ -642,20 +642,32 @@ impl ErrorCode {
     /// `GATE_FAILED`, the checker never ran, so the envelope carries no
     /// `verdict` field.
     pub const STALE_BINARY: &'static str = "STALE_BINARY";
+    /// `jit issue delete` was refused for missing operator confirmation
+    /// (`JIT_ALLOW_DELETION=1` not set in the process environment; exit code 2).
+    pub const DELETION_NOT_CONFIRMED: &'static str = "DELETION_NOT_CONFIRMED";
+    /// Requested embedded profile ID does not exist.
+    pub const PROFILE_NOT_FOUND: &'static str = "PROFILE_NOT_FOUND";
+    /// Profile package planning or final-state validation rejected the operation.
+    pub const PROFILE_CONFLICT: &'static str = "PROFILE_CONFLICT";
 }
 
 impl ErrorCode {
     /// Map error code string to exit code
     pub fn to_exit_code(code: &str) -> ExitCode {
         match code {
-            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
-            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::BLOCKED | Self::GATE_FAILED => {
-                ExitCode::ValidationFailed
+            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND | Self::PROFILE_NOT_FOUND => {
+                ExitCode::NotFound
             }
+            Self::CYCLE_DETECTED
+            | Self::VALIDATION_FAILED
+            | Self::BLOCKED
+            | Self::GATE_FAILED
+            | Self::PROFILE_CONFLICT => ExitCode::ValidationFailed,
             Self::INVALID_ARGUMENT
             | Self::INVALID_STATE
             | Self::AMBIGUOUS_ID
-            | Self::INVALID_ID_PREFIX => ExitCode::InvalidArgument,
+            | Self::INVALID_ID_PREFIX
+            | Self::DELETION_NOT_CONFIRMED => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
             Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
             Self::IO_ERROR
@@ -825,10 +837,15 @@ fn transition_blocker_json(blocker: &TransitionBlocker) -> serde_json::Value {
             "title": "(missing issue)",
             "state": "missing",
         }),
-        TransitionBlocker::Gate { gate_key, status } => serde_json::json!({
+        TransitionBlocker::Gate {
+            gate_key,
+            status,
+            mode,
+        } => serde_json::json!({
             "type": "gate",
             "key": gate_key,
             "status": gate_status_name(*status),
+            "mode": mode.as_str(),
         }),
         TransitionBlocker::GraphRule { rule, message } => serde_json::json!({
             "type": "graph_rule",
@@ -1090,6 +1107,12 @@ pub struct DependencyTreeNode {
     /// Whether this node appears multiple times in the tree (shared dependency)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shared: Option<bool>,
+    /// Pre-archive origin state, present only for an `Archived` node that
+    /// recorded one. Carried so dependency consumers can compute effective
+    /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
+    /// still satisfies its dependents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived_from: Option<State>,
     /// Child dependencies
     pub children: Vec<DependencyTreeNode>,
 }
@@ -1105,15 +1128,20 @@ impl DependencyTreeNode {
             priority: issue.priority,
             level,
             shared: None,
+            archived_from: issue.archived_from,
             children: Vec::new(),
         }
     }
 
     /// Get state symbol for display
+    ///
+    /// `✓` for effectively terminal nodes — `done`, `rejected`, or `archived`
+    /// from one of those (`jit:45a140ae`) — `○` otherwise.
     pub fn state_symbol(&self) -> &str {
-        match self.state {
-            State::Done | State::Rejected => "✓",
-            _ => "○",
+        if crate::domain::is_effectively_terminal(self.state, self.archived_from) {
+            "✓"
+        } else {
+            "○"
         }
     }
 }
@@ -1952,6 +1980,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     issue_id: "i1".into(),
 ///     commit: None,
 ///     branch: None,
+///     tree_dirty: None,
 ///     status: GateRunStatus::Passed,
 ///     started_at: Utc::now(),
 ///     completed_at: None,
@@ -1989,6 +2018,14 @@ pub struct GateRunSummary {
     pub commit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// Whether the working tree differed from [`commit`](Self::commit) when the
+    /// checker started: `true` dirty, `false` clean, omitted when there was no
+    /// commit to compare against. Carries
+    /// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult) so a machine
+    /// reader can tell a pass evidencing the commit from one taken on a modified
+    /// tree.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tree_dirty: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2032,6 +2069,7 @@ impl GateRunSummary {
             command: r.command.clone(),
             commit: r.commit.clone(),
             branch: r.branch.clone(),
+            tree_dirty: r.tree_dirty,
             by: r.by.clone(),
             message: r.message.clone(),
             stdout: include_output.then(|| r.stdout.clone()),
@@ -2223,6 +2261,33 @@ pub struct WorktreeListResponse {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
+    /// state renders and serializes as effectively terminal; a legacy Archived
+    /// node (no recorded origin) stays non-terminal.
+    #[test]
+    fn test_dependency_tree_node_effective_terminality() {
+        let mut issue = crate::domain::MinimalIssue {
+            id: "a".repeat(36),
+            title: "Archived dep".to_string(),
+            state: State::Archived,
+            priority: Priority::Normal,
+            assignee: None,
+            labels: Vec::new(),
+            archived_from: Some(State::Done),
+        };
+        let node = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(node.archived_from, Some(State::Done));
+        assert_eq!(node.state_symbol(), "✓");
+        let serialized = serde_json::to_value(&node).unwrap();
+        assert_eq!(serialized["archived_from"], json!("done"));
+
+        issue.archived_from = None;
+        let legacy = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(legacy.state_symbol(), "○");
+        let serialized = serde_json::to_value(&legacy).unwrap();
+        assert!(serialized.get("archived_from").is_none());
+    }
 
     #[test]
     fn test_gate_definition_json_includes_builtin_checker_configuration() {
@@ -2436,6 +2501,7 @@ mod tests {
             issue_id: issue.id.clone(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: run_at,
             completed_at: Some(run_at),

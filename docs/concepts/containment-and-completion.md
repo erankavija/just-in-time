@@ -83,9 +83,10 @@ facts compose:
    unassigned issues in state `Ready` that are unblocked, and a `Backlog` issue
    auto-promotes to `Ready` exactly when it stops being blocked.
 
-Compose them: a container is blocked while any issue it contains is non-terminal.
-Because blocking follows the edges transitively, an epic is blocked until every
-task beneath every story beneath it is `Done` or `Rejected`. So a container
+Compose them: a container is blocked while any issue it contains is not
+effectively terminal. Because blocking follows the edges transitively, an epic
+is blocked until every task beneath every story beneath it is `Done`,
+`Rejected`, or `Archived` from one of those. So a container
 surfaces as available work only once its entire subtree is terminal, and its own
 work (the closing gates, the acceptance pass, the release note) is the last thing
 the graph offers.

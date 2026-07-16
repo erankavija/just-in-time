@@ -140,7 +140,7 @@ echo "Created tasks: $TASK1, $TASK2, $TASK3"
 Express that the epic depends on all tasks:
 
 ```bash
-# Epic cannot complete until all tasks reach a terminal state (done or rejected)
+# Epic cannot complete until all tasks reach an effective terminal state (done, rejected, or archived from one)
 jit dep add $EPIC $TASK1
 jit dep add $EPIC $TASK2
 jit dep add $EPIC $TASK3

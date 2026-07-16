@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "dd7a3b80-2c86-44c0-a877-69030f130892",
+  "gate_key": "cargo-ci",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "700288f62dd40768e78e96f6581b17d3519d4db6",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T16:59:58.425620979Z",
+  "completed_at": "2026-07-16T17:02:40.480732011Z",
+  "duration_ms": 162055,
+  "exit_code": 1,
+  "stdout": "--- test failures ---\ntest code_review_policy_test::test_code_review_prompt_uses_recorded_gates_and_structured_references ... FAILED\ntest result: FAILED. 196 passed; 1 failed; 6 ignored; 0 measured; 0 filtered out; finished in 69.99s\n---- code_review_policy_test::test_code_review_prompt_uses_recorded_gates_and_structured_references stdout ----\n\nthread 'code_review_policy_test::test_code_review_prompt_uses_recorded_gates_and_structured_references' (263175) panicked at crates/jit/tests/fast_docs_templates/code_review_policy_test.rs:211:9:\nmissing policy phrase: @/inv/pid-safety\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1126 bytes=18579999)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1034627704/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "stderr": "",
+  "command": "./scripts/cargo-ci.sh",
+  "by": "auto:executor",
+  "message": null
+}

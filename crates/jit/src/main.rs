@@ -21,7 +21,7 @@ use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
-    ProjectCommands,
+    ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
@@ -55,6 +55,15 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
     {
         return ExitCode::InvalidArgument;
     }
+    // A manual gate evaluated without --by (jit:1d59070d REQ-03): a usage
+    // error, raised before any write, in the same family as gate define's
+    // manual+checker-command conflict.
+    if error
+        .downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
+        .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
     if error
         .downcast_ref::<jit::errors::TransitionBlockedError>()
         .is_some()
@@ -66,6 +75,12 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .is_some()
         || error
             .downcast_ref::<jit::validation::projection::ProjectionError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::profile::ProfilePlanError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
         return ExitCode::ValidationFailed;
@@ -206,6 +221,17 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .is_some()
         || error.downcast_ref::<std::string::FromUtf8Error>().is_some()
         || error.downcast_ref::<std::str::Utf8Error>().is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
+
+    // A `jit issue delete` refused for missing operator confirmation
+    // (jit:0daba57d) is an argument/usage error (exit 2), not the generic
+    // fallback: the caller omitted the required `JIT_ALLOW_DELETION=1`
+    // confirmation, the same family as a malformed or missing required value.
+    if error
+        .downcast_ref::<jit::errors::DeletionNotConfirmedError>()
+        .is_some()
     {
         return ExitCode::InvalidArgument;
     }
@@ -503,6 +529,22 @@ fn render_gate_pass_error(
                 "Add the gate first: jit gate add {} {}",
                 not_required.issue_id, not_required.gate_key
             ))
+    } else if let Some(needs_attestor) =
+        e.downcast_ref::<jit::commands::ManualGateAttestationRequiredError>()
+    {
+        // Pre-verdict argument error (jit:1d59070d REQ-03): a manual gate has
+        // no checker to run, so a bare evaluate would silently record an
+        // unattributed pass. No write happened, so — like `GateNotRequiredError`
+        // above — this carries no `verdict` field.
+        JsonError::new("INVALID_ARGUMENT", e.to_string(), command)
+            .with_details(serde_json::json!({
+                "issue_id": needs_attestor.issue_id,
+                "key": needs_attestor.gate_key,
+            }))
+            .with_suggestion(format!(
+                "Record the pass with: jit gate evaluate {} {} --by <attestor>",
+                needs_attestor.issue_id, needs_attestor.gate_key
+            ))
     } else if e
         .downcast_ref::<jit::storage::IssueNotFoundError>()
         .is_some()
@@ -691,6 +733,37 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
         std::process::exit(json_error.exit_code().code());
     }
     jit::errors::InvalidArgumentError::new(message).into()
+}
+
+fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::JsonError {
+    use jit::output::{ErrorCode, JsonError};
+
+    if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
+        JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
+            .with_suggestion("Run 'jit profile list --json' to see embedded profiles")
+    } else if error
+        .downcast_ref::<jit::profile::ProfilePlanError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::commands::ProfileApplyError>()
+            .is_some()
+    {
+        JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command)
+    } else {
+        JsonError::new("PROFILE_ERROR", error.to_string(), command)
+    }
+}
+
+fn profile_result<T>(result: anyhow::Result<T>, command: &str, json: bool) -> anyhow::Result<T> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if json => {
+            let json_error = profile_json_error(&error, command);
+            println!("{}", json_error.to_json_string()?);
+            std::process::exit(json_error.exit_code().code());
+        }
+        Err(error) => Err(error),
+    }
 }
 
 /// Wrong-verb guess -> canonical-command hint, keyed by (group, guessed verb).
@@ -923,6 +996,7 @@ mod gate_findings_text_tests {
             issue_id: "issue-1".to_string(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc::now(),
             completed_at: None,
@@ -1013,6 +1087,9 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
+    }
+    if let Some(dirty) = result.tree_dirty {
+        println!("  Tree: {}", if dirty { "dirty" } else { "clean" });
     }
     if let Some(f) = &result.findings {
         println!(
@@ -1733,6 +1810,7 @@ fn run() -> Result<()> {
     match &command {
         Commands::Init {
             hierarchy_template,
+            profile,
             json,
         } => {
             let output_ctx = OutputContext::new(quiet, *json);
@@ -1756,16 +1834,45 @@ fn run() -> Result<()> {
                 None
             };
 
+            let chosen = template
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
+            if let Some(id) = profile.as_deref() {
+                profile_result(executor.validate_profile_id(id), "init", *json)?;
+            }
+
             // Snapshot which core repository files already exist so the `--json`
             // envelope can report exactly what THIS run created, rather than the
             // full idempotent set `executor.init()` always ensures.
             let index_existed = jit_dir.join("index.json").exists();
             let gates_existed = jit_dir.join("gates.toml").exists();
             let events_existed = jit_dir.join("events.jsonl").exists();
-
-            let (worktree_identity, init_warnings) = executor.init()?;
+            let config_existed = jit_dir.join("config.toml").exists();
+            let rules_existed = jit_dir.join("rules.toml").exists();
+            let fresh = !jit_dir.exists();
+            let fresh_result = profile_result(
+                if let Some(id) = profile.as_deref() {
+                    Some(executor.initialize_profiled_repository(&current_dir, &chosen, id))
+                } else {
+                    fresh.then(|| executor.initialize_fresh_repository(&current_dir, &chosen, None))
+                }
+                .transpose(),
+                "init",
+                *json,
+            )?;
+            let (worktree_identity, init_warnings) = if fresh || profile.is_some() {
+                executor.initialize_worktree_identity()?
+            } else {
+                executor.init()?
+            };
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
+            }
+            if let Some(result) = &fresh_result {
+                for warning in &result.warnings {
+                    eprintln!("Warning: {warning}");
+                }
             }
 
             // Set up .gitattributes for merge drivers (if in git repo). The
@@ -1782,29 +1889,33 @@ fn run() -> Result<()> {
                 }
             };
 
-            // The chosen template defines the on-disk config.toml (namespace
-            // registry + type hierarchy) from which the fixed default rules.toml
-            // is derived.
-            let chosen = template
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
-
             // Seed the `[project]` identity (REQ-01). The command layer owns the
             // orchestration — existence check, default-name computation, and the
             // store write — and is idempotent, so a re-init leaves an existing
             // `[project]` table untouched.
-            let project_name =
-                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?;
+            let project_name = if let Some(result) = &fresh_result {
+                (!config_existed).then(|| result.project_name.clone())
+            } else {
+                executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?
+            };
 
             // Scaffold .jit/rules.toml (the operative ruleset) with the FIXED
             // default ruleset derived from the repo's namespace registry + type
             // hierarchy. A no-op when rules.toml already exists (re-init
             // never clobbers user edits).
-            let scaffolded = executor.scaffold_default_rules()?;
+            let scaffolded = if fresh_result.is_some() {
+                !rules_existed
+            } else {
+                executor.scaffold_default_rules()?
+            };
             if scaffolded {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
+            let profile_result = if let Some(result) = fresh_result {
+                result.profile
+            } else {
+                None
+            };
 
             let message = if let Some(ref t) = template {
                 format!("Initialized with '{}' hierarchy template", t.name)
@@ -1852,6 +1963,7 @@ fn run() -> Result<()> {
                     "hierarchy_template": chosen.name,
                     "created_paths": created_paths,
                     "modified_paths": modified_paths,
+                    "profile": profile_result,
                 });
                 let output = JsonOutput::success(payload, "init").with_message(message);
                 println!("{}", output.to_json_string()?);
@@ -1862,6 +1974,7 @@ fn run() -> Result<()> {
             // "no repository". The explicit recovery command still succeeds:
             // its requested work completed before validation became relevant.
         }
+        Commands::Profile(ProfileCommands::List { .. } | ProfileCommands::Show { .. }) => {}
         _ => {
             // Validate repository exists for all commands except init
             storage.validate()?;
@@ -1897,6 +2010,120 @@ fn run() -> Result<()> {
         Commands::Init { .. } => {
             // Already handled above
         }
+        Commands::Profile(profile_cmd) => match profile_cmd {
+            ProfileCommands::List { json } => match executor.list_embedded_profiles() {
+                Ok(result) => {
+                    if json {
+                        let output = JsonOutput::success(&result, "profile list");
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        for profile in result.profiles {
+                            println!(
+                                "{} {} embedded{}",
+                                profile.id,
+                                profile.version,
+                                if profile.applied { " (applied)" } else { "" }
+                            );
+                        }
+                    }
+                }
+                Err(error) if json => {
+                    let json_error = profile_json_error(&error, "profile list");
+                    println!("{}", json_error.to_json_string()?);
+                    std::process::exit(json_error.exit_code().code());
+                }
+                Err(error) => return Err(error),
+            },
+            ProfileCommands::Show { id, json } => match executor.show_embedded_profile(&id) {
+                Ok(result) => {
+                    if json {
+                        let output = JsonOutput::success(&result, "profile show");
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        let profile = &result.manifest.profile;
+                        println!("Profile: {}", profile.id);
+                        println!("Version: {}", profile.version);
+                        println!("Origin: embedded");
+                        println!("Compatible JIT: {}", profile.jit);
+                        println!("Package hash: {}", result.package_hash);
+                        println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
+                        println!("Targets: {}", result.target_hashes.len());
+                        println!(
+                            "Applied: {}",
+                            if result.applied.is_some() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+                    }
+                }
+                Err(error) if json => {
+                    let json_error = profile_json_error(&error, "profile show");
+                    println!("{}", json_error.to_json_string()?);
+                    std::process::exit(json_error.exit_code().code());
+                }
+                Err(error) => return Err(error),
+            },
+            ProfileCommands::Apply { id, dry_run, json } => {
+                if dry_run {
+                    match executor.plan_embedded_profile(&id) {
+                        Ok(plan) => {
+                            if json {
+                                let output = JsonOutput::success(&plan, "profile apply");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                let status = match plan.status {
+                                    jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
+                                    jit::profile::ProfilePlanStatus::WouldApply => "would apply",
+                                };
+                                println!("Profile {} {}: {}", plan.id, plan.version, status);
+                                for target in plan.targets {
+                                    let action = match target.action {
+                                        jit::profile::ProfileTargetAction::Unchanged => "unchanged",
+                                        jit::profile::ProfileTargetAction::Create => "create",
+                                        jit::profile::ProfileTargetAction::Update => "update",
+                                    };
+                                    println!("  {action}: {}", target.path);
+                                }
+                            }
+                        }
+                        Err(error) if json => {
+                            let json_error = profile_json_error(&error, "profile apply");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        Err(error) => return Err(error),
+                    }
+                } else {
+                    match executor.apply_profile(&id) {
+                        Ok(applied) => {
+                            if json {
+                                let output = JsonOutput::success(&applied, "profile apply");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                let status = match applied.status {
+                                    jit::profile::ProfileApplicationStatus::Unchanged => {
+                                        "unchanged"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::Applied => "applied",
+                                };
+                                println!("Profile {} {}: {}", applied.id, applied.version, status);
+                                for warning in applied.warnings {
+                                    eprintln!("Warning: {:?}", warning);
+                                }
+                            }
+                        }
+                        Err(error) if json => {
+                            let json_error = profile_json_error(&error, "profile apply");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+            }
+        },
         Commands::Rdeps { .. } | Commands::List { .. } => {
             unreachable!("top-level rdeps/list are normalized to canonical commands above")
         }
@@ -2692,16 +2919,29 @@ fn run() -> Result<()> {
                         anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
                     }
 
-                    // Phase 3 safety check: Require JIT_ALLOW_DELETION=1 to discourage deletion
-                    if std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() != "1" {
-                        anyhow::bail!(
-                            "Issue deletion is discouraged and requires explicit confirmation.\n\
-                             Set JIT_ALLOW_DELETION=1 environment variable to proceed.\n\
-                             Example: JIT_ALLOW_DELETION=1 jit issue delete {}\n\
-                             \n\
-                             Note: Deletion is a destructive operation. Consider closing issues instead of deleting them.",
-                            id
-                        );
+                    // Phase 3 safety check: require JIT_ALLOW_DELETION=1 to discourage
+                    // deletion (jit:0daba57d). The env var is read here (dispatch-level
+                    // input gathering); the refusal decision itself is
+                    // `CommandExecutor::confirm_deletion_allowed`, so it stays testable
+                    // without mutating global process state.
+                    let allow_deletion =
+                        std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
+                    if let Err(e) = executor.confirm_deletion_allowed(&id, allow_deletion) {
+                        if json {
+                            let json_error = jit::output::JsonError::new(
+                                jit::output::ErrorCode::DELETION_NOT_CONFIRMED,
+                                e.to_string(),
+                                "issue delete",
+                            )
+                            .with_details(serde_json::json!({ "id": id }))
+                            .with_suggestion(format!(
+                                "Set JIT_ALLOW_DELETION=1 environment variable to proceed: \
+                                 JIT_ALLOW_DELETION=1 jit issue delete {id}"
+                            ));
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        return Err(e.into());
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);
@@ -3159,11 +3399,32 @@ fn run() -> Result<()> {
                 use jit::domain::GateChecker;
 
                 // `--auto` is a convenience spelling of `--mode auto`; it wins
-                // over `--mode` when both are supplied.
+                // over `--mode` when both are supplied. Otherwise resolve the
+                // omitted-`--mode` case: a checker command with no explicit
+                // mode infers `auto` (REQ-01), so the checker is never
+                // silently discarded by a defaulted-to-manual gate. An
+                // EXPLICIT `--mode manual` combined with `--checker-command`
+                // is a usage error (REQ-02) rather than a silent drop — a
+                // manual gate cannot carry a checker.
+                let has_checker_command = checker_command.is_some();
                 let mode = if auto {
                     jit::domain::GateMode::Auto
                 } else {
-                    mode
+                    match mode {
+                        Some(jit::domain::GateMode::Manual) if has_checker_command => {
+                            return Err(invalid_argument(
+                                format!(
+                                    "--mode manual conflicts with --checker-command for gate '{}': a manual gate cannot have a checker. Drop --checker-command, or omit --mode to define an automated gate.",
+                                    key
+                                ),
+                                "gate define",
+                                json,
+                            ));
+                        }
+                        Some(explicit) => explicit,
+                        None if has_checker_command => jit::domain::GateMode::Auto,
+                        None => jit::domain::GateMode::Manual,
+                    }
                 };
 
                 let output_ctx = OutputContext::new(quiet, json);
@@ -5553,12 +5814,10 @@ fn run() -> Result<()> {
                         },
                         "coordination": {
                             "default_ttl_secs": config.coordination().default_ttl_secs(),
-                            "heartbeat_interval_secs": config.coordination().heartbeat_interval_secs(),
                             "lease_renewal_threshold_pct": config.coordination().lease_renewal_threshold_pct(),
                             "stale_threshold_secs": config.coordination().stale_threshold_secs(),
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
                             "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
-                            "auto_renew_leases": config.coordination().auto_renew_leases(),
                         },
                         "global_operations": {
                             "require_main_history": config.global_operations().require_main_history(),
@@ -5603,10 +5862,6 @@ fn run() -> Result<()> {
                         config.coordination().default_ttl_secs()
                     );
                     println!(
-                        "  heartbeat_interval_secs = {}",
-                        config.coordination().heartbeat_interval_secs()
-                    );
-                    println!(
                         "  lease_renewal_threshold_pct = {}",
                         config.coordination().lease_renewal_threshold_pct()
                     );
@@ -5621,10 +5876,6 @@ fn run() -> Result<()> {
                     println!(
                         "  max_indefinite_leases_per_repo = {}",
                         config.coordination().max_indefinite_leases_per_repo()
-                    );
-                    println!(
-                        "  auto_renew_leases = {}",
-                        config.coordination().auto_renew_leases()
                     );
                     println!();
                     println!("[global_operations]");
@@ -5741,7 +5992,6 @@ fn run() -> Result<()> {
                 #[derive(Default)]
                 struct ValidationResult {
                     errors: Vec<String>,
-                    warnings: Vec<String>,
                 }
 
                 let mut result = ValidationResult::default();
@@ -5784,51 +6034,35 @@ fn run() -> Result<()> {
                 let _ = loader.with_repo_config(&jit_dir);
 
                 let has_errors = !result.errors.is_empty();
-                let has_warnings = !result.warnings.is_empty();
 
                 if json {
                     let output = json!({
                         "valid": !has_errors,
                         "errors": result.errors,
-                        "warnings": result.warnings,
                     });
                     println!(
                         "{}",
                         JsonOutput::success(output, "config validate")
                             .with_message(if has_errors {
                                 format!("Validation failed: {} error(s)", result.errors.len())
-                            } else if has_warnings {
-                                format!(
-                                    "Validation passed with {} warning(s)",
-                                    result.warnings.len()
-                                )
                             } else {
                                 "Configuration is valid".to_string()
                             })
                             .to_json_string()?
                     );
-                } else if result.errors.is_empty() && result.warnings.is_empty() {
-                    println!("✓ Configuration is valid");
+                } else if has_errors {
+                    println!("Errors:");
+                    for err in &result.errors {
+                        println!("  ✗ {}", err);
+                    }
                 } else {
-                    if !result.errors.is_empty() {
-                        println!("Errors:");
-                        for err in &result.errors {
-                            println!("  ✗ {}", err);
-                        }
-                    }
-                    if !result.warnings.is_empty() {
-                        println!("Warnings:");
-                        for warn in &result.warnings {
-                            println!("  ⚠ {}", warn);
-                        }
-                    }
+                    println!("✓ Configuration is valid");
                 }
 
-                // Exit with appropriate code
+                // A source that failed to load or carried an invalid value exits 1;
+                // a valid configuration exits 0. There is no warning outcome.
                 if has_errors {
                     std::process::exit(1);
-                } else if has_warnings {
-                    std::process::exit(2);
                 }
             }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
@@ -6800,7 +7034,7 @@ fn run() -> Result<()> {
                 if fg {
                     use jit::commands::serve::{
                         find_available_port, find_server_binary, find_web_dir, is_process_alive,
-                        read_pid_file,
+                        read_pid_file, spawn_with_listener,
                     };
 
                     // Honour existing running server.
@@ -6859,9 +7093,11 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
-                    // Release the port right before spawning: the child binds it next.
-                    drop(listener);
-                    let status = cmd.status().context("Failed to run jit-server")?;
+                    // Hand the bound socket to the child (inherited fd on
+                    // Unix); it adopts this exact socket instead of re-binding.
+                    let mut child = spawn_with_listener(&mut cmd, listener)
+                        .context("Failed to run jit-server")?;
+                    let status = child.wait().context("Failed to wait on jit-server")?;
                     if json {
                         println!(
                             "{}",
@@ -7556,6 +7792,7 @@ mod exit_code_projection_tests {
             issue_id: "abc123".to_string(),
             commit: None,
             branch: None,
+            tree_dirty: None,
             status,
             started_at: chrono::Utc::now(),
             completed_at: None,

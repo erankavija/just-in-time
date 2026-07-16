@@ -1,4 +1,4 @@
-use crate::config::{ProjectionMode, ProjectionStyle};
+use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use schemars::{schema::RootSchema, schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -72,10 +72,10 @@ pub enum Contribution {
         /// Complete JSON-compatible TOML table.
         value: Value,
     },
-    /// One complete root singleton table.
-    SingletonTable {
-        /// Supported singleton table.
-        target: SingletonTableTarget,
+    /// One complete `[projection.<name>]` table in the projection registry.
+    Projection {
+        /// The projection name (its `[projection.<name>]` table key).
+        name: String,
         /// Complete projection configuration. No field defaults are applied.
         value: CompleteProjectionConfig,
     },
@@ -85,7 +85,7 @@ impl Contribution {
     /// Repository-relative registry file receiving this contribution.
     pub fn registry_path(&self) -> &'static str {
         match self {
-            Self::MapEntry { .. } | Self::SetString { .. } | Self::SingletonTable { .. } => {
+            Self::MapEntry { .. } | Self::SetString { .. } | Self::Projection { .. } => {
                 ".jit/config.toml"
             }
             Self::KeyedArray { target, .. } => target.registry_path(),
@@ -152,33 +152,21 @@ impl KeyedArrayTarget {
     }
 }
 
-/// Supported complete root singleton tables.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum SingletonTableTarget {
-    /// `[invariant_projection]`
-    InvariantProjection,
-    /// `[rules_gates_projection]`
-    RulesGatesProjection,
-}
-
-impl SingletonTableTarget {
-    pub(crate) fn table_name(self) -> &'static str {
-        match self {
-            Self::InvariantProjection => "invariant_projection",
-            Self::RulesGatesProjection => "rules_gates_projection",
-        }
-    }
-}
-
-/// Required fields for a profile-provided projection table.
+/// Required fields for a profile-provided `[projection.<name>]` table.
 ///
 /// The repository configuration types apply defaults because hand-authored
 /// configuration may omit fields. A profile contribution must instead state
 /// the complete value so equality and hashing never depend on ambient defaults.
+/// The field shape mirrors [`ProjectionConfig`](crate::config::ProjectionConfig)
+/// exactly (the same `kind` string-or-array serialization), so the merged
+/// `[projection.<name>]` table a repository reads is byte-equal to what the
+/// profile declared.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CompleteProjectionConfig {
+    /// The item kind(s) whose addressable rows this projection renders (one name,
+    /// or an array — the same shape as `[projection.<name>].kind`).
+    pub kind: ProjectionKinds,
     /// Projection placement mode.
     pub mode: ProjectionMode,
     /// Repository-relative projection target.

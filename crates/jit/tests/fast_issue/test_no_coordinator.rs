@@ -155,7 +155,12 @@ fn test_gates_work_without_coordinator() {
 
     // Pass the gate
     h.executor
-        .pass_gate(&id, "test-gate".to_string(), None, false)
+        .pass_gate(
+            &id,
+            "test-gate".to_string(),
+            Some("human:reviewer".to_string()),
+            false,
+        )
         .unwrap();
 
     // Issue should now auto-transition to Done

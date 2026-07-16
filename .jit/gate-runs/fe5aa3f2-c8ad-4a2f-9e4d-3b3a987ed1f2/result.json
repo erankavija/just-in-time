@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "run_id": "fe5aa3f2-c8ad-4a2f-9e4d-3b3a987ed1f2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "1d59070d-bebc-4a55-9456-c6c7a3caba2a",
+  "commit": "e9676c8d44f1e861f8f20a7f2989c692e22d97fd",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T16:09:29.807780620Z",
+  "completed_at": "2026-07-16T16:13:55.334629345Z",
+  "duration_ms": 265526,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:1d59070d` commits 3bb9c937, 37369032, 6b24ca42, and claim-only 8901b649; uncommitted changes excluded  \nPolicy sources: AGENTS.md  \nResolved items: @/inv/gate-semantics (.jit/invariants.toml); @/charter/D-2, @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0); code-review pending (current review; no prior run); doc-review pending; docs-mechanical failed (exit 1, non-attributable dangling citation)  \nTruncation recovery: narrowed reads of gate evaluation/update paths and individual tagged patches after broad output truncated  \n\n1. **Blocking · issue-impact** — A gate that passed while automated can be changed to manual, then a bare `jit gate evaluate` still returns success. [`pass_gate`](crates/jit/src/commands/gate.rs:410) takes the historical “already passed at HEAD” shortcut before loading the current mode or enforcing `--by`; `update_gate` only updates the registry and preserves per-issue status/run history. This contradicts the documented absolute requirement that manual gates require `--by` at [`cli-commands.md`](docs/reference/cli-commands.md:1557) and leaves REQ-03 unmet. Add coverage for auto-pass → switch to manual → bare evaluate, and enforce the manual-attestation check before the skip path.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A stale automated pass can bypass the new manual-gate attestation requirement after the gate is changed to manual.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"After an automated gate passes at HEAD and is changed to manual, bare evaluation returns already_passed before checking --by.\",\"file\":\"crates/jit/src/commands/gate.rs\",\"line\":410,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 6763 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6bb0-b2a0-7661-9ea7-71452feb74d7\n--------\nuser\n--- 6750 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "A stale automated pass can bypass the new manual-gate attestation requirement after the gate is changed to manual.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "After an automated gate passes at HEAD and is changed to manual, bare evaluation returns already_passed before checking --by.",
+        "file": "crates/jit/src/commands/gate.rs",
+        "line": 410
+      }
+    ]
+  }
+}

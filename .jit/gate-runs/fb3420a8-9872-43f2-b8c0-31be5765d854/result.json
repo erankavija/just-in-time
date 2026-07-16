@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "fb3420a8-9872-43f2-b8c0-31be5765d854",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "070ca05f-f7a9-4922-b796-3376a0b813b2",
+  "commit": "cd9528929d166cf4679929754942a3a1442fca69",
+  "branch": "worktree-agent-070ca05f",
+  "status": "passed",
+  "started_at": "2026-07-16T18:55:03.412500820Z",
+  "completed_at": "2026-07-16T18:57:37.658032594Z",
+  "duration_ms": 154245,
+  "exit_code": 0,
+  "stdout": "Attribution: cd952892, f45030f2, 59a1f7fe, d78ea864, 977d331c, f59e74b4 (`jit:070ca05f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-2, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit 0); repo-validate pending\nTruncation recovery: reread d78ea864 profile/main and remaining affected paths separately; inspected each tagged commit individually\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable profile CLI and atomic initialization work meets the issue criteria; the prior partial-repository defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "All attributable profile CLI and atomic initialization work meets the issue criteria; the prior partial-repository defect is resolved.",
+    "findings": []
+  }
+}

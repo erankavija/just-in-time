@@ -1,0 +1,4 @@
+# Adopter-owned invariant registry.
+#
+# Add project invariants here, then run `jit project render` to refresh the
+# configured managed region in AGENTS.md.

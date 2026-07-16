@@ -12,9 +12,38 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T15:58:21.523707990Z"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T16:00:47.706977351Z"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T16:00:47.111456558Z"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T16:04:35.177729932Z"
+    }
+  },
   "context": {},
-  "documents": [],
+  "documents": [
+    {
+      "path": "dev/active/d74a9ed1-write-through-namespace-unique-membership.md",
+      "commit": null,
+      "label": "Write-through design note",
+      "doc_type": "design",
+      "format": "markdown"
+    }
+  ],
   "labels": [
     "epic:core-maintenance",
     "component:storage",
@@ -22,7 +51,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T19:05:10.783498583Z",
-  "updated_at": "2026-07-16T08:53:53.042221118Z",
+  "updated_at": "2026-07-16T16:06:51.961344538Z",
   "first_ready_at": "2026-07-14T19:05:10.783504203Z",
   "claimed_at": "2026-07-16T08:53:53.042220838Z"
 }

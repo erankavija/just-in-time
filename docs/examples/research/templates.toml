@@ -32,7 +32,7 @@ applies_to  = ["goal"]           # container types this template may be applied 
   type        = "breakdown"
   gates       = ["coverage-preview", "breakdown-review"]
   labels      = ["brackets:{container.short_id}"]
-  description = "Breakdown node bracketing {container.title} ({container.short_id}). Holds the decomposition of the approved plan into well-ordered child issues that cover the goal's [hard] success criteria."
+  description = "Breakdown node bracketing {container.title} ({container.short_id}). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the goal's [hard] success criteria."
   depends_on  = ["planning"]     # internal edge: B → P
 
   # Edge to an anchor: container depends on the breakdown node (C → B)

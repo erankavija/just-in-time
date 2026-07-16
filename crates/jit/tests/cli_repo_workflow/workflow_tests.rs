@@ -272,7 +272,10 @@ fn test_workflow_gates() {
     assert!(stdout.contains("Gated"));
 
     // Pass review gate
-    run_jit(&temp, &["gate", "pass", &id, "review"]);
+    run_jit(
+        &temp,
+        &["gate", "pass", &id, "review", "--by", "human:reviewer"],
+    );
 
     // Now should auto-transition to Done
     let output = run_jit(&temp, &["issue", "show", &id]);
@@ -404,7 +407,10 @@ fn test_workflow_complex_epic() {
     run_jit(&temp, &["issue", "update", &frontend, "--state", "done"]);
 
     // Complete docs
-    run_jit(&temp, &["gate", "pass", &docs, "review"]);
+    run_jit(
+        &temp,
+        &["gate", "pass", &docs, "review", "--by", "human:reviewer"],
+    );
     run_jit(&temp, &["issue", "update", &docs, "--state", "done"]);
 
     // Epic should now be unblocked and ready

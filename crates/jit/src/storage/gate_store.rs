@@ -115,14 +115,22 @@ pub fn load_gate_registry(jit_root: &Path) -> Result<GateRegistry> {
 /// );
 /// ```
 pub fn save_gate_registry(jit_root: &Path, registry: &GateRegistry) -> Result<()> {
+    let toml_str = serialize_gate_registry(registry)?;
+    write_file_atomic(&jit_root.join(GATES_FILE), &toml_str)
+}
+
+/// Serialize a gate registry into its deterministic on-disk image without I/O.
+///
+/// Fresh initialization uses this alongside [`save_gate_registry`] so ordinary
+/// and transactional scaffold publication share one byte constructor.
+pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<String> {
     let mut gates: Vec<Gate> = registry.gates.values().cloned().collect();
     gates.sort_by(|a, b| a.key.cmp(&b.key));
     for gate in &mut gates {
         gate.reserved.retain(|_, value| !value.is_null());
     }
     let file = GatesFile { gates };
-    let toml_str = toml::to_string_pretty(&file).context("Failed to serialize gate registry")?;
-    write_file_atomic(&jit_root.join(GATES_FILE), &toml_str)
+    toml::to_string_pretty(&file).context("Failed to serialize gate registry")
 }
 
 #[cfg(test)]

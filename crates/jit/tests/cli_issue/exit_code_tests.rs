@@ -385,7 +385,7 @@ fn test_exit_code_state_transition_blocked_by_gates() {
     // Now pass the gate and verify transition to done succeeds
     let status = Command::new(jit_binary())
         .current_dir(&temp_dir)
-        .args(["gate", "pass", id, "tests"])
+        .args(["gate", "pass", id, "tests", "--by", "human:reviewer"])
         .status()
         .unwrap();
     assert!(status.success());
@@ -1551,4 +1551,87 @@ fn test_exit_code_startup_format_too_new_json_envelope() {
         .contains("newer than this jit"));
     // Human line stays on stderr.
     assert!(String::from_utf8_lossy(&output.stderr).contains("newer than this jit"));
+}
+
+// ============================================================================
+// `issue delete` confirmation (jit:0daba57d)
+//
+// A deletion refused for missing `JIT_ALLOW_DELETION=1` confirmation must exit
+// nonzero (REQ-01) so scripts observe the refusal as a failure instead of
+// reading exit 0 and assuming the deletion happened. A confirmed deletion's
+// exit code and output stay unchanged (REQ-03).
+// ============================================================================
+
+#[test]
+fn test_exit_code_issue_delete_unconfirmed_text_mode() {
+    let temp_dir = setup_test_env();
+    let id = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Doomed", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .env_remove("JIT_ALLOW_DELETION")
+        .args(["issue", "delete", &id])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("JIT_ALLOW_DELETION=1"), "stderr: {stderr}");
+    assert!(output.stdout.is_empty(), "non-json stdout must stay empty");
+}
+
+#[test]
+fn test_exit_code_issue_delete_confirmed_unchanged_text_mode() {
+    let temp_dir = setup_test_env();
+    let id = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Doomed", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .env("JIT_ALLOW_DELETION", "1")
+        .args(["issue", "delete", &id])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(&format!("Deleted issue: {id}")),
+        "stdout: {stdout}"
+    );
+}
+
+#[test]
+fn test_exit_code_issue_delete_confirmed_unchanged_json_mode() {
+    let temp_dir = setup_test_env();
+    let id = json_issue_id(
+        &Command::new(jit_binary())
+            .current_dir(&temp_dir)
+            .args(["issue", "create", "--title", "Doomed", "--json"])
+            .output()
+            .unwrap(),
+    );
+
+    let output = Command::new(jit_binary())
+        .current_dir(&temp_dir)
+        .env("JIT_ALLOW_DELETION", "1")
+        .args(["issue", "delete", &id, "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["id"], id);
+    assert_eq!(json["deleted"], true);
 }

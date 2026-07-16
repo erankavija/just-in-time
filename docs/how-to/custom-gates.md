@@ -671,7 +671,8 @@ jit gate add abc123 tests clippy fmt code-review
 jit gate preset create abc123 rust-ci
 ```
 
-This writes `.jit/config/gate-presets/rust-ci.json` bundling those four gates.
+This writes the bundle to `.jit/config/gate-presets/<name>.json` (here
+`rust-ci.json`) with those four gates.
 `jit gate preset create` rejects a built-in name; commit the JSON file to share
 the preset with your team.
 

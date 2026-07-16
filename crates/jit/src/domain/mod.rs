@@ -26,6 +26,7 @@ pub mod artifact_inventory;
 pub mod artifact_plan;
 pub mod build_provenance;
 pub mod event_catalog;
+pub mod event_log;
 pub mod gate_findings;
 pub mod item;
 pub mod projection;
@@ -44,6 +45,7 @@ pub use event_catalog::{
     event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc,
     REFERENCE_PATH as EVENT_REFERENCE_PATH,
 };
+pub use event_log::{parse_known_events, EventLogError};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.
 pub use projection::{project, ProjectedSection, Projection};

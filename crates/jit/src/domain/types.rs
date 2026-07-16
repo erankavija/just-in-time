@@ -1118,6 +1118,16 @@ pub struct GateRunResult {
     pub commit: Option<String>,
     /// Git branch (if available)
     pub branch: Option<String>,
+    /// Whether the working tree differed from the named [`commit`](Self::commit)
+    /// when the checker started. `Some(true)` means the tree carried uncommitted
+    /// or untracked changes, so the run evidences that modified tree rather than
+    /// the commit alone; `Some(false)` means the tree matched the commit exactly;
+    /// `None` means there was no commit to compare against (the working directory
+    /// is not a git repository, or the repository has no commits yet) — a clean
+    /// tree is never fabricated in that case. Defaulted so run records written
+    /// before this field existed parse as `None`.
+    #[serde(default)]
+    pub tree_dirty: Option<bool>,
     /// Result status
     pub status: GateRunStatus,
     /// When execution started
@@ -1160,6 +1170,14 @@ pub enum GateRunStatus {
     Pending,
     /// Not applicable (future: for conditional gates)
     Skipped,
+}
+
+/// Origin vocabulary persisted for an installed profile package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileOrigin {
+    /// Package bytes were compiled into the running JIT binary.
+    Embedded,
 }
 
 /// System event types for audit log
@@ -1447,6 +1465,29 @@ pub enum Event {
         /// Number of issues whose lifecycle timestamps were backfilled
         issues_updated: usize,
     },
+    /// An embedded profile package was transactionally applied.
+    ///
+    /// Repository-scoped: package targets, the minimal installed record, and
+    /// this event become durable in one recoverable transaction.
+    ProfileApplied {
+        /// Event ID.
+        id: String,
+        /// When the transaction was constructed.
+        timestamp: DateTime<Utc>,
+        /// Stable profile identifier.
+        profile_id: String,
+        /// Applied semantic version.
+        version: String,
+        /// Package discovery origin.
+        origin: ProfileOrigin,
+        /// Hash of the complete canonical package.
+        package_hash: String,
+        /// Package contribution hashes keyed by repository target.
+        target_hashes: std::collections::BTreeMap<String, String>,
+        /// Whether the transaction isolated a pre-existing non-newline,
+        /// malformed event tail immediately before this record.
+        isolated_torn_tail: bool,
+    },
 }
 
 impl Event {
@@ -1720,6 +1761,27 @@ impl Event {
         }
     }
 
+    /// Create a repository-scoped profile application event.
+    pub fn new_profile_applied(
+        profile_id: String,
+        version: String,
+        origin: ProfileOrigin,
+        package_hash: String,
+        target_hashes: std::collections::BTreeMap<String, String>,
+        isolated_torn_tail: bool,
+    ) -> Self {
+        Event::ProfileApplied {
+            id: Uuid::new_v4().to_string(),
+            timestamp: Utc::now(),
+            profile_id,
+            version,
+            origin,
+            package_hash,
+            target_hashes,
+            isolated_torn_tail,
+        }
+    }
+
     /// Get the issue ID associated with this event
     pub fn get_issue_id(&self) -> &str {
         match self {
@@ -1743,6 +1805,7 @@ impl Event {
             Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
             Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
+            Event::ProfileApplied { .. } => "",        // No associated issue (repo-scoped)
         }
     }
 

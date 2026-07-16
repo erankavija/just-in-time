@@ -127,9 +127,10 @@ jit issue claim abc123 agent:worker-1
 
 # Agent does work...
 
-# Agent validates quality
+# Agent validates quality (an automated gate runs its checker; a manual
+# gate's evaluate requires --by <attestor>)
 jit gate evaluate abc123 tests
-jit gate evaluate abc123 code-review
+jit gate evaluate abc123 code-review --by "human:reviewer"
 
 # Inspect gate statuses, then explicitly request completion
 jit gate status-all abc123

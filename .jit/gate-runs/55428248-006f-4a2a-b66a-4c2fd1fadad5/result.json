@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "55428248-006f-4a2a-b66a-4c2fd1fadad5",
+  "gate_key": "repo-validate",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "7a4362c45bc9efa383f523eaafac053bfabba79b",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "passed",
+  "started_at": "2026-07-16T15:57:53.736188803Z",
+  "completed_at": "2026-07-16T15:57:55.539746705Z",
+  "duration_ms": 1803,
+  "exit_code": 0,
+  "stdout": "✓ Repository validation passed\n",
+  "stderr": "",
+  "command": "jit validate",
+  "by": "auto:executor",
+  "message": null
+}

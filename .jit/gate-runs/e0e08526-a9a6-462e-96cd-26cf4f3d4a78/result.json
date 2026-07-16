@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "e0e08526-a9a6-462e-96cd-26cf4f3d4a78",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
+  "commit": "f23479ed2aed7a3ce334d3f322b2d1b87ab383e4",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T15:09:18.315147179Z",
+  "completed_at": "2026-07-16T15:12:14.580382445Z",
+  "duration_ms": 176265,
+  "exit_code": 0,
+  "stdout": "Attribution: 8901b649, e7782142, 1e72fbf1, f23479ed (reachable `jit:8917c558`; merge inspected against its first parent)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/event-log (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T14:59:02Z); doc-review pending; docs-mechanical passed (exit 0, 2026-07-16T14:35:21Z)\nTruncation recovery: Re-read individual claim, implementation, merge-first-parent, fix, source, test, documentation, and gate-result slices after aggregate diffs truncated.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The implementation satisfies all three success criteria; the prior stale-pin finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The implementation satisfies all three success criteria; the prior stale-pin finding is addressed.",
+    "findings": []
+  }
+}

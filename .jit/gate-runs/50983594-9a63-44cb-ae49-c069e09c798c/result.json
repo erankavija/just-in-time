@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "50983594-9a63-44cb-ae49-c069e09c798c",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "0fc74aca1f9dbf357207b4aae0f0c45144c79f51",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T17:31:35.019511846Z",
+  "completed_at": "2026-07-16T17:33:48.500874401Z",
+  "duration_ms": 133481,
+  "exit_code": 1,
+  "stdout": "Attribution: `7ad4019b` is a leaf task (configured maximum level 4; no resolved children). I inspected the 11 reachable `jit:7ad4019b` commits individually with rename detection and verified current behavior. Uncommitted JIT run-state changes were excluded. The prior three blockers are addressed, but related documentation remains inconsistent with warning-only review placeholders.\n\n1. **F1 — blocking, issue-impact, medium:** The CLI reference’s `jit gate preset list` sample still calls `plan-review` an “Agent plan-quality review,” although the live built-in preset uses `review_placeholder` and runs no reviewer. Update [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/reference/cli-commands.md:1838) to match current output or direct readers to the canonical generated preset reference.\n\n2. **F2 — blocking, issue-impact, high:** The planning-bracket concept and adoption workflow still describe a built-in placeholder pass as approval: [docs/concepts/planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/concepts/planning-bracket.md:108) says work waits for an “approved” plan, while the same page says the checker does not judge quality. The adoption guide repeats this in its “approved plan” and “breakdown approved” wording at [docs/how-to/adopt-planning-bracket.md](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/how-to/adopt-planning-bracket.md:265). Say the default workflow waits for gate passage and deterministic coverage; reserve “approved” for a repository-configured real reviewer.\n\n3. **F3 — blocking, issue-impact, medium:** Both shipped example templates describe their breakdown node as decomposing an “approved plan,” even though their adjacent configuration now explicitly says the built-in review gates are placeholders. Update [docs/examples/sdd/templates.toml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/examples/sdd/templates.toml:33) and [docs/examples/research/templates.toml](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b/docs/examples/research/templates.toml:35) to say “plan” or condition approval on a replaced reviewer.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Prior placeholder documentation fixes landed, but stale approval claims and one CLI-output example still misrepresent the built-in review placeholders.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The gate-preset list sample still labels warning-only plan-review as an agent quality review.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1838},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Concept and adoption documentation call placeholder gate passage plan or breakdown approval despite explicitly stating the built-in checker performs no review.\",\"file\":\"docs/concepts/planning-bracket.md\",\"line\":108},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Shipped SDD and research template descriptions call the plan approved although their built-in review gates are placeholders.\",\"file\":\"docs/examples/sdd/templates.toml\",\"line\":33}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11623 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6bfb-d99f-7be3-9415-e8f4b09f61fe\n--------\nuser\n--- 11610 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Prior placeholder documentation fixes landed, but stale approval claims and one CLI-output example still misrepresent the built-in review placeholders.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The gate-preset list sample still labels warning-only plan-review as an agent quality review.",
+        "file": "docs/reference/cli-commands.md",
+        "line": 1838
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Concept and adoption documentation call placeholder gate passage plan or breakdown approval despite explicitly stating the built-in checker performs no review.",
+        "file": "docs/concepts/planning-bracket.md",
+        "line": 108
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Shipped SDD and research template descriptions call the plan approved although their built-in review gates are placeholders.",
+        "file": "docs/examples/sdd/templates.toml",
+        "line": 33
+      }
+    ]
+  }
+}

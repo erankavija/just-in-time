@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "run_id": "607a6d58-8cb3-4f94-9fc2-a0b88f2389e6",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "070ca05f-f7a9-4922-b796-3376a0b813b2",
+  "commit": "59a1f7fec97cdd0bf6a5a4a5d61bcd105d9c6911",
+  "branch": "worktree-agent-070ca05f",
+  "status": "failed",
+  "started_at": "2026-07-16T18:31:59.882790550Z",
+  "completed_at": "2026-07-16T18:36:19.463918272Z",
+  "duration_ms": 259581,
+  "exit_code": 1,
+  "stdout": "Attribution: 59a1f7fe, d78ea864, 977d331c, f59e74b4 (`jit:070ca05f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,@/invariant/atomic-writes (.jit/invariants.toml); @/issue/070ca05f/requirement/REQ-01,REQ-02,REQ-03 (issue Markdown source)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T18:27:11Z); mcp-ci passed (exit 0, 2026-07-16T18:31:42Z); repo-validate pending\nTruncation recovery: reread attributable files, init paths, tests, MCP curation, and policy sources in narrower line ranges\n\n1. F1 — blocking, issue-impact, high: `init --profile` still invokes mutating plain initialization when `.jit` already exists. `fresh == false` selects `executor.init()` before `executor.apply_profile()`; a subsequent profile conflict can therefore leave plain-init mutations/projection refreshes despite the profiled operation failing. This violates the requirement that explicit profiled init never invokes mutating plain init first. [crates/jit/src/main.rs:1877](/tmp/jit-agent-070ca05f/crates/jit/src/main.rs:1877) [crates/jit/src/main.rs:1927](/tmp/jit-agent-070ca05f/crates/jit/src/main.rs:1927) (`@/issue/070ca05f/requirement/REQ-01`, `@/issue/070ca05f/requirement/REQ-02`).\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profiled init can mutate an existing partial repository before profile application fails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"init --profile runs mutating plain init before applying the profile when .jit already exists.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1877,\"references\":[\"@/issue/070ca05f/requirement/REQ-01\",\"@/issue/070ca05f/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 17174 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /tmp/jit-agent-070ca05f\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6c33-295c-7a00-882b-b546311e573d\n--------\nuser\n--- 17161 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Profiled init can mutate an existing partial repository before profile application fails.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "init --profile runs mutating plain init before applying the profile when .jit already exists.",
+        "file": "crates/jit/src/main.rs",
+        "line": 1877,
+        "references": [
+          "@/issue/070ca05f/requirement/REQ-01",
+          "@/issue/070ca05f/requirement/REQ-02"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "8c5fca7e-eb08-4f58-89a4-a79009986dc1",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004",
+  "commit": "f0891941d583d55af54c9151a7d718909bcee382",
+  "branch": "worktree-agent-9b0a997e",
+  "status": "failed",
+  "started_at": "2026-07-16T13:52:44.616147390Z",
+  "completed_at": "2026-07-16T13:57:15.633042137Z",
+  "duration_ms": 271016,
+  "exit_code": 1,
+  "stdout": "Attribution: `6216f7e9`, `f0891941` (`jit:9b0a997e`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `.jit/gates.toml`; `dev/vision/9db27a3a-charter.md`\nResolved items: `@/charter/D-1`, `@/charter/D-4`, `@/charter/D-6` (charter); `@/invariant/atomic-writes`, `@/invariant/single-source-prose` (invariant registry); `@/gate/cargo-ci`, `@/gate/docs-mechanical`, `@/gate/repo-validate`, `@/gate/code-review`, `@/gate/doc-review`, `@/gate/jit-validate` (gate registry)\nGate evidence: cargo-ci passed (0, 2026-07-16T13:43:31Z); docs-mechanical passed (0, 2026-07-16T13:52:28Z); repo-validate passed (0, 2026-07-16T13:52:15Z); doc-review pending; code-review pending\nTruncation recovery: Re-read issue-specific gate results, bounded tagged patches, dependency recovery integration, and affected line ranges after combined-output truncation.\n\n1. **F1 — blocking, issue-impact:** Applying over a torn `events.jsonl` tail cannot succeed. The service intentionally turns a torn prefix into a separate physical line, then validates that exact overlay before publishing ([profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:123), [profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:133)). Repository validation rejects every non-empty line that is not JSON ([repository.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/validation/repository.rs:652)), so `{\"torn\":\\n<event>\\n` fails before the transaction. This violates REQ-02’s required torn-tail preservation/application behavior and leaves REQ-03’s service-level torn-tail case untested.\n\n2. **F2 — blocking, issue-impact:** The new public command-layer entrypoint bypasses the universal recovery boundary. `apply_embedded_profile` creates a kernel and immediately calls the mutation method ([profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:59)); that method only acquires the repository/event locks ([profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:74)). It never invokes or requires `RecoveryCoordinator::recover_before_services`, unlike the established mutation startup path ([main.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/main.rs:1731)). Consequently a direct library caller can apply over a pending journal; the added tests recover only through an explicit manual call after dropping the executor ([profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e/crates/jit/src/commands/profile.rs:406)).\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profile application does not handle torn event tails end-to-end and bypasses the required recovery boundary for direct callers.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Final repository validation rejects the preserved torn event-log prefix, so profile application fails instead of publishing its required event image.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":133,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The public profile-application service does not establish the universal recovery boundary before taking locks and publishing a transaction.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":63,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 8102 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9b0a997e\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b33-80d0-7442-b11f-92a4cfa08b0a\n--------\nuser\n--- 8089 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Profile application does not handle torn event tails end-to-end and bypasses the required recovery boundary for direct callers.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Final repository validation rejects the preserved torn event-log prefix, so profile application fails instead of publishing its required event image.",
+        "file": "crates/jit/src/commands/profile.rs",
+        "line": 133
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The public profile-application service does not establish the universal recovery boundary before taking locks and publishing a transaction.",
+        "file": "crates/jit/src/commands/profile.rs",
+        "line": 63
+      }
+    ]
+  }
+}

@@ -2,9 +2,9 @@
   "id": "554ad07f-edd8-4ac9-8f6d-139902abbf7e",
   "title": "Record working-tree cleanliness in gate-run evidence",
   "description": "Split from 45e1b7e8 REQ-04 (aspirational): a recorded gate result names the commit the repository pointed at when the checker ran, but not whether the working tree matched that commit. A pass produced against a modified tree is therefore indistinguishable from a pass evidencing the commit itself. Recording the observed tree's cleanliness alongside the commit makes the distinction machine-readable.\n\n## Background\n\n45e1b7e8 landed commit-level build verification for merges (scripts/verify-commit-builds.sh) and left the general evidence gap to this issue: GateRunResult carries a commit field only. crates/jit/build_info.rs already demonstrates dirty-tree detection. Whether any consumer treats a dirty-tree pass differently (e.g. gate readiness at HEAD) is a behavior decision outside this issue: this issue makes the evidence readable, it does not change pass/fail semantics.\n\n## Success Criteria\n\n- [hard] REQ-01: A recorded gate run captures whether the working tree matched the named commit at checker start (clean/dirty), stored in the run record.\n- [hard] REQ-02: Machine-readable gate outputs (gate status, status-all, structured findings envelope) expose the tree-cleanliness field wherever the commit is exposed.\n- [hard] REQ-03: Recorded schema/reference docs for the gate-run format state the field and its meaning; existing run records without the field remain readable.\n- [hard] REQ-04: Tests cover a clean-tree run and a dirty-tree run asserting the recorded value.\n- Out of scope: changing gate pass/fail or readiness semantics based on the field.",
-  "state": "ready",
+  "state": "in_progress",
   "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:worker",
   "dependencies": [],
   "gates_required": [
     "cargo-ci",
@@ -22,6 +22,7 @@
     "type:enhancement"
   ],
   "created_at": "2026-07-14T13:07:27.437433470Z",
-  "updated_at": "2026-07-14T13:07:27.439592181Z",
-  "first_ready_at": "2026-07-14T13:07:27.437438430Z"
+  "updated_at": "2026-07-16T14:29:00.313098335Z",
+  "first_ready_at": "2026-07-14T13:07:27.437438430Z",
+  "claimed_at": "2026-07-16T14:29:00.313098205Z"
 }

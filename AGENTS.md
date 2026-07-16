@@ -162,9 +162,16 @@ New code should respect these boundaries. Prefer adding a domain function over e
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **git is optional** — jit must work without git unless a feature strictly requires it (`@/charter/D-4`). Exception: the `jit claim` lease subcommands require a git repository for worktree identity and branch tracking; they fail with a typed `ClaimRequiresGitError` (exit 10) when run outside one.
 
-### Domain Invariants
+<!-- jit:dogfood-guidance:begin -->
+## JIT workflow
 
-Each invariant is addressable at `@/inv/<name>`.
+- Treat `.jit/` as repository-owned workflow configuration and issue data.
+- Read `.jit/reference/content-standards.md` before authoring issues or planning documents.
+- Derive hierarchy, templates, gates, namespaces, and documentation paths from repository configuration.
+- Use `jit issue status`, `jit query available`, and the dependency graph to select and sequence work.
+- Run the configured gates before completing an issue; a passing review placeholder is advisory evidence only.
+
+### Project invariants
 
 <!-- jit:invariants:begin -->
 - **label-format** — Every label is namespace:value (namespace lowercase-kebab, value non-empty).
@@ -179,6 +186,7 @@ Each invariant is addressable at `@/inv/<name>`.
 - **single-source-prose** — Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect.
 - **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
 <!-- jit:invariants:end -->
+<!-- jit:dogfood-guidance:end -->
 
 ### Charter Decisions
 

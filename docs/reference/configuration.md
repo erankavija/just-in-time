@@ -4,6 +4,12 @@
 
 Complete reference for JIT configuration options.
 
+For the portable recommended workflow, initialize with
+`jit init --profile jit-dogfood`; the
+[Repository Profiles reference](profiles.md) owns that package's exact contract.
+This page is the advanced manual surface for repositories that want to inspect
+or customize individual settings.
+
 **Quick links:**
 - [Example config.toml](example-config.toml) - Full annotated example with all options
 - [Schema Configuration](#schema-configuration) - Issue types, validation, namespaces
@@ -142,7 +148,10 @@ proceeds and the bypass is logged, at every level.
 > `[type_hierarchy]` registry in `config.toml`, in memory at load; the
 > `schemas/default-*.json` files are regenerated projections, not the validation
 > authority. So you change what a default rule checks by editing that registry
-> (a hand-declared namespace takes effect on the next command, no regeneration
+> (a hand-declared namespace takes effect on the next command, no regeneration;
+> the next jit-driven config write — `jit config set` or re-init — also writes
+> the matching `namespace-unique-*` row through to `rules.toml` so its
+> `@/rule/<name>` address resolves)
 > step), and author new conventions as custom rules in `rules.toml`. `strictness`
 > tunes how all of these gate operations globally.
 
@@ -317,19 +326,18 @@ Maximum indefinite (TTL=0) leases per agent. Default: `2`.
 
 Maximum indefinite leases across entire repository. Default: `10`.
 
-`default_ttl_secs`, `heartbeat_interval_secs`,
-`lease_renewal_threshold_pct`, `stale_threshold_secs`, and
-`auto_renew_leases` are accepted and shown by config commands, but currently
-do not alter claim timing or start a renewal runner. Timed claims therefore
-use `jit claim acquire --ttl` (defaulting to the built-in claim lease TTL —
-see [Runtime coordination defaults](#runtime-coordination-defaults)), and an
+`default_ttl_secs`, `lease_renewal_threshold_pct`, and `stale_threshold_secs`
+are accepted and shown by config commands, but currently do not alter claim
+timing. Timed claims therefore use `jit claim acquire --ttl` (defaulting to the
+built-in claim lease TTL — see
+[Runtime coordination defaults](#runtime-coordination-defaults)), and an
 indefinite lease needs explicit `jit claim heartbeat` calls.
 
 ### Runtime coordination defaults
 
-The built-in heartbeat cadence, lock acquisition timeout and poll interval,
-orphaned temp-file cleanup threshold, and claim lease TTL — each with its unit
-and operational scope — are listed in
+The built-in lock acquisition timeout and poll interval, orphaned temp-file
+cleanup threshold, and claim lease TTL — each with its unit and operational
+scope — are listed in
 [Runtime Coordination Defaults](runtime-defaults.md). That reference is
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
@@ -372,9 +380,8 @@ ISO 8601 timestamp when this agent config was created.
 Human-readable description of this agent.
 
 `[agent].id` is the active persistent identity source (after an explicit CLI
-identity and `JIT_AGENT_ID`). The optional `default_ttl_secs` and `[behavior]`
-fields are parsed metadata only: they do not select a claim TTL or start a
-heartbeat runner. In particular, `auto_heartbeat` defaults to `false`.
+identity and `JIT_AGENT_ID`). The optional `default_ttl_secs` field is parsed
+metadata only: it does not select a claim TTL.
 
 ## Environment Variables
 

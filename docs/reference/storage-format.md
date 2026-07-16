@@ -23,6 +23,8 @@ where each comes up.
 ├── rules.toml        # Validation rules
 ├── invariants.toml   # Invariants registry
 ├── events.jsonl      # Append-only event log
+├── profiles/         # Minimal applied-profile provenance records
+│   └── <id>.json
 ├── issues/           # One JSON file per issue
 │   ├── <uuid>.json   # Issue data
 │   └── <uuid>.lock   # File lock for atomic operations
@@ -39,7 +41,15 @@ by `jit init`.
 
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `worktree.json`, `server.log`, `server.pid.json`, `*.lock`, and
-`tmp/`. These are runtime state, not part of the versioned data format.
+`tmp/`. Pending recoverable multi-file transactions use
+`.jit/tmp/transactions/`. These are runtime state, not part of the versioned
+data format.
+
+When an embedded repository profile is applied, its minimal provenance record
+lives under `.jit/profiles/`. Fresh profiled initialization may temporarily use
+the repository-sibling `.jit-bootstrap/` control directory before `.jit/`
+exists. The [Repository Profiles reference](profiles.md) defines the record,
+transaction, rollback, and mandatory-recovery contract.
 
 Lease records live under `.git/jit/`, not `.jit/`. See
 [The `.git/jit/` control plane](#the-gitjit-control-plane) below.
@@ -92,7 +102,7 @@ Each issue is stored as `issues/<uuid>.json`:
 | `state` | enum | `backlog`, `ready`, `in_progress`, `gated`, `done`, `rejected`, `archived` |
 | `priority` | enum | `critical`, `high`, `normal`, `low` |
 | `assignee` | string? | Format: `type:identifier` (e.g., `agent:copilot-1`) |
-| `dependencies` | UUID[] | Issues that must reach a terminal state before this one |
+| `dependencies` | UUID[] | Issues that must reach an effective terminal state (done, rejected, or archived from one — see `archived_from`) before this one |
 | `gates_required` | string[] | Gate keys from registry |
 | `gates_status` | object | Per-gate status with timestamps |
 | `labels` | string[] | Format: `namespace:value` |
@@ -307,7 +317,6 @@ than falling back to a per-worktree lease store.
 .git/jit/
 ├── claims.jsonl         # Append-only audit log of claim operations
 ├── claims.index.json    # Derived cache of currently active leases
-├── heartbeat/           # Initialized control-plane directory
 └── locks/               # Advisory lock files guarding claim-log operations
     └── claims.lock
 ```

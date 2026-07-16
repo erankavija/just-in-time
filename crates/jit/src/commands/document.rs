@@ -64,8 +64,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Identity is (issue, path): re-adding a path already linked to this
         // issue refreshes that entry in place instead of appending a
-        // duplicate. `commit`/`label`/`doc_type` follow the same
-        // partial-update convention as `issue update` — an omitted flag
+        // duplicate. `commit` is always taken from this invocation, exactly as
+        // on a fresh add — a supplied value pins the reference, an omitted one
+        // records it unpinned (read as the current version), so a re-run
+        // re-points a stale pin at the present state instead of preserving it.
+        // `label`/`doc_type` are descriptive metadata and follow the
+        // partial-update convention of `issue update` — an omitted flag
         // (`None`) leaves the existing value alone rather than clearing it —
         // while `format`/`assets` are always the freshly computed scan
         // result (or empty, under `--skip-scan`), mirroring a fresh add.
@@ -77,7 +81,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let existing = &issue.documents[idx];
                 DocumentReference {
                     path: path.to_string(),
-                    commit: commit.map(String::from).or_else(|| existing.commit.clone()),
+                    commit: commit.map(String::from),
                     label: label.map(String::from).or_else(|| existing.label.clone()),
                     doc_type: doc_type
                         .map(String::from)

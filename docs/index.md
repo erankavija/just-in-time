@@ -33,7 +33,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Research Projects](how-to/research-projects.md) - Research questions, experiments
 - [Knowledge Work](how-to/knowledge-work.md) - Personal projects, learning goals
 - [Validation Rules](how-to/validation-rules.md) - Author `.jit/rules.toml` rules and schemas
-- [Adopt the Planning Bracket](how-to/adopt-planning-bracket.md) - Wire gated planning before the fan-out
+- [Manually Adopt the Planning Bracket](how-to/adopt-planning-bracket.md) - Advanced configuration for gated planning before the fan-out
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
@@ -44,25 +44,29 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 *Technical specifications and API documentation*
 
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
+- [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
 - [Storage Record Layout](reference/storage-records.md) - Generated projection of issue identifiers, event-log serialization, and the gate-run record
 - [Event Log Tags](reference/events.md) - Generated catalog of event tags, scopes, and `issue_id` presence
 - [Configuration](reference/configuration.md) - config.toml and settings
-- [Runtime Coordination Defaults](reference/runtime-defaults.md) - Built-in heartbeat, lock, cleanup, and claim-TTL defaults
+- [Runtime Coordination Defaults](reference/runtime-defaults.md) - Built-in lock, cleanup, and claim-TTL defaults
 - [Item Addresses](reference/item-addresses.md) - Address grammar for addressable structured items
 - [Glossary](reference/glossary.md) - Term definitions
 - [Claim System](reference/claim.md) - Leases and coordination
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
-- [Content Standards](reference/jit-content-standards.md) - Authoring standards for issue descriptions and markdown documents
 - [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
 - [Built-in Gate Presets](reference/gate-presets.md) - The gate bundles the binary ships, with each preset's gates and checkers
 - [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
 
 ### 🧪 [Examples](examples/) - Sample Configurations and Rulesets
 *Ready-to-copy configuration and ruleset examples for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
+
+These are advanced customization examples. For the portable recommended
+workflow, start with the
+[embedded `jit-dogfood` profile](reference/profiles.md).
 
 - [sdd](examples/sdd/) - Spec-Driven Development
 - [bug-repro](examples/bug-repro/) - bug triage
@@ -96,4 +100,3 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 **Development documentation** (`dev/`) covers how we build JIT itself - see [dev/index.md](../dev/index.md) for contributor resources.
 
 ---
-

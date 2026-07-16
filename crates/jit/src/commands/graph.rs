@@ -598,6 +598,7 @@ mod tests {
             priority: Priority::Normal,
             level: 1,
             shared: None,
+            archived_from: None,
             children: vec![],
         }
     }

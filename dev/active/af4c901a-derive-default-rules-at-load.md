@@ -56,6 +56,11 @@ answers the question the schema was baked to ask).
   including custom-rule comments) whenever jit writes `config.toml` or `rules.toml`
   (init/re-init and `config set`). They no longer decide validation, so a
   projection can never desync it.
+- The `namespace-unique-*` family's file MEMBERSHIP is separately write-through
+  synced into `rules.toml` itself (not just projected) on the same triggers, so
+  the registry-first `rule` item kind — which resolves `@/rule/<name>` straight
+  from the file, not this in-memory reconciliation — cannot dangle behind a
+  registry edit either. See `jit:d74a9ed1`.
 - This generalizes the earlier type-hierarchy-specific fix (`jit:c78168d8`): the
   `type-hierarchy-known` rule now derives its enum at load like the other
   default rules, rather than depending on a write-time regeneration helper.

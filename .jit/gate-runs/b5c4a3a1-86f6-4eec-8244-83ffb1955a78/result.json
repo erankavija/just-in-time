@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "run_id": "b5c4a3a1-86f6-4eec-8244-83ffb1955a78",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "3e12ffbd-694e-44b3-81c9-5a24ebf17340",
+  "commit": "14b025d21033872d0ffec8033e72e18539aea7a8",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T15:30:48.200313632Z",
+  "completed_at": "2026-07-16T15:35:04.244560352Z",
+  "duration_ms": 256044,
+  "exit_code": 1,
+  "stdout": "Attribution: `jit:3e12ffbd` commits 970b8066, 08c1b23a, 8901b649, e8b9b8da, 1c26833b, 7ca34a54\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-2, D-3, D-4, D-6, D-7 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic (.jit/invariants.toml); @/rule/coverage-preview (.jit/rules.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1; unrelated server listener tests); doc-review pending; docs-mechanical passed (exit 0)\nTruncation recovery: recovered truncated merge output with parent-specific diffs limited to the affected paths\n\n1. **F1 — high, blocking, issue-impact:** `--scope` does not restrict edges for `json`, `dot`, or `mermaid`. The new scoped path filters only the graph node set at `crates/jit/src/commands/graph.rs:215`, but each renderer emits every selected issue’s raw dependencies (`crates/jit/src/visualization.rs:70`, `136`, `195`). A scoped node with a cross-container dependency therefore exports an edge to an out-of-scope ID, violating REQ-01 and the documentation’s “edges among them” contract.\n\n2. **F2 — medium, advisory, pre-existing:** Latest `cargo-ci` failed on two `crates/server/src/lib.rs:162` listener-resolution tests, not on the attributable graph-export footprint. The recorded run confirms fmt, clippy, provenance, budget, and incremental-state checks passed; this does not establish a defect in this issue.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Scoped non-batch graph exports retain cross-boundary edges, so REQ-01 is not met.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Scoped json, dot, and mermaid exports emit dependencies to out-of-scope nodes.\",\"file\":\"crates/jit/src/commands/graph.rs\",\"line\":215,\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"references\":[]},{\"id\":\"F2\",\"severity\":\"medium\",\"summary\":\"Latest Cargo CI failure is confined to unrelated server listener tests.\",\"file\":\"crates/server/src/lib.rs\",\"line\":162,\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 7581 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6b8d-45f9-7c40-8919-87c3010dcb82\n--------\nuser\n--- 7568 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Scoped non-batch graph exports retain cross-boundary edges, so REQ-01 is not met.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Scoped json, dot, and mermaid exports emit dependencies to out-of-scope nodes.",
+        "file": "crates/jit/src/commands/graph.rs",
+        "line": 215
+      },
+      {
+        "id": "F2",
+        "severity": "medium",
+        "disposition": "advisory",
+        "origin": "pre-existing",
+        "summary": "Latest Cargo CI failure is confined to unrelated server listener tests.",
+        "file": "crates/server/src/lib.rs",
+        "line": 162
+      }
+    ]
+  }
+}

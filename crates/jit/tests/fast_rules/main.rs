@@ -11,6 +11,7 @@ mod label_membership_validation_tests;
 mod label_query_tests;
 mod label_strategic_tests;
 mod local_rule_enforcement_tests;
+mod namespace_unique_writethrough_tests;
 mod project_render_harness_tests;
 mod type_hierarchy_schema_regen_tests;
 mod type_taxonomy_custom_strategic_tests;

@@ -6,6 +6,7 @@
 //!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code)
 //!   issue not found     -> exit 3,  no verdict
 //!   gate not required   -> exit 2,  no verdict
+//!   manual gate, no --by -> exit 2, no verdict (jit:1d59070d REQ-03)
 
 use std::process::Command;
 use tempfile::TempDir;
@@ -286,11 +287,77 @@ fn test_gate_pass_manual_gate_success_verdict_pass() {
 
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["gate", "pass", &id, "review", "--json"])
+        .args([
+            "gate",
+            "pass",
+            &id,
+            "review",
+            "--by",
+            "human:reviewer",
+            "--json",
+        ])
         .output()
         .unwrap();
 
     assert_eq!(output.status.code(), Some(0));
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["verdict"], "pass");
+}
+
+/// REQ-03 (jit:1d59070d): a manual gate has no checker to run, so a bare
+/// evaluate would silently record an unattributed pass. It must instead fail
+/// as a usage error (exit 2, no verdict) with a hint naming the attested
+/// form. Auto gates are unaffected by --by.
+#[test]
+fn test_gate_pass_manual_gate_without_by_exit_2_no_verdict() {
+    let temp = setup_repo();
+
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "review",
+            "--title",
+            "Review",
+            "--description",
+            "Manual review",
+            "--mode",
+            "manual",
+        ])
+        .output()
+        .unwrap();
+
+    let create = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args([
+            "issue", "create", "--title", "Work", "--gate", "review", "--json",
+        ])
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&create.stdout).unwrap();
+    let id = json["id"].as_str().unwrap().to_string();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "pass", &id, "review", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(json.get("verdict").is_none());
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("--by <attestor>"));
+    assert!(json["error"]["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s
+            .as_str()
+            .unwrap()
+            .contains(&format!("jit gate evaluate {} review --by <attestor>", id))));
 }

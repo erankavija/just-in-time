@@ -450,15 +450,31 @@ Use `jit version` when you need the full provenance record.
 
 Initialize (or re-initialize) the `.jit/` repository in the current directory.
 Idempotent: re-running over an existing repository never overwrites
-`config.toml` or `rules.toml`, and leaves `index.json`/`events.jsonl` intact.
+`config.toml`, and leaves `index.json`/`events.jsonl` intact. `rules.toml`
+keeps every custom rule and hand-edited policy field byte-exact; the one
+synchronization re-init performs (when default-origin rules remain enabled) is
+the default `namespace-unique-*` row set, appended or dropped to match the
+current `[namespaces]`/`[type_hierarchy]` registry so each row's `@/rule/<name>`
+address stays resolvable.
 
 ```bash
-jit init [--hierarchy-template <name>] [--json]
+jit init [--hierarchy-template <name>] [--profile <profile-id>] [--json]
 ```
 
 `--hierarchy-template` selects the type hierarchy seeded into `config.toml`
 (`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
-(exit `2`). Inside a git repository, init also creates a worktree identity
+(exit `2`).
+
+`--profile <profile-id>` applies an embedded repository profile as part of
+initialization. `jit init --profile jit-dogfood` is the preferred setup for
+JIT's portable workflow; plain init remains methodology-neutral. For a fresh
+repository, the neutral scaffold and profile projection are planned, validated,
+and published together. The same flag can complete and apply the profile to an
+existing partial repository. See
+[Repository Profiles](profiles.md) for the canonical package, conflict,
+transaction, recovery, and lifecycle contract.
+
+Inside a git repository, init also creates a worktree identity
 (`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
 sets up a `.gitattributes` union-merge driver for the tracked append-only log
 `.jit/events.jsonl` (so concurrent worktrees' event appends don't conflict) —
@@ -467,8 +483,10 @@ doesn't already carry it. Lease/claim coordination state lives under `.git/jit/`
 (an untracked per-worktree control plane), not in the versioned `.jit/` tree.
 
 `--json` reports what this run actually did rather than the full idempotent
-set init always ensures — `created_paths` and `modified_paths` are both empty
-on a re-init:
+set init always ensures — on a re-init `created_paths` is empty and
+`modified_paths` lists only a `.gitattributes` the run had to amend (the
+in-place refreshes init performs, such as the `namespace-unique-*` row sync
+and projection republishing, are not path-listed):
 
 ```json
 {
@@ -485,6 +503,7 @@ on a re-init:
     ".gitattributes"
   ],
   "modified_paths": [],
+  "profile": null,
   "message": "Initialized jit repository (worktree: wt:d5f301ab)"
 }
 ```
@@ -500,6 +519,73 @@ failure and the repository-format-too-new startup failure (see **Scripting
 and Automation § Exit Codes** below) both emit the standard `--json` error
 envelope (`INVALID_ARGUMENT` / exit `2`, `REPOSITORY_FORMAT_TOO_NEW` / exit
 `10`).
+
+When `--profile` is present, `profile` contains the same
+`ProfileApplyResult` returned by `jit profile apply`; otherwise it is `null`.
+
+## Profile Commands
+
+Profile inspection works without an initialized repository. Application targets
+the current JIT repository and runs mandatory transaction recovery before
+planning or writing.
+
+### `jit profile list`
+
+List the immutable profiles embedded in the running binary:
+
+```bash
+jit profile list [--json]
+```
+
+Human output shows each profile's ID, version, compatible JIT range, embedded
+origin, and whether a matching stored provenance record exists. This record
+check does not read every installed target. JSON uses the standard list envelope
+`{"count": N, "profiles": [...]}`. Each profile entry carries `id`, `version`,
+`origin`, `jit`, and `applied`.
+
+The running binary is authoritative for the live values; scripts should inspect
+the returned fields rather than copy package identity or compatibility values
+from prose.
+
+### `jit profile show`
+
+Inspect one embedded package:
+
+```bash
+jit profile show <PROFILE_ID> [--json]
+```
+
+Human output summarizes package identity, compatibility, hashes, contribution
+and asset counts, and installed state. JSON returns `ProfileShowResult`: the
+complete parsed manifest, `origin`, `package_hash`, `target_hashes`,
+`file_count`, `byte_size`, and the parseable stored `applied` provenance record
+when one is present. `show` does not compare that record with current target
+bytes; use `jit profile apply <PROFILE_ID> --dry-run` for exact current-state
+verification.
+
+### `jit profile apply`
+
+Preview or apply an embedded profile to the current repository:
+
+```bash
+jit profile apply <PROFILE_ID> [--dry-run] [--json]
+```
+
+`--dry-run` builds and validates the exact plan without writing. JSON returns
+`ProfilePlanResult`, including `status` (`would_apply` or `unchanged`),
+`plan_hash`, and the sorted target list with each action (`create`, `update`, or
+`unchanged`) and executable intent.
+
+Without `--dry-run`, JSON returns `ProfileApplyResult`: profile identity,
+`status` (`applied` or `unchanged`), `plan_hash`, an optional
+`transaction_id`, and non-fatal cleanup warnings. Exact reapplication is a
+successful no-op.
+
+Unknown IDs are not-found errors (exit `3`). Conflicts, invalid package state,
+final-state validation failures, filesystem failures, and recovery-required
+conditions use the shared typed error envelope and exit-code taxonomy. The
+[Repository Profiles reference](profiles.md) defines what application may
+change and the v1.0 features that do not exist.
 
 ## Version and Provenance
 
@@ -855,9 +941,10 @@ that point at a missing target, keeping those ids visible alongside the
 
 **Unmet dependencies:** the `issue show --json` object also carries an
 `unmet_dependencies` array: the subset of `dependencies` that are not yet **met**.
-A dependency is met exactly when it is in a terminal state (`done` or
-`rejected`) — the same readiness test `jit query ready` uses to decide whether an
-issue is blocked — so a `rejected` dependency counts as met and is **not** listed.
+A dependency is met exactly when it is in an effective terminal state (`done`,
+`rejected`, or `archived` from one of those) — the same readiness test `jit query
+ready` uses to decide whether an issue is blocked — so a `rejected` dependency
+counts as met and is **not** listed.
 Each entry is a subset of the matching `dependencies` entry: `{id, short_id,
 title, state}`. The array is always present (empty `[]` when every dependency is
 met or there are none), so a caller reads the filter straight from the response.
@@ -1140,6 +1227,30 @@ jit issue reject $GATED_ISSUE --reason "wont-fix"
 jit issue reject $ISSUE --reason "out-of-scope"
 ```
 
+### Deleting Issues (`jit issue delete`)
+
+Deletion permanently removes an issue record. It is a destructive, discouraged
+operation — prefer `jit issue reject` — and requires explicit operator
+confirmation via the environment:
+
+```bash
+JIT_ALLOW_DELETION=1 jit issue delete <ID>
+```
+
+**Key behaviors:**
+
+- **Refusal exits nonzero.** Without `JIT_ALLOW_DELETION=1` the command refuses
+  before writing anything and exits `2` (invalid-argument family) in both text
+  and JSON modes, so a script can distinguish "refused" from "deleted".
+- **JSON refusal envelope.** Under `--json` the refusal uses the standard
+  top-level `error` object with code `DELETION_NOT_CONFIRMED`, `details.id`
+  naming the issue, and a `suggestions` entry carrying the exact
+  `JIT_ALLOW_DELETION=1 jit issue delete <ID>` remediation command.
+- **Confirmed deletion is unchanged**: it removes the issue, logs the deletion
+  event, and reports the removal (exit `0`).
+- **Main worktree only.** Deletion is refused from secondary git worktrees to
+  keep worktree state consistent.
+
 ## Gate Commands
 
 Gates are quality checkpoints that enforce process requirements. See [How-To: Custom Gates](../how-to/custom-gates.md) for practical examples and [Core Model - Gates](../concepts/core-model.md#gates) for conceptual understanding.
@@ -1162,7 +1273,11 @@ jit gate define <KEY> --title <TITLE> --description <DESCRIPTION> [OPTIONS]
 
 **Optional:**
 - `--stage <STAGE>` - When gate runs: `precheck` or `postcheck` (default: `postcheck`)
-- `--mode <MODE>` - How gate is checked: `manual` or `auto` (default: `manual`)
+- `--mode <MODE>` - How gate is checked: `manual` or `auto`. When omitted, the
+  mode is inferred: `auto` if `--checker-command` is given, `manual`
+  otherwise. An explicit `--mode manual` combined with `--checker-command` is
+  a usage error (exit 2) — a manual gate cannot carry a checker, so the
+  conflict is rejected rather than silently dropping the checker.
 - `--auto` - Convenience flag for `--mode auto` (overrides `--mode` when both are given)
 - `--checker-command <COMMAND>` - Command to run for automated gates
 - `--timeout <SECONDS>` - Checker timeout in seconds (default: 300)
@@ -1181,12 +1296,11 @@ jit gate define code-review \
   --stage postcheck \
   --mode manual
 
-# Automated test gate
+# Automated test gate — --checker-command with no --mode infers auto
 jit gate define tests \
   --title "All Tests Pass" \
   --description "Full test suite must succeed" \
   --stage postcheck \
-  --mode auto \
   --checker-command "cargo test --lib" \
   --timeout 300
 
@@ -1199,6 +1313,11 @@ jit gate define review \
   --prompt-file "docs/review-prompt.md" \
   --checker-command "./scripts/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command"
+
+# Usage error: explicit manual mode conflicts with a checker command
+jit gate define bad --title "Bad" --description "Bad" \
+  --mode manual --checker-command "cargo test"
+# error: --mode manual conflicts with --checker-command for gate 'bad': ...
 ```
 
 ### `jit gate update`
@@ -1514,7 +1633,7 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 
 **Options:**
 - `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
-- `--by <WHO>` - Record who passed the gate (e.g., `human:alice`, `ci:github-actions`)
+- `--by <WHO>` - Who is passing the gate (e.g., `human:alice`, `ci:github-actions`). Required for a manual gate; ignored for an automated gate, whose verdict comes from the checker.
 - `--force` - Re-run the checker even if the gate already passed at the current HEAD commit
 
 **Examples:**
@@ -1525,10 +1644,7 @@ jit gate evaluate abc123 code-review --by "human:alice"
 # Same command using the flag form
 jit gate evaluate abc123 --gate code-review --by "human:alice"
 
-# Evaluate without attribution
-jit gate evaluate abc123 tdd-reminder
-
-# Evaluate an automated gate — runs its checker (no manual override)
+# Evaluate an automated gate — runs its checker (no --by needed)
 jit gate evaluate abc123 tests
 
 # Force a re-run even if it already passed at HEAD
@@ -1537,8 +1653,8 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: updates gate status to `passed`, records who passed it and timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
-- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes. This evaluation records a run; it does not itself complete the issue.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, it updates gate status to `passed`, records who passed it and the timestamp. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
 - After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
 
 **Skip when already passed at HEAD:**
@@ -1559,9 +1675,9 @@ jit gate evaluate abc123 --gate tests --force
 for every code `jit gate evaluate` returns. The command-specific split it
 records: a checker that ran and returned verdict `fail` exits `4`; a checker that
 ran but could not produce a verdict (timeout, command-not-found, or crash) exits
-`10`. Pre-verdict argument errors (e.g. the gate is not required for the issue)
-and lookup errors (issue not found) are classified before the run path and are
-never reported as a runner error.
+`10`. Pre-verdict argument errors (e.g. the gate is not required for the issue,
+or a manual gate evaluated without `--by`) and lookup errors (issue not found)
+are classified before the run path and are never reported as a runner error.
 
 **Stale-binary refusal for `exec` checkers (jit:7446af34):** a `jit` binary that
 predates the repository it is validating must not produce — or let an `exec`
@@ -1798,7 +1914,7 @@ jit gate preset list [--json]
 `jit gate preset show <name>` for a preset's actual gate list and count; the
 builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] plan-review - Agent plan-quality review on the planning node before fan-out (<N> gates)
+[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out (<N> gates)
 [builtin] coverage-preview - Deterministic coverage preview on the breakdown node (scoped validate) (<N> gates)
 [custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```
@@ -2354,8 +2470,11 @@ a commit. The rest of the family works without git.
 Attach a document reference to an issue. Identity is (issue, path): re-running
 `doc add` for a path already linked to the issue updates that reference in
 place rather than appending a duplicate — `jit doc list` still shows one entry
-for the path. An omitted `--commit`/`--label`/`--doc-type` on the re-add
-leaves the existing value alone; a supplied one overwrites it. The scanned
+for the path. The commit pin always reflects the invocation, exactly as on a
+fresh add: a supplied `--commit` pins the reference, an omitted one records it
+unpinned (the current version), so a re-run re-points a stale pin. An omitted
+`--label`/`--doc-type` on the re-add leaves the existing value alone; a
+supplied one overwrites it. The scanned
 `format`/assets are always the freshly computed result unless `--skip-scan` is
 given. The JSON result's `updated` field is `true` for a refresh and `false`
 for a genuinely new reference; the appended `issue_updated` event records the
@@ -2369,7 +2488,7 @@ jit doc add <ID> <PATH> [--commit <COMMIT>] [--label <LABEL>] [--doc-type <DOC_T
 |-----------------|-------------|
 | `<ID>` | Issue id (full, short, or a unique prefix). |
 | `<PATH>` | Document path relative to the repository root. |
-| `-c`, `--commit <COMMIT>` | Git commit to pin the reference to. Defaults to `HEAD`. |
+| `-c`, `--commit <COMMIT>` | Git commit to pin the reference to. Omitted, the reference is stored unpinned and reads as the current version. |
 | `-l`, `--label <LABEL>` | Human-readable label for the reference (alias `--title`). |
 | `--doc-type <DOC_TYPE>` | Free-form document type, e.g. `design`, `implementation`, `notes`. |
 | `--skip-scan` | Skip scanning the document for asset references. |
@@ -2651,7 +2770,8 @@ repository:
 - **Boundary edges are reported.** A dependency on an issue outside the `--scope`
   membership is excluded from `depends_on` and reported on stderr (count plus
   `from -> to` short-id pairs), never dropped silently. `stdout` therefore stays
-  a clean array you can pipe straight into batch creation.
+  a clean batch-create payload: write it to a file (`--output` or shell
+  redirection) and feed that file to `jit issue batch-create --from-json`.
 
 Without `--scope` the whole graph is exported in batch shape (still minus bracket
 nodes). Round-tripping the same-scope export through batch creation in a fresh
@@ -3269,7 +3389,10 @@ jit config show [--json]
 ### `jit config set`
 
 Set a `section.field` key in the repository (or, with `--global`, the
-user-global) `config.toml`.
+user-global) `config.toml`. A repository-level set that changes the namespace
+registry also synchronizes the default `namespace-unique-*` rows in
+`rules.toml` (same write-through as re-init; custom rules and policy edits are
+untouched).
 
 ```bash
 jit config set <KEY> <VALUE> [--global] [--json]
@@ -3514,9 +3637,7 @@ the per-command mappings and exceptions, is the [Exit Codes reference](exit-code
 `command_exit_codes` array (the per-command rows). Every emitted row is bound by a
 test to the runtime that produces it: to the shared classifier for codes raised as
 typed errors, and to the command's own exit site for codes a completed run emits
-directly. The lone row marked *reserved* there (`config validate` `2`) names a
-handler branch no condition reaches, so nothing emits it. The `--json` `code`
-distinctions below refine that taxonomy.
+directly. The `--json` `code` distinctions below refine that taxonomy.
 
 Exit `4` covers several validation failures that share the code but carry a
 distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would

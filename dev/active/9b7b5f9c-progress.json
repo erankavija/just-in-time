@@ -1,7 +1,7 @@
 {
   "epic_id": "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
   "epic_short_id": "9b7b5f9c",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -80,7 +80,7 @@
           "short_id": "9b0a997e",
           "title": "Apply profiles with transactional provenance and audit",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -92,7 +92,7 @@
           "short_id": "7ad4019b",
           "title": "Author the portable dogfood workflow package",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
@@ -176,8 +176,9 @@
     "92039d9c-1433-4b24-b3f6-2c206648cc8f": 1,
     "be542b98-8d5a-4c1f-8000-9fd0c480bebc": 5,
     "0d8f20a8-db02-43ba-ad9e-8f219b427690": 1,
-    "56838d99-dc9d-4028-9b41-6ba691fc4852": 1
+    "56838d99-dc9d-4028-9b41-6ba691fc4852": 1,
+    "9b0a997e-2b32-4f7b-a9ef-0f6b0af5a004": 2
   },
   "started_at": "2026-07-15T15:20:34+03:00",
-  "updated_at": "2026-07-16T15:44:00+03:00"
+  "updated_at": "2026-07-16T17:32:44+03:00"
 }

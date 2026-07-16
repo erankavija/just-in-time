@@ -14,7 +14,7 @@ use crate::domain::item::{
     load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
     ProjectSource, RawScopeItem,
 };
-use crate::domain::{Event, EventTag, GateChecker, Issue, SHORT_ID_LENGTH};
+use crate::domain::{parse_known_events, GateChecker, Issue, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
 use crate::storage::GateRegistry;
 use crate::validation::engine::Finding;
@@ -455,6 +455,65 @@ pub fn validate_repository(
     }
 }
 
+/// Resolve every configured projection target from a proposed repository image.
+///
+/// Returns the repo-relative target path of EVERY declared `[projection.<name>]`.
+/// Profile planning uses this set to exempt package-owned projection targets from
+/// the asset-conflict check (their bytes are re-derived from the merged
+/// registries, not frozen from the package's contribution rows).
+pub(crate) fn projection_targets(view: &dyn RepositoryView) -> Result<BTreeSet<PathBuf>> {
+    let config = load_config(view)?;
+    Ok(config
+        .projection
+        .as_ref()
+        .map(|projections| {
+            projections
+                .iter()
+                .map(|(name, projection)| PathBuf::from(projection.target(name)))
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Render every configured projection for a proposed final repository image.
+///
+/// Profile planning uses this before validation so a package-owned projection
+/// target is derived from the merged registries rather than frozen from only the
+/// package's contribution rows. Each returned `(target, bytes)` is the exact
+/// content `jit project render` would write for that projection over the proposed
+/// image, rendered through the SAME generic body path.
+pub(crate) fn render_projections(view: &dyn RepositoryView) -> Result<Vec<(PathBuf, Vec<u8>)>> {
+    let config = load_config(view)?;
+    let Some(projections) = config.projection.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let namespaces =
+        ConfigManager::new(view.repository_root().join(".jit")).namespaces_from_config(&config);
+    let rules = load_rules(view, &config, &namespaces)?;
+    let gates = load_gates(view)?;
+    let inputs = ProjectionInputs {
+        config: &config,
+        rules: &rules,
+        gates: &gates,
+    };
+    let mut rendered = Vec::with_capacity(projections.len());
+    for (name, projection) in projections {
+        let mut read = |path: &str| read_text(view, path);
+        let (body, _count) = render_projection_body(projection, &inputs, &mut read)?;
+        let target = projection.target(name);
+        let content = projected_content(
+            view,
+            &target,
+            projection.mode(),
+            &body,
+            &projection.region_begin(name),
+            &projection.region_end(name),
+        )?;
+        rendered.push((PathBuf::from(&target), content.into_bytes()));
+    }
+    Ok(rendered)
+}
+
 fn validate_relative(path: &Path) -> Result<()> {
     if path.as_os_str().is_empty()
         || path.is_absolute()
@@ -645,26 +704,9 @@ fn load_records(view: &dyn RepositoryView) -> Result<Records> {
 
     let mut event_count = 0;
     if let Some(events) = read_text(view, ".jit/events.jsonl")? {
-        for (offset, line) in events.lines().enumerate() {
-            if line.trim().is_empty() {
-                continue;
-            }
-            let value: serde_json::Value = serde_json::from_str(line)
-                .with_context(|| format!("invalid .jit/events.jsonl line {}", offset + 1))?;
-            let tag = value
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| anyhow!("event line {} is missing a string type", offset + 1))?;
-            if EventTag::ALL.iter().any(|known| known.as_str() == tag) {
-                let _: Event = serde_json::from_value(value).with_context(|| {
-                    format!(
-                        "invalid known event on .jit/events.jsonl line {}",
-                        offset + 1
-                    )
-                })?;
-                event_count += 1;
-            }
-        }
+        event_count = parse_known_events(&events)
+            .context("invalid .jit/events.jsonl")?
+            .len();
     }
     Ok(Records {
         issues,
