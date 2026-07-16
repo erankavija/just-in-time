@@ -18,6 +18,16 @@
     "repo-validate"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "failed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T17:25:25.907868227Z"
+    },
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T17:13:36.605768490Z"
+    },
     "code-review": {
       "status": "passed",
       "updated_by": "auto:executor",
@@ -27,16 +37,6 @@
       "status": "passed",
       "updated_by": "auto:executor",
       "updated_at": "2026-07-16T17:13:24.542502578Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T17:13:36.605768490Z"
-    },
-    "doc-review": {
-      "status": "failed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T17:21:19.547928430Z"
     },
     "docs-mechanical": {
       "status": "passed",
@@ -56,7 +56,7 @@
     "satisfies:REQ-12"
   ],
   "created_at": "2026-07-14T22:28:46.042256597Z",
-  "updated_at": "2026-07-16T17:23:18.637642209Z",
+  "updated_at": "2026-07-16T17:27:51.520212613Z",
   "first_ready_at": "2026-07-14T22:28:46.042256807Z",
   "claimed_at": "2026-07-16T14:32:44.503322741Z",
   "done_at": "2026-07-16T17:10:37.825483245Z"

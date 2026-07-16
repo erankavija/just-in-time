@@ -49,11 +49,13 @@ A **breakable container** `C` — a type a ruleset *declares* as requiring plann
 — is bracketed by two **function-typed children**:
 
 - **`P` — the planning node** (`type:planning`). It produces the plan and carries
-  an **agent plan-quality gate** (`plan-review`).
+  the `plan-review` review checkpoint. The built-in checker is a warning-only
+  placeholder until the repository supplies a reviewer.
 - **`B` — the breakdown node** (`type:breakdown`). It is created **at scaffold
   time** by `jit apply plan`, carries **two gates** — a **deterministic
-  coverage-preview gate** (`coverage-preview`) and an **agent breakdown-review
-  gate** (`breakdown-review`) — and wears a `brackets:<C-short-id>` label naming
+  coverage-preview gate** (`coverage-preview`) and the `breakdown-review` review
+  checkpoint, also a warning-only placeholder by default — and wears a
+  `brackets:<C-short-id>` label naming
   the container it brackets. The breakdown step **consumes** this pre-created `B`;
   it does not create one.
 
@@ -139,14 +141,15 @@ bracket:
 
 | Gate | Node | Mode | Checks |
 |------|------|------|--------|
-| `plan-review` | `P` | agent (command-backed) | Is the *plan itself* good? Reviews the planning issue's success criteria and linked design document. |
-| `coverage-preview` | `B` | deterministic | Does the *decomposition* cover every `[hard]` criterion? Runs `jit validate --scope <C>`. |
-| `breakdown-review` | `B` | agent (command-backed) | Is the *decomposition itself* good? Per-child content standards, dependency-DAG coherence, and right-sized depth. |
+| `plan-review` | `P` | review placeholder | Reserves the plan-quality checkpoint. Replace the checker with a real reviewer before relying on it. |
+| `coverage-preview` | `B` | deterministic, in-process | Does the *decomposition* cover every `[hard]` criterion? Runs scoped repository validation for `C`. |
+| `breakdown-review` | `B` | review placeholder | Reserves the decomposition-quality checkpoint. Replace the checker with a real reviewer before relying on it. |
 
-**`plan-review`** is an agent gate — the same command-backed AI-review mechanism
-described in [Custom Gates](../how-to/custom-gates.md). It judges plan *quality*:
-is the design sound, complete, the right approach? A FAIL leaves the drafted plan
-in place for revision (drafts stay in Backlog; nothing is archived on rejection).
+**`plan-review`** ships with the in-process `review_placeholder` checker. It passes
+with the structured warning `WARNING: EXTERNAL REVIEW PLACEHOLDER`, so the bracket
+can be installed without a shell, source checkout, or selected agent. It does not
+judge plan quality. Replace it with a repository-owned reviewer before treating a
+pass as approval.
 
 **`coverage-preview`** is deterministic. Its checker resolves the container `C`
 from `B`'s `brackets:<C-short-id>` label and runs `jit validate --scope <C>`. That
@@ -155,26 +158,18 @@ scoped validation evaluates the **preview coverage rule** (below), which exits 4
 uncovered. No human judgment, no agent: pure structural coverage over the drafted
 decomposition.
 
-**`breakdown-review`** is the agent counterpart of `coverage-preview` on the same
-node — the *quality* half of `B`'s split. It is the command-backed AI-review
-mechanism again, pointed at the drafted children: it audits each child against the
-project's content standards, checks the **dependency DAG** for coherence (flagging
-**both** a missing prerequisite that lets a task start too early **and** an
-over-constraint that needlessly serializes parallel work), verifies decomposition
-depth suits the work size, and confirms every root can start on a blank workspace.
-It deliberately does **not** re-check `[hard]`-criterion coverage — that is
-`coverage-preview`'s job. A FAIL reports concrete proposed fixes (the specific edge
-to add/remove, the criterion to make verifiable) for the breakdown owner to apply;
-the drafts stay in Backlog for revision.
+**`breakdown-review`** ships with the same warning-only placeholder on `B`. Its
+intended role is the *quality* half of `B`'s split: a repository-supplied reviewer
+can audit child content, dependency-DAG coherence, decomposition depth, and
+blank-workspace reachability without duplicating `coverage-preview`. The built-in
+checker performs none of those judgments.
 
-The three answer different questions. `plan-review` asks *"is this plan any
-good?"*; `coverage-preview` asks *"does this breakdown actually cover what the
+The three checkpoints are designed to answer different questions once real
+review integrations replace the placeholders. `plan-review` asks *"is this plan
+any good?"*; `coverage-preview` asks *"does this breakdown actually cover what the
 container promised?"*; `breakdown-review` asks *"is the decomposition itself sound
-— right pieces, right wiring?"* A plan can read beautifully and still leave a hard
-requirement with no implementing child (the coverage gap), or cover every
-requirement yet wire a dependency chain that stalls the fan-out (the structure
-gap). Each gate catches a failure the others cannot, all before any work fans
-out.
+— right pieces, right wiring?"* Only `coverage-preview` answers its question in
+the built-in configuration.
 
 ## Coverage at both ends: preview vs closure
 
@@ -245,9 +240,10 @@ traversals; the bracket relies on both.
 
 ## Why this shape
 
-- **Plan reviewed *before* fan-out.** The agent plan-quality gate sits on `P` at
-  the front of the spine, so a weak plan is caught before any implementation issue
-  becomes ready — not after the work is half-built.
+- **Plan-review checkpoint *before* fan-out.** The `plan-review` gate sits on `P`
+  at the front of the spine. Once its placeholder is replaced with a real
+  reviewer, a weak plan is caught before any implementation issue becomes ready
+  — not after the work is half-built.
 - **Coverage checked *before* fan-out.** The preview gate catches an uncovered
   `[hard]` criterion at the moment the decomposition is drafted, when fixing it is
   cheap (add a child, redraft), rather than only at the `→ done` transition when
@@ -266,6 +262,6 @@ traversals; the bracket relies on both.
 - [How-To: Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md) — declare the vocabulary, wire the gates, scaffold a container
 - [Methodology-Agnostic Validation](validation-engine.md) — why coverage is configuration, and the `→ done` closure enforcement the bracket front-ends
 - [How-To: Author Validation Rules](../how-to/validation-rules.md) — the `label-coverage` rule kind and its knobs
-- [How-To: Custom Gates](../how-to/custom-gates.md) — the agent gate mechanism the `plan-review` gate uses
+- [How-To: Custom Gates](../how-to/custom-gates.md) — replace the review placeholders with repository-owned integrations
 - [`docs/examples/sdd/`](../examples/sdd/config.toml) — the bracket on a software `epic`
 - [`docs/examples/research/`](../examples/research/config.toml) — the bracket on a research `goal`, with no software vocabulary

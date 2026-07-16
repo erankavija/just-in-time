@@ -630,4 +630,29 @@ mod tests {
         assert!(redirect.contains("ordinary `jit init` does not install it"));
         assert!(redirect.contains("does not expose a public profile-install command"));
     }
+
+    #[test]
+    fn test_planning_bracket_docs_describe_builtin_review_placeholders() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for path in [
+            "docs/concepts/planning-bracket.md",
+            "docs/how-to/adopt-planning-bracket.md",
+            "docs/examples/sdd/config.toml",
+            "docs/examples/research/config.toml",
+        ] {
+            let text = fs::read_to_string(root.join(path)).unwrap();
+            assert!(
+                text.contains("placeholder"),
+                "{path} must describe the built-in review placeholders"
+            );
+            for stale in [
+                "agent plan-quality gate",
+                "agent breakdown-review gate",
+                "agent (command-backed)",
+                "JIT_SRC=",
+            ] {
+                assert!(!text.contains(stale), "{path} retains stale text: {stale}");
+            }
+        }
+    }
 }
