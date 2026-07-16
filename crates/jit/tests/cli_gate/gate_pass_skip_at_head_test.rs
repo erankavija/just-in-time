@@ -209,6 +209,105 @@ fn test_gate_pass_does_not_skip_without_git() {
     );
 }
 
+/// The `updated_by` stamped on a gate's current status, read straight from the
+/// on-disk issue JSON (no CLI surface exposes it). `None` when never set.
+fn gate_updated_by(root: &Path, id: &str, key: &str) -> Option<String> {
+    let path = root.join(".jit").join("issues").join(format!("{id}.json"));
+    let json: serde_json::Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    json["gates_status"][key]["updated_by"]
+        .as_str()
+        .map(str::to_string)
+}
+
+#[test]
+fn test_manual_redefine_requires_attestation_over_stale_auto_pass() {
+    // Regression (jit:1d59070d F1): an auto gate passes at HEAD, then the gate is
+    // redefined to manual. The lingering auto-era pass must NOT let a bare
+    // `evaluate` short-circuit — a manual gate's recorded pass may only be skipped
+    // when it is attested. Once attested with --by, a subsequent bare `evaluate`
+    // short-circuits again on the attested pass.
+    let (_temp, root) = setup_git_jit_repo();
+    let id = define_counting_gate_and_issue(&root);
+
+    // Auto evaluate at HEAD: checker runs, records a passing run stamped
+    // auto:executor and sets the gate status Passed.
+    let first = jit()
+        .current_dir(&root)
+        .args(["gate", "evaluate", &id, "counting", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(first.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(json["already_passed"], false);
+    assert_eq!(run_count(&root), 1);
+    assert_eq!(gate_status(&root, &id, "counting"), "passed");
+    assert_eq!(
+        gate_updated_by(&root, &id, "counting").as_deref(),
+        Some("auto:executor"),
+        "the auto pass is stamped auto:executor"
+    );
+
+    // Redefine the gate to manual (the checker is dropped); the issue's stale
+    // auto-era pass in gates_status is left untouched.
+    let redefine = jit()
+        .current_dir(&root)
+        .args(["gate", "update", "counting", "--mode", "manual"])
+        .output()
+        .unwrap();
+    assert_eq!(redefine.status.code(), Some(0));
+
+    // Bare evaluate: must NOT short-circuit on the stale auto pass. Attestation is
+    // required -> ManualGateAttestationRequiredError, exit 2 (InvalidArgument).
+    let bare = jit()
+        .current_dir(&root)
+        .args(["gate", "evaluate", &id, "counting"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        bare.status.code(),
+        Some(2),
+        "stale auto pass must not satisfy manual attestation: {}",
+        String::from_utf8_lossy(&bare.stderr)
+    );
+
+    // Attest with --by: records a fresh attested pass (updated_by = human:alice).
+    let attested = jit()
+        .current_dir(&root)
+        .args([
+            "gate",
+            "evaluate",
+            &id,
+            "counting",
+            "--by",
+            "human:alice",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(attested.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&attested.stdout).unwrap();
+    assert_eq!(json["already_passed"], false);
+    assert_eq!(gate_status(&root, &id, "counting"), "passed");
+    assert_eq!(
+        gate_updated_by(&root, &id, "counting").as_deref(),
+        Some("human:alice"),
+        "attested pass records the human attestor"
+    );
+
+    // Subsequent bare evaluate now short-circuits on the attested pass.
+    let again = jit()
+        .current_dir(&root)
+        .args(["gate", "evaluate", &id, "counting", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(again.status.code(), Some(0));
+    let json: serde_json::Value = serde_json::from_slice(&again.stdout).unwrap();
+    assert_eq!(
+        json["already_passed"], true,
+        "an attested manual pass must keep short-circuiting"
+    );
+}
+
 /// Current `status` of a gate from `issue show --json`.
 fn gate_status(root: &Path, id: &str, key: &str) -> String {
     let out = jit()

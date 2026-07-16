@@ -397,17 +397,39 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into());
         }
 
+        // Load the gate registry once, up front: its mode governs both the
+        // short-circuit guard below and the auto/manual arm selected further down.
+        let registry = self.storage.load_gate_registry()?;
+        let gate_is_manual = registry
+            .gates
+            .get(&gate_key)
+            .is_some_and(|gate| gate.mode == GateMode::Manual);
+
         // Skip the checker when the gate is CURRENTLY passed AND its latest run
         // passed at the current HEAD, unless --force was given. Requiring the
         // current `gates_status` to be Passed prevents a false success when the
         // gate was reset to Pending (e.g. removed and re-added) while a stale
         // passing run still lingers at this HEAD. A `None` HEAD (no git / no
         // commit) cannot prove the prior pass is still valid, so we fall through.
-        let current_passed = matches!(
-            issue.gates_status.get(&gate_key),
-            Some(s) if s.status == GateStatus::Passed
-        );
-        if !force && current_passed && self.gate_passed_at_head(&full_id, &gate_key)? {
+        //
+        // A Manual gate additionally requires the recorded pass to be attested:
+        // an auto-era pass (updated_by == AUTO_EXECUTOR), left behind when the
+        // gate was redefined from auto to manual, must NOT satisfy attestation.
+        // Such a pass falls through to the manual arm, which raises
+        // ManualGateAttestationRequiredError on a bare call and records a fresh
+        // attested run under --by.
+        let recorded = issue.gates_status.get(&gate_key);
+        let current_passed = matches!(recorded, Some(s) if s.status == GateStatus::Passed);
+        let attested_if_manual = !gate_is_manual
+            || matches!(
+                recorded,
+                Some(s) if s.updated_by.as_ref().is_some_and(|by| *by != *crate::gate_execution::AUTO_EXECUTOR)
+            );
+        if !force
+            && current_passed
+            && attested_if_manual
+            && self.gate_passed_at_head(&full_id, &gate_key)?
+        {
             return Ok(GatePassOutcome {
                 warnings,
                 already_passed: true,
@@ -415,7 +437,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // Check if gate is automated - if so, run the checker instead
-        let registry = self.storage.load_gate_registry()?;
         if let Some(gate) = registry.gates.get(&gate_key) {
             if gate.mode == GateMode::Auto {
                 // Smart behavior: auto-run the checker

@@ -16,6 +16,12 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+/// Actor stamped on the `by` field of a gate run recorded by the automated
+/// executor (as opposed to a human or agent attestation). A recorded pass whose
+/// `updated_by` equals this value is an auto-era pass with no human attestation
+/// behind it, which matters when a gate is later redefined to manual mode.
+pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
+
 /// Execute a gate checker and return the result (without context).
 ///
 /// Convenience wrapper around [`execute_gate_checker_with_context`] that passes `None`
@@ -181,7 +187,7 @@ pub fn execute_gate_checker_with_context(
         stdout: execution_result.stdout,
         stderr: execution_result.stderr,
         command: execution_result.command,
-        by: Some("auto:executor".to_string()),
+        by: Some(AUTO_EXECUTOR.to_string()),
         message: None,
         findings,
     })
@@ -1016,7 +1022,7 @@ mod tests {
             stdout: "Previous review feedback".to_string(),
             stderr: String::new(),
             command: "review-checker".to_string(),
-            by: Some("auto:executor".to_string()),
+            by: Some(AUTO_EXECUTOR.to_string()),
             message: None,
             findings: None,
         };

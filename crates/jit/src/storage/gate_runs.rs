@@ -35,7 +35,7 @@ mod tests {
             stdout: "All tests passed".to_string(),
             stderr: "".to_string(),
             command: "cargo test".to_string(),
-            by: Some("auto:executor".to_string()),
+            by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
             message: None,
             findings: Some(GateFindings {
                 verdict: "pass".to_string(),
@@ -208,7 +208,7 @@ mod tests {
                 stdout: format!("Output {}", i),
                 stderr: "".to_string(),
                 command: "cargo test".to_string(),
-                by: Some("auto:executor".to_string()),
+                by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
                 message: None,
                 findings: None,
             };
@@ -266,7 +266,7 @@ mod tests {
             stdout: "Linting passed".to_string(),
             stderr: "".to_string(),
             command: "cargo clippy".to_string(),
-            by: Some("auto:executor".to_string()),
+            by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
             message: None,
             findings: None,
         };
