@@ -6794,7 +6794,7 @@ fn run() -> Result<()> {
                 if fg {
                     use jit::commands::serve::{
                         find_available_port, find_server_binary, find_web_dir, is_process_alive,
-                        read_pid_file,
+                        read_pid_file, spawn_with_listener,
                     };
 
                     // Honour existing running server.
@@ -6853,9 +6853,11 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
-                    // Release the port right before spawning: the child binds it next.
-                    drop(listener);
-                    let status = cmd.status().context("Failed to run jit-server")?;
+                    // Hand the bound socket to the child (inherited fd on
+                    // Unix); it adopts this exact socket instead of re-binding.
+                    let mut child = spawn_with_listener(&mut cmd, listener)
+                        .context("Failed to run jit-server")?;
+                    let status = child.wait().context("Failed to wait on jit-server")?;
                     if json {
                         println!(
                             "{}",

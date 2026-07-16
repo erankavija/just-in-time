@@ -141,7 +141,7 @@ pub fn is_process_alive(pid: u32) -> bool {
 // ────────────────────────────────────────────────────────────────────────────
 
 /// Selects an available TCP port and returns it as an owned, already-bound
-/// listener.
+/// listener on `0.0.0.0` (all interfaces — the address the server serves on).
 ///
 /// When `start` is `0`, binds directly to an OS-assigned ephemeral port —
 /// there is no preferred port to range-walk from, so any free port will do.
@@ -149,25 +149,86 @@ pub fn is_process_alive(pid: u32) -> bool {
 /// that binds.
 ///
 /// The returned listener is already bound, so nothing else can claim the
-/// port between selection and use — this is what closes the probe-then-bind
-/// race at the type level. Read the chosen port with
-/// `listener.local_addr()?.port()`, and keep the listener alive until the
-/// moment the caller actually hands the port off (e.g. drop it immediately
-/// before spawning a child process that will bind the same port itself).
-/// Dropping it early and re-deriving the port number reopens the race this
-/// API exists to close.
+/// port between selection and use. The caller must hand this exact socket to
+/// the server child rather than closing it and letting the child re-bind:
+/// [`spawn_with_listener`] does so via file-descriptor inheritance, which is
+/// what closes the probe-then-bind race across the process boundary. Read the
+/// chosen port with `listener.local_addr()?.port()`.
 pub fn find_available_port(start: u16) -> Result<TcpListener> {
     if start == 0 {
-        return TcpListener::bind(("127.0.0.1", 0)).context("Failed to bind an OS-assigned port");
+        return TcpListener::bind(("0.0.0.0", 0)).context("Failed to bind an OS-assigned port");
     }
     (start..=start.saturating_add(99))
-        .find_map(|port| TcpListener::bind(("127.0.0.1", port)).ok())
+        .find_map(|port| TcpListener::bind(("0.0.0.0", port)).ok())
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "No available port found in range {start}–{}",
                 start.saturating_add(99)
             )
         })
+}
+
+/// Configures `cmd` so the spawned `jit-server` child inherits `listener` as
+/// its serving socket instead of binding a port itself (Unix only).
+///
+/// Clears close-on-exec on the listener's descriptor so it survives the
+/// child's `execve`, then publishes the listenfd environment
+/// (`LISTEN_FDS=1`, `LISTEN_FDS_FIRST_FD=<fd>`) that `jit-server` reads to
+/// adopt the fd. `LISTEN_PID` is intentionally unset: the listenfd protocol
+/// treats an absent `LISTEN_PID` as "addressed to this process", which is
+/// what we want since the child's PID is unknown before the spawn.
+///
+/// The caller must keep `listener` alive until after the child is spawned;
+/// the child receives its own dup of the socket at fork time, so the port is
+/// never unbound. See [`spawn_with_listener`], which sequences this correctly.
+#[cfg(unix)]
+pub fn inherit_listener(cmd: &mut std::process::Command, listener: &TcpListener) -> Result<()> {
+    use nix::fcntl::{fcntl, FcntlArg, FdFlag};
+    use std::os::unix::io::AsRawFd;
+
+    let fd = listener.as_raw_fd();
+    // Empty flags = FD_CLOEXEC cleared, so the descriptor is inherited across
+    // the child's execve rather than closed by it.
+    fcntl(listener, FcntlArg::F_SETFD(FdFlag::empty()))
+        .context("Failed to clear close-on-exec on the server listener")?;
+    cmd.env("LISTEN_FDS", "1")
+        .env("LISTEN_FDS_FIRST_FD", fd.to_string());
+    Ok(())
+}
+
+/// Spawns `cmd` as the `jit-server` child, handing it `listener` as its
+/// pre-bound serving socket, and returns the running child.
+///
+/// On Unix the child inherits the exact socket via [`inherit_listener`] — it
+/// performs no bind of its own, so the port `find_available_port` probed is
+/// held continuously across the process boundary and cannot be stolen in a
+/// probe-then-bind window. The parent's handle is dropped only after the
+/// fork, once the child holds its own dup.
+///
+/// On non-Unix platforms file-descriptor inheritance is unavailable, so the
+/// socket is released before the spawn and the child binds `--bind` itself.
+///
+/// # Errors
+/// Returns an error if the descriptor cannot be made inheritable or the child
+/// process fails to spawn.
+pub fn spawn_with_listener(
+    cmd: &mut std::process::Command,
+    listener: TcpListener,
+) -> Result<std::process::Child> {
+    #[cfg(unix)]
+    {
+        inherit_listener(cmd, &listener)?;
+        let child = cmd.spawn().context("Failed to spawn jit-server")?;
+        // The child now holds its own dup from the fork; release ours.
+        drop(listener);
+        Ok(child)
+    }
+    #[cfg(not(unix))]
+    {
+        // Release the port so the child can bind it itself.
+        drop(listener);
+        cmd.spawn().context("Failed to spawn jit-server")
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -256,10 +317,9 @@ pub fn find_web_dir() -> Option<PathBuf> {
 /// starts a new daemonized `jit-server` process and returns `Started`.
 ///
 /// Foreground mode is handled by the caller, not this function. Use
-/// [`find_server_binary`] and [`find_available_port`] to build the command —
-/// keep the returned listener alive until immediately before spawning, the
-/// same way this function does — then invoke it with `Command::status()` so
-/// the caller can print the URL before blocking.
+/// [`find_available_port`] to bind the socket and [`spawn_with_listener`] to
+/// hand it to the child — the same inheritance path this function uses — so
+/// the port is never re-bound across the process boundary.
 pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     let data_dir = &opts.data_dir;
 
@@ -275,11 +335,10 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         remove_pid_file(data_dir)?;
     }
 
-    // Hold the probed listener open through all of the setup below and
-    // release it only immediately before spawning the child (REQ-2). The
-    // child does its own bind — some window is unavoidable across the
-    // process boundary — but nothing in between here and the spawn call
-    // re-binds or otherwise widens it.
+    // Bind the serving socket here and hand this exact socket to the child
+    // (spawn_with_listener). The child adopts it rather than re-binding, so
+    // the port stays bound continuously across the process boundary — there
+    // is no probe-then-bind window for another process to slip into (REQ-2).
     let listener = find_available_port(opts.preferred_port)?;
     let port = listener
         .local_addr()
@@ -330,10 +389,9 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
         cmd.process_group(0);
     }
 
-    // Release the port right before spawning: the child binds it next.
-    drop(listener);
-
-    let mut child = cmd.spawn().context("Failed to spawn jit-server")?;
+    // Hand the bound socket to the child (inherited fd on Unix); it adopts
+    // this exact socket instead of re-binding the port.
+    let mut child = spawn_with_listener(&mut cmd, listener)?;
 
     let pid = child.id();
 
@@ -341,9 +399,9 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     std::thread::sleep(Duration::from_millis(300));
 
     // Verify the child is still alive. A rapid exit indicates a startup
-    // failure (e.g. the port was grabbed between our probe and the bind).
-    // In that case we must not write a PID file — doing so would leave a
-    // stale record that falsely reports a running server.
+    // failure (e.g. it could not adopt the inherited socket, or a data-dir
+    // error). In that case we must not write a PID file — doing so would
+    // leave a stale record that falsely reports a running server.
     if let Some(exit_status) = child.try_wait().context("Failed to check server startup")? {
         bail!(
             "jit-server exited during startup with {exit_status}. \
@@ -592,6 +650,49 @@ mod tests {
         assert!(
             (held_port..=held_port.saturating_add(99)).contains(&port),
             "chosen port {port} should be within the scanned range starting at {held_port}"
+        );
+    }
+
+    // ── listener handoff (parent side) ────────────────────────────────────────
+
+    #[test]
+    #[cfg(unix)]
+    fn test_inherit_listener_hands_off_socket() {
+        use nix::fcntl::{fcntl, FcntlArg, FdFlag};
+        use std::os::unix::io::AsRawFd;
+
+        let listener = find_available_port(0).unwrap();
+        let fd = listener.as_raw_fd();
+
+        let mut cmd = std::process::Command::new("true");
+        inherit_listener(&mut cmd, &listener).unwrap();
+
+        // Close-on-exec must be cleared so the descriptor survives the child's
+        // execve — this is what lets the child adopt the bound socket instead
+        // of re-binding the port.
+        let flags = fcntl(&listener, FcntlArg::F_GETFD).unwrap();
+        assert_eq!(
+            flags & FdFlag::FD_CLOEXEC.bits(),
+            0,
+            "FD_CLOEXEC must be cleared so the socket survives the child's exec"
+        );
+
+        // The child is pointed at this exact descriptor via the listenfd env.
+        let envs: std::collections::HashMap<String, String> = cmd
+            .get_envs()
+            .filter_map(|(k, v)| Some((k.to_str()?.to_owned(), v?.to_str()?.to_owned())))
+            .collect();
+        assert_eq!(envs.get("LISTEN_FDS").map(String::as_str), Some("1"));
+        assert_eq!(
+            envs.get("LISTEN_FDS_FIRST_FD").map(String::as_str),
+            Some(fd.to_string().as_str()),
+            "child must be pointed at the parent's bound descriptor"
+        );
+        // LISTEN_PID stays unset: listenfd reads an absent value as addressed
+        // to the receiving process, which sidesteps not knowing the child PID.
+        assert!(
+            !envs.contains_key("LISTEN_PID"),
+            "LISTEN_PID must remain unset"
         );
     }
 

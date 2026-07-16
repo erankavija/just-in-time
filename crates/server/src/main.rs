@@ -20,7 +20,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
-use jit_server::prepare_server_storage;
+use jit_server::{prepare_server_storage, resolve_listener, ListenerSource};
 use routes::AppState;
 
 /// JIT REST API Server
@@ -128,9 +128,16 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Start server
-    let listener = tokio::net::TcpListener::bind(&args.bind).await?;
-    info!("Server listening on http://{}", args.bind);
+    // Start server. Prefer a socket inherited from the launching `jit`
+    // process (listenfd); only bind `--bind` when none was handed down. This
+    // keeps the port bound continuously across the jit→jit-server handoff.
+    let (std_listener, source) = resolve_listener(&args.bind)?;
+    let listener = tokio::net::TcpListener::from_std(std_listener)?;
+    let local_addr = listener.local_addr()?;
+    match source {
+        ListenerSource::Inherited => info!("Server listening on http://{local_addr} (inherited)"),
+        ListenerSource::Bound => info!("Server listening on http://{local_addr}"),
+    }
 
     axum::serve(listener, app).await?;
 
