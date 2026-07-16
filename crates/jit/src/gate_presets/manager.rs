@@ -144,9 +144,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
-        assert!(manager.has_preset("rust-tdd"));
-        assert!(manager.has_preset("minimal"));
-        assert_eq!(manager.presets.len(), 8);
+        assert!(manager.has_preset("plan-review"));
+        assert!(manager.has_preset("coverage-preview"));
+        assert_eq!(manager.presets.len(), 3);
     }
 
     #[test]
@@ -154,9 +154,9 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
-        let preset = manager.get_preset("rust-tdd").unwrap();
-        assert_eq!(preset.name, "rust-tdd");
-        assert_eq!(preset.gates.len(), 5);
+        let preset = manager.get_preset("plan-review").unwrap();
+        assert_eq!(preset.name, "plan-review");
+        assert_eq!(preset.gates.len(), 1);
     }
 
     #[test]
@@ -191,13 +191,13 @@ mod tests {
         let presets_dir = temp_dir.path().join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir).unwrap();
 
-        // Create custom "minimal" preset that overrides builtin
-        create_test_preset_file(&presets_dir, "minimal").unwrap();
+        // Create custom "plan-review" preset that overrides builtin
+        create_test_preset_file(&presets_dir, "plan-review").unwrap();
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
-        let preset = manager.get_preset("minimal").unwrap();
-        assert_eq!(preset.description, "Custom preset minimal");
+        let preset = manager.get_preset("plan-review").unwrap();
+        assert_eq!(preset.description, "Custom preset plan-review");
     }
 
     #[test]
@@ -206,15 +206,15 @@ mod tests {
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
         let list = manager.list_presets();
-        assert_eq!(list.len(), 8);
+        assert_eq!(list.len(), 3);
 
-        let rust_tdd = list.iter().find(|p| p.name == "rust-tdd").unwrap();
-        assert_eq!(rust_tdd.gate_count, 5);
-        assert!(rust_tdd.builtin);
+        let plan_review = list.iter().find(|p| p.name == "plan-review").unwrap();
+        assert_eq!(plan_review.gate_count, 1);
+        assert!(plan_review.builtin);
 
-        let minimal = list.iter().find(|p| p.name == "minimal").unwrap();
-        assert_eq!(minimal.gate_count, 1);
-        assert!(minimal.builtin);
+        let coverage = list.iter().find(|p| p.name == "coverage-preview").unwrap();
+        assert_eq!(coverage.gate_count, 1);
+        assert!(coverage.builtin);
     }
 
     #[test]
@@ -228,7 +228,7 @@ mod tests {
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
         let list = manager.list_presets();
 
-        assert_eq!(list.len(), 9);
+        assert_eq!(list.len(), 4);
         let custom = list.iter().find(|p| p.name == "my-custom").unwrap();
         assert!(!custom.builtin);
     }
@@ -239,21 +239,21 @@ mod tests {
         let presets_dir = temp_dir.path().join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir).unwrap();
 
-        // Override builtin "minimal" with a custom version
-        create_test_preset_file(&presets_dir, "minimal").unwrap();
+        // Override builtin "plan-review" with a custom version
+        create_test_preset_file(&presets_dir, "plan-review").unwrap();
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
         let list = manager.list_presets();
 
-        let minimal = list.iter().find(|p| p.name == "minimal").unwrap();
+        let plan_review = list.iter().find(|p| p.name == "plan-review").unwrap();
         assert!(
-            !minimal.builtin,
+            !plan_review.builtin,
             "Overridden builtin should be listed as custom"
         );
 
         // Non-overridden builtins should still be listed as builtin
-        let rust_tdd = list.iter().find(|p| p.name == "rust-tdd").unwrap();
-        assert!(rust_tdd.builtin);
+        let coverage = list.iter().find(|p| p.name == "coverage-preview").unwrap();
+        assert!(coverage.builtin);
     }
 
     #[test]
@@ -275,6 +275,6 @@ mod tests {
         // Don't create the presets directory
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-        assert_eq!(manager.presets.len(), 8); // Only builtins
+        assert_eq!(manager.presets.len(), 3); // Only builtins
     }
 }

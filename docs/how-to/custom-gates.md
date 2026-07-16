@@ -612,13 +612,19 @@ jit issue update $ISSUE --state done
 
 Gate presets are pre-configured bundles of quality gates that dramatically reduce setup time. Instead of defining and adding gates individually, apply entire workflows in seconds.
 
-### Using Builtin Presets
+### What the Binary Ships
 
-Every preset the binary ships — each one's gates with their keys, stages, modes,
-descriptions, and checker configuration — is listed in
+The `jit` binary ships exactly the three
+[planning-bracket](../concepts/planning-bracket.md) presets — `plan-review`,
+`coverage-preview`, and `breakdown-review` — which the `plan` graph template
+resolves to gate the planning and breakdown nodes. They are listed in
 [Built-in Gate Presets](../reference/gate-presets.md), a reference generated from
-the preset definitions themselves. Among them are the three
-[planning-bracket](../concepts/planning-bracket.md) presets.
+the preset definitions themselves.
+
+Gate keys, titles, and checkers (a test runner, a linter, a formatter, a security
+audit) are domain vocabulary, so language- or workflow-specific bundles are
+declared per project rather than built in. Declare them once as project presets
+and they load alongside the built-ins.
 
 **List available presets:**
 ```bash
@@ -626,25 +632,66 @@ jit gate preset list
 ```
 
 Each line names one preset with its description and gate count, prefixed
-`[builtin]` for a preset the binary ships. To inspect the gates a preset carries,
-run `jit gate preset show <name>`.
+`[builtin]` for a preset the binary ships and `[custom]` for a project-defined
+one. To inspect the gates a preset carries, run `jit gate preset show <name>`.
+
+### Declaring a Project Preset
+
+Capture a repeated gate set — a Rust CI bundle, a security review, your team's
+standard workflow — as a project-defined preset stored in
+`.jit/config/gate-presets/`. Configure one reference issue with the gates you
+want, then capture them:
+
+**Step 1: Define the gates and add them to a reference issue**
+```bash
+jit gate define tests \
+  --title "All tests pass" --description "cargo test must pass" \
+  --stage postcheck --mode auto \
+  --checker-command "cargo test" --timeout 300
+
+jit gate define clippy \
+  --title "Clippy lints pass" --description "No clippy warnings" \
+  --stage postcheck --mode auto \
+  --checker-command "cargo clippy --all-targets -- -D warnings" --timeout 120
+
+jit gate define fmt \
+  --title "Code formatted" --description "cargo fmt --check must pass" \
+  --stage postcheck --mode auto \
+  --checker-command "cargo fmt --check" --timeout 30
+
+jit gate define code-review \
+  --title "Code review completed" --description "Another developer reviewed the code"
+
+jit issue create --title "Reference issue"
+jit gate add abc123 tests clippy fmt code-review
+```
+
+**Step 2: Capture the issue's gates as a preset**
+```bash
+jit gate preset create abc123 rust-ci
+```
+
+This writes `.jit/config/gate-presets/rust-ci.json` bundling those four gates.
+`jit gate preset create` rejects a built-in name; commit the JSON file to share
+the preset with your team.
 
 **View preset details:**
 ```bash
-jit gate preset show rust-tdd
+jit gate preset show rust-ci
 ```
 
 The output names the preset and its description, then each bundled gate with its
 key, title, stage, mode, and — for automated gates — the checker command and
 timeout.
 
-**Apply preset to issue:**
+### Applying a Preset
+
 ```bash
 # Create issue
 jit issue create --title "Implement user authentication"
 
-# Apply the rust-tdd preset (adds its gates in one command)
-jit gate preset apply rust-tdd abc123
+# Apply the rust-ci preset (adds its gates in one command)
+jit gate preset apply rust-ci def456
 ```
 
 The issue now requires every gate the preset bundles, and each of those gates is
@@ -657,39 +704,37 @@ Filter which gates to apply using command options:
 
 **Skip precheck gates:**
 ```bash
-# For hotfixes or situations where TDD isn't required
-jit gate preset apply rust-tdd abc123 --no-precheck
-# Applies only the preset's postcheck gates
+# Apply only the preset's postcheck gates
+jit gate preset apply rust-ci def456 --no-precheck
 ```
 
 **Skip postcheck gates:**
 ```bash
-# For planning or precheck-only workflows
-jit gate preset apply rust-tdd abc123 --no-postcheck
-# Applies only the preset's precheck gates
+# Apply only the preset's precheck gates
+jit gate preset apply rust-ci def456 --no-postcheck
 ```
 
 **Exclude specific gates:**
 ```bash
-# Skip clippy if not using linter
-jit gate preset apply rust-tdd abc123 --except clippy
+# Skip clippy if not using the linter
+jit gate preset apply rust-ci def456 --except clippy
 
 # Skip multiple gates
-jit gate preset apply rust-tdd abc123 --except clippy --except fmt
+jit gate preset apply rust-ci def456 --except clippy --except fmt
 # Applies every other gate the preset bundles
 ```
 
 **Override timeouts:**
 ```bash
 # Increase timeout for slow CI
-jit gate preset apply rust-tdd abc123 --timeout 600
+jit gate preset apply rust-ci def456 --timeout 600
 # Every automated gate in the preset gets a 600s timeout instead of its own
 ```
 
 **Combine filters:**
 ```bash
 # Hotfix workflow: no precheck, no linter, fast timeout
-jit gate preset apply rust-tdd abc123 --no-precheck --except clippy --timeout 60
+jit gate preset apply rust-ci def456 --no-precheck --except clippy --timeout 60
 # Applies the preset's postcheck gates except clippy, each with a 60s timeout
 ```
 
@@ -699,35 +744,32 @@ Apply presets to multiple issues at once:
 
 **Multiple issues directly:**
 ```bash
-jit gate preset apply minimal abc123 def456 ghi789
+jit gate preset apply rust-ci abc123 def456 ghi789
 # Applies to all three issues
 ```
 
 **From query results:**
 ```bash
 # Apply to all issues in an epic
-jit query all --label "epic:auth" --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-tdd
+jit query all --label "epic:auth" --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-ci
 
 # Apply to all ready issues
-jit query available --json | jq -r '.issues[].id' | xargs jit gate preset apply minimal
+jit query available --json | jq -r '.issues[].id' | xargs jit gate preset apply rust-ci
 ```
 
-### Creating Custom Presets
+### Evolving a Preset
 
-Capture your team's workflow as a reusable preset:
+Refine a captured preset by reconfiguring a reference issue and re-capturing under
+a new name:
 
 **Step 1: Configure one issue perfectly**
 ```bash
-# Create issue and add desired gates
-jit issue create --title "Reference issue"
-jit gate add abc123 tests clippy code-review docs security-scan
-
-# Or apply builtin and customize
-jit gate preset apply rust-tdd abc123 --except fmt
+# Apply an existing preset and customize
+jit gate preset apply rust-ci abc123 --except fmt
 jit gate add abc123 security-scan
 ```
 
-**Step 2: Save as custom preset**
+**Step 2: Save as a new preset**
 ```bash
 jit gate preset create abc123 team-standard
 ```
@@ -791,7 +833,7 @@ cat .jit/config/gate-presets/team-standard.json
 **Quick Start New Issue:**
 ```bash
 jit issue create --title "New feature"
-jit gate preset apply rust-tdd $ISSUE_ID
+jit gate preset apply rust-ci $ISSUE_ID
 # Ready to work with full quality pipeline
 ```
 
@@ -808,10 +850,10 @@ jit gate preset apply team-workflow their-issue
 **Different Requirements by Type:**
 ```bash
 # Full workflow for features
-jit gate preset apply rust-tdd feature-issue
+jit gate preset apply rust-ci feature-issue
 
-# Minimal for docs
-jit gate preset apply minimal doc-issue --except code-review
+# Lighter workflow for docs
+jit gate preset apply docs-ci doc-issue --except code-review
 jit gate add doc-issue spell-check
 
 # Custom for infrastructure
@@ -851,12 +893,12 @@ jit gate add $ISSUE tests clippy fmt code-review
 **Preset approach:**
 ```bash
 # One command
-jit gate preset apply rust-tdd $ISSUE
+jit gate preset apply rust-ci $ISSUE
 ```
 
 **Benefits:**
 - **Fewer commands**: one preset apply instead of a separate define and add per gate
-- **No mistakes**: Preset definitions are tested and proven
+- **No mistakes**: Preset definitions are captured once from a working issue and reused
 - **Consistent**: Same gates on every issue
 - **Shareable**: Team uses identical workflows
 - **Customizable**: Filter options for special cases

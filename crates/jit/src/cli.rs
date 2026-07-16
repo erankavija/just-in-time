@@ -1273,7 +1273,7 @@ pub enum DepCommands {
 /// # Configuration
 /// jit gate define code-review --title "Code Review" --description "Human review"
 /// jit gate add abc123 code-review            # attach a registered gate to an issue
-/// jit gate preset apply rust-tdd abc123      # attach a preset bundle
+/// jit gate preset apply ci abc123            # attach a project-defined preset bundle
 ///
 /// # Execution (mutating — produces a verdict)
 /// jit gate evaluate abc123 code-review       # run/attest, record a verdict
@@ -1756,10 +1756,10 @@ pub enum PresetCommands {
     /// required gates. Use 'jit gate preset list' to see available presets.
     ///
     /// Examples:
-    ///   jit gate preset apply rust-tdd abc123           # Single issue
-    ///   jit gate preset apply minimal abc123 def456     # Multiple issues  
-    ///   jit query all | xargs jit gate preset apply rust-tdd  # From query
-    ///   jit gate preset apply rust-tdd abc123 --except clippy # Skip specific gates
+    ///   jit gate preset apply ci abc123                 # Single issue
+    ///   jit gate preset apply ci abc123 def456          # Multiple issues
+    ///   jit query all | xargs jit gate preset apply ci  # From query
+    ///   jit gate preset apply ci abc123 --except lint   # Skip specific gates
     Apply {
         /// Preset name
         name: String,
