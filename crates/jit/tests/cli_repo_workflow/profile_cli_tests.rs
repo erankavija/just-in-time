@@ -134,3 +134,34 @@ fn test_profiled_init_conflict_leaves_no_jit_and_preserves_occupant() {
     assert_eq!(fs::read(&occupant).unwrap(), b"local script\n");
     assert!(!repo.path().join(".jit").exists());
 }
+
+#[test]
+fn test_existing_partial_profiled_init_conflict_does_not_plain_init_first() {
+    let repo = TempDir::new().unwrap();
+    fs::create_dir_all(repo.path().join(".jit")).unwrap();
+    let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
+    fs::write(repo.path().join(".jit/index.json"), index).unwrap();
+    fs::create_dir_all(repo.path().join("scripts")).unwrap();
+    fs::write(repo.path().join("scripts/ai-review.sh"), b"local script\n").unwrap();
+
+    let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+
+    assert_eq!(output.status.code(), Some(4));
+    assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
+    assert_eq!(
+        fs::read(repo.path().join(".jit/index.json")).unwrap(),
+        index
+    );
+    for path in [
+        "gates.toml",
+        "events.jsonl",
+        "config.toml",
+        "rules.toml",
+        "issues",
+    ] {
+        assert!(
+            !repo.path().join(".jit").join(path).exists(),
+            "profile preflight failure must not scaffold {path}"
+        );
+    }
+}

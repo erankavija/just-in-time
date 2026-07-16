@@ -1874,7 +1874,19 @@ fn run() -> Result<()> {
                 "init",
                 *json,
             )?;
-            let (worktree_identity, init_warnings) = if fresh {
+            let existing_profile_result = if !fresh {
+                profile_result(
+                    profile
+                        .as_deref()
+                        .map(|id| executor.apply_profile(id))
+                        .transpose(),
+                    "init",
+                    *json,
+                )?
+            } else {
+                None
+            };
+            let (worktree_identity, init_warnings) = if fresh || profile.is_some() {
                 executor.initialize_worktree_identity()?
             } else {
                 executor.init()?
@@ -1908,6 +1920,8 @@ fn run() -> Result<()> {
             // `[project]` table untouched.
             let project_name = if let Some(result) = &fresh_result {
                 Some(result.project_name.clone())
+            } else if profile.is_some() {
+                None
             } else {
                 executor.seed_project_config(&current_dir, &chosen.generate_config_toml())?
             };
@@ -1918,6 +1932,8 @@ fn run() -> Result<()> {
             // never clobbers user edits).
             let scaffolded = if fresh {
                 true
+            } else if profile.is_some() {
+                false
             } else {
                 executor.scaffold_default_rules()?
             };
@@ -1927,14 +1943,7 @@ fn run() -> Result<()> {
             let profile_result = if let Some(result) = fresh_result {
                 result.profile
             } else {
-                profile_result(
-                    profile
-                        .as_deref()
-                        .map(|id| executor.apply_profile(id))
-                        .transpose(),
-                    "init",
-                    *json,
-                )?
+                existing_profile_result
             };
 
             let message = if let Some(ref t) = template {
