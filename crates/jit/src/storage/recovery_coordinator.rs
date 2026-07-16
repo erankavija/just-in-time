@@ -31,6 +31,13 @@ impl RecoveryDispatchReport {
 /// CLI mutation dispatch retains this value through command execution. Nested
 /// storage writes re-enter the same repository lock, preventing a transaction
 /// from appearing between startup recovery and the command's first write.
+///
+/// External checker processes are the exception to whole-command retention:
+/// file-backed storage temporarily drops this session before spawning a
+/// checker, then reacquires the same bootstrap → repository chain and runs
+/// recovery before the checker result can be persisted. Nested mutating `jit`
+/// commands therefore use the ordinary cross-process locks; no descendant
+/// bypasses repository-wide serialization.
 pub struct RecoverySession {
     report: RecoveryDispatchReport,
     // Field order is intentional: repository drops before bootstrap.
@@ -296,5 +303,79 @@ mod tests {
         drop(session);
         acquired_rx.recv_timeout(Duration::from_secs(1)).unwrap();
         writer.join().unwrap();
+    }
+
+    #[test]
+    fn test_external_process_scope_releases_then_restores_recovery_session() {
+        let temp = TempDir::new().unwrap();
+        let jit = temp.path().join(".jit");
+        std::fs::create_dir_all(&jit).unwrap();
+        std::fs::write(jit.join("index.json"), b"{}").unwrap();
+
+        let storage = JsonFileStorage::new(&jit);
+        let session = RecoveryCoordinator::recover_before_services(&storage).unwrap();
+        storage.retain_recovery_session(session).unwrap();
+
+        let competing = RepoWriteLock::for_lock_path(
+            temp.path().join(".jit-bootstrap.lock"),
+            Duration::from_millis(100),
+        );
+        storage
+            .run_external_process(|| {
+                let _guard = competing.acquire()?;
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(
+            competing.acquire().is_err(),
+            "the startup recovery session must be restored before returning"
+        );
+    }
+
+    #[test]
+    fn test_external_process_scope_recovers_checker_transaction_before_returning() {
+        let temp = TempDir::new().unwrap();
+        let jit = temp.path().join(".jit");
+        std::fs::create_dir_all(&jit).unwrap();
+        std::fs::write(jit.join("index.json"), b"{}").unwrap();
+        std::fs::write(jit.join("config.toml"), b"original").unwrap();
+
+        let storage = JsonFileStorage::new(&jit);
+        let session = RecoveryCoordinator::recover_before_services(&storage).unwrap();
+        storage.retain_recovery_session(session).unwrap();
+
+        storage
+            .run_external_process(|| {
+                let failures = Arc::new(SelectedFailures(HashSet::from([
+                    TransactionFailurePoint::SyncJournal {
+                        decision: crate::storage::RecoveryState::Prepared,
+                    },
+                ])));
+                let kernel = FileTransactionKernel::with_injector(root(&temp), failures)?;
+                let checker_storage = JsonFileStorage::new(&jit);
+                let guard = checker_storage.acquire_repo_write_lock_raw()?;
+                kernel
+                    .execute(
+                        &guard,
+                        FileTransactionPlan {
+                            transaction_id: "checker-prepared".to_string(),
+                            actions: vec![TransactionAction::WriteFile {
+                                path: ".jit/config.toml".to_string(),
+                                contents: b"replacement".to_vec(),
+                                unix_mode: None,
+                            }],
+                        },
+                    )
+                    .expect_err("failure injection must leave a prepared journal");
+                Ok(())
+            })
+            .unwrap();
+
+        assert_eq!(std::fs::read(jit.join("config.toml")).unwrap(), b"original");
+        assert!(
+            !jit.join("tmp/transactions/checker-prepared").exists(),
+            "the parent must recover checker residue before persisting a verdict"
+        );
     }
 }

@@ -280,7 +280,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let context = self.build_gate_context(checker, &full_id, gate_key, gate, &repo_root)?;
 
         let result = match checker {
-            crate::domain::GateChecker::Exec { .. } => {
+            crate::domain::GateChecker::Exec { .. } => self.storage.run_external_process(|| {
                 gate_execution::execute_gate_checker_with_context(
                     gate_key,
                     &full_id,
@@ -289,8 +289,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                     &working_dir,
                     context.as_ref(),
                     &issue.documents,
-                )?
-            }
+                )
+            })?,
             _ => self.execute_builtin_checker(gate_key, &full_id, gate.stage, checker)?,
         };
 

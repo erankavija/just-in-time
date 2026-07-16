@@ -122,6 +122,23 @@ pub trait IssueStore: Clone {
     /// timeout.
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard>;
 
+    /// Run an external process outside any startup recovery session retained by
+    /// this backend, then restore recovery serialization before returning.
+    ///
+    /// File-backed CLI storage overrides this to release the bootstrap and
+    /// repository locks while a checker subprocess runs. The locks are
+    /// reacquired and pending journals are recovered before the caller can
+    /// persist the subprocess result. Backends without a retained startup
+    /// session execute `operation` directly.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `operation`, or from restoring the recovery
+    /// boundary after the external process exits.
+    fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        operation()
+    }
+
     /// Save an issue (create or update).
     ///
     /// Takes ownership of the issue and automatically updates the `updated_at`

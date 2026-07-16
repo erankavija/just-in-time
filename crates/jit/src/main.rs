@@ -1741,6 +1741,9 @@ fn run() -> Result<()> {
         .as_ref()
         .map(|session| session.report().recovered_count())
         .unwrap_or(0);
+    if let Some(session) = recovery_session {
+        storage.retain_recovery_session(session)?;
+    }
     let mut executor = CommandExecutor::new(storage.clone());
 
     match &command {
