@@ -218,6 +218,29 @@ async function main() {
       ]) {
         assert.ok(!names.has(deferred), `deferred profile lifecycle tool leaked: ${deferred}`);
       }
+
+      const profileInputKeys = Object.fromEntries(
+        tools
+          .filter(tool => tool.name.startsWith('jit_profile_'))
+          .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
+      );
+      assert.deepStrictEqual(profileInputKeys, {
+        jit_profile_apply: ['dry-run', 'id', 'json'],
+        jit_profile_list: ['json'],
+        jit_profile_show: ['id', 'json'],
+      });
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
+        ['id']
+      );
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_show').inputSchema.required,
+        ['id']
+      );
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
+        []
+      );
     });
 
     // -- Error handling ------------------------------------------------------

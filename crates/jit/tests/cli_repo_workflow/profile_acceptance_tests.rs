@@ -22,8 +22,40 @@ impl TestRepo {
     }
 }
 
-fn jit(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_jit"))
+#[cfg(unix)]
+struct CheckerPath {
+    _directory: TempDir,
+    value: PathBuf,
+}
+
+#[cfg(unix)]
+fn checker_path_without_jq() -> CheckerPath {
+    use std::os::unix::fs::symlink;
+
+    let directory = TempDir::new().expect("create checker PATH");
+    for command in [
+        "bash", "cat", "cut", "grep", "head", "mktemp", "rm", "sed", "sh", "tail", "wc",
+    ] {
+        let source = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+            .map(|entry| entry.join(command))
+            .find(|candidate| candidate.is_file())
+            .unwrap_or_else(|| panic!("required checker command is unavailable: {command}"));
+        symlink(&source, directory.path().join(command))
+            .unwrap_or_else(|error| panic!("link {command} into checker PATH: {error}"));
+    }
+    assert!(
+        !directory.path().join("jq").exists(),
+        "the offline checker PATH must not expose jq"
+    );
+    CheckerPath {
+        value: directory.path().to_path_buf(),
+        _directory: directory,
+    }
+}
+
+fn jit_with_path(repo: &Path, args: &[&str], path: Option<&Path>) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_jit"));
+    command
         .args(args)
         .current_dir(repo)
         .env_remove("GIT_DIR")
@@ -33,7 +65,11 @@ fn jit(repo: &Path, args: &[&str]) -> Output {
         .env("HTTP_PROXY", "http://127.0.0.1:9")
         .env("HTTPS_PROXY", "http://127.0.0.1:9")
         .env("ALL_PROXY", "http://127.0.0.1:9")
-        .env("NO_PROXY", "")
+        .env("NO_PROXY", "");
+    if let Some(path) = path {
+        command.env("PATH", path);
+    }
+    command
         .output()
         .unwrap_or_else(|error| panic!("failed to run jit {args:?}: {error}"))
 }
@@ -50,7 +86,11 @@ fn parse_json(output: &Output) -> Value {
 }
 
 fn success_json(repo: &Path, args: &[&str]) -> Value {
-    let output = jit(repo, args);
+    success_json_with_path(repo, args, None)
+}
+
+fn success_json_with_path(repo: &Path, args: &[&str], path: Option<&Path>) -> Value {
+    let output = jit_with_path(repo, args, path);
     assert!(
         output.status.success(),
         "jit {args:?} failed\nstatus={}\nstdout={}\nstderr={}",
@@ -61,8 +101,8 @@ fn success_json(repo: &Path, args: &[&str]) -> Value {
     parse_json(&output)
 }
 
-fn failed_json(repo: &Path, args: &[&str], exit_code: i32) -> Value {
-    let output = jit(repo, args);
+fn failed_json_with_path(repo: &Path, args: &[&str], exit_code: i32, path: Option<&Path>) -> Value {
+    let output = jit_with_path(repo, args, path);
     assert_eq!(
         output.status.code(),
         Some(exit_code),
@@ -175,6 +215,15 @@ fn property_keys(schema: &Value, definition: &str) -> BTreeSet<String> {
         .collect()
 }
 
+fn variant_property_keys(schema: &Value, definition: &str) -> BTreeSet<String> {
+    schema["definitions"][definition]["oneOf"][0]["properties"]
+        .as_object()
+        .unwrap_or_else(|| panic!("missing variant properties for schema definition {definition}"))
+        .keys()
+        .cloned()
+        .collect()
+}
+
 fn expected_keys(keys: &[&str]) -> BTreeSet<String> {
     keys.iter().map(|key| (*key).to_string()).collect()
 }
@@ -250,14 +299,21 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
 }
 
 #[test]
+#[cfg(unix)]
 fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let repo = TestRepo::new();
-    success_json(&repo.path, &["init", "--profile", "jit-dogfood", "--json"]);
+    let checker_path = checker_path_without_jq();
+    let path = Some(checker_path.value.as_path());
+    success_json_with_path(
+        &repo.path,
+        &["init", "--profile", "jit-dogfood", "--json"],
+        path,
+    );
     assert!(!repo.path.join(".git").exists());
 
-    let invariants = success_json(&repo.path, &["invariant", "render", "--json"]);
+    let invariants = success_json_with_path(&repo.path, &["invariant", "render", "--json"], path);
     assert_eq!(invariants["target"], "AGENTS.md");
-    let references = success_json(&repo.path, &["reference", "render", "--json"]);
+    let references = success_json_with_path(&repo.path, &["reference", "render", "--json"], path);
     assert_eq!(references["target"], ".jit/reference/rules-and-gates.md");
     let agents = fs::read_to_string(repo.path.join("AGENTS.md")).unwrap();
     assert!(agents.contains("<!-- jit:invariants:begin -->"));
@@ -267,7 +323,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     assert!(rules_and_gates.contains("## Gates"));
     assert!(rules_and_gates.contains("plan-review"));
 
-    let container = success_json(
+    let container = success_json_with_path(
         &repo.path,
         &[
             "issue",
@@ -281,9 +337,11 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "epic:acceptance",
             "--json",
         ],
+        path,
     );
     let container_id = container["id"].as_str().unwrap();
-    let applied = success_json(&repo.path, &["apply", "plan", container_id, "--json"]);
+    let applied =
+        success_json_with_path(&repo.path, &["apply", "plan", container_id, "--json"], path);
     let planning_id = applied["created_node_ids_by_role"]["planning"]
         .as_str()
         .unwrap();
@@ -291,31 +349,35 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         .as_str()
         .unwrap();
 
-    success_json(
+    success_json_with_path(
         &repo.path,
         &["issue", "claim", planning_id, "agent:acceptance", "--json"],
+        path,
     );
-    let blocked_plan = failed_json(
+    let blocked_plan = failed_json_with_path(
         &repo.path,
         &["issue", "update", planning_id, "--state", "done", "--json"],
         4,
+        path,
     );
     assert_eq!(blocked_plan["error"]["details"]["actual_state"], "gated");
-    let plan_review = success_json(
+    let plan_review = success_json_with_path(
         &repo.path,
         &["gate", "evaluate", planning_id, "plan-review", "--json"],
+        path,
     );
     assert_eq!(plan_review["status"], "passed");
     assert!(plan_review["warnings"][0]
         .as_str()
         .unwrap()
         .contains("EXTERNAL REVIEW PLACEHOLDER"));
-    success_json(
+    success_json_with_path(
         &repo.path,
         &["issue", "update", planning_id, "--state", "done", "--json"],
+        path,
     );
 
-    let implementation = success_json(
+    let implementation = success_json_with_path(
         &repo.path,
         &[
             "issue",
@@ -331,13 +393,15 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "satisfies:REQ-01",
             "--json",
         ],
+        path,
     );
     let implementation_id = implementation["id"].as_str().unwrap();
-    success_json(
+    success_json_with_path(
         &repo.path,
         &["dep", "add", implementation_id, breakdown_id, "--json"],
+        path,
     );
-    success_json(
+    success_json_with_path(
         &repo.path,
         &[
             "dep",
@@ -347,22 +411,25 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "--reduce",
             "--json",
         ],
+        path,
     );
 
-    success_json(
+    success_json_with_path(
         &repo.path,
         &["issue", "claim", breakdown_id, "agent:acceptance", "--json"],
+        path,
     );
-    let blocked_breakdown = failed_json(
+    let blocked_breakdown = failed_json_with_path(
         &repo.path,
         &["issue", "update", breakdown_id, "--state", "done", "--json"],
         4,
+        path,
     );
     assert_eq!(
         blocked_breakdown["error"]["details"]["actual_state"],
         "gated"
     );
-    let coverage = success_json(
+    let coverage = success_json_with_path(
         &repo.path,
         &[
             "gate",
@@ -371,10 +438,11 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "coverage-preview",
             "--json",
         ],
+        path,
     );
     assert_eq!(coverage["status"], "passed");
     assert_eq!(coverage["warnings"], Value::Array(Vec::new()));
-    let breakdown_review = success_json(
+    let breakdown_review = success_json_with_path(
         &repo.path,
         &[
             "gate",
@@ -383,20 +451,23 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "breakdown-review",
             "--json",
         ],
+        path,
     );
     assert_eq!(breakdown_review["status"], "passed");
     assert!(breakdown_review["warnings"][0]
         .as_str()
         .unwrap()
         .contains("EXTERNAL REVIEW PLACEHOLDER"));
-    success_json(
+    success_json_with_path(
         &repo.path,
         &["issue", "update", breakdown_id, "--state", "done", "--json"],
+        path,
     );
 
-    let statuses = success_json(
+    let statuses = success_json_with_path(
         &repo.path,
         &["issue", "status", breakdown_id, implementation_id, "--json"],
+        path,
     );
     let by_id = statuses["issues"]
         .as_array()
@@ -420,7 +491,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         "implementation leaf must be ready"
     );
 
-    let validation = success_json(&repo.path, &["validate", "--json"]);
+    let validation = success_json_with_path(&repo.path, &["validate", "--json"], path);
     assert_eq!(validation["valid"], true);
     assert_eq!(validation["error_count"], 0);
     assert!(validation["warnings"]
@@ -442,6 +513,24 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         commands.keys().cloned().collect::<BTreeSet<_>>(),
         expected_keys(&["apply", "list", "show"])
     );
+    assert_eq!(
+        commands["apply"]["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|argument| argument["name"].as_str().unwrap().to_string())
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["id"])
+    );
+    assert_eq!(
+        commands["apply"]["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|flag| flag["name"].as_str().unwrap().to_string())
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["dry-run", "json"])
+    );
 
     let show_schema = &commands["show"]["output"]["success_schema"];
     assert_eq!(
@@ -462,4 +551,46 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             "{definition} must reject undeclared lifecycle fields"
         );
     }
+
+    let apply_schemas = commands["apply"]["output"]["success_schema"]["oneOf"]
+        .as_array()
+        .unwrap();
+    assert_eq!(apply_schemas.len(), 2);
+    let by_title = apply_schemas
+        .iter()
+        .map(|schema| (schema["title"].as_str().unwrap(), schema))
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(
+        by_title["ProfileApplyResult"]["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&[
+            "id",
+            "plan_hash",
+            "status",
+            "transaction_id",
+            "version",
+            "warnings",
+        ])
+    );
+    assert_eq!(
+        by_title["ProfilePlanResult"]["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["id", "plan_hash", "status", "targets", "version"])
+    );
+    assert_eq!(
+        variant_property_keys(by_title["ProfileApplyResult"], "ProfileApplicationWarning"),
+        expected_keys(&["kind", "reason", "transaction_id"])
+    );
+    assert_eq!(
+        property_keys(by_title["ProfilePlanResult"], "ProfileTargetChange"),
+        expected_keys(&["action", "executable", "path"])
+    );
 }
