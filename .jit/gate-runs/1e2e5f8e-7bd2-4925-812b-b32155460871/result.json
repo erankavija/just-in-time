@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "1e2e5f8e-7bd2-4925-812b-b32155460871",
+  "gate_key": "dependency-audit",
+  "stage": "postcheck",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "commit": "2d935a6b92afa8678c2c5f5d1fa90b94809fcf88",
+  "branch": "main",
+  "status": "passed",
+  "started_at": "2026-07-16T07:39:52.399646392Z",
+  "completed_at": "2026-07-16T07:40:03.124477081Z",
+  "duration_ms": 10724,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "    Fetching advisory database from `https://github.com/RustSec/advisory-db.git`\n      Loaded 1160 security advisories (from /home/vkaskivuo/.cargo/advisory-db)\n    Updating crates.io index\n    Scanning Cargo.lock for vulnerabilities (376 crate dependencies)\nerror: couldn't check if the package is yanked: registry: request could not be completed in the allotted timeframe\nCaused by:\n  -> request could not be completed in the allotted timeframe\n",
+  "command": "cargo audit -D warnings",
+  "by": "auto:executor",
+  "message": null
+}
