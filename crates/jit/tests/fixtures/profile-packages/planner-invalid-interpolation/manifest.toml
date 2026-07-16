@@ -1,0 +1,9 @@
+[profile]
+manifest-version = 1
+id = "planner-invalid-interpolation"
+version = "1.0.0"
+jit = ">=0.2.0, <2.0.0"
+
+[[asset]]
+source = "assets/profile.txt"
+target = "docs/profile.txt"

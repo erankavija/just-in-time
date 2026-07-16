@@ -142,6 +142,14 @@ impl KeyedArrayTarget {
             Self::Rules | Self::Templates => "name",
         }
     }
+
+    pub(crate) fn array_name(self) -> &'static str {
+        match self {
+            Self::Gates => "gates",
+            Self::Rules => "rules",
+            Self::Templates => "template",
+        }
+    }
 }
 
 /// Supported complete root singleton tables.
@@ -152,6 +160,15 @@ pub enum SingletonTableTarget {
     InvariantProjection,
     /// `[rules_gates_projection]`
     RulesGatesProjection,
+}
+
+impl SingletonTableTarget {
+    pub(crate) fn table_name(self) -> &'static str {
+        match self {
+            Self::InvariantProjection => "invariant_projection",
+            Self::RulesGatesProjection => "rules_gates_projection",
+        }
+    }
 }
 
 /// Required fields for a profile-provided projection table.
