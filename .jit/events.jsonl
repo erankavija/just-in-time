@@ -7992,3 +7992,5 @@
 {"type":"gate_passed","id":"9d9da97a-638d-4016-8fee-7e95b0f260d0","issue_id":"0d8f20a8-db02-43ba-ad9e-8f219b427690","timestamp":"2026-07-16T12:22:07.997466161Z","gate_key":"cargo-ci","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"83609daf-fc34-435a-a698-1185b9924610","issue_id":"0d8f20a8-db02-43ba-ad9e-8f219b427690","timestamp":"2026-07-16T12:26:36.013365676Z","gate_key":"code-review","updated_by":"auto:executor"}
 {"type":"gate_passed","id":"57c81e24-2b52-49cb-b79c-5e0536aae3ce","issue_id":"0d8f20a8-db02-43ba-ad9e-8f219b427690","timestamp":"2026-07-16T12:27:20.744669813Z","gate_key":"repo-validate","updated_by":"auto:executor"}
+{"type":"issue_state_changed","id":"03fd230d-57d6-4e1d-9810-2a5685a4953e","issue_id":"0d8f20a8-db02-43ba-ad9e-8f219b427690","timestamp":"2026-07-16T12:28:15.322598231Z","from":"in_progress","to":"done"}
+{"type":"issue_completed","id":"70bb2e29-e729-44c6-8dff-b21cb08dc231","issue_id":"0d8f20a8-db02-43ba-ad9e-8f219b427690","timestamp":"2026-07-16T12:28:15.322638931Z"}
