@@ -64,8 +64,8 @@ See [INSTALL.md](INSTALL.md) for all installation options.
 ### Basic Usage
 
 ```bash
-# Initialize in your project
-jit init
+# Preferred setup: initialize with the embedded, offline JIT workflow
+jit init --profile jit-dogfood
 
 # Create work; -q prints just the issue id for capture
 EPIC=$(jit issue create --title "User authentication" --label type:epic --priority high -q)
@@ -90,6 +90,11 @@ jit issue progress $EPIC             # counts by state, done/total
 ```
 
 Ordering between siblings is also a dependency edge: `jit dep add $TASK2 $TASK1 --reduce`. Edge operations are atomic and keep the graph transitively reduced. Here `--reduce` drops the epic's now-shortcut edge to `$TASK1` in the same step.
+
+The profile works without Git or network access. Plain `jit init` remains the
+methodology-neutral setup. See the
+[Repository Profiles reference](docs/reference/profiles.md) for the package,
+commands, safety guarantees, and v1.0 lifecycle boundary.
 
 **See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
 
@@ -217,12 +222,18 @@ jit query all --label "milestone:*"              # wildcard per namespace
 
 Quick links:
 - [Quickstart](docs/tutorials/quickstart.md): Get started in 10 minutes
+- [Repository Profiles](docs/reference/profiles.md): Preferred workflow setup and exact profile contract
 - [CLI Commands](docs/reference/cli-commands.md): Complete command reference
 - [Configuration](docs/reference/configuration.md): Customization options
 
 ## Configuration
 
-JIT is configurable via `.jit/config.toml`:
+The embedded `jit-dogfood` profile is the preferred way to install JIT's
+portable recommended workflow. The
+[Repository Profiles reference](docs/reference/profiles.md) owns its package
+inventory and guarantees.
+
+For advanced customization, JIT is configurable via `.jit/config.toml`:
 
 - **Issue hierarchies**: Type levels (e.g. milestone → epic → story → task) drive strategic queries and hierarchy resolution
 - **Validation rules**: Enforce or relax organizational requirements

@@ -9,6 +9,12 @@ shape of that structure — the **bracket** — the three gates it carries, and 
 coverage split that lets the same rule kind check the decomposition twice: once
 at plan time, once at closure.
 
+The preferred way to install JIT's portable bracket workflow is
+`jit init --profile jit-dogfood`; see
+[Repository Profiles](../reference/profiles.md). The configuration and examples
+below explain the mechanism and remain the advanced path for repositories that
+want a different taxonomy, container type, rule names, or review integration.
+
 The bracket is **opt-in configuration**, not engine behaviour. The engine stays
 domain-agnostic; an adopting ruleset declares the vocabulary and wires the gates.
 Two worked rulesets ship it: [`docs/examples/sdd/`](../examples/sdd/config.toml)
@@ -262,6 +268,7 @@ traversals; the bracket relies on both.
 
 ## See Also
 
+- [Repository Profiles](../reference/profiles.md) — install the portable recommended workflow
 - [How-To: Adopt the Planning Bracket](../how-to/adopt-planning-bracket.md) — declare the vocabulary, wire the gates, scaffold a container
 - [Methodology-Agnostic Validation](validation-engine.md) — why coverage is configuration, and the `→ done` closure enforcement the bracket front-ends
 - [How-To: Author Validation Rules](../how-to/validation-rules.md) — the `label-coverage` rule kind and its knobs

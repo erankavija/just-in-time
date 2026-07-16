@@ -193,8 +193,11 @@ flags.
 
 Stop immediately and report to the invoker when:
 
-- `.jit/` is absent from the repository root. Suggest `jit init` or the
-  jit-migrate skill.
+- `.jit/` is absent from the repository root. Suggest
+  `jit init --profile jit-dogfood` for the preferred portable workflow, or the
+  jit-migrate skill when planning artifacts already exist. Plain `jit init` is
+  the methodology-neutral alternative; see
+  [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md).
 - `.jit/config.toml` is missing or unreadable (no configuration to read).
 - Tier derivation stops (see `references/tier-derivation.md`). A missing
   `.jit/templates.toml` or an empty `strategic_types` first routes into the

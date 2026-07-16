@@ -16,11 +16,13 @@ of the preset's gates are applied. Each gate materializes into the registry with
 This page is generated from the binary's package-derived preset projection. The
 embedded `jit-dogfood` profile's plan template selects the built-in names, and its
 matching gate contributions provide their definitions. The page lists what the
-binary carries — not what any repository has configured. `jit init` writes an empty
-gate registry, so nothing below reaches a project until `jit gate preset apply`
-runs. The gates a project actually enforces live in its own `.jit/gates.toml`, its
-settings in `.jit/config.toml`; render those with `jit reference render` (see
-[Rules and Gates](rules-and-gates.md)).
+binary carries — not what any repository has configured. Plain `jit init` writes an
+empty gate registry; `jit init --profile jit-dogfood` installs the package's matching
+definitions directly, while manual adopters can use `jit gate preset apply`. See
+[Repository Profiles](profiles.md) for the profile contract. The gates a project
+actually enforces live in its own `.jit/gates.toml`, its settings in
+`.jit/config.toml`; render those with `jit reference render` (see [Rules and
+Gates](rules-and-gates.md)).
 
 ## Portable checker types
 

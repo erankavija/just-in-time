@@ -69,8 +69,8 @@ cd just-in-time
 
 # Initialize the shared data volume first — the API server refuses to start
 # against an uninitialized directory. The cli service mounts the same volume
-# and sets JIT_DATA_DIR=/data, so `jit init` targets it.
-docker-compose run --rm --entrypoint jit cli init
+# and sets JIT_DATA_DIR=/data, so profiled init targets it.
+docker-compose run --rm --entrypoint jit cli init --profile jit-dogfood
 
 # Start all services (API + Web UI)
 docker-compose up -d
@@ -110,7 +110,7 @@ docker network create jit-network
 docker run --rm \
   --workdir /data \
   -v jit-data:/data \
-  ghcr.io/erankavija/just-in-time-cli:main init
+  ghcr.io/erankavija/just-in-time-cli:main init --profile jit-dogfood
 
 docker run -d \
   --name jit-api \
@@ -308,7 +308,10 @@ rg --version
 
 ## Next Steps
 
-- Initialize a repository: `jit init`
+- Initialize with the preferred embedded workflow:
+  `jit init --profile jit-dogfood`
+- Read the [Repository Profiles reference](docs/reference/profiles.md) for the
+  offline package contract, dry-run/apply commands, and recovery guarantees
 - Read the [Quick Start](README.md#quick-start)
 - See [Quickstart Tutorial](docs/tutorials/quickstart.md) for complete workflows
 - Check [Deployment Guide](docs/how-to/deployment.md) for production setup

@@ -4,6 +4,12 @@
 
 Complete reference for JIT configuration options.
 
+For the portable recommended workflow, initialize with
+`jit init --profile jit-dogfood`; the
+[Repository Profiles reference](profiles.md) owns that package's exact contract.
+This page is the advanced manual surface for repositories that want to inspect
+or customize individual settings.
+
 **Quick links:**
 - [Example config.toml](example-config.toml) - Full annotated example with all options
 - [Schema Configuration](#schema-configuration) - Issue types, validation, namespaces

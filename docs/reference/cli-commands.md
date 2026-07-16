@@ -458,12 +458,23 @@ current `[namespaces]`/`[type_hierarchy]` registry so each row's `@/rule/<name>`
 address stays resolvable.
 
 ```bash
-jit init [--hierarchy-template <name>] [--json]
+jit init [--hierarchy-template <name>] [--profile <profile-id>] [--json]
 ```
 
 `--hierarchy-template` selects the type hierarchy seeded into `config.toml`
 (`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
-(exit `2`). Inside a git repository, init also creates a worktree identity
+(exit `2`).
+
+`--profile <profile-id>` applies an embedded repository profile as part of
+initialization. `jit init --profile jit-dogfood` is the preferred setup for
+JIT's portable workflow; plain init remains methodology-neutral. For a fresh
+repository, the neutral scaffold and profile projection are planned, validated,
+and published together. The same flag can complete and apply the profile to an
+existing partial repository. See
+[Repository Profiles](profiles.md) for the canonical package, conflict,
+transaction, recovery, and lifecycle contract.
+
+Inside a git repository, init also creates a worktree identity
 (`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
 sets up a `.gitattributes` union-merge driver for the tracked append-only log
 `.jit/events.jsonl` (so concurrent worktrees' event appends don't conflict) —
@@ -492,6 +503,7 @@ and projection republishing, are not path-listed):
     ".gitattributes"
   ],
   "modified_paths": [],
+  "profile": null,
   "message": "Initialized jit repository (worktree: wt:d5f301ab)"
 }
 ```
@@ -507,6 +519,70 @@ failure and the repository-format-too-new startup failure (see **Scripting
 and Automation § Exit Codes** below) both emit the standard `--json` error
 envelope (`INVALID_ARGUMENT` / exit `2`, `REPOSITORY_FORMAT_TOO_NEW` / exit
 `10`).
+
+When `--profile` is present, `profile` contains the same
+`ProfileApplyResult` returned by `jit profile apply`; otherwise it is `null`.
+
+## Profile Commands
+
+Profile inspection works without an initialized repository. Application targets
+the current JIT repository and runs mandatory transaction recovery before
+planning or writing.
+
+### `jit profile list`
+
+List the immutable profiles embedded in the running binary:
+
+```bash
+jit profile list [--json]
+```
+
+Human output shows each profile's ID, version, compatible JIT range, embedded
+origin, and whether an exact installed record exists. JSON uses the standard
+list envelope `{"count": N, "profiles": [...]}`. Each profile entry carries
+`id`, `version`, `origin`, `jit`, and `applied`.
+
+The running binary is authoritative for the live values; scripts should inspect
+the returned fields rather than copy package identity or compatibility values
+from prose.
+
+### `jit profile show`
+
+Inspect one embedded package:
+
+```bash
+jit profile show <PROFILE_ID> [--json]
+```
+
+Human output summarizes package identity, compatibility, hashes, contribution
+and asset counts, and installed state. JSON returns `ProfileShowResult`: the
+complete parsed manifest, `origin`, `package_hash`, `target_hashes`,
+`file_count`, `byte_size`, and an `applied` provenance record when the current
+repository exactly matches one.
+
+### `jit profile apply`
+
+Preview or apply an embedded profile to the current repository:
+
+```bash
+jit profile apply <PROFILE_ID> [--dry-run] [--json]
+```
+
+`--dry-run` builds and validates the exact plan without writing. JSON returns
+`ProfilePlanResult`, including `status` (`would_apply` or `unchanged`),
+`plan_hash`, and the sorted target list with each action (`create`, `update`, or
+`unchanged`) and executable intent.
+
+Without `--dry-run`, JSON returns `ProfileApplyResult`: profile identity,
+`status` (`applied` or `unchanged`), `plan_hash`, an optional
+`transaction_id`, and non-fatal cleanup warnings. Exact reapplication is a
+successful no-op.
+
+Unknown IDs are not-found errors (exit `3`). Conflicts, invalid package state,
+final-state validation failures, filesystem failures, and recovery-required
+conditions use the shared typed error envelope and exit-code taxonomy. The
+[Repository Profiles reference](profiles.md) defines what application may
+change and the v1.0 features that do not exist.
 
 ## Version and Provenance
 

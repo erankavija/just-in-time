@@ -70,8 +70,11 @@ These rules apply across **all** workflows. Never violate them.
 
 Runs before every workflow. Do not skip.
 
-1. Verify `.jit/` exists in the repo root. If not, suggest `jit init` or
-   the `jit-migrate` skill and stop.
+1. Verify `.jit/` exists in the repo root. If not, suggest
+   `jit init --profile jit-dogfood` as the preferred portable workflow, or the
+   `jit-migrate` skill for existing planning artifacts, and stop. Plain
+   `jit init` is the methodology-neutral alternative; see
+   [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md).
 
 2. Run `jit recover` to clean stale locks from crashed processes.
 

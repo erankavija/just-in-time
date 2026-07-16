@@ -92,7 +92,7 @@ cd just-in-time
 
 # `jit-server` requires an initialized JIT data directory. The Compose CLI
 # service shares the named `jit-data` volume with the API service.
-docker compose run --rm --entrypoint jit cli init
+docker compose run --rm --entrypoint jit cli init --profile jit-dogfood
 
 # Start the API and reverse-proxied Web UI.
 docker compose up -d
@@ -100,6 +100,10 @@ docker compose up -d
 # API: http://localhost:3000
 # Web: http://localhost:8080
 ```
+
+The profile is the preferred workflow setup and does not require Git or network
+access inside the container. Use plain `init` for a methodology-neutral data
+volume. See [Repository Profiles](../reference/profiles.md).
 
 ### Custom Data Directory
 
