@@ -1701,6 +1701,7 @@ fn run() -> Result<()> {
     }
 
     let current_dir = env::current_dir()?;
+    let requires_recovery_dispatch = command.requires_recovery_dispatch();
 
     // Determine the jit data directory.
     //
@@ -1719,12 +1720,27 @@ fn run() -> Result<()> {
         current_dir.join(custom_dir)
     } else if matches!(command, Commands::Init { .. }) {
         current_dir.join(".jit")
+    } else if requires_recovery_dispatch {
+        jit::storage::discovery::discover_recovery_jit_dir(&current_dir)
+            .unwrap_or_else(|| current_dir.join(".jit"))
     } else {
         jit::storage::discovery::discover_jit_dir(&current_dir)
             .unwrap_or_else(|| current_dir.join(".jit"))
     };
 
     let storage = JsonFileStorage::new(&jit_dir);
+    // Recovery is deliberately ahead of repository validation and
+    // CommandExecutor construction: both can load state a pending journal is
+    // responsible for repairing. Keep the session alive through dispatch so
+    // mutating CLI commands retain bootstrap → repository serialization until
+    // their last write.
+    let recovery_session = requires_recovery_dispatch
+        .then(|| jit::storage::RecoveryCoordinator::recover_before_services(&storage))
+        .transpose()?;
+    let transactions_recovered = recovery_session
+        .as_ref()
+        .map(|session| session.report().recovered_count())
+        .unwrap_or(0);
     let mut executor = CommandExecutor::new(storage.clone());
 
     match &command {
@@ -1853,6 +1869,11 @@ fn run() -> Result<()> {
                 let output = JsonOutput::success(payload, "init").with_message(message);
                 println!("{}", output.to_json_string()?);
             }
+        }
+        Commands::Recover { .. } if !storage.root().exists() && transactions_recovered > 0 => {
+            // A prepared fresh-root transaction may legitimately recover to
+            // "no repository". The explicit recovery command still succeeds:
+            // its requested work completed before validation became relevant.
         }
         _ => {
             // Validate repository exists for all commands except init
@@ -6554,6 +6575,32 @@ fn run() -> Result<()> {
             use jit::output::{JsonOutput, OutputContext};
             use serde_json::json;
 
+            if !storage.root().exists() && transactions_recovered > 0 {
+                if json {
+                    let output = JsonOutput::success(
+                        json!({
+                            "success": true,
+                            "transactions_recovered": transactions_recovered,
+                            "stale_locks_cleaned": 0,
+                            "index_rebuilt": false,
+                            "expired_leases_evicted": 0,
+                            "temp_files_removed": 0,
+                            "warnings": [],
+                        }),
+                        "recover",
+                    )
+                    .with_message(format!(
+                        "Recovery: {transactions_recovered} transaction(s) recovered; repository absence restored"
+                    ));
+                    println!("{}", output.to_json_string()?);
+                } else {
+                    println!("Recovery complete:");
+                    println!("  • Transactions recovered: {transactions_recovered}");
+                    println!("  • Repository state: not initialized (restored)");
+                }
+                return Ok(());
+            }
+
             match execute_recover(&storage) {
                 Ok(report) => {
                     if json {
@@ -6564,6 +6611,7 @@ fn run() -> Result<()> {
                         let output = JsonOutput::success(
                             json!({
                                 "success": true,
+                                "transactions_recovered": transactions_recovered,
                                 "stale_locks_cleaned": report.stale_locks_cleaned,
                                 "index_rebuilt": report.index_rebuilt,
                                 "expired_leases_evicted": report.expired_leases_evicted,
@@ -6576,6 +6624,7 @@ fn run() -> Result<()> {
                         println!("{}", output.to_json_string()?);
                     } else {
                         println!("Recovery complete:");
+                        println!("  • Transactions recovered: {}", transactions_recovered);
                         println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
                         println!("  • Index rebuilt: {}", report.index_rebuilt);
                         println!(
