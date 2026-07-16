@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "run_id": "0499ab86-0edb-48d9-9c41-114d70106e91",
+  "gate_key": "docs-mechanical",
+  "stage": "postcheck",
+  "issue_id": "c533ac18-88dc-42b6-a773-18228a5d2320",
+  "commit": "340e1a0d7baa0d753839a9e919a6037edc082282",
+  "branch": "worktree-agent-c533ac18",
+  "status": "passed",
+  "started_at": "2026-07-16T19:23:37.962731110Z",
+  "completed_at": "2026-07-16T19:23:39.266376808Z",
+  "duration_ms": 1303,
+  "exit_code": 0,
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n",
+  "stderr": "",
+  "command": "./scripts/docs-mechanical.sh",
+  "by": "auto:executor",
+  "message": null
+}
