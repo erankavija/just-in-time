@@ -635,6 +635,9 @@ impl ErrorCode {
     /// `GATE_FAILED`, the checker never ran, so the envelope carries no
     /// `verdict` field.
     pub const STALE_BINARY: &'static str = "STALE_BINARY";
+    /// `jit issue delete` was refused for missing operator confirmation
+    /// (`JIT_ALLOW_DELETION=1` not set in the process environment; exit code 2).
+    pub const DELETION_NOT_CONFIRMED: &'static str = "DELETION_NOT_CONFIRMED";
 }
 
 impl ErrorCode {
@@ -648,7 +651,8 @@ impl ErrorCode {
             Self::INVALID_ARGUMENT
             | Self::INVALID_STATE
             | Self::AMBIGUOUS_ID
-            | Self::INVALID_ID_PREFIX => ExitCode::InvalidArgument,
+            | Self::INVALID_ID_PREFIX
+            | Self::DELETION_NOT_CONFIRMED => ExitCode::InvalidArgument,
             Self::ALREADY_EXISTS => ExitCode::AlreadyExists,
             Self::REPOSITORY_NOT_FOUND => ExitCode::NotFound,
             Self::IO_ERROR

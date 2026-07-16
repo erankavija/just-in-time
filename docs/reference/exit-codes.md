@@ -33,6 +33,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
 | `issue update, issue claim, issue claim-next` | `4` | A state transition is blocked by unmet dependencies or unpassed gates. |  |
 | `gate define` | `6` | The gate key is already registered. |  |
+| `issue delete` | `2` | Deletion was refused for missing operator confirmation (JIT_ALLOW_DELETION=1 not set in the process environment). |  |
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
 | `issue batch-create` | `10` | A write failed after some issues were already created. |  |
 | `snapshot export` | `6` | The snapshot output path already exists. |  |

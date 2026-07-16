@@ -207,6 +207,17 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
         return ExitCode::InvalidArgument;
     }
 
+    // A `jit issue delete` refused for missing operator confirmation
+    // (jit:0daba57d) is an argument/usage error (exit 2), not the generic
+    // fallback: the caller omitted the required `JIT_ALLOW_DELETION=1`
+    // confirmation, the same family as a malformed or missing required value.
+    if error
+        .downcast_ref::<jit::errors::DeletionNotConfirmedError>()
+        .is_some()
+    {
+        return ExitCode::InvalidArgument;
+    }
+
     // Path-based storage errors are typed via PathReadError; classify by variant.
     // A wrapped (`Other`) cause is re-classified by recursing on its inner error,
     // so an io::Error or an InvalidArgumentError nested in PathReadError still
@@ -2684,16 +2695,29 @@ fn run() -> Result<()> {
                         anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
                     }
 
-                    // Phase 3 safety check: Require JIT_ALLOW_DELETION=1 to discourage deletion
-                    if std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() != "1" {
-                        anyhow::bail!(
-                            "Issue deletion is discouraged and requires explicit confirmation.\n\
-                             Set JIT_ALLOW_DELETION=1 environment variable to proceed.\n\
-                             Example: JIT_ALLOW_DELETION=1 jit issue delete {}\n\
-                             \n\
-                             Note: Deletion is a destructive operation. Consider closing issues instead of deleting them.",
-                            id
-                        );
+                    // Phase 3 safety check: require JIT_ALLOW_DELETION=1 to discourage
+                    // deletion (jit:0daba57d). The env var is read here (dispatch-level
+                    // input gathering); the refusal decision itself is
+                    // `CommandExecutor::confirm_deletion_allowed`, so it stays testable
+                    // without mutating global process state.
+                    let allow_deletion =
+                        std::env::var("JIT_ALLOW_DELETION").unwrap_or_default() == "1";
+                    if let Err(e) = executor.confirm_deletion_allowed(&id, allow_deletion) {
+                        if json {
+                            let json_error = jit::output::JsonError::new(
+                                jit::output::ErrorCode::DELETION_NOT_CONFIRMED,
+                                e.to_string(),
+                                "issue delete",
+                            )
+                            .with_details(serde_json::json!({ "id": id }))
+                            .with_suggestion(format!(
+                                "Set JIT_ALLOW_DELETION=1 environment variable to proceed: \
+                                 JIT_ALLOW_DELETION=1 jit issue delete {id}"
+                            ));
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        return Err(e.into());
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);
