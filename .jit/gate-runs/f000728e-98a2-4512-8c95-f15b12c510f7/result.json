@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "f000728e-98a2-4512-8c95-f15b12c510f7",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "eceffc17-98ce-4e7d-8fe1-cbb539a078a2",
+  "commit": "d21cb57ac0ed6424df5b631d54705f66d6448a6d",
+  "branch": "main",
+  "status": "failed",
+  "started_at": "2026-07-16T10:27:54.780592165Z",
+  "completed_at": "2026-07-16T10:32:20.867676377Z",
+  "duration_ms": 266087,
+  "exit_code": 1,
+  "stdout": "Attribution: b89f414f, ec8e6ebe, 6ddf4fe3, e1860b05, a15a3d9e (`jit:eceffc17`; merge patches duplicate their worker patches)\nPolicy sources: AGENTS.md\nResolved items: issue REQ-01–03 (markdown source `.jit/issues/eceffc17-98ce-4e7d-8fe1-cbb539a078a2.json`); @/charter/D-4 (`dev/vision/9db27a3a-charter.md`); @/invariant/atomic-writes and @/invariant/bounded-rust-build-footprint (`.jit/invariants.toml`); @/gate/cargo-ci, @/gate/code-review, @/gate/jit-validate, @/gate/repo-validate (`.jit/gates.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-07-16T10:26:13Z); repo-validate passed (exit 0, 2026-07-16T10:27:42Z); code-review unrun/current judgment\nTruncation recovery: reread bounded coordinator, CLI classifier, server, storage, snapshot, and per-commit patch sections after truncated combined output\n\n1. **F1 — blocking, issue-impact:** The server’s documented default `--data-dir .jit` is relative, but recovery opens `storage.root().parent()` directly. For `.jit`, that parent is the empty path; unlike the lock setup, it is not normalized to `.` before `open_ambient_dir`. Normal `jit-server` startup therefore fails before recovery/validation. The existing startup test supplies an absolute temp path and misses this case. [crates/jit/src/storage/recovery_coordinator.rs:65] [crates/server/src/main.rs:34]\n\n2. **F2 — blocking, issue-impact:** `snapshot export` creates a directory or tar archive, yet the universal classifier marks every `Snapshot` command read-only. It consequently skips recovery and runs `storage.validate()` before export; a pending transaction can still make validation fail or expose partial state. This violates the required exhaustive mutability boundary. [crates/jit/src/cli.rs:2805] [crates/jit/src/main.rs:1883] [crates/jit/src/commands/snapshot.rs:523]\n\n3. **F3 — blocking, issue-impact:** The required generated CLI-enumeration test is absent. The only classification test asserts four representative cases, which did not catch the `snapshot export` omission above. Add exhaustive command/writer enumeration coverage so a missing recovery dispatch fails tests. [crates/jit/src/cli.rs:2969]\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Recovery dispatch misses snapshot export, and default relative server startup cannot enter recovery.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Relative default server data directory fails recovery because its empty parent is opened instead of the current directory.\",\"file\":\"crates/jit/src/storage/recovery_coordinator.rs\",\"line\":65,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Snapshot export writes filesystem output but is classified as read-only, skipping pre-validation recovery.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":2805,\"references\":[]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Only representative recovery-classification tests exist; no exhaustive CLI enumeration test catches omitted writers.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":2969,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 11276 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6a77-f7ec-7100-b434-ee438066427a\n--------\nuser\n--- 11263 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Recovery dispatch misses snapshot export, and default relative server startup cannot enter recovery.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Relative default server data directory fails recovery because its empty parent is opened instead of the current directory.",
+        "file": "crates/jit/src/storage/recovery_coordinator.rs",
+        "line": 65
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Snapshot export writes filesystem output but is classified as read-only, skipping pre-validation recovery.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 2805
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "Only representative recovery-classification tests exist; no exhaustive CLI enumeration test catches omitted writers.",
+        "file": "crates/jit/src/cli.rs",
+        "line": 2969
+      }
+    ]
+  }
+}
