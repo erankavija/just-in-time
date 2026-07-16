@@ -98,16 +98,18 @@ graph LR
 Each arrow is a **dependency edge** (`A --> B` reads "A depends on B"). Read the
 spine as precedence `P > B > impl > C`:
 
-1. **plan first** (`P`, reviewed by the plan-review gate),
+1. **plan first** (`P`, held at the plan-review checkpoint),
 2. **then breakdown** (`B`, checked by the coverage-preview gate),
 3. **then the work** (the impl subgraph),
 4. **then the container closes** (`C`, checked by the closure coverage rule at
    `→ done`).
 
 Because the implementation subgraph transitively depends on `B`, and `B` depends
-on `P`, **no implementation issue becomes ready until the plan is approved and the
-breakdown's coverage passes**. The gates are sequenced by the graph itself — no
-ordering rule kind is needed, only dependency edges.
+on `P`, **no implementation issue becomes ready until the plan-review checkpoint
+and the breakdown gates pass**. The gates are sequenced by the graph itself — no
+ordering rule kind is needed, only dependency edges. With the built-in
+warning-only review placeholders, those passes reserve sequencing checkpoints;
+they become approval evidence only after the repository installs real reviewers.
 
 ### Edge geometry
 
@@ -120,14 +122,15 @@ That shapes the spine edges:
   edge.
 - **impl → `B`: sources only.** Only entry impl issues (those with no
   intra-subgraph predecessor) depend on `B`; internal chains carry the rest. This
-  transitively gates *all* impl work behind the approved breakdown.
+  transitively gates *all* impl work behind the breakdown checkpoints.
 - **The `C → B` anchor edge disappears after breakdown.** `jit apply plan` wires
   a direct `C → B` edge at scaffold time. Once breakdown splices the impl subgraph
   in (`C → impl → B`), reduction removes that now-redundant direct edge
   automatically, leaving the spine `C → impl → B → P`. There is never a direct
   `C → P` edge.
-- **`B → P`.** The breakdown depends on the plan (breakdown after plan approved);
-  `jit apply plan` wires this internal edge at scaffold time.
+- **`B → P`.** The breakdown depends on the plan (breakdown after the
+  plan-review checkpoint passes); `jit apply plan` wires this internal edge at
+  scaffold time.
 - **Retrofit moves upstream deps onto `P`.** When you bracket a container
   (`jit apply plan <C>`), `C`'s pre-existing upstream dependencies **move onto
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure

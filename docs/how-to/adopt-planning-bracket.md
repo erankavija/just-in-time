@@ -262,9 +262,12 @@ plan. Replace its checker as described in Step 4 before treating that pass as
 approval. A real review failure leaves drafts in place for revision — nothing is
 archived on rejection.
 
-## Step 7 — Break down behind the approved plan
+## Step 7 — Break down after the plan checkpoint
 
-Once `P`'s plan-review gate passes, break the container down. The breakdown step
+Once `P`'s `plan-review` gate passes, break the container down. With the built-in
+placeholder, this means only that the sequencing checkpoint cleared; it is
+approval only after you install the real reviewer described in Step 4. The
+breakdown step
 **consumes the pre-created breakdown node `B`** (the one `jit apply plan` already
 scaffolded, carrying the `coverage-preview` and `breakdown-review` gates and the
 `brackets:<C-short-id>` label) — it does not create `B`. It then:
@@ -297,12 +300,13 @@ automatically; if you wire it by hand, follow the source/sink edge geometry in
 
 ## Step 8 — Implement, then close
 
-With the breakdown approved, the impl children become ready in dependency order
-and the work proceeds normally. When the container finally transitions to `done`,
-your **closure** rule from Step 2 fires: every `[hard]` criterion must now be
-satisfied by a **done** child. An uncovered criterion blocks the `→ done`
-transition (exit 4); `--force` bypasses it and records a bypass event in the audit
-log.
+With the breakdown gates passed, the impl children become ready in dependency
+order and the work proceeds normally. The warning-only `breakdown-review`
+placeholder is not approval evidence until replaced with a real reviewer. When
+the container finally transitions to `done`, your **closure** rule from Step 2
+fires: every `[hard]` criterion must now be satisfied by a **done** child. An
+uncovered criterion blocks the `→ done` transition (exit 4); `--force` bypasses
+it and records a bypass event in the audit log.
 
 So coverage is checked at **both ends** of the bracket — *mapping exists* at the
 breakdown gate (plan time), *mapping done* at the container's done transition

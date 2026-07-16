@@ -639,6 +639,7 @@ mod tests {
             "docs/how-to/adopt-planning-bracket.md",
             "docs/examples/sdd/config.toml",
             "docs/examples/research/config.toml",
+            "docs/reference/cli-commands.md",
         ] {
             let text = fs::read_to_string(root.join(path)).unwrap();
             assert!(
@@ -650,6 +651,28 @@ mod tests {
                 "agent breakdown-review gate",
                 "agent (command-backed)",
                 "JIT_SRC=",
+            ] {
+                assert!(!text.contains(stale), "{path} retains stale text: {stale}");
+            }
+        }
+
+        for path in [
+            ".jit/templates.toml",
+            "docs/concepts/planning-bracket.md",
+            "docs/how-to/adopt-planning-bracket.md",
+            "docs/examples/sdd/templates.toml",
+            "docs/examples/research/templates.toml",
+            "docs/reference/cli-commands.md",
+            "profiles/jit-dogfood/manifest.toml",
+        ] {
+            let text = fs::read_to_string(root.join(path)).unwrap();
+            for stale in [
+                "Agent plan-quality review",
+                "approved plan",
+                "approved breakdown",
+                "breakdown approved",
+                "plan is approved",
+                "breakdown after plan approved",
             ] {
                 assert!(!text.contains(stale), "{path} retains stale text: {stale}");
             }

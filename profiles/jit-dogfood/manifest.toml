@@ -160,7 +160,7 @@ identity = "plan-review"
 version = 1
 key = "plan-review"
 title = "Plan Review"
-description = "Review the linked plan before implementation work fans out."
+description = "External-review placeholder for the linked plan before implementation work fans out."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -179,7 +179,7 @@ identity = "breakdown-review"
 version = 1
 key = "breakdown-review"
 title = "Breakdown Review"
-description = "Review decomposition quality, issue content, and dependency ordering before implementation."
+description = "External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -294,7 +294,7 @@ role = "breakdown"
 type = "breakdown"
 gates = ["coverage-preview", "breakdown-review"]
 labels = ["brackets:{container.short_id}"]
-description = "Decompose the approved plan for {container.title} ({container.short_id}) into well-ordered implementation issues."
+description = "After the plan-review checkpoint passes, decompose the plan for {container.title} ({container.short_id}) into well-ordered implementation issues."
 depends_on = ["planning"]
 
 [[contribution.value.anchor_edges]]

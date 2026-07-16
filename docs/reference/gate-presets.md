@@ -110,17 +110,17 @@ name as project-local instead of `[builtin]`.
 
 | Preset | Description | Gates |
 | --- | --- | --- |
-| [`breakdown-review`](#breakdown-review) | Review decomposition quality, issue content, and dependency ordering before implementation. | 1 |
+| [`breakdown-review`](#breakdown-review) | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | 1 |
 | [`coverage-preview`](#coverage-preview) | Validate the container named by the breakdown issue's brackets label. | 1 |
-| [`plan-review`](#plan-review) | Review the linked plan before implementation work fans out. | 1 |
+| [`plan-review`](#plan-review) | External-review placeholder for the linked plan before implementation work fans out. | 1 |
 
 ## `breakdown-review`
 
-Review decomposition quality, issue content, and dependency ordering before implementation.
+External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation.
 
 | Gate key | Title | Stage | Mode | Description | Checker |
 | --- | --- | --- | --- | --- | --- |
-| `breakdown-review` | Breakdown Review | postcheck | auto | Review decomposition quality, issue content, and dependency ordering before implementation. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
+| `breakdown-review` | Breakdown Review | postcheck | auto | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
 
 ## `coverage-preview`
 
@@ -132,8 +132,8 @@ Validate the container named by the breakdown issue's brackets label.
 
 ## `plan-review`
 
-Review the linked plan before implementation work fans out.
+External-review placeholder for the linked plan before implementation work fans out.
 
 | Gate key | Title | Stage | Mode | Description | Checker |
 | --- | --- | --- | --- | --- | --- |
-| `plan-review` | Plan Review | postcheck | auto | Review the linked plan before implementation work fans out. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
+| `plan-review` | Plan Review | postcheck | auto | External-review placeholder for the linked plan before implementation work fans out. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
