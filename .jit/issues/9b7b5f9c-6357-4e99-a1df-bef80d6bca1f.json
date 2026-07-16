@@ -14,7 +14,13 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_by": "auto:executor",
+      "updated_at": "2026-07-16T20:41:36.135070946Z"
+    }
+  },
   "context": {},
   "documents": [
     {
@@ -36,7 +42,7 @@
     "per:@/charter/D-8"
   ],
   "created_at": "2026-07-13T23:41:53.510143551Z",
-  "updated_at": "2026-07-16T20:40:35.002971462Z",
+  "updated_at": "2026-07-16T20:46:54.557935325Z",
   "first_ready_at": "2026-07-13T23:41:53.510147651Z",
   "claimed_at": "2026-07-14T19:21:55.658832364Z"
 }
