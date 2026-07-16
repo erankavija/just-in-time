@@ -9,8 +9,8 @@
 use crate::domain::{Event, EventTag, Issue};
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRegistry, GateRunNotFoundError, InvalidIdPrefixError,
-    IssueNotFoundError, IssueStore, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
-    RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
+    IssueNotFoundError, IssueStore, RecoveryCoordinator, RecoverySession, RepoWriteGuard,
+    RepoWriteLock, RepositoryFormatTooNewError, RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// On-disk repository-format version this binary writes and understands.
@@ -162,6 +162,13 @@ pub struct JsonFileStorage {
     /// Shared by every clone of this instance, so a nested write inside a
     /// sequence that already holds the lock reenters it instead of deadlocking.
     repo_lock: Arc<RepoWriteLock>,
+    /// Startup recovery boundary retained by CLI mutation dispatch.
+    ///
+    /// External checker execution temporarily removes and drops this session,
+    /// then reacquires it and recovers any journals before checker results are
+    /// persisted. Clones share the slot so the command executor sees the same
+    /// boundary installed by `main`.
+    recovery_session: Arc<Mutex<Option<RecoverySession>>>,
 }
 
 impl JsonFileStorage {
@@ -189,9 +196,26 @@ impl JsonFileStorage {
                 Some(Arc::clone(&bootstrap_lock)),
             ),
             bootstrap_lock,
+            recovery_session: Arc::new(Mutex::new(None)),
             root,
             locker: FileLocker::new(timeout),
         }
+    }
+
+    /// Retain the startup recovery boundary for this storage and every clone.
+    ///
+    /// CLI mutation dispatch installs the session after pre-service recovery.
+    /// At most one session may be retained for one storage instance.
+    pub fn retain_recovery_session(&self, session: RecoverySession) -> Result<()> {
+        let mut retained = self
+            .recovery_session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if retained.is_some() {
+            anyhow::bail!("A recovery session is already retained for this storage");
+        }
+        *retained = Some(session);
+        Ok(())
     }
 
     /// Acquire only the repository-sibling bootstrap lock.
@@ -673,6 +697,43 @@ impl IssueStore for JsonFileStorage {
 
     fn acquire_repo_write_lock(&self) -> Result<RepoWriteGuard> {
         self.repo_lock.acquire()
+    }
+
+    fn run_external_process<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        let mut retained = self
+            .recovery_session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(session) = retained.take() else {
+            return operation();
+        };
+
+        // External checkers may invoke mutating jit subprocesses. Release the
+        // process-local session guards before spawning them so those subprocesses
+        // acquire the ordinary cross-process bootstrap → repository chain.
+        drop(session);
+        let operation_result = operation();
+
+        // Re-establish the boundary before the caller can persist a verdict.
+        // This also repairs a journal left by a checker-side mutation that
+        // crashed after preparing or committing its transaction.
+        match RecoveryCoordinator::recover_before_services(self) {
+            Ok(session) => {
+                *retained = Some(session);
+                operation_result
+            }
+            Err(recovery_error) => {
+                let context = match operation_result {
+                    Ok(_) => "Failed to restore recovery serialization after external process"
+                        .to_string(),
+                    Err(operation_error) => format!(
+                        "Failed to restore recovery serialization after external process; \
+                         the external process also failed: {operation_error:#}"
+                    ),
+                };
+                Err(recovery_error.context(context))
+            }
+        }
     }
 
     fn save_issue(&self, mut issue: Issue) -> Result<()> {

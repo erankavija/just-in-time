@@ -14,3 +14,4 @@ mod gate_pass_exit_code_test;
 mod gate_pass_skip_at_head_test;
 mod gate_status_all_strict_test;
 mod gate_update_test;
+mod nested_checker_recovery_test;
