@@ -17,7 +17,8 @@ mod snapshot;
 pub use crate::domain::ProfileOrigin;
 pub use application::{
     append_profile_event_image, AppliedProfileRecord, ProfileApplicationStatus,
-    ProfileApplicationWarning, ProfileApplyResult,
+    ProfileApplicationWarning, ProfileApplyResult, ProfileListResult, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use dogfood::{
     jit_dogfood_gate, jit_dogfood_live_projection, jit_dogfood_package,

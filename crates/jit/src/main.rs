@@ -21,7 +21,7 @@ use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
-    ReferenceCommands,
+    ProfileCommands, ReferenceCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate};
 use jit::domain::{GateRunResult, Priority, State};
@@ -72,6 +72,12 @@ fn error_to_exit_code(error: &anyhow::Error) -> ExitCode {
             .is_some()
         || error
             .downcast_ref::<jit::errors::RedundantDependencyError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::profile::ProfilePlanError>()
+            .is_some()
+        || error
+            .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
         return ExitCode::ValidationFailed;
@@ -724,6 +730,25 @@ fn invalid_argument(message: String, command: &str, json: bool) -> anyhow::Error
         std::process::exit(json_error.exit_code().code());
     }
     jit::errors::InvalidArgumentError::new(message).into()
+}
+
+fn profile_json_error(error: &anyhow::Error, command: &str) -> jit::output::JsonError {
+    use jit::output::{ErrorCode, JsonError};
+
+    if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
+        JsonError::new(ErrorCode::PROFILE_NOT_FOUND, error.to_string(), command)
+            .with_suggestion("Run 'jit profile list --json' to see embedded profiles")
+    } else if error
+        .downcast_ref::<jit::profile::ProfilePlanError>()
+        .is_some()
+        || error
+            .downcast_ref::<jit::commands::ProfileApplyError>()
+            .is_some()
+    {
+        JsonError::new(ErrorCode::PROFILE_CONFLICT, error.to_string(), command)
+    } else {
+        JsonError::new("PROFILE_ERROR", error.to_string(), command)
+    }
 }
 
 /// Wrong-verb guess -> canonical-command hint, keyed by (group, guessed verb).
@@ -1785,6 +1810,7 @@ fn run() -> Result<()> {
     match &command {
         Commands::Init {
             hierarchy_template,
+            profile,
             json,
         } => {
             let output_ctx = OutputContext::new(quiet, *json);
@@ -1857,6 +1883,10 @@ fn run() -> Result<()> {
             if scaffolded {
                 let _ = output_ctx.print_success("Scaffolded .jit/rules.toml");
             }
+            let profile_result = profile
+                .as_deref()
+                .map(|id| executor.apply_profile(id))
+                .transpose()?;
 
             let message = if let Some(ref t) = template {
                 format!("Initialized with '{}' hierarchy template", t.name)
@@ -1904,6 +1934,7 @@ fn run() -> Result<()> {
                     "hierarchy_template": chosen.name,
                     "created_paths": created_paths,
                     "modified_paths": modified_paths,
+                    "profile": profile_result,
                 });
                 let output = JsonOutput::success(payload, "init").with_message(message);
                 println!("{}", output.to_json_string()?);
@@ -1914,6 +1945,7 @@ fn run() -> Result<()> {
             // "no repository". The explicit recovery command still succeeds:
             // its requested work completed before validation became relevant.
         }
+        Commands::Profile(ProfileCommands::List { .. } | ProfileCommands::Show { .. }) => {}
         _ => {
             // Validate repository exists for all commands except init
             storage.validate()?;
@@ -1949,6 +1981,120 @@ fn run() -> Result<()> {
         Commands::Init { .. } => {
             // Already handled above
         }
+        Commands::Profile(profile_cmd) => match profile_cmd {
+            ProfileCommands::List { json } => match executor.list_embedded_profiles() {
+                Ok(result) => {
+                    if json {
+                        let output = JsonOutput::success(&result, "profile list");
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        for profile in result.profiles {
+                            println!(
+                                "{} {} embedded{}",
+                                profile.id,
+                                profile.version,
+                                if profile.applied { " (applied)" } else { "" }
+                            );
+                        }
+                    }
+                }
+                Err(error) if json => {
+                    let json_error = profile_json_error(&error, "profile list");
+                    println!("{}", json_error.to_json_string()?);
+                    std::process::exit(json_error.exit_code().code());
+                }
+                Err(error) => return Err(error),
+            },
+            ProfileCommands::Show { id, json } => match executor.show_embedded_profile(&id) {
+                Ok(result) => {
+                    if json {
+                        let output = JsonOutput::success(&result, "profile show");
+                        println!("{}", output.to_json_string()?);
+                    } else {
+                        let profile = &result.manifest.profile;
+                        println!("Profile: {}", profile.id);
+                        println!("Version: {}", profile.version);
+                        println!("Origin: embedded");
+                        println!("Compatible JIT: {}", profile.jit);
+                        println!("Package hash: {}", result.package_hash);
+                        println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
+                        println!("Targets: {}", result.target_hashes.len());
+                        println!(
+                            "Applied: {}",
+                            if result.applied.is_some() {
+                                "yes"
+                            } else {
+                                "no"
+                            }
+                        );
+                    }
+                }
+                Err(error) if json => {
+                    let json_error = profile_json_error(&error, "profile show");
+                    println!("{}", json_error.to_json_string()?);
+                    std::process::exit(json_error.exit_code().code());
+                }
+                Err(error) => return Err(error),
+            },
+            ProfileCommands::Apply { id, dry_run, json } => {
+                if dry_run {
+                    match executor.plan_embedded_profile(&id) {
+                        Ok(plan) => {
+                            if json {
+                                let output = JsonOutput::success(&plan, "profile apply");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                let status = match plan.status {
+                                    jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
+                                    jit::profile::ProfilePlanStatus::WouldApply => "would apply",
+                                };
+                                println!("Profile {} {}: {}", plan.id, plan.version, status);
+                                for target in plan.targets {
+                                    let action = match target.action {
+                                        jit::profile::ProfileTargetAction::Unchanged => "unchanged",
+                                        jit::profile::ProfileTargetAction::Create => "create",
+                                        jit::profile::ProfileTargetAction::Update => "update",
+                                    };
+                                    println!("  {action}: {}", target.path);
+                                }
+                            }
+                        }
+                        Err(error) if json => {
+                            let json_error = profile_json_error(&error, "profile apply");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        Err(error) => return Err(error),
+                    }
+                } else {
+                    match executor.apply_profile(&id) {
+                        Ok(applied) => {
+                            if json {
+                                let output = JsonOutput::success(&applied, "profile apply");
+                                println!("{}", output.to_json_string()?);
+                            } else {
+                                let status = match applied.status {
+                                    jit::profile::ProfileApplicationStatus::Unchanged => {
+                                        "unchanged"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::Applied => "applied",
+                                };
+                                println!("Profile {} {}: {}", applied.id, applied.version, status);
+                                for warning in applied.warnings {
+                                    eprintln!("Warning: {:?}", warning);
+                                }
+                            }
+                        }
+                        Err(error) if json => {
+                            let json_error = profile_json_error(&error, "profile apply");
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+            }
+        },
         Commands::Rdeps { .. } | Commands::List { .. } => {
             unreachable!("top-level rdeps/list are normalized to canonical commands above")
         }

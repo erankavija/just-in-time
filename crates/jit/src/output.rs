@@ -645,16 +645,24 @@ impl ErrorCode {
     /// `jit issue delete` was refused for missing operator confirmation
     /// (`JIT_ALLOW_DELETION=1` not set in the process environment; exit code 2).
     pub const DELETION_NOT_CONFIRMED: &'static str = "DELETION_NOT_CONFIRMED";
+    /// Requested embedded profile ID does not exist.
+    pub const PROFILE_NOT_FOUND: &'static str = "PROFILE_NOT_FOUND";
+    /// Profile package planning or final-state validation rejected the operation.
+    pub const PROFILE_CONFLICT: &'static str = "PROFILE_CONFLICT";
 }
 
 impl ErrorCode {
     /// Map error code string to exit code
     pub fn to_exit_code(code: &str) -> ExitCode {
         match code {
-            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND => ExitCode::NotFound,
-            Self::CYCLE_DETECTED | Self::VALIDATION_FAILED | Self::BLOCKED | Self::GATE_FAILED => {
-                ExitCode::ValidationFailed
+            Self::ISSUE_NOT_FOUND | Self::GATE_NOT_FOUND | Self::PROFILE_NOT_FOUND => {
+                ExitCode::NotFound
             }
+            Self::CYCLE_DETECTED
+            | Self::VALIDATION_FAILED
+            | Self::BLOCKED
+            | Self::GATE_FAILED
+            | Self::PROFILE_CONFLICT => ExitCode::ValidationFailed,
             Self::INVALID_ARGUMENT
             | Self::INVALID_STATE
             | Self::AMBIGUOUS_ID

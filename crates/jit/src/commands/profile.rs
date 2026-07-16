@@ -1,9 +1,11 @@
 use super::CommandExecutor;
 use crate::domain::Event;
 use crate::profile::{
-    append_profile_event_image, plan_profile_application_against, AppliedProfileRecord,
-    EmbeddedProfilePackage, PlannedTargetAction, ProfileApplicationStatus,
-    ProfileApplicationWarning, ProfileApplyResult, ProfileOrigin, ProjectedFileMode, SnapshotEntry,
+    append_profile_event_image, jit_dogfood_package, plan_profile_application_against,
+    AppliedProfileRecord, EmbeddedProfilePackage, PlannedTargetAction, ProfileApplicationPlan,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
+    ProfileOrigin, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange, ProjectedFileMode, RepositorySnapshot, SnapshotEntry,
 };
 use crate::storage::{
     FileTransactionKernel, FileTransactionPlan, IssueStore, JsonFileStorage, RecoveryCoordinator,
@@ -17,6 +19,15 @@ use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
+
+struct PreparedProfileApplication {
+    record_path: String,
+    record: AppliedProfileRecord,
+    record_matches: bool,
+    snapshot: RepositorySnapshot,
+    next_events: Vec<u8>,
+    plan: ProfileApplicationPlan,
+}
 
 /// Profile application conflict detected before transaction preparation.
 #[derive(Debug, thiserror::Error)]
@@ -55,6 +66,53 @@ pub enum ProfileApplyError {
 }
 
 impl CommandExecutor<JsonFileStorage> {
+    /// List the immutable profiles embedded in this binary.
+    pub fn list_embedded_profiles(&self) -> Result<ProfileListResult> {
+        let package = jit_dogfood_package()?;
+        let metadata = &package.manifest().profile;
+        let applied = self
+            .inspect_applied_record(&package)?
+            .is_some_and(|record| record.package_hash == package.hashes().package);
+        let profiles = vec![ProfileSummary {
+            id: metadata.id.clone(),
+            version: metadata.version.clone(),
+            origin: ProfileOrigin::Embedded,
+            jit: metadata.jit.clone(),
+            applied,
+        }];
+        Ok(ProfileListResult {
+            count: profiles.len(),
+            profiles,
+        })
+    }
+
+    /// Inspect one immutable embedded profile package.
+    pub fn show_embedded_profile(&self, id: &str) -> Result<ProfileShowResult> {
+        let package = embedded_profile(id)?;
+        Ok(ProfileShowResult {
+            manifest: package.manifest().clone(),
+            origin: ProfileOrigin::Embedded,
+            package_hash: package.hashes().package.clone(),
+            target_hashes: package.hashes().targets.clone(),
+            file_count: package.file_count(),
+            byte_size: package.byte_size(),
+            applied: self.inspect_applied_record(&package)?,
+        })
+    }
+
+    /// Build the exact non-mutating target plan for one embedded profile.
+    pub fn plan_embedded_profile(&self, id: &str) -> Result<ProfilePlanResult> {
+        let package = embedded_profile(id)?;
+        let prepared = self.prepare_embedded_profile(&package)?;
+        Ok(profile_plan_result(&package, &prepared))
+    }
+
+    /// Resolve and apply one embedded profile by stable ID.
+    pub fn apply_profile(&self, id: &str) -> Result<ProfileApplyResult> {
+        let package = embedded_profile(id)?;
+        self.apply_embedded_profile(&package)
+    }
+
     /// Apply one validated embedded profile package under a single write lock.
     pub fn apply_embedded_profile(
         &self,
@@ -80,6 +138,111 @@ impl CommandExecutor<JsonFileStorage> {
 
         // Rebuild all plan inputs after serialization. Nothing computed before
         // this boundary is trusted for publication.
+        let prepared = self.prepare_embedded_profile(package)?;
+        let metadata = &package.manifest().profile;
+        if prepared.plan.is_no_op() && prepared.record_matches {
+            return Ok(ProfileApplyResult {
+                id: metadata.id.clone(),
+                version: metadata.version.clone(),
+                status: ProfileApplicationStatus::Unchanged,
+                plan_hash: prepared.plan.identity.plan_hash,
+                transaction_id: None,
+                warnings: Vec::new(),
+            });
+        }
+
+        ensure_profile_directory(&prepared.snapshot)?;
+        let record_bytes = prepared.record.to_bytes()?;
+
+        let validation_base: Arc<dyn RepositoryView> = Arc::new(
+            FilesystemRepositoryView::from_jit_root(self.storage.root())?,
+        );
+        let mut overlay = prepared.plan.overlay_changes();
+        overlay.insert(
+            PathBuf::from(&prepared.record_path),
+            Some(record_bytes.clone()),
+        );
+        overlay.insert(
+            PathBuf::from(".jit/events.jsonl"),
+            Some(prepared.next_events.clone()),
+        );
+        let final_view = OverlayRepositoryView::new(validation_base, overlay)?;
+        let validation = validate_repository(&final_view).map_err(ProfileApplyError::from)?;
+        if validation.rule_report.has_errors() {
+            return Err(ProfileApplyError::FinalValidationFindings {
+                error_count: validation.rule_report.error_count(),
+            }
+            .into());
+        }
+
+        let mut actions = prepared
+            .plan
+            .targets
+            .values()
+            .filter(|target| target.action != PlannedTargetAction::NoOp)
+            .map(|target| TransactionAction::WriteFile {
+                path: transaction_path(self.storage.root(), &target.path),
+                contents: target.bytes.clone(),
+                unix_mode: unix_mode(target.mode),
+            })
+            .collect::<Vec<_>>();
+        if prepared.snapshot.entry(".jit/profiles").is_none() {
+            actions.push(TransactionAction::CreateDirectory {
+                path: transaction_path(self.storage.root(), ".jit/profiles"),
+                unix_mode: Some(0o755),
+            });
+        }
+        if !prepared.record_matches {
+            actions.push(TransactionAction::WriteFile {
+                path: transaction_path(self.storage.root(), &prepared.record_path),
+                contents: record_bytes,
+                unix_mode: Some(0o644),
+            });
+        }
+        actions.push(TransactionAction::WriteFile {
+            path: transaction_path(self.storage.root(), ".jit/events.jsonl"),
+            contents: prepared.next_events,
+            unix_mode: Some(0o644),
+        });
+
+        let transaction_id = format!("profile-{}-{}", metadata.id, Uuid::new_v4());
+        let outcome = kernel.execute(
+            &repo_guard,
+            FileTransactionPlan {
+                transaction_id: transaction_id.clone(),
+                actions,
+            },
+        );
+        let warnings = match outcome {
+            Ok(_) => Vec::new(),
+            Err(error) => {
+                let Some(recovery) = error.downcast_ref::<RecoveryRequiredError>() else {
+                    return Err(error);
+                };
+                if recovery.state != RecoveryState::Committed {
+                    return Err(error);
+                }
+                vec![ProfileApplicationWarning::TransactionCleanupPending {
+                    transaction_id: transaction_id.clone(),
+                    reason: format!("{:#}", recovery.source),
+                }]
+            }
+        };
+
+        Ok(ProfileApplyResult {
+            id: metadata.id.clone(),
+            version: metadata.version.clone(),
+            status: ProfileApplicationStatus::Applied,
+            plan_hash: prepared.plan.identity.plan_hash,
+            transaction_id: Some(transaction_id),
+            warnings,
+        })
+    }
+
+    fn prepare_embedded_profile(
+        &self,
+        package: &EmbeddedProfilePackage<'_>,
+    ) -> Result<PreparedProfileApplication> {
         let metadata = &package.manifest().profile;
         let record_path = format!(".jit/profiles/{}.json", metadata.id);
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
@@ -122,100 +285,82 @@ impl CommandExecutor<JsonFileStorage> {
                 )],
             )?)
         } else {
-            validation_base.clone()
+            validation_base
         };
         let plan = plan_profile_application_against(package, &snapshot, planning_validation_base)?;
-
-        if plan.is_no_op() && record_matches {
-            return Ok(ProfileApplyResult {
-                id: metadata.id.clone(),
-                version: metadata.version.clone(),
-                status: ProfileApplicationStatus::Unchanged,
-                plan_hash: plan.identity.plan_hash,
-                transaction_id: None,
-                warnings: Vec::new(),
-            });
-        }
-
-        ensure_profile_directory(&snapshot)?;
-        let record_bytes = record.to_bytes()?;
-
-        let mut overlay = plan.overlay_changes();
-        overlay.insert(PathBuf::from(&record_path), Some(record_bytes.clone()));
-        overlay.insert(
-            PathBuf::from(".jit/events.jsonl"),
-            Some(next_events.clone()),
-        );
-        let final_view = OverlayRepositoryView::new(validation_base, overlay)?;
-        let validation = validate_repository(&final_view).map_err(ProfileApplyError::from)?;
-        if validation.rule_report.has_errors() {
-            return Err(ProfileApplyError::FinalValidationFindings {
-                error_count: validation.rule_report.error_count(),
-            }
-            .into());
-        }
-
-        let mut actions = plan
-            .targets
-            .values()
-            .filter(|target| target.action != PlannedTargetAction::NoOp)
-            .map(|target| TransactionAction::WriteFile {
-                path: transaction_path(self.storage.root(), &target.path),
-                contents: target.bytes.clone(),
-                unix_mode: unix_mode(target.mode),
-            })
-            .collect::<Vec<_>>();
-        if snapshot.entry(".jit/profiles").is_none() {
-            actions.push(TransactionAction::CreateDirectory {
-                path: transaction_path(self.storage.root(), ".jit/profiles"),
-                unix_mode: Some(0o755),
-            });
-        }
-        if !record_matches {
-            actions.push(TransactionAction::WriteFile {
-                path: transaction_path(self.storage.root(), &record_path),
-                contents: record_bytes,
-                unix_mode: Some(0o644),
-            });
-        }
-        actions.push(TransactionAction::WriteFile {
-            path: transaction_path(self.storage.root(), ".jit/events.jsonl"),
-            contents: next_events,
-            unix_mode: Some(0o644),
-        });
-
-        let transaction_id = format!("profile-{}-{}", metadata.id, Uuid::new_v4());
-        let outcome = kernel.execute(
-            &repo_guard,
-            FileTransactionPlan {
-                transaction_id: transaction_id.clone(),
-                actions,
-            },
-        );
-        let warnings = match outcome {
-            Ok(_) => Vec::new(),
-            Err(error) => {
-                let Some(recovery) = error.downcast_ref::<RecoveryRequiredError>() else {
-                    return Err(error);
-                };
-                if recovery.state != RecoveryState::Committed {
-                    return Err(error);
-                }
-                vec![ProfileApplicationWarning::TransactionCleanupPending {
-                    transaction_id: transaction_id.clone(),
-                    reason: format!("{:#}", recovery.source),
-                }]
-            }
-        };
-
-        Ok(ProfileApplyResult {
-            id: metadata.id.clone(),
-            version: metadata.version.clone(),
-            status: ProfileApplicationStatus::Applied,
-            plan_hash: plan.identity.plan_hash,
-            transaction_id: Some(transaction_id),
-            warnings,
+        Ok(PreparedProfileApplication {
+            record_path,
+            record,
+            record_matches,
+            snapshot,
+            next_events,
+            plan,
         })
+    }
+
+    fn inspect_applied_record(
+        &self,
+        package: &EmbeddedProfilePackage<'_>,
+    ) -> Result<Option<AppliedProfileRecord>> {
+        let metadata = &package.manifest().profile;
+        let record_path = format!(".jit/profiles/{}.json", metadata.id);
+        let snapshot = self
+            .storage
+            .capture_profile_snapshot([record_path.as_str()])?;
+        match snapshot.entry(&record_path) {
+            None => Ok(None),
+            Some(SnapshotEntry::File(file)) => {
+                let record =
+                    serde_json::from_slice::<AppliedProfileRecord>(&file.bytes).map_err(|_| {
+                        ProfileApplyError::InstalledRecordConflict {
+                            path: record_path.clone(),
+                            id: metadata.id.clone(),
+                            version: metadata.version.clone(),
+                        }
+                    })?;
+                Ok(Some(record))
+            }
+            Some(_) => Err(ProfileApplyError::UnsupportedMetadataPath { path: record_path }.into()),
+        }
+    }
+}
+
+fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+    let package = jit_dogfood_package()?;
+    if package.manifest().profile.id == id {
+        Ok(package)
+    } else {
+        Err(crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
+    }
+}
+
+fn profile_plan_result(
+    package: &EmbeddedProfilePackage<'_>,
+    prepared: &PreparedProfileApplication,
+) -> ProfilePlanResult {
+    let targets = prepared
+        .plan
+        .targets
+        .values()
+        .map(|target| {
+            let action = match target.action {
+                PlannedTargetAction::Create => ProfileTargetAction::Create,
+                PlannedTargetAction::Update => ProfileTargetAction::Update,
+                PlannedTargetAction::NoOp => ProfileTargetAction::Unchanged,
+            };
+            ProfileTargetChange::new(target.path.clone(), action, target.mode)
+        })
+        .collect();
+    ProfilePlanResult {
+        id: package.manifest().profile.id.clone(),
+        version: package.manifest().profile.version.clone(),
+        status: if prepared.plan.is_no_op() && prepared.record_matches {
+            ProfilePlanStatus::Unchanged
+        } else {
+            ProfilePlanStatus::WouldApply
+        },
+        plan_hash: prepared.plan.identity.plan_hash.clone(),
+        targets,
     }
 }
 
