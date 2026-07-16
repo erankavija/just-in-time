@@ -87,16 +87,13 @@ impl PresetManager {
 
     /// List all available presets.
     pub fn list_presets(&self) -> Vec<PresetInfo> {
-        let builtin_names = BuiltinPresets::names();
-
         self.presets
             .values()
             .map(|preset| PresetInfo {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: builtin_names.contains(&preset.name)
-                    && !self.custom_names.contains(&preset.name),
+                builtin: !self.custom_names.contains(&preset.name),
             })
             .collect()
     }

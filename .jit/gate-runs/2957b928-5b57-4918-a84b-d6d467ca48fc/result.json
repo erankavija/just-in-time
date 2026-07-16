@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "2957b928-5b57-4918-a84b-d6d467ca48fc",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "a873223af0fbbc62ae4825c635b966583a93b60c",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "passed",
+  "started_at": "2026-07-16T17:42:07.164644827Z",
+  "completed_at": "2026-07-16T17:46:09.170220088Z",
+  "duration_ms": 242005,
+  "exit_code": 0,
+  "stdout": "Attribution: e3304357, 45fe0a99, d95eb2f, d5daa114, 3b2509da, 0b34afb4, d03b6a2f, f27df820, f59e74b, 0de3a39e, 0fc74ac, a873223a (`jit:7ad4019b`); uncommitted JIT metadata excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic,single-source-prose,gate-semantics,atomic-writes (.jit/invariants.toml); @/gate/jit-validate,repo-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); docs-mechanical passed (exit 0); doc-review passed (exit 0); repo-validate passed (exit 0)\nTruncation recovery: individual commit stats/name-status/patch reads; bounded manifest, renderer, package asset, current-output, and test reads\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable portable dogfood package, renderer integration, portability safeguards, and resolved prior findings satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributable portable dogfood package, renderer integration, portability safeguards, and resolved prior findings satisfy the issue criteria.",
+    "findings": []
+  }
+}

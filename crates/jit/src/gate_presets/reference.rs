@@ -250,12 +250,13 @@ pub fn render_reference_markdown() -> Result<String> {
          of the preset's gates are applied. Each gate materializes into the registry with\n\
          `version = 1`, `priority = 100`, and `auto` set from its mode.\n\
          \n\
-         This page is generated from the preset definitions in\n\
-         `crates/jit/src/gate_presets/` and lists what the binary carries — not what any\n\
-         repository has configured. `jit init` writes an empty gate registry, so nothing\n\
-         below reaches a project until `jit gate preset apply` runs. The gates a project\n\
-         actually enforces live in its own `.jit/gates.toml`, its settings in\n\
-         `.jit/config.toml`; render those with `jit reference render` (see\n\
+         This page is generated from the binary's package-derived preset projection. The\n\
+         embedded `jit-dogfood` profile's plan template selects the built-in names, and its\n\
+         matching gate contributions provide their definitions. The page lists what the\n\
+         binary carries — not what any repository has configured. `jit init` writes an empty\n\
+         gate registry, so nothing below reaches a project until `jit gate preset apply`\n\
+         runs. The gates a project actually enforces live in its own `.jit/gates.toml`, its\n\
+         settings in `.jit/config.toml`; render those with `jit reference render` (see\n\
          [Rules and Gates](rules-and-gates.md)).\n\
          \n\
          ## Portable checker types\n\
@@ -442,7 +443,7 @@ mod tests {
             .into_iter()
             .map(|preset| preset.name)
             .collect();
-        let declared: HashSet<String> = BuiltinPresets::names().into_iter().collect();
+        let declared: HashSet<String> = BuiltinPresets::names().unwrap().into_iter().collect();
         assert_eq!(rendered, declared);
     }
 

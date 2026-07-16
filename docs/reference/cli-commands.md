@@ -1835,7 +1835,7 @@ jit gate preset list [--json]
 `jit gate preset show <name>` for a preset's actual gate list and count; the
 builtin registry is the source of truth, so the totals below are placeholders):
 ```
-[builtin] plan-review - Agent plan-quality review on the planning node before fan-out (<N> gates)
+[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out (<N> gates)
 [builtin] coverage-preview - Deterministic coverage preview on the breakdown node (scoped validate) (<N> gates)
 [custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
 ```

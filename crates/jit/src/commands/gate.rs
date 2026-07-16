@@ -1122,7 +1122,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         if preset_name.is_empty() {
             return Err(anyhow!("Preset name cannot be empty"));
         }
-        if crate::gate_presets::BuiltinPresets::names().contains(&preset_name.to_string()) {
+        if crate::gate_presets::BuiltinPresets::load()?.contains_key(preset_name) {
             return Err(anyhow!("Cannot override builtin preset: {}", preset_name));
         }
 

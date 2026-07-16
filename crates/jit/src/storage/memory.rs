@@ -246,7 +246,6 @@ impl IssueStore for InMemoryStorage {
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
         // InMemoryStorage only supports builtin presets (no custom presets in tests)
         let presets = crate::gate_presets::BuiltinPresets::load()?;
-        let builtin_names = crate::gate_presets::BuiltinPresets::names();
 
         Ok(presets
             .values()
@@ -254,7 +253,7 @@ impl IssueStore for InMemoryStorage {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: builtin_names.contains(&preset.name),
+                builtin: true,
             })
             .collect())
     }

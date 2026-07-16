@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "b191dba2-7565-4758-bda1-ed64c4e3fbb2",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "700288f62dd40768e78e96f6581b17d3519d4db6",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "passed",
+  "started_at": "2026-07-16T16:39:47.761960253Z",
+  "completed_at": "2026-07-16T16:43:18.089881578Z",
+  "duration_ms": 210327,
+  "exit_code": 0,
+  "stdout": "Attribution: e3304357, 7a4362c4, 24282cb6, c13b6c0b, af6d581a, 700288f6 (`jit:7ad4019b`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/atomic-writes, @/invariant/domain-agnostic, @/invariant/gate-semantics, @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-4, @/charter/D-6 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci pending; docs-mechanical passed (exit 0); doc-review passed (exit 0); repo-validate passed (exit 0)\nTruncation recovery: narrowed reads by commit and path for manifest, profile renderer, projection tests, preset integration, scripts, assets, and current generated documentation\n\nNo findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable portable dogfood package, live projections, portability changes, and preset derivation satisfy the reviewed criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The attributable portable dogfood package, live projections, portability changes, and preset derivation satisfy the reviewed criteria.",
+    "findings": []
+  }
+}

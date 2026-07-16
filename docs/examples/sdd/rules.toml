@@ -31,7 +31,7 @@
 #   (`type:breakdown`), which depends on `P` (`type:planning`).
 #
 #   read as precedence `P > B > impl > C`: plan first, then breakdown, then the
-#   work, then the container closes. `P` carries the agent `plan-review` gate; `B`
+#   work, then the container closes. `P` carries the `plan-review` placeholder; `B`
 #   carries the deterministic `coverage-preview` gate (checker: `jit validate
 #   --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its container.
 #

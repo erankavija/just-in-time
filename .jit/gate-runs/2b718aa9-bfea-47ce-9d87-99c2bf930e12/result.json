@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_id": "2b718aa9-bfea-47ce-9d87-99c2bf930e12",
+  "gate_key": "doc-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "0de3a39e2aa1df513a1cbb0c04ceccc2e9c10c83",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "failed",
+  "started_at": "2026-07-16T17:25:25.907868227Z",
+  "completed_at": "2026-07-16T17:27:51.519582443Z",
+  "duration_ms": 145611,
+  "exit_code": 1,
+  "stdout": "Attribution: `7ad4019b` is a leaf task (level 4) with no resolved children. I inspected its ten reachable `jit:7ad4019b` commits individually. The prior redirect finding is fixed: the public redirect is now explicitly repository-local and links to the available canonical file. Current preset output confirms review placeholders and label-target validation.\n\n1. **F1 — high, blocking, issue-impact:** [Planning-bracket concept](docs/concepts/planning-bracket.md:52) still describes `plan-review` and `breakdown-review` as command-backed agent gates that perform real review and can fail. The shipped presets now use `review_placeholder`, which passes with a structural warning until an adopter configures an `exec` checker. Update the concept’s gate descriptions and workflow implications to match the placeholder behavior and link to the canonical preset reference.\n\n2. **F2 — high, blocking, issue-impact:** [Planning-bracket how-to](docs/how-to/adopt-planning-bracket.md:189) tells adopters that built-in presets shell out to repository scripts, requires `jq` and an agent CLI, and instructs copying scripts from a JIT checkout. The current built-in presets have in-process/placeholder checkers and do not reference those scripts. Replace this section with the current placeholder-warning workflow and explicit instructions for configuring external reviewers when desired.\n\n3. **F3 — medium, blocking, issue-impact:** The copied planning examples retain stale comments saying the bundled review presets invoke agent review: [SDD config](docs/examples/sdd/config.toml:37), [SDD rules](docs/examples/sdd/rules.toml:34), and their research counterparts ([config](docs/examples/research/config.toml:42), [rules](docs/examples/research/rules.toml)). Preserve the valid template/rule examples but revise comments to describe `review_placeholder` and `label_target_validation` accurately.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Built-in planning presets now use placeholders, but concept, how-to, and example documentation still promises command-backed agent review.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The planning-bracket concept claims built-in review presets run command-backed agent reviews, but both now use warning-only review placeholders.\",\"file\":\"docs/concepts/planning-bracket.md\",\"line\":52},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The planning-bracket how-to requires copied jq-dependent reviewer scripts even though current built-in presets no longer invoke them.\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":189},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"SDD and research example comments still describe the built-in review presets as agent-executed rather than placeholders.\",\"file\":\"docs/examples/sdd/config.toml\",\"line\":37}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "stderr": "--- agent stderr (first 13 of 10423 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.144.4\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-7ad4019b\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019f6bf6-37c8-7e81-8a47-a4f7cb5d028c\n--------\nuser\n--- 10410 more lines omitted (resume the session for the rest) ---\n",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "fail",
+    "summary": "Built-in planning presets now use placeholders, but concept, how-to, and example documentation still promises command-backed agent review.",
+    "findings": [
+      {
+        "id": "F1",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The planning-bracket concept claims built-in review presets run command-backed agent reviews, but both now use warning-only review placeholders.",
+        "file": "docs/concepts/planning-bracket.md",
+        "line": 52
+      },
+      {
+        "id": "F2",
+        "severity": "high",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "The planning-bracket how-to requires copied jq-dependent reviewer scripts even though current built-in presets no longer invoke them.",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "line": 189
+      },
+      {
+        "id": "F3",
+        "severity": "medium",
+        "disposition": "blocking",
+        "origin": "issue-impact",
+        "summary": "SDD and research example comments still describe the built-in review presets as agent-executed rather than placeholders.",
+        "file": "docs/examples/sdd/config.toml",
+        "line": 37
+      }
+    ]
+  }
+}

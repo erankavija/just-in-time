@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "run_id": "332c5127-0f08-4315-9cd7-5dacac6bf836",
+  "gate_key": "code-review",
+  "stage": "postcheck",
+  "issue_id": "7ad4019b-2998-424b-9ea0-6d8ce3ff402c",
+  "commit": "f59e74b455178276e4c59d19515dac9d4da7364a",
+  "branch": "worktree-agent-7ad4019b",
+  "status": "passed",
+  "started_at": "2026-07-16T17:17:02.438454636Z",
+  "completed_at": "2026-07-16T17:21:05.594918424Z",
+  "duration_ms": 243156,
+  "exit_code": 0,
+  "stdout": "Attribution: f59e74b4, f27df820, d03b6a2f, 0b34afb4, 3b2509da, d5daa114, d95eb2f, 45fe0a99, e3304357 (`jit:7ad4019b`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1,D-2,D-3,D-4,D-6 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics,domain-agnostic,single-source-prose,atomic-writes (.jit/invariants.toml); @/gate/jit-validate,repo-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); docs-mechanical passed (0); doc-review passed (0); repo-validate passed (0); prior code-review passed (0)\nTruncation recovery: narrowed reads by commit/path for patches, manifest, renderer, assets, tests, and policy sources; issue-item resolution required a write lock in this read-only environment, so its markdown source was inspected directly\n\nNo findings identified.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The portable dogfood package, renderer integration, portability safeguards, and corrected package-derived preset reference satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "stderr": "",
+  "command": "./scripts/ai-review.sh",
+  "by": "auto:executor",
+  "message": null,
+  "findings": {
+    "verdict": "pass",
+    "summary": "The portable dogfood package, renderer integration, portability safeguards, and corrected package-derived preset reference satisfy the issue criteria.",
+    "findings": []
+  }
+}

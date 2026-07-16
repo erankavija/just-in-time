@@ -82,7 +82,7 @@
 #   (`type:planning`).
 #
 #   read as precedence `P > B > experiments > C`: plan first, then breakdown, then
-#   the experiments, then the goal closes. `P` carries the agent `plan-review`
+#   the experiments, then the goal closes. `P` carries the `plan-review` placeholder
 #   gate; `B` carries the deterministic `coverage-preview` gate (checker: `jit
 #   validate --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its
 #   container goal.
